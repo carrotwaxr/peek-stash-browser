@@ -51,8 +51,18 @@ const StudioDetail = () => {
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
 
-  // Get active tab from URL or default to 'scenes'
-  const activeTab = searchParams.get("tab") || "scenes";
+  // Compute tabs with counts for smart default selection
+  const contentTabs = [
+    { id: "scenes", label: "Scenes", count: studio?.scene_count || 0 },
+    { id: "galleries", label: "Galleries", count: studio?.gallery_count || 0 },
+    { id: "images", label: "Images", count: studio?.image_count || 0 },
+    { id: "performers", label: "Performers", count: studio?.performer_count || 0 },
+    { id: "groups", label: "Collections", count: studio?.group_count || 0 },
+  ];
+  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || "scenes";
+
+  // Get active tab from URL or default to first tab with content
+  const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // Handler for toggling include sub-studios
   const handleIncludeSubStudiosChange = (checked) => {
@@ -232,89 +242,82 @@ const StudioDetail = () => {
             </div>
           )}
 
-          <TabNavigation
-            tabs={[
-              { id: "scenes", label: "Scenes", count: studio.scene_count || 0 },
-              {
-                id: "galleries",
-                label: "Galleries",
-                count: studio.gallery_count || 0 },
-              { id: "images", label: "Images", count: studio.image_count || 0 },
-              {
-                id: "performers",
-                label: "Performers",
-                count: studio.performer_count || 0 },
-              {
-                id: "groups",
-                label: "Collections",
-                count: studio.group_count || 0 },
-            ]}
-            defaultTab="scenes"
-          />
+          {contentTabs.every(t => t.count === 0) ? (
+            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+              This studio has no content in Peek
+            </div>
+          ) : (
+            <>
+              <TabNavigation
+                tabs={contentTabs}
+                defaultTab={effectiveDefaultTab}
+              />
 
-          {/* Tab Content */}
-          {activeTab === "scenes" && (
-            <SceneSearch
-              key={`scenes-${includeSubStudios}`}
-              context="scene_studio"
-              permanentFilters={{
-                studios: {
-                  value: [parseInt(studioId, 10)],
-                  modifier: "INCLUDES",
-                  ...(includeSubStudios && { depth: -1 }) } }}
-              permanentFiltersMetadata={{
-                studios: [
-                  { id: studioId, name: studio?.name || "Unknown Studio" },
-                ] }}
-              title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
-              fromPageTitle={studio?.name || "Studio"}
-            />
-          )}
+              {/* Tab Content */}
+              {activeTab === "scenes" && (
+                <SceneSearch
+                  key={`scenes-${includeSubStudios}`}
+                  context="scene_studio"
+                  permanentFilters={{
+                    studios: {
+                      value: [parseInt(studioId, 10)],
+                      modifier: "INCLUDES",
+                      ...(includeSubStudios && { depth: -1 }) } }}
+                  permanentFiltersMetadata={{
+                    studios: [
+                      { id: studioId, name: studio?.name || "Unknown Studio" },
+                    ] }}
+                  title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
+                  fromPageTitle={studio?.name || "Studio"}
+                />
+              )}
 
-          {activeTab === "galleries" && (
-            <GalleryGrid
-              key={`galleries-${includeSubStudios}`}
-              lockedFilters={{
-                gallery_filter: {
-                  studios: {
-                    value: [parseInt(studioId, 10)],
-                    modifier: "INCLUDES",
-                    ...(includeSubStudios && { depth: -1 }) } } }}
-              hideLockedFilters
-              emptyMessage={`No galleries found for ${studio?.name}`}
-            />
-          )}
+              {activeTab === "galleries" && (
+                <GalleryGrid
+                  key={`galleries-${includeSubStudios}`}
+                  lockedFilters={{
+                    gallery_filter: {
+                      studios: {
+                        value: [parseInt(studioId, 10)],
+                        modifier: "INCLUDES",
+                        ...(includeSubStudios && { depth: -1 }) } } }}
+                  hideLockedFilters
+                  emptyMessage={`No galleries found for ${studio?.name}`}
+                />
+              )}
 
-          {activeTab === "images" && (
-            <ImagesTab
-              studioId={studioId}
-              studioName={studio?.name}
-              includeSubStudios={includeSubStudios}
-            />
-          )}
+              {activeTab === "images" && (
+                <ImagesTab
+                  studioId={studioId}
+                  studioName={studio?.name}
+                  includeSubStudios={includeSubStudios}
+                />
+              )}
 
-          {activeTab === "performers" && (
-            <PerformerGrid
-              lockedFilters={{
-                performer_filter: {
-                  studios: {
-                    value: [parseInt(studioId, 10)],
-                    modifier: "INCLUDES" } } }}
-              hideLockedFilters
-              emptyMessage={`No performers found for ${studio?.name}`}
-            />
-          )}
+              {activeTab === "performers" && (
+                <PerformerGrid
+                  lockedFilters={{
+                    performer_filter: {
+                      studios: {
+                        value: [parseInt(studioId, 10)],
+                        modifier: "INCLUDES" } } }}
+                  hideLockedFilters
+                  emptyMessage={`No performers found for ${studio?.name}`}
+                />
+              )}
 
-          {activeTab === "groups" && (
-            <GroupGrid
-              lockedFilters={{
-                group_filter: {
-                  studios: {
-                    value: [parseInt(studioId, 10)],
-                    modifier: "INCLUDES" } } }}
-              hideLockedFilters
-              emptyMessage={`No collections found for ${studio?.name}`}
-            />
+              {activeTab === "groups" && (
+                <GroupGrid
+                  lockedFilters={{
+                    group_filter: {
+                      studios: {
+                        value: [parseInt(studioId, 10)],
+                        modifier: "INCLUDES" } } }}
+                  hideLockedFilters
+                  emptyMessage={`No collections found for ${studio?.name}`}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
