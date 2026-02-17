@@ -12,6 +12,16 @@ const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
 // the flag would need to be reset after successful login.
 let isRedirectingToLogin = false;
 
+// Endpoints where 401/403 should NOT trigger a redirect to /login.
+// These are background/fire-and-forget calls (e.g., watch history pings during
+// video playback) that should fail silently instead of disrupting the user.
+const AUTH_SILENT_ENDPOINTS = new Set([
+  "/watch-history/save-activity",
+  "/watch-history/increment-play-count",
+  "/image-view-history/increment-o",
+  "/image-view-history/view",
+]);
+
 /**
  * Base fetch wrapper with error handling
  */
@@ -19,6 +29,7 @@ async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   const config = {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -47,18 +58,38 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     // Handle auth failures (401/403) - redirect to login
-    // Exclude auth endpoints to avoid redirect loops
+    // Exclude auth endpoints to avoid redirect loops, and silent endpoints
+    // (background pings) to avoid disrupting video playback
     const isAuthEndpoint = endpoint.startsWith("/auth/");
-    if ((response.status === 401 || response.status === 403) && !isAuthEndpoint && !isRedirectingToLogin) {
-      isRedirectingToLogin = true;
-      // Save current URL for redirect after login
-      const currentUrl = window.location.pathname + window.location.search;
-      if (currentUrl !== "/login" && currentUrl !== "/setup") {
-        sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
+    const isSilentEndpoint = AUTH_SILENT_ENDPOINTS.has(endpoint);
+    if ((response.status === 401 || response.status === 403) && !isAuthEndpoint) {
+      // Log telemetry for debugging mobile playback redirect issue
+      console.warn(
+        `[API] Auth failure: ${response.status} on ${endpoint}`,
+        `| error: ${errorData?.error || "unknown"}`,
+        `| cookie present: ${document.cookie.length > 0}`,
+        `| page: ${window.location.pathname}`
+      );
+
+      if (isSilentEndpoint) {
+        // Don't redirect for background pings — throw so retry logic can handle it
+        const error = new Error(errorData?.error || `Auth failure on ${endpoint}`);
+        error.status = response.status;
+        error.data = errorData;
+        throw error;
       }
-      window.location.href = "/login";
-      // Return a never-resolving promise to prevent further processing
-      return new Promise(() => {});
+
+      if (!isRedirectingToLogin) {
+        isRedirectingToLogin = true;
+        // Save current URL for redirect after login
+        const currentUrl = window.location.pathname + window.location.search;
+        if (currentUrl !== "/login" && currentUrl !== "/setup") {
+          sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
+        }
+        window.location.href = "/login";
+        // Return a never-resolving promise to prevent further processing
+        return new Promise(() => {});
+      }
     }
 
     // Create error with additional metadata
