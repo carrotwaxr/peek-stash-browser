@@ -74,6 +74,12 @@ export async function setup() {
     stdio: "inherit",
   });
 
+  // Configure SQLite PRAGMAs (WAL mode, busy_timeout, etc.)
+  // Must happen after migrations but before any application queries
+  console.log("[Integration Tests] Configuring SQLite PRAGMAs...");
+  const { configureSQLite } = await import("../../prisma/singleton.js");
+  await configureSQLite();
+
   // Import and start the server
   console.log(
     "[Integration Tests] Starting test server on port",

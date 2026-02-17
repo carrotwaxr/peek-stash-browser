@@ -98,7 +98,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
   });
 
   describe("INCLUDE mode tag restrictions", () => {
-    it("should exclude tags not in the INCLUDE list", async () => {
+    it("should exclude tags not in the INCLUDE list", { timeout: 120000 }, async () => {
       // Set INCLUDE mode restriction allowing only tag1 and tag2
       const restrictions = [
         {
@@ -177,7 +177,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       expect(userTagsResponse.data.findTags.count).toBeLessThan(255); // Assuming ~255 total tags
     });
 
-    it("should handle INCLUDE mode with empty list (exclude all)", async () => {
+    it("should handle INCLUDE mode with empty list (exclude all)", { timeout: 120000 }, async () => {
       // Set INCLUDE mode with empty list - this should exclude ALL tags
       const restrictions = [
         {

@@ -127,13 +127,12 @@ class ExclusionComputationService {
     const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, prisma);
     const t2 = Date.now();
 
-    // Phase 3: Compute empty exclusions (uses temp tables — needs own transaction for connection affinity)
-    // Prisma's connection pool may route sequential raw queries to different connections,
-    // breaking temp tables. Wrapping in a transaction ensures all queries use the same connection.
+    // Phase 3: Compute empty exclusions (uses temp tables for performance)
+    // No transaction needed: Prisma's SQLite driver uses connection_limit=1, so all queries
+    // share the same connection and temp tables persist across sequential raw queries.
+    // Avoiding a transaction here prevents holding a write lock during the 10-30s computation.
     const previousExclusions = [...directExclusions, ...cascadeExclusions];
-    const emptyExclusions = await prisma.$transaction(async (tx) => {
-      return await this.computeEmptyExclusions(userId, previousExclusions, tx);
-    }, { timeout: 60000 });
+    const emptyExclusions = await this.computeEmptyExclusions(userId, previousExclusions, prisma);
     const t3 = Date.now();
 
     // Combine all exclusions and deduplicate
