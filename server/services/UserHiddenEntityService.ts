@@ -35,20 +35,23 @@ class UserHiddenEntityService {
   async hideEntity(
     userId: number,
     entityType: EntityType,
-    entityId: string
+    entityId: string,
+    instanceId: string = ""
   ): Promise<void> {
     await prisma.userHiddenEntity.upsert({
       where: {
-        userId_entityType_entityId: {
+        userId_entityType_entityId_instanceId: {
           userId,
           entityType,
           entityId,
+          instanceId,
         },
       },
       create: {
         userId,
         entityType,
         entityId,
+        instanceId,
       },
       update: {
         hiddenAt: new Date(), // Update timestamp if re-hiding
@@ -58,8 +61,8 @@ class UserHiddenEntityService {
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);
 
-    // Update pre-computed exclusions
-    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId);
+    // Update pre-computed exclusions (pass instanceId so cascades are scoped)
+    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId, instanceId);
   }
 
   /**
@@ -68,13 +71,15 @@ class UserHiddenEntityService {
   async unhideEntity(
     userId: number,
     entityType: EntityType,
-    entityId: string
+    entityId: string,
+    instanceId: string = ""
   ): Promise<void> {
     await prisma.userHiddenEntity.deleteMany({
       where: {
         userId,
         entityType,
         entityId,
+        instanceId,
       },
     });
 
@@ -82,7 +87,7 @@ class UserHiddenEntityService {
     this.hiddenIdsCache.delete(userId);
 
     // Update pre-computed exclusions (async recompute)
-    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId);
+    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId, instanceId);
   }
 
   /**
@@ -138,32 +143,36 @@ class UserHiddenEntityService {
       hiddenEntities.map(async (hidden) => {
         let entity = null;
 
+        const instId = hidden.instanceId || undefined;
         switch (hidden.entityType) {
           case "scene":
-            entity = await stashEntityService.getScene(hidden.entityId);
+            entity = await stashEntityService.getScene(hidden.entityId, instId);
             break;
           case "performer":
-            entity = await stashEntityService.getPerformer(hidden.entityId);
+            entity = await stashEntityService.getPerformer(hidden.entityId, instId);
             break;
           case "studio":
-            entity = await stashEntityService.getStudio(hidden.entityId);
+            entity = await stashEntityService.getStudio(hidden.entityId, instId);
             break;
           case "tag":
-            entity = await stashEntityService.getTag(hidden.entityId);
+            entity = await stashEntityService.getTag(hidden.entityId, instId);
             break;
           case "group":
-            entity = await stashEntityService.getGroup(hidden.entityId);
+            entity = await stashEntityService.getGroup(hidden.entityId, instId);
             break;
           case "gallery":
-            entity = await stashEntityService.getGallery(hidden.entityId);
+            entity = await stashEntityService.getGallery(hidden.entityId, instId);
             break;
-          // image type doesn't have a cache getter
+          case "image":
+            entity = await stashEntityService.getImage(hidden.entityId, instId);
+            break;
         }
 
         return {
           id: hidden.id,
           entityType: hidden.entityType as EntityType,
           entityId: hidden.entityId,
+          instanceId: hidden.instanceId,
           hiddenAt: hidden.hiddenAt,
           entity,
         };

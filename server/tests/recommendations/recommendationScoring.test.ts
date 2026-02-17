@@ -273,6 +273,8 @@ describe("RecommendationScoringService", () => {
   });
 
   describe("scoreSceneByPreferences", () => {
+    const INST_ID = "inst-a";
+
     const createEmptyPrefs = (): EntityPreferences => ({
       favoritePerformers: new Set(),
       highlyRatedPerformers: new Set(),
@@ -283,11 +285,15 @@ describe("RecommendationScoringService", () => {
       derivedPerformerWeights: new Map(),
       derivedStudioWeights: new Map(),
       derivedTagWeights: new Map(),
+      implicitPerformerWeights: new Map(),
+      implicitStudioWeights: new Map(),
+      implicitTagWeights: new Map(),
     });
 
-    const mockScene: NormalizedScene = {
+    const mockScene = {
       id: "scene1",
       title: "Test Scene",
+      instanceId: INST_ID,
       performers: [
         { id: "perf1", name: "Performer 1", tags: [] },
         { id: "perf2", name: "Performer 2", tags: [] },
@@ -304,7 +310,7 @@ describe("RecommendationScoringService", () => {
 
     it("scores favorite performer correctly (5 points)", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add("perf1");
+      prefs.favoritePerformers.add(`perf1\0${INST_ID}`);
 
       const score = scoreSceneByPreferences(mockScene, prefs);
 
@@ -313,8 +319,8 @@ describe("RecommendationScoringService", () => {
 
     it("applies sqrt diminishing returns for multiple favorite performers", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add("perf1");
-      prefs.favoritePerformers.add("perf2");
+      prefs.favoritePerformers.add(`perf1\0${INST_ID}`);
+      prefs.favoritePerformers.add(`perf2\0${INST_ID}`);
 
       const score = scoreSceneByPreferences(mockScene, prefs);
 
@@ -324,7 +330,7 @@ describe("RecommendationScoringService", () => {
 
     it("scores favorite studio correctly (3 points)", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoriteStudios.add("studio1");
+      prefs.favoriteStudios.add(`studio1\0${INST_ID}`);
 
       const score = scoreSceneByPreferences(mockScene, prefs);
 
@@ -344,8 +350,8 @@ describe("RecommendationScoringService", () => {
 
     it("combines explicit and derived preferences", () => {
       const prefs = createEmptyPrefs();
-      prefs.favoritePerformers.add("perf1"); // 5 points
-      prefs.favoriteStudios.add("studio1"); // 3 points
+      prefs.favoritePerformers.add(`perf1\0${INST_ID}`); // 5 points
+      prefs.favoriteStudios.add(`studio1\0${INST_ID}`); // 3 points
       prefs.derivedPerformerWeights.set("perf2", 0.4); // 5 * sqrt(0.4) ≈ 3.16
 
       const score = scoreSceneByPreferences(mockScene, prefs);

@@ -644,7 +644,7 @@ class GroupQueryBuilder {
 
     const groupIds = groups.map((g) => g.id);
     // Extract instanceIds from groups for multi-instance correctness
-    const groupInstanceIds = [...new Set(groups.map((g) => (g as any).instanceId))];
+    const groupInstanceIds = [...new Set(groups.map((g) => g.instanceId))];
 
     // Load tag junctions and scene groups - filter by both groupId AND groupInstanceId
     const [tagJunctions, sceneGroups] = await Promise.all([
@@ -696,10 +696,13 @@ class GroupQueryBuilder {
     const tagKeys = [...new Map(
       tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
     ).values()];
+    // Cast to `any` because studioId is set on the raw SQL row in transformRow()
+    // but NormalizedGroup (from GraphQL's Group type) only has `studio?: Maybe<Studio>`,
+    // not a flat studioId field.
     const studioKeys = [...new Map(
       groups
         .filter((g) => (g as any).studioId)
-        .map((g) => [`${(g as any).studioId}:${(g as any).instanceId}`, { id: (g as any).studioId, instanceId: (g as any).instanceId }])
+        .map((g) => [`${(g as any).studioId}:${g.instanceId}`, { id: (g as any).studioId, instanceId: g.instanceId }])
     ).values()];
     const performerKeys = [...new Map(
       scenePerformers.map((sp) => [`${sp.performerId}:${sp.performerInstanceId}`, { id: sp.performerId, instanceId: sp.performerInstanceId }])
@@ -825,12 +828,12 @@ class GroupQueryBuilder {
 
     // Populate groups using composite keys
     for (const group of groups) {
-      const groupKey = `${group.id}:${(group as any).instanceId}`;
+      const groupKey = `${group.id}:${group.instanceId}`;
       group.tags = tagsByGroup.get(groupKey) || [];
 
       // Hydrate studio with tooltip data (id, name, image_path) using composite key
       if (group.studio?.id) {
-        const studioKey = `${group.studio.id}:${(group as any).instanceId}`;
+        const studioKey = `${group.studio.id}:${group.instanceId}`;
         const studioData = studiosByKey.get(studioKey);
         if (studioData) {
           (group as any).studio = studioData;

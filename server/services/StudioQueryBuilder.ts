@@ -472,7 +472,7 @@ class StudioQueryBuilder {
     if (studios.length === 0) return;
 
     const studioIds = studios.map((s) => s.id);
-    const studioInstanceIds = [...new Set(studios.map((s) => (s as any).instanceId))];
+    const studioInstanceIds = [...new Set(studios.map((s) => s.instanceId))];
 
     // Load tag junctions, scenes, and galleries for this studio
     // Use composite keys (studioId + studioInstanceId) for multi-instance correctness
@@ -649,7 +649,7 @@ class StudioQueryBuilder {
 
     // Populate studios using composite keys
     for (const studio of studios) {
-      const studioKey = `${studio.id}:${(studio as any).instanceId}`;
+      const studioKey = `${studio.id}:${studio.instanceId}`;
       studio.tags = tagsByStudio.get(studioKey) || [];
       (studio as any).performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter(Boolean);
       (studio as any).groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter(Boolean);

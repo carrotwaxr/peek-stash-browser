@@ -14,6 +14,7 @@ import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
+  NormalizedImage,
   NormalizedPerformer,
   NormalizedScene,
   NormalizedStudio,
@@ -200,7 +201,7 @@ class StashEntityService {
       LEFT JOIN ScenePerformer sp ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId
       LEFT JOIN SceneTag st ON s.id = st.sceneId AND s.stashInstanceId = st.sceneInstanceId
       WHERE s.deletedAt IS NULL
-      GROUP BY s.id
+      GROUP BY s.id, s.stashInstanceId
     `;
 
     const rows = await prisma.$queryRawUnsafe<Array<{
@@ -272,10 +273,12 @@ class StashEntityService {
 
         UNION ALL
 
-        -- Scenes from same studio (weight: 2)
+        -- Scenes from same studio (weight: 2) - scoped to same instance
         SELECT s2.id as sceneId, 2 as weight
         FROM StashScene s1
-        JOIN StashScene s2 ON s2.studioId = s1.studioId AND s2.deletedAt IS NULL
+        JOIN StashScene s2 ON s2.studioId = s1.studioId
+          AND s2.stashInstanceId = s1.stashInstanceId
+          AND s2.deletedAt IS NULL
         WHERE s1.id = ?
           AND s2.id != ?
           AND s1.studioId IS NOT NULL
@@ -769,28 +772,34 @@ class StashEntityService {
 
   /**
    * Get performer by ID with computed counts
+   * @param id - Performer ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getPerformer(id: string): Promise<NormalizedPerformer | null> {
+  async getPerformer(id: string, instanceId?: string): Promise<NormalizedPerformer | null> {
     const cached = await prisma.stashPerformer.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
     });
 
     if (!cached) return null;
 
     // Compute counts from junction tables (except imageCount which uses stored inherited value)
-    const instanceId = cached.stashInstanceId;
+    const performerInstanceId = cached.stashInstanceId;
     const [sceneCount, galleryCount] = await Promise.all([
       prisma.scenePerformer.count({
         where: {
           performerId: id,
-          performerInstanceId: instanceId,
+          performerInstanceId,
           scene: { deletedAt: null },
         },
       }),
       prisma.galleryPerformer.count({
         where: {
           performerId: id,
-          performerInstanceId: instanceId,
+          performerInstanceId,
           gallery: { deletedAt: null },
         },
       }),
@@ -803,7 +812,7 @@ class StashEntityService {
       INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
       INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
       WHERE sp.performerId = ${id}
-        AND sp.performerInstanceId = ${instanceId}
+        AND sp.performerInstanceId = ${performerInstanceId}
         AND s.deletedAt IS NULL
     `;
     const groupCount = Number(groupCountResult[0]?.count ?? 0);
@@ -819,12 +828,15 @@ class StashEntityService {
 
   /**
    * Get performers by IDs
+   * @param ids - Array of performer IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getPerformersByIds(ids: string[]): Promise<NormalizedPerformer[]> {
+  async getPerformersByIds(ids: string[], instanceId?: string): Promise<NormalizedPerformer[]> {
     const cached = await prisma.stashPerformer.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
     });
 
@@ -887,15 +899,19 @@ class StashEntityService {
       return this.studioNameCachePromise;
     }
 
-    // Build the cache
+    // Build the cache with composite keys (id + instanceId) to prevent cross-instance collisions
     this.studioNameCachePromise = (async () => {
       const studios = await prisma.stashStudio.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true },
+        select: { id: true, stashInstanceId: true, name: true },
       });
       const map = new Map<string, string>();
       for (const s of studios) {
-        if (s.name) map.set(s.id, s.name);
+        if (s.name) {
+          map.set(`${s.id}\0${s.stashInstanceId}`, s.name);
+          // Also set by ID only (for backwards compat when instanceId unavailable)
+          if (!map.has(s.id)) map.set(s.id, s.name);
+        }
       }
       this.studioNameCache = map;
       this.studioNameCachePromise = null;
@@ -928,15 +944,19 @@ class StashEntityService {
       return this.tagNameCachePromise;
     }
 
-    // Build the cache
+    // Build the cache with composite keys (id + instanceId) to prevent cross-instance collisions
     this.tagNameCachePromise = (async () => {
       const tags = await prisma.stashTag.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true },
+        select: { id: true, stashInstanceId: true, name: true },
       });
       const map = new Map<string, string>();
       for (const t of tags || []) {
-        if (t.name) map.set(t.id, t.name);
+        if (t.name) {
+          map.set(`${t.id}\0${t.stashInstanceId}`, t.name);
+          // Also set by ID only (for backwards compat when instanceId unavailable)
+          if (!map.has(t.id)) map.set(t.id, t.name);
+        }
       }
       this.tagNameCache = map;
       this.tagNameCachePromise = null;
@@ -980,25 +1000,34 @@ class StashEntityService {
 
   /**
    * Get studio by ID with computed counts
+   * @param id - Studio ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getStudio(id: string): Promise<NormalizedStudio | null> {
+  async getStudio(id: string, instanceId?: string): Promise<NormalizedStudio | null> {
     const cached = await prisma.stashStudio.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
     });
 
     if (!cached) return null;
 
     // Compute counts from junction tables and scene data (except imageCount which uses stored inherited value)
+    const studioInstanceId = cached.stashInstanceId;
     const [sceneCount, galleryCount] = await Promise.all([
       prisma.stashScene.count({
         where: {
           studioId: id,
+          stashInstanceId: studioInstanceId,
           deletedAt: null,
         },
       }),
       prisma.stashGallery.count({
         where: {
           studioId: id,
+          stashInstanceId: studioInstanceId,
           deletedAt: null,
         },
       }),
@@ -1008,8 +1037,9 @@ class StashEntityService {
     const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(DISTINCT sp.performerId) as count
       FROM ScenePerformer sp
-      INNER JOIN StashScene s ON sp.sceneId = s.id
+      INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
       WHERE s.studioId = ${id}
+        AND s.stashInstanceId = ${studioInstanceId}
         AND s.deletedAt IS NULL
     `;
     const performerCount = Number(performerCountResult[0]?.count ?? 0);
@@ -1018,8 +1048,9 @@ class StashEntityService {
     const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(DISTINCT sg.groupId) as count
       FROM SceneGroup sg
-      INNER JOIN StashScene s ON sg.sceneId = s.id
+      INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
       WHERE s.studioId = ${id}
+        AND s.stashInstanceId = ${studioInstanceId}
         AND s.deletedAt IS NULL
     `;
     const groupCount = Number(groupCountResult[0]?.count ?? 0);
@@ -1036,12 +1067,15 @@ class StashEntityService {
 
   /**
    * Get studios by IDs
+   * @param ids - Array of studio IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getStudiosByIds(ids: string[]): Promise<NormalizedStudio[]> {
+  async getStudiosByIds(ids: string[], instanceId?: string): Promise<NormalizedStudio[]> {
     const cached = await prisma.stashStudio.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
     });
 
@@ -1082,10 +1116,16 @@ class StashEntityService {
 
   /**
    * Get tag by ID with computed counts
+   * @param id - Tag ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getTag(id: string): Promise<NormalizedTag | null> {
+  async getTag(id: string, instanceId?: string): Promise<NormalizedTag | null> {
     const cached = await prisma.stashTag.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
     });
 
     if (!cached) return null;
@@ -1144,12 +1184,15 @@ class StashEntityService {
 
   /**
    * Get tags by IDs
+   * @param ids - Array of tag IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getTagsByIds(ids: string[]): Promise<NormalizedTag[]> {
+  async getTagsByIds(ids: string[], instanceId?: string): Promise<NormalizedTag[]> {
     const cached = await prisma.stashTag.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
     });
 
@@ -1265,10 +1308,16 @@ class StashEntityService {
 
   /**
    * Get group by ID with computed counts
+   * @param id - Group ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getGroup(id: string): Promise<NormalizedGroup | null> {
+  async getGroup(id: string, instanceId?: string): Promise<NormalizedGroup | null> {
     const cached = await prisma.stashGroup.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
     });
 
     if (!cached) return null;
@@ -1304,12 +1353,15 @@ class StashEntityService {
 
   /**
    * Get groups by IDs
+   * @param ids - Array of group IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getGroupsByIds(ids: string[]): Promise<NormalizedGroup[]> {
+  async getGroupsByIds(ids: string[], instanceId?: string): Promise<NormalizedGroup[]> {
     const cached = await prisma.stashGroup.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
     });
 
@@ -1401,10 +1453,16 @@ class StashEntityService {
 
   /**
    * Get image by ID with relations
+   * @param id - Image ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getImage(id: string): Promise<any | null> {
+  async getImage(id: string, instanceId?: string): Promise<NormalizedImage | null> {
     const cached = await prisma.stashImage.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
       include: this.imageIncludes,
     });
 
@@ -1415,9 +1473,13 @@ class StashEntityService {
   /**
    * Get images by IDs with relations
    * Uses chunked queries for large ID sets to avoid Prisma's string conversion limit.
+   * @param ids - Array of image IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getImagesByIds(ids: string[]): Promise<any[]> {
+  async getImagesByIds(ids: string[], instanceId?: string): Promise<NormalizedImage[]> {
     if (ids.length === 0) return [];
+
+    const instanceFilter = instanceId ? { stashInstanceId: instanceId } : {};
 
     // For smaller sets, use single query
     if (ids.length < 5000) {
@@ -1425,6 +1487,7 @@ class StashEntityService {
         where: {
           id: { in: ids },
           deletedAt: null,
+          ...instanceFilter,
         },
         include: this.imageIncludes,
       });
@@ -1441,6 +1504,7 @@ class StashEntityService {
         where: {
           id: { in: chunkIds },
           deletedAt: null,
+          ...instanceFilter,
         },
         include: this.imageIncludes,
       });
@@ -1560,9 +1624,11 @@ class StashEntityService {
    * Returns absolute Stash URLs (without API key) matching original Stash format.
    * The client will rewrite these to Peek proxy endpoints.
    */
-  public generateSceneStreams(sceneId: string): Array<{url: string; mime_type: string; label: string}> {
-    // Get Stash base URL (without /graphql path)
-    const config = stashInstanceManager.getDefaultConfig();
+  public generateSceneStreams(sceneId: string, instanceId?: string): Array<{url: string; mime_type: string; label: string}> {
+    // Get Stash base URL (without /graphql path) — use instance-specific config when available
+    const config = instanceId
+      ? stashInstanceManager.getConfig(instanceId) || stashInstanceManager.getDefaultConfig()
+      : stashInstanceManager.getDefaultConfig();
     const stashUrl = new URL(config.url);
     const baseUrl = `${stashUrl.protocol}//${stashUrl.host}`;
 
@@ -1609,7 +1675,7 @@ class StashEntityService {
     const results = await prisma.$queryRaw<{ performerId: string }[]>`
       SELECT DISTINCT sp.performerId
       FROM ScenePerformer sp
-      INNER JOIN StashScene cs ON sp.sceneId = cs.id
+      INNER JOIN StashScene cs ON sp.sceneId = cs.id AND sp.sceneInstanceId = cs.stashInstanceId
       WHERE cs.studioId IN (${Prisma.join(studioIds)})
         AND cs.deletedAt IS NULL
     `;
@@ -1699,7 +1765,7 @@ class StashEntityService {
       },
 
       // Generate streams on-demand (no longer stored in DB)
-      sceneStreams: this.generateSceneStreams(scene.id),
+      sceneStreams: this.generateSceneStreams(scene.id, scene.stashInstanceId),
 
       // Caption metadata for multi-language subtitle support
       captions: scene.captions ? JSON.parse(scene.captions) : [],
@@ -1803,7 +1869,9 @@ class StashEntityService {
   private hydrateStudioNames(scenes: NormalizedScene[], studioNames: Map<string, string>): void {
     for (const scene of scenes) {
       if (scene.studio?.id) {
-        const name = studioNames.get(scene.studio.id);
+        const sceneInstanceId = scene.instanceId || '';
+        // Try composite key first, fall back to ID-only
+        const name = studioNames.get(`${scene.studio.id}\0${sceneInstanceId}`) || studioNames.get(scene.studio.id);
         if (name) {
           (scene.studio as { id: string; name?: string }).name = name;
         }
@@ -1819,9 +1887,11 @@ class StashEntityService {
     for (const scene of scenes) {
       const inheritedTagIds = (scene as any).inheritedTagIds;
       if (inheritedTagIds && Array.isArray(inheritedTagIds) && inheritedTagIds.length > 0) {
+        const sceneInstanceId = scene.instanceId || '';
         (scene as any).inheritedTags = inheritedTagIds.map((tagId: string) => ({
           id: tagId,
-          name: tagNames.get(tagId) || "Unknown",
+          // Try composite key first, fall back to ID-only
+          name: tagNames.get(`${tagId}\0${sceneInstanceId}`) || tagNames.get(tagId) || "Unknown",
         }));
       }
     }

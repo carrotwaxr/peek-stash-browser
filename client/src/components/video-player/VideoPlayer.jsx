@@ -101,7 +101,7 @@ const VideoPlayer = () => {
         return;
       }
       try {
-        const response = await getClipsForScene(scene.id, true);
+        const response = await getClipsForScene(scene.id, scene.instanceId, true);
         setClips(response.clips || []);
       } catch (err) {
         console.error("Failed to fetch clips for timeline", err);

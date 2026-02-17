@@ -197,7 +197,7 @@ export const findGroups = async (
     // For single-entity requests (detail pages), get group with computed counts
     let paginatedGroups = groups;
     if (ids && ids.length === 1 && paginatedGroups.length === 1) {
-      const groupWithCounts = await stashEntityService.getGroup(ids[0]);
+      const groupWithCounts = await stashEntityService.getGroup(ids[0], paginatedGroups[0].instanceId);
       if (groupWithCounts) {
         const existingGroup = paginatedGroups[0];
         paginatedGroups = [

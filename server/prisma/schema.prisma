@@ -510,6 +510,7 @@ model Download {
   // For individual downloads
   entityType  String?        // "scene" or "image"
   entityId    String?
+  instanceId  String         @default("") // Stash instance ID for multi-instance scoping
 
   fileName    String
   fileSize    BigInt?
@@ -524,6 +525,7 @@ model Download {
   @@index([userId])
   @@index([status])
   @@index([expiresAt])
+  @@index([instanceId])
 }
 
 model UserHiddenEntity {
@@ -531,11 +533,12 @@ model UserHiddenEntity {
   userId     Int
   entityType String // 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image'
   entityId   String // Stash entity ID
+  instanceId String   @default("") // Stash instance ID for multi-instance scoping
   hiddenAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityType, entityId])
+  @@unique([userId, entityType, entityId, instanceId])
   @@index([userId])
   @@index([entityType])
   @@index([entityId])
@@ -548,13 +551,14 @@ model UserExcludedEntity {
   userId     Int
   entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
   entityId   String   // Stash entity ID
+  instanceId String   @default("") // Stash instance ID for multi-instance scoping
 
   reason     String   // 'restricted', 'hidden', 'cascade', 'empty'
   computedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityType, entityId])
+  @@unique([userId, entityType, entityId, instanceId])
   @@index([userId, entityType])
   @@index([entityType, entityId])
   @@index([userId, entityType, reason]) // For groupBy stats queries
@@ -565,12 +569,13 @@ model UserEntityStats {
   id           Int      @id @default(autoincrement())
   userId       Int
   entityType   String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
+  instanceId   String   @default("") // Stash instance ID for per-instance counts
   visibleCount Int      // total - excluded
   updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityType])
+  @@unique([userId, entityType, instanceId])
 }
 
 // Track which data migrations have been applied
@@ -1298,6 +1303,8 @@ model MergeRecord {
   id              String   @id @default(uuid())
   sourceSceneId   String // The scene that was merged away (soft-deleted)
   targetSceneId   String // The scene it was merged into (survivor)
+  sourceInstanceId String  @default("") // Instance of source scene
+  targetInstanceId String  @default("") // Instance of target scene
   matchedByPhash  String? // The phash that linked them (null if manual)
 
   // User data that was transferred
@@ -1320,5 +1327,7 @@ model MergeRecord {
 
   @@index([sourceSceneId])
   @@index([targetSceneId])
+  @@index([sourceInstanceId])
+  @@index([targetInstanceId])
   @@index([userId])
 }

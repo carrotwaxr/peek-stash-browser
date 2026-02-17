@@ -13,6 +13,7 @@ export interface ClipQueryOptions {
   studioId?: string;
   q?: string;
   randomSeed?: number; // Seed for consistent random ordering
+  allowedInstanceIds?: string[];
 }
 
 /**
@@ -101,9 +102,10 @@ export class ClipService {
   async getClipsForScene(
     sceneId: string,
     userId: number,
-    includeUngenerated = false
+    includeUngenerated = false,
+    allowedInstanceIds?: string[]
   ): Promise<ClipWithRelations[]> {
-    const clips = await clipQueryBuilder.getClipsForScene(sceneId, userId, includeUngenerated);
+    const clips = await clipQueryBuilder.getClipsForScene(sceneId, userId, includeUngenerated, allowedInstanceIds);
     return clips.map((clip) => this.transformClip(clip));
   }
 

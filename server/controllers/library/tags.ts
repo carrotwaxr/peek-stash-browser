@@ -120,7 +120,7 @@ export const findTags = async (
     // For single-entity requests (detail pages), get tag with computed counts
     let resultTags = tags;
     if (ids && ids.length === 1 && resultTags.length === 1) {
-      const tagWithCounts = await stashEntityService.getTag(ids[0]);
+      const tagWithCounts = await stashEntityService.getTag(ids[0], resultTags[0].instanceId);
       if (tagWithCounts) {
         const existingTag = resultTags[0];
         resultTags = [

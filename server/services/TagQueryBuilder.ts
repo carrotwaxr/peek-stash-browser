@@ -647,7 +647,7 @@ class TagQueryBuilder {
     if (tags.length === 0) return;
 
     const tagIds = tags.map((t) => t.id);
-    const tagInstanceIds = [...new Set(tags.map((t) => (t as any).instanceId))];
+    const tagInstanceIds = [...new Set(tags.map((t) => t.instanceId))];
 
     // Collect all parent IDs that need name hydration
     const parentIds = new Set<string>();
@@ -712,7 +712,7 @@ class TagQueryBuilder {
     }
     for (const tag of tags) {
       if (tag.parents && Array.isArray(tag.parents)) {
-        const tagInstanceId = (tag as any).instanceId;
+        const tagInstanceId = tag.instanceId;
         (tag as any).parents = tag.parents.map((p) => ({
           id: p.id,
           name: parentNameMap.get(`${p.id}:${tagInstanceId}`) || "Unknown",
@@ -845,7 +845,7 @@ class TagQueryBuilder {
 
     // Populate tags with all relations using composite keys
     for (const tag of tags) {
-      const tagInstanceId = (tag as any).instanceId;
+      const tagInstanceId = tag.instanceId;
       const tagKey = `${tag.id}:${tagInstanceId}`;
       (tag as any).performers = performersByTag.get(tagKey) || [];
       (tag as any).studios = studiosByTag.get(tagKey) || [];

@@ -2089,7 +2089,7 @@ export const hideEntity = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { entityType, entityId } = req.body;
+    const { entityType, entityId, instanceId } = req.body;
 
     if (!entityType || !entityId) {
       return res
@@ -2111,12 +2111,23 @@ export const hideEntity = async (
       return res.status(400).json({ error: "Invalid entity type" });
     }
 
+    // Validate instanceId if provided
+    if (instanceId) {
+      const { stashInstanceManager } = await import(
+        "../services/StashInstanceManager.js"
+      );
+      const instance = stashInstanceManager.getConfig(instanceId);
+      if (!instance) {
+        return res.status(400).json({ error: "Invalid instanceId" });
+      }
+    }
+
     // Import service
     const { userHiddenEntityService } = await import(
       "../services/UserHiddenEntityService.js"
     );
 
-    await userHiddenEntityService.hideEntity(userId, entityType, entityId);
+    await userHiddenEntityService.hideEntity(userId, entityType, entityId, instanceId || "");
 
     res.json({ success: true, message: "Entity hidden successfully" });
   } catch (error) {
@@ -2166,7 +2177,20 @@ export const unhideEntity = async (
       "../services/UserHiddenEntityService.js"
     );
 
-    await userHiddenEntityService.unhideEntity(userId, entityType as any, entityId);
+    const unhideInstanceId = (req.query.instanceId as string) || "";
+
+    // Validate instanceId if provided
+    if (unhideInstanceId) {
+      const { stashInstanceManager } = await import(
+        "../services/StashInstanceManager.js"
+      );
+      const instance = stashInstanceManager.getConfig(unhideInstanceId);
+      if (!instance) {
+        return res.status(400).json({ error: "Invalid instanceId" });
+      }
+    }
+
+    await userHiddenEntityService.unhideEntity(userId, entityType as any, entityId, unhideInstanceId);
 
     res.json({ success: true, message: "Entity restored successfully" });
   } catch (error) {
@@ -2378,7 +2402,8 @@ export const hideEntities = async (
         await userHiddenEntityService.hideEntity(
           userId,
           entity.entityType,
-          entity.entityId
+          entity.entityId,
+          entity.instanceId || ""
         );
         successCount++;
       } catch (error) {

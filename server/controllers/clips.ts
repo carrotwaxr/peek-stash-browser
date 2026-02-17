@@ -23,6 +23,7 @@ export const getClips = async (req: Request, res: Response) => {
       performerIds,
       studioId,
       q,
+      instanceId,
     } = req.query;
 
     // Parse random sort to extract seed for consistent pagination
@@ -43,6 +44,7 @@ export const getClips = async (req: Request, res: Response) => {
       studioId: studioId as string | undefined,
       q: q as string | undefined,
       randomSeed,
+      allowedInstanceIds: instanceId ? [instanceId as string] : undefined,
     });
 
     res.json({
@@ -88,12 +90,13 @@ export const getClipsForScene = async (req: Request, res: Response) => {
   try {
     const userId = (req as AuthenticatedRequest).user.id;
     const { id } = req.params;
-    const { includeUngenerated = "false" } = req.query;
+    const { includeUngenerated = "false", instanceId } = req.query;
 
     const clips = await clipService.getClipsForScene(
       id,
       userId,
-      includeUngenerated === "true"
+      includeUngenerated === "true",
+      instanceId ? [instanceId as string] : undefined
     );
 
     res.json({ clips });

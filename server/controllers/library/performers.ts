@@ -201,7 +201,7 @@ export const findPerformers = async (
       logger.warn("Ambiguous performer lookup", {
         id: ids[0],
         matchCount: performers.length,
-        instances: performers.map(p => (p as any).instanceId),
+        instances: performers.map(p => p.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
@@ -209,7 +209,7 @@ export const findPerformers = async (
         matches: performers.map(p => ({
           id: p.id,
           name: p.name,
-          instanceId: (p as any).instanceId,
+          instanceId: p.instanceId,
         })),
       });
     }

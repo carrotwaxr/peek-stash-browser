@@ -204,6 +204,9 @@ export type NormalizedImage = Image & {
   lastViewedAt: string | null;
 };
 
+/** Entity with instanceId, for nested entities within scenes/galleries */
+export type WithInstanceId<T> = T & { instanceId: string };
+
 /**
  * Lightweight scene data for scoring operations
  * Contains only IDs needed for similarity/recommendation scoring

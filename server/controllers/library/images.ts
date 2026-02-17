@@ -272,7 +272,8 @@ export const findImageById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    const image = await stashEntityService.getImage(id);
+    const imageInstanceId = req.query.instanceId as string | undefined;
+    const image = await stashEntityService.getImage(id, imageInstanceId);
 
     if (!image) {
       return res.status(404).json({ error: "Image not found" });
