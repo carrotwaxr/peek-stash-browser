@@ -195,7 +195,7 @@ export const useFilterState = ({
     });
 
     // Preserve specific params we don't manage (folderPath from FolderView)
-    const preserveParams = ["folderPath"];
+    const preserveParams = ["folderPath", "instance"];
 
     setSearchParams((prev) => {
       // Start with new params

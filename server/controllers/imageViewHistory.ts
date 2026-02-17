@@ -21,7 +21,7 @@ export async function incrementImageOCounter(
   res: TypedResponse<IncrementImageOCounterResponse | ApiErrorResponse>
 ) {
   try {
-    const { imageId } = req.body;
+    const { imageId, instanceId: requestInstanceId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -38,7 +38,9 @@ export async function incrementImageOCounter(
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('image', imageId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('image', imageId),
     ]);
 
     if (!user) {
@@ -108,7 +110,7 @@ export async function recordImageView(
   res: TypedResponse<RecordImageViewResponse | ApiErrorResponse>
 ) {
   try {
-    const { imageId } = req.body;
+    const { imageId, instanceId: requestInstanceId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -119,8 +121,8 @@ export async function recordImageView(
       return res.status(400).json({ error: "Missing required field: imageId" });
     }
 
-    // Get image instanceId
-    const instanceId = await getEntityInstanceId('image', imageId);
+    // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
+    const instanceId = requestInstanceId || await getEntityInstanceId('image', imageId);
 
     const now = new Date();
 
@@ -177,6 +179,7 @@ export async function getImageViewHistory(
 ) {
   try {
     const { imageId } = req.params;
+    const requestInstanceId = req.query.instanceId as string | undefined;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -187,8 +190,8 @@ export async function getImageViewHistory(
       return res.status(400).json({ error: "Missing required parameter: imageId" });
     }
 
-    // Get image instanceId
-    const instanceId = await getEntityInstanceId('image', imageId);
+    // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
+    const instanceId = requestInstanceId || await getEntityInstanceId('image', imageId);
 
     const viewHistory = await prisma.imageViewHistory.findUnique({
       where: { userId_instanceId_imageId: { userId, instanceId, imageId } },

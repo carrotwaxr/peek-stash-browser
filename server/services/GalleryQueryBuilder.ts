@@ -657,13 +657,13 @@ class GalleryQueryBuilder {
 
     // Build gallery keys with instanceId for multi-instance support
     const galleryIds = galleries.map((g) => g.id);
-    const galleryInstanceIds = [...new Set(galleries.map((g) => (g as any).instanceId))];
+    const galleryInstanceIds = [...new Set(galleries.map((g) => g.instanceId))];
 
     // Collect unique (studioId, instanceId) pairs - each gallery's studio comes from its own instance
     const studioKeys = [...new Map(
       galleries
         .filter((g) => g.studio?.id)
-        .map((g) => [`${g.studio!.id}:${(g as any).instanceId}`, { id: g.studio!.id, instanceId: (g as any).instanceId }])
+        .map((g) => [`${g.studio!.id}:${g.instanceId}`, { id: g.studio!.id, instanceId: g.instanceId }])
     ).values()];
 
     // Batch load all relations in parallel
@@ -785,13 +785,13 @@ class GalleryQueryBuilder {
 
     // Populate galleries using composite keys
     for (const gallery of galleries) {
-      const galleryKey = `${gallery.id}:${(gallery as any).instanceId}`;
+      const galleryKey = `${gallery.id}:${gallery.instanceId}`;
       gallery.performers = performersByGallery.get(galleryKey) || [];
       gallery.tags = tagsByGallery.get(galleryKey) || [];
 
       // Hydrate studio with full data using composite key
       if (gallery.studio?.id) {
-        const studioKey = `${gallery.studio.id}:${(gallery as any).instanceId}`;
+        const studioKey = `${gallery.studio.id}:${gallery.instanceId}`;
         const fullStudio = studiosByKey.get(studioKey);
         if (fullStudio) {
           gallery.studio = fullStudio;

@@ -119,7 +119,7 @@ export const findStudios = async (
     let resultStudios = studios;
     if (ids && ids.length === 1 && resultStudios.length === 1) {
       // Get studio with computed counts from junction tables
-      const studioWithCounts = await stashEntityService.getStudio(ids[0]);
+      const studioWithCounts = await stashEntityService.getStudio(ids[0], resultStudios[0].instanceId);
       if (studioWithCounts) {
         // Merge with the studio data (which has user ratings/stats)
         const existingStudio = resultStudios[0];

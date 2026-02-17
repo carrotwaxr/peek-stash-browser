@@ -31,7 +31,8 @@ import {
   type SceneRatingInput,
   type EntityRankingData,
 } from "../../services/RecommendationScoringService.js";
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import type { NormalizedScene, PeekSceneFilter, WithInstanceId } from "../../types/index.js";
+import type { Performer, Studio, Tag } from "../../graphql/types.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
@@ -137,7 +138,7 @@ export async function mergeScenesWithUserData(
 
   // Merge data and update nested entity favorites
   return scenes.map((scene) => {
-    const sceneKey = `${scene.id}${KEY_SEP}${(scene as any).instanceId || ""}`;
+    const sceneKey = `${scene.id}${KEY_SEP}${scene.instanceId || ""}`;
     const mergedScene = {
       ...scene,
       ...watchMap.get(sceneKey),
@@ -146,25 +147,28 @@ export async function mergeScenesWithUserData(
 
     // Update favorite status for nested performers
     if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
-      mergedScene.performers = mergedScene.performers.map((p) => ({
+      const performers = mergedScene.performers as WithInstanceId<Performer>[];
+      mergedScene.performers = performers.map((p) => ({
         ...p,
-        favorite: performerFavorites.has(`${p.id}${KEY_SEP}${(p as any).instanceId || ""}`),
+        favorite: performerFavorites.has(`${p.id}${KEY_SEP}${p.instanceId || ""}`),
       }));
     }
 
     // Update favorite status for studio
     if (mergedScene.studio) {
+      const studio = mergedScene.studio as WithInstanceId<Studio>;
       mergedScene.studio = {
         ...mergedScene.studio,
-        favorite: studioFavorites.has(`${mergedScene.studio.id}${KEY_SEP}${(mergedScene.studio as any).instanceId || ""}`),
+        favorite: studioFavorites.has(`${studio.id}${KEY_SEP}${studio.instanceId || ""}`),
       };
     }
 
     // Update favorite status for nested tags
     if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
-      mergedScene.tags = mergedScene.tags.map((t) => ({
+      const tags = mergedScene.tags as WithInstanceId<Tag>[];
+      mergedScene.tags = tags.map((t) => ({
         ...t,
-        favorite: tagFavorites.has(`${t.id}${KEY_SEP}${(t as any).instanceId || ""}`),
+        favorite: tagFavorites.has(`${t.id}${KEY_SEP}${t.instanceId || ""}`),
       }));
     }
 
@@ -212,7 +216,7 @@ export async function applyQuickSceneFilters(
     // Populate sceneStreams for detail views (browse queries return empty streams for performance)
     filtered = filtered.map((s) => ({
       ...s,
-      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : stashEntityService.generateSceneStreams(s.id),
+      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : stashEntityService.generateSceneStreams(s.id, s.instanceId),
     }));
   }
 
@@ -939,7 +943,7 @@ export const findScenes = async (
         logger.warn("Ambiguous scene lookup", {
           id: ids[0],
           matchCount: result.scenes.length,
-          instances: result.scenes.map(s => (s as any).instanceId),
+          instances: result.scenes.map(s => s.instanceId),
         });
         return res.status(400).json({
           error: "Ambiguous lookup",
@@ -947,7 +951,7 @@ export const findScenes = async (
           matches: result.scenes.map(s => ({
             id: s.id,
             title: s.title,
-            instanceId: (s as any).instanceId,
+            instanceId: s.instanceId,
           })),
         });
       }
@@ -1426,30 +1430,31 @@ export const getRecommendedScenes = async (
       });
     }
 
-    // Build sets of favorite and highly-rated entities
+    // Build sets of favorite and highly-rated entities using composite keys (id + instanceId)
+    // to prevent cross-instance favorites from influencing recommendations for the wrong instance
     const favoritePerformers = new Set(
-      performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
+      performerRatings.filter((r) => r.favorite).map((r) => `${r.performerId}\0${r.instanceId || ""}`)
     );
     const highlyRatedPerformers = new Set(
       performerRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => r.performerId)
+        .map((r) => `${r.performerId}\0${r.instanceId || ""}`)
     );
     const favoriteStudios = new Set(
-      studioRatings.filter((r) => r.favorite).map((r) => r.studioId)
+      studioRatings.filter((r) => r.favorite).map((r) => `${r.studioId}\0${r.instanceId || ""}`)
     );
     const highlyRatedStudios = new Set(
       studioRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => r.studioId)
+        .map((r) => `${r.studioId}\0${r.instanceId || ""}`)
     );
     const favoriteTags = new Set(
-      tagRatings.filter((r) => r.favorite).map((r) => r.tagId)
+      tagRatings.filter((r) => r.favorite).map((r) => `${r.tagId}\0${r.instanceId || ""}`)
     );
     const highlyRatedTags = new Set(
       tagRatings
         .filter((r) => r.rating !== null && r.rating >= 80)
-        .map((r) => r.tagId)
+        .map((r) => `${r.tagId}\0${r.instanceId || ""}`)
     );
 
     // Count user criteria for feedback

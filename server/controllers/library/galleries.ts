@@ -54,7 +54,7 @@ async function mergeGalleriesWithUserData(
     rating: null,
     rating100: null,
     favorite: false,
-    ...ratingMap.get(`${gallery.id}${KEY_SEP}${(gallery as any).instanceId || ""}`),
+    ...ratingMap.get(`${gallery.id}${KEY_SEP}${gallery.instanceId || ""}`),
   }));
 }
 
@@ -314,7 +314,8 @@ export const findGalleryById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    let gallery = await stashEntityService.getGallery(id);
+    const galleryInstanceId = req.query.instanceId as string | undefined;
+    let gallery = await stashEntityService.getGallery(id, galleryInstanceId);
 
     if (!gallery) {
       return res.status(404).json({ error: "Gallery not found" });
@@ -329,9 +330,10 @@ export const findGalleryById = async (
     }
 
     // Hydrate performers with full cached data
+    const galleryInstId = gallery.instanceId || galleryInstanceId;
     if (mergedGallery.performers && mergedGallery.performers.length > 0) {
       const performerIds = mergedGallery.performers.map((p) => p.id);
-      const cachedPerformers = await stashEntityService.getPerformersByIds(performerIds);
+      const cachedPerformers = await stashEntityService.getPerformersByIds(performerIds, galleryInstId);
       const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
 
       mergedGallery.performers = mergedGallery.performers.map((performer) => {
@@ -354,7 +356,7 @@ export const findGalleryById = async (
 
     // Hydrate studio with full cached data
     if (mergedGallery.studio && mergedGallery.studio.id) {
-      const cachedStudio = await stashEntityService.getStudio(mergedGallery.studio.id);
+      const cachedStudio = await stashEntityService.getStudio(mergedGallery.studio.id, galleryInstId);
       if (cachedStudio) {
         // Type assertion: Gallery.studio typed as Studio, but we hydrate with NormalizedStudio
         mergedGallery.studio =
@@ -370,7 +372,7 @@ export const findGalleryById = async (
     // Hydrate tags with full cached data
     if (mergedGallery.tags && mergedGallery.tags.length > 0) {
       const tagIds = mergedGallery.tags.map((t) => t.id);
-      const cachedTags = await stashEntityService.getTagsByIds(tagIds);
+      const cachedTags = await stashEntityService.getTagsByIds(tagIds, galleryInstId);
       const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
 
       mergedGallery.tags = mergedGallery.tags.map((tag) => {
@@ -544,7 +546,7 @@ export const getGalleryImages = async (
       if (gallery.performers && gallery.performers.length > 0) {
         const performerIds = gallery.performers.map((p) => p.id);
         const cachedPerformers =
-          await stashEntityService.getPerformersByIds(performerIds);
+          await stashEntityService.getPerformersByIds(performerIds, instanceId || gallery.instanceId);
         const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
         hydratedPerformers = gallery.performers.map((performer) => {
           const cachedPerformer = performerMap.get(performer.id);
@@ -556,7 +558,7 @@ export const getGalleryImages = async (
       let hydratedTags: NormalizedTag[] = [];
       if (gallery.tags && gallery.tags.length > 0) {
         const tagIds = gallery.tags.map((t) => t.id);
-        const cachedTags = await stashEntityService.getTagsByIds(tagIds);
+        const cachedTags = await stashEntityService.getTagsByIds(tagIds, instanceId || gallery.instanceId);
         const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
         hydratedTags = gallery.tags.map((tag) => {
           const cachedTag = tagMap.get(tag.id);
@@ -567,7 +569,7 @@ export const getGalleryImages = async (
       // Hydrate gallery studio with full cached data (gallery.studio only has id)
       let hydratedStudio = null;
       if (gallery.studio?.id) {
-        const cachedStudio = await stashEntityService.getStudio(gallery.studio.id);
+        const cachedStudio = await stashEntityService.getStudio(gallery.studio.id, instanceId || gallery.instanceId);
         hydratedStudio = cachedStudio || gallery.studio;
       }
 

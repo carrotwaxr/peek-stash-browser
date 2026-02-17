@@ -260,7 +260,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, scenes);
         scenes.forEach(s => {
-          if (s.stashInstanceId) {
+          if (s.stashInstanceId && !result.has(s.id)) {
             result.set(s.id, s.stashInstanceId);
           }
         });
@@ -273,7 +273,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, performers);
         performers.forEach(p => {
-          if (p.stashInstanceId) {
+          if (p.stashInstanceId && !result.has(p.id)) {
             result.set(p.id, p.stashInstanceId);
           }
         });
@@ -286,7 +286,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, studios);
         studios.forEach(s => {
-          if (s.stashInstanceId) {
+          if (s.stashInstanceId && !result.has(s.id)) {
             result.set(s.id, s.stashInstanceId);
           }
         });
@@ -299,7 +299,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, tags);
         tags.forEach(t => {
-          if (t.stashInstanceId) {
+          if (t.stashInstanceId && !result.has(t.id)) {
             result.set(t.id, t.stashInstanceId);
           }
         });
@@ -312,7 +312,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, galleries);
         galleries.forEach(g => {
-          if (g.stashInstanceId) {
+          if (g.stashInstanceId && !result.has(g.id)) {
             result.set(g.id, g.stashInstanceId);
           }
         });
@@ -325,7 +325,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, groups);
         groups.forEach(g => {
-          if (g.stashInstanceId) {
+          if (g.stashInstanceId && !result.has(g.id)) {
             result.set(g.id, g.stashInstanceId);
           }
         });
@@ -338,7 +338,7 @@ export async function getEntityInstanceIds(
         });
         warnBatchDuplicates(entityType, images);
         images.forEach(i => {
-          if (i.stashInstanceId) {
+          if (i.stashInstanceId && !result.has(i.id)) {
             result.set(i.id, i.stashInstanceId);
           }
         });

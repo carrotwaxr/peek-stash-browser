@@ -387,10 +387,11 @@ class UserStatsService {
       // Batch load all scenes for the watch history (with relations for performers/tags/studio)
       const sceneIds = watchHistory.map((wh) => wh.sceneId);
       const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
-      const sceneMap = new Map(scenes.map((s) => [s.id, s]));
+      // Use composite key (id + instanceId) to avoid cross-instance collisions
+      const sceneMap = new Map(scenes.map((s) => [`${s.id}\0${s.instanceId || ''}`, s]));
 
       for (const wh of watchHistory) {
-        const scene = sceneMap.get(wh.sceneId);
+        const scene = sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ''}`);
         if (!scene) continue;
 
         // Get instanceId from the watch history record

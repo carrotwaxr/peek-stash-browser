@@ -21,6 +21,7 @@ export type {
   NormalizedGroup,
   NormalizedImage,
   SceneScoringData,
+  WithInstanceId,
 } from "./entities.js";
 
 // Base filter types from Stash GraphQL

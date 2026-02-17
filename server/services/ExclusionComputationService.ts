@@ -43,6 +43,7 @@ interface ExclusionRecord {
   userId: number;
   entityType: string;
   entityId: string;
+  instanceId?: string;
   reason: string;
 }
 
@@ -113,7 +114,7 @@ class ExclusionComputationService {
       const seen = new Set<string>();
       const allExclusions: ExclusionRecord[] = [];
       for (const excl of allExclusionsRaw) {
-        const key = `${excl.entityType}:${excl.entityId}`;
+        const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ''}`;
         if (!seen.has(key)) {
           seen.add(key);
           allExclusions.push(excl);
@@ -242,12 +243,13 @@ class ExclusionComputationService {
       where: { userId },
     });
 
-    // Add hidden entities to exclusions
+    // Add hidden entities to exclusions (with instanceId for multi-instance scoping)
     for (const hidden of hiddenEntities) {
       exclusions.push({
         userId,
         entityType: hidden.entityType,
         entityId: hidden.entityId,
+        instanceId: hidden.instanceId || "",
         reason: "hidden",
       });
     }
@@ -274,90 +276,135 @@ class ExclusionComputationService {
     tx: TransactionClient
   ): Promise<ExclusionRecord[]> {
     const cascadeExclusions: ExclusionRecord[] = [];
-    const seen = new Set<string>(); // Track "entityType:entityId" to avoid duplicates
+    const seen = new Set<string>();
 
-    // Helper to add exclusion if not already seen
-    const addCascade = (entityType: string, entityId: string) => {
-      const key = `${entityType}:${entityId}`;
+    // Helper to add cascade exclusion if not already seen (with optional instance scoping)
+    const addCascade = (entityType: string, entityId: string, instanceId?: string) => {
+      const key = `${entityType}:${entityId}:${instanceId || ''}`;
       if (!seen.has(key)) {
         seen.add(key);
         cascadeExclusions.push({
           userId,
           entityType,
           entityId,
+          instanceId: instanceId || '',
           reason: "cascade",
         });
       }
     };
 
-    // Group direct exclusions by entity type
-    const excludedPerformers: string[] = [];
-    const excludedStudios: string[] = [];
-    const excludedTags: string[] = [];
-    const excludedGroups: string[] = [];
-    const excludedGalleries: string[] = [];
+    // Group direct exclusions by entity type, preserving instanceId for scoping
+    // Global exclusions (empty instanceId from UserContentRestriction) cascade to all instances
+    // Scoped exclusions (non-empty instanceId from UserHiddenEntity) cascade only within that instance
+    const excludedPerformers: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedStudios: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedTags: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedGroups: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedGalleries: Array<{ entityId: string; instanceId: string }> = [];
 
     for (const excl of directExclusions) {
+      const ref = { entityId: excl.entityId, instanceId: excl.instanceId || '' };
       switch (excl.entityType) {
         case "performer":
-          excludedPerformers.push(excl.entityId);
+          excludedPerformers.push(ref);
           break;
         case "studio":
-          excludedStudios.push(excl.entityId);
+          excludedStudios.push(ref);
           break;
         case "tag":
-          excludedTags.push(excl.entityId);
+          excludedTags.push(ref);
           break;
         case "group":
-          excludedGroups.push(excl.entityId);
+          excludedGroups.push(ref);
           break;
         case "gallery":
-          excludedGalleries.push(excl.entityId);
+          excludedGalleries.push(ref);
           break;
       }
     }
 
     // 1. Performer -> Scenes
     if (excludedPerformers.length > 0) {
-      const scenePerformers = await tx.scenePerformer.findMany({
-        where: { performerId: { in: excludedPerformers } },
-        select: { sceneId: true },
-      });
-      for (const sp of scenePerformers) {
-        addCascade("scene", sp.sceneId);
+      const globalIds = excludedPerformers.filter(e => !e.instanceId).map(e => e.entityId);
+      const scoped = excludedPerformers.filter(e => e.instanceId);
+
+      if (globalIds.length > 0) {
+        const sps = await tx.scenePerformer.findMany({
+          where: { performerId: { in: globalIds } },
+          select: { sceneId: true },
+        });
+        for (const sp of sps) addCascade("scene", sp.sceneId);
+      }
+      if (scoped.length > 0) {
+        const sps = await tx.scenePerformer.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              performerId: e.entityId,
+              performerInstanceId: e.instanceId,
+            })),
+          },
+          select: { sceneId: true, sceneInstanceId: true },
+        });
+        for (const sp of sps) addCascade("scene", sp.sceneId, sp.sceneInstanceId);
       }
     }
 
     // 2. Studio -> Scenes
     if (excludedStudios.length > 0) {
-      const studioScenes = await tx.stashScene.findMany({
-        where: {
-          studioId: { in: excludedStudios },
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      for (const scene of studioScenes) {
-        addCascade("scene", scene.id);
+      const globalIds = excludedStudios.filter(e => !e.instanceId).map(e => e.entityId);
+      const scoped = excludedStudios.filter(e => e.instanceId);
+
+      if (globalIds.length > 0) {
+        const scenes = await tx.stashScene.findMany({
+          where: { studioId: { in: globalIds }, deletedAt: null },
+          select: { id: true },
+        });
+        for (const s of scenes) addCascade("scene", s.id);
+      }
+      if (scoped.length > 0) {
+        const scenes = await tx.stashScene.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              studioId: e.entityId,
+              stashInstanceId: e.instanceId,
+            })),
+            deletedAt: null,
+          },
+          select: { id: true, stashInstanceId: true },
+        });
+        for (const s of scenes) addCascade("scene", s.id, s.stashInstanceId);
       }
     }
 
     // 3. Tag -> Scenes/Performers/Studios/Groups
     if (excludedTags.length > 0) {
+      const globalIds = excludedTags.filter(e => !e.instanceId).map(e => e.entityId);
+      const scoped = excludedTags.filter(e => e.instanceId);
+
       // 3a. Scenes with direct tag
-      const sceneTagsResult = await tx.sceneTag.findMany({
-        where: { tagId: { in: excludedTags } },
-        select: { sceneId: true },
-      });
-      for (const st of sceneTagsResult) {
-        addCascade("scene", st.sceneId);
+      if (globalIds.length > 0) {
+        const sts = await tx.sceneTag.findMany({
+          where: { tagId: { in: globalIds } },
+          select: { sceneId: true },
+        });
+        for (const st of sts) addCascade("scene", st.sceneId);
+      }
+      if (scoped.length > 0) {
+        const sts = await tx.sceneTag.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              tagId: e.entityId,
+              tagInstanceId: e.instanceId,
+            })),
+          },
+          select: { sceneId: true, sceneInstanceId: true },
+        });
+        for (const st of sts) addCascade("scene", st.sceneId, st.sceneInstanceId);
       }
 
       // 3b. Scenes with inherited tag (via inheritedTagIds JSON column)
-      // Batch all tags into a single query for efficiency
-      if (excludedTags.length > 0) {
-        // Build a query that checks if ANY of the excluded tags is in inheritedTagIds
-        const tagList = excludedTags.map(t => `'${t}'`).join(",");
+      if (globalIds.length > 0) {
+        const tagList = globalIds.map(t => `'${t}'`).join(",");
         const inheritedScenes = await (tx as any).$queryRaw`
           SELECT DISTINCT s.id FROM StashScene s
           WHERE s.deletedAt IS NULL
@@ -366,69 +413,166 @@ class ExclusionComputationService {
             WHERE je.value IN (${Prisma.raw(tagList)})
           )
         ` as Array<{ id: string }>;
-
-        for (const scene of inheritedScenes) {
-          addCascade("scene", scene.id);
+        for (const s of inheritedScenes) addCascade("scene", s.id);
+      }
+      if (scoped.length > 0) {
+        // Group scoped tags by instanceId for efficient batched queries
+        const scopedByInstance = new Map<string, string[]>();
+        for (const st of scoped) {
+          const list = scopedByInstance.get(st.instanceId) || [];
+          list.push(st.entityId);
+          scopedByInstance.set(st.instanceId, list);
+        }
+        for (const [instId, tagIds] of scopedByInstance) {
+          const tagList = tagIds.map(t => `'${t}'`).join(",");
+          const inheritedScenes = await (tx as any).$queryRaw`
+            SELECT DISTINCT s.id FROM StashScene s
+            WHERE s.deletedAt IS NULL
+            AND s.stashInstanceId = ${instId}
+            AND EXISTS (
+              SELECT 1 FROM json_each(s.inheritedTagIds) je
+              WHERE je.value IN (${Prisma.raw(tagList)})
+            )
+          ` as Array<{ id: string }>;
+          for (const s of inheritedScenes) addCascade("scene", s.id, instId);
         }
       }
 
       // 3c. Performers with tag
-      const performerTagsResult = await tx.performerTag.findMany({
-        where: { tagId: { in: excludedTags } },
-        select: { performerId: true },
-      });
-      for (const pt of performerTagsResult) {
-        addCascade("performer", pt.performerId);
+      if (globalIds.length > 0) {
+        const pts = await tx.performerTag.findMany({
+          where: { tagId: { in: globalIds } },
+          select: { performerId: true },
+        });
+        for (const pt of pts) addCascade("performer", pt.performerId);
+      }
+      if (scoped.length > 0) {
+        const pts = await tx.performerTag.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              tagId: e.entityId,
+              tagInstanceId: e.instanceId,
+            })),
+          },
+          select: { performerId: true, performerInstanceId: true },
+        });
+        for (const pt of pts) addCascade("performer", pt.performerId, pt.performerInstanceId);
       }
 
       // 3d. Studios with tag
-      const studioTagsResult = await tx.studioTag.findMany({
-        where: { tagId: { in: excludedTags } },
-        select: { studioId: true },
-      });
-      for (const st of studioTagsResult) {
-        addCascade("studio", st.studioId);
+      if (globalIds.length > 0) {
+        const sts = await tx.studioTag.findMany({
+          where: { tagId: { in: globalIds } },
+          select: { studioId: true },
+        });
+        for (const st of sts) addCascade("studio", st.studioId);
+      }
+      if (scoped.length > 0) {
+        const sts = await tx.studioTag.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              tagId: e.entityId,
+              tagInstanceId: e.instanceId,
+            })),
+          },
+          select: { studioId: true, studioInstanceId: true },
+        });
+        for (const st of sts) addCascade("studio", st.studioId, st.studioInstanceId);
       }
 
       // 3e. Groups with tag
-      const groupTagsResult = await tx.groupTag.findMany({
-        where: { tagId: { in: excludedTags } },
-        select: { groupId: true },
-      });
-      for (const gt of groupTagsResult) {
-        addCascade("group", gt.groupId);
+      if (globalIds.length > 0) {
+        const gts = await tx.groupTag.findMany({
+          where: { tagId: { in: globalIds } },
+          select: { groupId: true },
+        });
+        for (const gt of gts) addCascade("group", gt.groupId);
+      }
+      if (scoped.length > 0) {
+        const gts = await tx.groupTag.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              tagId: e.entityId,
+              tagInstanceId: e.instanceId,
+            })),
+          },
+          select: { groupId: true, groupInstanceId: true },
+        });
+        for (const gt of gts) addCascade("group", gt.groupId, gt.groupInstanceId);
       }
     }
 
     // 4. Group -> Scenes
     if (excludedGroups.length > 0) {
-      const sceneGroups = await tx.sceneGroup.findMany({
-        where: { groupId: { in: excludedGroups } },
-        select: { sceneId: true },
-      });
-      for (const sg of sceneGroups) {
-        addCascade("scene", sg.sceneId);
+      const globalIds = excludedGroups.filter(e => !e.instanceId).map(e => e.entityId);
+      const scoped = excludedGroups.filter(e => e.instanceId);
+
+      if (globalIds.length > 0) {
+        const sgs = await tx.sceneGroup.findMany({
+          where: { groupId: { in: globalIds } },
+          select: { sceneId: true },
+        });
+        for (const sg of sgs) addCascade("scene", sg.sceneId);
+      }
+      if (scoped.length > 0) {
+        const sgs = await tx.sceneGroup.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              groupId: e.entityId,
+              groupInstanceId: e.instanceId,
+            })),
+          },
+          select: { sceneId: true, sceneInstanceId: true },
+        });
+        for (const sg of sgs) addCascade("scene", sg.sceneId, sg.sceneInstanceId);
       }
     }
 
     // 5. Gallery -> Scenes/Images
     if (excludedGalleries.length > 0) {
+      const globalIds = excludedGalleries.filter(e => !e.instanceId).map(e => e.entityId);
+      const scoped = excludedGalleries.filter(e => e.instanceId);
+
       // 5a. Linked scenes
-      const sceneGalleries = await tx.sceneGallery.findMany({
-        where: { galleryId: { in: excludedGalleries } },
-        select: { sceneId: true },
-      });
-      for (const sg of sceneGalleries) {
-        addCascade("scene", sg.sceneId);
+      if (globalIds.length > 0) {
+        const sgs = await tx.sceneGallery.findMany({
+          where: { galleryId: { in: globalIds } },
+          select: { sceneId: true },
+        });
+        for (const sg of sgs) addCascade("scene", sg.sceneId);
+      }
+      if (scoped.length > 0) {
+        const sgs = await tx.sceneGallery.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              galleryId: e.entityId,
+              galleryInstanceId: e.instanceId,
+            })),
+          },
+          select: { sceneId: true, sceneInstanceId: true },
+        });
+        for (const sg of sgs) addCascade("scene", sg.sceneId, sg.sceneInstanceId);
       }
 
       // 5b. Images in gallery
-      const imageGalleries = await tx.imageGallery.findMany({
-        where: { galleryId: { in: excludedGalleries } },
-        select: { imageId: true },
-      });
-      for (const ig of imageGalleries) {
-        addCascade("image", ig.imageId);
+      if (globalIds.length > 0) {
+        const igs = await tx.imageGallery.findMany({
+          where: { galleryId: { in: globalIds } },
+          select: { imageId: true },
+        });
+        for (const ig of igs) addCascade("image", ig.imageId);
+      }
+      if (scoped.length > 0) {
+        const igs = await tx.imageGallery.findMany({
+          where: {
+            OR: scoped.map(e => ({
+              galleryId: e.entityId,
+              galleryInstanceId: e.instanceId,
+            })),
+          },
+          select: { imageId: true, imageInstanceId: true },
+        });
+        for (const ig of igs) addCascade("image", ig.imageId, ig.imageInstanceId);
       }
     }
 
@@ -462,30 +606,30 @@ class ExclusionComputationService {
   ): Promise<ExclusionRecord[]> {
     const emptyExclusions: ExclusionRecord[] = [];
 
-    // Build sets of already-excluded entity IDs by type
-    // These will be used in temporary tables for SQL-based filtering
-    const excludedSceneIds = new Set<string>();
-    const excludedImageIds = new Set<string>();
-    const excludedPerformerIds = new Set<string>();
-    const excludedStudioIds = new Set<string>();
-    const excludedGroupIds = new Set<string>();
+    // Track excluded entities with instanceId for multi-instance-aware temp tables
+    const excludedScenes: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedImages: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedPerformers: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedStudios: Array<{ entityId: string; instanceId: string }> = [];
+    const excludedGroups: Array<{ entityId: string; instanceId: string }> = [];
 
     for (const excl of priorExclusions) {
+      const ref = { entityId: excl.entityId, instanceId: excl.instanceId || '' };
       switch (excl.entityType) {
         case "scene":
-          excludedSceneIds.add(excl.entityId);
+          excludedScenes.push(ref);
           break;
         case "image":
-          excludedImageIds.add(excl.entityId);
+          excludedImages.push(ref);
           break;
         case "performer":
-          excludedPerformerIds.add(excl.entityId);
+          excludedPerformers.push(ref);
           break;
         case "studio":
-          excludedStudioIds.add(excl.entityId);
+          excludedStudios.push(ref);
           break;
         case "group":
-          excludedGroupIds.add(excl.entityId);
+          excludedGroups.push(ref);
           break;
       }
     }
@@ -493,22 +637,14 @@ class ExclusionComputationService {
     // 1. Empty galleries - galleries with 0 visible images
     // Use a temporary table to avoid loading all relationships into memory
     // Create temp table with excluded image IDs
-    if (excludedImageIds.size > 0) {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT PRIMARY KEY)
-      `;
+    await (tx as any).$executeRaw`
+      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (imageId, instanceId))
+    `;
+    await (tx as any).$executeRaw`DELETE FROM temp_excluded_images`;
+    if (excludedImages.length > 0) {
       await (tx as any).$executeRaw(Prisma.raw(`
-        DELETE FROM temp_excluded_images
+        INSERT INTO temp_excluded_images (imageId, instanceId) VALUES ${excludedImages.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
-      await (tx as any).$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_images (imageId) VALUES ${Array.from(excludedImageIds).map(id => `('${id}')`).join(',')}
-      `));
-    } else {
-      // If no excluded images, create empty temp table
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_images`;
     }
 
     // Query for empty galleries using temp table
@@ -521,7 +657,11 @@ class ExclusionComputationService {
         JOIN StashImage i ON ig.imageId = i.id AND ig.imageInstanceId = i.stashInstanceId
         WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId
           AND i.deletedAt IS NULL
-          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_images te
+            WHERE te.imageId = i.id
+            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+          )
       )
     ` as Array<{ galleryId: string }>;
 
@@ -536,34 +676,24 @@ class ExclusionComputationService {
 
     // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
     // Create temp tables for excluded entities
-    if (excludedSceneIds.size > 0) {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
+    await (tx as any).$executeRaw`
+      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (sceneId, instanceId))
+    `;
+    await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
+    if (excludedScenes.length > 0) {
       await (tx as any).$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_scenes (sceneId) VALUES ${Array.from(excludedSceneIds).map(id => `('${id}')`).join(',')}
+        INSERT INTO temp_excluded_scenes (sceneId, instanceId) VALUES ${excludedScenes.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
-    } else {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
     }
 
-    if (excludedPerformerIds.size > 0) {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
+    await (tx as any).$executeRaw`
+      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (performerId, instanceId))
+    `;
+    await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
+    if (excludedPerformers.length > 0) {
       await (tx as any).$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_performers (performerId) VALUES ${Array.from(excludedPerformerIds).map(id => `('${id}')`).join(',')}
+        INSERT INTO temp_excluded_performers (performerId, instanceId) VALUES ${excludedPerformers.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
-    } else {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
     }
 
     // Query for empty performers
@@ -571,20 +701,32 @@ class ExclusionComputationService {
       SELECT p.id as performerId
       FROM StashPerformer p
       WHERE p.deletedAt IS NULL
-      AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
+      AND NOT EXISTS (
+        SELECT 1 FROM temp_excluded_performers te
+        WHERE te.performerId = p.id
+        AND (te.instanceId = '' OR te.instanceId = p.stashInstanceId)
+      )
       AND NOT EXISTS (
         SELECT 1 FROM ScenePerformer sp
         JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
         WHERE sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
           AND s.deletedAt IS NULL
-          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_scenes te
+            WHERE te.sceneId = s.id
+            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM ImagePerformer ip
         JOIN StashImage i ON ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId
         WHERE ip.performerId = p.id AND ip.performerInstanceId = p.stashInstanceId
           AND i.deletedAt IS NULL
-          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_images te
+            WHERE te.imageId = i.id
+            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+          )
       )
     ` as Array<{ performerId: string }>;
 
@@ -598,37 +740,46 @@ class ExclusionComputationService {
     }
 
     // 3. Empty studios - studios with 0 visible scenes AND 0 visible images
-    if (excludedStudioIds.size > 0) {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
+    await (tx as any).$executeRaw`
+      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (studioId, instanceId))
+    `;
+    await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
+    if (excludedStudios.length > 0) {
       await (tx as any).$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_studios (studioId) VALUES ${Array.from(excludedStudioIds).map(id => `('${id}')`).join(',')}
+        INSERT INTO temp_excluded_studios (studioId, instanceId) VALUES ${excludedStudios.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
-    } else {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
     }
 
     const emptyStudios = await (tx as any).$queryRaw`
       SELECT st.id as studioId
       FROM StashStudio st
       WHERE st.deletedAt IS NULL
-      AND st.id NOT IN (SELECT studioId FROM temp_excluded_studios)
+      AND NOT EXISTS (
+        SELECT 1 FROM temp_excluded_studios te
+        WHERE te.studioId = st.id
+        AND (te.instanceId = '' OR te.instanceId = st.stashInstanceId)
+      )
       AND NOT EXISTS (
         SELECT 1 FROM StashScene s
         WHERE s.studioId = st.id
+          AND s.stashInstanceId = st.stashInstanceId
           AND s.deletedAt IS NULL
-          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_scenes te
+            WHERE te.sceneId = s.id
+            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM StashImage i
         WHERE i.studioId = st.id
+          AND i.stashInstanceId = st.stashInstanceId
           AND i.deletedAt IS NULL
-          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_images te
+            WHERE te.imageId = i.id
+            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+          )
       )
     ` as Array<{ studioId: string }>;
 
@@ -642,32 +793,35 @@ class ExclusionComputationService {
     }
 
     // 4. Empty groups - groups with 0 visible scenes
-    if (excludedGroupIds.size > 0) {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
+    await (tx as any).$executeRaw`
+      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (groupId, instanceId))
+    `;
+    await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
+    if (excludedGroups.length > 0) {
       await (tx as any).$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_groups (groupId) VALUES ${Array.from(excludedGroupIds).map(id => `('${id}')`).join(',')}
+        INSERT INTO temp_excluded_groups (groupId, instanceId) VALUES ${excludedGroups.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
-    } else {
-      await (tx as any).$executeRaw`
-        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT PRIMARY KEY)
-      `;
-      await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
     }
 
     const emptyGroups = await (tx as any).$queryRaw`
       SELECT g.id as groupId
       FROM StashGroup g
       WHERE g.deletedAt IS NULL
-      AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
+      AND NOT EXISTS (
+        SELECT 1 FROM temp_excluded_groups te
+        WHERE te.groupId = g.id
+        AND (te.instanceId = '' OR te.instanceId = g.stashInstanceId)
+      )
       AND NOT EXISTS (
         SELECT 1 FROM SceneGroup sg
         JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
         WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId
           AND s.deletedAt IS NULL
-          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_scenes te
+            WHERE te.sceneId = s.id
+            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+          )
       )
     ` as Array<{ groupId: string }>;
 
@@ -691,28 +845,44 @@ class ExclusionComputationService {
         JOIN StashScene s ON st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId
         WHERE st.tagId = t.id AND st.tagInstanceId = t.stashInstanceId
           AND s.deletedAt IS NULL
-          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_scenes te
+            WHERE te.sceneId = s.id
+            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM PerformerTag pt
         JOIN StashPerformer p ON pt.performerId = p.id AND pt.performerInstanceId = p.stashInstanceId
         WHERE pt.tagId = t.id AND pt.tagInstanceId = t.stashInstanceId
           AND p.deletedAt IS NULL
-          AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_performers te
+            WHERE te.performerId = p.id
+            AND (te.instanceId = '' OR te.instanceId = p.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM StudioTag stt
         JOIN StashStudio stu ON stt.studioId = stu.id AND stt.studioInstanceId = stu.stashInstanceId
         WHERE stt.tagId = t.id AND stt.tagInstanceId = t.stashInstanceId
           AND stu.deletedAt IS NULL
-          AND stu.id NOT IN (SELECT studioId FROM temp_excluded_studios)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_studios te
+            WHERE te.studioId = stu.id
+            AND (te.instanceId = '' OR te.instanceId = stu.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM GroupTag gt
         JOIN StashGroup g ON gt.groupId = g.id AND gt.groupInstanceId = g.stashInstanceId
         WHERE gt.tagId = t.id AND gt.tagInstanceId = t.stashInstanceId
           AND g.deletedAt IS NULL
-          AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
+          AND NOT EXISTS (
+            SELECT 1 FROM temp_excluded_groups te
+            WHERE te.groupId = g.id
+            AND (te.instanceId = '' OR te.instanceId = g.stashInstanceId)
+          )
       )
       AND NOT EXISTS (
         SELECT 1 FROM StashTag child
@@ -757,8 +927,8 @@ class ExclusionComputationService {
       });
 
       await tx.userEntityStats.upsert({
-        where: { userId_entityType: { userId, entityType } },
-        create: { userId, entityType, visibleCount: total - excluded },
+        where: { userId_entityType_instanceId: { userId, entityType, instanceId: "" } },
+        create: { userId, entityType, instanceId: "", visibleCount: total - excluded },
         update: { visibleCount: total - excluded },
       });
     }
@@ -858,9 +1028,9 @@ class ExclusionComputationService {
       // Add the direct exclusion
       await tx.userExcludedEntity.upsert({
         where: {
-          userId_entityType_entityId: { userId, entityType, entityId },
+          userId_entityType_entityId_instanceId: { userId, entityType, entityId, instanceId: "" },
         },
-        create: { userId, entityType, entityId, reason: "hidden" },
+        create: { userId, entityType, entityId, instanceId: "", reason: "hidden" },
         update: { reason: "hidden" },
       });
 
@@ -886,22 +1056,27 @@ class ExclusionComputationService {
     tx: TransactionClient,
     userId: number,
     entityType: string,
-    entityId: string
+    entityId: string,
+    instanceId?: string
   ): Promise<void> {
     const cascadeExclusions: Prisma.UserExcludedEntityCreateManyInput[] = [];
 
     switch (entityType) {
       case "performer": {
         // Performer -> Scenes
+        const where = instanceId
+          ? { performerId: entityId, performerInstanceId: instanceId }
+          : { performerId: entityId };
         const scenePerformers = await tx.scenePerformer.findMany({
-          where: { performerId: entityId },
-          select: { sceneId: true },
+          where,
+          select: { sceneId: true, sceneInstanceId: true },
         });
         for (const sp of scenePerformers) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: sp.sceneId,
+            instanceId: instanceId ? sp.sceneInstanceId : "",
             reason: "cascade",
           });
         }
@@ -910,15 +1085,19 @@ class ExclusionComputationService {
 
       case "studio": {
         // Studio -> Scenes
+        const where = instanceId
+          ? { studioId: entityId, stashInstanceId: instanceId, deletedAt: null }
+          : { studioId: entityId, deletedAt: null };
         const studioScenes = await tx.stashScene.findMany({
-          where: { studioId: entityId, deletedAt: null },
-          select: { id: true },
+          where,
+          select: { id: true, stashInstanceId: true },
         });
         for (const scene of studioScenes) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: scene.id,
+            instanceId: instanceId ? scene.stashInstanceId : "",
             reason: "cascade",
           });
         }
@@ -927,75 +1106,93 @@ class ExclusionComputationService {
 
       case "tag": {
         // Tag -> Scenes (direct)
+        const tagWhere = instanceId
+          ? { tagId: entityId, tagInstanceId: instanceId }
+          : { tagId: entityId };
         const sceneTags = await tx.sceneTag.findMany({
-          where: { tagId: entityId },
-          select: { sceneId: true },
+          where: tagWhere,
+          select: { sceneId: true, sceneInstanceId: true },
         });
         for (const st of sceneTags) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: st.sceneId,
+            instanceId: instanceId ? st.sceneInstanceId : "",
             reason: "cascade",
           });
         }
 
         // Tag -> Scenes (inherited via inheritedTagIds JSON column)
-        const inheritedScenes = await (tx as any).$queryRaw`
-          SELECT id FROM StashScene
-          WHERE deletedAt IS NULL
-          AND EXISTS (
-            SELECT 1 FROM json_each(inheritedTagIds)
-            WHERE json_each.value = ${entityId}
-          )
-        ` as Array<{ id: string }>;
+        const inheritedScenes = instanceId
+          ? await (tx as any).$queryRawUnsafe(
+              `SELECT id FROM StashScene WHERE deletedAt IS NULL AND stashInstanceId = ? AND EXISTS (SELECT 1 FROM json_each(inheritedTagIds) WHERE json_each.value = ?)`,
+              instanceId, entityId
+            ) as Array<{ id: string }>
+          : await (tx as any).$queryRawUnsafe(
+              `SELECT id FROM StashScene WHERE deletedAt IS NULL AND EXISTS (SELECT 1 FROM json_each(inheritedTagIds) WHERE json_each.value = ?)`,
+              entityId
+            ) as Array<{ id: string }>;
         for (const scene of inheritedScenes) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: scene.id,
+            instanceId: instanceId || "",
             reason: "cascade",
           });
         }
 
         // Tag -> Performers
+        const perfTagWhere = instanceId
+          ? { tagId: entityId, tagInstanceId: instanceId }
+          : { tagId: entityId };
         const performerTags = await tx.performerTag.findMany({
-          where: { tagId: entityId },
-          select: { performerId: true },
+          where: perfTagWhere,
+          select: { performerId: true, performerInstanceId: true },
         });
         for (const pt of performerTags) {
           cascadeExclusions.push({
             userId,
             entityType: "performer",
             entityId: pt.performerId,
+            instanceId: instanceId ? pt.performerInstanceId : "",
             reason: "cascade",
           });
         }
 
         // Tag -> Studios
+        const studioTagWhere = instanceId
+          ? { tagId: entityId, tagInstanceId: instanceId }
+          : { tagId: entityId };
         const studioTags = await tx.studioTag.findMany({
-          where: { tagId: entityId },
-          select: { studioId: true },
+          where: studioTagWhere,
+          select: { studioId: true, studioInstanceId: true },
         });
         for (const st of studioTags) {
           cascadeExclusions.push({
             userId,
             entityType: "studio",
             entityId: st.studioId,
+            instanceId: instanceId ? st.studioInstanceId : "",
             reason: "cascade",
           });
         }
 
         // Tag -> Groups
+        const groupTagWhere = instanceId
+          ? { tagId: entityId, tagInstanceId: instanceId }
+          : { tagId: entityId };
         const groupTags = await tx.groupTag.findMany({
-          where: { tagId: entityId },
-          select: { groupId: true },
+          where: groupTagWhere,
+          select: { groupId: true, groupInstanceId: true },
         });
         for (const gt of groupTags) {
           cascadeExclusions.push({
             userId,
             entityType: "group",
             entityId: gt.groupId,
+            instanceId: instanceId ? gt.groupInstanceId : "",
             reason: "cascade",
           });
         }
@@ -1004,15 +1201,19 @@ class ExclusionComputationService {
 
       case "group": {
         // Group -> Scenes
+        const where = instanceId
+          ? { groupId: entityId, groupInstanceId: instanceId }
+          : { groupId: entityId };
         const sceneGroups = await tx.sceneGroup.findMany({
-          where: { groupId: entityId },
-          select: { sceneId: true },
+          where,
+          select: { sceneId: true, sceneInstanceId: true },
         });
         for (const sg of sceneGroups) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: sg.sceneId,
+            instanceId: instanceId ? sg.sceneInstanceId : "",
             reason: "cascade",
           });
         }
@@ -1021,29 +1222,37 @@ class ExclusionComputationService {
 
       case "gallery": {
         // Gallery -> Scenes
+        const gallerySceneWhere = instanceId
+          ? { galleryId: entityId, galleryInstanceId: instanceId }
+          : { galleryId: entityId };
         const sceneGalleries = await tx.sceneGallery.findMany({
-          where: { galleryId: entityId },
-          select: { sceneId: true },
+          where: gallerySceneWhere,
+          select: { sceneId: true, sceneInstanceId: true },
         });
         for (const sg of sceneGalleries) {
           cascadeExclusions.push({
             userId,
             entityType: "scene",
             entityId: sg.sceneId,
+            instanceId: instanceId ? sg.sceneInstanceId : "",
             reason: "cascade",
           });
         }
 
         // Gallery -> Images
+        const galleryImageWhere = instanceId
+          ? { galleryId: entityId, galleryInstanceId: instanceId }
+          : { galleryId: entityId };
         const imageGalleries = await tx.imageGallery.findMany({
-          where: { galleryId: entityId },
-          select: { imageId: true },
+          where: galleryImageWhere,
+          select: { imageId: true, imageInstanceId: true },
         });
         for (const ig of imageGalleries) {
           cascadeExclusions.push({
             userId,
             entityType: "image",
             entityId: ig.imageId,
+            instanceId: instanceId ? ig.imageInstanceId : "",
             reason: "cascade",
           });
         }
@@ -1058,13 +1267,14 @@ class ExclusionComputationService {
         cascadeExclusions.map((exclusion) =>
           tx.userExcludedEntity.upsert({
             where: {
-              userId_entityType_entityId: {
+              userId_entityType_entityId_instanceId: {
                 userId: exclusion.userId,
                 entityType: exclusion.entityType,
                 entityId: exclusion.entityId,
+                instanceId: exclusion.instanceId || "",
               },
             },
-            create: exclusion,
+            create: { ...exclusion, instanceId: exclusion.instanceId || "" },
             update: {}, // No update needed - just ensure it exists
           })
         )

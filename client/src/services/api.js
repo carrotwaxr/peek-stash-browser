@@ -733,23 +733,29 @@ export const imageViewHistoryApi = {
   /**
    * Increment O counter for an image
    * @param {string} imageId - Image ID
+   * @param {string} [instanceId] - Optional Stash instance ID for multi-instance disambiguation
    * @returns {Promise<{success: boolean, oCount: number, timestamp: string}>}
    */
-  incrementO: (imageId) => apiPost("/image-view-history/increment-o", { imageId }),
+  incrementO: (imageId, instanceId) =>
+    apiPost("/image-view-history/increment-o", { imageId, ...(instanceId && { instanceId }) }),
 
   /**
    * Record image view
    * @param {string} imageId - Image ID
+   * @param {string} [instanceId] - Optional Stash instance ID for multi-instance disambiguation
    * @returns {Promise<{success: boolean, viewCount: number, lastViewedAt: string}>}
    */
-  recordView: (imageId) => apiPost("/image-view-history/view", { imageId }),
+  recordView: (imageId, instanceId) =>
+    apiPost("/image-view-history/view", { imageId, ...(instanceId && { instanceId }) }),
 
   /**
    * Get view history for specific image
    * @param {string} imageId - Image ID
+   * @param {string} [instanceId] - Optional Stash instance ID for multi-instance disambiguation
    * @returns {Promise<Object>} View history object
    */
-  getViewHistory: (imageId) => apiGet(`/image-view-history/${imageId}`),
+  getViewHistory: (imageId, instanceId) =>
+    apiGet(`/image-view-history/${imageId}${instanceId ? `?instanceId=${instanceId}` : ""}`),
 };
 
 // ============================================================================
@@ -964,10 +970,14 @@ export async function getClips(options = {}) {
 
 /**
  * Get clips for a scene
+ * @param {string} sceneId - Scene ID
+ * @param {string} [instanceId] - Optional Stash instance ID for multi-instance disambiguation
+ * @param {boolean} [includeUngenerated=false] - Include ungenerated clips
  */
-export async function getClipsForScene(sceneId, includeUngenerated = false) {
+export async function getClipsForScene(sceneId, instanceId, includeUngenerated = false) {
   const params = new URLSearchParams();
   if (includeUngenerated) params.set("includeUngenerated", "true");
+  if (instanceId) params.set("instanceId", instanceId);
   const queryString = params.toString();
   return apiGet(`/scenes/${sceneId}/clips${queryString ? `?${queryString}` : ""}`);
 }

@@ -5,6 +5,7 @@ vi.mock("../../prisma/singleton.js", () => ({
   default: {
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
     $executeRaw: vi.fn(),
     userExcludedEntity: {
       deleteMany: vi.fn(),
@@ -1098,13 +1099,14 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "performer",
             entityId: "perf1",
+            instanceId: "",
           },
         },
-        create: expect.objectContaining({ reason: "hidden" }),
+        create: expect.objectContaining({ reason: "hidden", instanceId: "" }),
         update: expect.objectContaining({ reason: "hidden" }),
       })
     );
@@ -1113,26 +1115,28 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "scene",
             entityId: "scene1",
+            instanceId: "",
           },
         },
-        create: expect.objectContaining({ reason: "cascade" }),
+        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
         update: {},
       })
     );
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "scene",
             entityId: "scene2",
+            instanceId: "",
           },
         },
-        create: expect.objectContaining({ reason: "cascade" }),
+        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
         update: {},
       })
     );
@@ -1141,7 +1145,7 @@ describe("addHiddenEntity", () => {
   it("should add hidden exclusion and cascade to scenes for studio", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
     mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", studioId: "studio1" },
+      { id: "scene1", stashInstanceId: "inst1", studioId: "studio1" },
     ]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
@@ -1152,17 +1156,18 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "studio",
             entityId: "studio1",
+            instanceId: "",
           },
         },
       })
     );
     expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
       where: { studioId: "studio1", deletedAt: null },
-      select: { id: true },
+      select: { id: true, stashInstanceId: true },
     });
     // Cascades now use upsert (SQLite compatibility)
     // 1 hidden + 1 cascade scene = 2 upserts
@@ -1171,11 +1176,11 @@ describe("addHiddenEntity", () => {
 
   it("should add hidden exclusion and cascade for tag to scenes, performers, studios, and groups", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneTag.findMany.mockResolvedValue([{ sceneId: "scene1", tagId: "tag1" }]);
-    mockPrisma.$queryRaw.mockResolvedValue([{ id: "scene2" }]); // inherited tag scene
-    mockPrisma.performerTag.findMany.mockResolvedValue([{ performerId: "perf1", tagId: "tag1" }]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([{ studioId: "studio1", tagId: "tag1" }]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([{ groupId: "group1", tagId: "tag1" }]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", tagId: "tag1" }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "scene2" }]); // inherited tag scene
+    mockPrisma.performerTag.findMany.mockResolvedValue([{ performerId: "perf1", performerInstanceId: "inst1", tagId: "tag1" }]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([{ studioId: "studio1", studioInstanceId: "inst1", tagId: "tag1" }]);
+    mockPrisma.groupTag.findMany.mockResolvedValue([{ groupId: "group1", groupInstanceId: "inst1", tagId: "tag1" }]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
     });
@@ -1184,19 +1189,19 @@ describe("addHiddenEntity", () => {
 
     expect(mockPrisma.sceneTag.findMany).toHaveBeenCalledWith({
       where: { tagId: "tag1" },
-      select: { sceneId: true },
+      select: { sceneId: true, sceneInstanceId: true },
     });
     expect(mockPrisma.performerTag.findMany).toHaveBeenCalledWith({
       where: { tagId: "tag1" },
-      select: { performerId: true },
+      select: { performerId: true, performerInstanceId: true },
     });
     expect(mockPrisma.studioTag.findMany).toHaveBeenCalledWith({
       where: { tagId: "tag1" },
-      select: { studioId: true },
+      select: { studioId: true, studioInstanceId: true },
     });
     expect(mockPrisma.groupTag.findMany).toHaveBeenCalledWith({
       where: { tagId: "tag1" },
-      select: { groupId: true },
+      select: { groupId: true, groupInstanceId: true },
     });
 
     // Cascades now use upsert (SQLite compatibility)
@@ -1207,8 +1212,8 @@ describe("addHiddenEntity", () => {
   it("should add hidden exclusion and cascade for group to scenes", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
     mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1", groupId: "group1" },
-      { sceneId: "scene2", groupId: "group1" },
+      { sceneId: "scene1", sceneInstanceId: "inst1", groupId: "group1" },
+      { sceneId: "scene2", sceneInstanceId: "inst1", groupId: "group1" },
     ]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
@@ -1218,7 +1223,7 @@ describe("addHiddenEntity", () => {
 
     expect(mockPrisma.sceneGroup.findMany).toHaveBeenCalledWith({
       where: { groupId: "group1" },
-      select: { sceneId: true },
+      select: { sceneId: true, sceneInstanceId: true },
     });
     // Cascades now use upsert instead of createMany (SQLite compatibility)
     // 1 upsert for the hidden entity + 2 upserts for cascade scenes
@@ -1227,10 +1232,10 @@ describe("addHiddenEntity", () => {
 
   it("should add hidden exclusion and cascade for gallery to scenes and images", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([{ sceneId: "scene1", galleryId: "gallery1" }]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", galleryId: "gallery1" }]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([
-      { imageId: "image1", galleryId: "gallery1" },
-      { imageId: "image2", galleryId: "gallery1" },
+      { imageId: "image1", imageInstanceId: "inst1", galleryId: "gallery1" },
+      { imageId: "image2", imageInstanceId: "inst1", galleryId: "gallery1" },
     ]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
@@ -1240,11 +1245,11 @@ describe("addHiddenEntity", () => {
 
     expect(mockPrisma.sceneGallery.findMany).toHaveBeenCalledWith({
       where: { galleryId: "gallery1" },
-      select: { sceneId: true },
+      select: { sceneId: true, sceneInstanceId: true },
     });
     expect(mockPrisma.imageGallery.findMany).toHaveBeenCalledWith({
       where: { galleryId: "gallery1" },
-      select: { imageId: true },
+      select: { imageId: true, imageInstanceId: true },
     });
 
     // Cascades now use upsert instead of createMany (SQLite compatibility)
@@ -1253,10 +1258,11 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "scene",
             entityId: "scene1",
+            instanceId: "",
           },
         },
       })
@@ -1264,10 +1270,11 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "image",
             entityId: "image1",
+            instanceId: "",
           },
         },
       })
@@ -1289,7 +1296,7 @@ describe("addHiddenEntity", () => {
 
   it("should use upsert for cascade exclusions to handle duplicates", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([{ sceneId: "scene1", performerId: "perf1" }]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", performerId: "perf1" }]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
     });
@@ -1302,13 +1309,14 @@ describe("addHiddenEntity", () => {
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_entityType_entityId: {
+          userId_entityType_entityId_instanceId: {
             userId: 1,
             entityType: "scene",
             entityId: "scene1",
+            instanceId: "",
           },
         },
-        create: expect.objectContaining({ reason: "cascade" }),
+        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
         update: {},
       })
     );
