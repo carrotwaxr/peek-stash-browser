@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
-
-const prisma = new PrismaClient();
 
 /**
  * Result of checking Stash instance configuration status

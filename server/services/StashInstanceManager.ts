@@ -1,8 +1,7 @@
-import { PrismaClient, StashInstance } from "@prisma/client";
+import type { StashInstance } from "@prisma/client";
 import { StashClient } from "../graphql/StashClient.js";
+import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
-
-const prisma = new PrismaClient();
 
 /**
  * Manages Stash server instance connections.

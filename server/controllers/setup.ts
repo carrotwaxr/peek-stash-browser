@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Request } from "express";
 import { StashClient } from "../graphql/StashClient.js";
+import prisma from "../prisma/singleton.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type {
@@ -29,8 +29,6 @@ import type {
   DeleteStashInstanceResponse,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
-
-const prisma = new PrismaClient();
 
 /**
  * Carousel preference configuration for user home page
