@@ -115,14 +115,17 @@ class ExclusionComputationService {
    */
   private async doRecomputeForUser(userId: number): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", { userId });
+    const t0 = Date.now();
 
     // === COMPUTATION PHASE (outside transaction — read-heavy, no write locks) ===
 
     // Phase 1: Compute direct exclusions (reads UserContentRestriction + UserHiddenEntity)
     const directExclusions = await this.computeDirectExclusions(userId, prisma);
+    const t1 = Date.now();
 
     // Phase 2: Compute cascade exclusions (reads junction tables)
     const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, prisma);
+    const t2 = Date.now();
 
     // Phase 3: Compute empty exclusions (uses temp tables — needs own transaction for connection affinity)
     // Prisma's connection pool may route sequential raw queries to different connections,
@@ -131,6 +134,7 @@ class ExclusionComputationService {
     const emptyExclusions = await prisma.$transaction(async (tx) => {
       return await this.computeEmptyExclusions(userId, previousExclusions, tx);
     }, { timeout: 60000 });
+    const t3 = Date.now();
 
     // Combine all exclusions and deduplicate
     // An entity can be excluded via multiple paths (e.g., cascade from performer + cascade from tag)
@@ -166,10 +170,18 @@ class ExclusionComputationService {
     }, {
       timeout: 30000,
     });
+    const t4 = Date.now();
 
     logger.info("ExclusionComputationService.recomputeForUser completed", {
       userId,
       totalExclusions: allExclusions.length,
+      timing: {
+        directMs: t1 - t0,
+        cascadeMs: t2 - t1,
+        emptyMs: t3 - t2,
+        writeMs: t4 - t3,
+        totalMs: t4 - t0,
+      },
     });
   }
 
