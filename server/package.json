@@ -1,6 +1,6 @@
 {
   "name": "peek-server",
-  "version": "3.3.3-beta.5",
+  "version": "3.3.3-beta.6",
   "description": "Backend for Peek Stash Browser. Handles serving the client, API endpoints, communication with media library manager (Stash), and transcoding",
   "type": "module",
   "main": "dist/index.js",
