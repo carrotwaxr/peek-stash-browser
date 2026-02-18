@@ -714,20 +714,24 @@ export const reorderPlaylist = async (
 
     // Update positions in a transaction
     await prisma.$transaction(
-      items.map((item) =>
-        prisma.playlistItem.update({
+      items.map((item) => {
+        const instanceId = instanceIdMap.get(item.sceneId);
+        if (!instanceId) {
+          throw new Error(`Missing instanceId for scene ${item.sceneId}`);
+        }
+        return prisma.playlistItem.update({
           where: {
             playlistId_instanceId_sceneId: {
               playlistId,
-              instanceId: instanceIdMap.get(item.sceneId)!,
+              instanceId,
               sceneId: item.sceneId,
             },
           },
           data: {
             position: item.position,
           },
-        })
-      )
+        });
+      })
     );
 
     res.json({ success: true, message: "Playlist reordered" });

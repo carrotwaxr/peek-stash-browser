@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Paper, Button } from "../ui/index.js";
 import { useAuth } from "../../hooks/useAuth.js";
 
@@ -24,11 +24,7 @@ const StashInstanceSection = ({ api }) => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  useEffect(() => {
-    loadInstances();
-  }, []);
-
-  const loadInstances = async () => {
+  const loadInstances = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,7 +45,11 @@ const StashInstanceSection = ({ api }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [api, isAdmin]);
+
+  useEffect(() => {
+    loadInstances();
+  }, [loadInstances]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";

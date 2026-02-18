@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Share2 } from "lucide-react";
 import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../services/api.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
@@ -10,13 +10,7 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
   const [userGroups, setUserGroups] = useState([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen, playlistId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [groupsResult, sharesResult] = await Promise.all([
@@ -32,7 +26,13 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [playlistId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData();
+    }
+  }, [isOpen, playlistId, loadData]);
 
   const handleToggleGroup = (groupId) => {
     setSelectedGroupIds((prev) => {

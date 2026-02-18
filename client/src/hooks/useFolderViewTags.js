@@ -70,6 +70,7 @@ export function useFolderViewTags(isActive, filters = null) {
     };
 
     fetchTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) captures all filter changes
   }, [isActive, filterKey]);
 
   return { tags, isLoading, error };

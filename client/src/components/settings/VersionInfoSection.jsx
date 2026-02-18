@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Paper } from "../ui/index.js";
 
 const VersionInfoSection = ({ clientVersion, api }) => {
@@ -7,21 +7,16 @@ const VersionInfoSection = ({ clientVersion, api }) => {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateError, setUpdateError] = useState(null);
 
-  useEffect(() => {
-    loadServerVersion();
-    checkForUpdates();
-  }, []);
-
-  const loadServerVersion = async () => {
+  const loadServerVersion = useCallback(async () => {
     try {
       const response = await api.get("/version");
       setServerVersion(response.data.server);
     } catch (err) {
       console.error("Failed to load server version:", err);
     }
-  };
+  }, [api]);
 
-  const checkForUpdates = async () => {
+  const checkForUpdates = useCallback(async () => {
     setCheckingUpdate(true);
     setUpdateError(null);
 
@@ -48,7 +43,12 @@ const VersionInfoSection = ({ clientVersion, api }) => {
     } finally {
       setCheckingUpdate(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadServerVersion();
+    checkForUpdates();
+  }, [loadServerVersion, checkForUpdates]);
 
   const parseVersion = (v) => {
     const [core, pre] = v.split("-");
