@@ -29,7 +29,6 @@ const MarqueeText = ({
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [overflowAmount, setOverflowAmount] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isInView, setIsInView] = useState(false);
@@ -98,19 +97,10 @@ const MarqueeText = ({
     return () => observer.disconnect();
   }, [autoplayOnScroll, hasHoverCapability]);
 
-  // Determine if animation should play
-  useEffect(() => {
-    if (prefersReducedMotion || !isOverflowing) {
-      setIsAnimating(false);
-      return;
-    }
-
-    const shouldAnimate = autoplayOnScroll && !hasHoverCapability
-      ? isInView
-      : isHovering;
-
-    setIsAnimating(shouldAnimate);
-  }, [isHovering, isInView, isOverflowing, hasHoverCapability, autoplayOnScroll, prefersReducedMotion]);
+  // Derive animation state at render time instead of via effect
+  const isAnimating = !prefersReducedMotion && isOverflowing && (
+    autoplayOnScroll && !hasHoverCapability ? isInView : isHovering
+  );
 
   // Calculate animation duration based on overflow amount
   // Target: ~30 pixels/second for comfortable, relaxed reading

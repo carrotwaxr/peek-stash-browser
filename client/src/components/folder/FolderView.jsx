@@ -1,5 +1,5 @@
 // client/src/components/folder/FolderView.jsx
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids.js";
 import { buildFolderTree } from "../../utils/buildFolderTree.js";
@@ -30,12 +30,15 @@ const FolderView = ({
     return pathParam ? pathParam.split(",").filter(Boolean) : [];
   }, [searchParams]);
 
-  // Notify parent when path changes (for API filtering by tag)
+  // Track last notified tag to avoid duplicate notifications
+  const lastNotifiedTagRef = useRef(undefined);
+
+  // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
   useEffect(() => {
-    if (onFolderPathChange) {
-      // Pass the deepest tag ID in the path (or null if at root)
-      const currentTagId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
-      onFolderPathChange(currentTagId);
+    const currentTagId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+    if (currentTagId !== lastNotifiedTagRef.current) {
+      lastNotifiedTagRef.current = currentTagId;
+      onFolderPathChange?.(currentTagId);
     }
   }, [currentPath, onFolderPathChange]);
 
@@ -53,8 +56,12 @@ const FolderView = ({
         next.delete("page");
         return next;
       });
+      // Eagerly notify parent (effect will deduplicate via ref)
+      const currentTagId = newPath.length > 0 ? newPath[newPath.length - 1] : null;
+      lastNotifiedTagRef.current = currentTagId;
+      onFolderPathChange?.(currentTagId);
     },
-    [setSearchParams]
+    [setSearchParams, onFolderPathChange]
   );
 
   // Build folder tree from items and tags

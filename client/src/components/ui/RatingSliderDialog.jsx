@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "../../hooks/useDebounce.js";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -40,8 +40,8 @@ const RatingSliderDialog = ({
     }
   }, [isOpen, initialRating]);
 
-  // Calculate position based on anchor element
-  useEffect(() => {
+  // Calculate position based on anchor element (useLayoutEffect prevents position flicker)
+  useLayoutEffect(() => {
     if (isOpen && anchorEl) {
       const rect = anchorEl.getBoundingClientRect();
       const popoverWidth = 280; // Match the width in the popover style

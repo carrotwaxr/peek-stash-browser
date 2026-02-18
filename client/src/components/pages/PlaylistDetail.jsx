@@ -98,13 +98,6 @@ const PlaylistDetail = () => {
   // Set page title to playlist name
   usePageTitle(playlist?.name || "Playlist");
 
-  // Clear selection when entering edit or reorder mode
-  useEffect(() => {
-    if (isEditing || reorderMode) {
-      setSelectedScenes([]);
-    }
-  }, [isEditing, reorderMode]);
-
   useEffect(() => {
     loadPlaylist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,7 +423,7 @@ const PlaylistDetail = () => {
                 {/* Edit button - owner only */}
                 {isOwner && (
                   <Button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => { setSelectedScenes([]); setIsEditing(true); }}
                     variant="primary"
                     icon={<Edit2 size={16} className="sm:w-4 sm:h-4" />}
                     title="Edit Playlist"
@@ -442,7 +435,7 @@ const PlaylistDetail = () => {
                 {/* Reorder button - owner only */}
                 {isOwner && scenes.length > 1 && (
                   <Button
-                    onClick={() => setReorderMode(true)}
+                    onClick={() => { setSelectedScenes([]); setReorderMode(true); }}
                     variant="secondary"
                     icon={<ArrowUpDown size={16} className="sm:w-4 sm:h-4" />}
                     title="Reorder Scenes"

@@ -1,5 +1,5 @@
 import { MoreVertical } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -13,8 +13,8 @@ const EntityMenu = ({ entityType, entityId, entityName, onHide }) => {
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Update menu position when opening
-  useEffect(() => {
+  // Update menu position when opening (useLayoutEffect prevents position flicker)
+  useLayoutEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setMenuPosition({

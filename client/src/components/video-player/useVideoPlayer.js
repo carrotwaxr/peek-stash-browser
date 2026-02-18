@@ -454,8 +454,9 @@ export function useVideoPlayer({
         console.log("[AUTO-FALLBACK] canplay fired, restoring position");
         player.currentTime(currentTime);
         console.log("[AUTO-FALLBACK] Playback started successfully");
-        // Update quality in state (quality selector UI)
+        // Update quality in state (quality selector UI) and track for watch history
         dispatch({ type: "SET_QUALITY", payload: bestQuality });
+        updateQuality(bestQuality);
         // Clear auto-fallback flag
         isAutoFallbackRef.current = false;
       });
@@ -606,13 +607,6 @@ export function useVideoPlayer({
   // ============================================================================
   // QUALITY SWITCHING (from useVideoPlayerSources)
   // ============================================================================
-
-  // Track quality changes for watch history
-  useEffect(() => {
-    if (quality) {
-      updateQuality(quality);
-    }
-  }, [quality, updateQuality]);
 
   // ============================================================================
   // AUTOPLAY AND RESUME (Stash pattern - simple and clean)
