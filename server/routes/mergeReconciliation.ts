@@ -80,7 +80,7 @@ router.post(
         id,
         targetSceneId,
         null, // Will be looked up if available
-        req.user!.id // Admin who initiated
+        req.user.id // Admin who initiated
       );
 
       res.json({
@@ -146,7 +146,7 @@ router.post(
             orphan.id,
             exactMatch.sceneId,
             orphan.phash,
-            req.user!.id
+            req.user.id
           );
           reconciled++;
         } else {

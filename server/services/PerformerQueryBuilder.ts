@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for performer filtering, sorting, and pagination.
  * Eliminates the need to load all performers into memory.
  */
-import type { PeekPerformerFilter, NormalizedPerformer } from "../types/index.js";
+import type { PeekPerformerFilter, NormalizedPerformer, TagRef, GroupRef, GalleryRef, StudioRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
@@ -588,7 +588,7 @@ class PerformerQueryBuilder {
 
     // Tag filter
     if (filters?.tags) {
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
@@ -596,7 +596,7 @@ class PerformerQueryBuilder {
 
     // Studio filter (performers appearing in scenes from specific studios)
     if (filters?.studios) {
-      const studioFilter = this.buildStudioFilter(filters.studios as any);
+      const studioFilter = this.buildStudioFilter(filters.studios);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -604,7 +604,7 @@ class PerformerQueryBuilder {
 
     // Scenes filter
     if (filters?.scenes) {
-      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      const scenesFilter = this.buildScenesFilter(filters.scenes);
       if (scenesFilter.sql) {
         whereClauses.push(scenesFilter);
       }
@@ -612,7 +612,7 @@ class PerformerQueryBuilder {
 
     // Group filter (performers appearing in scenes from specific groups)
     if (filters?.groups) {
-      const groupFilter = this.buildGroupFilter(filters.groups as any);
+      const groupFilter = this.buildGroupFilter(filters.groups);
       if (groupFilter.sql) {
         whereClauses.push(groupFilter);
       }
@@ -696,7 +696,7 @@ class PerformerQueryBuilder {
     }
 
     if (filters?.weight) {
-      const weightFilter = buildNumericFilter(filters.weight as any, "COALESCE(p.weightKg, 0)");
+      const weightFilter = buildNumericFilter(filters.weight, "COALESCE(p.weightKg, 0)");
       if (weightFilter.sql) {
         whereClauses.push(weightFilter);
       }
@@ -821,7 +821,7 @@ class PerformerQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -884,7 +884,9 @@ class PerformerQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedPerformer
    */
-  private transformRow(row: any): NormalizedPerformer {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a 30+ field interface adds maintenance overhead without real safety gain
+  private transformRow(row: Record<string, any>): NormalizedPerformer {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedPerformer from DB row; Performer base type requires fields we don't populate
     const performer: any = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -1021,28 +1023,34 @@ class PerformerQueryBuilder {
     ]);
 
     // Build lookup maps with minimal tooltip data, including instanceId for multi-instance routing
-    const tagsById = new Map(tags.map((t) => [t.id, {
+    const tagsById = new Map<string, TagRef>(tags.map((t) => [t.id, {
       id: t.id,
+      instanceId: t.stashInstanceId,
       name: t.name,
       image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+      favorite: t.favorite,
     }]));
 
-    const groupsById = new Map(groups.map((g) => [g.id, {
+    const groupsById = new Map<string, GroupRef>(groups.map((g) => [g.id, {
       id: g.id,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
+      back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
     }]));
 
-    const galleriesById = new Map(galleries.map((g) => [g.id, {
+    const galleriesById = new Map<string, GalleryRef>(galleries.map((g) => [g.id, {
       id: g.id,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
-    const studiosById = new Map(studios.map((s) => [s.id, {
+    const studiosById = new Map<string, StudioRef>(studios.map((s) => [s.id, {
       id: s.id,
+      instanceId: s.stashInstanceId,
       name: s.name,
       image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
+      favorite: s.favorite,
+      parent_studio: s.parentId ? { id: s.parentId } : null,
     }]));
 
     // Build performer -> scene mapping (keyed by composite performerId\0instanceId)
@@ -1075,7 +1083,7 @@ class PerformerQueryBuilder {
     }
 
     // Build performer -> tags map (keyed by composite performerId\0instanceId)
-    const tagsByPerformer = new Map<string, any[]>();
+    const tagsByPerformer = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
       const tag = tagsById.get(junction.tagId);
       if (!tag) continue;
@@ -1097,7 +1105,7 @@ class PerformerQueryBuilder {
     // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
       const performerKey = `${performer.id}${KEY_SEP}${performer.instanceId || ""}`;
-      performer.tags = tagsByPerformer.get(performerKey) || [];
+      performer.tags = (tagsByPerformer.get(performerKey) || []) as unknown as NormalizedPerformer["tags"];
 
       // Derive groups and studios from performer's scenes
       const performerSceneIds = scenesByPerformer.get(performerKey) || new Set();
@@ -1114,9 +1122,9 @@ class PerformerQueryBuilder {
       // Galleries come from direct GalleryPerformer association
       const performerGalleryIds = galleriesByPerformer.get(performerKey) || new Set();
 
-      (performer as any).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter(Boolean);
-      (performer as any).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter(Boolean);
-      (performer as any).studios = [...performerStudioIds].map((id) => studiosById.get(id)).filter(Boolean);
+      (performer as unknown as { groups: GroupRef[] }).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter((g): g is GroupRef => !!g);
+      (performer as unknown as { galleries: GalleryRef[] }).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter((g): g is GalleryRef => !!g);
+      (performer as unknown as { studios: StudioRef[] }).studios = [...performerStudioIds].map((id) => studiosById.get(id)).filter((s): s is StudioRef => !!s);
     }
   }
 

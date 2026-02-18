@@ -95,7 +95,7 @@ class UserHiddenEntityService {
    * @returns Number of entities unhidden
    */
   async unhideAll(userId: number, entityType?: string): Promise<number> {
-    const where: any = { userId };
+    const where: { userId: number; entityType?: string } = { userId };
     if (entityType) {
       where.entityType = entityType;
     }
@@ -125,10 +125,10 @@ class UserHiddenEntityService {
       entityType: EntityType;
       entityId: string;
       hiddenAt: Date;
-      entity: any; // Full entity data from Stash cache
+      entity: Record<string, unknown> | null; // Full entity data from Stash cache
     }>
   > {
-    const where: any = { userId };
+    const where: { userId: number; entityType?: EntityType } = { userId };
     if (entityType) {
       where.entityType = entityType;
     }

@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for studio filtering, sorting, and pagination.
  * Eliminates the need to load all studios into memory.
  */
-import type { PeekStudioFilter, NormalizedStudio } from "../types/index.js";
+import type { PeekStudioFilter, NormalizedStudio, TagRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
@@ -266,7 +266,7 @@ class StudioQueryBuilder {
 
     // Tag filter
     if (filters?.tags) {
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
@@ -363,7 +363,7 @@ class StudioQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -426,7 +426,9 @@ class StudioQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedStudio
    */
-  private transformRow(row: any): NormalizedStudio {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private transformRow(row: Record<string, any>): NormalizedStudio {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studio: any = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -567,11 +569,12 @@ class StudioQueryBuilder {
     ]);
 
     // Build lookup maps by composite key (id:instanceId)
-    const tagsById = new Map(tags.map((t) => [`${t.id}:${t.stashInstanceId}`, {
+    const tagsById = new Map<string, TagRef>(tags.map((t) => [`${t.id}:${t.stashInstanceId}`, {
       id: t.id,
       instanceId: t.stashInstanceId,
       name: t.name,
       image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+      favorite: t.favorite,
     }]));
 
     const performersById = new Map(performers.map((p) => [`${p.id}:${p.stashInstanceId}`, {
@@ -599,7 +602,7 @@ class StudioQueryBuilder {
     const studioByScene = new Map(scenes.map((s) => [`${s.id}:${s.stashInstanceId}`, { studioId: s.studioId, instanceId: s.stashInstanceId }]));
 
     // Build studio -> tags map using composite keys
-    const tagsByStudio = new Map<string, any[]>();
+    const tagsByStudio = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
       const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
       const tag = tagsById.get(tagKey);
@@ -650,10 +653,13 @@ class StudioQueryBuilder {
     // Populate studios using composite keys
     for (const studio of studios) {
       const studioKey = `${studio.id}:${studio.instanceId}`;
-      studio.tags = tagsByStudio.get(studioKey) || [];
-      (studio as any).performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter(Boolean);
-      (studio as any).groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter(Boolean);
-      (studio as any).galleries = [...(galleriesByStudio.get(studioKey) || [])].map((key) => galleriesById.get(key)).filter(Boolean);
+      studio.tags = (tagsByStudio.get(studioKey) || []) as unknown as NormalizedStudio["tags"];
+      const performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter(Boolean);
+      (studio as unknown as { performers: typeof performers }).performers = performers;
+      const groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter(Boolean);
+      (studio as unknown as { groups: typeof groups }).groups = groups;
+      const studioGalleryList = [...(galleriesByStudio.get(studioKey) || [])].map((key) => galleriesById.get(key)).filter(Boolean);
+      (studio as unknown as { galleries: typeof studioGalleryList }).galleries = studioGalleryList;
     }
   }
 

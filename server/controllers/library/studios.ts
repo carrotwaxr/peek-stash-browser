@@ -235,7 +235,7 @@ export function applyStudioFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((s) => {
-        const studioTagIds = (s.tags || []).map((t: any) => String(t.id));
+        const studioTagIds = (s.tags || []).map((t: { id: string }) => String(t.id));
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {

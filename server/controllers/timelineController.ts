@@ -13,7 +13,7 @@ export async function getDateDistribution(
 ): Promise<void> {
   const { entityType } = req.params;
   const granularity = (req.query.granularity as string) || "months";
-  const userId = req.user!.id;
+  const userId = req.user.id;
 
   // Parse optional filter params
   const filters: TimelineFilters = {};

@@ -44,7 +44,7 @@ export async function getDescendantTagIds(
         if (!childrenMap.has(parentId)) {
           childrenMap.set(parentId, []);
         }
-        childrenMap.get(parentId)!.push(String(tag.id));
+        childrenMap.get(parentId)?.push(String(tag.id));
       }
     }
   }
@@ -54,7 +54,9 @@ export async function getDescendantTagIds(
   ];
 
   while (queue.length > 0) {
-    const { id, currentDepth } = queue.shift()!;
+    const item = queue.shift();
+    if (!item) continue;
+    const { id, currentDepth } = item;
 
     // Check if we've reached the depth limit (depth -1 means infinite)
     if (depth !== -1 && currentDepth >= depth) {
@@ -103,7 +105,7 @@ export async function getDescendantStudioIds(
       if (!childrenMap.has(parentId)) {
         childrenMap.set(parentId, []);
       }
-      childrenMap.get(parentId)!.push(String(studio.id));
+      childrenMap.get(parentId)?.push(String(studio.id));
     }
   }
 
@@ -113,7 +115,9 @@ export async function getDescendantStudioIds(
   ];
 
   while (queue.length > 0) {
-    const { id, currentDepth } = queue.shift()!;
+    const item = queue.shift();
+    if (!item) continue;
+    const { id, currentDepth } = item;
 
     // Check if we've reached the depth limit (depth -1 means infinite)
     if (depth !== -1 && currentDepth >= depth) {
@@ -207,7 +211,7 @@ export async function hydrateTagRelationships<T extends { id: string; name?: str
         if (!childrenMap.has(parent.id)) {
           childrenMap.set(parent.id, []);
         }
-        childrenMap.get(parent.id)!.push({
+        childrenMap.get(parent.id)?.push({
           id: tag.id,
           name: tag.name || "Unknown",
         });
@@ -295,7 +299,7 @@ export async function hydrateStudioRelationships<T extends { id: string; name?: 
       if (!childrenMap.has(parentId)) {
         childrenMap.set(parentId, []);
       }
-      childrenMap.get(parentId)!.push({
+      childrenMap.get(parentId)?.push({
         id: studio.id,
         name: studio.name || "Unknown",
       });

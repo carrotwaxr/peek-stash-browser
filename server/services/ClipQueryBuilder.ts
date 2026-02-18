@@ -302,7 +302,7 @@ class ClipQueryBuilder {
       if (!tagMap.has(key)) {
         tagMap.set(key, []);
       }
-      tagMap.get(key)!.push({
+      tagMap.get(key)?.push({
         id: tag.tagId,
         name: tag.tagName,
         color: tag.tagColor,

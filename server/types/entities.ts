@@ -208,6 +208,54 @@ export type NormalizedImage = Image & {
 export type WithInstanceId<T> = T & { instanceId: string };
 
 /**
+ * Lightweight relation reference types
+ *
+ * These types represent the transformed entity shapes used in QueryBuilder
+ * relation maps and populated relation arrays. They are the output of
+ * transformStash* helper methods across all QueryBuilder files.
+ */
+export interface PerformerRef {
+  id: string;
+  instanceId: string;
+  name: string;
+  disambiguation: string | null;
+  gender: string | null;
+  image_path: string | null;
+  favorite: boolean | null;
+  rating100: number | null;
+}
+
+export interface TagRef {
+  id: string;
+  instanceId: string;
+  name: string;
+  image_path: string | null;
+  favorite: boolean | null;
+}
+
+export interface StudioRef {
+  id: string;
+  instanceId: string;
+  name: string;
+  image_path: string | null;
+  favorite: boolean | null;
+  parent_studio: { id: string } | null;
+}
+
+export interface GroupRef {
+  id: string;
+  name: string;
+  front_image_path: string | null;
+  back_image_path: string | null;
+}
+
+export interface GalleryRef {
+  id: string;
+  title: string | null;
+  cover: string | null;
+}
+
+/**
  * Lightweight scene data for scoring operations
  * Contains only IDs needed for similarity/recommendation scoring
  */

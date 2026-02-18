@@ -173,7 +173,7 @@ export const findPerformers = async (
     };
 
     // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
-    const specificInstanceId = (performer_filter as any)?.instance_id as string | undefined;
+    const specificInstanceId = performer_filter?.instance_id as string | undefined;
 
     // Use SQL query builder - admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
@@ -256,7 +256,7 @@ export const findPerformers = async (
  */
 export async function applyPerformerFilters(
   performers: NormalizedPerformer[],
-  filters: (PeekPerformerFilter & Record<string, any>) | null | undefined
+  filters: PeekPerformerFilter | null | undefined
 ): Promise<NormalizedPerformer[]> {
   if (!filters) return performers;
 
@@ -289,7 +289,7 @@ export async function applyPerformerFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((p) => {
-        const performerTagIds = (p.tags || []).map((t: any) => String(t.id));
+        const performerTagIds = (p.tags || []).map((t: { id: string }) => String(t.id));
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {

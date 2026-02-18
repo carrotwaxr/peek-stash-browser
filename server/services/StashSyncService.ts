@@ -13,9 +13,26 @@
  */
 
 import { EventEmitter } from "events";
-import type { Gallery, Group, Performer, Scene, Studio, Tag } from "../graphql/types.js";
 import { SortDirectionEnum, CriterionModifier } from "../graphql/generated/graphql.js";
-import type { FindFilterType, SceneMarkerFilterType } from "../graphql/generated/graphql.js";
+import type {
+  FindFilterType,
+  SceneMarkerFilterType,
+  SceneFilterType,
+  PerformerFilterType,
+  StudioFilterType,
+  TagFilterType,
+  GroupFilterType,
+  GalleryFilterType,
+  ImageFilterType,
+  FindScenesCompactQuery,
+  FindPerformersQuery,
+  FindStudiosQuery,
+  FindTagsQuery,
+  FindGroupsQuery,
+  FindGalleriesQuery,
+  FindImagesQuery,
+} from "../graphql/generated/graphql.js";
+import type { SyncState, SyncSettings } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
@@ -27,6 +44,23 @@ import { userStatsService } from "./UserStatsService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
+
+// Type aliases for query-specific entity types returned by the GraphQL SDK.
+// These carry the exact field sets from the queries (including fields like stash_ids, tags, etc.)
+// that the generic Scene/Performer/etc. types from the full schema may represent differently.
+type SyncScene = FindScenesCompactQuery["findScenes"]["scenes"][number];
+type SyncPerformer = FindPerformersQuery["findPerformers"]["performers"][number];
+type SyncStudio = FindStudiosQuery["findStudios"]["studios"][number];
+type SyncTag = FindTagsQuery["findTags"]["tags"][number];
+type SyncGroup = FindGroupsQuery["findGroups"]["groups"][number];
+type SyncGallery = FindGalleriesQuery["findGalleries"]["galleries"][number];
+type SyncImage = FindImagesQuery["findImages"]["images"][number];
+
+/** Minimal tag reference shape used in junction table syncing */
+interface TagRef {
+  id: string;
+  name?: string;
+}
 
 export interface SyncProgress {
   entityType: string;
@@ -637,8 +671,8 @@ class StashSyncService extends EventEmitter {
     stashInstanceId?: string
   ): Promise<number> {
     const stash = this.getStashClient(stashInstanceId);
-    const filter = {
-      updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(since) },
+    const updatedAtFilter = {
+      updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(since) },
     };
 
     try {
@@ -646,49 +680,49 @@ class StashSyncService extends EventEmitter {
         case "scene": {
           const result = await stash.findScenesCompact({
             filter: { page: 1, per_page: 0 },
-            scene_filter: filter as any,
+            scene_filter: updatedAtFilter,
           });
           return result.findScenes.count;
         }
         case "performer": {
           const result = await stash.findPerformers({
             filter: { page: 1, per_page: 0 },
-            performer_filter: filter as any,
+            performer_filter: updatedAtFilter,
           });
           return result.findPerformers.count;
         }
         case "studio": {
           const result = await stash.findStudios({
             filter: { page: 1, per_page: 0 },
-            studio_filter: filter as any,
+            studio_filter: updatedAtFilter,
           });
           return result.findStudios.count;
         }
         case "tag": {
           const result = await stash.findTags({
             filter: { page: 1, per_page: 0 },
-            tag_filter: filter as any,
+            tag_filter: updatedAtFilter,
           });
           return result.findTags.count;
         }
         case "group": {
           const result = await stash.findGroups({
             filter: { page: 1, per_page: 0 },
-            group_filter: filter as any,
+            group_filter: updatedAtFilter,
           });
           return result.findGroups.count;
         }
         case "gallery": {
           const result = await stash.findGalleries({
             filter: { page: 1, per_page: 0 },
-            gallery_filter: filter as any,
+            gallery_filter: updatedAtFilter,
           });
           return result.findGalleries.count;
         }
         case "image": {
           const result = await stash.findImages({
             filter: { page: 1, per_page: 0 },
-            image_filter: filter as any,
+            image_filter: updatedAtFilter,
           });
           return result.findImages.count;
         }
@@ -941,9 +975,11 @@ class StashSyncService extends EventEmitter {
     switch (entityType) {
       case "scene": {
         // Use findScenes with ids filter for single scene
+        // findScenes returns SyncSceneFull, which is structurally compatible with SyncScene
+        // (missing fields like urls/captions are handled by || [] fallbacks in processScenesBatch)
         const result = await stash.findScenes({ ids: [entityId] });
         if (result.findScenes.scenes.length > 0) {
-          await this.processScenesBatch(result.findScenes.scenes as Scene[], instanceId, 0, 1);
+          await this.processScenesBatch(result.findScenes.scenes as unknown as SyncScene[], instanceId, 0, 1);
         }
         break;
       }
@@ -951,7 +987,7 @@ class StashSyncService extends EventEmitter {
         const result = await stash.findPerformers({ ids: [entityId] });
         if (result.findPerformers.performers.length > 0) {
           await this.processPerformersBatch(
-            result.findPerformers.performers as Performer[],
+            result.findPerformers.performers,
             instanceId
           );
         }
@@ -960,28 +996,28 @@ class StashSyncService extends EventEmitter {
       case "studio": {
         const result = await stash.findStudios({ ids: [entityId] });
         if (result.findStudios.studios.length > 0) {
-          await this.processStudiosBatch(result.findStudios.studios as Studio[], instanceId);
+          await this.processStudiosBatch(result.findStudios.studios, instanceId);
         }
         break;
       }
       case "tag": {
         const result = await stash.findTags({ ids: [entityId] });
         if (result.findTags.tags.length > 0) {
-          await this.processTagsBatch(result.findTags.tags as Tag[], instanceId);
+          await this.processTagsBatch(result.findTags.tags, instanceId);
         }
         break;
       }
       case "group": {
         const result = await stash.findGroup({ id: entityId });
         if (result.findGroup) {
-          await this.processGroupsBatch([result.findGroup as Group], instanceId);
+          await this.processGroupsBatch([result.findGroup as SyncGroup], instanceId);
         }
         break;
       }
       case "gallery": {
         const result = await stash.findGallery({ id: entityId });
         if (result.findGallery) {
-          await this.processGalleriesBatch([result.findGallery as Gallery], instanceId);
+          await this.processGalleriesBatch([result.findGallery as SyncGallery], instanceId);
         }
         break;
       }
@@ -1031,15 +1067,15 @@ class StashSyncService extends EventEmitter {
 
         // Build filter for incremental sync
         // Use formatTimestampForStash to handle Stash's timezone quirks
-        const sceneFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const sceneFilter: SceneFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         logger.debug(`Fetching scenes page ${page}...`);
         const fetchStart = Date.now();
         const result = await stash.findScenesCompact({
           filter: { page, per_page: this.PAGE_SIZE },
-          scene_filter: sceneFilter as any,
+          scene_filter: sceneFilter,
         });
         logger.debug(`Fetched page ${page} in ${Date.now() - fetchStart}ms`);
 
@@ -1055,7 +1091,7 @@ class StashSyncService extends EventEmitter {
         }
 
         // Process batch with progress logging every 500 items
-        await this.processScenesBatch(scenes as Scene[], stashInstanceId, totalSynced, totalCount);
+        await this.processScenesBatch(scenes, stashInstanceId, totalSynced, totalCount);
 
         totalSynced += scenes.length;
         this.emit("progress", {
@@ -1102,7 +1138,7 @@ class StashSyncService extends EventEmitter {
   }
 
   private async processScenesBatch(
-    scenes: Scene[],
+    scenes: SyncScene[],
     stashInstanceId: string,
     _batchStart: number,
     _totalCount: number
@@ -1148,7 +1184,9 @@ class StashSyncService extends EventEmitter {
     const sceneValues = validScenes
       .map((scene) => {
         const file = scene.files?.[0];
-        const paths = scene.paths as any; // Cast to any to access optional chapters_vtt
+        const paths = scene.paths;
+        // Stash may return extra fields (chapters_vtt, stream) not in the GraphQL query selection
+        const pathsExtended = scene.paths as Record<string, unknown>;
         // Extract phashes from files
         const { phash, phashes } = extractPhashes(scene.files);
 
@@ -1177,8 +1215,8 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(paths?.preview)},
       ${this.escapeNullable(paths?.sprite)},
       ${this.escapeNullable(paths?.vtt)},
-      ${this.escapeNullable(paths?.chapters_vtt)},
-      ${this.escapeNullable(paths?.stream)},
+      ${this.escapeNullable(pathsExtended?.chapters_vtt as string | undefined)},
+      ${this.escapeNullable(pathsExtended?.stream as string | undefined)},
       ${this.escapeNullable(paths?.caption)},
       ${this.escapeNullable(JSON.stringify(scene.captions || []))},
       ${this.escapeNullable(JSON.stringify(scene.sceneStreams || []))},
@@ -1265,11 +1303,10 @@ class StashSyncService extends EventEmitter {
         }
       }
       for (const g of scene.groups || []) {
-        const groupObj = (g as any).group || g;
-        if (validateEntityId(groupObj.id)) {
-          const index = (g as any).scene_index ?? "NULL";
+        if (validateEntityId(g.group.id)) {
+          const index = g.scene_index ?? "NULL";
           groupRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(groupObj.id)}', '${this.escape(instanceId)}', ${index})`
+            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(g.group.id)}', '${this.escape(instanceId)}', ${index})`
           );
         }
       }
@@ -1641,13 +1678,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const performerFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const performerFilter: PerformerFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findPerformers({
           filter: { page, per_page: this.PAGE_SIZE },
-          performer_filter: performerFilter as any,
+          performer_filter: performerFilter,
         });
 
         const performers = result.findPerformers.performers;
@@ -1661,7 +1698,7 @@ class StashSyncService extends EventEmitter {
           maxUpdatedAt = batchMax;
         }
 
-        await this.processPerformersBatch(performers as Performer[], stashInstanceId);
+        await this.processPerformersBatch(performers, stashInstanceId);
 
         totalSynced += performers.length;
         this.emit("progress", {
@@ -1707,7 +1744,7 @@ class StashSyncService extends EventEmitter {
   }
 
   private async processPerformersBatch(
-    performers: Performer[],
+    performers: SyncPerformer[],
     stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
@@ -1720,9 +1757,8 @@ class StashSyncService extends EventEmitter {
     const values = validPerformers
       .map((performer) => {
         // Serialize stash_ids array to JSON for deduplication
-        const stashIds = (performer as any).stash_ids;
-        const stashIdsJson = stashIds && stashIds.length > 0
-          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+        const stashIdsJson = performer.stash_ids.length > 0
+          ? JSON.stringify(performer.stash_ids.map((s) => ({
               endpoint: s.endpoint,
               stash_id: s.stash_id,
             })))
@@ -1757,7 +1793,7 @@ class StashSyncService extends EventEmitter {
       ${performer.scene_count ?? 0},
       ${performer.image_count ?? 0},
       ${performer.gallery_count ?? 0},
-      ${(performer as any).group_count ?? 0},
+      ${performer.group_count ?? 0},
       ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
       ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1815,9 +1851,8 @@ class StashSyncService extends EventEmitter {
     // Collect all tag relationships for batch insert
     const tagInserts: { performerId: string; tagId: string }[] = [];
     for (const performer of validPerformers) {
-      const performerTags = (performer as any).tags;
-      if (performerTags && Array.isArray(performerTags) && performerTags.length > 0) {
-        for (const tag of performerTags) {
+      if (performer.tags && performer.tags.length > 0) {
+        for (const tag of performer.tags) {
           if (tag?.id && validateEntityId(tag.id)) {
             tagInserts.push({
               performerId: performer.id,
@@ -1872,13 +1907,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const studioFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const studioFilter: StudioFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findStudios({
           filter: { page, per_page: this.PAGE_SIZE },
-          studio_filter: studioFilter as any,
+          studio_filter: studioFilter,
         });
 
         const studios = result.findStudios.studios;
@@ -1892,7 +1927,7 @@ class StashSyncService extends EventEmitter {
           maxUpdatedAt = batchMax;
         }
 
-        await this.processStudiosBatch(studios as Studio[], stashInstanceId);
+        await this.processStudiosBatch(studios, stashInstanceId);
 
         totalSynced += studios.length;
         this.emit("progress", {
@@ -1938,7 +1973,7 @@ class StashSyncService extends EventEmitter {
   }
 
   private async processStudiosBatch(
-    studios: Studio[],
+    studios: SyncStudio[],
     stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
@@ -1951,9 +1986,8 @@ class StashSyncService extends EventEmitter {
     const values = validStudios
       .map((studio) => {
         // Serialize stash_ids array to JSON for deduplication
-        const stashIds = (studio as any).stash_ids;
-        const stashIdsJson = stashIds && stashIds.length > 0
-          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+        const stashIdsJson = studio.stash_ids.length > 0
+          ? JSON.stringify(studio.stash_ids.map((s) => ({
               endpoint: s.endpoint,
               stash_id: s.stash_id,
             })))
@@ -1970,8 +2004,8 @@ class StashSyncService extends EventEmitter {
       ${studio.scene_count ?? 0},
       ${studio.image_count ?? 0},
       ${studio.gallery_count ?? 0},
-      ${(studio as any).performer_count ?? 0},
-      ${(studio as any).group_count ?? 0},
+      ${studio.performer_count ?? 0},
+      ${studio.group_count ?? 0},
       ${this.escapeNullable(studio.details)},
       ${this.escapeNullable(studio.url)},
       ${this.escapeNullable(studio.image_path)},
@@ -2013,8 +2047,7 @@ class StashSyncService extends EventEmitter {
     // Sync studio tags to StudioTag junction table
     const instanceId = stashInstanceId;
     for (const studio of validStudios) {
-      const studioTags = (studio as any).tags;
-      if (studioTags && Array.isArray(studioTags) && studioTags.length > 0) {
+      if (studio.tags && studio.tags.length > 0) {
         const studioId = studio.id;
 
         // Delete existing tags for this studio
@@ -2023,10 +2056,10 @@ class StashSyncService extends EventEmitter {
         );
 
         // Insert new tags (filter to valid tag IDs)
-        const validTags = studioTags.filter((t: any) => t?.id && validateEntityId(t.id));
+        const validTags = studio.tags.filter((t: TagRef) => t?.id && validateEntityId(t.id));
         if (validTags.length > 0) {
           const tagValues = validTags
-            .map((t: any) => `('${this.escape(studioId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
+            .map((t: TagRef) => `('${this.escape(studioId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
             .join(", ");
 
           await prisma.$executeRawUnsafe(
@@ -2063,13 +2096,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const tagFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const tagFilter: TagFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findTags({
           filter: { page, per_page: this.PAGE_SIZE },
-          tag_filter: tagFilter as any,
+          tag_filter: tagFilter,
         });
 
         const tags = result.findTags.tags;
@@ -2083,7 +2116,7 @@ class StashSyncService extends EventEmitter {
           maxUpdatedAt = batchMax;
         }
 
-        await this.processTagsBatch(tags as Tag[], stashInstanceId);
+        await this.processTagsBatch(tags, stashInstanceId);
 
         totalSynced += tags.length;
         this.emit("progress", {
@@ -2128,7 +2161,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processTagsBatch(tags: Tag[], stashInstanceId: string): Promise<void> {
+  private async processTagsBatch(tags: SyncTag[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (tags.length === 0) return;
 
@@ -2139,15 +2172,17 @@ class StashSyncService extends EventEmitter {
     const values = validTags
       .map((tag) => {
         const parentIds = tag.parents?.map((p) => p.id) || [];
-        const aliases = (tag as any).aliases || [];
+        const aliases = tag.aliases || [];
         // Serialize stash_ids array to JSON for deduplication
-        const stashIds = (tag as any).stash_ids;
-        const stashIdsJson = stashIds && stashIds.length > 0
-          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+        const stashIdsJson = tag.stash_ids.length > 0
+          ? JSON.stringify(tag.stash_ids.map((s) => ({
               endpoint: s.endpoint,
               stash_id: s.stash_id,
             })))
           : null;
+
+        // "color" is not in the standard Stash GraphQL schema but may be added by plugins
+        const tagRecord = tag as Record<string, unknown>;
 
         return `(
       '${this.escape(tag.id)}',
@@ -2159,14 +2194,14 @@ class StashSyncService extends EventEmitter {
       ${tag.image_count ?? 0},
       ${tag.gallery_count ?? 0},
       ${tag.performer_count ?? 0},
-      ${(tag as any).studio_count ?? 0},
-      ${(tag as any).group_count ?? 0},
+      ${tag.studio_count ?? 0},
+      ${tag.group_count ?? 0},
       ${tag.scene_marker_count ?? 0},
       ${this.escapeNullable(tag.description)},
       ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
       ${this.escapeNullable(tag.image_path)},
-      ${this.escapeNullable((tag as any).color)},
+      ${this.escapeNullable(tagRecord.color as string | undefined)},
       ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
       ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
       datetime('now'),
@@ -2230,13 +2265,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const groupFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const groupFilter: GroupFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findGroups({
           filter: { page, per_page: this.PAGE_SIZE },
-          group_filter: groupFilter as any,
+          group_filter: groupFilter,
         });
 
         const groups = result.findGroups.groups;
@@ -2250,7 +2285,7 @@ class StashSyncService extends EventEmitter {
           maxUpdatedAt = batchMax;
         }
 
-        await this.processGroupsBatch(groups as Group[], stashInstanceId);
+        await this.processGroupsBatch(groups, stashInstanceId);
 
         totalSynced += groups.length;
         this.emit("progress", {
@@ -2295,7 +2330,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processGroupsBatch(groups: Group[], stashInstanceId: string): Promise<void> {
+  private async processGroupsBatch(groups: SyncGroup[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (groups.length === 0) return;
 
@@ -2316,7 +2351,7 @@ class StashSyncService extends EventEmitter {
       ${group.rating100 ?? "NULL"},
       ${duration ? Math.round(duration) : "NULL"},
       ${group.scene_count ?? 0},
-      ${(group as any).performer_count ?? 0},
+      ${group.performer_count ?? 0},
       ${this.escapeNullable(group.director)},
       ${this.escapeNullable(group.synopsis)},
       ${this.escapeNullable(JSON.stringify(urls))},
@@ -2359,8 +2394,7 @@ class StashSyncService extends EventEmitter {
     // Sync group tags to GroupTag junction table
     const instanceId = stashInstanceId;
     for (const group of validGroups) {
-      const groupTags = (group as any).tags;
-      if (groupTags && Array.isArray(groupTags) && groupTags.length > 0) {
+      if (group.tags && group.tags.length > 0) {
         const groupId = group.id;
 
         // Delete existing tags for this group
@@ -2369,10 +2403,10 @@ class StashSyncService extends EventEmitter {
         );
 
         // Insert new tags (filter to valid tag IDs)
-        const validTags = groupTags.filter((t: any) => t?.id && validateEntityId(t.id));
+        const validTags = group.tags.filter((t: TagRef) => t?.id && validateEntityId(t.id));
         if (validTags.length > 0) {
           const tagValues = validTags
-            .map((t: any) => `('${this.escape(groupId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
+            .map((t: TagRef) => `('${this.escape(groupId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
             .join(", ");
 
           await prisma.$executeRawUnsafe(
@@ -2409,13 +2443,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const galleryFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const galleryFilter: GalleryFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findGalleries({
           filter: { page, per_page: this.PAGE_SIZE },
-          gallery_filter: galleryFilter as any,
+          gallery_filter: galleryFilter,
         });
 
         const galleries = result.findGalleries.galleries;
@@ -2429,7 +2463,7 @@ class StashSyncService extends EventEmitter {
           maxUpdatedAt = batchMax;
         }
 
-        await this.processGalleriesBatch(galleries as Gallery[], stashInstanceId);
+        await this.processGalleriesBatch(galleries, stashInstanceId);
 
         totalSynced += galleries.length;
         this.emit("progress", {
@@ -2475,7 +2509,7 @@ class StashSyncService extends EventEmitter {
   }
 
   private async processGalleriesBatch(
-    galleries: Gallery[],
+    galleries: SyncGallery[],
     stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
@@ -2491,7 +2525,7 @@ class StashSyncService extends EventEmitter {
         // Get first file's basename for zip gallery title fallback
         const fileBasename = gallery.files?.[0]?.basename || null;
         // Cover image ID for dimension lookup
-        const coverImageId = (gallery as any).cover?.id || null;
+        const coverImageId = gallery.cover?.id || null;
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -2502,10 +2536,10 @@ class StashSyncService extends EventEmitter {
       ${coverImageId ? `'${this.escape(coverImageId)}'` : "NULL"},
       ${gallery.image_count ?? 0},
       ${this.escapeNullable(gallery.details)},
-      ${this.escapeNullable(gallery.url)},
+      ${this.escapeNullable(gallery.urls?.[0])},
       ${this.escapeNullable(gallery.code)},
-      ${this.escapeNullable((gallery as any).photographer)},
-      ${this.escapeNullable((gallery as any).urls ? JSON.stringify((gallery as any).urls) : null)},
+      ${this.escapeNullable(gallery.photographer)},
+      ${this.escapeNullable(gallery.urls ? JSON.stringify(gallery.urls) : null)},
       ${this.escapeNullable(folder?.path)},
       ${this.escapeNullable(fileBasename)},
       ${this.escapeNullable(gallery.paths?.cover)},
@@ -2581,9 +2615,8 @@ class StashSyncService extends EventEmitter {
     // Sync gallery tags to GalleryTag junction table
     const tagInserts: { galleryId: string; tagId: string }[] = [];
     for (const gallery of validGalleries) {
-      const galleryTags = (gallery as any).tags;
-      if (galleryTags && Array.isArray(galleryTags) && galleryTags.length > 0) {
-        for (const tag of galleryTags) {
+      if (gallery.tags && gallery.tags.length > 0) {
+        for (const tag of gallery.tags) {
           if (tag?.id && validateEntityId(tag.id)) {
             tagInserts.push({
               galleryId: gallery.id,
@@ -2638,13 +2671,13 @@ class StashSyncService extends EventEmitter {
       while (true) {
         this.checkAbort();
 
-        const imageFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
+        const imageFilter: ImageFilterType | undefined = lastSyncTime
+          ? { updated_at: { modifier: CriterionModifier.GreaterThan, value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findImages({
           filter: { page, per_page: this.PAGE_SIZE },
-          image_filter: imageFilter as any,
+          image_filter: imageFilter,
         });
 
         const images = result.findImages.images;
@@ -2869,21 +2902,21 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processImagesBatch(images: any[], stashInstanceId: string): Promise<void> {
+  private async processImagesBatch(images: SyncImage[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (images.length === 0) return;
 
     // Validate IDs
-    const validImages = images.filter((i: any) => validateEntityId(i.id));
+    const validImages = images.filter((i) => validateEntityId(i.id));
     if (validImages.length === 0) return;
 
-    const imageIds = validImages.map((i: any) => i.id);
+    const imageIds = validImages.map((i) => i.id);
     const instanceId = stashInstanceId;
 
     // Bulk delete junction records
     // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
     // and includes extended timeout for large libraries
-    const imageIdList = imageIds.map((id: string) => `'${this.escape(id)}'`).join(",");
+    const imageIdList = imageIds.map((id) => `'${this.escape(id)}'`).join(",");
     const escapedInstanceId = this.escape(instanceId);
     await prisma.$transaction(
       async (tx) => {
@@ -2901,8 +2934,8 @@ class StashSyncService extends EventEmitter {
     );
 
     // Build bulk image upsert
-    const values = validImages.map((image: any) => {
-      const visualFile = image.visual_files?.[0] || image.files?.[0];
+    const values = validImages.map((image) => {
+      const visualFile = image.files?.[0];
       const paths = image.paths;
       return `(
         '${this.escape(image.id)}',
@@ -3216,8 +3249,8 @@ class StashSyncService extends EventEmitter {
    * Get sync status for all entity types
    */
   async getSyncStatus(stashInstanceId?: string): Promise<{
-    states: any[];
-    settings: any;
+    states: SyncState[];
+    settings: SyncSettings | { syncIntervalMinutes: number; enableScanSubscription: boolean; enablePluginWebhook: boolean };
     inProgress: boolean;
   }> {
     const states = await prisma.syncState.findMany({

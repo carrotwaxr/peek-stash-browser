@@ -61,10 +61,10 @@ async function mergeGalleriesWithUserData(
 /**
  * Merge images with user rating/favorite data
  */
-async function mergeImagesWithUserData(
-  images: any[],
+async function mergeImagesWithUserData<T extends { id: string; instanceId?: string | null }>(
+  images: T[],
   userId: number
-): Promise<any[]> {
+): Promise<(T & { rating?: number | null; rating100?: number | null; favorite?: boolean })[]> {
   const ratings = await prisma.imageRating.findMany({ where: { userId } });
 
   const KEY_SEP = "\0";
@@ -655,7 +655,9 @@ export const getGalleryImages = async (
       };
     }
 
-    res.json(response);
+    // Cast needed: transformed gallery images have structural differences from
+    // GalleryImageWithContext (e.g. nested studio type) that are compatible at runtime
+    res.json(response as unknown as GetGalleryImagesResponse);
   } catch (error) {
     logger.error("Error fetching gallery images", {
       galleryId: req.params.galleryId,

@@ -70,7 +70,7 @@ class SceneTagInheritanceService {
       if (!directTagsByScene.has(key)) {
         directTagsByScene.set(key, new Set());
       }
-      directTagsByScene.get(key)!.add(dt.tagId);
+      directTagsByScene.get(key)?.add(dt.tagId);
     }
 
     // Get performer tags for all scenes in batch (scoped by instance)
@@ -90,11 +90,11 @@ class SceneTagInheritanceService {
       if (!tagsByPerformer.has(key)) {
         tagsByPerformer.set(key, []);
       }
-      tagsByPerformer.get(key)!.push(pt.tagId);
+      tagsByPerformer.get(key)?.push(pt.tagId);
     }
 
     // Get studio tags (scoped by instance)
-    const studioIds = [...new Set(scenes.filter((s) => s.studioId).map((s) => s.studioId!))];
+    const studioIds = [...new Set(scenes.filter((s) => s.studioId).map((s) => s.studioId as string))];
     const studioTags = await prisma.studioTag.findMany({
       where: { studioId: { in: studioIds }, studioInstanceId: { in: sceneInstanceIds } },
       select: { studioId: true, studioInstanceId: true, tagId: true },
@@ -105,7 +105,7 @@ class SceneTagInheritanceService {
       if (!tagsByStudio.has(key)) {
         tagsByStudio.set(key, []);
       }
-      tagsByStudio.get(key)!.push(st.tagId);
+      tagsByStudio.get(key)?.push(st.tagId);
     }
 
     // Get group tags for all scenes in batch (scoped by instance)
@@ -125,7 +125,7 @@ class SceneTagInheritanceService {
       if (!tagsByGroup.has(key)) {
         tagsByGroup.set(key, []);
       }
-      tagsByGroup.get(key)!.push(gt.tagId);
+      tagsByGroup.get(key)?.push(gt.tagId);
     }
 
     // Build scene -> performer mapping (using composite keys)
@@ -136,7 +136,7 @@ class SceneTagInheritanceService {
       if (!performersByScene.has(sceneKey)) {
         performersByScene.set(sceneKey, []);
       }
-      performersByScene.get(sceneKey)!.push(perfKey);
+      performersByScene.get(sceneKey)?.push(perfKey);
     }
 
     // Build scene -> group mapping (using composite keys)
@@ -147,7 +147,7 @@ class SceneTagInheritanceService {
       if (!groupsByScene.has(sceneKey)) {
         groupsByScene.set(sceneKey, []);
       }
-      groupsByScene.get(sceneKey)!.push(grpKey);
+      groupsByScene.get(sceneKey)?.push(grpKey);
     }
 
     // Compute inherited tags for each scene

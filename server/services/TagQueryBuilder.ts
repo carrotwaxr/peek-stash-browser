@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for tag filtering, sorting, and pagination.
  * Eliminates the need to load all tags into memory.
  */
-import type { PeekTagFilter, NormalizedTag } from "../types/index.js";
+import type { PeekTagFilter, NormalizedTag, PerformerRef, StudioRef, GroupRef, GalleryRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
@@ -402,7 +402,7 @@ class TagQueryBuilder {
 
     // Parent filter
     if (filters?.parents) {
-      const parentFilter = await this.buildParentFilterWithHierarchy(filters.parents as any);
+      const parentFilter = await this.buildParentFilterWithHierarchy(filters.parents);
       if (parentFilter.sql) {
         whereClauses.push(parentFilter);
       }
@@ -410,7 +410,7 @@ class TagQueryBuilder {
 
     // Performer filter
     if (filters?.performers) {
-      const performerFilter = this.buildPerformerFilter(filters.performers as any);
+      const performerFilter = this.buildPerformerFilter(filters.performers);
       if (performerFilter.sql) {
         whereClauses.push(performerFilter);
       }
@@ -418,7 +418,7 @@ class TagQueryBuilder {
 
     // Studio filter
     if (filters?.studios) {
-      const studioFilter = this.buildStudioFilter(filters.studios as any);
+      const studioFilter = this.buildStudioFilter(filters.studios);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -426,7 +426,7 @@ class TagQueryBuilder {
 
     // Scenes filter
     if (filters?.scenes_filter) {
-      const scenesFilter = this.buildScenesFilter(filters.scenes_filter as any);
+      const scenesFilter = this.buildScenesFilter(filters.scenes_filter);
       if (scenesFilter.sql) {
         whereClauses.push(scenesFilter);
       }
@@ -456,14 +456,11 @@ class TagQueryBuilder {
       }
     }
 
-    // Cast to any to access BaseTagFilterType properties
-    const filtersAny = filters as Record<string, any> | undefined;
-
-    // Scene count filter (from BaseTagFilterType)
+    // Scene count filter
     // Use MAX of direct scene count and performer scene count to match the enhanced scene_count returned
-    if (filtersAny?.scene_count) {
+    if (filters?.scene_count) {
       const sceneCountFilter = buildNumericFilter(
-        filtersAny.scene_count,
+        filters.scene_count,
         "MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0))"
       );
       if (sceneCountFilter.sql) {
@@ -471,31 +468,31 @@ class TagQueryBuilder {
       }
     }
 
-    // Text filters (from BaseTagFilterType)
-    if (filtersAny?.name) {
-      const nameFilter = buildTextFilter(filtersAny.name, "t.name");
+    // Text filters
+    if (filters?.name) {
+      const nameFilter = buildTextFilter(filters.name, "t.name");
       if (nameFilter.sql) {
         whereClauses.push(nameFilter);
       }
     }
 
-    if (filtersAny?.description) {
-      const descriptionFilter = buildTextFilter(filtersAny.description, "t.description");
+    if (filters?.description) {
+      const descriptionFilter = buildTextFilter(filters.description, "t.description");
       if (descriptionFilter.sql) {
         whereClauses.push(descriptionFilter);
       }
     }
 
-    // Date filters (from BaseTagFilterType)
-    if (filtersAny?.created_at) {
-      const createdAtFilter = buildDateFilter(filtersAny.created_at, "t.stashCreatedAt");
+    // Date filters
+    if (filters?.created_at) {
+      const createdAtFilter = buildDateFilter(filters.created_at, "t.stashCreatedAt");
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
-    if (filtersAny?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filtersAny.updated_at, "t.stashUpdatedAt");
+    if (filters?.updated_at) {
+      const updatedAtFilter = buildDateFilter(filters.updated_at, "t.stashUpdatedAt");
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
@@ -530,7 +527,7 @@ class TagQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -593,12 +590,14 @@ class TagQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedTag
    */
-  private transformRow(row: any): NormalizedTag {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns
+  private transformRow(row: Record<string, any>): NormalizedTag {
     const directSceneCount = row.sceneCount || 0;
     const performerSceneCount = row.sceneCountViaPerformers || 0;
     // Use the greater of direct scene count or performer scene count
     const totalSceneCount = Math.max(directSceneCount, performerSceneCount);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedTag from DB row; Tag base type requires fields we don't populate
     const tag: any = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -713,7 +712,7 @@ class TagQueryBuilder {
     for (const tag of tags) {
       if (tag.parents && Array.isArray(tag.parents)) {
         const tagInstanceId = tag.instanceId;
-        (tag as any).parents = tag.parents.map((p) => ({
+        (tag as unknown as Record<string, unknown>).parents = tag.parents.map((p) => ({
           id: p.id,
           name: parentNameMap.get(`${p.id}:${tagInstanceId}`) || "Unknown",
         }));
@@ -769,37 +768,42 @@ class TagQueryBuilder {
     ]);
 
     // Build lookup maps with minimal tooltip data by composite key (id:instanceId)
-    const performersById = new Map(performers.map((p) => [`${p.id}:${p.stashInstanceId}`, {
+    const performersById = new Map<string, PerformerRef>(performers.map((p) => [`${p.id}:${p.stashInstanceId}`, {
       id: p.id,
       instanceId: p.stashInstanceId,
       name: p.name,
+      disambiguation: p.disambiguation || null,
+      gender: p.gender || null,
       image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
+      favorite: p.favorite ?? null,
+      rating100: p.rating100 ?? null,
     }]));
 
-    const studiosById = new Map(studios.map((s) => [`${s.id}:${s.stashInstanceId}`, {
+    const studiosById = new Map<string, StudioRef>(studios.map((s) => [`${s.id}:${s.stashInstanceId}`, {
       id: s.id,
       instanceId: s.stashInstanceId,
       name: s.name,
       image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
+      favorite: s.favorite ?? null,
+      parent_studio: s.parentId ? { id: s.parentId } : null,
     }]));
 
-    const groupsById = new Map(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
+    const groupsById = new Map<string, GroupRef>(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
-      instanceId: g.stashInstanceId,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
+      back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
     }]));
 
-    const galleriesById = new Map(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
+    const galleriesById = new Map<string, GalleryRef>(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
-      instanceId: g.stashInstanceId,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
     // Build tag -> entities maps using composite keys
     // Key format: tagId:tagInstanceId -> entities[]
-    const performersByTag = new Map<string, any[]>();
+    const performersByTag = new Map<string, PerformerRef[]>();
     for (const pt of performerTags) {
       const performerKey = `${pt.performerId}:${pt.performerInstanceId}`;
       const performer = performersById.get(performerKey);
@@ -810,7 +814,7 @@ class TagQueryBuilder {
       performersByTag.set(tagKey, list);
     }
 
-    const studiosByTag = new Map<string, any[]>();
+    const studiosByTag = new Map<string, StudioRef[]>();
     for (const st of studioTags) {
       const studioKey = `${st.studioId}:${st.studioInstanceId}`;
       const studio = studiosById.get(studioKey);
@@ -821,7 +825,7 @@ class TagQueryBuilder {
       studiosByTag.set(tagKey, list);
     }
 
-    const groupsByTag = new Map<string, any[]>();
+    const groupsByTag = new Map<string, GroupRef[]>();
     for (const gt of groupTags) {
       const groupKey = `${gt.groupId}:${gt.groupInstanceId}`;
       const group = groupsById.get(groupKey);
@@ -832,7 +836,7 @@ class TagQueryBuilder {
       groupsByTag.set(tagKey, list);
     }
 
-    const galleriesByTag = new Map<string, any[]>();
+    const galleriesByTag = new Map<string, GalleryRef[]>();
     for (const gt of galleryTags) {
       const galleryKey = `${gt.galleryId}:${gt.galleryInstanceId}`;
       const gallery = galleriesById.get(galleryKey);
@@ -847,10 +851,11 @@ class TagQueryBuilder {
     for (const tag of tags) {
       const tagInstanceId = tag.instanceId;
       const tagKey = `${tag.id}:${tagInstanceId}`;
-      (tag as any).performers = performersByTag.get(tagKey) || [];
-      (tag as any).studios = studiosByTag.get(tagKey) || [];
-      (tag as any).groups = groupsByTag.get(tagKey) || [];
-      (tag as any).galleries = galleriesByTag.get(tagKey) || [];
+      const tagRecord = tag as unknown as Record<string, unknown>;
+      tagRecord.performers = performersByTag.get(tagKey) || [];
+      tagRecord.studios = studiosByTag.get(tagKey) || [];
+      tagRecord.groups = groupsByTag.get(tagKey) || [];
+      tagRecord.galleries = galleriesByTag.get(tagKey) || [];
     }
   }
 

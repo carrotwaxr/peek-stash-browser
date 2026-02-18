@@ -83,7 +83,7 @@ export async function applyGroupFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((g) => {
-        const groupTagIds = (g.tags || []).map((t: any) => String(t.id));
+        const groupTagIds = (g.tags || []).map((t: { id: string }) => String(t.id));
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
