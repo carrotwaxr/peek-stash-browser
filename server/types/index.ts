@@ -22,6 +22,11 @@ export type {
   NormalizedImage,
   SceneScoringData,
   WithInstanceId,
+  PerformerRef,
+  TagRef,
+  StudioRef,
+  GroupRef,
+  GalleryRef,
 } from "./entities.js";
 
 // Base filter types from Stash GraphQL

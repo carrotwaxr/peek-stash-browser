@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for group filtering, sorting, and pagination.
  * Eliminates the need to load all groups into memory.
  */
-import type { PeekGroupFilter, NormalizedGroup } from "../types/index.js";
+import type { PeekGroupFilter, NormalizedGroup, PerformerRef, TagRef, StudioRef, GalleryRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
@@ -412,7 +412,7 @@ class GroupQueryBuilder {
 
     // Studio filter
     if (filters?.studios) {
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios as any);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -420,7 +420,7 @@ class GroupQueryBuilder {
 
     // Scenes filter
     if (filters?.scenes) {
-      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      const scenesFilter = this.buildScenesFilter(filters.scenes);
       if (scenesFilter.sql) {
         whereClauses.push(scenesFilter);
       }
@@ -428,7 +428,7 @@ class GroupQueryBuilder {
 
     // Performer filter (via scenes)
     if (filters?.performers) {
-      const performerFilter = this.buildPerformerFilter(filters.performers as any);
+      const performerFilter = this.buildPerformerFilter(filters.performers);
       if (performerFilter.sql) {
         whereClauses.push(performerFilter);
       }
@@ -436,7 +436,7 @@ class GroupQueryBuilder {
 
     // Tag filter
     if (filters?.tags) {
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
@@ -450,26 +450,25 @@ class GroupQueryBuilder {
       }
     }
 
-    // Scene count filter (from BaseGroupFilterType)
-    const filtersAny = filters as Record<string, any> | undefined;
-    if (filtersAny?.scene_count) {
-      const sceneCountFilter = buildNumericFilter(filtersAny.scene_count, "COALESCE(g.sceneCount, 0)");
+    // Scene count filter
+    if (filters?.scene_count) {
+      const sceneCountFilter = buildNumericFilter(filters.scene_count, "COALESCE(g.sceneCount, 0)");
       if (sceneCountFilter.sql) {
         whereClauses.push(sceneCountFilter);
       }
     }
 
-    // Duration filter (from BaseGroupFilterType)
-    if (filtersAny?.duration) {
-      const durationFilter = buildNumericFilter(filtersAny.duration, "COALESCE(g.duration, 0)");
+    // Duration filter
+    if (filters?.duration) {
+      const durationFilter = buildNumericFilter(filters.duration, "COALESCE(g.duration, 0)");
       if (durationFilter.sql) {
         whereClauses.push(durationFilter);
       }
     }
 
-    // Name filter (from BaseGroupFilterType)
-    if (filtersAny?.name) {
-      const nameFilter = buildTextFilter(filtersAny.name, "g.name");
+    // Name filter
+    if (filters?.name) {
+      const nameFilter = buildTextFilter(filters.name, "g.name");
       if (nameFilter.sql) {
         whereClauses.push(nameFilter);
       }
@@ -477,21 +476,21 @@ class GroupQueryBuilder {
 
     // Date filters
     if (filters?.date) {
-      const dateFilter = buildDateFilter(filters.date as any, "g.date");
+      const dateFilter = buildDateFilter(filters.date, "g.date");
       if (dateFilter.sql) {
         whereClauses.push(dateFilter);
       }
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at as any, "g.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(filters.created_at, "g.stashCreatedAt");
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at as any, "g.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(filters.updated_at, "g.stashUpdatedAt");
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
@@ -526,7 +525,7 @@ class GroupQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -587,7 +586,8 @@ class GroupQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGroup
    */
-  private transformRow(row: any): NormalizedGroup {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private transformRow(row: Record<string, any>): NormalizedGroup {
     // Parse URLs JSON if present
     let urls: string[] = [];
     if (row.urls) {
@@ -598,6 +598,7 @@ class GroupQueryBuilder {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const group: any = {
       id: row.id,
       instanceId: row.stashInstanceId, // For multi-instance correctness in populateRelations
@@ -696,13 +697,16 @@ class GroupQueryBuilder {
     const tagKeys = [...new Map(
       tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
     ).values()];
-    // Cast to `any` because studioId is set on the raw SQL row in transformRow()
+    // Cast via `unknown` because studioId is set on the raw SQL row in transformRow()
     // but NormalizedGroup (from GraphQL's Group type) only has `studio?: Maybe<Studio>`,
     // not a flat studioId field.
     const studioKeys = [...new Map(
       groups
-        .filter((g) => (g as any).studioId)
-        .map((g) => [`${(g as any).studioId}:${g.instanceId}`, { id: (g as any).studioId, instanceId: g.instanceId }])
+        .filter((g) => (g as unknown as { studioId: string | null }).studioId)
+        .map((g) => {
+          const studioId = (g as unknown as { studioId: string | null }).studioId;
+          return [`${studioId}:${g.instanceId}`, { id: studioId as string, instanceId: g.instanceId }];
+        })
     ).values()];
     const performerKeys = [...new Map(
       scenePerformers.map((sp) => [`${sp.performerId}:${sp.performerInstanceId}`, { id: sp.performerId, instanceId: sp.performerInstanceId }])
@@ -738,7 +742,7 @@ class GroupQueryBuilder {
     ]);
 
     // Build lookup maps with composite keys (id:instanceId)
-    const tagsByKey = new Map<string, any>();
+    const tagsByKey = new Map<string, TagRef>();
     for (const t of tags) {
       const key = `${t.id}:${t.stashInstanceId}`;
       tagsByKey.set(key, {
@@ -746,10 +750,11 @@ class GroupQueryBuilder {
         instanceId: t.stashInstanceId,
         name: t.name,
         image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+        favorite: t.favorite,
       });
     }
 
-    const studiosByKey = new Map<string, any>();
+    const studiosByKey = new Map<string, StudioRef>();
     for (const s of studios) {
       const key = `${s.id}:${s.stashInstanceId}`;
       studiosByKey.set(key, {
@@ -757,26 +762,31 @@ class GroupQueryBuilder {
         instanceId: s.stashInstanceId,
         name: s.name,
         image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
+        favorite: s.favorite,
+        parent_studio: s.parentId ? { id: s.parentId } : null,
       });
     }
 
-    const performersByKey = new Map<string, any>();
+    const performersByKey = new Map<string, PerformerRef>();
     for (const p of performers) {
       const key = `${p.id}:${p.stashInstanceId}`;
       performersByKey.set(key, {
         id: p.id,
         instanceId: p.stashInstanceId,
         name: p.name,
+        disambiguation: p.disambiguation || null,
+        gender: p.gender || null,
         image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
+        favorite: p.favorite,
+        rating100: p.rating100 ?? null,
       });
     }
 
-    const galleriesByKey = new Map<string, any>();
+    const galleriesByKey = new Map<string, GalleryRef>();
     for (const g of galleries) {
       const key = `${g.id}:${g.stashInstanceId}`;
       galleriesByKey.set(key, {
         id: g.id,
-        instanceId: g.stashInstanceId,
         title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
         cover: this.transformUrl(g.coverPath, g.stashInstanceId),
       });
@@ -784,7 +794,7 @@ class GroupQueryBuilder {
 
     // Build group -> tags map using composite keys
     // Key format: groupId:groupInstanceId -> tags[]
-    const tagsByGroup = new Map<string, any[]>();
+    const tagsByGroup = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
       const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
       const tag = tagsByKey.get(tagKey);
@@ -829,14 +839,14 @@ class GroupQueryBuilder {
     // Populate groups using composite keys
     for (const group of groups) {
       const groupKey = `${group.id}:${group.instanceId}`;
-      group.tags = tagsByGroup.get(groupKey) || [];
+      group.tags = (tagsByGroup.get(groupKey) || []) as unknown as NormalizedGroup["tags"];
 
       // Hydrate studio with tooltip data (id, name, image_path) using composite key
       if (group.studio?.id) {
         const studioKey = `${group.studio.id}:${group.instanceId}`;
         const studioData = studiosByKey.get(studioKey);
         if (studioData) {
-          (group as any).studio = studioData;
+          (group as unknown as { studio: typeof studioData }).studio = studioData;
         }
       }
 
@@ -851,8 +861,8 @@ class GroupQueryBuilder {
         for (const galleryKey of galleriesByScene.get(sceneKey) || []) groupGalleryKeys.add(galleryKey);
       }
 
-      (group as any).performers = [...groupPerformerKeys].map((key) => performersByKey.get(key)).filter(Boolean);
-      (group as any).galleries = [...groupGalleryKeys].map((key) => galleriesByKey.get(key)).filter(Boolean);
+      (group as unknown as { performers: PerformerRef[] }).performers = [...groupPerformerKeys].map((key) => performersByKey.get(key)).filter((p): p is PerformerRef => !!p);
+      (group as unknown as { galleries: GalleryRef[] }).galleries = [...groupGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
     }
   }
 

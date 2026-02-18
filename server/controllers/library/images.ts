@@ -16,15 +16,16 @@ import {
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import type { NormalizedImage } from "../../types/index.js";
 
 /**
  * Merge images with user rating/favorite data and O counter
  * Used by findImageById for single image lookups
  */
 async function mergeImagesWithUserData(
-  images: any[],
+  images: NormalizedImage[],
   userId: number
-): Promise<any[]> {
+): Promise<NormalizedImage[]> {
   // Fetch ratings and view history in parallel
   const [ratings, viewHistories] = await Promise.all([
     prisma.imageRating.findMany({ where: { userId } }),
@@ -68,7 +69,8 @@ async function mergeImagesWithUserData(
 /**
  * Transform ImageQueryBuilder result to match expected API response format
  */
-function transformImageResult(image: any): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- data transformer between ImageQueryBuilder's internal DB row format and API response; spread of dynamic fields prevents specific return type
+function transformImageResult(image: Record<string, any>): any {
   return {
     ...image,
     // Map user data fields to expected names
@@ -286,7 +288,7 @@ export const findImageById = async (
     // Add stashUrl
     const imageWithStashUrl = {
       ...mergedImage,
-      stashUrl: buildStashEntityUrl("image", mergedImage.id),
+      stashUrl: buildStashEntityUrl("image", mergedImage.id) || "",
     };
 
     res.json(imageWithStashUrl);

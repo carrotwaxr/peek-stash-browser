@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for gallery filtering, sorting, and pagination.
  * Eliminates the need to load all galleries into memory.
  */
-import type { PeekGalleryFilter, NormalizedGallery } from "../types/index.js";
+import type { PeekGalleryFilter, NormalizedGallery, PerformerRef, TagRef, StudioRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
@@ -427,7 +427,7 @@ class GalleryQueryBuilder {
 
     // Studio filter
     if (filters?.studios) {
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios as any);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -435,7 +435,7 @@ class GalleryQueryBuilder {
 
     // Scenes filter
     if (filters?.scenes) {
-      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      const scenesFilter = this.buildScenesFilter(filters.scenes);
       if (scenesFilter.sql) {
         whereClauses.push(scenesFilter);
       }
@@ -443,7 +443,7 @@ class GalleryQueryBuilder {
 
     // Performer filter
     if (filters?.performers) {
-      const performerFilter = this.buildPerformerFilter(filters.performers as any);
+      const performerFilter = this.buildPerformerFilter(filters.performers);
       if (performerFilter.sql) {
         whereClauses.push(performerFilter);
       }
@@ -451,7 +451,7 @@ class GalleryQueryBuilder {
 
     // Tag filter
     if (filters?.tags) {
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
@@ -483,21 +483,21 @@ class GalleryQueryBuilder {
 
     // Date filters
     if (filters?.date) {
-      const dateFilter = buildDateFilter(filters.date as any, "g.date");
+      const dateFilter = buildDateFilter(filters.date, "g.date");
       if (dateFilter.sql) {
         whereClauses.push(dateFilter);
       }
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at as any, "g.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(filters.created_at, "g.stashCreatedAt");
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at as any, "g.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(filters.updated_at, "g.stashUpdatedAt");
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
@@ -532,7 +532,7 @@ class GalleryQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -595,7 +595,8 @@ class GalleryQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGallery
    */
-  private transformRow(row: any): NormalizedGallery {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a full interface adds maintenance overhead without real safety gain
+  private transformRow(row: Record<string, any>): NormalizedGallery {
     // Parse URLs JSON if present
     let urls: string[] = [];
     if (row.urls) {
@@ -606,6 +607,7 @@ class GalleryQueryBuilder {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedGallery from DB row; Gallery base type requires fields we don't populate (chapters, files, etc.)
     const gallery: any = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -663,7 +665,7 @@ class GalleryQueryBuilder {
     const studioKeys = [...new Map(
       galleries
         .filter((g) => g.studio?.id)
-        .map((g) => [`${g.studio!.id}:${g.instanceId}`, { id: g.studio!.id, instanceId: g.instanceId }])
+        .map((g) => [`${g.studio?.id}:${g.instanceId}`, { id: g.studio?.id ?? "", instanceId: g.instanceId }])
     ).values()];
 
     // Batch load all relations in parallel
@@ -725,19 +727,22 @@ class GalleryQueryBuilder {
     ]);
 
     // Build entity lookup maps by composite key (id:instanceId)
-    const performersByKey = new Map<string, any>();
+    const performersByKey = new Map<string, PerformerRef>();
     for (const performer of performers) {
       const key = `${performer.id}:${performer.stashInstanceId}`;
       performersByKey.set(key, {
         id: performer.id,
         instanceId: performer.stashInstanceId,
         name: performer.name,
-        image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
+        disambiguation: performer.disambiguation,
         gender: performer.gender,
+        image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
+        favorite: performer.favorite,
+        rating100: performer.rating100,
       });
     }
 
-    const tagsByKey = new Map<string, any>();
+    const tagsByKey = new Map<string, TagRef>();
     for (const tag of tags) {
       const key = `${tag.id}:${tag.stashInstanceId}`;
       tagsByKey.set(key, {
@@ -745,10 +750,11 @@ class GalleryQueryBuilder {
         instanceId: tag.stashInstanceId,
         name: tag.name,
         image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
+        favorite: tag.favorite,
       });
     }
 
-    const studiosByKey = new Map<string, any>();
+    const studiosByKey = new Map<string, StudioRef>();
     for (const studio of studios) {
       const key = `${studio.id}:${studio.stashInstanceId}`;
       studiosByKey.set(key, {
@@ -756,12 +762,14 @@ class GalleryQueryBuilder {
         instanceId: studio.stashInstanceId,
         name: studio.name,
         image_path: this.transformUrl(studio.imagePath, studio.stashInstanceId),
+        favorite: studio.favorite,
+        parent_studio: studio.parentId ? { id: studio.parentId } : null,
       });
     }
 
     // Build gallery-to-entities maps using junction tables with composite keys
     // Key format: galleryId:galleryInstanceId -> entities[]
-    const performersByGallery = new Map<string, any[]>();
+    const performersByGallery = new Map<string, PerformerRef[]>();
     for (const junction of performerJunctions) {
       const performerKey = `${junction.performerId}:${junction.performerInstanceId}`;
       const performer = performersByKey.get(performerKey);
@@ -772,7 +780,7 @@ class GalleryQueryBuilder {
       performersByGallery.set(galleryKey, list);
     }
 
-    const tagsByGallery = new Map<string, any[]>();
+    const tagsByGallery = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
       const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
       const tag = tagsByKey.get(tagKey);
@@ -784,17 +792,20 @@ class GalleryQueryBuilder {
     }
 
     // Populate galleries using composite keys
+    // Relations are populated with lightweight refs (PerformerRef etc.), not full GraphQL types.
+    // NormalizedGallery inherits Performer[]/Tag[]/etc. from Gallery, but QueryBuilder intentionally
+    // populates only the fields needed by the API response.
     for (const gallery of galleries) {
       const galleryKey = `${gallery.id}:${gallery.instanceId}`;
-      gallery.performers = performersByGallery.get(galleryKey) || [];
-      gallery.tags = tagsByGallery.get(galleryKey) || [];
+      gallery.performers = (performersByGallery.get(galleryKey) || []) as unknown as NormalizedGallery["performers"];
+      gallery.tags = (tagsByGallery.get(galleryKey) || []) as unknown as NormalizedGallery["tags"];
 
       // Hydrate studio with full data using composite key
       if (gallery.studio?.id) {
         const studioKey = `${gallery.studio.id}:${gallery.instanceId}`;
         const fullStudio = studiosByKey.get(studioKey);
         if (fullStudio) {
-          gallery.studio = fullStudio;
+          gallery.studio = fullStudio as unknown as NormalizedGallery["studio"];
         }
       }
     }

@@ -26,6 +26,7 @@ export type PeekSceneFilter = BaseSceneFilterType & {
   performer_favorite?: boolean;
   groups?: { value: string[]; modifier?: string };
   galleries?: { value: string[]; modifier?: string };
+  instance_id?: string;
 };
 
 /**
@@ -35,6 +36,7 @@ export type PeekSceneFilter = BaseSceneFilterType & {
 export type PeekPerformerFilter = BasePerformerFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  instance_id?: string;
   // Additional filters using custom format for compatibility with frontend
   name?: { value?: string; modifier?: string };
   details?: { value?: string; modifier?: string };
@@ -77,6 +79,7 @@ export type PeekTagFilter = BaseTagFilterType & {
   rating100?: { value?: number; value2?: number; modifier?: string };
   o_counter?: { value?: number; value2?: number; modifier?: string };
   play_count?: { value?: number; value2?: number; modifier?: string };
+  scene_count?: { value?: number; value2?: number; modifier?: string };
   // Custom entity filters (not in Stash API)
   performers?: { value: string[]; modifier?: string };
   studios?: { value: string[]; modifier?: string };
@@ -105,4 +108,5 @@ export type PeekGroupFilter = BaseGroupFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
   scenes?: { value: string[]; modifier?: string };
+  scene_count?: { value?: number; value2?: number; modifier?: string };
 };

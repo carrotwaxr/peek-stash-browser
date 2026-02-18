@@ -33,6 +33,7 @@ import {
 } from "../../services/RecommendationScoringService.js";
 import type { NormalizedScene, PeekSceneFilter, WithInstanceId } from "../../types/index.js";
 import type { Performer, Studio, Tag } from "../../graphql/types.js";
+import { OrientationEnum } from "../../graphql/generated/graphql.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
@@ -339,6 +340,7 @@ export async function applyQuickSceneFilters(
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
       // NOT nested: { group: { id, name }, scene_index }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
       const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
       const filterGroupIds = groupIds.map((id) => String(id));
       if (modifier === "INCLUDES") {
@@ -503,17 +505,17 @@ export async function applyQuickSceneFilters(
       const height = s.files?.[0]?.height || 0;
 
       // Determine scene orientation from dimensions
-      let sceneOrientation: string;
+      let sceneOrientation: OrientationEnum;
       if (width > height) {
-        sceneOrientation = "LANDSCAPE";
+        sceneOrientation = OrientationEnum.Landscape;
       } else if (width < height) {
-        sceneOrientation = "PORTRAIT";
+        sceneOrientation = OrientationEnum.Portrait;
       } else {
-        sceneOrientation = "SQUARE";
+        sceneOrientation = OrientationEnum.Square;
       }
 
       // Check if scene orientation matches any of the filter orientations
-      return orientations.includes(sceneOrientation as any);
+      return orientations.includes(sceneOrientation);
     });
   }
 
@@ -837,6 +839,7 @@ function getFieldValue(
     }
     // After transformScene, groups are flattened: { id, name, scene_index }
     const group = scene.groups.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
       (g: any) => String(g.id) === String(groupId)
     );
     return group?.scene_index ?? 999999; // Put scenes without scene_index at the end
@@ -921,7 +924,7 @@ export const findScenes = async (
       }
 
       // Extract specific instance ID for disambiguation (from scene_filter.instance_id)
-      const specificInstanceId = (scene_filter as any)?.instance_id as string | undefined;
+      const specificInstanceId = scene_filter?.instance_id as string | undefined;
 
       // Execute query (applyExclusions defaults to true)
       const result = await sceneQueryBuilder.execute({

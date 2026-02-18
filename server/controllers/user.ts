@@ -4,6 +4,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import type { EntityType } from "../services/UserHiddenEntityService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
@@ -2159,7 +2160,7 @@ export const unhideEntity = async (
     }
 
     // Validate entity type
-    const validTypes = [
+    const validTypes: EntityType[] = [
       "scene",
       "performer",
       "studio",
@@ -2168,7 +2169,7 @@ export const unhideEntity = async (
       "gallery",
       "image",
     ];
-    if (!validTypes.includes(entityType)) {
+    if (!validTypes.includes(entityType as EntityType)) {
       return res.status(400).json({ error: "Invalid entity type" });
     }
 
@@ -2190,7 +2191,7 @@ export const unhideEntity = async (
       }
     }
 
-    await userHiddenEntityService.unhideEntity(userId, entityType as any, entityId, unhideInstanceId);
+    await userHiddenEntityService.unhideEntity(userId, entityType as EntityType, entityId, unhideInstanceId);
 
     res.json({ success: true, message: "Entity restored successfully" });
   } catch (error) {
@@ -2272,7 +2273,7 @@ export const getHiddenEntities = async (
 
     // Validate entity type if provided
     if (entityType) {
-      const validTypes = [
+      const validTypes: EntityType[] = [
         "scene",
         "performer",
         "studio",
@@ -2281,7 +2282,7 @@ export const getHiddenEntities = async (
         "gallery",
         "image",
       ];
-      if (!validTypes.includes(entityType as string)) {
+      if (!validTypes.includes(entityType as EntityType)) {
         return res.status(400).json({ error: "Invalid entity type" });
       }
     }
@@ -2293,7 +2294,7 @@ export const getHiddenEntities = async (
 
     const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
       userId,
-      entityType as any
+      entityType as EntityType
     );
 
     res.json({ hiddenEntities });

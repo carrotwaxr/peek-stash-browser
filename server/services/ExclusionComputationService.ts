@@ -304,7 +304,7 @@ class ExclusionComputationService {
   private async cascadeViaJunction(
     excluded: ScopedExclusion[],
     tx: TransactionClient,
-    junctionDelegate: { findMany: (args: any) => Promise<any[]> },
+    junctionDelegate: { findMany: (args: { where: Record<string, unknown>; select: Record<string, boolean> }) => Promise<Record<string, string>[]> },
     sourceIdField: string,
     sourceInstanceField: string,
     targetIdField: string,
@@ -452,7 +452,7 @@ class ExclusionComputationService {
       // 3b. Scenes with inherited tag (via inheritedTagIds JSON column — raw SQL required)
       if (globalIds.length > 0) {
         const tagList = globalIds.map(t => `'${t}'`).join(",");
-        const inheritedScenes = await (tx as any).$queryRaw`
+        const inheritedScenes = await tx.$queryRaw`
           SELECT DISTINCT s.id FROM StashScene s
           WHERE s.deletedAt IS NULL
           AND EXISTS (
@@ -471,7 +471,7 @@ class ExclusionComputationService {
         }
         for (const [instId, tagIds] of scopedByInstance) {
           const tagList = tagIds.map(t => `'${t}'`).join(",");
-          const inheritedScenes = await (tx as any).$queryRaw`
+          const inheritedScenes = await tx.$queryRaw`
             SELECT DISTINCT s.id FROM StashScene s
             WHERE s.deletedAt IS NULL
             AND s.stashInstanceId = ${instId}
@@ -599,18 +599,18 @@ class ExclusionComputationService {
     // 1. Empty galleries - galleries with 0 visible images
     // Use a temporary table to avoid loading all relationships into memory
     // Create temp table with excluded image IDs
-    await (tx as any).$executeRaw`
+    await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (imageId, instanceId))
     `;
-    await (tx as any).$executeRaw`DELETE FROM temp_excluded_images`;
+    await tx.$executeRaw`DELETE FROM temp_excluded_images`;
     if (excludedImages.length > 0) {
-      await (tx as any).$executeRaw(Prisma.raw(`
+      await tx.$executeRaw(Prisma.raw(`
         INSERT INTO temp_excluded_images (imageId, instanceId) VALUES ${excludedImages.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
     }
 
     // Query for empty galleries using temp table
-    const emptyGalleries = await (tx as any).$queryRaw`
+    const emptyGalleries = await tx.$queryRaw`
       SELECT g.id as galleryId
       FROM StashGallery g
       WHERE g.deletedAt IS NULL
@@ -639,28 +639,28 @@ class ExclusionComputationService {
 
     // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
     // Create temp tables for excluded entities
-    await (tx as any).$executeRaw`
+    await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (sceneId, instanceId))
     `;
-    await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
+    await tx.$executeRaw`DELETE FROM temp_excluded_scenes`;
     if (excludedScenes.length > 0) {
-      await (tx as any).$executeRaw(Prisma.raw(`
+      await tx.$executeRaw(Prisma.raw(`
         INSERT INTO temp_excluded_scenes (sceneId, instanceId) VALUES ${excludedScenes.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
     }
 
-    await (tx as any).$executeRaw`
+    await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (performerId, instanceId))
     `;
-    await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
+    await tx.$executeRaw`DELETE FROM temp_excluded_performers`;
     if (excludedPerformers.length > 0) {
-      await (tx as any).$executeRaw(Prisma.raw(`
+      await tx.$executeRaw(Prisma.raw(`
         INSERT INTO temp_excluded_performers (performerId, instanceId) VALUES ${excludedPerformers.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
     }
 
     // Query for empty performers
-    const emptyPerformers = await (tx as any).$queryRaw`
+    const emptyPerformers = await tx.$queryRaw`
       SELECT p.id as performerId
       FROM StashPerformer p
       WHERE p.deletedAt IS NULL
@@ -704,17 +704,17 @@ class ExclusionComputationService {
     }
 
     // 3. Empty studios - studios with 0 visible scenes AND 0 visible images
-    await (tx as any).$executeRaw`
+    await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (studioId, instanceId))
     `;
-    await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
+    await tx.$executeRaw`DELETE FROM temp_excluded_studios`;
     if (excludedStudios.length > 0) {
-      await (tx as any).$executeRaw(Prisma.raw(`
+      await tx.$executeRaw(Prisma.raw(`
         INSERT INTO temp_excluded_studios (studioId, instanceId) VALUES ${excludedStudios.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
     }
 
-    const emptyStudios = await (tx as any).$queryRaw`
+    const emptyStudios = await tx.$queryRaw`
       SELECT st.id as studioId
       FROM StashStudio st
       WHERE st.deletedAt IS NULL
@@ -758,17 +758,17 @@ class ExclusionComputationService {
     }
 
     // 4. Empty groups - groups with 0 visible scenes
-    await (tx as any).$executeRaw`
+    await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (groupId, instanceId))
     `;
-    await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
+    await tx.$executeRaw`DELETE FROM temp_excluded_groups`;
     if (excludedGroups.length > 0) {
-      await (tx as any).$executeRaw(Prisma.raw(`
+      await tx.$executeRaw(Prisma.raw(`
         INSERT INTO temp_excluded_groups (groupId, instanceId) VALUES ${excludedGroups.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
       `));
     }
 
-    const emptyGroups = await (tx as any).$queryRaw`
+    const emptyGroups = await tx.$queryRaw`
       SELECT g.id as groupId
       FROM StashGroup g
       WHERE g.deletedAt IS NULL
@@ -802,7 +802,7 @@ class ExclusionComputationService {
 
     // 5. Empty tags - tags not attached to any visible scene, performer, studio, or group
     // BUT exclude parent/organizational tags (tags that have children) since they're used for hierarchy
-    const emptyTags = await (tx as any).$queryRaw`
+    const emptyTags = await tx.$queryRaw`
       SELECT t.id as tagId
       FROM StashTag t
       WHERE t.deletedAt IS NULL
@@ -868,11 +868,11 @@ class ExclusionComputationService {
     }
 
     // Clean up temporary tables
-    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_images`;
-    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_scenes`;
-    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_performers`;
-    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_studios`;
-    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_groups`;
+    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_images`;
+    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_scenes`;
+    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_performers`;
+    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_studios`;
+    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_groups`;
 
     return emptyExclusions;
   }
@@ -1095,11 +1095,11 @@ class ExclusionComputationService {
 
         // Tag -> Scenes (inherited via inheritedTagIds JSON column)
         const inheritedScenes = instanceId
-          ? await (tx as any).$queryRawUnsafe(
+          ? await tx.$queryRawUnsafe(
               `SELECT id FROM StashScene WHERE deletedAt IS NULL AND stashInstanceId = ? AND EXISTS (SELECT 1 FROM json_each(inheritedTagIds) WHERE json_each.value = ?)`,
               instanceId, entityId
             ) as Array<{ id: string }>
-          : await (tx as any).$queryRawUnsafe(
+          : await tx.$queryRawUnsafe(
               `SELECT id FROM StashScene WHERE deletedAt IS NULL AND EXISTS (SELECT 1 FROM json_each(inheritedTagIds) WHERE json_each.value = ?)`,
               entityId
             ) as Array<{ id: string }>;

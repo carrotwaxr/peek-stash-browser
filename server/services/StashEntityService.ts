@@ -9,6 +9,7 @@
  */
 
 import { Prisma } from "@prisma/client";
+import type { StashScene, StashPerformer, StashStudio, StashTag, StashGroup, StashGallery, StashImage } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
@@ -23,6 +24,176 @@ import type {
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { getSceneFallbackTitle, getGalleryFallbackTitle, getImageFallbackTitle } from "../utils/titleUtils.js";
+
+/**
+ * Row shape returned by FTS search queries (raw SQL returning StashScene columns).
+ * Uses Record<string, unknown> base since raw SQL results don't have Prisma's
+ * typed Date objects - timestamps come back as strings or numbers.
+ */
+type FtsSceneRow = Record<string, unknown> & StashScene;
+
+/**
+ * Row shape returned by FTS performer search queries.
+ */
+type FtsPerformerRow = Record<string, unknown> & StashPerformer;
+
+/** Junction table entry for scene-performer with included performer */
+interface ScenePerformerWithPerformer {
+  performer: StashPerformer;
+}
+
+/** Junction table entry for scene-tag with included tag */
+interface SceneTagWithTag {
+  tag: StashTag;
+}
+
+/** Junction table entry for scene-group with included group */
+interface SceneGroupWithGroup {
+  group: StashGroup;
+  sceneIndex: number | null;
+}
+
+/** Junction table entry for scene-gallery with included gallery */
+interface SceneGalleryWithGallery {
+  gallery: StashGallery;
+}
+
+/** Scene result from Prisma with all relations included */
+interface SceneWithRelations extends StashScene {
+  performers?: ScenePerformerWithPerformer[];
+  tags?: SceneTagWithTag[];
+  groups?: SceneGroupWithGroup[];
+  galleries?: SceneGalleryWithGallery[];
+}
+
+/** Performer tag junction entry with included tag */
+interface PerformerTagWithTag {
+  tagId: string;
+  tag?: StashTag | null;
+}
+
+/** Performer input for transformPerformer - Prisma result with optional tag relation and optional computed counts */
+type PerformerInput = StashPerformer & {
+  tags?: PerformerTagWithTag[];
+};
+
+/** Studio tag junction entry with included tag */
+interface StudioTagWithTag {
+  tagId: string;
+  tag?: StashTag | null;
+}
+
+/** Studio input for transformStudio - Prisma result with optional tag relation and optional computed counts */
+type StudioInput = StashStudio & {
+  tags?: StudioTagWithTag[];
+};
+
+/** Tag input for transformTag - Prisma result with optional computed counts */
+type TagInput = StashTag & {
+  sceneMarkerCount?: number;
+};
+
+/** Group tag junction entry with included tag */
+interface GroupTagWithTag {
+  tagId: string;
+  tag?: StashTag | null;
+}
+
+/** Group input for transformGroup - Prisma result with optional tag relation and optional computed counts */
+type GroupInput = StashGroup & {
+  tags?: GroupTagWithTag[];
+};
+
+/** Gallery performer junction entry */
+interface GalleryPerformerEntry {
+  performer: StashPerformer;
+}
+
+/** Gallery tag junction entry with included tag */
+interface GalleryTagWithTag {
+  tagId: string;
+  tag?: StashTag | null;
+}
+
+/** Gallery scene junction entry */
+interface GallerySceneEntry {
+  scene: StashScene;
+}
+
+/** Gallery input for transformGallery - Prisma result with optional relations and computed counts */
+type GalleryInput = StashGallery & {
+  performers?: GalleryPerformerEntry[];
+  tags?: GalleryTagWithTag[];
+  scenes?: GallerySceneEntry[];
+};
+
+/** Image performer junction entry */
+interface ImagePerformerEntry {
+  performer: StashPerformer;
+}
+
+/** Image tag junction entry */
+interface ImageTagEntry {
+  tag: StashTag;
+}
+
+/** Image gallery junction entry with nested relations */
+interface ImageGalleryEntry {
+  gallery: StashGallery & {
+    studio?: { id: string; name: string } | null;
+    performers?: GalleryPerformerEntry[];
+    tags?: GalleryTagWithTag[];
+  };
+}
+
+/** Image input for transformImage - Prisma result with optional relations */
+type ImageInput = StashImage & {
+  studio?: { id: string; name: string } | null;
+  performers?: ImagePerformerEntry[];
+  tags?: ImageTagEntry[];
+  galleries?: ImageGalleryEntry[];
+};
+
+/** Scene fields returned by BROWSE_SELECT queries (subset of StashScene without streams/data) */
+type BrowseSceneRow = Pick<StashScene,
+  'id' | 'stashInstanceId' | 'title' | 'code' | 'date' | 'studioId' |
+  'rating100' | 'duration' | 'organized' | 'details' | 'director' | 'urls' |
+  'filePath' | 'fileBitRate' | 'fileFrameRate' | 'fileWidth' | 'fileHeight' |
+  'fileVideoCodec' | 'fileAudioCodec' | 'fileSize' | 'pathScreenshot' |
+  'pathPreview' | 'pathSprite' | 'pathVtt' | 'pathChaptersVtt' | 'pathStream' |
+  'pathCaption' | 'captions' | 'oCounter' | 'playCount' | 'playDuration' |
+  'stashCreatedAt' | 'stashUpdatedAt' | 'syncedAt' | 'deletedAt' | 'inheritedTagIds'
+>;
+
+/** Transformed image output shape (returned by transformImage) */
+interface TransformedImage {
+  id: string;
+  instanceId: string;
+  title: string | null;
+  code: string | null;
+  details: string | null;
+  photographer: string | null;
+  urls: string[];
+  date: string | null;
+  studio: { id: string; name?: string } | null;
+  studioId: string | null;
+  rating100: number | null;
+  o_counter: number;
+  organized: boolean;
+  filePath: string | null;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  files: Array<{ path: string; width: number | null; height: number | null; size: number | null }>;
+  paths: { thumbnail: string; preview: string; image: string };
+  performers: Array<{ id: string; name: string; gender: string | null; image_path: string | null }>;
+  tags: Array<{ id: string; name: string }>;
+  galleries: Array<Record<string, unknown>>;
+  created_at: string | null;
+  updated_at: string | null;
+  stashCreatedAt: string | null;
+  stashUpdatedAt: string | null;
+}
 
 /**
  * Default user fields for scenes (when no user data is merged)
@@ -634,7 +805,7 @@ class StashEntityService {
     const isRandom = sortField === 'random';
 
     // Build where clause with exclusions at DB level
-    const where: any = { deletedAt: null };
+    const where: Prisma.StashSceneWhereInput = { deletedAt: null };
     if (excludeIds && excludeIds.size > 0) {
       where.id = { notIn: Array.from(excludeIds) };
     }
@@ -645,13 +816,14 @@ class StashEntityService {
     logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`);
 
     // Build orderBy
-    let orderBy: any;
+    const direction = sortDirection.toLowerCase() as Prisma.SortOrder;
+    let orderBy: Prisma.StashSceneOrderByWithRelationInput;
     if (isRandom) {
       // For random, we'll use a seeded approach based on page
       // This gives consistent results per page but variety across pages
-      orderBy = { id: sortDirection.toLowerCase() };
+      orderBy = { id: direction };
     } else {
-      orderBy = { [sortColumn]: sortDirection.toLowerCase() };
+      orderBy = { [sortColumn]: direction };
     }
 
     // Query with pagination - exclusions already applied in where clause
@@ -705,7 +877,7 @@ class StashEntityService {
   async searchScenes(query: string, limit = 100): Promise<NormalizedScene[]> {
     try {
       // Use raw SQL for FTS5 search - select all scene columns
-      const results = await prisma.$queryRaw<any[]>`
+      const results = await prisma.$queryRaw<FtsSceneRow[]>`
         SELECT s.*
         FROM scene_fts
         INNER JOIN StashScene s ON scene_fts.id = s.id
@@ -857,7 +1029,7 @@ class StashEntityService {
    */
   async searchPerformers(query: string, limit = 100): Promise<NormalizedPerformer[]> {
     try {
-      const results = await prisma.$queryRaw<any[]>`
+      const results = await prisma.$queryRaw<FtsPerformerRow[]>`
         SELECT p.*
         FROM performer_fts
         INNER JOIN StashPerformer p ON performer_fts.id = p.id
@@ -1405,7 +1577,7 @@ class StashEntityService {
    * The "Failed to convert rust String into napi string" error occurs when Prisma
    * tries to serialize very large result sets (500k+ rows with relations).
    */
-  async getAllImages(): Promise<any[]> {
+  async getAllImages(): Promise<TransformedImage[]> {
     const startTime = Date.now();
 
     // Get total count first
@@ -1419,7 +1591,7 @@ class StashEntityService {
         where: { deletedAt: null },
         include: this.imageIncludes,
       });
-      const result = cached.map((c) => this.transformImage(c));
+      const result = cached.map((c) => this.transformImage(c as unknown as ImageInput));
       logger.info(`getAllImages: single query for ${totalCount} images in ${Date.now() - startTime}ms`);
       return result;
     }
@@ -1427,7 +1599,7 @@ class StashEntityService {
     // For large datasets, fetch in chunks to avoid Prisma string limit
     // Chunk size of 5000 keeps each query well under the limit
     const CHUNK_SIZE = 5000;
-    const allImages: any[] = [];
+    const allImages: TransformedImage[] = [];
     let offset = 0;
 
     while (offset < totalCount) {
@@ -1440,7 +1612,7 @@ class StashEntityService {
         orderBy: { id: 'asc' }, // Consistent ordering for pagination
       });
 
-      const transformed = chunk.map((c) => this.transformImage(c));
+      const transformed = chunk.map((c) => this.transformImage(c as unknown as ImageInput));
       allImages.push(...transformed);
 
       logger.debug(`getAllImages chunk: offset=${offset}, fetched=${chunk.length} in ${Date.now() - chunkStart}ms`);
@@ -1467,7 +1639,7 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformImage(cached);
+    return this.transformImage(cached as unknown as ImageInput) as unknown as NormalizedImage;
   }
 
   /**
@@ -1491,12 +1663,12 @@ class StashEntityService {
         },
         include: this.imageIncludes,
       });
-      return cached.map((c) => this.transformImage(c));
+      return cached.map((c) => this.transformImage(c as unknown as ImageInput) as unknown as NormalizedImage);
     }
 
     // For large sets, fetch in chunks
     const CHUNK_SIZE = 5000;
-    const allImages: any[] = [];
+    const allImages: NormalizedImage[] = [];
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
       const chunkIds = ids.slice(i, i + CHUNK_SIZE);
@@ -1508,7 +1680,7 @@ class StashEntityService {
         },
         include: this.imageIncludes,
       });
-      allImages.push(...chunk.map((c) => this.transformImage(c)));
+      allImages.push(...chunk.map((c) => this.transformImage(c as unknown as ImageInput) as unknown as NormalizedImage));
     }
 
     return allImages;
@@ -1724,7 +1896,7 @@ class StashEntityService {
     return new Set(results.map(r => r.groupId));
   }
 
-  private transformScene(scene: any): NormalizedScene {
+  private transformScene(scene: StashScene): NormalizedScene {
     return {
       // User fields (defaults first, then override with actual values)
       ...DEFAULT_SCENE_USER_FIELDS,
@@ -1794,7 +1966,7 @@ class StashEntityService {
   /**
    * Transform scene for browse queries (no streams - generated on demand)
    */
-  private transformSceneForBrowse(scene: any): NormalizedScene {
+  private transformSceneForBrowse(scene: BrowseSceneRow): NormalizedScene {
     return {
       // User fields (defaults first, then override with actual values)
       ...DEFAULT_SCENE_USER_FIELDS,
@@ -1885,10 +2057,10 @@ class StashEntityService {
    */
   private hydrateInheritedTags(scenes: NormalizedScene[], tagNames: Map<string, string>): void {
     for (const scene of scenes) {
-      const inheritedTagIds = (scene as any).inheritedTagIds;
+      const inheritedTagIds = scene.inheritedTagIds;
       if (inheritedTagIds && Array.isArray(inheritedTagIds) && inheritedTagIds.length > 0) {
         const sceneInstanceId = scene.instanceId || '';
-        (scene as any).inheritedTags = inheritedTagIds.map((tagId: string) => ({
+        scene.inheritedTags = inheritedTagIds.map((tagId: string) => ({
           id: tagId,
           // Try composite key first, fall back to ID-only
           name: tagNames.get(`${tagId}\0${sceneInstanceId}`) || tagNames.get(tagId) || "Unknown",
@@ -1897,40 +2069,40 @@ class StashEntityService {
     }
   }
 
-  private transformSceneWithRelations(scene: any): NormalizedScene {
+  private transformSceneWithRelations(scene: SceneWithRelations): NormalizedScene {
     const base = this.transformScene(scene);
 
     // Add nested entities
     if (scene.performers) {
-      base.performers = scene.performers.map((sp: any) =>
+      base.performers = scene.performers.map((sp: ScenePerformerWithPerformer) =>
         this.transformPerformer(sp.performer)
       );
     }
     if (scene.tags) {
-      base.tags = scene.tags.map((st: any) =>
+      base.tags = scene.tags.map((st: SceneTagWithTag) =>
         this.transformTag(st.tag)
       );
     }
     if (scene.groups) {
-      base.groups = scene.groups.map((sg: any) => ({
+      base.groups = scene.groups.map((sg: SceneGroupWithGroup) => ({
         ...this.transformGroup(sg.group),
         scene_index: sg.sceneIndex,
-      }));
+      })) as unknown as typeof base.groups;
     }
     if (scene.galleries) {
-      base.galleries = scene.galleries.map((sg: any) =>
+      base.galleries = scene.galleries.map((sg: SceneGalleryWithGallery) =>
         this.transformGallery(sg.gallery)
-      );
+      ) as unknown as typeof base.galleries;
     }
 
     // Hydrate inherited tags with full tag objects
     if (scene.inheritedTagIds) {
-      const inheritedTagIds = JSON.parse(scene.inheritedTagIds);
+      const inheritedTagIds: string[] = JSON.parse(scene.inheritedTagIds);
       if (inheritedTagIds.length > 0) {
         // Look up tags in the tags array we already have, or create minimal stub
         base.inheritedTags = inheritedTagIds.map((tagId: string) => {
           // Find in existing tags or create minimal stub
-          const existingTag = base.tags?.find((t: any) => t.id === tagId);
+          const existingTag = base.tags?.find((t) => t.id === tagId);
           return existingTag || { id: tagId, name: "Unknown" };
         });
       }
@@ -1939,9 +2111,9 @@ class StashEntityService {
     return base;
   }
 
-  private transformPerformer(performer: any): NormalizedPerformer {
+  private transformPerformer(performer: PerformerInput): NormalizedPerformer {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = performer.tags?.map((pt: any) => ({
+    const tags = performer.tags?.map((pt: PerformerTagWithTag) => ({
       id: pt.tagId,
       name: pt.tag?.name || "Unknown",
       image_path: pt.tag?.imagePath ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId) : null,
@@ -1983,9 +2155,9 @@ class StashEntityService {
     } as unknown as NormalizedPerformer;
   }
 
-  private transformStudio(studio: any): NormalizedStudio {
+  private transformStudio(studio: StudioInput): NormalizedStudio {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = studio.tags?.map((st: any) => ({
+    const tags = studio.tags?.map((st: StudioTagWithTag) => ({
       id: st.tagId,
       name: st.tag?.name || "Unknown",
       image_path: st.tag?.imagePath ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId) : null,
@@ -2013,7 +2185,7 @@ class StashEntityService {
     } as unknown as NormalizedStudio;
   }
 
-  private transformTag(tag: any): NormalizedTag {
+  private transformTag(tag: TagInput): NormalizedTag {
     return {
       ...DEFAULT_TAG_USER_FIELDS,
       id: tag.id,
@@ -2037,9 +2209,9 @@ class StashEntityService {
     } as unknown as NormalizedTag;
   }
 
-  private transformGroup(group: any): NormalizedGroup {
+  private transformGroup(group: GroupInput): NormalizedGroup {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = group.tags?.map((gt: any) => ({
+    const tags = group.tags?.map((gt: GroupTagWithTag) => ({
       id: gt.tagId,
       name: gt.tag?.name || "Unknown",
       image_path: gt.tag?.imagePath ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId) : null,
@@ -2066,19 +2238,19 @@ class StashEntityService {
     } as unknown as NormalizedGroup;
   }
 
-  private transformGallery(gallery: any): NormalizedGallery {
+  private transformGallery(gallery: GalleryInput): NormalizedGallery {
     const coverUrl = this.transformUrl(gallery.coverPath, gallery.stashInstanceId);
     // Extract tags from junction table relation (if included) or empty array
     // Include image_path for TooltipEntityGrid display
-    const tags = gallery.tags?.map((gt: any) => ({
+    const tags = gallery.tags?.map((gt: GalleryTagWithTag) => ({
       id: gt.tagId,
       name: gt.tag?.name || "Unknown",
-      image_path: this.transformUrl(gt.tag?.imagePath, gt.tag?.stashInstanceId),
+      image_path: this.transformUrl(gt.tag?.imagePath ?? null, gt.tag?.stashInstanceId),
     })) || [];
 
     // Transform performers from junction table
     // Include image_path and gender for TooltipEntityGrid display
-    const performers = gallery.performers?.map((gp: any) => ({
+    const performers = gallery.performers?.map((gp: GalleryPerformerEntry) => ({
       id: gp.performer.id,
       name: gp.performer.name,
       gender: gp.performer.gender,
@@ -2087,7 +2259,7 @@ class StashEntityService {
 
     // Transform scenes from junction table
     // Include minimal data for display (id, title, screenshot)
-    const scenes = gallery.scenes?.map((gs: any) => ({
+    const scenes = gallery.scenes?.map((gs: GallerySceneEntry) => ({
       id: gs.scene.id,
       title: gs.scene.title,
       paths: {
@@ -2126,9 +2298,9 @@ class StashEntityService {
     } as unknown as NormalizedGallery;
   }
 
-  private transformImage(image: any): any {
+  private transformImage(image: ImageInput): TransformedImage {
     // Transform performers from junction table (include image_path and gender for display)
-    const performers = (image.performers ?? []).map((ip: any) => ({
+    const performers = (image.performers ?? []).map((ip: ImagePerformerEntry) => ({
       id: ip.performer.id,
       name: ip.performer.name,
       gender: ip.performer.gender,
@@ -2136,13 +2308,13 @@ class StashEntityService {
     }));
 
     // Transform tags from junction table
-    const tags = (image.tags ?? []).map((it: any) => ({
+    const tags = (image.tags ?? []).map((it: ImageTagEntry) => ({
       id: it.tag.id,
       name: it.tag.name,
     }));
 
     // Transform galleries from junction table (with their performers/tags/studio for inheritance)
-    const galleries = (image.galleries ?? []).map((ig: any) => ({
+    const galleries = (image.galleries ?? []).map((ig: ImageGalleryEntry) => ({
       id: ig.gallery.id,
       title: ig.gallery.title,
       date: ig.gallery.date,
@@ -2156,15 +2328,15 @@ class StashEntityService {
         id: ig.gallery.studio.id,
         name: ig.gallery.studio.name,
       } : null,
-      performers: (ig.gallery.performers ?? []).map((gp: any) => ({
+      performers: (ig.gallery.performers ?? []).map((gp: GalleryPerformerEntry) => ({
         id: gp.performer.id,
         name: gp.performer.name,
         gender: gp.performer.gender,
         image_path: this.transformUrl(gp.performer.imagePath, gp.performer.stashInstanceId),
       })),
-      tags: (ig.gallery.tags ?? []).map((gt: any) => ({
-        id: gt.tag.id,
-        name: gt.tag.name,
+      tags: (ig.gallery.tags ?? []).map((gt: GalleryTagWithTag) => ({
+        id: gt.tag?.id ?? gt.tagId,
+        name: gt.tag?.name || "Unknown",
       })),
     }));
 

@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for scene filtering, sorting, and pagination.
  * Eliminates the need to load all scenes into memory.
  */
-import type { PeekSceneFilter, NormalizedScene } from "../types/index.js";
+import type { PeekSceneFilter, NormalizedScene, PerformerRef, TagRef, StudioRef, GroupRef, GalleryRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
@@ -1023,7 +1023,7 @@ class SceneQueryBuilder {
 
     if (filters?.tags) {
       // Use hierarchy-aware filter that supports depth parameter
-      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
@@ -1031,21 +1031,21 @@ class SceneQueryBuilder {
 
     if (filters?.studios) {
       // Use hierarchy-aware filter that supports depth parameter
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios as any);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
     }
 
     if (filters?.groups) {
-      const groupFilter = this.buildGroupFilter(filters.groups as any);
+      const groupFilter = this.buildGroupFilter(filters.groups);
       if (groupFilter.sql) {
         whereClauses.push(groupFilter);
       }
     }
 
     if (filters?.galleries) {
-      const galleriesFilter = this.buildGalleriesFilter(filters.galleries as any);
+      const galleriesFilter = this.buildGalleriesFilter(filters.galleries);
       if (galleriesFilter.sql) {
         whereClauses.push(galleriesFilter);
       }
@@ -1245,7 +1245,7 @@ class SceneQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query - use simplified count without JOINs when possible
@@ -1326,7 +1326,8 @@ class SceneQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedScene
    */
-  private transformRow(row: any): NormalizedScene {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a 30+ field interface adds maintenance overhead without real safety gain
+  private transformRow(row: Record<string, any>): NormalizedScene {
     // Parse JSON fields
     const oHistory = this.parseJsonArray(row.userOHistory);
     const playHistory = this.parseJsonArray(row.userPlayHistory);
@@ -1335,6 +1336,7 @@ class SceneQueryBuilder {
     const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
 
     // Create scene object with studioId preserved for population
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedScene from DB row; Scene base type requires fields we don't populate (interactive, movies, etc.)
     const scene: any = {
       id: row.id,
       instanceId: row.stashInstanceId,
@@ -1438,8 +1440,11 @@ class SceneQueryBuilder {
     // Collect unique (studioId, instanceId) pairs - each scene's studio comes from its own instance
     const studioKeys = [...new Map(
       scenes
-        .filter((s) => (s as any).studioId)
-        .map((s) => [`${(s as any).studioId}:${normalizeInstanceId(s.instanceId)}`, { id: (s as any).studioId, instanceId: normalizeInstanceId(s.instanceId) }])
+        .filter((s) => (s as unknown as { studioId: string | null }).studioId)
+        .map((s) => {
+          const studioId = (s as unknown as { studioId: string }).studioId;
+          return [`${studioId}:${normalizeInstanceId(s.instanceId)}`, { id: studioId, instanceId: normalizeInstanceId(s.instanceId) }] as const;
+        })
     ).values()];
 
     // Batch load all relations in parallel
@@ -1494,9 +1499,8 @@ class SceneQueryBuilder {
     // For inherited tags, we use just ID since they're pre-computed and stored without instance info
     const inheritedTagIdSet = new Set<string>();
     for (const scene of scenes) {
-      const sceneAny = scene as any;
-      if (sceneAny.inheritedTagIds && Array.isArray(sceneAny.inheritedTagIds)) {
-        for (const tagId of sceneAny.inheritedTagIds) {
+      if (scene.inheritedTagIds && scene.inheritedTagIds.length > 0) {
+        for (const tagId of scene.inheritedTagIds) {
           inheritedTagIdSet.add(tagId);
         }
       }
@@ -1560,31 +1564,31 @@ class SceneQueryBuilder {
     ]);
 
     // Build entity lookup maps by composite key (id:instanceId)
-    const performersByKey = new Map<string, any>();
+    const performersByKey = new Map<string, PerformerRef>();
     for (const performer of performers) {
       const key = `${performer.id}:${performer.stashInstanceId}`;
       performersByKey.set(key, this.transformStashPerformer(performer));
     }
 
-    const tagsByKey = new Map<string, any>();
+    const tagsByKey = new Map<string, TagRef>();
     for (const tag of tags) {
       const key = `${tag.id}:${tag.stashInstanceId}`;
       tagsByKey.set(key, this.transformStashTag(tag));
     }
 
-    const groupsByKey = new Map<string, any>();
+    const groupsByKey = new Map<string, GroupRef>();
     for (const group of groups) {
       const key = `${group.id}:${group.stashInstanceId}`;
       groupsByKey.set(key, this.transformStashGroup(group));
     }
 
-    const galleriesByKey = new Map<string, any>();
+    const galleriesByKey = new Map<string, GalleryRef>();
     for (const gallery of galleries) {
       const key = `${gallery.id}:${gallery.stashInstanceId}`;
       galleriesByKey.set(key, this.transformStashGallery(gallery));
     }
 
-    const studiosByKey = new Map<string, any>();
+    const studiosByKey = new Map<string, StudioRef>();
     for (const studio of studios) {
       const key = `${studio.id}:${studio.stashInstanceId}`;
       studiosByKey.set(key, this.transformStashStudio(studio));
@@ -1592,7 +1596,7 @@ class SceneQueryBuilder {
 
     // Build scene-to-entities maps using junction tables with composite keys
     // Key format: sceneId:sceneInstanceId -> entities[]
-    const performersByScene = new Map<string, any[]>();
+    const performersByScene = new Map<string, PerformerRef[]>();
     for (const junction of performerJunctions) {
       const performerKey = `${junction.performerId}:${junction.performerInstanceId}`;
       const performer = performersByKey.get(performerKey);
@@ -1603,7 +1607,7 @@ class SceneQueryBuilder {
       performersByScene.set(sceneKey, list);
     }
 
-    const tagsByScene = new Map<string, any[]>();
+    const tagsByScene = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
       const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
       const tag = tagsByKey.get(tagKey);
@@ -1614,7 +1618,7 @@ class SceneQueryBuilder {
       tagsByScene.set(sceneKey, list);
     }
 
-    const groupsByScene = new Map<string, any[]>();
+    const groupsByScene = new Map<string, (GroupRef & { scene_index: number | null })[]>();
     for (const junction of groupJunctions) {
       const groupKey = `${junction.groupId}:${junction.groupInstanceId}`;
       const group = groupsByKey.get(groupKey);
@@ -1625,7 +1629,7 @@ class SceneQueryBuilder {
       groupsByScene.set(sceneKey, list);
     }
 
-    const galleriesByScene = new Map<string, any[]>();
+    const galleriesByScene = new Map<string, GalleryRef[]>();
     for (const junction of galleryJunctions) {
       const galleryKey = `${junction.galleryId}:${junction.galleryInstanceId}`;
       const gallery = galleriesByKey.get(galleryKey);
@@ -1640,29 +1644,32 @@ class SceneQueryBuilder {
     for (const scene of scenes) {
       const normalizedSceneInstanceId = normalizeInstanceId(scene.instanceId);
       const sceneKey = `${scene.id}:${normalizedSceneInstanceId}`;
-      scene.performers = performersByScene.get(sceneKey) || [];
-      scene.tags = tagsByScene.get(sceneKey) || [];
-      scene.groups = groupsByScene.get(sceneKey) || [];
-      scene.galleries = galleriesByScene.get(sceneKey) || [];
-      const sceneAny = scene as any;
-      if (sceneAny.studioId) {
-        const studioKey = `${sceneAny.studioId}:${normalizedSceneInstanceId}`;
-        scene.studio = studiosByKey.get(studioKey) || null;
+      // Relations are populated with lightweight refs (PerformerRef etc.), not full GraphQL types.
+      // NormalizedScene inherits Performer[]/Tag[]/etc. from Scene, but QueryBuilder intentionally
+      // populates only the fields needed by the API response.
+      scene.performers = (performersByScene.get(sceneKey) || []) as unknown as NormalizedScene["performers"];
+      scene.tags = (tagsByScene.get(sceneKey) || []) as unknown as NormalizedScene["tags"];
+      scene.groups = (groupsByScene.get(sceneKey) || []) as unknown as NormalizedScene["groups"];
+      scene.galleries = (galleriesByScene.get(sceneKey) || []) as unknown as NormalizedScene["galleries"];
+      const studioId = (scene as unknown as { studioId: string | null }).studioId;
+      if (studioId) {
+        const studioKey = `${studioId}:${normalizedSceneInstanceId}`;
+        scene.studio = (studiosByKey.get(studioKey) || null) as unknown as NormalizedScene["studio"];
       }
 
       // Hydrate inherited tags with full tag objects
       // Inherited tags use scene's instanceId since they're from the same Stash instance
-      if (sceneAny.inheritedTagIds && Array.isArray(sceneAny.inheritedTagIds) && sceneAny.inheritedTagIds.length > 0) {
-        sceneAny.inheritedTags = sceneAny.inheritedTagIds
-          .map((tagId: string) => tagsByKey.get(`${tagId}:${normalizedSceneInstanceId}`))
-          .filter((tag: any) => tag !== undefined);
+      if (scene.inheritedTagIds && scene.inheritedTagIds.length > 0) {
+        scene.inheritedTags = scene.inheritedTagIds
+          .map((tagId) => tagsByKey.get(`${tagId}:${normalizedSceneInstanceId}`))
+          .filter((tag): tag is TagRef => tag !== undefined);
       }
     }
   }
 
   // Helper transforms for Stash entities - all image URLs need proxy treatment
   // Each entity includes its stashInstanceId for multi-instance routing
-  private transformStashPerformer(p: any): any {
+  private transformStashPerformer(p: { id: string; stashInstanceId: string; name: string; disambiguation: string | null; gender: string | null; imagePath: string | null; favorite: boolean; rating100: number | null }): PerformerRef {
     return {
       id: p.id,
       instanceId: p.stashInstanceId,
@@ -1675,7 +1682,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashTag(t: any): any {
+  private transformStashTag(t: { id: string; stashInstanceId: string; name: string; imagePath: string | null; favorite: boolean }): TagRef {
     return {
       id: t.id,
       instanceId: t.stashInstanceId,
@@ -1685,7 +1692,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashStudio(s: any): any {
+  private transformStashStudio(s: { id: string; stashInstanceId: string; name: string; imagePath: string | null; favorite: boolean; parentId: string | null }): StudioRef {
     return {
       id: s.id,
       instanceId: s.stashInstanceId,
@@ -1696,7 +1703,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashGroup(g: any): any {
+  private transformStashGroup(g: { id: string; name: string; frontImagePath: string | null; backImagePath: string | null; stashInstanceId: string }): GroupRef {
     return {
       id: g.id,
       name: g.name,
@@ -1705,7 +1712,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashGallery(g: any): any {
+  private transformStashGallery(g: { id: string; title: string | null; coverPath: string | null; stashInstanceId: string }): GalleryRef {
     const coverUrl = g.coverPath ? this.transformUrl(g.coverPath, g.stashInstanceId) : null;
     return {
       id: g.id,
@@ -1732,7 +1739,7 @@ class SceneQueryBuilder {
    * Parse sceneStreams JSON and keep the raw stream URLs
    * The frontend will handle URL rewriting to proxy-stream endpoint
    */
-  private parseSceneStreams(json: string | null): any[] {
+  private parseSceneStreams(json: string | null): unknown[] {
     if (!json) return [];
     try {
       const parsed = JSON.parse(json);

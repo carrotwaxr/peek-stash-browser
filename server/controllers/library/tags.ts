@@ -379,7 +379,7 @@ export async function applyTagFilters(
     );
     if (performerIdSet.size > 0) {
       const allPerformers = await stashEntityService.getAllPerformers();
-      const matchingPerformers = allPerformers.filter((p: any) =>
+      const matchingPerformers = allPerformers.filter((p) =>
         performerIdSet.has(String(p.id))
       );
 
@@ -424,7 +424,7 @@ export async function applyTagFilters(
     if (sceneIdSet.size > 0) {
       const allScenes = await stashEntityService.getAllScenes();
       const allPerformers = await stashEntityService.getAllPerformers();
-      const matchingScenes = allScenes.filter((s: any) =>
+      const matchingScenes = allScenes.filter((s) =>
         sceneIdSet.has(String(s.id))
       );
 
@@ -459,8 +459,9 @@ export async function applyTagFilters(
     if (groupIdSet.size > 0) {
       const allScenes = await stashEntityService.getAllScenes();
       const allPerformers = await stashEntityService.getAllPerformers();
-      const matchingScenes = allScenes.filter((scene: any) => {
+      const matchingScenes = allScenes.filter((scene) => {
         if (!scene.groups) return false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
         return scene.groups.some((g: any) => groupIdSet.has(String(g.id)));
       });
 
@@ -614,7 +615,7 @@ export const findTagsForScenes = async (
       LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
       WHERE s.deletedAt IS NULL AND e.id IS NULL
     `;
-    const params: (string | number)[] = [userId!];
+    const params: (string | number)[] = [userId as number];
 
     if (performerId) {
       sceneTagQuery += ` AND EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId = ?)`;
@@ -684,7 +685,7 @@ export const findTagsForScenes = async (
             if (!childrenMap.has(parent.id)) {
               childrenMap.set(parent.id, []);
             }
-            childrenMap.get(parent.id)!.push({ id: tag.id });
+            childrenMap.get(parent.id)?.push({ id: tag.id });
           }
         }
       }
