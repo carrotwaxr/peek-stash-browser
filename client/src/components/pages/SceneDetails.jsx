@@ -75,7 +75,7 @@ const SceneDetails = ({
       }
     }
     fetchClips();
-  }, [scene?.id]);
+  }, [scene?.id, scene?.instanceId]);
 
   // Handle clip click - dispatch event to seek video player
   const handleClipClick = (clip) => {

@@ -109,7 +109,7 @@ const VideoPlayer = () => {
       }
     }
     fetchClips();
-  }, [scene?.id]);
+  }, [scene?.id, scene?.instanceId]);
 
   // Add clip markers to timeline using the markers plugin
   useEffect(() => {

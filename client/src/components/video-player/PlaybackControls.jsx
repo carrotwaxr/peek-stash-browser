@@ -28,12 +28,15 @@ const PlaybackControls = () => {
   const [permissions, setPermissions] = useState(null);
 
   // Sync state when scene changes
+  const sceneId = scene?.id;
+  const sceneRating = scene?.rating;
+  const sceneFavorite = scene?.favorite;
   useEffect(() => {
-    if (scene) {
-      setRating(scene.rating ?? null);
-      setIsFavorite(scene.favorite || false);
+    if (sceneId != null) {
+      setRating(sceneRating ?? null);
+      setIsFavorite(sceneFavorite || false);
     }
-  }, [scene?.id, scene?.rating, scene?.favorite]);
+  }, [sceneId, sceneRating, sceneFavorite]);
 
   // Fetch user permissions on mount
   useEffect(() => {
