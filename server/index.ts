@@ -1,4 +1,3 @@
-import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -8,12 +7,11 @@ import { initializeDatabase } from "./initializers/database.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
+import prisma, { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { stashSyncService } from "./services/StashSyncService.js";
 import { logger } from "./utils/logger.js";
-
-const prisma = new PrismaClient();
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +34,10 @@ const main = async () => {
 
   // Run database migrations and seeding
   await initializeDatabase();
+
+  // Configure SQLite for production performance (WAL mode, busy_timeout, etc.)
+  await configureSQLite();
+  logger.info("SQLite PRAGMAs configured (WAL mode, busy_timeout, etc.)");
 
   // Initialize Stash instances (migrate from env vars if needed)
   const stashConfig = await initializeStashInstances();

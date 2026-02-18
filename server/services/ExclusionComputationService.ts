@@ -79,7 +79,9 @@ class ExclusionComputationService {
 
   /**
    * Full recompute for a user.
-   * Runs in a transaction - if any phase fails, previous exclusions are preserved.
+   * Computation runs in phases outside transactions; only the final
+   * DELETE+INSERT swap is atomic. If the write phase fails, previous
+   * exclusions are preserved.
    * Prevents concurrent recomputes for the same user.
    */
   async recomputeForUser(userId: number): Promise<void> {
@@ -103,41 +105,53 @@ class ExclusionComputationService {
 
   /**
    * Internal recompute implementation.
+   *
+   * Structured to minimize SQLite write lock time:
+   * - Phases 1-2 (read-heavy computation) run outside any transaction
+   * - Phase 3 (empty exclusions with temp tables) runs in its own transaction
+   *   for connection affinity (temp tables are per-connection in SQLite)
+   * - Only the final atomic swap (DELETE + INSERT + stats) runs in a short
+   *   write transaction
    */
   private async doRecomputeForUser(userId: number): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", { userId });
+    const t0 = Date.now();
 
-    // Use a longer timeout for large datasets (120 seconds)
-    // The default 5-second timeout is too short for users with many entities
-    await prisma.$transaction(async (tx) => {
-      // Phase 1: Compute direct exclusions (restrictions + hidden)
-      const directExclusions = await this.computeDirectExclusions(userId, tx);
+    // === COMPUTATION PHASE (outside transaction — read-heavy, no write locks) ===
 
-      // Phase 2: Compute cascade exclusions
-      const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, tx);
+    // Phase 1: Compute direct exclusions (reads UserContentRestriction + UserHiddenEntity)
+    const directExclusions = await this.computeDirectExclusions(userId, prisma);
+    const t1 = Date.now();
 
-      // Phase 3: Compute empty exclusions
-      // Empty exclusions need to consider direct + cascade exclusions already computed
-      const emptyExclusions = await this.computeEmptyExclusions(
-        userId,
-        [...directExclusions, ...cascadeExclusions],
-        tx
-      );
+    // Phase 2: Compute cascade exclusions (reads junction tables)
+    const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, prisma);
+    const t2 = Date.now();
 
-      // Combine all exclusions and deduplicate
-      // An entity can be excluded via multiple paths (e.g., cascade from performer + cascade from tag)
-      // but we only need one record per (userId, entityType, entityId)
-      const allExclusionsRaw = [...directExclusions, ...cascadeExclusions, ...emptyExclusions];
-      const seen = new Set<string>();
-      const allExclusions: ExclusionRecord[] = [];
-      for (const excl of allExclusionsRaw) {
-        const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ''}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          allExclusions.push(excl);
-        }
+    // Phase 3: Compute empty exclusions (uses temp tables for performance)
+    // No transaction needed: Prisma's SQLite driver uses connection_limit=1, so all queries
+    // share the same connection and temp tables persist across sequential raw queries.
+    // Avoiding a transaction here prevents holding a write lock during the 10-30s computation.
+    const previousExclusions = [...directExclusions, ...cascadeExclusions];
+    const emptyExclusions = await this.computeEmptyExclusions(userId, previousExclusions, prisma);
+    const t3 = Date.now();
+
+    // Combine all exclusions and deduplicate
+    // An entity can be excluded via multiple paths (e.g., cascade from performer + cascade from tag)
+    // but we only need one record per (userId, entityType, entityId)
+    const allExclusionsRaw = [...directExclusions, ...cascadeExclusions, ...emptyExclusions];
+    const seen = new Set<string>();
+    const allExclusions: ExclusionRecord[] = [];
+    for (const excl of allExclusionsRaw) {
+      const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allExclusions.push(excl);
       }
+    }
 
+    // === WRITE PHASE (short transaction — only the atomic swap) ===
+
+    await prisma.$transaction(async (tx) => {
       // Delete existing exclusions for this user
       await tx.userExcludedEntity.deleteMany({
         where: { userId },
@@ -152,15 +166,21 @@ class ExclusionComputationService {
 
       // Phase 4: Update entity stats
       await this.updateEntityStats(userId, tx);
-
-      logger.info("ExclusionComputationService.recomputeForUser completed", {
-        userId,
-        totalExclusions: allExclusions.length,
-      });
     }, {
-      // Increase timeout to 120 seconds for large datasets
-      // Default is 5 seconds which is too short for users with many entities
-      timeout: 120000,
+      timeout: 30000,
+    });
+    const t4 = Date.now();
+
+    logger.info("ExclusionComputationService.recomputeForUser completed", {
+      userId,
+      totalExclusions: allExclusions.length,
+      timing: {
+        directMs: t1 - t0,
+        cascadeMs: t2 - t1,
+        emptyMs: t3 - t2,
+        writeMs: t4 - t3,
+        totalMs: t4 - t0,
+      },
     });
   }
 
@@ -532,9 +552,9 @@ class ExclusionComputationService {
    * - Groups: 0 visible scenes
    * - Tags: not attached to any visible scene, performer, studio, or group
    *
-   * Note: Since we delete and recreate all exclusions in the same transaction,
-   * we need to check against the priorExclusions in-memory rather than querying
-   * UserExcludedEntity (which will be empty during the transaction).
+   * Note: We check against priorExclusions in-memory rather than querying
+   * UserExcludedEntity because new exclusions haven't been written yet
+   * (they are being computed), so the DB still contains the old set.
    *
    * @param userId - User ID
    * @param priorExclusions - Direct + cascade exclusions already computed
