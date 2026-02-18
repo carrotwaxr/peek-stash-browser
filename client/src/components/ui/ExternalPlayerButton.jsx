@@ -1,5 +1,5 @@
 import { ExternalLink, ChevronDown, Copy } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 
@@ -109,8 +109,8 @@ export default function ExternalPlayerButton({
     }
   };
 
-  // Update menu position when opening
-  useEffect(() => {
+  // Update menu position when opening (useLayoutEffect prevents position flicker)
+  useLayoutEffect(() => {
     if (isDropdownOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setMenuPosition({

@@ -560,7 +560,7 @@ describe("TimelineView", () => {
       });
     });
 
-    it("calls onDateFilterChange with null when selectedPeriod is cleared", () => {
+    it("does not call onDateFilterChange when selectedPeriod is null on mount", () => {
       const onDateFilterChange = vi.fn();
 
       mockUseTimelineState.mockReturnValue({
@@ -572,7 +572,8 @@ describe("TimelineView", () => {
         <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange} />
       );
 
-      expect(onDateFilterChange).toHaveBeenCalledWith(null);
+      // No notification needed for null state - parent already knows no filter is active
+      expect(onDateFilterChange).not.toHaveBeenCalled();
     });
 
     it("does not crash when onDateFilterChange is not provided", () => {

@@ -3,7 +3,7 @@ import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import TimelineControls from "./TimelineControls.jsx";
 import TimelineStrip from "./TimelineStrip.jsx";
 import TimelineMobileSheet from "./TimelineMobileSheet.jsx";
-import { useTimelineState } from "./useTimelineState.js";
+import { useTimelineState, parsePeriodToDateRange } from "./useTimelineState.js";
 import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import { getGridClasses } from "../../constants/grids.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
@@ -54,19 +54,32 @@ function TimelineView({
     };
   }, [selectedPeriod]);
 
-  // Notify parent when selected period changes
+  // Track whether auto-selection has been notified to parent
+  const hasNotifiedAutoSelectRef = useRef(false);
+
+  // Notify parent of auto-selected period (initial load only)
   useEffect(() => {
-    if (onDateFilterChange) {
-      if (selectedPeriod) {
-        onDateFilterChange({
-          start: selectedPeriod.start,
-          end: selectedPeriod.end,
-        });
-      } else {
-        onDateFilterChange(null);
-      }
+    if (!hasNotifiedAutoSelectRef.current && selectedPeriod && onDateFilterChange) {
+      hasNotifiedAutoSelectRef.current = true;
+      onDateFilterChange({ start: selectedPeriod.start, end: selectedPeriod.end });
     }
   }, [selectedPeriod, onDateFilterChange]);
+
+  // Wrap selectPeriod to notify parent directly on user interaction
+  const handleSelectPeriod = useCallback((period) => {
+    selectPeriod(period);
+    hasNotifiedAutoSelectRef.current = true; // Mark as handled
+    // selectPeriod toggles: clicking same period deselects
+    const willDeselect = selectedPeriod?.period === period;
+    if (onDateFilterChange) {
+      if (willDeselect) {
+        onDateFilterChange(null);
+      } else {
+        const range = parsePeriodToDateRange(period, zoomLevel);
+        onDateFilterChange(range ? { start: range.start, end: range.end } : null);
+      }
+    }
+  }, [selectPeriod, selectedPeriod, zoomLevel, onDateFilterChange]);
 
   // Sync period to URL separately - only when period actually changes from user action
   // Uses ref for callback to avoid infinite loop from callback identity changes
@@ -143,7 +156,7 @@ function TimelineView({
         maxCount={maxCount}
         zoomLevel={zoomLevel}
         selectedPeriod={selectedPeriod}
-        onSelectPeriod={selectPeriod}
+        onSelectPeriod={handleSelectPeriod}
         onVisibleRangeChange={handleVisibleRangeChange}
       />
     </>

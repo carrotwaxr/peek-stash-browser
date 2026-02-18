@@ -293,20 +293,6 @@ const SearchControls = ({
   const sortField = sort.field;
   const sortDirection = sort.direction;
 
-  // Notify parent of perPage state changes (fixes stale URL param bug)
-  useEffect(() => {
-    if (onPerPageStateChange) {
-      onPerPageStateChange(perPage);
-    }
-  }, [perPage, onPerPageStateChange]);
-
-  // Notify parent of view mode changes
-  useEffect(() => {
-    if (onViewModeChange) {
-      onViewModeChange(viewMode);
-    }
-  }, [viewMode, onViewModeChange]);
-
   // Local filters state for filter panel editing (before submit)
   const [localFilters, setLocalFilters] = useState(filters);
 
@@ -528,6 +514,8 @@ const SearchControls = ({
   const handleLoadPreset = useCallback(
     (preset) => {
       loadPreset(preset); // Hook handles URL sync and state updates
+      onPerPageStateChange?.(preset.perPage || perPage);
+      if (preset.viewMode) onViewModeChange?.(preset.viewMode);
 
       // Reset random seed when loading preset (like Stash does)
       // This ensures fresh randomization each time a preset is loaded
@@ -553,7 +541,7 @@ const SearchControls = ({
 
       onQueryChange(query);
     },
-    [loadPreset, permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference, getSortWithSeed, resetRandomSeed]
+    [loadPreset, onPerPageStateChange, onViewModeChange, permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference, getSortWithSeed, resetRandomSeed]
   );
 
   const handlePageChange = useCallback((page) => {
@@ -660,6 +648,7 @@ const SearchControls = ({
 
   const handlePerPageChange = useCallback((newPerPage) => {
     setPerPageAction(newPerPage); // Hook handles URL sync and resets to page 1
+    onPerPageStateChange?.(newPerPage);
 
     // Trigger search with new per page value
     const query = {
@@ -674,7 +663,13 @@ const SearchControls = ({
     };
 
     onQueryChange(query);
-  }, [setPerPageAction, sortDirection, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [setPerPageAction, onPerPageStateChange, sortDirection, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+
+  // Handle view mode change - notify parent directly instead of via effect
+  const handleViewModeChange = useCallback((newMode) => {
+    setViewMode(newMode);
+    onViewModeChange?.(newMode);
+  }, [setViewMode, onViewModeChange]);
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -890,7 +885,7 @@ const SearchControls = ({
             <ViewModeToggle
               modes={viewModes}
               value={viewMode}
-              onChange={setViewMode}
+              onChange={handleViewModeChange}
             />
           </div>
         )}

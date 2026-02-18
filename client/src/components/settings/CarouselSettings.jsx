@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -60,7 +60,7 @@ const isCustomCarousel = (id) => id && id.startsWith("custom-");
  */
 const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   const navigate = useNavigate();
-  const [preferences, setPreferences] = useState([]);
+  const [userPreferences, setUserPreferences] = useState(null);
   const [customCarousels, setCustomCarousels] = useState([]);
   const [loadingCustom, setLoadingCustom] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
@@ -82,12 +82,15 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     loadCustomCarousels();
   }, []);
 
-  // Merge hardcoded + custom preferences when both are ready
-  useEffect(() => {
-    if (loadingCustom) return;
+  // Derive merged preferences at render time instead of via effect
+  const preferences = useMemo(() => {
+    if (loadingCustom) return [];
+
+    // Use user-modified preferences if available, otherwise start from props
+    const base = userPreferences || carouselPreferences;
 
     // Start with saved preferences
-    let merged = [...carouselPreferences].sort((a, b) => a.order - b.order);
+    let merged = [...base].sort((a, b) => a.order - b.order);
 
     // Add any custom carousels that aren't in preferences yet
     customCarousels.forEach((carousel) => {
@@ -111,8 +114,8 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     merged.sort((a, b) => a.order - b.order);
     merged = merged.map((pref, idx) => ({ ...pref, order: idx }));
 
-    setPreferences(merged);
-  }, [carouselPreferences, customCarousels, loadingCustom]);
+    return merged;
+  }, [carouselPreferences, customCarousels, loadingCustom, userPreferences]);
 
   const moveUp = (index) => {
     if (index === 0) return;
@@ -128,7 +131,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       order: idx,
     }));
 
-    setPreferences(reordered);
+    setUserPreferences(reordered);
     setHasChanges(true);
   };
 
@@ -146,7 +149,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       order: idx,
     }));
 
-    setPreferences(reordered);
+    setUserPreferences(reordered);
     setHasChanges(true);
   };
 
@@ -154,7 +157,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     const updated = preferences.map((pref) =>
       pref.id === id ? { ...pref, enabled: !pref.enabled } : pref
     );
-    setPreferences(updated);
+    setUserPreferences(updated);
     setHasChanges(true);
   };
 
@@ -164,8 +167,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   };
 
   const handleReset = () => {
-    const sorted = [...carouselPreferences].sort((a, b) => a.order - b.order);
-    setPreferences(sorted);
+    setUserPreferences(null); // Reset to derived from props
     setHasChanges(false);
   };
 
@@ -193,7 +195,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       const updatedPrefs = preferences
         .filter((p) => p.id !== carouselId)
         .map((p, idx) => ({ ...p, order: idx }));
-      setPreferences(updatedPrefs);
+      setUserPreferences(updatedPrefs);
 
       // Save the updated preferences immediately
       onSave(updatedPrefs);

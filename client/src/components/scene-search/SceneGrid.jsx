@@ -84,10 +84,11 @@ const SceneGrid = ({
     }
   }, [tvGridZoneActive, scenes]);
 
-  // Clear selections when page changes
-  useEffect(() => {
+  // Clear selections when page changes - wrapped in handler instead of effect
+  const handlePageChange = (page) => {
     setSelectedScenes([]);
-  }, [currentPage]);
+    onPageChange?.(page);
+  };
 
   if (loading) {
     return (
@@ -173,7 +174,7 @@ const SceneGrid = ({
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={onPageChange}
+          onPageChange={handlePageChange}
         />
       )}
 

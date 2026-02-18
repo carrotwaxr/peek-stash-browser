@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import axios from "axios";
 import { showError, showSuccess, showWarning } from "../../utils/toast.jsx";
 import { ThemedIcon } from "../icons/index.js";
@@ -38,7 +38,7 @@ const AddToPlaylistButton = ({
   // Auto-detect menu position when opening
   const dropdownPosition = dropdownPositionProp || computedPosition;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (showMenu && !dropdownPositionProp && menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
       const menuHeight = 280; // approximate menu height

@@ -15,7 +15,7 @@ import {
 
 const ZOOM_LEVELS = ["years", "months", "weeks", "days"];
 
-function parsePeriodToDateRange(period, zoomLevel) {
+export function parsePeriodToDateRange(period, zoomLevel) {
   if (!period) return null;
 
   try {
