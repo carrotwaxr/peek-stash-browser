@@ -41,6 +41,7 @@ export const TagRefSchema = EntityRefSchema.extend({
  * Group reference for embedding in scenes
  */
 export const GroupRefSchema = EntityRefSchema.extend({
+  instanceId: z.string(),
   front_image_path: z.string().nullable(),
 });
 
@@ -49,6 +50,7 @@ export const GroupRefSchema = EntityRefSchema.extend({
  */
 export const GalleryRefSchema = z.object({
   id: z.string(),
+  instanceId: z.string(),
   title: z.string().nullable(),
   cover: z.string().nullable(),
   image_count: z.number().nullable(),

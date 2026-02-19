@@ -443,6 +443,7 @@ class ImageQueryBuilder {
       }
       galleriesByImage.get(imageId)?.push({
         id: row.id as string,
+        instanceId: row.stashInstanceId as string,
         title: row.title as string | null,
         cover: this.transformUrl(row.coverPath as string | null, row.stashInstanceId as string),
       });

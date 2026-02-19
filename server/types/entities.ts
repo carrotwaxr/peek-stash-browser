@@ -244,6 +244,7 @@ export interface StudioRef {
 
 export interface GroupRef {
   id: string;
+  instanceId: string;
   name: string;
   front_image_path: string | null;
   back_image_path: string | null;
@@ -251,6 +252,7 @@ export interface GroupRef {
 
 export interface GalleryRef {
   id: string;
+  instanceId: string;
   title: string | null;
   cover: string | null;
 }

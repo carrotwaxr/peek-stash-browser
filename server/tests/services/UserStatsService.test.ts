@@ -79,6 +79,21 @@ describe("UserStatsService", () => {
   });
 
   describe("updateStatsForScene", () => {
+    it("passes instanceId to getScene when provided (#390)", async () => {
+      mockGetScene.mockResolvedValue({
+        id: "scene-1",
+        performers: [],
+        studio: null,
+        tags: [],
+      });
+
+      await userStatsService.updateStatsForScene(
+        1, "scene-1", 0, 1, new Date(), undefined, "instance-xyz"
+      );
+
+      expect(mockGetScene).toHaveBeenCalledWith("scene-1", "instance-xyz");
+    });
+
     it("uses provided instanceId for stats upsert", async () => {
       mockGetScene.mockResolvedValue({
         id: "scene-1",
