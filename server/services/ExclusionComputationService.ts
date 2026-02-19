@@ -76,26 +76,6 @@ interface RecomputeAllResult {
 class ExclusionComputationService {
   // Track pending recomputes to prevent race conditions
   private pendingRecomputes = new Map<number, Promise<void>>();
-  // Global mutex for computeEmptyExclusions - temp tables are connection-scoped
-  // in SQLite, so concurrent users' computations would interfere with each other
-  private emptyExclusionsMutex: Promise<void> = Promise.resolve();
-
-  /**
-   * Acquire the global mutex for empty exclusions computation.
-   * Ensures only one computeEmptyExclusions runs at a time since
-   * SQLite temp tables are connection-scoped and would collide.
-   */
-  private async acquireEmptyExclusionsMutex<T>(fn: () => Promise<T>): Promise<T> {
-    const prev = this.emptyExclusionsMutex;
-    let resolve: () => void;
-    this.emptyExclusionsMutex = new Promise<void>((r) => { resolve = r; });
-    await prev;
-    try {
-      return await fn();
-    } finally {
-      resolve!();
-    }
-  }
 
   /**
    * Full recompute for a user.
@@ -147,13 +127,11 @@ class ExclusionComputationService {
     const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, prisma);
     const t2 = Date.now();
 
-    // Phase 3: Compute empty exclusions (uses temp tables for performance)
-    // Serialized via mutex because temp tables are connection-scoped in SQLite —
-    // concurrent users' computations on the same connection would interfere.
+    // Phase 3: Compute empty exclusions (entities with no visible children)
+    // Uses json_each() for exclusion lookups — each query is self-contained
+    // so there are no connection affinity or temp table issues.
     const previousExclusions = [...directExclusions, ...cascadeExclusions];
-    const emptyExclusions = await this.acquireEmptyExclusionsMutex(() =>
-      this.computeEmptyExclusions(userId, previousExclusions, prisma)
-    );
+    const emptyExclusions = await this.computeEmptyExclusions(userId, previousExclusions, prisma);
     const t3 = Date.now();
 
     // Combine all exclusions and deduplicate
@@ -582,6 +560,23 @@ class ExclusionComputationService {
    * @param tx - Transaction client
    * @returns Array of empty exclusion records
    */
+  /**
+   * Build JSON strings for json_each() exclusion lookups.
+   * Splits exclusions into global (empty instanceId → efficient NOT IN) and
+   * scoped (specific instanceId → NOT EXISTS with json_extract).
+   */
+  private buildExclusionJson(items: Array<{ entityId: string; instanceId: string }>): {
+    globalJson: string;
+    scopedJson: string;
+  } {
+    const globalIds = items.filter(e => !e.instanceId).map(e => e.entityId);
+    const scoped = items.filter(e => e.instanceId).map(e => ({ id: e.entityId, iid: e.instanceId }));
+    return {
+      globalJson: JSON.stringify(globalIds),
+      scopedJson: JSON.stringify(scoped),
+    };
+  }
+
   private async computeEmptyExclusions(
     userId: number,
     priorExclusions: ExclusionRecord[],
@@ -589,7 +584,7 @@ class ExclusionComputationService {
   ): Promise<ExclusionRecord[]> {
     const emptyExclusions: ExclusionRecord[] = [];
 
-    // Track excluded entities with instanceId for multi-instance-aware temp tables
+    // Categorize excluded entities by type
     const excludedScenes: Array<{ entityId: string; instanceId: string }> = [];
     const excludedImages: Array<{ entityId: string; instanceId: string }> = [];
     const excludedPerformers: Array<{ entityId: string; instanceId: string }> = [];
@@ -617,21 +612,18 @@ class ExclusionComputationService {
       }
     }
 
-    // 1. Empty galleries - galleries with 0 visible images
-    // Use a temporary table to avoid loading all relationships into memory
-    // Create temp table with excluded image IDs
-    // Note: Concurrent access is prevented by acquireEmptyExclusionsMutex in doRecomputeForUser
-    await tx.$executeRaw`
-      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (imageId, instanceId))
-    `;
-    await tx.$executeRaw`DELETE FROM temp_excluded_images`;
-    if (excludedImages.length > 0) {
-      await tx.$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_images (imageId, instanceId) VALUES ${excludedImages.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
-      `));
-    }
+    // Build JSON parameters for json_each() queries.
+    // Global exclusions use NOT IN (SELECT value FROM json_each(?)) — SQLite
+    // materializes the subquery into an ephemeral B-tree for O(log n) lookups,
+    // matching indexed temp table performance without connection affinity issues.
+    // Scoped exclusions use NOT EXISTS with json_extract for composite key matching.
+    const img = this.buildExclusionJson(excludedImages);
+    const scn = this.buildExclusionJson(excludedScenes);
+    const perf = this.buildExclusionJson(excludedPerformers);
+    const stu = this.buildExclusionJson(excludedStudios);
+    const grp = this.buildExclusionJson(excludedGroups);
 
-    // Query for empty galleries using temp table
+    // 1. Empty galleries - galleries with 0 visible images
     const emptyGalleries = await tx.$queryRaw`
       SELECT g.id as galleryId
       FROM StashGallery g
@@ -641,10 +633,11 @@ class ExclusionComputationService {
         JOIN StashImage i ON ig.imageId = i.id AND ig.imageInstanceId = i.stashInstanceId
         WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId
           AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT value FROM json_each(${img.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_images te
-            WHERE te.imageId = i.id
-            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+            SELECT 1 FROM json_each(${img.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = i.id
+            AND json_extract(je.value, '$.iid') = i.stashInstanceId
           )
       )
     ` as Array<{ galleryId: string }>;
@@ -660,46 +653,26 @@ class ExclusionComputationService {
     }
 
     // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
-    // Create temp tables for excluded entities
-    await tx.$executeRaw`
-      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (sceneId, instanceId))
-    `;
-    await tx.$executeRaw`DELETE FROM temp_excluded_scenes`;
-    if (excludedScenes.length > 0) {
-      await tx.$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_scenes (sceneId, instanceId) VALUES ${excludedScenes.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
-      `));
-    }
-
-    await tx.$executeRaw`
-      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (performerId, instanceId))
-    `;
-    await tx.$executeRaw`DELETE FROM temp_excluded_performers`;
-    if (excludedPerformers.length > 0) {
-      await tx.$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_performers (performerId, instanceId) VALUES ${excludedPerformers.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
-      `));
-    }
-
-    // Query for empty performers
     const emptyPerformers = await tx.$queryRaw`
       SELECT p.id as performerId
       FROM StashPerformer p
       WHERE p.deletedAt IS NULL
+      AND p.id NOT IN (SELECT value FROM json_each(${perf.globalJson}))
       AND NOT EXISTS (
-        SELECT 1 FROM temp_excluded_performers te
-        WHERE te.performerId = p.id
-        AND (te.instanceId = '' OR te.instanceId = p.stashInstanceId)
+        SELECT 1 FROM json_each(${perf.scopedJson}) je
+        WHERE json_extract(je.value, '$.id') = p.id
+        AND json_extract(je.value, '$.iid') = p.stashInstanceId
       )
       AND NOT EXISTS (
         SELECT 1 FROM ScenePerformer sp
         JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
         WHERE sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
           AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT value FROM json_each(${scn.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_scenes te
-            WHERE te.sceneId = s.id
-            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+            SELECT 1 FROM json_each(${scn.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = s.id
+            AND json_extract(je.value, '$.iid') = s.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -707,10 +680,11 @@ class ExclusionComputationService {
         JOIN StashImage i ON ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId
         WHERE ip.performerId = p.id AND ip.performerInstanceId = p.stashInstanceId
           AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT value FROM json_each(${img.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_images te
-            WHERE te.imageId = i.id
-            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+            SELECT 1 FROM json_each(${img.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = i.id
+            AND json_extract(je.value, '$.iid') = i.stashInstanceId
           )
       )
     ` as Array<{ performerId: string }>;
@@ -726,34 +700,26 @@ class ExclusionComputationService {
     }
 
     // 3. Empty studios - studios with 0 visible scenes AND 0 visible images
-    await tx.$executeRaw`
-      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (studioId, instanceId))
-    `;
-    await tx.$executeRaw`DELETE FROM temp_excluded_studios`;
-    if (excludedStudios.length > 0) {
-      await tx.$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_studios (studioId, instanceId) VALUES ${excludedStudios.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
-      `));
-    }
-
     const emptyStudios = await tx.$queryRaw`
       SELECT st.id as studioId
       FROM StashStudio st
       WHERE st.deletedAt IS NULL
+      AND st.id NOT IN (SELECT value FROM json_each(${stu.globalJson}))
       AND NOT EXISTS (
-        SELECT 1 FROM temp_excluded_studios te
-        WHERE te.studioId = st.id
-        AND (te.instanceId = '' OR te.instanceId = st.stashInstanceId)
+        SELECT 1 FROM json_each(${stu.scopedJson}) je
+        WHERE json_extract(je.value, '$.id') = st.id
+        AND json_extract(je.value, '$.iid') = st.stashInstanceId
       )
       AND NOT EXISTS (
         SELECT 1 FROM StashScene s
         WHERE s.studioId = st.id
           AND s.stashInstanceId = st.stashInstanceId
           AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT value FROM json_each(${scn.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_scenes te
-            WHERE te.sceneId = s.id
-            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+            SELECT 1 FROM json_each(${scn.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = s.id
+            AND json_extract(je.value, '$.iid') = s.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -761,10 +727,11 @@ class ExclusionComputationService {
         WHERE i.studioId = st.id
           AND i.stashInstanceId = st.stashInstanceId
           AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT value FROM json_each(${img.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_images te
-            WHERE te.imageId = i.id
-            AND (te.instanceId = '' OR te.instanceId = i.stashInstanceId)
+            SELECT 1 FROM json_each(${img.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = i.id
+            AND json_extract(je.value, '$.iid') = i.stashInstanceId
           )
       )
     ` as Array<{ studioId: string }>;
@@ -780,34 +747,26 @@ class ExclusionComputationService {
     }
 
     // 4. Empty groups - groups with 0 visible scenes
-    await tx.$executeRaw`
-      CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (groupId, instanceId))
-    `;
-    await tx.$executeRaw`DELETE FROM temp_excluded_groups`;
-    if (excludedGroups.length > 0) {
-      await tx.$executeRaw(Prisma.raw(`
-        INSERT INTO temp_excluded_groups (groupId, instanceId) VALUES ${excludedGroups.map(e => `('${e.entityId}','${e.instanceId}')`).join(',')}
-      `));
-    }
-
     const emptyGroups = await tx.$queryRaw`
       SELECT g.id as groupId
       FROM StashGroup g
       WHERE g.deletedAt IS NULL
+      AND g.id NOT IN (SELECT value FROM json_each(${grp.globalJson}))
       AND NOT EXISTS (
-        SELECT 1 FROM temp_excluded_groups te
-        WHERE te.groupId = g.id
-        AND (te.instanceId = '' OR te.instanceId = g.stashInstanceId)
+        SELECT 1 FROM json_each(${grp.scopedJson}) je
+        WHERE json_extract(je.value, '$.id') = g.id
+        AND json_extract(je.value, '$.iid') = g.stashInstanceId
       )
       AND NOT EXISTS (
         SELECT 1 FROM SceneGroup sg
         JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
         WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId
           AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT value FROM json_each(${scn.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_scenes te
-            WHERE te.sceneId = s.id
-            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+            SELECT 1 FROM json_each(${scn.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = s.id
+            AND json_extract(je.value, '$.iid') = s.stashInstanceId
           )
       )
     ` as Array<{ groupId: string }>;
@@ -833,10 +792,11 @@ class ExclusionComputationService {
         JOIN StashScene s ON st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId
         WHERE st.tagId = t.id AND st.tagInstanceId = t.stashInstanceId
           AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT value FROM json_each(${scn.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_scenes te
-            WHERE te.sceneId = s.id
-            AND (te.instanceId = '' OR te.instanceId = s.stashInstanceId)
+            SELECT 1 FROM json_each(${scn.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = s.id
+            AND json_extract(je.value, '$.iid') = s.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -844,10 +804,11 @@ class ExclusionComputationService {
         JOIN StashPerformer p ON pt.performerId = p.id AND pt.performerInstanceId = p.stashInstanceId
         WHERE pt.tagId = t.id AND pt.tagInstanceId = t.stashInstanceId
           AND p.deletedAt IS NULL
+          AND p.id NOT IN (SELECT value FROM json_each(${perf.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_performers te
-            WHERE te.performerId = p.id
-            AND (te.instanceId = '' OR te.instanceId = p.stashInstanceId)
+            SELECT 1 FROM json_each(${perf.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = p.id
+            AND json_extract(je.value, '$.iid') = p.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -855,10 +816,11 @@ class ExclusionComputationService {
         JOIN StashStudio stu ON stt.studioId = stu.id AND stt.studioInstanceId = stu.stashInstanceId
         WHERE stt.tagId = t.id AND stt.tagInstanceId = t.stashInstanceId
           AND stu.deletedAt IS NULL
+          AND stu.id NOT IN (SELECT value FROM json_each(${stu.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_studios te
-            WHERE te.studioId = stu.id
-            AND (te.instanceId = '' OR te.instanceId = stu.stashInstanceId)
+            SELECT 1 FROM json_each(${stu.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = stu.id
+            AND json_extract(je.value, '$.iid') = stu.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -866,10 +828,11 @@ class ExclusionComputationService {
         JOIN StashGroup g ON gt.groupId = g.id AND gt.groupInstanceId = g.stashInstanceId
         WHERE gt.tagId = t.id AND gt.tagInstanceId = t.stashInstanceId
           AND g.deletedAt IS NULL
+          AND g.id NOT IN (SELECT value FROM json_each(${grp.globalJson}))
           AND NOT EXISTS (
-            SELECT 1 FROM temp_excluded_groups te
-            WHERE te.groupId = g.id
-            AND (te.instanceId = '' OR te.instanceId = g.stashInstanceId)
+            SELECT 1 FROM json_each(${grp.scopedJson}) je
+            WHERE json_extract(je.value, '$.id') = g.id
+            AND json_extract(je.value, '$.iid') = g.stashInstanceId
           )
       )
       AND NOT EXISTS (
@@ -888,13 +851,6 @@ class ExclusionComputationService {
         reason: "empty",
       });
     }
-
-    // Clean up temporary tables
-    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_images`;
-    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_scenes`;
-    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_performers`;
-    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_studios`;
-    await tx.$executeRaw`DROP TABLE IF EXISTS temp_excluded_groups`;
 
     return emptyExclusions;
   }
