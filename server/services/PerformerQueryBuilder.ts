@@ -12,6 +12,17 @@ import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { KEY_SEP } from "./UserStatsService.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/** Deduplicate composite key objects by id+stashInstanceId */
+function dedupeKeys(items: { id: string; stashInstanceId: string }[]): { id: string; stashInstanceId: string }[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.id}:${item.stashInstanceId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // Query builder options
 export interface PerformerQueryOptions {
   userId: number;
@@ -64,7 +75,7 @@ class PerformerQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'performer' AND e.entityId = p.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'performer' AND e.entityId = p.id AND (e.instanceId = '' OR e.instanceId = p.stashInstanceId)`,
         params: [userId, userId, userId],
       };
     }
@@ -837,7 +848,7 @@ class PerformerQueryBuilder {
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `
-        SELECT COUNT(DISTINCT p.id) as total
+        SELECT COUNT(DISTINCT p.id || ':' || p.stashInstanceId) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;
@@ -965,7 +976,7 @@ class PerformerQueryBuilder {
       // Get galleries this performer appears in directly
       prisma.galleryPerformer.findMany({
         where: { OR: performerWhereClause },
-        select: { performerId: true, performerInstanceId: true, galleryId: true },
+        select: { performerId: true, performerInstanceId: true, galleryId: true, galleryInstanceId: true },
       }),
     ]);
 
@@ -995,35 +1006,52 @@ class PerformerQueryBuilder {
         : [],
     ]);
 
-    // Get unique entity IDs
-    const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
-    const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
+    // Build composite key OR conditions for entity lookups (prevents cross-instance data leakage)
+    const tagOrConditions = dedupeKeys(tagJunctions.map((j) => ({
+      id: j.tagId,
+      stashInstanceId: j.tagInstanceId,
+    })));
+    const groupOrConditions = dedupeKeys(sceneGroups.map((sg) => ({
+      id: sg.groupId,
+      stashInstanceId: sg.groupInstanceId,
+    })));
     // Galleries come from direct performer-gallery association (galleryPerformers)
     // plus any scene-gallery associations (sceneGalleries)
-    const galleryIds = [...new Set([
-      ...galleryPerformers.map((gp) => gp.galleryId),
-      ...sceneGalleries.map((sg) => sg.galleryId),
-    ])];
-    const studioIds = [...new Set(scenes.map((s) => s.studioId).filter((id): id is string => !!id))];
+    const galleryOrConditions = dedupeKeys([
+      ...galleryPerformers.map((gp) => ({
+        id: gp.galleryId,
+        stashInstanceId: gp.galleryInstanceId,
+      })),
+      ...sceneGalleries.map((sg) => ({
+        id: sg.galleryId,
+        stashInstanceId: sg.galleryInstanceId,
+      })),
+    ]);
+    const studioOrConditions = dedupeKeys(scenes
+      .filter((s) => !!s.studioId)
+      .map((s) => ({
+        id: s.studioId!,
+        stashInstanceId: s.stashInstanceId,
+      })));
 
-    // Load all entities in parallel
+    // Load all entities in parallel using composite key lookups
     const [tags, groups, galleries, studios] = await Promise.all([
-      tagIds.length > 0
-        ? prisma.stashTag.findMany({ where: { id: { in: tagIds } } })
+      tagOrConditions.length > 0
+        ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } })
         : [],
-      groupIds.length > 0
-        ? prisma.stashGroup.findMany({ where: { id: { in: groupIds } } })
+      groupOrConditions.length > 0
+        ? prisma.stashGroup.findMany({ where: { OR: groupOrConditions } })
         : [],
-      galleryIds.length > 0
-        ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } })
+      galleryOrConditions.length > 0
+        ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } })
         : [],
-      studioIds.length > 0
-        ? prisma.stashStudio.findMany({ where: { id: { in: studioIds } } })
+      studioOrConditions.length > 0
+        ? prisma.stashStudio.findMany({ where: { OR: studioOrConditions } })
         : [],
     ]);
 
-    // Build lookup maps with minimal tooltip data, including instanceId for multi-instance routing
-    const tagsById = new Map<string, TagRef>(tags.map((t) => [t.id, {
+    // Build lookup maps keyed by composite id:instanceId (prevents cross-instance collisions)
+    const tagsByKey = new Map<string, TagRef>(tags.map((t) => [`${t.id}:${t.stashInstanceId}`, {
       id: t.id,
       instanceId: t.stashInstanceId,
       name: t.name,
@@ -1031,7 +1059,7 @@ class PerformerQueryBuilder {
       favorite: t.favorite,
     }]));
 
-    const groupsById = new Map<string, GroupRef>(groups.map((g) => [g.id, {
+    const groupsByKey = new Map<string, GroupRef>(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
       instanceId: g.stashInstanceId,
       name: g.name,
@@ -1039,14 +1067,14 @@ class PerformerQueryBuilder {
       back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
     }]));
 
-    const galleriesById = new Map<string, GalleryRef>(galleries.map((g) => [g.id, {
+    const galleriesByKey = new Map<string, GalleryRef>(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
       instanceId: g.stashInstanceId,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
-    const studiosById = new Map<string, StudioRef>(studios.map((s) => [s.id, {
+    const studiosByKey = new Map<string, StudioRef>(studios.map((s) => [`${s.id}:${s.stashInstanceId}`, {
       id: s.id,
       instanceId: s.stashInstanceId,
       name: s.name,
@@ -1064,30 +1092,30 @@ class PerformerQueryBuilder {
       scenesByPerformer.set(key, set);
     }
 
-    // Build scene -> entities mappings
+    // Build scene -> entities mappings (using composite keys id:instanceId)
     const groupsByScene = new Map<string, Set<string>>();
     for (const sg of sceneGroups) {
       const set = groupsByScene.get(sg.sceneId) || new Set();
-      set.add(sg.groupId);
+      set.add(`${sg.groupId}:${sg.groupInstanceId}`);
       groupsByScene.set(sg.sceneId, set);
     }
 
     const galleriesByScene = new Map<string, Set<string>>();
     for (const sg of sceneGalleries) {
       const set = galleriesByScene.get(sg.sceneId) || new Set();
-      set.add(sg.galleryId);
+      set.add(`${sg.galleryId}:${sg.galleryInstanceId}`);
       galleriesByScene.set(sg.sceneId, set);
     }
 
     const studioByScene = new Map<string, string>();
     for (const s of scenes) {
-      if (s.studioId) studioByScene.set(s.id, s.studioId);
+      if (s.studioId) studioByScene.set(s.id, `${s.studioId}:${s.stashInstanceId}`);
     }
 
     // Build performer -> tags map (keyed by composite performerId\0instanceId)
     const tagsByPerformer = new Map<string, TagRef[]>();
     for (const junction of tagJunctions) {
-      const tag = tagsById.get(junction.tagId);
+      const tag = tagsByKey.get(`${junction.tagId}:${junction.tagInstanceId}`);
       if (!tag) continue;
       const key = `${junction.performerId}${KEY_SEP}${junction.performerInstanceId}`;
       const list = tagsByPerformer.get(key) || [];
@@ -1100,7 +1128,7 @@ class PerformerQueryBuilder {
     for (const gp of galleryPerformers) {
       const key = `${gp.performerId}${KEY_SEP}${gp.performerInstanceId}`;
       const set = galleriesByPerformer.get(key) || new Set();
-      set.add(gp.galleryId);
+      set.add(`${gp.galleryId}:${gp.galleryInstanceId}`);
       galleriesByPerformer.set(key, set);
     }
 
@@ -1112,21 +1140,21 @@ class PerformerQueryBuilder {
       // Derive groups and studios from performer's scenes
       const performerSceneIds = scenesByPerformer.get(performerKey) || new Set();
 
-      const performerGroupIds = new Set<string>();
-      const performerStudioIds = new Set<string>();
+      const performerGroupKeys = new Set<string>();
+      const performerStudioKeys = new Set<string>();
 
       for (const sceneId of performerSceneIds) {
-        for (const gid of groupsByScene.get(sceneId) || []) performerGroupIds.add(gid);
-        const sid = studioByScene.get(sceneId);
-        if (sid) performerStudioIds.add(sid);
+        for (const gkey of groupsByScene.get(sceneId) || []) performerGroupKeys.add(gkey);
+        const skey = studioByScene.get(sceneId);
+        if (skey) performerStudioKeys.add(skey);
       }
 
       // Galleries come from direct GalleryPerformer association
-      const performerGalleryIds = galleriesByPerformer.get(performerKey) || new Set();
+      const performerGalleryKeys = galleriesByPerformer.get(performerKey) || new Set();
 
-      (performer as unknown as { groups: GroupRef[] }).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter((g): g is GroupRef => !!g);
-      (performer as unknown as { galleries: GalleryRef[] }).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter((g): g is GalleryRef => !!g);
-      (performer as unknown as { studios: StudioRef[] }).studios = [...performerStudioIds].map((id) => studiosById.get(id)).filter((s): s is StudioRef => !!s);
+      (performer as unknown as { groups: GroupRef[] }).groups = [...performerGroupKeys].map((key) => groupsByKey.get(key)).filter((g): g is GroupRef => !!g);
+      (performer as unknown as { galleries: GalleryRef[] }).galleries = [...performerGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
+      (performer as unknown as { studios: StudioRef[] }).studios = [...performerStudioKeys].map((key) => studiosByKey.get(key)).filter((s): s is StudioRef => !!s);
     }
   }
 

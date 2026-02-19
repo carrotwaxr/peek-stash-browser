@@ -58,7 +58,7 @@ class GroupQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'group' AND e.entityId = g.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'group' AND e.entityId = g.id AND (e.instanceId = '' OR e.instanceId = g.stashInstanceId)`,
         params: [userId, userId],
       };
     }
@@ -539,7 +539,7 @@ class GroupQueryBuilder {
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `
-        SELECT COUNT(DISTINCT g.id) as total
+        SELECT COUNT(DISTINCT g.id || ':' || g.stashInstanceId) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;

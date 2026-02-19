@@ -580,7 +580,7 @@ export function useVideoPlayer({
 
     // Setup subtitles if available (using sourceSelector for track management)
     if (scene.captions && scene.captions.length > 0) {
-      setupSubtitles(player, scene.id, scene.captions);
+      setupSubtitles(player, scene.id, scene.captions, scene.instanceId);
     }
 
     // Configure player

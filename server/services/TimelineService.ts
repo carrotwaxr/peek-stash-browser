@@ -106,7 +106,7 @@ export class TimelineService {
       FROM ${config.table} ${config.alias}
       ${joinClause}
       LEFT JOIN UserExcludedEntity e
-        ON e.userId = ? AND e.entityType = '${entityType}' AND e.entityId = ${config.alias}.id
+        ON e.userId = ? AND e.entityType = '${entityType}' AND e.entityId = ${config.alias}.id AND (e.instanceId = '' OR e.instanceId = ${config.alias}.stashInstanceId)
       WHERE ${config.alias}.deletedAt IS NULL
         AND e.id IS NULL
         AND ${config.dateField} IS NOT NULL

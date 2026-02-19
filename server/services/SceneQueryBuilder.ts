@@ -71,7 +71,7 @@ class SceneQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)`,
         params: [userId, userId, userId],
       };
     }
@@ -1269,7 +1269,7 @@ class SceneQueryBuilder {
     if (hasUserDataFilters || applyExclusions) {
       // Need full JOINs for accurate count with user data filters or exclusions
       const countSql = `
-        SELECT COUNT(DISTINCT s.id) as total
+        SELECT COUNT(DISTINCT s.id || ':' || s.stashInstanceId) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;

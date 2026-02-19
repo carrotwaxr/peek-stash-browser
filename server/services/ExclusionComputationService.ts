@@ -76,6 +76,26 @@ interface RecomputeAllResult {
 class ExclusionComputationService {
   // Track pending recomputes to prevent race conditions
   private pendingRecomputes = new Map<number, Promise<void>>();
+  // Global mutex for computeEmptyExclusions - temp tables are connection-scoped
+  // in SQLite, so concurrent users' computations would interfere with each other
+  private emptyExclusionsMutex: Promise<void> = Promise.resolve();
+
+  /**
+   * Acquire the global mutex for empty exclusions computation.
+   * Ensures only one computeEmptyExclusions runs at a time since
+   * SQLite temp tables are connection-scoped and would collide.
+   */
+  private async acquireEmptyExclusionsMutex<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.emptyExclusionsMutex;
+    let resolve: () => void;
+    this.emptyExclusionsMutex = new Promise<void>((r) => { resolve = r; });
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      resolve!();
+    }
+  }
 
   /**
    * Full recompute for a user.
@@ -128,11 +148,12 @@ class ExclusionComputationService {
     const t2 = Date.now();
 
     // Phase 3: Compute empty exclusions (uses temp tables for performance)
-    // No transaction needed: Prisma's SQLite driver uses connection_limit=1, so all queries
-    // share the same connection and temp tables persist across sequential raw queries.
-    // Avoiding a transaction here prevents holding a write lock during the 10-30s computation.
+    // Serialized via mutex because temp tables are connection-scoped in SQLite —
+    // concurrent users' computations on the same connection would interfere.
     const previousExclusions = [...directExclusions, ...cascadeExclusions];
-    const emptyExclusions = await this.computeEmptyExclusions(userId, previousExclusions, prisma);
+    const emptyExclusions = await this.acquireEmptyExclusionsMutex(() =>
+      this.computeEmptyExclusions(userId, previousExclusions, prisma)
+    );
     const t3 = Date.now();
 
     // Combine all exclusions and deduplicate
@@ -599,6 +620,7 @@ class ExclusionComputationService {
     // 1. Empty galleries - galleries with 0 visible images
     // Use a temporary table to avoid loading all relationships into memory
     // Create temp table with excluded image IDs
+    // Note: Concurrent access is prevented by acquireEmptyExclusionsMutex in doRecomputeForUser
     await tx.$executeRaw`
       CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT, instanceId TEXT DEFAULT '', PRIMARY KEY (imageId, instanceId))
     `;

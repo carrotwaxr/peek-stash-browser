@@ -94,7 +94,7 @@ class ClipQueryBuilder {
         FROM StashClip c
         INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId
         LEFT JOIN StashTag pt ON c.primaryTagId = pt.id AND c.primaryTagInstanceId = pt.stashInstanceId
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = c.sceneId
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = c.sceneId AND (e.instanceId = '' OR e.instanceId = c.sceneInstanceId)
       `.trim(),
       params: [userId],
     };

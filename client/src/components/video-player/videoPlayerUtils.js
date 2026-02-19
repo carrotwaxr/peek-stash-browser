@@ -31,7 +31,7 @@ export const togglePlaybackRateControl = (player, show) => {
  * Adds text tracks via sourceSelector for proper lifecycle management
  * Video.js automatically shows/hides the caption button based on available tracks
  */
-export const setupSubtitles = (player, sceneId, captions) => {
+export const setupSubtitles = (player, sceneId, captions, instanceId) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
 
@@ -91,7 +91,7 @@ export const setupSubtitles = (player, sceneId, captions) => {
 
     const trackOptions = {
       kind: "captions", // Use "captions" not "subtitles" to match Stash
-      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}`,
+      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}${instanceId ? `&instanceId=${instanceId}` : ""}`,
       srclang: lang,
       label: label,
       default: setAsDefault,

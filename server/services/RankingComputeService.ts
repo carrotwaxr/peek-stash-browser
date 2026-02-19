@@ -203,6 +203,7 @@ class RankingComputeService {
         ON e.userId = ${userId}
         AND e.entityType = 'performer'
         AND e.entityId = ups.performerId
+        AND (e.instanceId = '' OR e.instanceId = ups.instanceId)
       LEFT JOIN (
         SELECT sp.performerId, sp.performerInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM ScenePerformer sp
@@ -240,6 +241,7 @@ class RankingComputeService {
         ON e.userId = ${userId}
         AND e.entityType = 'studio'
         AND e.entityId = uss.studioId
+        AND (e.instanceId = '' OR e.instanceId = uss.instanceId)
       LEFT JOIN (
         SELECT s.studioId, s.stashInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM StashScene s
@@ -279,6 +281,7 @@ class RankingComputeService {
         ON e.userId = ${userId}
         AND e.entityType = 'tag'
         AND e.entityId = uts.tagId
+        AND (e.instanceId = '' OR e.instanceId = uts.instanceId)
       LEFT JOIN (
         SELECT st.tagId, st.tagInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM SceneTag st
@@ -317,6 +320,7 @@ class RankingComputeService {
         ON e.userId = ${userId}
         AND e.entityType = 'scene'
         AND e.entityId = w.sceneId
+        AND (e.instanceId = '' OR e.instanceId = COALESCE(w.instanceId, ''))
       WHERE w.userId = ${userId}
         AND e.id IS NULL
         AND (w.playCount > 0 OR w.oCount > 0 OR w.playDuration > 0)

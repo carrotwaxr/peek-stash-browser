@@ -76,7 +76,7 @@ class ImageQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'image' AND e.entityId = i.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'image' AND e.entityId = i.id AND (e.instanceId = '' OR e.instanceId = i.stashInstanceId)`,
         params: [userId, userId, userId],
       };
     }
@@ -600,7 +600,7 @@ class ImageQueryBuilder {
 
     // Count query
     const countSql = `
-      SELECT COUNT(DISTINCT i.id) as total
+      SELECT COUNT(DISTINCT i.id || ':' || i.stashInstanceId) as total
       ${fromClause.sql}
       WHERE ${whereSQL}
     `;
