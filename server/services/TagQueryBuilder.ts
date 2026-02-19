@@ -60,7 +60,7 @@ class TagQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'tag' AND e.entityId = t.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'tag' AND e.entityId = t.id AND (e.instanceId = '' OR e.instanceId = t.stashInstanceId)`,
         params: [userId, userId, userId],
       };
     }
@@ -543,7 +543,7 @@ class TagQueryBuilder {
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `
-        SELECT COUNT(DISTINCT t.id) as total
+        SELECT COUNT(DISTINCT t.id || ':' || t.stashInstanceId) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;

@@ -317,6 +317,11 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
       .json({ error: "Missing or invalid path parameter" });
   }
 
+  // Validate path to prevent traversal attacks
+  if (!path.startsWith("/") || path.includes("..") || path.includes("://")) {
+    return res.status(400).json({ error: "Invalid path parameter" });
+  }
+
   let stashUrl: string;
   let apiKey: string;
 

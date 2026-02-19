@@ -9,7 +9,8 @@ import { pipeResponseToClient } from "../utils/streamProxy.js";
  * @returns Object with baseUrl and apiKey
  */
 function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey: string } {
-  if (instanceId) {
+  // Treat "default" the same as undefined - use the default instance
+  if (instanceId && instanceId !== "default") {
     const instance = stashInstanceManager.get(instanceId);
     if (!instance) {
       throw new Error(`Stash instance not found: ${instanceId}`);
@@ -149,7 +150,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
 
     const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? '?' + queryString : ''}`;
 
-    logger.info(`[PROXY] Proxying stream: ${req.url} -> ${stashUrl}`);
+    logger.debug(`[PROXY] Proxying stream: ${req.url} -> ${stashUrl}`);
 
     // Abort the upstream fetch if the client disconnects (seek, refresh, navigate away).
     // This prevents orphaned connections from downloading entire files into memory.
@@ -157,11 +158,13 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     res.on('close', () => abortController.abort());
 
     // Forward request to Stash using fetch
+    const headers: Record<string, string> = { 'ApiKey': apiKey };
+    if (req.headers.range) {
+      headers['Range'] = req.headers.range;
+    }
+
     const response = await fetch(stashUrl, {
-      headers: {
-        'ApiKey': apiKey,
-        'Range': req.headers.range || '', // Forward range requests for seeking
-      },
+      headers,
       signal: abortController.signal,
     });
 

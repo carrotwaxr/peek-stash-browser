@@ -59,7 +59,7 @@ class StudioQueryBuilder {
     if (applyExclusions) {
       return {
         sql: `${baseJoins}
-        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'studio' AND e.entityId = s.id`,
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'studio' AND e.entityId = s.id AND (e.instanceId = '' OR e.instanceId = s.stashInstanceId)`,
         params: [userId, userId, userId],
       };
     }
@@ -379,7 +379,7 @@ class StudioQueryBuilder {
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `
-        SELECT COUNT(DISTINCT s.id) as total
+        SELECT COUNT(DISTINCT s.id || ':' || s.stashInstanceId) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;
