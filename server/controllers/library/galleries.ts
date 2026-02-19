@@ -255,9 +255,9 @@ export const findGalleries = async (
     // For single-entity requests (detail pages), get gallery with computed counts
     let paginatedGalleries = galleries;
     if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
-      const galleryWithCounts = await stashEntityService.getGallery(ids[0]);
+      const existingGallery = paginatedGalleries[0];
+      const galleryWithCounts = await stashEntityService.getGallery(ids[0], existingGallery.instanceId);
       if (galleryWithCounts) {
-        const existingGallery = paginatedGalleries[0];
         paginatedGalleries = [
           {
             ...existingGallery,

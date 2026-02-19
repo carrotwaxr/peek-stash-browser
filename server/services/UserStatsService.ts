@@ -150,7 +150,7 @@ class UserStatsService {
   ): Promise<void> {
     try {
       // Get scene from cache to find all related entities
-      const scene = await stashEntityService.getScene(sceneId);
+      const scene = await stashEntityService.getScene(sceneId, instanceId);
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
         return;

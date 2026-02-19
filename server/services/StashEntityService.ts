@@ -1902,6 +1902,7 @@ class StashEntityService {
       ...DEFAULT_SCENE_USER_FIELDS,
 
       id: scene.id,
+      instanceId: scene.stashInstanceId,
       title: scene.title || getSceneFallbackTitle(scene.filePath),
       code: scene.code,
       date: scene.date,
@@ -1972,6 +1973,7 @@ class StashEntityService {
       ...DEFAULT_SCENE_USER_FIELDS,
 
       id: scene.id,
+      instanceId: scene.stashInstanceId,
       title: scene.title || getSceneFallbackTitle(scene.filePath),
       code: scene.code,
       date: scene.date,
@@ -2219,6 +2221,7 @@ class StashEntityService {
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
+      instanceId: group.stashInstanceId,
       name: group.name,
       date: group.date,
       studio: group.studioId ? { id: group.studioId } : null,

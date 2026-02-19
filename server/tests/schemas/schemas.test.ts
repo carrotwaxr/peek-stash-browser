@@ -100,6 +100,7 @@ describe("Reference Schemas", () => {
     it("validates correct group ref", () => {
       const valid = {
         id: "101",
+        instanceId: "instance-1",
         name: "Test Group",
         front_image_path: "/api/proxy/stash?path=/group/101",
       };
@@ -109,6 +110,7 @@ describe("Reference Schemas", () => {
     it("accepts null front_image_path", () => {
       const valid = {
         id: "101",
+        instanceId: "instance-1",
         name: "Test Group",
         front_image_path: null,
       };
@@ -120,6 +122,7 @@ describe("Reference Schemas", () => {
     it("validates correct gallery ref", () => {
       const valid = {
         id: "202",
+        instanceId: "instance-1",
         title: "Test Gallery",
         cover: "/api/proxy/stash?path=/gallery/202/cover",
         image_count: 25,
@@ -130,6 +133,7 @@ describe("Reference Schemas", () => {
     it("accepts null for all nullable fields", () => {
       const valid = {
         id: "202",
+        instanceId: "instance-1",
         title: null,
         cover: null,
         image_count: null,
@@ -226,6 +230,7 @@ describe("Entity Schemas", () => {
         groups: [
           {
             id: "g1",
+            instanceId: "instance-1",
             name: "Group 1",
             front_image_path: null,
             scene_index: 5,
@@ -598,7 +603,7 @@ describe("Entity Schemas", () => {
     it("validates image with galleries", () => {
       const imageWithGalleries = {
         ...validImage,
-        galleries: [{ id: "g1", title: "Gallery 1", cover: null, image_count: 10 }],
+        galleries: [{ id: "g1", instanceId: "instance-1", title: "Gallery 1", cover: null, image_count: 10 }],
       };
       expect(() => ImageSchema.parse(imageWithGalleries)).not.toThrow();
     });

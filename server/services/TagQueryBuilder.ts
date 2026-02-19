@@ -790,6 +790,7 @@ class TagQueryBuilder {
 
     const groupsById = new Map<string, GroupRef>(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
       back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
@@ -797,6 +798,7 @@ class TagQueryBuilder {
 
     const galleriesById = new Map<string, GalleryRef>(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));

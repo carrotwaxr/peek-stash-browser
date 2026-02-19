@@ -1706,6 +1706,7 @@ class SceneQueryBuilder {
   private transformStashGroup(g: { id: string; name: string; frontImagePath: string | null; backImagePath: string | null; stashInstanceId: string }): GroupRef {
     return {
       id: g.id,
+      instanceId: g.stashInstanceId,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
       back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
@@ -1716,6 +1717,7 @@ class SceneQueryBuilder {
     const coverUrl = g.coverPath ? this.transformUrl(g.coverPath, g.stashInstanceId) : null;
     return {
       id: g.id,
+      instanceId: g.stashInstanceId,
       title: g.title,
       // Cover as simple string URL for consistency
       cover: coverUrl,

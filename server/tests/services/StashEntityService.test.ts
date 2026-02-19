@@ -14,6 +14,12 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       url: "http://localhost:9999/graphql",
       apiKey: "test-api-key",
     }),
+    getConfig: (id: string) => ({
+      id,
+      name: `Instance ${id}`,
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-api-key",
+    }),
     getAllConfigs: () => [],
     loadFromDatabase: async () => undefined,
   },
@@ -119,6 +125,7 @@ const getMock = (fn: unknown): Mock => fn as Mock;
 // Cached database row format (individual columns)
 const mockCachedScene = {
   id: "scene-1",
+  stashInstanceId: "test-instance",
   title: "Test Scene",
   code: "TEST001",
   details: "Test details",
@@ -236,6 +243,7 @@ const mockCachedGallery = {
 
 const mockCachedGroup = {
   id: "group-1",
+  stashInstanceId: "test-instance",
   name: "Test Group",
   aliases: null,
   duration: null,
@@ -684,6 +692,48 @@ describe("StashEntityService", () => {
       const version = await stashEntityService.getCacheVersion();
 
       expect(version).toBe(0);
+    });
+  });
+
+  describe("Transform instanceId inclusion (#390)", () => {
+    it("transformScene includes instanceId from stashInstanceId", async () => {
+      getMock(prisma.stashScene.findFirst).mockResolvedValue({
+        ...mockCachedScene,
+        stashInstanceId: "instance-alpha",
+      });
+
+      const result = await stashEntityService.getScene("scene-1");
+
+      expect(result).not.toBeNull();
+      expect(result!.instanceId).toBe("instance-alpha");
+    });
+
+    it("transformGroup includes instanceId from stashInstanceId", async () => {
+      getMock(prisma.stashGroup.findFirst).mockResolvedValue({
+        ...mockCachedGroup,
+        stashInstanceId: "instance-beta",
+        tags: [],
+      });
+      // getGroup calls $queryRaw for scene/performer counts
+      getMock(prisma.$queryRaw).mockResolvedValue([{ count: 0 }]);
+
+      const result = await stashEntityService.getGroup("group-1");
+
+      expect(result).not.toBeNull();
+      expect(result!.instanceId).toBe("instance-beta");
+    });
+
+    it("scenes from different instances have distinct instanceIds", async () => {
+      getMock(prisma.stashScene.findFirst)
+        .mockResolvedValueOnce({ ...mockCachedScene, id: "scene-1", stashInstanceId: "instance-a" })
+        .mockResolvedValueOnce({ ...mockCachedScene, id: "scene-1", stashInstanceId: "instance-b" });
+
+      const sceneA = await stashEntityService.getScene("scene-1", "instance-a");
+      const sceneB = await stashEntityService.getScene("scene-1", "instance-b");
+
+      expect(sceneA!.instanceId).toBe("instance-a");
+      expect(sceneB!.instanceId).toBe("instance-b");
+      expect(sceneA!.instanceId).not.toBe(sceneB!.instanceId);
     });
   });
 

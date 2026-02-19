@@ -787,6 +787,7 @@ class GroupQueryBuilder {
       const key = `${g.id}:${g.stashInstanceId}`;
       galleriesByKey.set(key, {
         id: g.id,
+        instanceId: g.stashInstanceId,
         title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
         cover: this.transformUrl(g.coverPath, g.stashInstanceId),
       });
