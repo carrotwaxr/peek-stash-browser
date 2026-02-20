@@ -308,8 +308,8 @@ describe("entityInstanceId", () => {
       ]);
 
       expect(result).toEqual([
-        { id: "1", name: "Jane Doe" },
-        { id: "2", name: "John Smith" },
+        { id: "1", name: "Jane Doe", instanceId: "aaa-111" },
+        { id: "2", name: "John Smith", instanceId: "aaa-111" },
       ]);
     });
 
@@ -320,8 +320,8 @@ describe("entityInstanceId", () => {
       ]);
 
       expect(result).toEqual([
-        { id: "1", name: "Jane Doe" },
-        { id: "2", name: "John Smith" },
+        { id: "1", name: "Jane Doe", instanceId: "aaa-111" },
+        { id: "2", name: "John Smith", instanceId: "bbb-222" },
       ]);
     });
 
@@ -332,9 +332,9 @@ describe("entityInstanceId", () => {
       ]);
 
       // Default instance (lowest priority) keeps plain name
-      expect(result[0]).toEqual({ id: "1", name: "Jane Doe" });
+      expect(result[0]).toEqual({ id: "1", name: "Jane Doe", instanceId: "aaa-111" });
       // Non-default instance gets suffix
-      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)" });
+      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)", instanceId: "bbb-222" });
     });
 
     it("disambiguates case-insensitively", () => {
@@ -343,8 +343,8 @@ describe("entityInstanceId", () => {
         { id: "2", name: "Jane Doe", instanceId: "bbb-222" },
       ]);
 
-      expect(result[0]).toEqual({ id: "1", name: "jane doe" });
-      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)" });
+      expect(result[0]).toEqual({ id: "1", name: "jane doe", instanceId: "aaa-111" });
+      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)", instanceId: "bbb-222" });
     });
 
     it("does not suffix default instance even with duplicates", () => {
@@ -371,8 +371,8 @@ describe("entityInstanceId", () => {
       ]);
 
       // Both empty names = duplicates, non-default gets suffix
-      expect(result[0]).toEqual({ id: "1", name: "" });
-      expect(result[1]).toEqual({ id: "2", name: " (Secondary Stash)" });
+      expect(result[0]).toEqual({ id: "1", name: "", instanceId: "aaa-111" });
+      expect(result[1]).toEqual({ id: "2", name: " (Secondary Stash)", instanceId: "bbb-222" });
     });
 
     it("handles no instances configured", () => {
@@ -383,7 +383,7 @@ describe("entityInstanceId", () => {
       ]);
 
       // With 0 instances, no disambiguation needed
-      expect(result).toEqual([{ id: "1", name: "Test" }]);
+      expect(result).toEqual([{ id: "1", name: "Test", instanceId: "aaa-111" }]);
     });
 
     it("handles multiple duplicated names correctly", () => {

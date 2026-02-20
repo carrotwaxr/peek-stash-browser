@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface StudioQueryOptions {
@@ -133,42 +133,17 @@ class StudioQueryBuilder {
     }
 
     let ids = filter.value;
-    const { modifier = "INCLUDES", depth } = filter;
+    const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0
     if (depth !== undefined && depth !== null && depth !== 0) {
       ids = await expandTagIds(ids, depth);
     }
 
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `s.id IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `s.id IN (
-            SELECT studioId FROM StudioTag
-            WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId
-            GROUP BY studioId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `s.id NOT IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "StudioTag", "studioId", "studioInstanceId",
+      "tagId", "tagInstanceId", "s", modifier || "INCLUDES"
+    );
   }
 
   /**

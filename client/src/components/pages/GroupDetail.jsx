@@ -209,7 +209,7 @@ const GroupDetail = () => {
                   context="scene_group"
                   initialSort="scene_index"
                   permanentFilters={{
-                    groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" } }}
+                    groups: { value: [instanceId ? `${groupId}:${instanceId}` : String(groupId)], modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
                     groups: [
                       { id: groupId, name: group?.name || "Unknown Collection" },
@@ -224,7 +224,7 @@ const GroupDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       groups: {
-                        value: [parseInt(groupId, 10)],
+                        value: [instanceId ? `${groupId}:${instanceId}` : String(groupId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No performers found in "${group?.name}"`}

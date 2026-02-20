@@ -469,6 +469,7 @@ export const findGalleriesMinimal = async (
     const minimalGalleries = galleries.map((g) => ({
       id: g.id,
       title: g.title || "", // Galleries use 'title' not 'name'
+      instanceId: g.instanceId || "",
     }));
 
     res.json({

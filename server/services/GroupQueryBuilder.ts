@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface GroupQueryOptions {
@@ -285,42 +285,17 @@ class GroupQueryBuilder {
     }
 
     let ids = filter.value;
-    const { modifier = "INCLUDES", depth } = filter;
+    const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0
     if (depth !== undefined && depth !== null && depth !== 0) {
       ids = await expandTagIds(ids, depth);
     }
 
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `g.id IN (SELECT groupId FROM GroupTag WHERE tagId IN (${placeholders}) AND groupInstanceId = g.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `g.id IN (
-            SELECT groupId FROM GroupTag
-            WHERE tagId IN (${placeholders}) AND groupInstanceId = g.stashInstanceId
-            GROUP BY groupId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `g.id NOT IN (SELECT groupId FROM GroupTag WHERE tagId IN (${placeholders}) AND groupInstanceId = g.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "GroupTag", "groupId", "groupInstanceId",
+      "tagId", "tagInstanceId", "g", modifier || "INCLUDES"
+    );
   }
 
   /**

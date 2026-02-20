@@ -425,7 +425,7 @@ const GalleryDetail = () => {
                   context="gallery_scenes"
                   permanentFilters={{
                     galleries: {
-                      value: [parseInt(galleryId, 10)],
+                      value: [instanceId ? `${galleryId}:${instanceId}` : String(galleryId)],
                       modifier: "INCLUDES"
                     }
                   }}

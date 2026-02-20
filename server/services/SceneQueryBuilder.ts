@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter } from "../utils/sqlFilterBuilders.js";
+import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface SceneQueryOptions {
@@ -130,6 +130,7 @@ class SceneQueryBuilder {
   /**
    * Build performer filter clause
    * Supports INCLUDES, INCLUDES_ALL, EXCLUDES modifiers
+   * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildPerformerFilter(
     filter: { value?: string[] | null; modifier?: string | null } | undefined | null
@@ -138,39 +139,18 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier || "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        // Scene has ANY of these performers
-        return {
-          sql: `EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        // Scene has ALL of these performers
-        return {
-          sql: `(SELECT COUNT(DISTINCT sp.performerId) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        // Scene has NONE of these performers
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        logger.warn("Unknown performer filter modifier", { modifier });
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "ScenePerformer", "sceneId", "sceneInstanceId",
+      "performerId", "performerInstanceId", "s", modifier
+    );
   }
 
   /**
    * Build tag filter clause
+   * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildTagFilter(
     filter: { value?: string[] | null; modifier?: string | null } | undefined | null
@@ -179,35 +159,19 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier || "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT st.tagId) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "SceneTag", "sceneId", "sceneInstanceId",
+      "tagId", "tagInstanceId", "s", modifier
+    );
   }
 
   /**
    * Build studio filter clause
+   * Studios use a direct FK (studioId) on the scene — no junction table.
+   * Instance is implied by scene's stashInstanceId.
    */
   private buildStudioFilter(
     filter: { value?: string[] | null; modifier?: string | null } | undefined | null
@@ -216,29 +180,15 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier || "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `s.studioId IN (${placeholders})`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `(s.studioId IS NULL OR s.studioId NOT IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildDirectFilter(ids, "s.studioId", "s.stashInstanceId", modifier);
   }
 
   /**
    * Build group filter clause
+   * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildGroupFilter(
     filter: { value?: string[] | null; modifier?: string | null } | undefined | null
@@ -247,35 +197,18 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier || "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT sg.groupId) FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "SceneGroup", "sceneId", "sceneInstanceId",
+      "groupId", "groupInstanceId", "s", modifier
+    );
   }
 
   /**
    * Build galleries filter clause
+   * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildGalleriesFilter(
     filter: { value?: string[] | null; modifier?: string | null } | undefined | null
@@ -284,36 +217,13 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier || "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `s.id IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `s.id IN (
-            SELECT sceneId FROM SceneGallery
-            WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId
-            GROUP BY sceneId, sceneInstanceId
-            HAVING COUNT(DISTINCT galleryId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `s.id NOT IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "SceneGallery", "sceneId", "sceneInstanceId",
+      "galleryId", "galleryInstanceId", "s", modifier
+    );
   }
 
 

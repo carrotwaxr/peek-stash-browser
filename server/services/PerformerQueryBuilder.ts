@@ -10,7 +10,7 @@ import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { KEY_SEP } from "./UserStatsService.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 /** Deduplicate composite key objects by id+stashInstanceId */
 function dedupeKeys(items: { id: string; stashInstanceId: string }[]): { id: string; stashInstanceId: string }[] {
@@ -185,42 +185,17 @@ class PerformerQueryBuilder {
     }
 
     let ids = filter.value;
-    const { modifier = "INCLUDES", depth } = filter;
+    const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0
     if (depth !== undefined && depth !== null && depth !== 0) {
       ids = await expandTagIds(ids, depth);
     }
 
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `p.id IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `p.id IN (
-            SELECT performerId FROM PerformerTag
-            WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId
-            GROUP BY performerId, performerInstanceId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `p.id NOT IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "PerformerTag", "performerId", "performerInstanceId",
+      "tagId", "tagInstanceId", "p", modifier || "INCLUDES"
+    );
   }
 
   /**

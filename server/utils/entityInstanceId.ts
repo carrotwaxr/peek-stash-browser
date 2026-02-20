@@ -393,6 +393,7 @@ interface EntityWithInstance {
 interface MinimalEntityResult {
   id: string;
   name: string;
+  instanceId: string;
 }
 
 /**
@@ -413,7 +414,7 @@ export function disambiguateEntityNames(entities: EntityWithInstance[]): Minimal
 
   // If only one instance or no instances, no disambiguation needed
   if (instances.length <= 1) {
-    return entities.map(e => ({ id: e.id, name: e.name }));
+    return entities.map(e => ({ id: e.id, name: e.name, instanceId: e.instanceId }));
   }
 
   // Find the default instance (lowest priority number)
@@ -455,9 +456,10 @@ export function disambiguateEntityNames(entities: EntityWithInstance[]): Minimal
       return {
         id: entity.id,
         name: `${entity.name} (${instanceName})`,
+        instanceId: entity.instanceId,
       };
     }
 
-    return { id: entity.id, name: entity.name };
+    return { id: entity.id, name: entity.name, instanceId: entity.instanceId };
   });
 }

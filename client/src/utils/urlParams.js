@@ -80,7 +80,38 @@ const filtersToUrlParams = (filters, filterOptions) => {
 const urlParamsToFilters = (searchParams, filterOptions) => {
   const filters = {};
 
+  // Handle singular entity ID params from card indicator clicks
+  // (e.g., /scenes?performerId=82&instance=abc-123 → performerIds: ["82:abc-123"])
+  const instanceParam = searchParams.get("instance");
+  const singularToPlural = {
+    performerId: "performerIds",
+    studioId: "studioId", // studioId is already the correct key (single-select)
+    tagId: "tagIds",
+    groupId: "groupIds",
+    galleryId: "galleryIds",
+  };
+
+  const singularProcessedKeys = new Set();
+  for (const [singular, pluralKey] of Object.entries(singularToPlural)) {
+    if (searchParams.has(singular)) {
+      const rawId = searchParams.get(singular);
+      const compositeId = instanceParam ? `${rawId}:${instanceParam}` : rawId;
+
+      // Check if the plural key is multi-select or single-select
+      const filterOption = filterOptions.find((opt) => opt.key === pluralKey);
+      if (filterOption?.multi) {
+        filters[pluralKey] = [compositeId];
+      } else {
+        filters[pluralKey] = compositeId;
+      }
+      singularProcessedKeys.add(pluralKey);
+    }
+  }
+
   filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
+    // Skip keys already handled by singular-to-plural mapping above
+    if (singularProcessedKeys.has(key)) return;
+
     switch (type) {
       case "checkbox":
         if (searchParams.has(key)) {

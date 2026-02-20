@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface TagQueryOptions {
@@ -182,25 +182,12 @@ class TagQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const { value: ids, modifier } = filter;
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `t.id IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `t.id NOT IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "PerformerTag", "tagId", "tagInstanceId",
+      "performerId", "performerInstanceId", "t", modifier || "INCLUDES"
+    );
   }
 
   /**
@@ -214,25 +201,12 @@ class TagQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const { value: ids, modifier } = filter;
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `t.id IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `t.id NOT IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(
+      ids, "StudioTag", "tagId", "tagInstanceId",
+      "studioId", "studioInstanceId", "t", modifier || "INCLUDES"
+    );
   }
 
   /**

@@ -293,7 +293,7 @@ const TagDetail = () => {
                   context="scene_tag"
                   permanentFilters={{
                     tags: {
-                      value: [parseInt(tagId, 10)],
+                      value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
                       modifier: "INCLUDES",
                       ...(includeSubTags && { depth: -1 }),
                     },
@@ -312,7 +312,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       tags: {
-                        value: [parseInt(tagId, 10)],
+                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -324,7 +324,7 @@ const TagDetail = () => {
               )}
 
               {activeTab === 'images' && (
-                <ImagesTab tagId={tagId} tagName={tag?.name} includeSubTags={includeSubTags} />
+                <ImagesTab tagId={tagId} instanceId={instanceId} tagName={tag?.name} includeSubTags={includeSubTags} />
               )}
 
               {activeTab === 'performers' && (
@@ -332,7 +332,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       tags: {
-                        value: [parseInt(tagId, 10)],
+                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -347,7 +347,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     studio_filter: {
                       tags: {
-                        value: [parseInt(tagId, 10)],
+                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -362,7 +362,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       tags: {
-                        value: [parseInt(tagId, 10)],
+                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -595,7 +595,7 @@ const TagDetails = ({ tag, hasMultipleInstances }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
+const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
@@ -618,7 +618,7 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
         filter: { page, per_page: perPage },
         image_filter: {
           tags: {
-            value: [parseInt(tagId, 10)],
+            value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
             modifier: "INCLUDES",
             ...(includeSubTags && { depth: -1 }),
           },
@@ -629,12 +629,12 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
         count: data.findImages?.count || 0,
       };
     },
-    [tagId, includeSubTags]
+    [tagId, instanceId, includeSubTags]
   );
 
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
-    dependencies: [tagId, includeSubTags],
+    dependencies: [tagId, instanceId, includeSubTags],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });

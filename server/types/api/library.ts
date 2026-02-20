@@ -137,7 +137,7 @@ export interface FindPerformersMinimalRequest {
 }
 
 export interface FindPerformersMinimalResponse {
-  performers: Array<{ id: string; name: string }>;
+  performers: Array<{ id: string; name: string; instanceId: string }>;
 }
 
 /**
@@ -187,7 +187,7 @@ export interface FindStudiosMinimalRequest {
 }
 
 export interface FindStudiosMinimalResponse {
-  studios: Array<{ id: string; name: string }>;
+  studios: Array<{ id: string; name: string; instanceId: string }>;
 }
 
 /**
@@ -237,7 +237,7 @@ export interface FindTagsMinimalRequest {
 }
 
 export interface FindTagsMinimalResponse {
-  tags: Array<{ id: string; name: string }>;
+  tags: Array<{ id: string; name: string; instanceId: string }>;
 }
 
 /**
@@ -366,7 +366,7 @@ export interface FindGalleriesMinimalRequest {
 }
 
 export interface FindGalleriesMinimalResponse {
-  galleries: Array<{ id: string; title: string }>;
+  galleries: Array<{ id: string; title: string; instanceId: string }>;
 }
 
 // =============================================================================
@@ -398,7 +398,7 @@ export interface FindGroupsMinimalRequest {
 }
 
 export interface FindGroupsMinimalResponse {
-  groups: Array<{ id: string; name: string }>;
+  groups: Array<{ id: string; name: string; instanceId: string }>;
 }
 
 // =============================================================================
