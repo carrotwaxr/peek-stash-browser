@@ -55,7 +55,10 @@ const Images = () => {
   } = useTableColumns("image");
 
   // Track current view mode for timeline date filter and folder view
-  const [currentViewMode, setCurrentViewMode] = useState("grid");
+  // Initialize from URL to stay in sync with useFilterState on back navigation
+  const [currentViewMode, setCurrentViewMode] = useState(
+    searchParams.get("view") || "grid"
+  );
 
   // Fetch tags for folder view (only when folder view is active)
   const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
