@@ -929,6 +929,7 @@ export const duplicatePlaylist = async (
         items: {
           create: original.items.map((item) => ({
             sceneId: item.sceneId,
+            instanceId: item.instanceId,
             position: item.position,
           })),
         },
