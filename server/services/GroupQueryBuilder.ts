@@ -22,6 +22,7 @@ export interface GroupQueryOptions {
   perPage: number;
   searchQuery?: string;
   allowedInstanceIds?: string[];
+  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
   randomSeed?: number; // Seed for consistent random ordering
 }
 
@@ -94,6 +95,19 @@ class GroupQueryBuilder {
     return {
       sql: `(g.stashInstanceId IN (${placeholders}) OR g.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
+    };
+  }
+
+  /**
+   * Build filter for a specific instance ID (for disambiguation on detail pages)
+   */
+  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+    if (!instanceId) {
+      return { sql: "", params: [] };
+    }
+    return {
+      sql: `g.stashInstanceId = ?`,
+      params: [instanceId],
     };
   }
 
@@ -351,7 +365,7 @@ class GroupQueryBuilder {
 
   async execute(options: GroupQueryOptions): Promise<GroupQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, randomSeed } = options;
+    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, specificInstanceId, randomSeed } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -363,6 +377,14 @@ class GroupQueryBuilder {
     const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
     if (instanceFilter.sql) {
       whereClauses.push(instanceFilter);
+    }
+
+    // Specific instance filter (for disambiguation on detail pages)
+    if (specificInstanceId) {
+      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      if (specificFilter.sql) {
+        whereClauses.push(specificFilter);
+      }
     }
 
     // Search query

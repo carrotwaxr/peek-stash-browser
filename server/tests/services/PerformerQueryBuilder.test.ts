@@ -87,5 +87,42 @@ describe("PerformerQueryBuilder", () => {
       expect(countQuerySql).toContain("p.stashInstanceId = s.instanceId");
       expect(countQuerySql).toContain("p.stashInstanceId = r.instanceId");
     });
+
+    it("filters to a specific instance when specificInstanceId is provided", async () => {
+      await performerQueryBuilder.execute({
+        userId: 1,
+        sort: "name",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        specificInstanceId: "instance-abc",
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      // Must contain a WHERE clause pinning to the specific instance
+      expect(mainQuerySql).toContain("p.stashInstanceId = ?");
+
+      // The instance ID must be in the params
+      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      expect(mainQueryParams).toContain("instance-abc");
+    });
+
+    it("does not add specific instance filter when specificInstanceId is not provided", async () => {
+      await performerQueryBuilder.execute({
+        userId: 1,
+        sort: "name",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      // Should NOT have a bare equality check for stashInstanceId
+      expect(mainQuerySql).not.toContain("p.stashInstanceId = ?");
+    });
   });
 });

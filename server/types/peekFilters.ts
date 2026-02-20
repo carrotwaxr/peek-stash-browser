@@ -65,6 +65,7 @@ export type PeekPerformerFilter = BasePerformerFilterType & {
 export type PeekStudioFilter = BaseStudioFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  instance_id?: string;
   o_counter?: { value?: number; value2?: number; modifier?: string };
   play_count?: { value?: number; value2?: number; modifier?: string };
 };
@@ -76,6 +77,7 @@ export type PeekStudioFilter = BaseStudioFilterType & {
 export type PeekTagFilter = BaseTagFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  instance_id?: string;
   rating100?: { value?: number; value2?: number; modifier?: string };
   o_counter?: { value?: number; value2?: number; modifier?: string };
   play_count?: { value?: number; value2?: number; modifier?: string };
@@ -96,6 +98,7 @@ export type PeekTagFilter = BaseTagFilterType & {
 export type PeekGalleryFilter = BaseGalleryFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  instance_id?: string;
   hasFavoriteImage?: boolean;
   scenes?: { value: string[]; modifier?: string };
 };
@@ -107,6 +110,7 @@ export type PeekGalleryFilter = BaseGalleryFilterType & {
 export type PeekGroupFilter = BaseGroupFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  instance_id?: string;
   scenes?: { value: string[]; modifier?: string };
   scene_count?: { value?: number; value2?: number; modifier?: string };
 };

@@ -22,6 +22,7 @@ export interface StudioQueryOptions {
   perPage: number;
   searchQuery?: string;
   allowedInstanceIds?: string[];
+  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
   randomSeed?: number; // Seed for consistent random ordering
 }
 
@@ -95,6 +96,19 @@ class StudioQueryBuilder {
     return {
       sql: `(s.stashInstanceId IN (${placeholders}) OR s.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
+    };
+  }
+
+  /**
+   * Build filter for a specific instance ID (for disambiguation on detail pages)
+   */
+  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+    if (!instanceId) {
+      return { sql: "", params: [] };
+    }
+    return {
+      sql: `s.stashInstanceId = ?`,
+      params: [instanceId],
     };
   }
 
@@ -205,7 +219,7 @@ class StudioQueryBuilder {
 
   async execute(options: StudioQueryOptions): Promise<StudioQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, randomSeed } = options;
+    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, specificInstanceId, randomSeed } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -217,6 +231,14 @@ class StudioQueryBuilder {
     const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
     if (instanceFilter.sql) {
       whereClauses.push(instanceFilter);
+    }
+
+    // Specific instance filter (for disambiguation on detail pages)
+    if (specificInstanceId) {
+      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      if (specificFilter.sql) {
+        whereClauses.push(specificFilter);
+      }
     }
 
     // Search query

@@ -96,6 +96,9 @@ export const findStudios = async (
       ids: normalizedIds,
     };
 
+    // Extract specific instance ID for disambiguation (from studio_filter.instance_id)
+    const specificInstanceId = studio_filter?.instance_id as string | undefined;
+
     // Use SQL query builder - admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
@@ -107,6 +110,7 @@ export const findStudios = async (
       filters: mergedFilter,
       applyExclusions,
       allowedInstanceIds,
+      specificInstanceId,
       sort: sortField,
       sortDirection,
       page,
@@ -114,6 +118,24 @@ export const findStudios = async (
       searchQuery,
       randomSeed,
     });
+
+    // Check for ambiguous results on single-ID lookups
+    if (ids && ids.length === 1 && !specificInstanceId && studios.length > 1) {
+      logger.warn("Ambiguous studio lookup", {
+        id: ids[0],
+        matchCount: studios.length,
+        instances: studios.map(s => s.instanceId),
+      });
+      return res.status(400).json({
+        error: "Ambiguous lookup",
+        message: `Multiple studios found with ID ${ids[0]}. Specify instance_id parameter.`,
+        matches: studios.map(s => ({
+          id: s.id,
+          name: s.name,
+          instanceId: s.instanceId,
+        })),
+      });
+    }
 
     // For single-entity requests (detail pages), get studio with computed counts
     let resultStudios = studios;
