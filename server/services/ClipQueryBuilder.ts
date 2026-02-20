@@ -7,6 +7,11 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import type { FilterClause } from "../utils/sqlFilterBuilders.js";
+import {
+  parseCompositeFilterValues,
+  buildJunctionFilter,
+  buildDirectFilter,
+} from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface ClipQueryOptions {
@@ -165,71 +170,156 @@ class ClipQueryBuilder {
   }
 
   /**
-   * Build clip tag filter (matches clips with ANY of these tags on the clip itself)
+   * Build clip tag filter (matches clips with ANY of these tags on the clip itself).
+   * Hybrid: checks both primaryTagId direct column AND ClipTag junction table.
    */
   private buildTagFilter(tagIds: string[] | undefined): FilterClause {
     if (!tagIds || tagIds.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const placeholders = tagIds.map(() => "?").join(", ");
+    const { parsed, hasInstanceIds } = parseCompositeFilterValues(tagIds);
+    const bareIds = parsed.map((p) => p.id);
+
+    // ClipTag junction filter (instance-aware)
+    const junctionFilter = buildJunctionFilter(
+      tagIds, "ClipTag", "clipId", "clipInstanceId",
+      "tagId", "tagInstanceId", "c", "INCLUDES"
+    );
+
+    if (!hasInstanceIds) {
+      // Bare IDs: simple IN for primaryTagId + junction EXISTS
+      const placeholders = bareIds.map(() => "?").join(", ");
+      return {
+        sql: `(c.primaryTagId IN (${placeholders}) OR ${junctionFilter.sql})`,
+        params: [...bareIds, ...junctionFilter.params],
+      };
+    }
+
+    // Composite IDs: pair conditions for primaryTagId + junction EXISTS
+    const primaryPairConditions = parsed.map((p) => {
+      if (p.instanceId) {
+        return "(c.primaryTagId = ? AND c.primaryTagInstanceId = ?)";
+      }
+      return "(c.primaryTagId = ?)";
+    });
+    const primaryParams: string[] = [];
+    for (const p of parsed) {
+      primaryParams.push(p.id);
+      if (p.instanceId) primaryParams.push(p.instanceId);
+    }
+
     return {
-      sql: `(c.primaryTagId IN (${placeholders}) OR EXISTS (
-        SELECT 1 FROM ClipTag ct WHERE ct.clipId = c.id AND ct.clipInstanceId = c.stashInstanceId AND ct.tagId IN (${placeholders})
-      ))`,
-      params: [...tagIds, ...tagIds],
+      sql: `(${primaryPairConditions.join(" OR ")} OR ${junctionFilter.sql})`,
+      params: [...primaryParams, ...junctionFilter.params],
     };
   }
 
   /**
-   * Build scene tag filter (matches clips from scenes with ANY of these tags)
+   * Build scene tag filter (matches clips from scenes with ANY of these tags).
+   * Note: parent alias is "c" (clip) — joins via c.sceneId/c.sceneInstanceId.
    */
   private buildSceneTagFilter(sceneTagIds: string[] | undefined): FilterClause {
     if (!sceneTagIds || sceneTagIds.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const placeholders = sceneTagIds.map(() => "?").join(", ");
+    // SceneTag junction uses sceneId/sceneInstanceId as parent columns,
+    // but the parent here is the clip table (c), not scenes (s).
+    // buildJunctionFilter joins on parentAlias.id / parentAlias.stashInstanceId,
+    // but clips use c.sceneId / c.sceneInstanceId. Build manually with composite support.
+    const { parsed, hasInstanceIds } = parseCompositeFilterValues(sceneTagIds);
+    const bareIds = parsed.map((p) => p.id);
+
+    if (!hasInstanceIds) {
+      const placeholders = bareIds.map(() => "?").join(", ");
+      return {
+        sql: `EXISTS (
+          SELECT 1 FROM SceneTag st
+          WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId
+          AND st.tagId IN (${placeholders})
+        )`,
+        params: bareIds,
+      };
+    }
+
+    // Instance-aware pair conditions
+    const pairConditions = parsed.map((p) => {
+      if (p.instanceId) {
+        return "(st.tagId = ? AND st.tagInstanceId = ?)";
+      }
+      return "(st.tagId = ?)";
+    });
+    const pairParams: string[] = [];
+    for (const p of parsed) {
+      pairParams.push(p.id);
+      if (p.instanceId) pairParams.push(p.instanceId);
+    }
+
     return {
       sql: `EXISTS (
         SELECT 1 FROM SceneTag st
         WHERE st.sceneId = c.sceneId AND st.sceneInstanceId = c.sceneInstanceId
-        AND st.tagId IN (${placeholders})
+        AND (${pairConditions.join(" OR ")})
       )`,
-      params: sceneTagIds,
+      params: pairParams,
     };
   }
 
   /**
-   * Build performer filter (matches clips from scenes with ANY of these performers)
+   * Build performer filter (matches clips from scenes with ANY of these performers).
+   * Joins via c.sceneId/c.sceneInstanceId → ScenePerformer.
    */
   private buildPerformerFilter(performerIds: string[] | undefined): FilterClause {
     if (!performerIds || performerIds.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const placeholders = performerIds.map(() => "?").join(", ");
+    const { parsed, hasInstanceIds } = parseCompositeFilterValues(performerIds);
+    const bareIds = parsed.map((p) => p.id);
+
+    if (!hasInstanceIds) {
+      const placeholders = bareIds.map(() => "?").join(", ");
+      return {
+        sql: `EXISTS (
+          SELECT 1 FROM ScenePerformer sp
+          WHERE sp.sceneId = c.sceneId AND sp.sceneInstanceId = c.sceneInstanceId
+          AND sp.performerId IN (${placeholders})
+        )`,
+        params: bareIds,
+      };
+    }
+
+    const pairConditions = parsed.map((p) => {
+      if (p.instanceId) {
+        return "(sp.performerId = ? AND sp.performerInstanceId = ?)";
+      }
+      return "(sp.performerId = ?)";
+    });
+    const pairParams: string[] = [];
+    for (const p of parsed) {
+      pairParams.push(p.id);
+      if (p.instanceId) pairParams.push(p.instanceId);
+    }
+
     return {
       sql: `EXISTS (
         SELECT 1 FROM ScenePerformer sp
         WHERE sp.sceneId = c.sceneId AND sp.sceneInstanceId = c.sceneInstanceId
-        AND sp.performerId IN (${placeholders})
+        AND (${pairConditions.join(" OR ")})
       )`,
-      params: performerIds,
+      params: pairParams,
     };
   }
 
   /**
-   * Build studio filter
+   * Build studio filter (direct FK on the joined scene table)
    */
   private buildStudioFilter(studioId: string | undefined): FilterClause {
     if (!studioId) {
       return { sql: "", params: [] };
     }
-    return {
-      sql: "s.studioId = ?",
-      params: [studioId],
-    };
+    return buildDirectFilter([studioId], "s.studioId", "s.stashInstanceId", "INCLUDES");
   }
 
   /**
