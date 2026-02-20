@@ -6,6 +6,7 @@ import type {
   FindGroupsMinimalRequest,
   FindGroupsMinimalResponse,
   ApiErrorResponse,
+  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -149,7 +150,7 @@ export async function applyGroupFilters(
  */
 export const findGroups = async (
   req: TypedAuthRequest<FindGroupsRequest>,
-  res: TypedResponse<FindGroupsResponse | ApiErrorResponse>
+  res: TypedResponse<FindGroupsResponse | ApiErrorResponse | AmbiguousLookupResponse>
 ) => {
   try {
     const startTime = Date.now();

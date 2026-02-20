@@ -9,6 +9,7 @@ import type {
   UpdateTagRequest,
   UpdateTagResponse,
   ApiErrorResponse,
+  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -70,7 +71,7 @@ export async function mergeTagsWithUserData(
  */
 export const findTags = async (
   req: TypedAuthRequest<FindTagsRequest>,
-  res: TypedResponse<FindTagsResponse | ApiErrorResponse>
+  res: TypedResponse<FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse>
 ) => {
   try {
     const startTime = Date.now();

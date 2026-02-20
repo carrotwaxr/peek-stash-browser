@@ -8,6 +8,7 @@ import type {
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
   ApiErrorResponse,
+  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -206,7 +207,7 @@ export async function applyGalleryFilters(
  */
 export const findGalleries = async (
   req: TypedAuthRequest<FindGalleriesRequest>,
-  res: TypedResponse<FindGalleriesResponse | ApiErrorResponse>
+  res: TypedResponse<FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse>
 ) => {
   try {
     const startTime = Date.now();

@@ -9,6 +9,7 @@ import type {
   UpdateStudioRequest,
   UpdateStudioResponse,
   ApiErrorResponse,
+  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -70,7 +71,7 @@ export async function mergeStudiosWithUserData(
  */
 export const findStudios = async (
   req: TypedAuthRequest<FindStudiosRequest>,
-  res: TypedResponse<FindStudiosResponse | ApiErrorResponse>
+  res: TypedResponse<FindStudiosResponse | ApiErrorResponse | AmbiguousLookupResponse>
 ) => {
   try {
     const startTime = Date.now();
