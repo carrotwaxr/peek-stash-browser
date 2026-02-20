@@ -86,7 +86,10 @@ const SceneSearch = ({
   const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
 
   // Track current view mode for context settings
-  const [currentViewMode, setCurrentViewMode] = useState("grid");
+  // Initialize from URL to stay in sync with useFilterState on back navigation
+  const [currentViewMode, setCurrentViewMode] = useState(
+    searchParams.get("view") || "grid"
+  );
 
   // Extract filter IDs for timeline/folder views
   const viewFilters = useMemo(() => {
