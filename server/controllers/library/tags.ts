@@ -96,6 +96,9 @@ export const findTags = async (
       ids: normalizedIds,
     };
 
+    // Extract specific instance ID for disambiguation (from tag_filter.instance_id)
+    const specificInstanceId = tag_filter?.instance_id as string | undefined;
+
     // Use SQL query builder - admins skip exclusions
     // When fetching by specific IDs, skip exclusions (for detail pages)
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
@@ -109,6 +112,7 @@ export const findTags = async (
       filters: mergedFilter,
       applyExclusions,
       allowedInstanceIds,
+      specificInstanceId,
       sort: sortField,
       sortDirection,
       page,
@@ -116,6 +120,25 @@ export const findTags = async (
       searchQuery,
       randomSeed,
     });
+
+    // Check for ambiguous results on single-ID lookups
+    // This happens when the same ID exists in multiple Stash instances
+    if (ids && ids.length === 1 && !specificInstanceId && tags.length > 1) {
+      logger.warn("Ambiguous tag lookup", {
+        id: ids[0],
+        matchCount: tags.length,
+        instances: tags.map(t => t.instanceId),
+      });
+      return res.status(400).json({
+        error: "Ambiguous lookup",
+        message: `Multiple tags found with ID ${ids[0]}. Specify instance_id parameter.`,
+        matches: tags.map(t => ({
+          id: t.id,
+          name: t.name,
+          instanceId: t.instanceId,
+        })),
+      });
+    }
 
     // For single-entity requests (detail pages), get tag with computed counts
     let resultTags = tags;
