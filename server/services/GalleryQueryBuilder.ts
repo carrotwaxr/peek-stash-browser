@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface GalleryQueryOptions {
@@ -134,43 +134,24 @@ class GalleryQueryBuilder {
     }
 
     let ids = filter.value;
-    const { modifier = "INCLUDES", depth } = filter;
+    const modifier = filter.modifier ?? "INCLUDES";
+    const depth = filter.depth;
 
     // Expand IDs if depth is specified and not 0
     if (depth !== undefined && depth !== null && depth !== 0) {
       ids = await expandStudioIds(ids, depth);
     }
 
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `g.studioId IN (${placeholders})`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        // For studios, a gallery can only have one studio, so INCLUDES_ALL with multiple IDs would return nothing
-        // Just treat as INCLUDES for single ID, or empty for multiple
-        if (ids.length === 1) {
-          return {
-            sql: `g.studioId = ?`,
-            params: ids,
-          };
-        }
-        // Multiple studios in INCLUDES_ALL means no gallery can match (a gallery has at most one studio)
-        return { sql: "1 = 0", params: [] };
-
-      case "EXCLUDES":
-        return {
-          sql: `(g.studioId IS NULL OR g.studioId NOT IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
+    // INCLUDES_ALL is special for studios: a gallery can only have one studio
+    if (modifier === "INCLUDES_ALL") {
+      if (ids.length === 1) {
+        return buildDirectFilter(ids, "g.studioId", "g.stashInstanceId", "INCLUDES");
+      }
+      // Multiple studios in INCLUDES_ALL means no gallery can match (a gallery has at most one studio)
+      return { sql: "1 = 0", params: [] };
     }
+
+    return buildDirectFilter(ids, "g.studioId", "g.stashInstanceId", modifier);
   }
 
   /**
@@ -233,31 +214,10 @@ class GalleryQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
+    const ids = filter.value;
+    const modifier = filter.modifier ?? "INCLUDES";
 
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT gp.performerId) FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(ids, "GalleryPerformer", "galleryId", "galleryInstanceId", "performerId", "performerInstanceId", "g", modifier);
   }
 
   /**
@@ -271,37 +231,15 @@ class GalleryQueryBuilder {
     }
 
     let ids = filter.value;
-    const { modifier = "INCLUDES", depth } = filter;
+    const modifier = filter.modifier ?? "INCLUDES";
+    const depth = filter.depth;
 
     // Expand IDs if depth is specified and not 0
     if (depth !== undefined && depth !== null && depth !== 0) {
       ids = await expandTagIds(ids, depth);
     }
 
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT gt.tagId) FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(ids, "GalleryTag", "galleryId", "galleryInstanceId", "tagId", "tagInstanceId", "g", modifier);
   }
 
   /**

@@ -260,7 +260,7 @@ const StudioDetail = () => {
                   context="scene_studio"
                   permanentFilters={{
                     studios: {
-                      value: [parseInt(studioId, 10)],
+                      value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
                       modifier: "INCLUDES",
                       ...(includeSubStudios && { depth: -1 }) } }}
                   permanentFiltersMetadata={{
@@ -278,7 +278,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       studios: {
-                        value: [parseInt(studioId, 10)],
+                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
                         modifier: "INCLUDES",
                         ...(includeSubStudios && { depth: -1 }) } } }}
                   hideLockedFilters
@@ -289,6 +289,7 @@ const StudioDetail = () => {
               {activeTab === "images" && (
                 <ImagesTab
                   studioId={studioId}
+                  instanceId={instanceId}
                   studioName={studio?.name}
                   includeSubStudios={includeSubStudios}
                 />
@@ -299,7 +300,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       studios: {
-                        value: [parseInt(studioId, 10)],
+                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No performers found for ${studio?.name}`}
@@ -311,7 +312,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       studios: {
-                        value: [parseInt(studioId, 10)],
+                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${studio?.name}`}
@@ -645,7 +646,7 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
+const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
@@ -668,7 +669,7 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
         filter: { page, per_page: perPage },
         image_filter: {
           studios: {
-            value: [parseInt(studioId, 10)],
+            value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
             modifier: "INCLUDES",
             ...(includeSubStudios && { depth: -1 }),
           },
@@ -679,12 +680,12 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
         count: data.findImages?.count || 0,
       };
     },
-    [studioId, includeSubStudios]
+    [studioId, instanceId, includeSubStudios]
   );
 
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
-    dependencies: [studioId, includeSubStudios],
+    dependencies: [studioId, instanceId, includeSubStudios],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });

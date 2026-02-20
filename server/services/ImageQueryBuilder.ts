@@ -7,7 +7,7 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { getImageFallbackTitle } from "../utils/titleUtils.js";
-import { buildFavoriteFilter, buildDateFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildFavoriteFilter, buildDateFilter, buildJunctionFilter, buildDirectFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 import type { NormalizedImage, PerformerRef, TagRef, GalleryRef } from "../types/index.js";
 
 // Query builder options
@@ -178,27 +178,7 @@ class ImageQueryBuilder {
     }
 
     const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM ImagePerformer ip WHERE ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId AND ip.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT ip.performerId) FROM ImagePerformer ip WHERE ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId AND ip.performerId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM ImagePerformer ip WHERE ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId AND ip.performerId IN (${placeholders}))`,
-          params: ids,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(ids, "ImagePerformer", "imageId", "imageInstanceId", "performerId", "performerInstanceId", "i", modifier);
   }
 
   // Build tag filter
@@ -210,27 +190,7 @@ class ImageQueryBuilder {
     }
 
     const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `EXISTS (SELECT 1 FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId AND it.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-      case "INCLUDES_ALL":
-        return {
-          sql: `(SELECT COUNT(DISTINCT it.tagId) FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId AND it.tagId IN (${placeholders})) = ?`,
-          params: [...ids, ids.length],
-        };
-      case "EXCLUDES":
-        return {
-          sql: `NOT EXISTS (SELECT 1 FROM ImageTag it WHERE it.imageId = i.id AND it.imageInstanceId = i.stashInstanceId AND it.tagId IN (${placeholders}))`,
-          params: ids,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(ids, "ImageTag", "imageId", "imageInstanceId", "tagId", "tagInstanceId", "i", modifier);
   }
 
   // Build studio filter
@@ -242,22 +202,7 @@ class ImageQueryBuilder {
     }
 
     const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `i.studioId IN (${placeholders})`,
-          params: ids,
-        };
-      case "EXCLUDES":
-        return {
-          sql: `(i.studioId IS NULL OR i.studioId NOT IN (${placeholders}))`,
-          params: ids,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildDirectFilter(ids, "i.studioId", "i.stashInstanceId", modifier);
   }
 
   // Build gallery filter
@@ -269,22 +214,7 @@ class ImageQueryBuilder {
     }
 
     const { value: ids, modifier = "INCLUDES" } = filter;
-    const placeholders = ids.map(() => "?").join(", ");
-
-    switch (modifier) {
-      case "INCLUDES":
-        return {
-          sql: `i.id IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}) AND imageInstanceId = i.stashInstanceId)`,
-          params: ids,
-        };
-      case "EXCLUDES":
-        return {
-          sql: `i.id NOT IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}) AND imageInstanceId = i.stashInstanceId)`,
-          params: ids,
-        };
-      default:
-        return { sql: "", params: [] };
-    }
+    return buildJunctionFilter(ids, "ImageGallery", "imageId", "imageInstanceId", "galleryId", "galleryInstanceId", "i", modifier);
   }
 
   // Build search query filter

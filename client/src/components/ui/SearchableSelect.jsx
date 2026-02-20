@@ -17,6 +17,24 @@ import Button from "./Button.jsx";
  * @param {string} props.placeholder - Placeholder text
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
  */
+/**
+ * Create a composite key from entity ID and instance ID.
+ * Format: "entityId:instanceId" when instanceId exists, otherwise just "entityId"
+ */
+const makeCompositeKey = (id, instanceId) =>
+  instanceId ? `${id}:${instanceId}` : id;
+
+/**
+ * Parse a composite key back to {id, instanceId}.
+ * Handles both "entityId:instanceId" and bare "entityId" formats.
+ */
+const parseCompositeKey = (key) => {
+  if (!key) return { id: key, instanceId: undefined };
+  const colonIdx = key.indexOf(":");
+  if (colonIdx === -1) return { id: key, instanceId: undefined };
+  return { id: key.substring(0, colonIdx), instanceId: key.substring(colonIdx + 1) };
+};
+
 const SearchableSelect = ({
   entityType,
   value,
@@ -48,39 +66,44 @@ const SearchableSelect = ({
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Fetch items by specific IDs (use full endpoints which support ID filtering)
+  // Handles composite "id:instanceId" keys by extracting bare IDs for API calls
   const fetchItemsByIds = useCallback(
-    async (ids) => {
+    async (compositeKeys) => {
       // Guard: don't fetch if no IDs provided
-      if (!ids || ids.length === 0) {
+      if (!compositeKeys || compositeKeys.length === 0) {
         return [];
       }
+
+      // Parse composite keys to extract bare IDs for the API call
+      const parsed = compositeKeys.map(parseCompositeKey);
+      const bareIds = [...new Set(parsed.map((p) => p.id))];
 
       try {
         let results;
 
         switch (entityType) {
           case "performers": {
-            const response = await libraryApi.findPerformers({ ids });
+            const response = await libraryApi.findPerformers({ ids: bareIds });
             results = response?.findPerformers?.performers || [];
             break;
           }
           case "studios": {
-            const response = await libraryApi.findStudios({ ids });
+            const response = await libraryApi.findStudios({ ids: bareIds });
             results = response?.findStudios?.studios || [];
             break;
           }
           case "tags": {
-            const response = await libraryApi.findTags({ ids });
+            const response = await libraryApi.findTags({ ids: bareIds });
             results = response?.findTags?.tags || [];
             break;
           }
           case "groups": {
-            const response = await libraryApi.findGroups({ ids });
+            const response = await libraryApi.findGroups({ ids: bareIds });
             results = response?.findGroups?.groups || [];
             break;
           }
           case "galleries": {
-            const response = await libraryApi.findGalleries({ ids });
+            const response = await libraryApi.findGalleries({ ids: bareIds });
             results = response?.findGalleries?.galleries || [];
             break;
           }
@@ -88,9 +111,9 @@ const SearchableSelect = ({
             results = [];
         }
 
-        // Extract minimal fields (id + name)
+        // Extract minimal fields with composite key
         return results.map((item) => ({
-          id: item.id,
+          id: makeCompositeKey(item.id, item.instanceId),
           name: item.name || item.title || "Unknown",
         }));
       } catch (error) {
@@ -209,7 +232,13 @@ const SearchableSelect = ({
         };
 
         const count_filter = getCountFilter();
-        const results = await apiMethod({ filter, count_filter });
+        const rawResults = await apiMethod({ filter, count_filter });
+
+        // Transform results to use composite id:instanceId keys
+        const results = rawResults.map((item) => ({
+          id: makeCompositeKey(item.id, item.instanceId),
+          name: item.name || item.title || "Unknown",
+        }));
 
         // Cache first page of results (no search = initial batch)
         if (!search && results.length > 0) {

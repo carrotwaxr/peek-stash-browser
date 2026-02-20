@@ -206,7 +206,7 @@ const PerformerDetail = () => {
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
-                      value: [parseInt(performerId, 10)],
+                      value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
                       modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
                     performers: [{ id: performerId, name: performer.name }] }}
@@ -220,7 +220,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
-                        value: [parseInt(performerId, 10)],
+                        value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No galleries found for ${performer.name}`}
@@ -228,7 +228,7 @@ const PerformerDetail = () => {
               )}
 
               {activeTab === 'images' && (
-                <ImagesTab performerId={performerId} performerName={performer?.name} />
+                <ImagesTab performerId={performerId} instanceId={instanceId} performerName={performer?.name} />
               )}
 
               {activeTab === 'groups' && (
@@ -236,7 +236,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       performers: {
-                        value: [parseInt(performerId, 10)],
+                        value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${performer.name}`}
@@ -699,7 +699,7 @@ const PerformerLinks = ({ performer, settings }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ performerId, performerName }) => {
+const ImagesTab = ({ performerId, instanceId, performerName }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
@@ -722,7 +722,7 @@ const ImagesTab = ({ performerId, performerName }) => {
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
-            value: [parseInt(performerId, 10)],
+            value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
             modifier: "INCLUDES",
           },
         },
@@ -732,12 +732,12 @@ const ImagesTab = ({ performerId, performerName }) => {
         count: data.findImages?.count || 0,
       };
     },
-    [performerId]
+    [performerId, instanceId]
   );
 
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
-    dependencies: [performerId],
+    dependencies: [performerId, instanceId],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });

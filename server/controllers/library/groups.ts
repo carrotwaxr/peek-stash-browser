@@ -318,6 +318,7 @@ export const findGroupsMinimal = async (
     const minimalGroups = groups.map((g) => ({
       id: g.id,
       name: g.name,
+      instanceId: g.instanceId || "",
       favorite: g.favorite,
     }));
 

@@ -10,6 +10,9 @@ import {
   buildDateFilter,
   buildTextFilter,
   buildFavoriteFilter,
+  parseCompositeFilterValues,
+  buildJunctionFilter,
+  buildDirectFilter,
 } from "../../utils/sqlFilterBuilders.js";
 
 describe("buildNumericFilter", () => {
@@ -328,5 +331,219 @@ describe("buildFavoriteFilter", () => {
     const result = buildFavoriteFilter(false);
     expect(result.sql).toBe("(r.favorite = 0 OR r.favorite IS NULL)");
     expect(result.params).toEqual([]);
+  });
+});
+
+describe("parseCompositeFilterValues", () => {
+  it("parses bare IDs (no instance)", () => {
+    const result = parseCompositeFilterValues(["1", "2", "3"]);
+    expect(result.hasInstanceIds).toBe(false);
+    expect(result.parsed).toEqual([
+      { id: "1", instanceId: undefined },
+      { id: "2", instanceId: undefined },
+      { id: "3", instanceId: undefined },
+    ]);
+  });
+
+  it("parses composite id:instanceId values", () => {
+    const result = parseCompositeFilterValues(["82:server-1", "5:server-2"]);
+    expect(result.hasInstanceIds).toBe(true);
+    expect(result.parsed).toEqual([
+      { id: "82", instanceId: "server-1" },
+      { id: "5", instanceId: "server-2" },
+    ]);
+  });
+
+  it("handles mixed bare and composite values", () => {
+    const result = parseCompositeFilterValues(["82:server-1", "5"]);
+    expect(result.hasInstanceIds).toBe(true);
+    expect(result.parsed).toEqual([
+      { id: "82", instanceId: "server-1" },
+      { id: "5", instanceId: undefined },
+    ]);
+  });
+
+  it("handles empty array", () => {
+    const result = parseCompositeFilterValues([]);
+    expect(result.hasInstanceIds).toBe(false);
+    expect(result.parsed).toEqual([]);
+  });
+
+  it("handles instanceId containing colons (UUID format)", () => {
+    const result = parseCompositeFilterValues(["82:abc-123:extra"]);
+    expect(result.parsed).toEqual([
+      { id: "82", instanceId: "abc-123:extra" },
+    ]);
+  });
+});
+
+describe("buildJunctionFilter", () => {
+  const junctionTable = "ScenePerformer";
+  const parentIdCol = "sceneId";
+  const parentInstanceCol = "sceneInstanceId";
+  const entityIdCol = "performerId";
+  const entityInstanceCol = "performerInstanceId";
+  const parentAlias = "s";
+
+  describe("bare IDs (no instanceId)", () => {
+    it("INCLUDES: generates EXISTS with IN clause", () => {
+      const result = buildJunctionFilter(
+        ["1", "2"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "INCLUDES"
+      );
+      expect(result.sql).toContain("EXISTS");
+      expect(result.sql).toContain("performerId IN (?, ?)");
+      expect(result.params).toEqual(["1", "2"]);
+    });
+
+    it("INCLUDES_ALL: generates COUNT(DISTINCT) = N", () => {
+      const result = buildJunctionFilter(
+        ["1", "2", "3"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "INCLUDES_ALL"
+      );
+      expect(result.sql).toContain("COUNT(DISTINCT");
+      expect(result.sql).toContain("= ?");
+      expect(result.params).toEqual(["1", "2", "3", 3]);
+    });
+
+    it("EXCLUDES: generates NOT EXISTS", () => {
+      const result = buildJunctionFilter(
+        ["1"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "EXCLUDES"
+      );
+      expect(result.sql).toContain("NOT EXISTS");
+      expect(result.sql).toContain("performerId IN (?)");
+      expect(result.params).toEqual(["1"]);
+    });
+
+    it("unknown modifier returns empty", () => {
+      const result = buildJunctionFilter(
+        ["1"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "UNKNOWN"
+      );
+      expect(result).toEqual({ sql: "", params: [] });
+    });
+  });
+
+  describe("composite IDs (with instanceId)", () => {
+    it("INCLUDES: generates pair conditions with AND", () => {
+      const result = buildJunctionFilter(
+        ["82:server-1", "5:server-2"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "INCLUDES"
+      );
+      expect(result.sql).toContain("EXISTS");
+      expect(result.sql).toContain("performerId = ? AND");
+      expect(result.sql).toContain("performerInstanceId = ?");
+      expect(result.sql).toContain(" OR ");
+      expect(result.params).toEqual(["82", "server-1", "5", "server-2"]);
+    });
+
+    it("INCLUDES_ALL: generates COUNT(DISTINCT concat) = N", () => {
+      const result = buildJunctionFilter(
+        ["82:server-1", "5:server-2"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "INCLUDES_ALL"
+      );
+      expect(result.sql).toContain("COUNT(DISTINCT");
+      expect(result.sql).toContain("|| ':' ||");
+      expect(result.params).toEqual(["82", "server-1", "5", "server-2", 2]);
+    });
+
+    it("EXCLUDES: generates NOT EXISTS with pair conditions", () => {
+      const result = buildJunctionFilter(
+        ["82:server-1"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "EXCLUDES"
+      );
+      expect(result.sql).toContain("NOT EXISTS");
+      expect(result.sql).toContain("performerId = ? AND");
+      expect(result.sql).toContain("performerInstanceId = ?");
+      expect(result.params).toEqual(["82", "server-1"]);
+    });
+
+    it("mixed bare + composite: bare ID matches any instance", () => {
+      const result = buildJunctionFilter(
+        ["82:server-1", "5"],
+        junctionTable, parentIdCol, parentInstanceCol,
+        entityIdCol, entityInstanceCol, parentAlias,
+        "INCLUDES"
+      );
+      // First pair: (performerId = ? AND performerInstanceId = ?)
+      // Second pair: (performerId = ?) — no instanceId constraint
+      expect(result.sql).toContain("performerInstanceId = ?");
+      expect(result.params).toEqual(["82", "server-1", "5"]);
+    });
+  });
+
+  it("joins parent table correctly", () => {
+    const result = buildJunctionFilter(
+      ["1"],
+      junctionTable, parentIdCol, parentInstanceCol,
+      entityIdCol, entityInstanceCol, parentAlias,
+      "INCLUDES"
+    );
+    expect(result.sql).toContain(`sc.${parentIdCol} = ${parentAlias}.id`);
+    expect(result.sql).toContain(`sc.${parentInstanceCol} = ${parentAlias}.stashInstanceId`);
+  });
+});
+
+describe("buildDirectFilter", () => {
+  const idCol = "s.studioId";
+  const instanceCol = "s.stashInstanceId";
+
+  describe("bare IDs", () => {
+    it("INCLUDES: generates IN clause", () => {
+      const result = buildDirectFilter(["1", "2"], idCol, instanceCol, "INCLUDES");
+      expect(result.sql).toBe("s.studioId IN (?, ?)");
+      expect(result.params).toEqual(["1", "2"]);
+    });
+
+    it("EXCLUDES: generates NOT IN with NULL check", () => {
+      const result = buildDirectFilter(["1"], idCol, instanceCol, "EXCLUDES");
+      expect(result.sql).toBe("(s.studioId IS NULL OR s.studioId NOT IN (?))");
+      expect(result.params).toEqual(["1"]);
+    });
+
+    it("unknown modifier returns empty", () => {
+      const result = buildDirectFilter(["1"], idCol, instanceCol, "UNKNOWN");
+      expect(result).toEqual({ sql: "", params: [] });
+    });
+  });
+
+  describe("composite IDs", () => {
+    it("INCLUDES: generates pair conditions", () => {
+      const result = buildDirectFilter(["3:server-1"], idCol, instanceCol, "INCLUDES");
+      expect(result.sql).toBe("((s.studioId = ? AND s.stashInstanceId = ?))");
+      expect(result.params).toEqual(["3", "server-1"]);
+    });
+
+    it("EXCLUDES: generates NOT pair conditions", () => {
+      const result = buildDirectFilter(["3:server-1"], idCol, instanceCol, "EXCLUDES");
+      expect(result.sql).toBe("NOT ((s.studioId = ? AND s.stashInstanceId = ?))");
+      expect(result.params).toEqual(["3", "server-1"]);
+    });
+
+    it("multiple composite IDs joined with OR", () => {
+      const result = buildDirectFilter(
+        ["3:server-1", "7:server-2"],
+        idCol, instanceCol, "INCLUDES"
+      );
+      expect(result.sql).toBe(
+        "((s.studioId = ? AND s.stashInstanceId = ?) OR (s.studioId = ? AND s.stashInstanceId = ?))"
+      );
+      expect(result.params).toEqual(["3", "server-1", "7", "server-2"]);
+    });
   });
 });
