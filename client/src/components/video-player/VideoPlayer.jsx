@@ -47,6 +47,7 @@ const VideoPlayer = () => {
   const initialResumeTimeRef = useRef(null); // Capture resume time once
 
   const [enableCast, setEnableCast] = useState(true); // Default to true
+  const [minimumPlayPercent, setMinimumPlayPercent] = useState(10)
   const [clips, setClips] = useState([]);
 
   // Fetch user settings for cast preference
@@ -55,6 +56,7 @@ const VideoPlayer = () => {
       try {
         const response = await api.get("/user/settings");
         setEnableCast(response.data.settings.enableCast !== false);
+        setMinimumPlayPercent(response.data.settings.minimumPlayPercent)
       } catch (error) {
         // If error, default to true (enabled)
         console.error("Failed to fetch user settings:", error);
@@ -165,6 +167,7 @@ const VideoPlayer = () => {
     watchHistory,
     loadingWatchHistory,
     enableCast,
+    minimumPlayPercent,
   });
 
   // Media keys for playlist navigation
