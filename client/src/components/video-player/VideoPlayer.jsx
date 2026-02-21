@@ -47,16 +47,18 @@ const VideoPlayer = () => {
   const initialResumeTimeRef = useRef(null); // Capture resume time once
 
   const [enableCast, setEnableCast] = useState(true); // Default to true
+  const [minimumPlayPercent, setMinimumPlayPercent] = useState(20); // Default to 20%
   const [clips, setClips] = useState([]);
 
-  // Fetch user settings for cast preference
+  // Fetch user settings for cast preference and playback thresholds
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const response = await api.get("/user/settings");
         setEnableCast(response.data.settings.enableCast !== false);
+        setMinimumPlayPercent(response.data.settings.minimumPlayPercent ?? 20);
       } catch (error) {
-        // If error, default to true (enabled)
+        // If error, keep defaults
         console.error("Failed to fetch user settings:", error);
       }
     };
@@ -165,6 +167,7 @@ const VideoPlayer = () => {
     watchHistory,
     loadingWatchHistory,
     enableCast,
+    minimumPlayPercent,
   });
 
   // Media keys for playlist navigation
