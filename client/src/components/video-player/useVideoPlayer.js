@@ -147,6 +147,7 @@ export function useVideoPlayer({
   watchHistory,
   loadingWatchHistory,
   enableCast = true,
+  minimumPlayPercent = 20,
 }) {
   // Track previous scene for detecting changes
   const prevSceneIdRef = useRef(null);
@@ -300,7 +301,7 @@ export function useVideoPlayer({
 
     // Enable tracking
     trackActivityPlugin.setEnabled(true);
-    trackActivityPlugin.minimumPlayPercent = 10; // Match Stash's 10% threshold
+    trackActivityPlugin.minimumPlayPercent = minimumPlayPercent;
 
     // Connect plugin callbacks to API endpoints
     // saveActivity is called periodically (every 10s) during playback
@@ -333,7 +334,7 @@ export function useVideoPlayer({
       trackActivityPlugin.setEnabled(false);
       trackActivityPlugin.reset();
     };
-  }, [scene?.id, playerRef]);
+  }, [scene?.id, playerRef, minimumPlayPercent]);
 
   // ============================================================================
   // ASPECT RATIO UPDATES (fix layout when switching scenes)
