@@ -19,12 +19,12 @@ class EntityExclusionHelper {
    * - Global exclusions (instanceId = '') exclude the entity from ALL instances
    * - Scoped exclusions (instanceId = 'X') exclude only from that specific instance
    *
-   * @param entities Array of entities with `id` property (and optional `stashInstanceId`)
+   * @param entities Array of entities with `id` property (and optional `instanceId`)
    * @param userId User ID to check exclusions for (if undefined, returns all entities)
    * @param entityType Type of entity ('performer', 'studio', 'tag', 'group', 'gallery', 'image')
    * @returns Filtered array with excluded entities removed
    */
-  async filterExcluded<T extends { id: string; stashInstanceId?: string }>(
+  async filterExcluded<T extends { id: string; instanceId?: string }>(
     entities: T[],
     userId: number | undefined,
     entityType: string
@@ -66,8 +66,8 @@ class EntityExclusionHelper {
       if (globalExcludedIds.has(entity.id)) {
         return false;
       }
-      // Check instance-scoped exclusion (if entity has stashInstanceId)
-      if (entity.stashInstanceId && scopedExclusions.has(`${entity.id}:${entity.stashInstanceId}`)) {
+      // Check instance-scoped exclusion (if entity has instanceId)
+      if (entity.instanceId && scopedExclusions.has(`${entity.id}:${entity.instanceId}`)) {
         return false;
       }
       return true;

@@ -174,6 +174,11 @@ class ExclusionComputationService {
     logger.info("ExclusionComputationService.recomputeForUser completed", {
       userId,
       totalExclusions: allExclusions.length,
+      phaseCounts: {
+        direct: directExclusions.length,
+        cascade: cascadeExclusions.length,
+        empty: emptyExclusions.length,
+      },
       timing: {
         directMs: t1 - t0,
         cascadeMs: t2 - t1,
@@ -240,6 +245,12 @@ class ExclusionComputationService {
     // Get user's content restrictions
     const restrictions = await tx.userContentRestriction.findMany({
       where: { userId },
+    });
+
+    logger.debug("computeDirectExclusions: found restrictions", {
+      userId,
+      restrictionCount: restrictions.length,
+      types: restrictions.map(r => `${r.entityType}:${r.mode}`),
     });
 
     // Process each restriction

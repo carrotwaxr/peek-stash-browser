@@ -53,11 +53,12 @@ describe("EntityExclusionHelper", () => {
         { entityId: "2", instanceId: "instA" },
       ]);
 
+      // Callers pass normalized entities which use `instanceId`, not `stashInstanceId`
       const entities = [
-        { id: "1", name: "Entity 1", stashInstanceId: "instA" },
-        { id: "2", name: "Entity 2A", stashInstanceId: "instA" },
-        { id: "2", name: "Entity 2B", stashInstanceId: "instB" },
-        { id: "3", name: "Entity 3", stashInstanceId: "instB" },
+        { id: "1", name: "Entity 1", instanceId: "instA" },
+        { id: "2", name: "Entity 2A", instanceId: "instA" },
+        { id: "2", name: "Entity 2B", instanceId: "instB" },
+        { id: "3", name: "Entity 3", instanceId: "instB" },
       ];
 
       const result = await entityExclusionHelper.filterExcluded(entities, 1, "performer");
@@ -73,11 +74,12 @@ describe("EntityExclusionHelper", () => {
         { entityId: "2", instanceId: "" },
       ]);
 
+      // Callers pass normalized entities which use `instanceId`, not `stashInstanceId`
       const entities = [
-        { id: "1", name: "Entity 1", stashInstanceId: "instA" },
-        { id: "2", name: "Entity 2A", stashInstanceId: "instA" },
-        { id: "2", name: "Entity 2B", stashInstanceId: "instB" },
-        { id: "3", name: "Entity 3", stashInstanceId: "instB" },
+        { id: "1", name: "Entity 1", instanceId: "instA" },
+        { id: "2", name: "Entity 2A", instanceId: "instA" },
+        { id: "2", name: "Entity 2B", instanceId: "instB" },
+        { id: "3", name: "Entity 3", instanceId: "instB" },
       ];
 
       const result = await entityExclusionHelper.filterExcluded(entities, 1, "performer");

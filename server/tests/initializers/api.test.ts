@@ -35,6 +35,13 @@ describe("setupAPI - trust proxy configuration", () => {
     expect(app.get("trust proxy")).toBe(true);
   });
 
+  it("passes string values like 'loopback' directly to Express", async () => {
+    process.env.TRUST_PROXY = "loopback";
+    const { setupAPI } = await import("../../initializers/api.js");
+    const app = setupAPI();
+    expect(app.get("trust proxy")).toBe("loopback");
+  });
+
   it("does not set trust proxy when TRUST_PROXY env var is not set", async () => {
     delete process.env.TRUST_PROXY;
     const { setupAPI } = await import("../../initializers/api.js");
