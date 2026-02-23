@@ -212,7 +212,7 @@ const GroupDetail = () => {
                     groups: { value: [instanceId ? `${groupId}:${instanceId}` : String(groupId)], modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
                     groups: [
-                      { id: groupId, name: group?.name || "Unknown Collection" },
+                      { id: instanceId ? `${groupId}:${instanceId}` : String(groupId), name: group?.name || "Unknown Collection" },
                     ] }}
                   title={`Scenes in ${group?.name || "this collection"}`}
                   fromPageTitle={group?.name || "Collection"}
