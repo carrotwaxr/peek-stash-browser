@@ -85,12 +85,13 @@ class ExclusionComputationService {
    * Prevents concurrent recomputes for the same user.
    */
   async recomputeForUser(userId: number): Promise<void> {
-    // If there's already a pending recompute for this user, wait for it
+    // If there's already a pending recompute for this user, wait for it to finish
+    // then re-run to pick up any state changes that occurred while waiting
+    // (e.g., admin saved new restrictions while a sync-triggered recompute was running)
     const pending = this.pendingRecomputes.get(userId);
     if (pending) {
-      logger.info("ExclusionComputationService.recomputeForUser already pending, waiting", { userId });
-      await pending;
-      return;
+      logger.info("ExclusionComputationService.recomputeForUser already pending, waiting then re-running", { userId });
+      try { await pending; } catch { /* ignore - we'll recompute anyway */ }
     }
 
     const recomputePromise = this.doRecomputeForUser(userId);
@@ -173,6 +174,11 @@ class ExclusionComputationService {
     logger.info("ExclusionComputationService.recomputeForUser completed", {
       userId,
       totalExclusions: allExclusions.length,
+      phaseCounts: {
+        direct: directExclusions.length,
+        cascade: cascadeExclusions.length,
+        empty: emptyExclusions.length,
+      },
       timing: {
         directMs: t1 - t0,
         cascadeMs: t2 - t1,
@@ -239,6 +245,12 @@ class ExclusionComputationService {
     // Get user's content restrictions
     const restrictions = await tx.userContentRestriction.findMany({
       where: { userId },
+    });
+
+    logger.debug("computeDirectExclusions: found restrictions", {
+      userId,
+      restrictionCount: restrictions.length,
+      types: restrictions.map(r => `${r.entityType}:${r.mode}`),
     });
 
     // Process each restriction
