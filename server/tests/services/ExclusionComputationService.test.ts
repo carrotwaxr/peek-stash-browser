@@ -93,6 +93,64 @@ describe("ExclusionComputationService", () => {
     it("should be a callable method", () => {
       expect(typeof exclusionComputationService.recomputeForUser).toBe("function");
     });
+
+    it("should re-run recompute when called while another is pending", async () => {
+      // This tests the race condition fix: if a sync-triggered recompute is running
+      // and the admin saves restrictions (triggering another recompute), the second
+      // recompute should NOT be skipped - it must run to pick up the new restrictions.
+      let computeCount = 0;
+      let resolveFirst: () => void;
+      const firstBlocker = new Promise<void>((resolve) => {
+        resolveFirst = resolve;
+      });
+
+      // Mock the full computation pipeline
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.stashScene.count.mockResolvedValue(0);
+      mockPrisma.stashPerformer.count.mockResolvedValue(0);
+      mockPrisma.stashStudio.count.mockResolvedValue(0);
+      mockPrisma.stashTag.count.mockResolvedValue(0);
+      mockPrisma.stashGroup.count.mockResolvedValue(0);
+      mockPrisma.stashGallery.count.mockResolvedValue(0);
+      mockPrisma.stashImage.count.mockResolvedValue(0);
+      mockPrisma.stashClip.count.mockResolvedValue(0);
+
+      // First call: block inside transaction to simulate slow recompute
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        computeCount++;
+        if (computeCount === 1) {
+          // First call: wait for blocker before completing
+          await firstBlocker;
+        }
+        return callback(mockPrisma);
+      });
+
+      // Start first recompute (will block in transaction)
+      const first = exclusionComputationService.recomputeForUser(1);
+
+      // Wait a tick to ensure first recompute has started
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Start second recompute (should NOT just return after first completes)
+      const second = exclusionComputationService.recomputeForUser(1);
+
+      // Unblock the first recompute
+      resolveFirst!();
+
+      // Wait for both to complete
+      await Promise.all([first, second]);
+
+      // The transaction should have been called twice:
+      // once for the first recompute, once for the second
+      expect(computeCount).toBeGreaterThanOrEqual(2);
+    });
   });
 
   describe("recomputeAllUsers", () => {

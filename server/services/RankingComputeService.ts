@@ -102,11 +102,13 @@ class RankingComputeService {
     if (entities.length === 0) return [];
 
     // Calculate scores (convert BigInt values from SQL to Number)
+    // Round Int fields to prevent "cannot be converted to a BigInt" errors
+    // when SQLite returns float values due to type affinity edge cases
     const scored = entities.map((e) => {
-      const playCount = Number(e.playCount);
-      const oCount = Number(e.oCount);
+      const playCount = Math.round(Number(e.playCount));
+      const oCount = Math.round(Number(e.oCount));
       const playDuration = Number(e.playDuration);
-      const libraryPresence = Number(e.libraryPresence);
+      const libraryPresence = Math.round(Number(e.libraryPresence));
 
       const normalizedDuration = playDuration / avgSceneDuration;
       const engagementScore = this.calculateEngagementScore(oCount, normalizedDuration, playCount);

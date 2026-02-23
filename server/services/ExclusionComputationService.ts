@@ -85,12 +85,13 @@ class ExclusionComputationService {
    * Prevents concurrent recomputes for the same user.
    */
   async recomputeForUser(userId: number): Promise<void> {
-    // If there's already a pending recompute for this user, wait for it
+    // If there's already a pending recompute for this user, wait for it to finish
+    // then re-run to pick up any state changes that occurred while waiting
+    // (e.g., admin saved new restrictions while a sync-triggered recompute was running)
     const pending = this.pendingRecomputes.get(userId);
     if (pending) {
-      logger.info("ExclusionComputationService.recomputeForUser already pending, waiting", { userId });
-      await pending;
-      return;
+      logger.info("ExclusionComputationService.recomputeForUser already pending, waiting then re-running", { userId });
+      try { await pending; } catch { /* ignore - we'll recompute anyway */ }
     }
 
     const recomputePromise = this.doRecomputeForUser(userId);

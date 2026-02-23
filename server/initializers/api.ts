@@ -48,6 +48,20 @@ const __dirname = path.dirname(__filename);
 
 export const setupAPI = () => {
   const app = express();
+
+  // Configure trust proxy for reverse proxy setups (nginx, etc.)
+  // Prevents express-rate-limit ERR_ERL_UNEXPECTED_X_FORWARDED_FOR errors
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy) {
+    if (trustProxy === "true") {
+      app.set("trust proxy", true);
+    } else if (/^\d+$/.test(trustProxy)) {
+      app.set("trust proxy", parseInt(trustProxy, 10));
+    } else {
+      app.set("trust proxy", trustProxy);
+    }
+  }
+
   app.use(
     cors({
       credentials: true,
