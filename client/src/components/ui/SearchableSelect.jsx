@@ -66,7 +66,9 @@ const SearchableSelect = ({
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Fetch items by specific IDs (use full endpoints which support ID filtering)
-  // Handles composite "id:instanceId" keys by extracting bare IDs for API calls
+  // Groups composite "id:instanceId" keys by instanceId and makes instance-scoped
+  // API calls to avoid ambiguous lookups when the same entity ID exists across
+  // multiple Stash instances.
   const fetchItemsByIds = useCallback(
     async (compositeKeys) => {
       // Guard: don't fetch if no IDs provided
@@ -74,45 +76,74 @@ const SearchableSelect = ({
         return [];
       }
 
-      // Parse composite keys to extract bare IDs for the API call
+      // Parse composite keys and group by instanceId
       const parsed = compositeKeys.map(parseCompositeKey);
-      const bareIds = [...new Set(parsed.map((p) => p.id))];
+      const groups = new Map(); // instanceId (or "__bare__") -> [bareId, ...]
+      for (const { id, instanceId } of parsed) {
+        const groupKey = instanceId || "__bare__";
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, []);
+        }
+        groups.get(groupKey).push(id);
+      }
+
+      // Entity filter key per entity type
+      const filterKeyMap = {
+        performers: "performer_filter",
+        studios: "studio_filter",
+        tags: "tag_filter",
+        groups: "group_filter",
+        galleries: "gallery_filter",
+      };
+
+      // Response extractor per entity type
+      const extractResults = {
+        performers: (r) => r?.findPerformers?.performers || [],
+        studios: (r) => r?.findStudios?.studios || [],
+        tags: (r) => r?.findTags?.tags || [],
+        groups: (r) => r?.findGroups?.groups || [],
+        galleries: (r) => r?.findGalleries?.galleries || [],
+      };
+
+      // API method per entity type
+      const apiMethodMap = {
+        performers: libraryApi.findPerformers,
+        studios: libraryApi.findStudios,
+        tags: libraryApi.findTags,
+        groups: libraryApi.findGroups,
+        galleries: libraryApi.findGalleries,
+      };
+
+      const apiMethod = apiMethodMap[entityType];
+      const filterKey = filterKeyMap[entityType];
+      const extract = extractResults[entityType];
+
+      if (!apiMethod || !extract) {
+        return [];
+      }
 
       try {
-        let results;
+        // Make one API call per instance group
+        const promises = [...groups.entries()].map(
+          async ([groupKey, bareIds]) => {
+            const uniqueIds = [...new Set(bareIds)];
+            const params = { ids: uniqueIds };
 
-        switch (entityType) {
-          case "performers": {
-            const response = await libraryApi.findPerformers({ ids: bareIds });
-            results = response?.findPerformers?.performers || [];
-            break;
+            // Add instance filter for non-bare groups
+            if (groupKey !== "__bare__" && filterKey) {
+              params[filterKey] = { instance_id: groupKey };
+            }
+
+            const response = await apiMethod(params);
+            return extract(response);
           }
-          case "studios": {
-            const response = await libraryApi.findStudios({ ids: bareIds });
-            results = response?.findStudios?.studios || [];
-            break;
-          }
-          case "tags": {
-            const response = await libraryApi.findTags({ ids: bareIds });
-            results = response?.findTags?.tags || [];
-            break;
-          }
-          case "groups": {
-            const response = await libraryApi.findGroups({ ids: bareIds });
-            results = response?.findGroups?.groups || [];
-            break;
-          }
-          case "galleries": {
-            const response = await libraryApi.findGalleries({ ids: bareIds });
-            results = response?.findGalleries?.galleries || [];
-            break;
-          }
-          default:
-            results = [];
-        }
+        );
+
+        const resultArrays = await Promise.all(promises);
+        const allResults = resultArrays.flat();
 
         // Extract minimal fields with composite key
-        return results.map((item) => ({
+        return allResults.map((item) => ({
           id: makeCompositeKey(item.id, item.instanceId),
           name: item.name || item.title || "Unknown",
         }));
