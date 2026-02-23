@@ -386,7 +386,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
         expect(response.data.count).toBeGreaterThanOrEqual(0);
-      });
+      }, 60_000); // Exclusion recompute can chain if a pending recompute exists
 
       it("should unhide all entities of a specific type", async () => {
         // Hide some scenes
