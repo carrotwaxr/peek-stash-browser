@@ -76,6 +76,8 @@ interface RecomputeAllResult {
 class ExclusionComputationService {
   // Track pending recomputes to prevent race conditions
   private pendingRecomputes = new Map<number, Promise<void>>();
+  // Track whether another recompute is needed after the current one finishes
+  private recomputeQueued = new Set<number>();
 
   /**
    * Full recompute for a user.
@@ -83,6 +85,10 @@ class ExclusionComputationService {
    * DELETE+INSERT swap is atomic. If the write phase fails, previous
    * exclusions are preserved.
    * Prevents concurrent recomputes for the same user.
+   *
+   * Coalescing: when N callers arrive concurrently for the same user,
+   * at most 2 recomputes occur — the currently-running one plus one
+   * queued recompute that picks up all pending state changes.
    */
   async recomputeForUser(userId: number): Promise<void> {
     // If there's already a pending recompute for this user, wait for it to finish
@@ -90,8 +96,24 @@ class ExclusionComputationService {
     // (e.g., admin saved new restrictions while a sync-triggered recompute was running)
     const pending = this.pendingRecomputes.get(userId);
     if (pending) {
+      // Mark that a recompute is needed after the current one
+      this.recomputeQueued.add(userId);
       logger.info("ExclusionComputationService.recomputeForUser already pending, waiting then re-running", { userId });
       try { await pending; } catch { /* ignore - we'll recompute anyway */ }
+
+      // After the pending recompute finished, check if another caller already
+      // consumed the queued flag and started a new recompute. If so, just
+      // await that one instead of starting yet another.
+      if (!this.recomputeQueued.has(userId)) {
+        const newPending = this.pendingRecomputes.get(userId);
+        if (newPending) {
+          await newPending;
+        }
+        return;
+      }
+      // We're the one to consume the queue flag and start the recompute
+      this.recomputeQueued.delete(userId);
+      // Fall through to start the recompute
     }
 
     const recomputePromise = this.doRecomputeForUser(userId);
