@@ -1,4 +1,3 @@
-import type { Scene } from "../graphql/types.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { getEntityInstanceId, getEntityInstanceIds } from "../utils/entityInstanceId.js";
@@ -111,7 +110,7 @@ export const getUserPlaylists = async (
 
           // 3. Transform scenes to add proxy URLs
           const transformedScenes = visibleScenes.map((s) =>
-            transformScene(s as unknown as Scene)
+            transformScene(s)
           );
 
           // Create a map of scene ID to scene data
@@ -228,7 +227,7 @@ export const getSharedPlaylists = async (
 
             // Transform scenes to add proxy URLs
             const transformedScenes = visibleScenes.map((s) =>
-              transformScene(s as unknown as Scene)
+              transformScene(s)
             );
 
             // Create a map of scene ID to scene data
@@ -338,6 +337,7 @@ export const getPlaylist = async (
         // 4. Merge with user's personal data (WatchHistory + SceneRating)
         const { mergeScenesWithUserData } = await import("./library/scenes.js");
         // Type assertion safe: scenes from cache are compatible with Normalized type structure
+        // Type assertion: cached scenes have o_history as string[] (from DB) vs Date[] in NormalizedScene
         const scenesWithUserHistory = await mergeScenesWithUserData(
           scenesWithDefaults as unknown as NormalizedScene[],
           userId
@@ -345,7 +345,7 @@ export const getPlaylist = async (
 
         // 5. Transform paths for proxy URLs
         const transformedScenes = scenesWithUserHistory.map((s) =>
-          transformScene(s as unknown as Scene)
+          transformScene(s)
         );
 
         // Create a map of scene ID to scene data

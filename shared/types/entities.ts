@@ -1,14 +1,10 @@
 /**
  * Standalone Normalized Entity Types
  *
- * These are standalone interfaces matching what StashEntityService transforms
- * and QueryBuilder populateRelations actually produce. They have no dependency
- * on Stash GraphQL types, enabling proper type checking without `as unknown as`
- * casts.
- *
- * A copy of these types lives in shared/types/entities.ts for client use.
- * Note: These are defined here (not re-exported from shared/) because
- * TypeScript's rootDir constraint prevents importing from outside server/.
+ * These types match the actual shapes produced by StashEntityService transform
+ * methods and QueryBuilder populateRelations. They are standalone interfaces
+ * (no dependency on Stash GraphQL types) so they can be shared across server
+ * and client code.
  *
  * Design:
  * - Fields present in both QueryBuilder AND StashEntityService output → required

@@ -575,8 +575,8 @@ export const findTagsMinimal = async (
 
     // Sort
     tags.sort((a, b) => {
-      const aValue = (a as Record<string, unknown>)[sortField] || "";
-      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const aValue = (a as unknown as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as unknown as Record<string, unknown>)[sortField] || "";
       const comparison =
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
@@ -761,7 +761,7 @@ export const updateTag = async (
       return res.status(500).json({ error: "Tag update returned null" });
     }
 
-    res.json({ success: true, tag: updatedTag.tagUpdate as NormalizedTag });
+    res.json({ success: true, tag: updatedTag.tagUpdate as unknown as NormalizedTag });
   } catch (error) {
     console.error("Error updating tag:", error);
     res.status(500).json({ error: "Failed to update tag" });

@@ -752,20 +752,17 @@ class GalleryQueryBuilder {
     }
 
     // Populate galleries using composite keys
-    // Relations are populated with lightweight refs (PerformerRef etc.), not full GraphQL types.
-    // NormalizedGallery inherits Performer[]/Tag[]/etc. from Gallery, but QueryBuilder intentionally
-    // populates only the fields needed by the API response.
     for (const gallery of galleries) {
       const galleryKey = `${gallery.id}:${gallery.instanceId}`;
-      gallery.performers = (performersByGallery.get(galleryKey) || []) as unknown as NormalizedGallery["performers"];
-      gallery.tags = (tagsByGallery.get(galleryKey) || []) as unknown as NormalizedGallery["tags"];
+      gallery.performers = performersByGallery.get(galleryKey) || [];
+      gallery.tags = tagsByGallery.get(galleryKey) || [];
 
       // Hydrate studio with full data using composite key
       if (gallery.studio?.id) {
         const studioKey = `${gallery.studio.id}:${gallery.instanceId}`;
         const fullStudio = studiosByKey.get(studioKey);
         if (fullStudio) {
-          gallery.studio = fullStudio as unknown as NormalizedGallery["studio"];
+          gallery.studio = fullStudio;
         }
       }
     }

@@ -11,7 +11,7 @@
  *   import type { Scene, Performer } from "../graphql/types.js";
  */
 
-// Normalized entity types (Stash types + Peek user data)
+// Normalized entity types (standalone interfaces matching transform output)
 export type {
   NormalizedScene,
   NormalizedPerformer,
@@ -27,6 +27,9 @@ export type {
   StudioRef,
   GroupRef,
   GalleryRef,
+  SceneFile,
+  ScenePaths,
+  SceneStream,
 } from "./entities.js";
 
 // Base filter types from Stash GraphQL

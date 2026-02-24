@@ -840,8 +840,8 @@ export const findPerformersMinimal = async (
 
     // Sort
     performers.sort((a, b) => {
-      const aValue = (a as Record<string, unknown>)[sortField] || "";
-      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const aValue = (a as unknown as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as unknown as Record<string, unknown>)[sortField] || "";
       const comparison =
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
@@ -907,7 +907,7 @@ export const updatePerformer = async (
       return res.status(500).json({ error: "Performer update returned null" });
     }
 
-    res.json({ success: true, performer: updatedPerformer.performerUpdate as NormalizedPerformer });
+    res.json({ success: true, performer: updatedPerformer.performerUpdate as unknown as NormalizedPerformer });
   } catch (error) {
     console.error("Error updating performer:", error);
     res.status(500).json({ error: "Failed to update performer" });

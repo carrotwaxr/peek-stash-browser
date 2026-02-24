@@ -1,6 +1,9 @@
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
+import type { NormalizedScene, NormalizedPerformer, NormalizedStudio, NormalizedTag, NormalizedGroup, NormalizedGallery, NormalizedImage } from "../types/index.js";
+
+type NormalizedEntity = NormalizedScene | NormalizedPerformer | NormalizedStudio | NormalizedTag | NormalizedGroup | NormalizedGallery | NormalizedImage;
 
 
 export type EntityType =
@@ -125,7 +128,7 @@ class UserHiddenEntityService {
       entityType: EntityType;
       entityId: string;
       hiddenAt: Date;
-      entity: Record<string, unknown> | null; // Full entity data from Stash cache
+      entity: NormalizedEntity | null; // Full entity data from Stash cache
     }>
   > {
     const where: { userId: number; entityType?: EntityType } = { userId };

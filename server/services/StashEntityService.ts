@@ -166,34 +166,9 @@ type BrowseSceneRow = Pick<StashScene,
 >;
 
 /** Transformed image output shape (returned by transformImage) */
-interface TransformedImage {
-  id: string;
-  instanceId: string;
-  title: string | null;
-  code: string | null;
-  details: string | null;
-  photographer: string | null;
-  urls: string[];
-  date: string | null;
-  studio: { id: string; name?: string } | null;
-  studioId: string | null;
-  rating100: number | null;
-  o_counter: number;
-  organized: boolean;
-  filePath: string | null;
-  width: number | null;
-  height: number | null;
-  fileSize: number | null;
-  files: Array<{ path: string; width: number | null; height: number | null; size: number | null }>;
-  paths: { thumbnail: string; preview: string; image: string };
-  performers: Array<{ id: string; name: string; gender: string | null; image_path: string | null }>;
-  tags: Array<{ id: string; name: string }>;
-  galleries: Array<Record<string, unknown>>;
-  created_at: string | null;
-  updated_at: string | null;
-  stashCreatedAt: string | null;
-  stashUpdatedAt: string | null;
-}
+// TransformedImage is a subset of NormalizedImage (without user activity fields).
+// Using NormalizedImage directly as return type since user fields are optional.
+type TransformedImage = NormalizedImage;
 
 /**
  * Default user fields for scenes (when no user data is merged)
@@ -1639,7 +1614,7 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformImage(cached as unknown as ImageInput) as unknown as NormalizedImage;
+    return this.transformImage(cached as unknown as ImageInput);
   }
 
   /**
@@ -1663,7 +1638,7 @@ class StashEntityService {
         },
         include: this.imageIncludes,
       });
-      return cached.map((c) => this.transformImage(c as unknown as ImageInput) as unknown as NormalizedImage);
+      return cached.map((c) => this.transformImage(c as unknown as ImageInput));
     }
 
     // For large sets, fetch in chunks
@@ -1680,7 +1655,7 @@ class StashEntityService {
         },
         include: this.imageIncludes,
       });
-      allImages.push(...chunk.map((c) => this.transformImage(c as unknown as ImageInput) as unknown as NormalizedImage));
+      allImages.push(...chunk.map((c) => this.transformImage(c as unknown as ImageInput)));
     }
 
     return allImages;
@@ -1961,7 +1936,7 @@ class StashEntityService {
 
       // Inherited tag IDs (pre-computed at sync time)
       inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
-    } as unknown as NormalizedScene;
+    };
   }
 
   /**
@@ -2032,7 +2007,7 @@ class StashEntityService {
 
       // Inherited tag IDs (pre-computed at sync time)
       inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
-    } as unknown as NormalizedScene;
+    };
   }
 
   /**
@@ -2089,12 +2064,12 @@ class StashEntityService {
       base.groups = scene.groups.map((sg: SceneGroupWithGroup) => ({
         ...this.transformGroup(sg.group),
         scene_index: sg.sceneIndex,
-      })) as unknown as typeof base.groups;
+      }));
     }
     if (scene.galleries) {
       base.galleries = scene.galleries.map((sg: SceneGalleryWithGallery) =>
         this.transformGallery(sg.gallery)
-      ) as unknown as typeof base.galleries;
+      );
     }
 
     // Hydrate inherited tags with full tag objects
@@ -2154,7 +2129,7 @@ class StashEntityService {
       image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
-    } as unknown as NormalizedPerformer;
+    };
   }
 
   private transformStudio(studio: StudioInput): NormalizedStudio {
@@ -2184,7 +2159,7 @@ class StashEntityService {
       image_path: this.transformUrl(studio.imagePath, studio.stashInstanceId),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
-    } as unknown as NormalizedStudio;
+    };
   }
 
   private transformTag(tag: TagInput): NormalizedTag {
@@ -2208,7 +2183,7 @@ class StashEntityService {
       image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
-    } as unknown as NormalizedTag;
+    };
   }
 
   private transformGroup(group: GroupInput): NormalizedGroup {
@@ -2238,7 +2213,7 @@ class StashEntityService {
       back_image_path: this.transformUrl(group.backImagePath, group.stashInstanceId),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
       updated_at: group.stashUpdatedAt?.toISOString() ?? null,
-    } as unknown as NormalizedGroup;
+    };
   }
 
   private transformGallery(gallery: GalleryInput): NormalizedGallery {
@@ -2298,7 +2273,7 @@ class StashEntityService {
       scenes,
       created_at: gallery.stashCreatedAt?.toISOString() ?? null,
       updated_at: gallery.stashUpdatedAt?.toISOString() ?? null,
-    } as unknown as NormalizedGallery;
+    };
   }
 
   private transformImage(image: ImageInput): TransformedImage {

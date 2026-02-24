@@ -1110,7 +1110,7 @@ class PerformerQueryBuilder {
     // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
       const performerKey = `${performer.id}${KEY_SEP}${performer.instanceId || ""}`;
-      performer.tags = (tagsByPerformer.get(performerKey) || []) as unknown as NormalizedPerformer["tags"];
+      performer.tags = tagsByPerformer.get(performerKey) || [];
 
       // Derive groups and studios from performer's scenes
       const performerSceneIds = scenesByPerformer.get(performerKey) || new Set();
@@ -1127,9 +1127,9 @@ class PerformerQueryBuilder {
       // Galleries come from direct GalleryPerformer association
       const performerGalleryKeys = galleriesByPerformer.get(performerKey) || new Set();
 
-      (performer as unknown as { groups: GroupRef[] }).groups = [...performerGroupKeys].map((key) => groupsByKey.get(key)).filter((g): g is GroupRef => !!g);
-      (performer as unknown as { galleries: GalleryRef[] }).galleries = [...performerGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
-      (performer as unknown as { studios: StudioRef[] }).studios = [...performerStudioKeys].map((key) => studiosByKey.get(key)).filter((s): s is StudioRef => !!s);
+      performer.groups = [...performerGroupKeys].map((key) => groupsByKey.get(key)).filter((g): g is GroupRef => !!g);
+      performer.galleries = [...performerGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
+      performer.studios = [...performerStudioKeys].map((key) => studiosByKey.get(key)).filter((s): s is StudioRef => !!s);
     }
   }
 
