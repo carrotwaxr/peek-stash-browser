@@ -73,12 +73,14 @@ const AddToPlaylistButton = ({
   const loadPlaylists = async () => {
     try {
       setLoading(true);
-      const [ownRes, sharedRes] = await Promise.all([
+      const [ownResult, sharedResult] = await Promise.allSettled([
         api.get("/playlists"),
         api.get("/playlists/shared"),
       ]);
-      const own = (ownRes.data.playlists || []).map((p) => ({ ...p, isShared: false }));
-      const shared = (sharedRes.data.playlists || []).map((p) => ({ ...p, isShared: true }));
+      const own = (ownResult.status === "fulfilled" ? ownResult.value.data.playlists || [] : [])
+        .map((p) => ({ ...p, isShared: false }));
+      const shared = (sharedResult.status === "fulfilled" ? sharedResult.value.data.playlists || [] : [])
+        .map((p) => ({ ...p, isShared: true }));
       setPlaylists([...own, ...shared]);
     } catch {
       // Error loading playlists - will show in UI
@@ -299,7 +301,7 @@ const AddToPlaylistButton = ({
                           className="text-xs"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          {playlist._count?.items || 0} videos
+                          {playlist._count?.items ?? playlist.sceneCount ?? 0} videos
                         </div>
                       </Button>
                     ))

@@ -561,6 +561,7 @@ export const addSceneToPlaylist = async (
     }
 
     // Check access — owners and shared users can add scenes
+    // Note: remove/reorder/rename remain owner-only (intentional asymmetry)
     const access = await getPlaylistAccess(playlistId, userId);
     if (access.level === "none") {
       return res.status(404).json({ error: "Playlist not found" });

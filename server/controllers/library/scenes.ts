@@ -220,11 +220,13 @@ export async function applyQuickSceneFilters(
 
   // Filter by performers
   if (filters.performers) {
-    const { value: performerIds, modifier } = filters.performers;
-    if (!performerIds || performerIds.length === 0) return filtered;
+    const { value: rawPerformerIds, modifier } = filters.performers;
+    if (!rawPerformerIds || rawPerformerIds.length === 0) return filtered;
+    // Strip composite keys ("42:instance-1" -> "42") since UI sends composite format
+    const { parsed: parsedPerformers } = parseCompositeFilterValues(rawPerformerIds.map((id) => String(id)));
     filtered = filtered.filter((s) => {
       const scenePerformerIds = (s.performers || []).map((p) => String(p.id));
-      const filterPerformerIds = performerIds.map((id) => String(id));
+      const filterPerformerIds = parsedPerformers.map((p) => p.id);
       if (modifier === "INCLUDES") {
         return filterPerformerIds.some((id: string) =>
           scenePerformerIds.includes(id)
@@ -339,15 +341,17 @@ export async function applyQuickSceneFilters(
 
   // Filter by groups
   if (filters.groups) {
-    const { value: groupIds, modifier } = filters.groups;
-    if (!groupIds || groupIds.length === 0) return filtered;
+    const { value: rawGroupIds, modifier } = filters.groups;
+    if (!rawGroupIds || rawGroupIds.length === 0) return filtered;
 
+    // Strip composite keys ("7:instance-1" -> "7") since UI sends composite format
+    const { parsed: parsedGroups } = parseCompositeFilterValues(rawGroupIds.map((id) => String(id)));
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
       // NOT nested: { group: { id, name }, scene_index }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
       const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
-      const filterGroupIds = groupIds.map((id) => String(id));
+      const filterGroupIds = parsedGroups.map((p) => p.id);
       if (modifier === "INCLUDES") {
         return filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }

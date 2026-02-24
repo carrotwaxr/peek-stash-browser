@@ -49,7 +49,7 @@ router.post(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      const { type = "incremental" } = req.body;
+      const { type = "incremental" } = req.body || {};
 
       if (stashSyncService.isSyncing()) {
         return res.status(409).json({
@@ -134,7 +134,7 @@ router.post(
         });
       }
 
-      const { entity, id, action } = req.body;
+      const { entity, id, action } = req.body || {};
 
       if (!entity || !id || !action) {
         return res.status(400).json({
