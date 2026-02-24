@@ -7,6 +7,7 @@ import {
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
 import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
@@ -247,7 +248,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     group_filter: {
                       scenes: {
-                        value: [scene.instanceId ? `${scene.id}:${scene.instanceId}` : String(scene.id)],
+                        value: [makeCompositeKey(scene.id, scene.instanceId)],
                         modifier: "INCLUDES"
                       }
                     }
@@ -264,7 +265,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     gallery_filter: {
                       scenes: {
-                        value: [scene.instanceId ? `${scene.id}:${scene.instanceId}` : String(scene.id)],
+                        value: [makeCompositeKey(scene.id, scene.instanceId)],
                         modifier: "INCLUDES"
                       }
                     }

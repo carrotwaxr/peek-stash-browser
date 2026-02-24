@@ -3,6 +3,7 @@ import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { useDebouncedValue } from "../../hooks/useDebounce.js";
 import { libraryApi } from "../../services/api.js";
 import { getCache, setCache } from "../../utils/filterCache.js";
+import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey.js";
 import Button from "./Button.jsx";
 
 /**
@@ -17,23 +18,6 @@ import Button from "./Button.jsx";
  * @param {string} props.placeholder - Placeholder text
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
  */
-/**
- * Create a composite key from entity ID and instance ID.
- * Format: "entityId:instanceId" when instanceId exists, otherwise just "entityId"
- */
-const makeCompositeKey = (id, instanceId) =>
-  instanceId ? `${id}:${instanceId}` : id;
-
-/**
- * Parse a composite key back to {id, instanceId}.
- * Handles both "entityId:instanceId" and bare "entityId" formats.
- */
-const parseCompositeKey = (key) => {
-  if (!key) return { id: key, instanceId: undefined };
-  const colonIdx = key.indexOf(":");
-  if (colonIdx === -1) return { id: key, instanceId: undefined };
-  return { id: key.substring(0, colonIdx), instanceId: key.substring(colonIdx + 1) };
-};
 
 const SearchableSelect = ({
   entityType,

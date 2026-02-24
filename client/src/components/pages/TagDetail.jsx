@@ -8,6 +8,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -293,13 +294,13 @@ const TagDetail = () => {
                   context="scene_tag"
                   permanentFilters={{
                     tags: {
-                      value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+                      value: [makeCompositeKey(tagId, instanceId)],
                       modifier: "INCLUDES",
                       ...(includeSubTags && { depth: -1 }),
                     },
                   }}
                   permanentFiltersMetadata={{
-                    tags: [{ id: instanceId ? `${tagId}:${instanceId}` : String(tagId), name: tag?.name || "Unknown Tag" }],
+                    tags: [{ id: makeCompositeKey(tagId, instanceId), name: tag?.name || "Unknown Tag" }],
                   }}
                   title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
                   fromPageTitle={tag?.name || "Tag"}
@@ -312,7 +313,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       tags: {
-                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+                        value: [makeCompositeKey(tagId, instanceId)],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -332,7 +333,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       tags: {
-                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+                        value: [makeCompositeKey(tagId, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -347,7 +348,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     studio_filter: {
                       tags: {
-                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+                        value: [makeCompositeKey(tagId, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -362,7 +363,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       tags: {
-                        value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+                        value: [makeCompositeKey(tagId, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -618,7 +619,7 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }) => {
         filter: { page, per_page: perPage },
         image_filter: {
           tags: {
-            value: [instanceId ? `${tagId}:${instanceId}` : String(tagId)],
+            value: [makeCompositeKey(tagId, instanceId)],
             modifier: "INCLUDES",
             ...(includeSubTags && { depth: -1 }),
           },

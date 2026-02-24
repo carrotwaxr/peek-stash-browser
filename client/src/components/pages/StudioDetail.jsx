@@ -11,6 +11,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -260,12 +261,12 @@ const StudioDetail = () => {
                   context="scene_studio"
                   permanentFilters={{
                     studios: {
-                      value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
+                      value: [makeCompositeKey(studioId, instanceId)],
                       modifier: "INCLUDES",
                       ...(includeSubStudios && { depth: -1 }) } }}
                   permanentFiltersMetadata={{
                     studios: [
-                      { id: instanceId ? `${studioId}:${instanceId}` : String(studioId), name: studio?.name || "Unknown Studio" },
+                      { id: makeCompositeKey(studioId, instanceId), name: studio?.name || "Unknown Studio" },
                     ] }}
                   title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
                   fromPageTitle={studio?.name || "Studio"}
@@ -278,7 +279,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       studios: {
-                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
+                        value: [makeCompositeKey(studioId, instanceId)],
                         modifier: "INCLUDES",
                         ...(includeSubStudios && { depth: -1 }) } } }}
                   hideLockedFilters
@@ -300,7 +301,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       studios: {
-                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
+                        value: [makeCompositeKey(studioId, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No performers found for ${studio?.name}`}
@@ -312,7 +313,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       studios: {
-                        value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
+                        value: [makeCompositeKey(studioId, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${studio?.name}`}
@@ -669,7 +670,7 @@ const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false
         filter: { page, per_page: perPage },
         image_filter: {
           studios: {
-            value: [instanceId ? `${studioId}:${instanceId}` : String(studioId)],
+            value: [makeCompositeKey(studioId, instanceId)],
             modifier: "INCLUDES",
             ...(includeSubStudios && { depth: -1 }),
           },

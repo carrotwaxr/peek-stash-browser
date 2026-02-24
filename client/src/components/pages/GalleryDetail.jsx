@@ -8,6 +8,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
@@ -425,12 +426,12 @@ const GalleryDetail = () => {
                   context="gallery_scenes"
                   permanentFilters={{
                     galleries: {
-                      value: [instanceId ? `${galleryId}:${instanceId}` : String(galleryId)],
+                      value: [makeCompositeKey(galleryId, instanceId)],
                       modifier: "INCLUDES"
                     }
                   }}
                   permanentFiltersMetadata={{
-                    galleries: [{ id: instanceId ? `${galleryId}:${instanceId}` : String(galleryId), title: galleryTitle(gallery) }]
+                    galleries: [{ id: makeCompositeKey(galleryId, instanceId), title: galleryTitle(gallery) }]
                   }}
                   title={`Scenes in ${galleryTitle(gallery)}`}
                   fromPageTitle={galleryTitle(gallery) || "Gallery"}
