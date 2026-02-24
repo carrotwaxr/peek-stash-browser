@@ -5,6 +5,7 @@
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
+  GroupRef,
   NormalizedGallery,
   NormalizedGroup,
   NormalizedPerformer,
@@ -408,14 +409,15 @@ export function createMockScenes(
     const sceneGroups = [];
     for (let j = 0; j < groupCount && j < groups.length; j++) {
       const g = groups[(i + j) % groups.length];
-      sceneGroups.push({
+      const groupWithIndex: GroupRef & { scene_index: number } = {
         id: g.id,
         instanceId: g.instanceId,
         name: g.name,
         front_image_path: g.front_image_path,
         back_image_path: g.back_image_path,
         scene_index: j,
-      } as any);
+      };
+      sceneGroups.push(groupWithIndex);
     }
 
     scenes.push(

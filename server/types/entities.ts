@@ -7,6 +7,8 @@
  * casts.
  *
  * A copy of these types lives in shared/types/entities.ts for client use.
+ * Note: These are defined here (not re-exported from shared/) because
+ * TypeScript's rootDir constraint prevents importing from outside server/.
  *
  * Design:
  * - Fields present in both QueryBuilder AND StashEntityService output → required
@@ -249,6 +251,7 @@ export interface NormalizedTag {
   updated_at: string | null;
 
   // User activity fields
+  // rating and rating100 are both present for API backward compatibility
   rating: number | null;
   rating100: number | null;
   o_counter: number;
