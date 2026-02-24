@@ -151,6 +151,169 @@ describe("ExclusionComputationService", () => {
       // once for the first recompute, once for the second
       expect(computeCount).toBeGreaterThanOrEqual(2);
     });
+
+    it("should coalesce 3+ concurrent callers to at most 2 recomputes", async () => {
+      // When N callers arrive concurrently for the same user, the coalescing
+      // mechanism should ensure at most 2 recomputes happen: the currently-
+      // running one plus one queued recompute that picks up all pending changes.
+      let computeCount = 0;
+      let resolveFirst: () => void;
+      const firstBlocker = new Promise<void>((resolve) => {
+        resolveFirst = resolve;
+      });
+
+      // Mock the full computation pipeline
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.stashScene.count.mockResolvedValue(0);
+      mockPrisma.stashPerformer.count.mockResolvedValue(0);
+      mockPrisma.stashStudio.count.mockResolvedValue(0);
+      mockPrisma.stashTag.count.mockResolvedValue(0);
+      mockPrisma.stashGroup.count.mockResolvedValue(0);
+      mockPrisma.stashGallery.count.mockResolvedValue(0);
+      mockPrisma.stashImage.count.mockResolvedValue(0);
+      mockPrisma.stashClip.count.mockResolvedValue(0);
+
+      // Block the first transaction to simulate a slow recompute
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        computeCount++;
+        if (computeCount === 1) {
+          await firstBlocker;
+        }
+        return callback(mockPrisma);
+      });
+
+      // Start first recompute (will block in transaction)
+      const first = exclusionComputationService.recomputeForUser(2);
+
+      // Wait a tick to ensure first recompute has started
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Start 4 more concurrent recomputes while first is running
+      const second = exclusionComputationService.recomputeForUser(2);
+      const third = exclusionComputationService.recomputeForUser(2);
+      const fourth = exclusionComputationService.recomputeForUser(2);
+      const fifth = exclusionComputationService.recomputeForUser(2);
+
+      // Unblock the first recompute
+      resolveFirst!();
+
+      // Wait for all to complete
+      await Promise.all([first, second, third, fourth, fifth]);
+
+      // With coalescing: at most 2 recomputes (the running one + one queued)
+      // Without coalescing: would be 5 (each caller starts its own)
+      expect(computeCount).toBe(2);
+    });
+
+    it("should ensure the second recompute runs after the first completes", async () => {
+      // The queued recompute must run after the first finishes, ensuring
+      // it picks up the latest state (e.g., new restrictions saved mid-recompute).
+      const executionOrder: string[] = [];
+      let resolveFirst: () => void;
+      const firstBlocker = new Promise<void>((resolve) => {
+        resolveFirst = resolve;
+      });
+      let computeCount = 0;
+
+      // Mock the full computation pipeline
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.stashScene.count.mockResolvedValue(0);
+      mockPrisma.stashPerformer.count.mockResolvedValue(0);
+      mockPrisma.stashStudio.count.mockResolvedValue(0);
+      mockPrisma.stashTag.count.mockResolvedValue(0);
+      mockPrisma.stashGroup.count.mockResolvedValue(0);
+      mockPrisma.stashGallery.count.mockResolvedValue(0);
+      mockPrisma.stashImage.count.mockResolvedValue(0);
+      mockPrisma.stashClip.count.mockResolvedValue(0);
+
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        computeCount++;
+        const currentRun = computeCount;
+        executionOrder.push(`start-${currentRun}`);
+        if (currentRun === 1) {
+          await firstBlocker;
+        }
+        const result = await callback(mockPrisma);
+        executionOrder.push(`end-${currentRun}`);
+        return result;
+      });
+
+      // Start first recompute (will block)
+      const first = exclusionComputationService.recomputeForUser(3);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Start second while first is running
+      const second = exclusionComputationService.recomputeForUser(3);
+
+      // Unblock the first
+      resolveFirst!();
+
+      await Promise.all([first, second]);
+
+      // Verify sequencing: first must complete before second starts
+      expect(executionOrder).toEqual(["start-1", "end-1", "start-2", "end-2"]);
+    });
+
+    it("should allow independent recomputes for different users", async () => {
+      // Coalescing should only apply per-user; different users should
+      // recompute independently and concurrently.
+      let user1Count = 0;
+      let user2Count = 0;
+
+      // Mock the full computation pipeline
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+      mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+      mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.stashScene.count.mockResolvedValue(0);
+      mockPrisma.stashPerformer.count.mockResolvedValue(0);
+      mockPrisma.stashStudio.count.mockResolvedValue(0);
+      mockPrisma.stashTag.count.mockResolvedValue(0);
+      mockPrisma.stashGroup.count.mockResolvedValue(0);
+      mockPrisma.stashGallery.count.mockResolvedValue(0);
+      mockPrisma.stashImage.count.mockResolvedValue(0);
+      mockPrisma.stashClip.count.mockResolvedValue(0);
+
+      // Track per-user invocations via userContentRestriction.findMany calls
+      mockPrisma.userContentRestriction.findMany.mockImplementation(
+        async (args: any) => {
+          if (args?.where?.userId === 10) user1Count++;
+          if (args?.where?.userId === 11) user2Count++;
+          return [];
+        }
+      );
+
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        return callback(mockPrisma);
+      });
+
+      await Promise.all([
+        exclusionComputationService.recomputeForUser(10),
+        exclusionComputationService.recomputeForUser(11),
+      ]);
+
+      // Each user should get exactly 1 recompute
+      expect(user1Count).toBe(1);
+      expect(user2Count).toBe(1);
+    });
   });
 
   describe("recomputeAllUsers", () => {
