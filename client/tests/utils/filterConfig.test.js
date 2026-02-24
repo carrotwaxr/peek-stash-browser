@@ -9,6 +9,7 @@ import {
   buildSceneFilter,
   buildGalleryFilter,
   buildImageFilter,
+  buildPerformerFilter,
   _buildPerformerFilter,
   _buildStudioFilter,
   _buildTagFilter,
@@ -697,6 +698,271 @@ describe("buildImageFilter", () => {
         value: ["perf1"],
         modifier: "INCLUDES",
       });
+    });
+  });
+});
+
+describe("buildPerformerFilter", () => {
+  describe("Range Filters - age", () => {
+    it("should build age filter with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({ age: { min: 20, max: 30 } });
+      expect(result.age).toEqual({
+        modifier: "BETWEEN",
+        value: 20,
+        value2: 30,
+      });
+    });
+
+    it("should build age filter with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ age: { min: 25 } });
+      expect(result.age).toEqual({
+        modifier: "GREATER_THAN",
+        value: 24, // min - 1
+      });
+    });
+
+    it("should build age filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ age: { max: 30 } });
+      expect(result.age).toEqual({
+        modifier: "LESS_THAN",
+        value: 31, // max + 1
+      });
+    });
+  });
+
+  describe("Range Filters - birthYear", () => {
+    it("should build birth_year filter with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({
+        birthYear: { min: 1990, max: 2000 },
+      });
+      expect(result.birth_year).toEqual({
+        modifier: "BETWEEN",
+        value: 1990,
+        value2: 2000,
+      });
+    });
+
+    it("should build birth_year filter with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ birthYear: { min: 1990 } });
+      expect(result.birth_year).toEqual({
+        modifier: "GREATER_THAN",
+        value: 1989,
+      });
+    });
+
+    it("should build birth_year filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ birthYear: { max: 2000 } });
+      expect(result.birth_year).toEqual({
+        modifier: "LESS_THAN",
+        value: 2001,
+      });
+    });
+  });
+
+  describe("Range Filters - deathYear", () => {
+    it("should build death_year filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ deathYear: { max: 2020 } });
+      expect(result.death_year).toEqual({
+        modifier: "LESS_THAN",
+        value: 2021,
+      });
+    });
+
+    it("should build death_year filter with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ deathYear: { min: 2010 } });
+      expect(result.death_year).toEqual({
+        modifier: "GREATER_THAN",
+        value: 2009,
+      });
+    });
+  });
+
+  describe("Range Filters - careerLength", () => {
+    it("should build career_length filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ careerLength: { max: 15 } });
+      expect(result.career_length).toEqual({
+        modifier: "LESS_THAN",
+        value: 16,
+      });
+    });
+
+    it("should build career_length filter with BETWEEN when both provided", () => {
+      const result = buildPerformerFilter({
+        careerLength: { min: 5, max: 15 },
+      });
+      expect(result.career_length).toEqual({
+        modifier: "BETWEEN",
+        value: 5,
+        value2: 15,
+      });
+    });
+  });
+
+  describe("Range Filters - height (uses convertedFilters)", () => {
+    it("should build height filter with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({ height: { min: 160, max: 180 } });
+      expect(result.height).toEqual({
+        modifier: "BETWEEN",
+        value: 160,
+        value2: 180,
+      });
+    });
+
+    it("should build height filter with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ height: { min: 170 } });
+      expect(result.height).toEqual({
+        modifier: "GREATER_THAN",
+        value: 169,
+      });
+    });
+
+    it("should build height filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ height: { max: 180 } });
+      expect(result.height).toEqual({
+        modifier: "LESS_THAN",
+        value: 181,
+      });
+    });
+  });
+
+  describe("Range Filters - weight (uses convertedFilters)", () => {
+    it("should build weight filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ weight: { max: 80 } });
+      expect(result.weight).toEqual({
+        modifier: "LESS_THAN",
+        value: 81,
+      });
+    });
+
+    it("should build weight filter with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ weight: { min: 60 } });
+      expect(result.weight).toEqual({
+        modifier: "GREATER_THAN",
+        value: 59,
+      });
+    });
+  });
+
+  describe("Range Filters - penisLength (uses convertedFilters)", () => {
+    it("should build penis_length filter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ penisLength: { max: 20 } });
+      expect(result.penis_length).toEqual({
+        modifier: "LESS_THAN",
+        value: 21,
+      });
+    });
+
+    it("should build penis_length filter with BETWEEN when both provided", () => {
+      const result = buildPerformerFilter({
+        penisLength: { min: 10, max: 20 },
+      });
+      expect(result.penis_length).toEqual({
+        modifier: "BETWEEN",
+        value: 10,
+        value2: 20,
+      });
+    });
+  });
+
+  describe("Range Filters - rating100 (conditional assignment pattern)", () => {
+    it("should build rating100 with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({ rating: { min: 40, max: 80 } });
+      expect(result.rating100).toEqual({
+        modifier: "BETWEEN",
+        value: 40,
+        value2: 80,
+      });
+    });
+
+    it("should build rating100 with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ rating: { min: 60 } });
+      expect(result.rating100).toEqual({
+        modifier: "GREATER_THAN",
+        value: 59,
+      });
+    });
+
+    it("should build rating100 with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ rating: { max: 80 } });
+      expect(result.rating100).toEqual({
+        modifier: "LESS_THAN",
+        value: 81,
+      });
+    });
+  });
+
+  describe("Range Filters - o_counter (conditional assignment pattern)", () => {
+    it("should build o_counter with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({ oCounter: { min: 1, max: 10 } });
+      expect(result.o_counter).toEqual({
+        modifier: "BETWEEN",
+        value: 1,
+        value2: 10,
+      });
+    });
+
+    it("should build o_counter with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ oCounter: { max: 5 } });
+      expect(result.o_counter).toEqual({
+        modifier: "LESS_THAN",
+        value: 6,
+      });
+    });
+  });
+
+  describe("Range Filters - play_count (conditional assignment pattern)", () => {
+    it("should build play_count with GREATER_THAN when only min provided", () => {
+      const result = buildPerformerFilter({ playCount: { min: 10 } });
+      expect(result.play_count).toEqual({
+        modifier: "GREATER_THAN",
+        value: 9,
+      });
+    });
+
+    it("should build play_count with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ playCount: { max: 20 } });
+      expect(result.play_count).toEqual({
+        modifier: "LESS_THAN",
+        value: 21,
+      });
+    });
+  });
+
+  describe("Range Filters - scene_count (conditional assignment pattern)", () => {
+    it("should build scene_count with BETWEEN when both min and max provided", () => {
+      const result = buildPerformerFilter({
+        sceneCount: { min: 5, max: 50 },
+      });
+      expect(result.scene_count).toEqual({
+        modifier: "BETWEEN",
+        value: 5,
+        value2: 50,
+      });
+    });
+
+    it("should build scene_count with LESS_THAN when only max provided", () => {
+      const result = buildPerformerFilter({ sceneCount: { max: 25 } });
+      expect(result.scene_count).toEqual({
+        modifier: "LESS_THAN",
+        value: 26,
+      });
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("should return empty object when no filters provided", () => {
+      const result = buildPerformerFilter({});
+      expect(result).toEqual({});
+    });
+
+    it("should not include age filter when age object is empty", () => {
+      const result = buildPerformerFilter({ age: {} });
+      expect(result.age).toBeUndefined();
+    });
+
+    it("should not include height filter when height object is empty", () => {
+      const result = buildPerformerFilter({ height: {} });
+      expect(result.height).toBeUndefined();
     });
   });
 });

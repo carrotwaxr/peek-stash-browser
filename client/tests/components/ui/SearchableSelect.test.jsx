@@ -6,7 +6,7 @@
  * passes instance_id in the entity-specific filter to avoid ambiguous
  * lookups on multi-instance setups.
  */
-import { render, waitFor } from "@testing-library/react";
+import { render, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- Hoisted mocks (available before vi.mock factory runs) ---
@@ -17,12 +17,22 @@ const {
   mockFindStudios,
   mockFindGroups,
   mockFindGalleries,
+  mockFindTagsMinimal,
+  mockFindPerformersMinimal,
+  mockFindStudiosMinimal,
+  mockFindGroupsMinimal,
+  mockFindGalleriesMinimal,
 } = vi.hoisted(() => ({
   mockFindTags: vi.fn(),
   mockFindPerformers: vi.fn(),
   mockFindStudios: vi.fn(),
   mockFindGroups: vi.fn(),
   mockFindGalleries: vi.fn(),
+  mockFindTagsMinimal: vi.fn().mockResolvedValue([]),
+  mockFindPerformersMinimal: vi.fn().mockResolvedValue([]),
+  mockFindStudiosMinimal: vi.fn().mockResolvedValue([]),
+  mockFindGroupsMinimal: vi.fn().mockResolvedValue([]),
+  mockFindGalleriesMinimal: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock filterCache so localStorage is never hit
@@ -39,15 +49,15 @@ vi.mock("../../../src/hooks/useDebounce.js", () => ({
 vi.mock("../../../src/services/api.js", () => ({
   libraryApi: {
     findTags: mockFindTags,
-    findTagsMinimal: vi.fn().mockResolvedValue([]),
+    findTagsMinimal: mockFindTagsMinimal,
     findPerformers: mockFindPerformers,
-    findPerformersMinimal: vi.fn().mockResolvedValue([]),
+    findPerformersMinimal: mockFindPerformersMinimal,
     findStudios: mockFindStudios,
-    findStudiosMinimal: vi.fn().mockResolvedValue([]),
+    findStudiosMinimal: mockFindStudiosMinimal,
     findGroups: mockFindGroups,
-    findGroupsMinimal: vi.fn().mockResolvedValue([]),
+    findGroupsMinimal: mockFindGroupsMinimal,
     findGalleries: mockFindGalleries,
-    findGalleriesMinimal: vi.fn().mockResolvedValue([]),
+    findGalleriesMinimal: mockFindGalleriesMinimal,
   },
 }));
 
@@ -420,7 +430,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
     consoleSpy.mockRestore();
   });
 
-  it("returns empty array for unsupported entity type", async () => {
+  it("returns empty array for unsupported entity type in fetchItemsByIds", async () => {
     render(
       <SearchableSelect
         entityType="unsupported"
@@ -436,5 +446,64 @@ describe("SearchableSelect fetchItemsByIds", () => {
       expect(mockFindPerformers).not.toHaveBeenCalled();
       expect(mockFindStudios).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("SearchableSelect loadOptions guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset minimal mocks to resolve empty
+    mockFindTagsMinimal.mockResolvedValue([]);
+    mockFindPerformersMinimal.mockResolvedValue([]);
+    mockFindStudiosMinimal.mockResolvedValue([]);
+    mockFindGroupsMinimal.mockResolvedValue([]);
+    mockFindGalleriesMinimal.mockResolvedValue([]);
+    // Reset find mocks for fetchItemsByIds
+    mockFindTags.mockResolvedValue({ findTags: { tags: [] } });
+    mockFindPerformers.mockResolvedValue({
+      findPerformers: { performers: [] },
+    });
+    mockFindStudios.mockResolvedValue({ findStudios: { studios: [] } });
+    mockFindGroups.mockResolvedValue({ findGroups: { groups: [] } });
+    mockFindGalleries.mockResolvedValue({
+      findGalleries: { galleries: [] },
+    });
+  });
+
+  it("does not throw and returns empty results for unsupported entity type", async () => {
+    const consoleSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    const { container } = render(
+      <SearchableSelect
+        entityType="unsupported"
+        value={[]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    // Open the dropdown to trigger loadOptions
+    const trigger = container.querySelector("[class*='cursor-pointer']");
+    fireEvent.click(trigger);
+
+    // Wait for component to settle - loadOptions should bail out gracefully
+    await waitFor(() => {
+      // Should show "No unsupported found" (the empty state message)
+      expect(container.textContent).toContain("No unsupported found");
+    });
+
+    // None of the minimal API methods should have been called
+    expect(mockFindTagsMinimal).not.toHaveBeenCalled();
+    expect(mockFindPerformersMinimal).not.toHaveBeenCalled();
+    expect(mockFindStudiosMinimal).not.toHaveBeenCalled();
+    expect(mockFindGroupsMinimal).not.toHaveBeenCalled();
+    expect(mockFindGalleriesMinimal).not.toHaveBeenCalled();
+
+    // Should not have logged any errors (guard returns early, not throws)
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

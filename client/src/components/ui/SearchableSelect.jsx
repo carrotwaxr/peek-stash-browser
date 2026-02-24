@@ -242,6 +242,11 @@ const SearchableSelect = ({
 
         // Fetch from API
         const apiMethod = apiMethods[entityType];
+        if (!apiMethod) {
+          setOptions([]);
+          setLoading(false);
+          return;
+        }
         const filter = {
           per_page: 50,
           sort: "name",
