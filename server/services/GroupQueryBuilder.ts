@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface GroupQueryOptions {
@@ -145,7 +145,9 @@ class GroupQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    let ids = filter.value;
+    // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
+    const { parsed } = parseCompositeFilterValues(filter.value);
+    let ids = parsed.map(p => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -298,7 +300,9 @@ class GroupQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    let ids = filter.value;
+    // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
+    const { parsed } = parseCompositeFilterValues(filter.value);
+    let ids = parsed.map(p => p.id);
     const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0

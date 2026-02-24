@@ -73,8 +73,15 @@ const AddToPlaylistButton = ({
   const loadPlaylists = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/playlists");
-      setPlaylists(response.data.playlists || []);
+      const [ownResult, sharedResult] = await Promise.allSettled([
+        api.get("/playlists"),
+        api.get("/playlists/shared"),
+      ]);
+      const own = (ownResult.status === "fulfilled" ? ownResult.value.data.playlists || [] : [])
+        .map((p) => ({ ...p, isShared: false }));
+      const shared = (sharedResult.status === "fulfilled" ? sharedResult.value.data.playlists || [] : [])
+        .map((p) => ({ ...p, isShared: true }));
+      setPlaylists([...own, ...shared]);
     } catch {
       // Error loading playlists - will show in UI
     } finally {
@@ -257,7 +264,7 @@ const AddToPlaylistButton = ({
                     .filter((playlist) => !excludePlaylistIds.includes(playlist.id))
                     .map((playlist) => (
                       <Button
-                        key={playlist.id}
+                        key={`${playlist.id}-${playlist.isShared ? "shared" : "own"}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           addToPlaylist(playlist.id);
@@ -275,12 +282,26 @@ const AddToPlaylistButton = ({
                           e.target.style.backgroundColor = "transparent";
                         }}
                       >
-                        <div>{playlist.name}</div>
+                        <div className="flex items-center gap-1.5">
+                          {playlist.name}
+                          {playlist.isShared && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full"
+                              style={{
+                                backgroundColor: "var(--accent-color)",
+                                color: "var(--bg-primary)",
+                                opacity: 0.8,
+                              }}
+                            >
+                              shared
+                            </span>
+                          )}
+                        </div>
                         <div
                           className="text-xs"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          {playlist._count?.items || 0} videos
+                          {playlist._count?.items ?? playlist.sceneCount ?? 0} videos
                         </div>
                       </Button>
                     ))

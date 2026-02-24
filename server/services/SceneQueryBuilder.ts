@@ -9,7 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter } from "../utils/sqlFilterBuilders.js";
+import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface SceneQueryOptions {
@@ -727,7 +727,10 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    let ids = filter.value;
+    // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
+    // but StashScene.studioId stores bare IDs
+    const { parsed } = parseCompositeFilterValues(filter.value);
+    let ids = parsed.map(p => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -769,7 +772,10 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    let ids = filter.value;
+    // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
+    // but SceneTag.tagId and inheritedTagIds store bare IDs
+    const { parsed } = parseCompositeFilterValues(filter.value);
+    let ids = parsed.map(p => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0

@@ -35,6 +35,7 @@ import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { OrientationEnum } from "../../graphql/generated/graphql.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
+import { parseCompositeFilterValues } from "../../utils/sqlFilterBuilders.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { logger } from "../../utils/logger.js";
 import { SeededRandom, parseRandomSort, generateDailySeed } from "../../utils/seededRandom.js";
@@ -219,11 +220,13 @@ export async function applyQuickSceneFilters(
 
   // Filter by performers
   if (filters.performers) {
-    const { value: performerIds, modifier } = filters.performers;
-    if (!performerIds || performerIds.length === 0) return filtered;
+    const { value: rawPerformerIds, modifier } = filters.performers;
+    if (!rawPerformerIds || rawPerformerIds.length === 0) return filtered;
+    // Strip composite keys ("42:instance-1" -> "42") since UI sends composite format
+    const { parsed: parsedPerformers } = parseCompositeFilterValues(rawPerformerIds.map((id) => String(id)));
     filtered = filtered.filter((s) => {
       const scenePerformerIds = (s.performers || []).map((p) => String(p.id));
-      const filterPerformerIds = performerIds.map((id) => String(id));
+      const filterPerformerIds = parsedPerformers.map((p) => p.id);
       if (modifier === "INCLUDES") {
         return filterPerformerIds.some((id: string) =>
           scenePerformerIds.includes(id)
@@ -246,13 +249,17 @@ export async function applyQuickSceneFilters(
   // Filter by tags (squashed: scene + performers + studio tags)
   // Supports hierarchical filtering via depth parameter
   if (filters.tags) {
-    const { value: tagIds, modifier, depth } = filters.tags;
-    if (!tagIds || tagIds.length === 0) return filtered;
+    const { value: rawTagIds, modifier, depth } = filters.tags;
+    if (!rawTagIds || rawTagIds.length === 0) return filtered;
+
+    // Strip composite keys ("284:instance-1" -> "284") since UI sends composite format
+    const { parsed } = parseCompositeFilterValues(rawTagIds.map((id) => String(id)));
+    const tagIds = parsed.map(p => p.id);
 
     // Expand tag IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
     const expandedTagIds = await expandTagIds(
-      tagIds.map((id) => String(id)),
+      tagIds,
       depth ?? 0
     );
 
@@ -303,14 +310,18 @@ export async function applyQuickSceneFilters(
   // Filter by studios
   // Supports hierarchical filtering via depth parameter
   if (filters.studios) {
-    const { value: studioIds, modifier, depth } = filters.studios;
-    if (!studioIds || studioIds.length === 0) return filtered;
+    const { value: rawStudioIds, modifier, depth } = filters.studios;
+    if (!rawStudioIds || rawStudioIds.length === 0) return filtered;
+
+    // Strip composite keys ("5:instance-1" -> "5") since UI sends composite format
+    const { parsed: parsedStudios } = parseCompositeFilterValues(rawStudioIds.map((id) => String(id)));
+    const studioIds = parsedStudios.map(p => p.id);
 
     // Expand studio IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
     const expandedStudioIds = new Set(
       await expandStudioIds(
-        studioIds.map((id) => String(id)),
+        studioIds,
         depth ?? 0
       )
     );
@@ -330,15 +341,17 @@ export async function applyQuickSceneFilters(
 
   // Filter by groups
   if (filters.groups) {
-    const { value: groupIds, modifier } = filters.groups;
-    if (!groupIds || groupIds.length === 0) return filtered;
+    const { value: rawGroupIds, modifier } = filters.groups;
+    if (!rawGroupIds || rawGroupIds.length === 0) return filtered;
 
+    // Strip composite keys ("7:instance-1" -> "7") since UI sends composite format
+    const { parsed: parsedGroups } = parseCompositeFilterValues(rawGroupIds.map((id) => String(id)));
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
       // NOT nested: { group: { id, name }, scene_index }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
       const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
-      const filterGroupIds = groupIds.map((id) => String(id));
+      const filterGroupIds = parsedGroups.map((p) => p.id);
       if (modifier === "INCLUDES") {
         return filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }

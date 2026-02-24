@@ -48,7 +48,7 @@ const ServerStatsSection = () => {
     try {
       setReprobingClips(true);
       setReprobeResult(null);
-      const response = await api.post("/sync/reprobe-clips");
+      const response = await api.post("/sync/reprobe-clips", {});
       setReprobeResult({
         success: true,
         checked: response.data.checked,
