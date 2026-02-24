@@ -837,14 +837,14 @@ class GroupQueryBuilder {
     // Populate groups using composite keys
     for (const group of groups) {
       const groupKey = `${group.id}:${group.instanceId}`;
-      group.tags = (tagsByGroup.get(groupKey) || []) as unknown as NormalizedGroup["tags"];
+      group.tags = tagsByGroup.get(groupKey) || [];
 
       // Hydrate studio with tooltip data (id, name, image_path) using composite key
       if (group.studio?.id) {
         const studioKey = `${group.studio.id}:${group.instanceId}`;
         const studioData = studiosByKey.get(studioKey);
         if (studioData) {
-          (group as unknown as { studio: typeof studioData }).studio = studioData;
+          group.studio = studioData;
         }
       }
 
@@ -859,8 +859,8 @@ class GroupQueryBuilder {
         for (const galleryKey of galleriesByScene.get(sceneKey) || []) groupGalleryKeys.add(galleryKey);
       }
 
-      (group as unknown as { performers: PerformerRef[] }).performers = [...groupPerformerKeys].map((key) => performersByKey.get(key)).filter((p): p is PerformerRef => !!p);
-      (group as unknown as { galleries: GalleryRef[] }).galleries = [...groupGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
+      group.performers = [...groupPerformerKeys].map((key) => performersByKey.get(key)).filter((p): p is PerformerRef => !!p);
+      group.galleries = [...groupGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
     }
   }
 

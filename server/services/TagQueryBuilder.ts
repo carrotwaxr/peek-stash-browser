@@ -709,7 +709,7 @@ class TagQueryBuilder {
     for (const tag of tags) {
       if (tag.parents && Array.isArray(tag.parents)) {
         const tagInstanceId = tag.instanceId;
-        (tag as unknown as Record<string, unknown>).parents = tag.parents.map((p) => ({
+        tag.parents = tag.parents.map((p) => ({
           id: p.id,
           name: parentNameMap.get(`${p.id}:${tagInstanceId}`) || "Unknown",
         }));
@@ -850,11 +850,10 @@ class TagQueryBuilder {
     for (const tag of tags) {
       const tagInstanceId = tag.instanceId;
       const tagKey = `${tag.id}:${tagInstanceId}`;
-      const tagRecord = tag as unknown as Record<string, unknown>;
-      tagRecord.performers = performersByTag.get(tagKey) || [];
-      tagRecord.studios = studiosByTag.get(tagKey) || [];
-      tagRecord.groups = groupsByTag.get(tagKey) || [];
-      tagRecord.galleries = galleriesByTag.get(tagKey) || [];
+      tag.performers = performersByTag.get(tagKey) || [];
+      tag.studios = studiosByTag.get(tagKey) || [];
+      tag.groups = groupsByTag.get(tagKey) || [];
+      tag.galleries = galleriesByTag.get(tagKey) || [];
     }
   }
 

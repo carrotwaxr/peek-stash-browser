@@ -4,7 +4,7 @@
  * Builds parameterized SQL queries for studio filtering, sorting, and pagination.
  * Eliminates the need to load all studios into memory.
  */
-import type { PeekStudioFilter, NormalizedStudio, TagRef } from "../types/index.js";
+import type { PeekStudioFilter, NormalizedStudio, TagRef, PerformerRef, GroupRef, GalleryRef } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
@@ -650,13 +650,10 @@ class StudioQueryBuilder {
     // Populate studios using composite keys
     for (const studio of studios) {
       const studioKey = `${studio.id}:${studio.instanceId}`;
-      studio.tags = (tagsByStudio.get(studioKey) || []) as unknown as NormalizedStudio["tags"];
-      const performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter(Boolean);
-      (studio as unknown as { performers: typeof performers }).performers = performers;
-      const groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter(Boolean);
-      (studio as unknown as { groups: typeof groups }).groups = groups;
-      const studioGalleryList = [...(galleriesByStudio.get(studioKey) || [])].map((key) => galleriesById.get(key)).filter(Boolean);
-      (studio as unknown as { galleries: typeof studioGalleryList }).galleries = studioGalleryList;
+      studio.tags = tagsByStudio.get(studioKey) || [];
+      studio.performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter((p): p is PerformerRef => !!p);
+      studio.groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter((g): g is GroupRef => !!g);
+      studio.galleries = [...(galleriesByStudio.get(studioKey) || [])].map((key) => galleriesById.get(key)).filter((g): g is GalleryRef => !!g);
     }
   }
 

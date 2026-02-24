@@ -484,8 +484,8 @@ export const findStudiosMinimal = async (
 
     // Sort
     studios.sort((a, b) => {
-      const aValue = (a as Record<string, unknown>)[sortField] || "";
-      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const aValue = (a as unknown as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as unknown as Record<string, unknown>)[sortField] || "";
       const comparison =
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
@@ -551,7 +551,7 @@ export const updateStudio = async (
       return res.status(500).json({ error: "Studio update returned null" });
     }
 
-    res.json({ success: true, studio: updatedStudio.studioUpdate as NormalizedStudio });
+    res.json({ success: true, studio: updatedStudio.studioUpdate as unknown as NormalizedStudio });
   } catch (error) {
     console.error("Error updating studio:", error);
     res.status(500).json({ error: "Failed to update studio" });

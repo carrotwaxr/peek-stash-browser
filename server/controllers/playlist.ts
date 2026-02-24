@@ -1,4 +1,3 @@
-import type { Scene } from "../graphql/types.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { getEntityInstanceId, getEntityInstanceIds } from "../utils/entityInstanceId.js";
@@ -111,7 +110,7 @@ export const getUserPlaylists = async (
 
           // 3. Transform scenes to add proxy URLs
           const transformedScenes = visibleScenes.map((s) =>
-            transformScene(s as unknown as Scene)
+            transformScene(s)
           );
 
           // Create a map of scene ID to scene data
@@ -228,7 +227,7 @@ export const getSharedPlaylists = async (
 
             // Transform scenes to add proxy URLs
             const transformedScenes = visibleScenes.map((s) =>
-              transformScene(s as unknown as Scene)
+              transformScene(s)
             );
 
             // Create a map of scene ID to scene data
@@ -345,7 +344,7 @@ export const getPlaylist = async (
 
         // 5. Transform paths for proxy URLs
         const transformedScenes = scenesWithUserHistory.map((s) =>
-          transformScene(s as unknown as Scene)
+          transformScene(s)
         );
 
         // Create a map of scene ID to scene data

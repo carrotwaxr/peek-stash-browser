@@ -1554,17 +1554,14 @@ class SceneQueryBuilder {
     for (const scene of scenes) {
       const normalizedSceneInstanceId = normalizeInstanceId(scene.instanceId);
       const sceneKey = `${scene.id}:${normalizedSceneInstanceId}`;
-      // Relations are populated with lightweight refs (PerformerRef etc.), not full GraphQL types.
-      // NormalizedScene inherits Performer[]/Tag[]/etc. from Scene, but QueryBuilder intentionally
-      // populates only the fields needed by the API response.
-      scene.performers = (performersByScene.get(sceneKey) || []) as unknown as NormalizedScene["performers"];
-      scene.tags = (tagsByScene.get(sceneKey) || []) as unknown as NormalizedScene["tags"];
-      scene.groups = (groupsByScene.get(sceneKey) || []) as unknown as NormalizedScene["groups"];
-      scene.galleries = (galleriesByScene.get(sceneKey) || []) as unknown as NormalizedScene["galleries"];
+      scene.performers = performersByScene.get(sceneKey) || [];
+      scene.tags = tagsByScene.get(sceneKey) || [];
+      scene.groups = groupsByScene.get(sceneKey) || [];
+      scene.galleries = galleriesByScene.get(sceneKey) || [];
       const studioId = (scene as unknown as { studioId: string | null }).studioId;
       if (studioId) {
         const studioKey = `${studioId}:${normalizedSceneInstanceId}`;
-        scene.studio = (studiosByKey.get(studioKey) || null) as unknown as NormalizedScene["studio"];
+        scene.studio = studiosByKey.get(studioKey) || null;
       }
 
       // Hydrate inherited tags with full tag objects

@@ -31,8 +31,7 @@ import {
   type SceneRatingInput,
   type EntityRankingData,
 } from "../../services/RecommendationScoringService.js";
-import type { NormalizedScene, PeekSceneFilter, WithInstanceId } from "../../types/index.js";
-import type { Performer, Studio, Tag } from "../../graphql/types.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { OrientationEnum } from "../../graphql/generated/graphql.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
@@ -148,8 +147,7 @@ export async function mergeScenesWithUserData(
 
     // Update favorite status for nested performers
     if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
-      const performers = mergedScene.performers as WithInstanceId<Performer>[];
-      mergedScene.performers = performers.map((p) => ({
+      mergedScene.performers = mergedScene.performers.map((p) => ({
         ...p,
         favorite: performerFavorites.has(`${p.id}${KEY_SEP}${p.instanceId || ""}`),
       }));
@@ -157,17 +155,15 @@ export async function mergeScenesWithUserData(
 
     // Update favorite status for studio
     if (mergedScene.studio) {
-      const studio = mergedScene.studio as WithInstanceId<Studio>;
       mergedScene.studio = {
         ...mergedScene.studio,
-        favorite: studioFavorites.has(`${studio.id}${KEY_SEP}${studio.instanceId || ""}`),
+        favorite: studioFavorites.has(`${mergedScene.studio.id}${KEY_SEP}${mergedScene.studio.instanceId || ""}`),
       };
     }
 
     // Update favorite status for nested tags
     if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
-      const tags = mergedScene.tags as WithInstanceId<Tag>[];
-      mergedScene.tags = tags.map((t) => ({
+      mergedScene.tags = mergedScene.tags.map((t) => ({
         ...t,
         favorite: tagFavorites.has(`${t.id}${KEY_SEP}${t.instanceId || ""}`),
       }));
@@ -874,7 +870,7 @@ function getFieldValue(
   if (field === "path") return scene.files?.[0]?.path || "";
 
   // Fallback for dynamic field access (safe as function is only called with known fields)
-  const value = (scene as Record<string, unknown>)[field];
+  const value = (scene as unknown as Record<string, unknown>)[field];
   return typeof value === "string" || typeof value === "number" ? value : 0;
 }
 

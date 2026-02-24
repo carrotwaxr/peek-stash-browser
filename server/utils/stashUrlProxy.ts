@@ -5,36 +5,28 @@
  * to the client. All Stash image/asset URLs are rewritten to go through Peek's
  * proxy endpoint.
  */
-import type {
-  Group,
-  Performer,
-  Scene,
-  Studio,
-  Tag,
-} from "../graphql/types.js";
 import { logger } from "./logger.js";
 
 /**
- * Nested tag with image path (used in performers, studios, scenes, etc.)
+ * Structural constraint for entities with image_path (performers, studios, tags).
+ * Accepts both Stash GraphQL types and standalone Normalized types.
  */
-interface NestedTagWithImage {
-  image_path?: string | null;
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type HasImagePath = { image_path?: string | null; tags?: any[]; [key: string]: any };
 
 /**
- * Nested performer (partial performer data)
+ * Structural constraint for scene-like objects.
+ * Accepts both Stash GraphQL Scene and standalone NormalizedScene.
  */
-interface NestedPerformer {
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SceneLike = { [key: string]: any };
 
 /**
- * Nested group (partial group data)
+ * Structural constraint for group-like objects.
+ * Accepts both Stash GraphQL Group and standalone NormalizedGroup.
  */
-interface NestedGroup {
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GroupLike = { [key: string]: any };
 
 /**
  * Convert Stash URLs to Peek proxy URLs to avoid exposing API keys
@@ -77,7 +69,7 @@ export const appendApiKeyToUrl = convertToProxyUrl;
  * Transform performer to add API key to image_path
  * Works with both full Performer objects and nested PerformerCompact/PerformerFull
  */
-export const transformPerformer = <T extends Partial<Performer>>(
+export const transformPerformer = <T extends HasImagePath>(
   performer: T
 ): T => {
   try {
@@ -90,12 +82,12 @@ export const transformPerformer = <T extends Partial<Performer>>(
 
     // Transform nested tags
     if (performer.tags && Array.isArray(performer.tags)) {
-      mutated.tags = performer.tags.map((t: NestedTagWithImage) => ({
+      mutated.tags = performer.tags.map((t: { image_path?: string | null; [key: string]: unknown }) => ({
         ...t,
         image_path: t.image_path
           ? appendApiKeyToUrl(t.image_path)
           : t.image_path,
-      })) as T["tags"];
+      }));
     }
 
     return mutated;
@@ -109,7 +101,7 @@ export const transformPerformer = <T extends Partial<Performer>>(
  * Transform studio to add API key to image_path
  * Works with both full Studio objects and nested StudioCompact/StudioFull
  */
-export const transformStudio = <T extends Partial<Studio>>(studio: T): T => {
+export const transformStudio = <T extends HasImagePath>(studio: T): T => {
   try {
     const mutated = {
       ...studio,
@@ -120,12 +112,12 @@ export const transformStudio = <T extends Partial<Studio>>(studio: T): T => {
 
     // Transform nested tags
     if (studio.tags && Array.isArray(studio.tags)) {
-      mutated.tags = studio.tags.map((t: NestedTagWithImage) => ({
+      mutated.tags = studio.tags.map((t: { image_path?: string | null; [key: string]: unknown }) => ({
         ...t,
         image_path: t.image_path
           ? appendApiKeyToUrl(t.image_path)
           : t.image_path,
-      })) as T["tags"];
+      }));
     }
 
     return mutated;
@@ -139,7 +131,7 @@ export const transformStudio = <T extends Partial<Studio>>(studio: T): T => {
  * Transform tag to add API key to image_path
  * Works with both full Tag objects and nested NestedTag
  */
-export const transformTag = <T extends Partial<Tag>>(tag: T): T => {
+export const transformTag = <T extends HasImagePath>(tag: T): T => {
   try {
     return {
       ...tag,
@@ -175,11 +167,10 @@ const stripApiKeyFromUrl = (url: string): string => {
  * Transform complete scene object to add API keys to all image/video URLs
  * Works with both full Scene objects and compact Scene variants
  */
-export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
+export const transformScene = <T extends SceneLike>(scene: T): T => {
   try {
-    const mutated = {
-      ...scene,
-    } as T;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mutated: any = { ...scene };
 
     // Transform paths object if present
     if (scene.paths) {
@@ -189,7 +180,7 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
           return acc;
         },
         {} as Record<string, string>
-      ) as T["paths"];
+      );
     }
 
     // Transform sceneStreams to strip API keys from URLs
@@ -204,40 +195,40 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
           ...stream,
           url: stripApiKeyFromUrl(stream.url),
         })
-      ) as T["sceneStreams"];
+      );
     }
 
     // Transform performers to add API key to image_path
     if (scene.performers && Array.isArray(scene.performers)) {
-      mutated.performers = scene.performers.map((p: NestedPerformer) =>
+      mutated.performers = scene.performers.map((p: HasImagePath) =>
         transformPerformer(p)
-      ) as T["performers"];
+      );
     }
 
     // Transform tags to add API key to image_path
     if (scene.tags && Array.isArray(scene.tags)) {
-      mutated.tags = scene.tags.map((t: NestedTagWithImage) =>
+      mutated.tags = scene.tags.map((t: { image_path?: string | null; [key: string]: unknown }) =>
         transformTag(t)
-      ) as T["tags"];
+      );
     }
 
     // Transform studio to add API key to image_path
     if (scene.studio) {
-      mutated.studio = transformStudio(scene.studio) as T["studio"];
+      mutated.studio = transformStudio(scene.studio);
     }
 
     // Transform groups - flatten nested structure and add API keys to images
     if (scene.groups && Array.isArray(scene.groups)) {
-      mutated.groups = scene.groups.map((g: NestedGroup) => {
+      mutated.groups = scene.groups.map((g: GroupLike) => {
         // Stash returns groups as: { group: { id, name, ... }, scene_index: 2 }
         // We need to flatten and transform, preserving scene_index
         const group = "group" in g ? g.group : g;
         const sceneIndex = "scene_index" in g ? g.scene_index : undefined;
         return {
-          ...transformGroup(group as Partial<Group>),
+          ...transformGroup(group as GroupLike),
           ...(sceneIndex !== undefined && { scene_index: sceneIndex }),
         };
-      }) as T["groups"];
+      });
     }
 
     return mutated;
@@ -251,34 +242,29 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
  * Transform group to add API keys to image URLs
  * Works with both full Group objects and nested NestedGroup
  */
-export const transformGroup = <T extends Partial<Group>>(group: T): T => {
+export const transformGroup = <T extends GroupLike>(group: T): T => {
   try {
-    const mutated = {
-      ...group,
-    } as T;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mutated: any = { ...group };
 
     // Transform front and back image paths
     if (group.front_image_path) {
-      mutated.front_image_path = appendApiKeyToUrl(
-        group.front_image_path
-      ) as T["front_image_path"];
+      mutated.front_image_path = appendApiKeyToUrl(group.front_image_path);
     }
     if (group.back_image_path) {
-      mutated.back_image_path = appendApiKeyToUrl(
-        group.back_image_path
-      ) as T["back_image_path"];
+      mutated.back_image_path = appendApiKeyToUrl(group.back_image_path);
     }
 
     // Transform studio to add API key to image_path
     if (group.studio) {
-      mutated.studio = transformStudio(group.studio) as T["studio"];
+      mutated.studio = transformStudio(group.studio);
     }
 
     // Transform tags to add API key to image_path
     if (group.tags && Array.isArray(group.tags)) {
-      mutated.tags = group.tags.map((t: NestedTagWithImage) =>
+      mutated.tags = group.tags.map((t: { image_path?: string | null; [key: string]: unknown }) =>
         transformTag(t)
-      ) as T["tags"];
+      );
     }
 
     return mutated;

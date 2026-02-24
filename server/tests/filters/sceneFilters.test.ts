@@ -15,6 +15,12 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       url: "http://localhost:9999/graphql",
       apiKey: "test-api-key",
     }),
+    getConfig: vi.fn().mockReturnValue({
+      id: "default",
+      name: "Default Stash",
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-api-key",
+    }),
     getAllConfigs: vi.fn().mockReturnValue([]),
     loadFromDatabase: vi.fn().mockResolvedValue(undefined),
   },
