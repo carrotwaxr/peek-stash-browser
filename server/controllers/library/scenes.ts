@@ -1040,10 +1040,10 @@ export const findScenes = async (
     }
 
     // STANDARD PATH: Load all scenes and filter in memory
-    // Get pre-computed scene exclusions
+    // Get pre-computed scene exclusions (instance-aware)
     const exclusionStart = Date.now();
-    const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
-    logger.info(`findScenes: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+    const exclusionData = await entityExclusionHelper.getExclusionData(userId, 'scene');
+    logger.info(`findScenes: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`);
 
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
@@ -1060,10 +1060,10 @@ export const findScenes = async (
       });
     }
 
-    // Apply pre-computed exclusions immediately (fast Set lookup)
+    // Apply pre-computed exclusions immediately (instance-aware filtering)
     const preFilterStart = Date.now();
-    scenes = scenes.filter(s => !excludeIds.has(s.id));
-    logger.info(`findScenes: applied ${excludeIds.size} exclusions in ${Date.now() - preFilterStart}ms, ${scenes.length} scenes remaining`);
+    scenes = scenes.filter(s => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData));
+    logger.info(`findScenes: applied exclusions in ${Date.now() - preFilterStart}ms, ${scenes.length} scenes remaining`);
 
     // Determine if we can use optimized pipeline
     // Expensive sort fields require user data, so we must merge all scenes first
@@ -1407,7 +1407,7 @@ export const getRecommendedScenes = async (
       sceneRatings,
       watchHistory,
       allScoringData,
-      excludedIds,
+      exclusionData,
       engagementRankings,
     ] = await Promise.all([
       prisma.performerRating.findMany({ where: { userId } }),
@@ -1416,7 +1416,7 @@ export const getRecommendedScenes = async (
       prisma.sceneRating.findMany({ where: { userId } }),
       prisma.watchHistory.findMany({ where: { userId } }),
       stashEntityService.getScenesForScoring(),
-      entityExclusionHelper.getExcludedIds(userId, 'scene'),
+      entityExclusionHelper.getExclusionData(userId, 'scene'),
       // Fetch implicit engagement signals from pre-computed rankings
       prisma.userEntityRanking.findMany({
         where: { userId, entityType: { in: ['performer', 'studio', 'tag'] } },
@@ -1510,8 +1510,8 @@ export const getRecommendedScenes = async (
       })
     );
 
-    // Filter excluded scenes from scoring data
-    const scoringData = allScoringData.filter((s) => !excludedIds.has(s.id));
+    // Filter excluded scenes from scoring data (instance-aware)
+    const scoringData = allScoringData.filter((s) => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData));
 
     // Build derived weights from rated/favorited scenes using lightweight data
     const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map((r) => ({

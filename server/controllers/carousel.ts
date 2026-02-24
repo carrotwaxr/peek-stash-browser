@@ -405,20 +405,20 @@ export async function executeCarouselQuery(
   // STANDARD PATH: Has filters, need to load more scenes
   logger.info(`executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`);
 
-  // Get pre-computed scene exclusions
+  // Get pre-computed scene exclusions (instance-aware)
   const exclusionStart = Date.now();
-  const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
-  logger.info(`executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+  const exclusionData = await entityExclusionHelper.getExclusionData(userId, 'scene');
+  logger.info(`executeCarouselQuery: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`);
 
   // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();
   let scenes = await stashEntityService.getAllScenes();
   logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
 
-  // Apply pre-computed exclusions (fast Set lookup instead of nested entity checks)
+  // Apply pre-computed exclusions (instance-aware filtering)
   const filterStart = Date.now();
-  scenes = scenes.filter(s => !excludeIds.has(s.id));
-  logger.info(`executeCarouselQuery: applied ${excludeIds.size} exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`);
+  scenes = scenes.filter(s => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData));
+  logger.info(`executeCarouselQuery: applied exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`);
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
   const quickFilterStart = Date.now();
