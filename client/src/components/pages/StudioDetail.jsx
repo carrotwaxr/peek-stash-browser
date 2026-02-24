@@ -265,7 +265,7 @@ const StudioDetail = () => {
                       ...(includeSubStudios && { depth: -1 }) } }}
                   permanentFiltersMetadata={{
                     studios: [
-                      { id: studioId, name: studio?.name || "Unknown Studio" },
+                      { id: instanceId ? `${studioId}:${instanceId}` : String(studioId), name: studio?.name || "Unknown Studio" },
                     ] }}
                   title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
                   fromPageTitle={studio?.name || "Studio"}

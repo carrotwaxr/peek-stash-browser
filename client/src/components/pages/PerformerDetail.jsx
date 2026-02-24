@@ -209,7 +209,7 @@ const PerformerDetail = () => {
                       value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
                       modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
-                    performers: [{ id: performerId, name: performer.name }] }}
+                    performers: [{ id: instanceId ? `${performerId}:${instanceId}` : String(performerId), name: performer.name }] }}
                   title={`Scenes featuring ${performer.name}`}
                   fromPageTitle={performer?.name || "Performer"}
                 />

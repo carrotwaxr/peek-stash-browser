@@ -793,6 +793,9 @@ export const STUDIO_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+    hierarchyKey: "tagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
     countFilterContext: "studios",
   },
   {
@@ -2239,6 +2242,10 @@ export const buildStudioFilter = (filters) => {
       value: filters.tagIds.map(String),
       modifier: filters.tagIdsModifier || "INCLUDES_ALL",
     };
+    // Pass through depth for hierarchical filtering
+    if (filters.tagIdsDepth !== undefined) {
+      studioFilter.tags.depth = filters.tagIdsDepth;
+    }
   }
 
   // Rating filter (0-100 scale)

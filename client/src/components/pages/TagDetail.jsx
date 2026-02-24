@@ -299,7 +299,7 @@ const TagDetail = () => {
                     },
                   }}
                   permanentFiltersMetadata={{
-                    tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
+                    tags: [{ id: instanceId ? `${tagId}:${instanceId}` : String(tagId), name: tag?.name || "Unknown Tag" }],
                   }}
                   title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
                   fromPageTitle={tag?.name || "Tag"}

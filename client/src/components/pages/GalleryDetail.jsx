@@ -430,7 +430,7 @@ const GalleryDetail = () => {
                     }
                   }}
                   permanentFiltersMetadata={{
-                    galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
+                    galleries: [{ id: instanceId ? `${galleryId}:${instanceId}` : String(galleryId), title: galleryTitle(gallery) }]
                   }}
                   title={`Scenes in ${galleryTitle(gallery)}`}
                   fromPageTitle={galleryTitle(gallery) || "Gallery"}

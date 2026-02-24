@@ -349,7 +349,12 @@ const SearchControls = ({
       ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
     onQueryChange(query);
-  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+
+    // Notify parent of initial viewMode and perPage so it stays in sync
+    // (e.g., when a default preset sets viewMode to "hierarchy")
+    onViewModeChange?.(viewMode);
+    onPerPageStateChange?.(perPage);
+  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed, onViewModeChange, viewMode, onPerPageStateChange]);
 
   // Track previous permanentFilters to detect changes
   const prevPermanentFiltersRef = useRef(permanentFilters);

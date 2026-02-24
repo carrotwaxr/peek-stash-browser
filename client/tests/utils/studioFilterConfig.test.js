@@ -80,6 +80,31 @@ describe("buildStudioFilter", () => {
       const result = buildStudioFilter(uiFilters);
       expect(result.tags).toBeUndefined();
     });
+
+    it("should include depth when tagIdsDepth is set", () => {
+      const uiFilters = {
+        tagIds: ["1", "2"],
+        tagIdsDepth: -1,
+      };
+      const result = buildStudioFilter(uiFilters);
+      expect(result.tags).toEqual({
+        value: ["1", "2"],
+        modifier: "INCLUDES_ALL",
+        depth: -1,
+      });
+    });
+
+    it("should not include depth when tagIdsDepth is undefined", () => {
+      const uiFilters = {
+        tagIds: ["1", "2"],
+      };
+      const result = buildStudioFilter(uiFilters);
+      expect(result.tags).toEqual({
+        value: ["1", "2"],
+        modifier: "INCLUDES_ALL",
+      });
+      expect(result.tags.depth).toBeUndefined();
+    });
   });
 
   describe("Rating Filter", () => {

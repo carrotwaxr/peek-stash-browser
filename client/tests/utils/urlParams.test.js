@@ -174,3 +174,46 @@ describe("buildSearchParams", () => {
     expect(params.has("grid_density")).toBe(false);
   });
 });
+
+describe("composite key round-tripping", () => {
+  it("preserves composite keys through buildSearchParams → parseSearchParams", () => {
+    const originalFilters = { tagIds: ["82:inst-1", "15:inst-2"] };
+
+    // Serialize to URL params
+    const params = buildSearchParams({
+      searchText: "",
+      sortField: "",
+      sortDirection: "",
+      currentPage: 1,
+      perPage: 24,
+      filters: originalFilters,
+      filterOptions: mockFilterOptions,
+    });
+
+    // Deserialize back
+    const result = parseSearchParams(params, mockFilterOptions);
+    expect(result.filters.tagIds).toEqual(["82:inst-1", "15:inst-2"]);
+  });
+
+  it("does NOT apply instance param to multi-select tagIds (instance is for parent entity)", () => {
+    const params = new URLSearchParams(
+      "tagIds=82:tag-inst,15:tag-inst&instance=studio-inst"
+    );
+    const result = parseSearchParams(params, mockFilterOptions);
+
+    // The instance param should NOT override the instance IDs already embedded in tagIds
+    expect(result.filters.tagIds).toEqual(["82:tag-inst", "15:tag-inst"]);
+  });
+
+  it("singular tagId gets instance param, multi tagIds do not", () => {
+    // Singular: tagId=82&instance=inst-1 → tagIds: ["82:inst-1"]
+    const singularParams = new URLSearchParams("tagId=82&instance=inst-1");
+    const singularResult = parseSearchParams(singularParams, mockFilterOptions);
+    expect(singularResult.filters.tagIds).toEqual(["82:inst-1"]);
+
+    // Multi: tagIds=82,15&instance=inst-1 → tagIds: ["82", "15"] (instance NOT applied)
+    const multiParams = new URLSearchParams("tagIds=82,15&instance=inst-1");
+    const multiResult = parseSearchParams(multiParams, mockFilterOptions);
+    expect(multiResult.filters.tagIds).toEqual(["82", "15"]);
+  });
+});
