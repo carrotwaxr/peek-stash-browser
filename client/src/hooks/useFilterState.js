@@ -75,20 +75,21 @@ export const useFilterState = ({
           filters: { ...permanentFilters },
         });
 
-        // Check if URL explicitly has sort params
+        // Check if URL explicitly has sort/pagination params
         const hasUrlSort = searchParams.has("sort");
         const hasUrlDirection = searchParams.has("dir");
+        const hasUrlPerPage = searchParams.has("per_page");
 
         let finalState;
 
         if (hasFilterParams) {
-          // URL has filter params: use URL sort if explicit, otherwise preset SORT, URL filters
+          // URL has filter params: use URL sort/perPage if explicit, otherwise preset values, URL filters
           finalState = {
             filters: urlState.filters,
             sortField: hasUrlSort ? urlState.sortField : (defaultPreset?.sort || initialSort),
             sortDirection: hasUrlDirection ? urlState.sortDirection : (defaultPreset?.direction || "DESC"),
             currentPage: urlState.currentPage,
-            perPage: urlState.perPage,
+            perPage: hasUrlPerPage ? urlState.perPage : (defaultPreset?.perPage || urlState.perPage),
             searchText: urlState.searchText,
             viewMode: urlState.viewMode,
             zoomLevel: urlState.zoomLevel,
@@ -96,13 +97,13 @@ export const useFilterState = ({
             timelinePeriod: urlState.timelinePeriod,
           };
         } else if (defaultPreset) {
-          // No URL params: use full preset
+          // No URL filter params: use full preset, but URL per_page takes precedence
           finalState = {
             filters: { ...permanentFilters, ...defaultPreset.filters },
             sortField: defaultPreset.sort,
             sortDirection: defaultPreset.direction,
             currentPage: 1,
-            perPage: urlState.perPage,
+            perPage: hasUrlPerPage ? urlState.perPage : (defaultPreset.perPage || urlState.perPage),
             searchText: "",
             viewMode: defaultPreset.viewMode || defaultViewMode,
             zoomLevel: defaultPreset.zoomLevel || defaultZoomLevel,
