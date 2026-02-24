@@ -68,7 +68,7 @@ describe("buildTagFilter", () => {
         rating: { min: "", max: "" },
       };
       const result = buildTagFilter(uiFilters);
-      expect(result.rating100).toEqual({});
+      expect(result.rating100).toBeUndefined();
     });
   });
 
@@ -184,9 +184,9 @@ describe("buildTagFilter", () => {
         sceneCount: { min: "", max: "" },
       };
       const result = buildTagFilter(uiFilters);
-      expect(result.o_counter).toEqual({});
-      expect(result.play_count).toEqual({});
-      expect(result.scene_count).toEqual({});
+      expect(result.o_counter).toBeUndefined();
+      expect(result.play_count).toBeUndefined();
+      expect(result.scene_count).toBeUndefined();
     });
   });
 

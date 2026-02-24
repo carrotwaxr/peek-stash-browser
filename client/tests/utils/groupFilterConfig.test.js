@@ -122,7 +122,7 @@ describe("buildGroupFilter", () => {
         rating: { min: "", max: "" },
       };
       const result = buildGroupFilter(uiFilters);
-      expect(result.rating100).toEqual({});
+      expect(result.rating100).toBeUndefined();
     });
   });
 
