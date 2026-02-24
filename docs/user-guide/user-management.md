@@ -353,6 +353,41 @@ The user should change their password after logging in.
 
 ---
 
+## Database Backup
+
+Admins can create and manage backups of the Peek database from the settings UI.
+
+**Location:** Settings → Server Configuration → Backup
+
+### Creating a Backup
+
+1. Click **Create Backup**
+2. Peek creates an atomic snapshot of the entire SQLite database
+3. The backup appears in the list with its creation date and file size
+
+### What's Included
+
+Backups contain all Peek data:
+
+- User accounts, preferences, and permissions
+- Ratings, favorites, and watch history
+- Playlists and playlist shares
+- Cached entity data from Stash
+- Custom themes and carousels
+
+Backups do **not** include Stash media files or Stash server configuration.
+
+### Managing Backups
+
+- Backups are listed newest-first with creation date and file size
+- Click the trash icon to delete a backup (with confirmation)
+- Backups are stored in the Peek data directory alongside the database
+
+!!! tip "Before Upgrading"
+    Create a backup before upgrading Peek to a new version. If something goes wrong, you can restore the backup by replacing the database file.
+
+---
+
 ## Next Steps
 
 - [Downloads](downloads.md) — Download scenes, images, and playlists

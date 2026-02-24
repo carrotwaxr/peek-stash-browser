@@ -122,10 +122,13 @@ nav:
       - FAQ: getting-started/faq.md
   - User Guide:
       - Browse and Display: user-guide/browse-and-display.md
+      - Clips: user-guide/clips.md
       - Content Restrictions: user-guide/content-restrictions.md
       - Custom Carousels: user-guide/custom-carousels.md
       - Downloads: user-guide/downloads.md
       - External Player: user-guide/external-player.md
+      - Galleries: user-guide/galleries.md
+      - Groups: user-guide/groups.md
       - Hidden Items: user-guide/hidden-items.md
       - Images: user-guide/images.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
@@ -134,6 +137,7 @@ nav:
       - Playlists: user-guide/playlists.md
       - Recommendations: user-guide/recommendations.md
       - User Management: user-guide/user-management.md
+      - User Stats: user-guide/stats.md
       - Watch History: user-guide/watch-history.md
   - Reference:
       - Docker Basics: reference/docker-basics.md
