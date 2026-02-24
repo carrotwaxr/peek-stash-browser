@@ -30,7 +30,7 @@ export interface PlaylistItemWithScene {
 export interface PlaylistPreviewItem {
   instanceId: string | null;
   sceneId: string;
-  scene?: Partial<Scene> | null;
+  scene?: Partial<Scene> | NormalizedScene | null;
 }
 
 /**

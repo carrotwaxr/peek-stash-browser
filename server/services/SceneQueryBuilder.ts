@@ -1350,9 +1350,9 @@ class SceneQueryBuilder {
     // Collect unique (studioId, instanceId) pairs - each scene's studio comes from its own instance
     const studioKeys = [...new Map(
       scenes
-        .filter((s) => (s as unknown as { studioId: string | null }).studioId)
+        .filter((s) => s.studioId)
         .map((s) => {
-          const studioId = (s as unknown as { studioId: string }).studioId;
+          const studioId = s.studioId!;
           return [`${studioId}:${normalizeInstanceId(s.instanceId)}`, { id: studioId, instanceId: normalizeInstanceId(s.instanceId) }] as const;
         })
     ).values()];
@@ -1558,7 +1558,7 @@ class SceneQueryBuilder {
       scene.tags = tagsByScene.get(sceneKey) || [];
       scene.groups = groupsByScene.get(sceneKey) || [];
       scene.galleries = galleriesByScene.get(sceneKey) || [];
-      const studioId = (scene as unknown as { studioId: string | null }).studioId;
+      const studioId = scene.studioId;
       if (studioId) {
         const studioKey = `${studioId}:${normalizedSceneInstanceId}`;
         scene.studio = studiosByKey.get(studioKey) || null;

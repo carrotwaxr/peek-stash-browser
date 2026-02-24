@@ -9,24 +9,40 @@ import { logger } from "./logger.js";
 
 /**
  * Structural constraint for entities with image_path (performers, studios, tags).
- * Accepts both Stash GraphQL types and standalone Normalized types.
+ * Only constrains the fields actually accessed by transform functions.
+ * No index signature — concrete interfaces (PerformerRef, StudioRef, etc.)
+ * don't have index signatures, so requiring one here would break compatibility.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type HasImagePath = { image_path?: string | null; tags?: any[]; [key: string]: any };
-
-/**
- * Structural constraint for scene-like objects.
- * Accepts both Stash GraphQL Scene and standalone NormalizedScene.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SceneLike = { [key: string]: any };
+type HasImagePath = {
+  image_path?: string | null;
+  tags?: Array<{ image_path?: string | null }>;
+};
 
 /**
  * Structural constraint for group-like objects.
- * Accepts both Stash GraphQL Group and standalone NormalizedGroup.
+ * Constrained to fields actually accessed by `transformGroup`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type GroupLike = { [key: string]: any };
+type GroupLike = {
+  front_image_path?: string | null;
+  back_image_path?: string | null;
+  studio?: HasImagePath | null;
+  tags?: Array<{ image_path?: string | null }>;
+};
+
+/**
+ * Structural constraint for scene-like objects.
+ * Constrained to fields actually accessed by `transformScene`.
+ * `paths` is typed as `object` because `ScenePaths` is a concrete interface
+ * without an index signature; `Object.entries()` accepts `{}` via its second overload.
+ */
+type SceneLike = {
+  paths?: object;
+  sceneStreams?: Array<{ url: string; mime_type?: string | null; label?: string | null }>;
+  performers?: Array<HasImagePath>;
+  tags?: Array<{ image_path?: string | null }>;
+  studio?: HasImagePath | null;
+  groups?: Array<{ group?: GroupLike; scene_index?: number | null }>;
+};
 
 /**
  * Convert Stash URLs to Peek proxy URLs to avoid exposing API keys
@@ -82,7 +98,7 @@ export const transformPerformer = <T extends HasImagePath>(
 
     // Transform nested tags
     if (performer.tags && Array.isArray(performer.tags)) {
-      mutated.tags = performer.tags.map((t: { image_path?: string | null; [key: string]: unknown }) => ({
+      mutated.tags = performer.tags.map((t: { image_path?: string | null }) => ({
         ...t,
         image_path: t.image_path
           ? appendApiKeyToUrl(t.image_path)
@@ -112,7 +128,7 @@ export const transformStudio = <T extends HasImagePath>(studio: T): T => {
 
     // Transform nested tags
     if (studio.tags && Array.isArray(studio.tags)) {
-      mutated.tags = studio.tags.map((t: { image_path?: string | null; [key: string]: unknown }) => ({
+      mutated.tags = studio.tags.map((t: { image_path?: string | null }) => ({
         ...t,
         image_path: t.image_path
           ? appendApiKeyToUrl(t.image_path)
@@ -207,7 +223,7 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
 
     // Transform tags to add API key to image_path
     if (scene.tags && Array.isArray(scene.tags)) {
-      mutated.tags = scene.tags.map((t: { image_path?: string | null; [key: string]: unknown }) =>
+      mutated.tags = scene.tags.map((t: { image_path?: string | null }) =>
         transformTag(t)
       );
     }
@@ -219,7 +235,7 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
 
     // Transform groups - flatten nested structure and add API keys to images
     if (scene.groups && Array.isArray(scene.groups)) {
-      mutated.groups = scene.groups.map((g: GroupLike) => {
+      mutated.groups = scene.groups.map((g) => {
         // Stash returns groups as: { group: { id, name, ... }, scene_index: 2 }
         // We need to flatten and transform, preserving scene_index
         const group = "group" in g ? g.group : g;
@@ -262,7 +278,7 @@ export const transformGroup = <T extends GroupLike>(group: T): T => {
 
     // Transform tags to add API key to image_path
     if (group.tags && Array.isArray(group.tags)) {
-      mutated.tags = group.tags.map((t: { image_path?: string | null; [key: string]: unknown }) =>
+      mutated.tags = group.tags.map((t: { image_path?: string | null }) =>
         transformTag(t)
       );
     }
