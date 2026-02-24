@@ -138,6 +138,10 @@ export interface NormalizedScene {
   last_played_at: string | null;
   last_o_at: string | null;
 
+  // Transient field: set by QueryBuilder transformRow() but not part of the GraphQL type.
+  // Used internally by populateRelations to look up studios without re-parsing.
+  studioId?: string | null;
+
   // Timestamps
   created_at: string | null;
   updated_at: string | null;
@@ -280,6 +284,10 @@ export interface NormalizedGroup {
   back_image_path: string | null;
   created_at: string | null;
   updated_at: string | null;
+
+  // Transient field: set by QueryBuilder transformRow() but not part of the GraphQL type.
+  // Used internally by populateRelations to look up studios without re-parsing.
+  studioId?: string | null;
 
   // User activity fields
   rating: number | null;

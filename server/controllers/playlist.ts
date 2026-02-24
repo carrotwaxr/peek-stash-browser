@@ -209,7 +209,7 @@ export const getSharedPlaylists = async (
     // Fetch scene details for preview items from cache
     const playlistsWithScenes = await Promise.all(
       sharedPlaylists.map(async (p) => {
-        let itemsWithScenes: Array<{ instanceId: string | null; sceneId: string; scene: ReturnType<typeof transformScene> | null }> = [];
+        let itemsWithScenes: Array<{ instanceId: string | null; sceneId: string; scene: NormalizedScene | null }> = [];
 
         if (p.items.length > 0) {
           const sceneIds = p.items.map((item) => item.sceneId);
