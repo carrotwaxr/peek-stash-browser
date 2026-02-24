@@ -91,33 +91,170 @@ describe("EntityExclusionHelper", () => {
   });
 
   describe("getExcludedIds", () => {
-    it("returns a Set of excluded entity IDs", async () => {
+    it("returns a flat superset of all excluded IDs when no instanceId is provided", async () => {
       (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
         { entityId: "1", instanceId: "" },
         { entityId: "2", instanceId: "instA" },
+        { entityId: "3", instanceId: "instB" },
       ]);
 
       const result = await entityExclusionHelper.getExcludedIds(1, "scene");
       expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(2);
+      expect(result.size).toBe(3);
       expect(result.has("1")).toBe(true);
       expect(result.has("2")).toBe(true);
+      expect(result.has("3")).toBe(true);
     });
 
-    it("returns scoped exclusion data for instance-aware filtering", async () => {
-      // getExcludedIds should return data that allows callers to differentiate
-      // between global and instance-scoped exclusions
+    it("returns empty Set when userId is undefined", async () => {
+      const result = await entityExclusionHelper.getExcludedIds(undefined, "scene");
+      expect(result.size).toBe(0);
+    });
+
+    it("returns global + instance-scoped exclusions when instanceId is provided", async () => {
+      (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { entityId: "1", instanceId: "" },       // global - should be included
+        { entityId: "2", instanceId: "instA" },   // scoped to instA - should be included
+        { entityId: "3", instanceId: "instB" },   // scoped to instB - should NOT be included
+      ]);
+
+      const result = await entityExclusionHelper.getExcludedIds(1, "scene", "instA");
+      expect(result.size).toBe(2);
+      expect(result.has("1")).toBe(true);  // global exclusion
+      expect(result.has("2")).toBe(true);  // instA-scoped exclusion
+      expect(result.has("3")).toBe(false); // instB-scoped exclusion - not relevant
+    });
+
+    it("returns only global exclusions when instanceId has no scoped exclusions", async () => {
       (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
         { entityId: "1", instanceId: "" },
         { entityId: "2", instanceId: "instA" },
       ]);
 
-      const result = await entityExclusionHelper.getExcludedIds(1, "scene");
+      const result = await entityExclusionHelper.getExcludedIds(1, "scene", "instC");
+      expect(result.size).toBe(1);
+      expect(result.has("1")).toBe(true);  // global exclusion
+      expect(result.has("2")).toBe(false); // instA-scoped - not relevant for instC
+    });
 
-      // For backward compatibility, getExcludedIds returns a flat Set of IDs
-      // (callers that need instance awareness use filterExcluded instead)
+    it("deduplicates when entity has both global and scoped exclusion", async () => {
+      (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { entityId: "1", instanceId: "" },       // global
+        { entityId: "1", instanceId: "instA" },   // also scoped to instA
+      ]);
+
+      const result = await entityExclusionHelper.getExcludedIds(1, "scene", "instA");
+      expect(result.size).toBe(1);
       expect(result.has("1")).toBe(true);
-      expect(result.has("2")).toBe(true);
+    });
+  });
+
+  describe("getExclusionData", () => {
+    it("returns structured exclusion data with global and scoped sets", async () => {
+      (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { entityId: "1", instanceId: "" },
+        { entityId: "2", instanceId: "instA" },
+        { entityId: "3", instanceId: "instB" },
+      ]);
+
+      const result = await entityExclusionHelper.getExclusionData(1, "scene");
+
+      expect(result.globalIds.size).toBe(1);
+      expect(result.globalIds.has("1")).toBe(true);
+
+      expect(result.scopedKeys.size).toBe(2);
+      expect(result.scopedKeys.has("2:instA")).toBe(true);
+      expect(result.scopedKeys.has("3:instB")).toBe(true);
+    });
+
+    it("returns empty sets when userId is undefined", async () => {
+      const result = await entityExclusionHelper.getExclusionData(undefined, "scene");
+      expect(result.globalIds.size).toBe(0);
+      expect(result.scopedKeys.size).toBe(0);
+    });
+
+    it("handles records with only global exclusions", async () => {
+      (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { entityId: "1", instanceId: "" },
+        { entityId: "2", instanceId: "" },
+      ]);
+
+      const result = await entityExclusionHelper.getExclusionData(1, "scene");
+      expect(result.globalIds.size).toBe(2);
+      expect(result.scopedKeys.size).toBe(0);
+    });
+
+    it("handles records with only scoped exclusions", async () => {
+      (mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { entityId: "1", instanceId: "instA" },
+        { entityId: "2", instanceId: "instB" },
+      ]);
+
+      const result = await entityExclusionHelper.getExclusionData(1, "scene");
+      expect(result.globalIds.size).toBe(0);
+      expect(result.scopedKeys.size).toBe(2);
+    });
+  });
+
+  describe("isExcluded", () => {
+    it("returns true for globally excluded entities", () => {
+      const exclusionData = {
+        globalIds: new Set(["1", "2"]),
+        scopedKeys: new Set<string>(),
+      };
+
+      expect(entityExclusionHelper.isExcluded("1", "instA", exclusionData)).toBe(true);
+      expect(entityExclusionHelper.isExcluded("1", "instB", exclusionData)).toBe(true);
+      expect(entityExclusionHelper.isExcluded("1", undefined, exclusionData)).toBe(true);
+    });
+
+    it("returns true for instance-scoped excluded entities matching instance", () => {
+      const exclusionData = {
+        globalIds: new Set<string>(),
+        scopedKeys: new Set(["2:instA"]),
+      };
+
+      expect(entityExclusionHelper.isExcluded("2", "instA", exclusionData)).toBe(true);
+    });
+
+    it("returns false for instance-scoped excluded entities with different instance", () => {
+      const exclusionData = {
+        globalIds: new Set<string>(),
+        scopedKeys: new Set(["2:instA"]),
+      };
+
+      expect(entityExclusionHelper.isExcluded("2", "instB", exclusionData)).toBe(false);
+    });
+
+    it("returns false for instance-scoped exclusions when entity has no instanceId", () => {
+      const exclusionData = {
+        globalIds: new Set<string>(),
+        scopedKeys: new Set(["2:instA"]),
+      };
+
+      expect(entityExclusionHelper.isExcluded("2", undefined, exclusionData)).toBe(false);
+    });
+
+    it("returns false for non-excluded entities", () => {
+      const exclusionData = {
+        globalIds: new Set(["1"]),
+        scopedKeys: new Set(["2:instA"]),
+      };
+
+      expect(entityExclusionHelper.isExcluded("3", "instA", exclusionData)).toBe(false);
+      expect(entityExclusionHelper.isExcluded("3", undefined, exclusionData)).toBe(false);
+    });
+
+    it("checks global exclusions before scoped exclusions", () => {
+      const exclusionData = {
+        globalIds: new Set(["1"]),
+        scopedKeys: new Set(["1:instA"]),
+      };
+
+      // Entity "1" is both globally and scoped-excluded; should be excluded regardless of instance
+      expect(entityExclusionHelper.isExcluded("1", "instA", exclusionData)).toBe(true);
+      expect(entityExclusionHelper.isExcluded("1", "instB", exclusionData)).toBe(true);
+      expect(entityExclusionHelper.isExcluded("1", undefined, exclusionData)).toBe(true);
     });
   });
 });
