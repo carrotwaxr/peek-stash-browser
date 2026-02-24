@@ -355,4 +355,86 @@ describe("SearchableSelect fetchItemsByIds", () => {
     expect(bareCall).toBeDefined();
     expect(bareCall.ids).toEqual(["99"]);
   });
+
+  it("deduplicates IDs within the same instance group", async () => {
+    mockFindTags.mockResolvedValue(
+      makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
+    );
+
+    render(
+      <SearchableSelect
+        entityType="tags"
+        value={["82:inst-1", "82:inst-1"]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockFindTags).toHaveBeenCalled();
+    });
+
+    // Should deduplicate: only one "82" in the ids array
+    const callArg = mockFindTags.mock.calls[0][0];
+    expect(callArg.ids).toEqual(["82"]);
+  });
+
+  it("returns partial results when one instance group fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // inst-1 succeeds, inst-2 fails
+    mockFindTags
+      .mockResolvedValueOnce(
+        makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
+      )
+      .mockRejectedValueOnce(new Error("Instance unreachable"));
+
+    const { container } = render(
+      <SearchableSelect
+        entityType="tags"
+        value={["82:inst-1", "15:inst-2"]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    // Wait for the successful result to render as a chip
+    await waitFor(() => {
+      expect(mockFindTags).toHaveBeenCalledTimes(2);
+    });
+
+    // Should log the error for the failed group
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error fetching tags by IDs"),
+        expect.any(Error)
+      );
+    });
+
+    // The successful instance's tag should still render
+    await waitFor(() => {
+      const text = container.textContent;
+      expect(text).toContain("Tag A");
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("returns empty array for unsupported entity type", async () => {
+    render(
+      <SearchableSelect
+        entityType="unsupported"
+        value={["1:inst-1"]}
+        onChange={vi.fn()}
+        multi
+      />
+    );
+
+    // None of the API methods should be called
+    await waitFor(() => {
+      expect(mockFindTags).not.toHaveBeenCalled();
+      expect(mockFindPerformers).not.toHaveBeenCalled();
+      expect(mockFindStudios).not.toHaveBeenCalled();
+    });
+  });
 });

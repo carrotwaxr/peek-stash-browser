@@ -122,35 +122,38 @@ const SearchableSelect = ({
         return [];
       }
 
-      try {
-        // Make one API call per instance group
-        const promises = [...groups.entries()].map(
-          async ([groupKey, bareIds]) => {
-            const uniqueIds = [...new Set(bareIds)];
-            const params = { ids: uniqueIds };
+      // Make one API call per instance group, using allSettled so a single
+      // failing instance doesn't prevent results from healthy instances
+      const promises = [...groups.entries()].map(
+        async ([groupKey, bareIds]) => {
+          const uniqueIds = [...new Set(bareIds)];
+          const params = { ids: uniqueIds };
 
-            // Add instance filter for non-bare groups
-            if (groupKey !== "__bare__" && filterKey) {
-              params[filterKey] = { instance_id: groupKey };
-            }
-
-            const response = await apiMethod(params);
-            return extract(response);
+          // Add instance filter for non-bare groups
+          if (groupKey !== "__bare__" && filterKey) {
+            params[filterKey] = { instance_id: groupKey };
           }
-        );
 
-        const resultArrays = await Promise.all(promises);
-        const allResults = resultArrays.flat();
+          const response = await apiMethod(params);
+          return extract(response);
+        }
+      );
 
-        // Extract minimal fields with composite key
-        return allResults.map((item) => ({
-          id: makeCompositeKey(item.id, item.instanceId),
-          name: item.name || item.title || "Unknown",
-        }));
-      } catch (error) {
-        console.error(`Error fetching ${entityType} by IDs:`, error);
-        return [];
+      const settled = await Promise.allSettled(promises);
+      const allResults = [];
+      for (const result of settled) {
+        if (result.status === "fulfilled") {
+          allResults.push(...result.value);
+        } else {
+          console.error(`Error fetching ${entityType} by IDs:`, result.reason);
+        }
       }
+
+      // Extract minimal fields with composite key
+      return allResults.map((item) => ({
+        id: makeCompositeKey(item.id, item.instanceId),
+        name: item.name || item.title || "Unknown",
+      }));
     },
     [entityType]
   );
