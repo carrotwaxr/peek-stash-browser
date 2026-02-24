@@ -1008,11 +1008,7 @@ class PerformerQueryBuilder {
       })),
     ]);
     const studioOrConditions = dedupeKeys(scenes
-      .filter((s): s is typeof s & { studioId: string } => !!s.studioId)
-      .map((s) => ({
-        id: s.studioId,
-        stashInstanceId: s.stashInstanceId,
-      })));
+      .flatMap((s) => s.studioId ? [{ id: s.studioId, stashInstanceId: s.stashInstanceId }] : []));
 
     // Load all entities in parallel using composite key lookups
     const [tags, groups, galleries, studios] = await Promise.all([

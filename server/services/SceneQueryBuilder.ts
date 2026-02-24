@@ -1356,10 +1356,7 @@ class SceneQueryBuilder {
     // Collect unique (studioId, instanceId) pairs - each scene's studio comes from its own instance
     const studioKeys = [...new Map(
       scenes
-        .filter((s): s is typeof s & { studioId: string } => !!s.studioId)
-        .map((s) => {
-          return [`${s.studioId}:${normalizeInstanceId(s.instanceId)}`, { id: s.studioId, instanceId: normalizeInstanceId(s.instanceId) }] as const;
-        })
+        .flatMap((s) => s.studioId ? [[`${s.studioId}:${normalizeInstanceId(s.instanceId)}`, { id: s.studioId, instanceId: normalizeInstanceId(s.instanceId) }] as const] : [])
     ).values()];
 
     // Batch load all relations in parallel

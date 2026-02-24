@@ -700,10 +700,7 @@ class GroupQueryBuilder {
     ).values()];
     const studioKeys = [...new Map(
       groups
-        .filter((g): g is typeof g & { studioId: string } => !!g.studioId)
-        .map((g) => {
-          return [`${g.studioId}:${g.instanceId}`, { id: g.studioId, instanceId: g.instanceId }];
-        })
+        .flatMap((g) => g.studioId ? [[`${g.studioId}:${g.instanceId}`, { id: g.studioId, instanceId: g.instanceId }] as const] : [])
     ).values()];
     const performerKeys = [...new Map(
       scenePerformers.map((sp) => [`${sp.performerId}:${sp.performerInstanceId}`, { id: sp.performerId, instanceId: sp.performerInstanceId }])
