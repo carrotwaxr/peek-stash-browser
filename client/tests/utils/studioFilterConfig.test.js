@@ -147,8 +147,7 @@ describe("buildStudioFilter", () => {
         rating: { min: "", max: "" },
       };
       const result = buildStudioFilter(uiFilters);
-      // Bug #2: Currently creates empty object - should be fixed
-      expect(result.rating100).toEqual({});
+      expect(result.rating100).toBeUndefined();
     });
   });
 
@@ -264,10 +263,9 @@ describe("buildStudioFilter", () => {
         sceneCount: { min: "", max: "" },
       };
       const result = buildStudioFilter(uiFilters);
-      // Bug #2: Currently creates empty objects - should be fixed
-      expect(result.o_counter).toEqual({});
-      expect(result.play_count).toEqual({});
-      expect(result.scene_count).toEqual({});
+      expect(result.o_counter).toBeUndefined();
+      expect(result.play_count).toBeUndefined();
+      expect(result.scene_count).toBeUndefined();
     });
   });
 

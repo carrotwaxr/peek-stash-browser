@@ -2250,22 +2250,27 @@ export const buildStudioFilter = (filters) => {
 
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    studioFilter.rating100 = {};
     const hasMin =
       filters.rating.min !== undefined && filters.rating.min !== "";
     const hasMax =
       filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
-      studioFilter.rating100.modifier = "BETWEEN";
-      studioFilter.rating100.value = parseInt(filters.rating.min);
-      studioFilter.rating100.value2 = parseInt(filters.rating.max);
+      studioFilter.rating100 = {
+        modifier: "BETWEEN",
+        value: parseInt(filters.rating.min),
+        value2: parseInt(filters.rating.max),
+      };
     } else if (hasMin) {
-      studioFilter.rating100.modifier = "GREATER_THAN";
-      studioFilter.rating100.value = parseInt(filters.rating.min) - 1;
+      studioFilter.rating100 = {
+        modifier: "GREATER_THAN",
+        value: parseInt(filters.rating.min) - 1,
+      };
     } else if (hasMax) {
-      studioFilter.rating100.modifier = "LESS_THAN";
-      studioFilter.rating100.value = parseInt(filters.rating.max) + 1;
+      studioFilter.rating100 = {
+        modifier: "LESS_THAN",
+        value: parseInt(filters.rating.max) + 1,
+      };
     }
   }
 
@@ -2274,22 +2279,27 @@ export const buildStudioFilter = (filters) => {
     filters.sceneCount?.min !== undefined ||
     filters.sceneCount?.max !== undefined
   ) {
-    studioFilter.scene_count = {};
     const hasMin =
       filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
     const hasMax =
       filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
 
     if (hasMin && hasMax) {
-      studioFilter.scene_count.modifier = "BETWEEN";
-      studioFilter.scene_count.value = parseInt(filters.sceneCount.min);
-      studioFilter.scene_count.value2 = parseInt(filters.sceneCount.max);
+      studioFilter.scene_count = {
+        modifier: "BETWEEN",
+        value: parseInt(filters.sceneCount.min),
+        value2: parseInt(filters.sceneCount.max),
+      };
     } else if (hasMin) {
-      studioFilter.scene_count.modifier = "GREATER_THAN";
-      studioFilter.scene_count.value = parseInt(filters.sceneCount.min) - 1;
+      studioFilter.scene_count = {
+        modifier: "GREATER_THAN",
+        value: parseInt(filters.sceneCount.min) - 1,
+      };
     } else if (hasMax) {
-      studioFilter.scene_count.modifier = "LESS_THAN";
-      studioFilter.scene_count.value = parseInt(filters.sceneCount.max) + 1;
+      studioFilter.scene_count = {
+        modifier: "LESS_THAN",
+        value: parseInt(filters.sceneCount.max) + 1,
+      };
     }
   }
 
@@ -2297,22 +2307,27 @@ export const buildStudioFilter = (filters) => {
     filters.oCounter?.min !== undefined ||
     filters.oCounter?.max !== undefined
   ) {
-    studioFilter.o_counter = {};
     const hasMin =
       filters.oCounter.min !== undefined && filters.oCounter.min !== "";
     const hasMax =
       filters.oCounter.max !== undefined && filters.oCounter.max !== "";
 
     if (hasMin && hasMax) {
-      studioFilter.o_counter.modifier = "BETWEEN";
-      studioFilter.o_counter.value = parseInt(filters.oCounter.min);
-      studioFilter.o_counter.value2 = parseInt(filters.oCounter.max);
+      studioFilter.o_counter = {
+        modifier: "BETWEEN",
+        value: parseInt(filters.oCounter.min),
+        value2: parseInt(filters.oCounter.max),
+      };
     } else if (hasMin) {
-      studioFilter.o_counter.modifier = "GREATER_THAN";
-      studioFilter.o_counter.value = parseInt(filters.oCounter.min) - 1;
+      studioFilter.o_counter = {
+        modifier: "GREATER_THAN",
+        value: parseInt(filters.oCounter.min) - 1,
+      };
     } else if (hasMax) {
-      studioFilter.o_counter.modifier = "LESS_THAN";
-      studioFilter.o_counter.value = parseInt(filters.oCounter.max) + 1;
+      studioFilter.o_counter = {
+        modifier: "LESS_THAN",
+        value: parseInt(filters.oCounter.max) + 1,
+      };
     }
   }
 
@@ -2320,22 +2335,27 @@ export const buildStudioFilter = (filters) => {
     filters.playCount?.min !== undefined ||
     filters.playCount?.max !== undefined
   ) {
-    studioFilter.play_count = {};
     const hasMin =
       filters.playCount.min !== undefined && filters.playCount.min !== "";
     const hasMax =
       filters.playCount.max !== undefined && filters.playCount.max !== "";
 
     if (hasMin && hasMax) {
-      studioFilter.play_count.modifier = "BETWEEN";
-      studioFilter.play_count.value = parseInt(filters.playCount.min);
-      studioFilter.play_count.value2 = parseInt(filters.playCount.max);
+      studioFilter.play_count = {
+        modifier: "BETWEEN",
+        value: parseInt(filters.playCount.min),
+        value2: parseInt(filters.playCount.max),
+      };
     } else if (hasMin) {
-      studioFilter.play_count.modifier = "GREATER_THAN";
-      studioFilter.play_count.value = parseInt(filters.playCount.min) - 1;
+      studioFilter.play_count = {
+        modifier: "GREATER_THAN",
+        value: parseInt(filters.playCount.min) - 1,
+      };
     } else if (hasMax) {
-      studioFilter.play_count.modifier = "LESS_THAN";
-      studioFilter.play_count.value = parseInt(filters.playCount.max) + 1;
+      studioFilter.play_count = {
+        modifier: "LESS_THAN",
+        value: parseInt(filters.playCount.max) + 1,
+      };
     }
   }
 
