@@ -700,10 +700,9 @@ class GroupQueryBuilder {
     ).values()];
     const studioKeys = [...new Map(
       groups
-        .filter((g) => g.studioId)
+        .filter((g): g is typeof g & { studioId: string } => !!g.studioId)
         .map((g) => {
-          const studioId = g.studioId!;
-          return [`${studioId}:${g.instanceId}`, { id: studioId, instanceId: g.instanceId }];
+          return [`${g.studioId}:${g.instanceId}`, { id: g.studioId, instanceId: g.instanceId }];
         })
     ).values()];
     const performerKeys = [...new Map(

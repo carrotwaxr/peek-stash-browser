@@ -1008,9 +1008,9 @@ class PerformerQueryBuilder {
       })),
     ]);
     const studioOrConditions = dedupeKeys(scenes
-      .filter((s) => !!s.studioId)
+      .filter((s): s is typeof s & { studioId: string } => !!s.studioId)
       .map((s) => ({
-        id: s.studioId!,
+        id: s.studioId,
         stashInstanceId: s.stashInstanceId,
       })));
 
