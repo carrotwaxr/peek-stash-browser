@@ -13,6 +13,54 @@ The wizard runs automatically on first access. No environment variables needed f
 
 > **Upgrading from v1.x?** Your existing `STASH_URL` and `STASH_API_KEY` environment variables will auto-migrate to the database on first start. You can remove them from your container configuration after successful migration.
 
+## Multi-Instance Support
+
+Peek can connect to **multiple Stash servers** simultaneously. This is useful when you have separate Stash instances for different media types, locations, or libraries.
+
+### Adding Instances
+
+**Location:** Settings → Server Configuration → Stash Instances
+
+1. Click **Add Instance**
+2. Fill in the instance details:
+   - **Name** (required) — Display name (e.g., "Main Library", "Archive Server")
+   - **Description** — Help users understand what content this instance contains
+   - **URL** (required) — Stash GraphQL endpoint (must end with `/graphql`)
+   - **API Key** (required) — From the Stash instance's Settings → Security
+   - **Priority** — Lower number = higher priority for deduplication
+3. Click **Test Connection** to validate
+4. Save the instance
+
+Peek automatically triggers a full sync for new instances in the background.
+
+### Managing Instances
+
+Each instance can be:
+
+- **Edited** — Update URL, API key, name, or priority
+- **Enabled/Disabled** — Temporarily hide an instance without deleting it
+- **Deleted** — Permanently remove (cannot delete the last enabled instance)
+
+### Per-User Instance Selection
+
+When multiple instances are configured, each user can choose which instances they see content from:
+
+**Location:** Settings → Content → Content Sources
+
+- Check or uncheck instances to control which content appears in your library
+- At least one instance must remain selected
+- New users see all instances by default
+
+!!! tip "First-Login Setup"
+    When a new user logs in and multiple instances are available, they're prompted to select which instances they want to see.
+
+### How Multi-Instance Content Works
+
+- Content from all selected instances appears together in search results, carousels, and browsing pages
+- Each entity is tagged internally with its source instance
+- If the same content exists on multiple instances, the instance with the lowest priority number is used as the primary source
+- Ratings, watch history, and playlists track which instance each scene belongs to
+
 ## Required Environment Variables
 
 | Variable     | Description     | Example                             |

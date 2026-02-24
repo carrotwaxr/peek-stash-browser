@@ -151,6 +151,48 @@ There's no limit to how many:
 - Scenes you can add to a playlist
 - Playlists a single scene can be in
 
+## Sharing Playlists
+
+Share your playlists with other users through user groups. Shared playlists appear in recipients' "Shared with Me" tab.
+
+!!! note "Permission Required"
+    Sharing requires the **Can Share** permission. Admins can grant this per-user or per-group in Settings → User Management.
+
+### How Sharing Works
+
+Playlists are shared with **user groups**, not individual users. All members of a shared group can access the playlist. This makes it easy to share with teams or households at once.
+
+### Sharing a Playlist
+
+1. Open a playlist you own
+2. Click the **Share** button
+3. A modal shows all groups you belong to
+4. Check the groups you want to share with
+5. Click **Save**
+
+To stop sharing, uncheck all groups and save.
+
+### Viewing Shared Playlists
+
+1. Go to **Playlists** in the navigation
+2. Click the **Shared with Me** tab
+3. Shared playlists show the owner's name and which groups they're shared through
+
+### What Shared Users Can Do
+
+| Action | Owner | Shared User |
+|--------|-------|-------------|
+| View playlist and scenes | Yes | Yes |
+| Add scenes to playlist | Yes | Yes |
+| Edit name/description | Yes | No |
+| Reorder or remove scenes | Yes | No |
+| Manage sharing settings | Yes | No |
+| Delete playlist | Yes | No |
+| Download playlist | Yes (with permission) | No |
+
+!!! tip "Duplicating Shared Playlists"
+    Shared users can duplicate a shared playlist to create their own copy, which they can then edit freely.
+
 ## Downloading Playlists
 
 You can download entire playlists as zip archives for offline viewing. The zip includes all video files plus an M3U playlist and Kodi-compatible NFO metadata files.
@@ -184,10 +226,17 @@ You can download entire playlists as zip archives for offline viewing. The zip i
 - Check your internet connection
 - Try refreshing and making changes again
 
+### Multi-Select
+
+Select multiple scenes at once for bulk actions:
+
+1. Click the checkbox on any scene card (or long-press on mobile)
+2. Select additional scenes
+3. Use the bulk action bar to **Add to Playlist** or **Remove** selected scenes
+
 ## Next Steps
 
-- [Downloads](downloads.md) - Download playlists, scenes, and images for offline viewing
-- [Watch History](watch-history.md) - Resume playback from where you left off
-- [Keyboard Navigation](keyboard-navigation.md) - Complete keyboard shortcuts and TV mode
-- [Troubleshooting](../getting-started/troubleshooting.md) - Fix common issues
-- [FAQ](../getting-started/faq.md) - Frequently asked questions
+- [Downloads](downloads.md) — Download playlists, scenes, and images for offline viewing
+- [Watch History](watch-history.md) — Resume playback from where you left off
+- [User Management](user-management.md) — Set up user groups for playlist sharing
+- [Keyboard Navigation](keyboard-navigation.md) — Keyboard shortcuts and TV mode

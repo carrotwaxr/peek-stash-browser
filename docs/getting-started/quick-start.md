@@ -35,12 +35,31 @@ Get Peek up and running in 5 minutes!
 
 ## Step 2: Setup Wizard
 
-1. Open browser: `http://localhost:6969` (or your server IP)
-2. Complete the 4-step setup wizard:
-   - **Welcome** - Introduction to Peek
-   - **Create Admin** - Set your admin username and password
-   - **Connect to Stash** - Enter your Stash URL and API key
-   - **Complete** - Setup finished!
+Open your browser to `http://localhost:6969` (or your server IP). The setup wizard runs automatically on first access.
+
+**Step 1 — Welcome**
+
+Introduction to Peek. Click **Get Started** to begin.
+
+**Step 2 — Create Admin Account**
+
+- Username is set to "admin"
+- Choose a password (minimum 8 characters, at least 1 letter and 1 number)
+- You're automatically logged in after creation
+
+**Step 3 — Connect to Stash**
+
+- Enter your **Stash URL** — the full GraphQL endpoint (e.g., `http://192.168.1.100:9999/graphql`)
+- Enter your **API Key** — found in your Stash instance under Settings → Security
+- Click **Test Connection** to verify before continuing
+- The wizard provides clear error messages if the connection fails (wrong URL, bad API key, host not found, etc.)
+
+**Step 4 — Complete**
+
+Setup is finished. Click **Start Browsing** to enter Peek. Your first library sync begins automatically in the background.
+
+!!! tip "Adding More Stash Servers Later"
+    You can connect additional Stash instances after setup. See [Multi-Instance Support](configuration.md#multi-instance-support).
 
 ## Step 3: Browse Your Library
 
