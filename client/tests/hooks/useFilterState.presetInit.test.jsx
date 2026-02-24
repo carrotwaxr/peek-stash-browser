@@ -97,7 +97,7 @@ describe("useFilterState - preset initialization", () => {
     expect(result.current.viewMode).toBe("grid");
   });
 
-  it("does not override perPage from preset on init (uses URL default)", async () => {
+  it("applies perPage from default preset on init when no URL per_page param", async () => {
     apiGet.mockImplementation((url) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
@@ -135,12 +135,124 @@ describe("useFilterState - preset initialization", () => {
       expect(result.current.isInitialized).toBe(true);
     });
 
-    // perPage is loaded from URL parsing (per_page param), but the preset path
-    // uses urlState.perPage. Since no URL param is present, it defaults to 24.
-    // Note: The preset branch does NOT override perPage from the preset on init -
-    // it uses urlState.perPage (line 105 of useFilterState.js). This is the
-    // current behavior. The perPage from presets is only applied via loadPreset().
+    // perPage should come from the preset (48), not the default (24)
+    expect(result.current.pagination.perPage).toBe(48);
+  });
+
+  it("uses URL per_page over preset perPage when URL param is explicit", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url === "/user/filter-presets") {
+        return Promise.resolve({
+          presets: {
+            scene: [
+              {
+                id: "preset-custom-perpage",
+                sort: "o_counter",
+                direction: "DESC",
+                filters: {},
+                viewMode: "grid",
+                perPage: 48,
+              },
+            ],
+          },
+        });
+      }
+      if (url === "/user/default-presets") {
+        return Promise.resolve({ defaults: { scene: "preset-custom-perpage" } });
+      }
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(
+      () =>
+        useFilterState({
+          artifactType: "scene",
+          initialSort: "o_counter",
+          defaultViewMode: "grid",
+        }),
+      // URL explicitly sets per_page=12 — should take precedence over preset
+      { wrapper: createWrapper(["/?per_page=12"])  }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    // URL per_page should win over preset perPage
+    expect(result.current.pagination.perPage).toBe(12);
+  });
+
+  it("defaults perPage to 24 when no preset and no URL param", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url === "/user/filter-presets") {
+        return Promise.resolve({ presets: {} });
+      }
+      if (url === "/user/default-presets") {
+        return Promise.resolve({ defaults: {} });
+      }
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(
+      () =>
+        useFilterState({
+          artifactType: "scene",
+          initialSort: "o_counter",
+          defaultViewMode: "grid",
+        }),
+      { wrapper: createWrapper(["/"])  }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    // No preset, no URL param — should use default of 24
     expect(result.current.pagination.perPage).toBe(24);
+  });
+
+  it("applies preset perPage when URL has filter params but no per_page", async () => {
+    apiGet.mockImplementation((url) => {
+      if (url === "/user/filter-presets") {
+        return Promise.resolve({
+          presets: {
+            scene: [
+              {
+                id: "preset-custom-perpage",
+                sort: "o_counter",
+                direction: "DESC",
+                filters: {},
+                viewMode: "grid",
+                perPage: 48,
+              },
+            ],
+          },
+        });
+      }
+      if (url === "/user/default-presets") {
+        return Promise.resolve({ defaults: { scene: "preset-custom-perpage" } });
+      }
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(
+      () =>
+        useFilterState({
+          artifactType: "scene",
+          initialSort: "o_counter",
+          defaultViewMode: "grid",
+          filterOptions: [{ key: "favorite", type: "checkbox" }],
+        }),
+      // URL has filter params but no per_page
+      { wrapper: createWrapper(["/?favorite=true"])  }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    // Preset perPage should be applied since URL doesn't have explicit per_page
+    expect(result.current.pagination.perPage).toBe(48);
   });
 
   it("uses preset viewMode even when URL has no view param", async () => {
