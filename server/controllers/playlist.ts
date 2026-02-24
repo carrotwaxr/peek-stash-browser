@@ -560,12 +560,14 @@ export const addSceneToPlaylist = async (
       return res.status(400).json({ error: "Scene ID is required" });
     }
 
-    // Check ownership
-    const playlist = await prisma.playlist.findFirst({
-      where: {
-        id: playlistId,
-        userId,
-      },
+    // Check access — owners and shared users can add scenes
+    const access = await getPlaylistAccess(playlistId, userId);
+    if (access.level === "none") {
+      return res.status(404).json({ error: "Playlist not found" });
+    }
+
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: playlistId },
       include: {
         items: {
           orderBy: {

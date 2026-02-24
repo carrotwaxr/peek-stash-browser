@@ -201,7 +201,7 @@ router.post(
         });
       }
 
-      const { instanceId } = req.body;
+      const { instanceId } = req.body || {};
 
       // If no instance specified, get the first enabled instance
       const { stashInstanceManager } = await import("../services/StashInstanceManager.js");
