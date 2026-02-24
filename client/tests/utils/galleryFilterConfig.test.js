@@ -68,7 +68,7 @@ describe("buildGalleryFilter", () => {
         rating: { min: "", max: "" },
       };
       const result = buildGalleryFilter(uiFilters);
-      expect(result.rating100).toEqual({});
+      expect(result.rating100).toBeUndefined();
     });
   });
 

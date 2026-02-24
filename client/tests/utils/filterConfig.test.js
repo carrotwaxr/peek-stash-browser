@@ -498,13 +498,13 @@ describe("buildSceneFilter", () => {
       expect(result.rating100).toBeUndefined();
     });
 
-    it("should create empty duration filter object when min and max are empty strings", () => {
+    it("should not include duration filter when min and max are empty strings", () => {
       const uiFilters = {
         duration: { min: "", max: "" },
       };
       const result = buildSceneFilter(uiFilters);
-      // Current implementation creates empty object - this is acceptable behavior
-      expect(result.duration).toEqual({});
+      // Empty strings should not produce a filter property (avoids sending empty objects to API)
+      expect(result.duration).toBeUndefined();
     });
   });
 });
