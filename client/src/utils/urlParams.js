@@ -1,6 +1,7 @@
 /**
  * Utility functions for persisting filter/sort state to URL query parameters
  */
+import { makeCompositeKey } from "./compositeKey.js";
 
 /**
  * Serialize filter state to URL query parameters
@@ -95,7 +96,7 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
   for (const [singular, pluralKey] of Object.entries(singularToPlural)) {
     if (searchParams.has(singular)) {
       const rawId = searchParams.get(singular);
-      const compositeId = instanceParam ? `${rawId}:${instanceParam}` : rawId;
+      const compositeId = makeCompositeKey(rawId, instanceParam);
 
       // Check if the plural key is multi-select or single-select
       const filterOption = filterOptions.find((opt) => opt.key === pluralKey);

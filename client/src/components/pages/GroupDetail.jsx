@@ -7,6 +7,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import { formatDuration } from "../../utils/format.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
@@ -209,10 +210,10 @@ const GroupDetail = () => {
                   context="scene_group"
                   initialSort="scene_index"
                   permanentFilters={{
-                    groups: { value: [instanceId ? `${groupId}:${instanceId}` : String(groupId)], modifier: "INCLUDES" } }}
+                    groups: { value: [makeCompositeKey(groupId, instanceId)], modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
                     groups: [
-                      { id: instanceId ? `${groupId}:${instanceId}` : String(groupId), name: group?.name || "Unknown Collection" },
+                      { id: makeCompositeKey(groupId, instanceId), name: group?.name || "Unknown Collection" },
                     ] }}
                   title={`Scenes in ${group?.name || "this collection"}`}
                   fromPageTitle={group?.name || "Collection"}
@@ -224,7 +225,7 @@ const GroupDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       groups: {
-                        value: [instanceId ? `${groupId}:${instanceId}` : String(groupId)],
+                        value: [makeCompositeKey(groupId, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No performers found in "${group?.name}"`}

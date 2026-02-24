@@ -9,6 +9,7 @@ import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions.js";
 import { libraryApi } from "../../services/api.js";
+import { makeCompositeKey } from "../../utils/compositeKey.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
@@ -206,10 +207,10 @@ const PerformerDetail = () => {
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
-                      value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
+                      value: [makeCompositeKey(performerId, instanceId)],
                       modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
-                    performers: [{ id: instanceId ? `${performerId}:${instanceId}` : String(performerId), name: performer.name }] }}
+                    performers: [{ id: makeCompositeKey(performerId, instanceId), name: performer.name }] }}
                   title={`Scenes featuring ${performer.name}`}
                   fromPageTitle={performer?.name || "Performer"}
                 />
@@ -220,7 +221,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
-                        value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
+                        value: [makeCompositeKey(performerId, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No galleries found for ${performer.name}`}
@@ -236,7 +237,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       performers: {
-                        value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
+                        value: [makeCompositeKey(performerId, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${performer.name}`}
@@ -722,7 +723,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }) => {
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
-            value: [instanceId ? `${performerId}:${instanceId}` : String(performerId)],
+            value: [makeCompositeKey(performerId, instanceId)],
             modifier: "INCLUDES",
           },
         },
