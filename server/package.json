@@ -23,6 +23,7 @@
     "test:integration": "vitest run --config integration/vitest.integration.config.ts",
     "test:integration:watch": "vitest --config integration/vitest.integration.config.ts",
     "test:integration:fresh": "FRESH_DB=true npm run test:integration",
+    "test:integration:ci": "vitest run --config integration/vitest.integration.config.ts --reporter=json --reporter=./integration/helpers/summaryReporter.ts --outputFile.json=integration/results/test-results.json",
     "stash:codegen": "graphql-codegen --config codegen.yml",
     "stash:refresh": "echo 'Copy schema.json from stashapp-api or run introspection, then run npm run stash:codegen'"
   },

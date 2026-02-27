@@ -83,10 +83,13 @@ site/
 screenshots/output/
 screenshots/config.json
 
-# Integration test secrets and data
+# Integration test secrets, data, and results
 server/integration/fixtures/testEntities.ts
 server/integration/*.db
+server/integration/*.db-shm
+server/integration/*.db-wal
 server/integration/.env.integration
+server/integration/results/
 
 # Git worktrees
 .worktrees/
