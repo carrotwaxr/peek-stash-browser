@@ -29,6 +29,12 @@ export default defineConfig({
         "integration/**",
         "index.ts",
       ],
+      thresholds: {
+        statements: 35,
+        branches: 65,
+        functions: 45,
+        lines: 35,
+      },
     },
   },
 });
