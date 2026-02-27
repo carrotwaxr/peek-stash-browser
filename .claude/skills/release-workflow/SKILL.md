@@ -87,8 +87,8 @@ GitHub Actions (`.github/workflows/docker-build.yml`) triggers on `v*` tags:
 After GitHub Actions completes:
 
 ```bash
-# SSH to server
-ssh root@10.0.0.4
+# SSH to your deployment server
+ssh root@<server-ip>
 
 # Pull new image
 docker pull carrotwaxr/peek-stash-browser:latest  # or :beta
