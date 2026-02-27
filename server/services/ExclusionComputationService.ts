@@ -306,18 +306,29 @@ class ExclusionComputationService {
         }
       } else if (restriction.mode === "INCLUDE") {
         // INCLUDE mode: exclude everything NOT in the list
-        // Parse composite keys to extract bare IDs for comparison
+        // Parse composite keys into global (bare ID) and scoped (ID + instanceId) sets
         const parsedIncludes = entityIds.map(parseCompositeKey);
-        const includeIds = new Set(parsedIncludes.map(p => p.id));
+        const globalIncludeIds = new Set<string>();
+        const scopedIncludeKeys = new Set<string>();
+        for (const p of parsedIncludes) {
+          if (p.instanceId) {
+            scopedIncludeKeys.add(`${p.id}\0${p.instanceId}`);
+          } else {
+            globalIncludeIds.add(p.id);
+          }
+        }
 
-        const allEntityIds = await this.getAllEntityIds(restriction.entityType, tx);
+        const allEntities = await this.getAllEntityIdsWithInstance(restriction.entityType, tx);
 
-        for (const entityId of allEntityIds) {
-          if (!includeIds.has(entityId)) {
+        for (const entity of allEntities) {
+          const isIncluded = globalIncludeIds.has(entity.id) ||
+            scopedIncludeKeys.has(`${entity.id}\0${entity.instanceId}`);
+          if (!isIncluded) {
             exclusions.push({
               userId,
               entityType: singularType,
-              entityId,
+              entityId: entity.id,
+              instanceId: entity.instanceId,
               reason: "restricted",
             });
           }
@@ -1000,6 +1011,46 @@ class ExclusionComputationService {
       }
       default:
         logger.warn("Unknown entity type for getAllEntityIds", { entityType });
+        return [];
+    }
+  }
+
+  /**
+   * Get all entity IDs with their instance IDs for a given entity type.
+   * Used for INCLUDE mode inversion with multi-instance awareness.
+   * Unlike getAllEntityIds, returns {id, instanceId} pairs so that
+   * entities with the same bare ID from different instances are distinguishable.
+   */
+  private async getAllEntityIdsWithInstance(
+    entityType: string,
+    tx: TransactionClient
+  ): Promise<Array<{ id: string; instanceId: string }>> {
+    const selectFields = { id: true, stashInstanceId: true } as const;
+    const where = { deletedAt: null } as const;
+    const mapRow = (r: { id: string; stashInstanceId: string }) => ({
+      id: r.id,
+      instanceId: r.stashInstanceId,
+    });
+
+    switch (entityType) {
+      case "tags": {
+        const rows = await tx.stashTag.findMany({ where, select: selectFields });
+        return rows.map(mapRow);
+      }
+      case "studios": {
+        const rows = await tx.stashStudio.findMany({ where, select: selectFields });
+        return rows.map(mapRow);
+      }
+      case "groups": {
+        const rows = await tx.stashGroup.findMany({ where, select: selectFields });
+        return rows.map(mapRow);
+      }
+      case "galleries": {
+        const rows = await tx.stashGallery.findMany({ where, select: selectFields });
+        return rows.map(mapRow);
+      }
+      default:
+        logger.warn("Unknown entity type for getAllEntityIdsWithInstance", { entityType });
         return [];
     }
   }
