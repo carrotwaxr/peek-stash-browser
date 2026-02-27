@@ -100,8 +100,9 @@ describe("Groups Controller", () => {
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
 
-    it("should return group with members", async () => {
+    it("should return group with members containing nested user objects", async () => {
       mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "1" } };
+      const createdAt = new Date();
       mockPrisma.userGroup.findUnique.mockResolvedValue({
         id: 1,
         name: "Family",
@@ -109,10 +110,10 @@ describe("Groups Controller", () => {
         canShare: true,
         canDownloadFiles: false,
         canDownloadPlaylists: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt,
+        updatedAt: createdAt,
         members: [
-          { id: 1, userId: 2, groupId: 1, user: { id: 2, username: "user1" } },
+          { id: 1, userId: 2, groupId: 1, createdAt, user: { id: 2, username: "user1", role: "USER" } },
         ],
       } as never);
 
@@ -121,9 +122,13 @@ describe("Groups Controller", () => {
       expect(responseJson).toHaveBeenCalledWith({
         group: expect.objectContaining({
           name: "Family",
-          members: expect.arrayContaining([
-            expect.objectContaining({ userId: 2, username: "user1" }),
-          ]),
+          members: [
+            expect.objectContaining({
+              id: 1,
+              user: { id: 2, username: "user1", role: "USER" },
+              joinedAt: createdAt,
+            }),
+          ],
         }),
       });
     });

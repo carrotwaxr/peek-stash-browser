@@ -1,3 +1,4 @@
+import { readFileSync, existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 /**
@@ -7,7 +8,28 @@ import { defineConfig, devices } from "@playwright/test";
  * CI: tests start the server + client dev server and run against localhost:5173.
  *
  * Override the base URL with the E2E_BASE_URL environment variable.
+ * Local credentials can be set in .env.e2e (gitignored):
+ *   E2E_USERNAME=admin
+ *   E2E_PASSWORD=yourpassword
  */
+
+// Load .env.e2e if it exists (simple key=value parsing, no dependency needed)
+const envFile = ".env.e2e";
+if (existsSync(envFile)) {
+  for (const line of readFileSync(envFile, "utf-8").split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx);
+        const value = trimmed.slice(eqIdx + 1);
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
+  }
+}
 
 const isCI = !!process.env.CI;
 

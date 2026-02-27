@@ -104,3 +104,4 @@ e2e/.auth/
 
 # Claude planning documents (session-specific)
 docs/plans/
+.env.e2e

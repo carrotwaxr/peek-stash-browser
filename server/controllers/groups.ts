@@ -90,9 +90,11 @@ export const getGroup = async (req: AuthenticatedRequest, res: Response) => {
       updatedAt: group.updatedAt,
       members: group.members.map((m) => ({
         id: m.id,
-        userId: m.userId,
-        username: m.user.username,
-        role: m.user.role,
+        user: {
+          id: m.user.id,
+          username: m.user.username,
+          role: m.user.role,
+        },
         joinedAt: m.createdAt,
       })),
     },

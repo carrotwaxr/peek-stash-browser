@@ -1,4 +1,4 @@
-import { test as setup, expect } from "@playwright/test";
+import { test as setup, expect, request } from "@playwright/test";
 
 const AUTH_FILE = "e2e/.auth/user.json";
 
@@ -6,27 +6,54 @@ const AUTH_FILE = "e2e/.auth/user.json";
  * Authenticate once and save the storage state (JWT cookie) for reuse
  * across all test files. Runs before any other test project.
  *
+ * Uses the API directly to obtain the auth cookie, then injects it into
+ * the browser context. This avoids headless Chromium quirks with form
+ * filling (special characters in passwords can behave differently in
+ * headed vs headless mode).
+ *
  * Credentials come from environment variables (E2E_USERNAME / E2E_PASSWORD)
  * or fall back to the default admin account.
  */
-setup("authenticate", async ({ page }) => {
+setup("authenticate", async ({ page, baseURL }) => {
   const username = process.env.E2E_USERNAME || "admin";
   const password = process.env.E2E_PASSWORD || "admin123";
 
-  await page.goto("/login");
+  // Login via API to get the auth cookie reliably
+  const api = await request.newContext({ baseURL });
+  try {
+    const loginResponse = await api.post("/api/auth/login", {
+      data: { username, password },
+    });
 
-  // The login page heading is "Peek Stash Browser"
-  await expect(
-    page.getByRole("heading", { name: /peek stash browser/i })
-  ).toBeVisible();
+    if (!loginResponse.ok()) {
+      const body = await loginResponse.text();
+      throw new Error(
+        `API login failed (${loginResponse.status()}): ${body}\n` +
+        `Credentials: ${username} / ${"*".repeat(password.length)}\n` +
+        `Set E2E_USERNAME and E2E_PASSWORD environment variables for your dev instance.`
+      );
+    }
 
-  // Labels are sr-only but accessible to getByLabel
-  await page.getByLabel("Username").fill(username);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+    // Extract token from the Set-Cookie header
+    const setCookie = loginResponse.headers()["set-cookie"] || "";
+    const tokenMatch = setCookie.match(/token=([^;]+)/);
 
-  // Wait for redirect away from login page — confirms auth succeeded.
-  // The app uses window.location.href (full page nav), so wait for URL change.
+    if (tokenMatch) {
+      // Inject the auth cookie into the browser context
+      const url = new URL(baseURL!);
+      await page.context().addCookies([{
+        name: "token",
+        value: tokenMatch[1],
+        domain: url.hostname,
+        path: "/",
+      }]);
+    }
+  } finally {
+    await api.dispose();
+  }
+
+  // Navigate to verify the cookie works and the app loads
+  await page.goto("/");
   await page.waitForURL((url) => !url.pathname.includes("/login"), {
     timeout: 15_000,
   });
