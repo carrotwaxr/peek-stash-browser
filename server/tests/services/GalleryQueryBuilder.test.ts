@@ -84,5 +84,99 @@ describe("GalleryQueryBuilder", () => {
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("g.stashInstanceId = ?");
     });
+
+    it("filters to allowed instances when allowedInstanceIds is provided", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        allowedInstanceIds: ["inst-a", "inst-b"],
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      // Should contain IN clause for allowed instances
+      expect(mainQuerySql).toContain("g.stashInstanceId IN (?, ?)");
+      // Should include NULL fallback
+      expect(mainQuerySql).toContain("g.stashInstanceId IS NULL");
+
+      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      expect(mainQueryParams).toContain("inst-a");
+      expect(mainQueryParams).toContain("inst-b");
+    });
+
+    it("does not add instance filter when allowedInstanceIds is empty", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        allowedInstanceIds: [],
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).not.toContain("g.stashInstanceId IN");
+    });
+  });
+
+  describe("exclusion filtering", () => {
+    it("includes exclusion JOIN and WHERE by default", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).toContain("UserExcludedEntity");
+      expect(mainQuerySql).toContain("entityType = 'gallery'");
+      expect(mainQuerySql).toContain("e.id IS NULL");
+    });
+
+    it("skips exclusion JOIN when applyExclusions is false", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        applyExclusions: false,
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).not.toContain("UserExcludedEntity");
+      expect(mainQuerySql).not.toContain("e.id IS NULL");
+    });
+  });
+
+  describe("search query", () => {
+    it("searches across title and details fields", async () => {
+      await galleryQueryBuilder.execute({
+        userId: 1,
+        sort: "title",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        searchQuery: "vacation",
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).toContain("LOWER(g.title) LIKE");
+      expect(mainQuerySql).toContain("LOWER(g.details) LIKE");
+    });
   });
 });
