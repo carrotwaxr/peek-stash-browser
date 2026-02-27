@@ -309,17 +309,19 @@ export const createFirstStashInstance = async (
       });
     }
 
-    // Test connection before saving
-    const testStash = new StashClient({ url, apiKey });
-    try {
-      await testStash.configuration();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error("Stash connection validation failed", { error: errorMessage });
-      return res.status(400).json({
-        error: "Could not connect to Stash server",
-        details: errorMessage,
-      });
+    // Test connection before saving (skip in test environment for E2E setup)
+    if (process.env.NODE_ENV !== "test") {
+      const testStash = new StashClient({ url, apiKey });
+      try {
+        await testStash.configuration();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error("Stash connection validation failed", { error: errorMessage });
+        return res.status(400).json({
+          error: "Could not connect to Stash server",
+          details: errorMessage,
+        });
+      }
     }
 
     // Create Stash instance

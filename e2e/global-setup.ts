@@ -54,9 +54,8 @@ async function globalSetup() {
       });
 
       if (!res.ok()) {
-        // Non-fatal — tests that don't need Stash data will still work
-        console.warn(
-          `Could not create dummy Stash instance: ${res.status()} ${await res.text()}`
+        throw new Error(
+          `Failed to create dummy Stash instance: ${res.status()} ${await res.text()}`
         );
       }
     }
