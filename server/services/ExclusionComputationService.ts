@@ -54,6 +54,17 @@ interface ScopedExclusion {
 }
 
 /**
+ * Parse a composite key ("id:instanceId" or bare "id") into components.
+ * The frontend's SearchableSelect stores entity IDs in composite format
+ * to support multi-instance disambiguation.
+ */
+function parseCompositeKey(key: string): { id: string; instanceId: string } {
+  const colonIdx = key.indexOf(":");
+  if (colonIdx === -1) return { id: key, instanceId: "" };
+  return { id: key.substring(0, colonIdx), instanceId: key.substring(colonIdx + 1) };
+}
+
+/**
  * Split exclusions into global (empty instanceId → all instances) and
  * instance-scoped (non-empty instanceId → that instance only).
  */
@@ -282,21 +293,27 @@ class ExclusionComputationService {
 
       if (restriction.mode === "EXCLUDE") {
         // EXCLUDE mode: directly exclude these entities
-        for (const entityId of entityIds) {
+        // entityIds may be composite keys ("id:instanceId") from the frontend
+        for (const rawId of entityIds) {
+          const { id, instanceId } = parseCompositeKey(rawId);
           exclusions.push({
             userId,
             entityType: singularType,
-            entityId,
+            entityId: id,
+            instanceId,
             reason: "restricted",
           });
         }
       } else if (restriction.mode === "INCLUDE") {
         // INCLUDE mode: exclude everything NOT in the list
+        // Parse composite keys to extract bare IDs for comparison
+        const parsedIncludes = entityIds.map(parseCompositeKey);
+        const includeIds = new Set(parsedIncludes.map(p => p.id));
+
         const allEntityIds = await this.getAllEntityIds(restriction.entityType, tx);
-        const includeSet = new Set(entityIds);
 
         for (const entityId of allEntityIds) {
-          if (!includeSet.has(entityId)) {
+          if (!includeIds.has(entityId)) {
             exclusions.push({
               userId,
               entityType: singularType,
