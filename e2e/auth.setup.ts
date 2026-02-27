@@ -48,6 +48,12 @@ setup("authenticate", async ({ page, baseURL }) => {
         path: "/",
       }]);
     }
+
+    // Complete first-login setup if needed (dismisses UserSetupModal overlay)
+    await api.post("/api/user/complete-setup", {
+      headers: { Cookie: setCookie.split(",")[0] },
+      data: { selectedInstanceIds: [] },
+    });
   } finally {
     await api.dispose();
   }
