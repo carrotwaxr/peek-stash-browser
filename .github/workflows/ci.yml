@@ -59,6 +59,11 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Set up test database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: file:./test.db
+
       - name: Lint
         run: npm run lint
 
@@ -67,6 +72,9 @@ jobs:
 
       - name: Test
         run: npm run test:run
+        env:
+          DATABASE_URL: file:./test.db
+          JWT_SECRET: ci-test-secret
 
   # Integration tests require access to a Stash test instance on the local network.
   # This job only runs on self-hosted runners with network access to the test server.
