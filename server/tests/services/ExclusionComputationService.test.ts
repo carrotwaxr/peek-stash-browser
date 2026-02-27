@@ -39,9 +39,11 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
     stashStudio: {
       count: vi.fn(),
+      findMany: vi.fn(),
     },
     stashTag: {
       count: vi.fn(),
+      findMany: vi.fn(),
     },
     stashGroup: {
       count: vi.fn(),
@@ -49,6 +51,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
     stashGallery: {
       count: vi.fn(),
+      findMany: vi.fn(),
     },
     stashImage: {
       count: vi.fn(),
@@ -1053,11 +1056,11 @@ describe("composite key parsing in restrictions (#412)", () => {
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
 
-    // Database has groups "5", "6", and "7"
+    // Database has groups "5", "6", and "7" (all on same instance)
     mockPrisma.stashGroup.findMany.mockResolvedValue([
-      { id: "5" },
-      { id: "6" },
-      { id: "7" },
+      { id: "5", stashInstanceId: "inst1" },
+      { id: "6", stashInstanceId: "inst1" },
+      { id: "7", stashInstanceId: "inst1" },
     ]);
 
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
@@ -2254,13 +2257,13 @@ describe("INCLUDE mode for non-group entity types", () => {
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
 
-    // getAllEntityIds returns all tags
+    // getAllEntityIdsWithInstance returns all tags with instance info
     mockPrisma.stashTag = {
       ...mockPrisma.stashTag,
       findMany: vi.fn().mockResolvedValue([
-        { id: "tag1" },
-        { id: "tag2" },
-        { id: "tag3" },
+        { id: "tag1", stashInstanceId: "instA" },
+        { id: "tag2", stashInstanceId: "instA" },
+        { id: "tag3", stashInstanceId: "instA" },
       ]),
     };
 
@@ -2296,9 +2299,9 @@ describe("INCLUDE mode for non-group entity types", () => {
     mockPrisma.stashStudio = {
       ...mockPrisma.stashStudio,
       findMany: vi.fn().mockResolvedValue([
-        { id: "studioA" },
-        { id: "studioB" },
-        { id: "studioC" },
+        { id: "studioA", stashInstanceId: "instA" },
+        { id: "studioB", stashInstanceId: "instA" },
+        { id: "studioC", stashInstanceId: "instA" },
       ]),
     };
 
@@ -2332,9 +2335,9 @@ describe("INCLUDE mode for non-group entity types", () => {
     mockPrisma.stashGallery = {
       ...mockPrisma.stashGallery,
       findMany: vi.fn().mockResolvedValue([
-        { id: "gal1" },
-        { id: "gal2" },
-        { id: "gal3" },
+        { id: "gal1", stashInstanceId: "instA" },
+        { id: "gal2", stashInstanceId: "instA" },
+        { id: "gal3", stashInstanceId: "instA" },
       ]),
     };
 
@@ -2351,6 +2354,111 @@ describe("INCLUDE mode for non-group entity types", () => {
     expect(excludedGalleryIds).toContain("gal3");
     expect(excludedGalleryIds).not.toContain("gal1");
     expect(excludedGalleryIds).not.toContain("gal2");
+  });
+
+  it("should distinguish same bare ID across different instances in INCLUDE mode", async () => {
+    // Multi-instance bug: tag "6" exists on both instA and instB.
+    // User includes only "6:instA". Tag "6:instB" should be EXCLUDED.
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      {
+        userId: 1,
+        entityType: "tags",
+        mode: "INCLUDE",
+        entityIds: JSON.stringify(["6:instA"]),
+      },
+    ]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
+
+    // getAllEntityIds returns tags from BOTH instances — same bare ID "6"
+    mockPrisma.stashTag = {
+      ...mockPrisma.stashTag,
+      findMany: vi.fn().mockResolvedValue([
+        { id: "6", stashInstanceId: "instA" },
+        { id: "6", stashInstanceId: "instB" },
+        { id: "7", stashInstanceId: "instA" },
+      ]),
+    };
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data);
+
+    const tagExclusions = allData.filter(
+      (e: any) => e.entityType === "tag" && e.reason === "restricted"
+    );
+
+    // Tag "6" from instA should NOT be excluded (it's in the include list)
+    expect(tagExclusions).not.toContainEqual(
+      expect.objectContaining({ entityId: "6", instanceId: "instA" })
+    );
+
+    // Tag "6" from instB SHOULD be excluded (not in the include list)
+    expect(tagExclusions).toContainEqual(
+      expect.objectContaining({ entityId: "6", instanceId: "instB" })
+    );
+
+    // Tag "7" from instA SHOULD be excluded (not in the include list)
+    expect(tagExclusions).toContainEqual(
+      expect.objectContaining({ entityId: "7", instanceId: "instA" })
+    );
+  });
+
+  it("should include bare IDs globally across all instances in INCLUDE mode", async () => {
+    // When a bare ID (no instanceId) is in the include list,
+    // it should include that entity from ALL instances.
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      {
+        userId: 1,
+        entityType: "groups",
+        mode: "INCLUDE",
+        entityIds: JSON.stringify(["6"]), // bare ID — no instance qualifier
+      },
+    ]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
+
+    mockPrisma.stashGroup = {
+      ...mockPrisma.stashGroup,
+      findMany: vi.fn().mockResolvedValue([
+        { id: "6", stashInstanceId: "instA" },
+        { id: "6", stashInstanceId: "instB" },
+        { id: "7", stashInstanceId: "instA" },
+      ]),
+    };
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data);
+
+    const groupExclusions = allData.filter(
+      (e: any) => e.entityType === "group" && e.reason === "restricted"
+    );
+
+    // Group "6" from BOTH instances should NOT be excluded (bare ID = global include)
+    expect(groupExclusions).not.toContainEqual(
+      expect.objectContaining({ entityId: "6", instanceId: "instA" })
+    );
+    expect(groupExclusions).not.toContainEqual(
+      expect.objectContaining({ entityId: "6", instanceId: "instB" })
+    );
+
+    // Group "7" SHOULD be excluded
+    expect(groupExclusions).toContainEqual(
+      expect.objectContaining({ entityId: "7" })
+    );
   });
 });
 

@@ -61,6 +61,23 @@ git log --oneline -10 --format="%h %s (%ar)"
 git stash list
 ```
 
+## Step 2b: Query the Brain
+
+Search the MCP memory service for context relevant to the branch topic or planned work:
+
+```
+memory_search(query: "<branch-topic-keywords>", limit: 5)
+memory_search(query: "gotchas <area>", limit: 5)
+```
+
+Look for:
+- Prior decisions and their rationale
+- Known gotchas in the area being worked on
+- Patterns established in previous sessions
+- Bug history and recurring issues
+
+Include relevant brain findings in the briefing under a "Brain Context" section.
+
 ## Step 3: Check Project Health
 
 Quick health check — catch problems before they compound:
@@ -139,4 +156,4 @@ Map branch topics to relevant skills:
 - Does not make decisions about what to work on (that's the human's call)
 - Does not start coding (wait for confirmation)
 - Does not replace `work-ticket` (which handles the full ticket lifecycle)
-- Does not query a brain/MCP (future Phase 5 addition)
+- Queries brain for context but does not store new memories (that happens at work completion)
