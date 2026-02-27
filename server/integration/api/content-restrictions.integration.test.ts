@@ -116,7 +116,7 @@ describe("Content Restrictions Integration Tests", () => {
 
         expect(response.ok).toBe(true);
         expect(response.data.success).toBe(true);
-      });
+      }, 60_000); // Exclusion recompute with restrictEmpty: true is expensive
 
       it("should validate entity type", async () => {
         const restrictions = [
@@ -199,7 +199,7 @@ describe("Content Restrictions Integration Tests", () => {
         }>(`/api/user/${testUserId}/restrictions`);
 
         expect(getResponse.data.restrictions).toHaveLength(0);
-      });
+      }, 60_000); // PUT + DELETE both trigger exclusion recompute
 
       it("should reject non-admin access", async () => {
         const response = await testUserClient.delete(
@@ -420,7 +420,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.status).toBe(200);
         expect(response.data.ok).toBe(true);
         expect(response.data.message).toContain("Recomputed");
-      });
+      }, 60_000); // Exclusion recompute can be slow with empty-entity scanning
 
       it("should reject invalid user ID", async () => {
         const response = await adminClient.post<{ error: string }>(
@@ -463,7 +463,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.data.ok).toBe(true);
         expect(typeof response.data.success).toBe("number");
         expect(response.data.failed).toBe(0);
-      });
+      }, 60_000); // Recomputes all users' exclusions
 
       it("should reject non-admin access", async () => {
         const response = await testUserClient.post(

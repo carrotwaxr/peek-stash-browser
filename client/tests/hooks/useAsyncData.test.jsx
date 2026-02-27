@@ -81,7 +81,7 @@ describe("useAsyncData", () => {
       useAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
       const fetchFn = vi.fn().mockResolvedValue({});
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      renderHook(() => useAsyncData(fetchFn));
 
       // Should not call fetchFn while auth is loading
       expect(fetchFn).not.toHaveBeenCalled();
