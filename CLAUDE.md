@@ -10,13 +10,11 @@ Web application for browsing and streaming Stash media with multi-instance suppo
 - **Deployment**: Docker (dev: docker-compose, prod: single container + Nginx)
 - **Stash API**: Internal `StashClient` using `graphql-request` + GraphQL codegen SDK
 
-## Development
+## Quick Reference
 
 ```bash
-# Start dev environment (recommended)
+# Dev environment
 docker-compose up --build -d
-
-# View logs
 docker-compose logs -f peek-server
 docker-compose logs -f peek-client
 
@@ -27,191 +25,102 @@ cd server && npm run lint
 # Tests
 cd client && npm test
 cd server && npm test
+cd server && npm run test:integration
 ```
 
 Docker is required for the full dev environment. Direct Node.js (`npm run dev`) works for quick validation but isn't fully functional.
 
-## Architecture
+## Core Architecture
 
-### Multi-Instance Support
+### Multi-Instance Support (affects everything)
 
-Peek connects to **multiple Stash servers** simultaneously. This is a core architectural pattern:
+Peek connects to **multiple Stash servers** simultaneously. This is the most important architectural pattern to understand:
 
-- `StashInstance` model stores server configs (URL, API key, priority)
-- `UserStashInstance` controls which instances each user sees
-- `StashInstanceManager` service manages connections and credentials
 - All cached entity tables use **composite keys**: `@@id([id, stashInstanceId])`
 - Query builders, stats, and user data functions all require `instanceId` awareness
+- `StashInstanceManager` manages connections and credentials per instance
+- Every data operation must be instance-scoped — forgetting this causes silent data mixing bugs
 
-### Video Streaming (server/controllers/video.ts)
+### Video Streaming
 
-Peek does **not** transcode video itself. It proxies Stash's native streaming:
-
-- Rewrites HLS playlist URLs to route through Peek's proxy (`/api/proxy/stash`)
-- Strips Stash API keys from segment URLs for security
-- Supports per-instance stream routing via `instanceId` parameter
-- Connection pooling and concurrency limiting via `server/controllers/proxy.ts`
-
-### Stash Integration
-
-- `StashClient` (`server/graphql/StashClient.ts`): Internal GraphQL client using generated SDK
-- `StashSyncService`: Syncs entity data from Stash instances into local SQLite cache
-- `StashEntityService`: Cached entity lookups and relationships
-- `StashInstanceManager`: Multi-instance connection lifecycle
-- GraphQL codegen config: `server/codegen.yml` generates `server/graphql/generated/graphql.ts`
-- All Stash image/stream URLs proxied via `/api/proxy/stash` to hide API keys
+Peek proxies Stash's native HLS streams — it does **not** transcode. The proxy rewrites playlist URLs, strips API keys from segment URLs for security, and routes per-instance. See `server/controllers/video.ts` and `server/controllers/proxy.ts`.
 
 ### Authentication
 
-- JWT in HTTP-only cookies (24h expiry, auto-refresh)
-- Supports reverse proxy auth via `PROXY_AUTH_HEADER`
-- Roles: ADMIN, USER
-- Middleware: `authenticate`, `requireAdmin`, `requireCacheReady` (in `server/middleware/auth.ts`)
-
-### Key Services (server/services/)
-
-| Service | Purpose |
-|---------|---------|
-| `StashInstanceManager` | Multi-instance connection management |
-| `StashSyncService` | Entity sync from Stash to local cache |
-| `StashEntityService` | Cached entity lookups and relations |
-| `SceneQueryBuilder` | Scene filtering with complex joins |
-| `PerformerQueryBuilder`, `GalleryQueryBuilder`, etc. | Per-entity query builders |
-| `UserStatsService` | User engagement tracking (play counts, O counter) |
-| `RankingComputeService` | Engagement scoring and percentile ranking |
-| `ExclusionComputationService` | Pre-computed content restriction caching |
-| `MergeReconciliationService` | Scene merge/duplicate handling |
-| `DataMigrationService` | Schema data migrations |
-
-### Controllers (server/controllers/)
-
-Video, proxy, setup, user, playlist, stats, userStats, ratings, watchHistory, download, clips, carousel, customTheme, groups, imageViewHistory, timelineController, plus `library/` subdirectory with per-entity files (scenes, performers, studios, tags, groups, galleries, images).
+JWT in HTTP-only cookies (24h expiry, auto-refresh). Roles: ADMIN, USER. Supports reverse proxy auth via `PROXY_AUTH_HEADER`. Middleware in `server/middleware/auth.ts`.
 
 ## Database
 
-**Always use migrations, never `prisma db push`.**
+**Always use migrations, never `prisma db push`.** Due to FTS virtual tables, `prisma migrate dev` causes false drift detection — use manual migrations per the `prisma-sqlite-expert` skill. Schema: `server/prisma/schema.prisma`.
 
-### Key Model Groups
+## Skill Directory
 
-- **Users**: User, UserGroup, UserGroupMembership
-- **Stash Cache**: StashScene, StashPerformer, StashStudio, StashTag, StashGroup, StashGallery, StashImage, StashClip (all with composite keys `[id, stashInstanceId]`)
-- **Multi-Instance**: StashInstance, UserStashInstance, UserCarousel
-- **User Activity**: WatchHistory, ImageViewHistory, Playlist, PlaylistItem, PlaylistShare, Download
-- **Ratings**: SceneRating, PerformerRating, StudioRating, TagRating, GalleryRating, GroupRating, ImageRating
-- **Stats**: UserPerformerStats, UserStudioStats, UserTagStats, UserEntityRanking, UserEntityStats
-- **Permissions**: UserContentRestriction, UserHiddenEntity, UserExcludedEntity
-- **Sync**: SyncState, SyncSettings, DataMigration, MergeRecord
-- **Other**: CustomTheme
-- **Junction Tables**: ScenePerformer, SceneTag, SceneGroup, SceneGallery, ImagePerformer, ImageTag, ImageGallery, GalleryPerformer, PerformerTag, StudioTag, GalleryTag, GroupTag, ClipTag
+These skills contain detailed reference material. Invoke the relevant skill when working in that area:
 
-### Creating Migrations
+| Area | Skill | What it covers |
+|------|-------|----------------|
+| **Session start** | `start-session` | Branch context, plan docs, recent history, structured briefing |
+| **API routes & controllers** | `express5-api-patterns` | Route handlers, middleware, proxy controllers, streaming endpoints |
+| **Database & migrations** | `prisma-sqlite-expert` | Schema design, FTS5, migration process (including FTS workaround) |
+| **Testing** | `writing-tests` | Vitest + RTL (client), integration tests (server), test Stash instance setup |
+| **UI components** | `visual-style` | Color system, spacing, theme variables, component conventions |
+| **React performance** | `react-spa-performance` | Code splitting, re-renders, virtualization, bundle optimization |
+| **Code review** | `self-review` | Quality checklist, invokes relevant skills per diff area |
+| **Releases** | `release-workflow` | Full lifecycle; also `/pre-release`, `/release-stable`, `/release-beta` |
+| **Documentation** | `updating-docs` | MkDocs conventions, doc structure, plan formatting |
+| **GraphQL** | `graphql-patterns` | Stash ecosystem GraphQL, codegen, query patterns |
+| **Stash API** | `stash` | Stash GraphQL API, plugin system, scraper system |
 
-**Important:** Due to FTS (Full-Text Search) virtual tables in the schema, `prisma migrate dev` often fails with schema drift errors. Use this manual process instead:
+## Development Lifecycle
 
-```bash
-cd server
+### Starting a session
 
-# 1. Create migration directory with timestamp
-mkdir -p prisma/migrations/YYYYMMDD000000_descriptive_name
+Run `/start-session` at the beginning of every session. This gathers branch context, plan documents, and recent history before any code is written. **Do not skip this step** — it prevents the cold-start problem where the agent works without context.
 
-# 2. Write the migration SQL manually
-cat > prisma/migrations/YYYYMMDD000000_descriptive_name/migration.sql << 'EOF'
--- Description of what this migration does
-ALTER TABLE "TableName" ADD COLUMN "columnName" TEXT;
-EOF
+### Working on a ticket
 
-# 3. Update schema.prisma to match the migration
+Follow this chain:
 
-# 4. Regenerate Prisma client
-npx prisma generate
+1. **Orient** → `/start-session` (gather context, present briefing, confirm direction)
+2. **Pick up ticket** → invoke `work-ticket` (handles branch creation, plan review, implementation)
+3. **Write tests** → invoke `writing-tests` for conventions
+4. **Verify** → `superpowers:verification-before-completion` (evidence before claims)
+5. **Self-review** → `self-review` (code quality, invokes relevant best-practice skills)
+6. **Complete** → `superpowers:finishing-a-development-branch` (merge/PR/keep/discard)
 
-# 5. Apply migration to dev database
-npx prisma migrate deploy
+### Lifecycle Gates
 
-# 6. Run tests to verify
-npm test
-```
+These are **mandatory** — do not skip or rationalize around them.
 
-**Why manual migrations?** Prisma's introspection doesn't handle SQLite FTS virtual tables well, causing `prisma migrate dev` to detect false schema drift and request a database reset. The FTS tables are created via raw SQL in migrations and work correctly at runtime.
+**Before creating a branch:**
+- Have a ticket or clear scope for the work
+- If non-trivial, have a plan document reviewed by the human
 
-### Applying Migrations
+**Before creating a PR:**
+- All tests pass: `cd client && npm test` and `cd server && npm test`
+- Lint clean: `cd client && npm run lint` and `cd server && npm run lint`
+- TypeScript compiles: `cd server && npx tsc --noEmit`
+- Client builds: `cd client && npm run build`
+- Integration tests pass (if touching server logic): `cd server && npm run test:integration`
+- Self-review completed via `self-review` skill
+- Documentation updated if behavior changed (invoke `updating-docs`)
 
-```bash
-npx prisma migrate deploy  # Apply pending migrations (dev and production)
-```
+**Before merging:**
+- CI passes (when available)
+- Human has reviewed the PR
 
-In Docker, migrations are applied automatically on container startup.
-
-## Release Process
+### Release Process
 
 Use `/release-workflow` for the full process overview. Quick reference:
 1. Run `/pre-release` to validate (tests, lint, build, Docker build)
-2. Run `/release-alpha` (stable) or `/release-beta` (beta) to bump versions, commit, tag, and push
+2. Run `/release-stable` (stable) or `/release-beta` (beta) to bump versions, commit, tag, and push
 3. GitHub Actions (`.github/workflows/docker-build.yml`) builds Docker image and creates release
-
-## Key Files
-
-**Frontend**: `client/src/components/video-player/VideoPlayer.jsx`, `client/src/services/api.js`
-**Backend**: `server/controllers/video.ts`, `server/controllers/proxy.ts`, `server/controllers/library/scenes.ts`
-**Services**: `server/services/StashInstanceManager.ts`, `server/services/StashSyncService.ts`, `server/services/StashEntityService.ts`
-**GraphQL**: `server/graphql/StashClient.ts`, `server/graphql/generated/graphql.ts`, `server/codegen.yml`
-**Config**: `docker-compose.yml`, `Dockerfile.production`, `server/prisma/schema.prisma`
 
 ## Environment Variables
 
 Required: `DATABASE_URL`, `JWT_SECRET`
-Instance config: `STASH_URL` and `STASH_API_KEY` (legacy env-based setup, now configurable via Setup Wizard UI with multi-instance support)
+Instance config: `STASH_URL` and `STASH_API_KEY` (legacy env-based setup, now configurable via Setup Wizard UI)
 Optional: `PROXY_AUTH_HEADER`, `SECURE_COOKIES`, `CONFIG_DIR`, `PEEK_DATA_DIR`, `PEEK_FRONTEND_PORT`, `PEEK_BACKEND_PORT`
-
-## Integration Testing
-
-Integration tests run against a real Stash server to validate API functionality.
-
-**Setup (first time):**
-1. Ensure `.env` has `STASH_URL` and `STASH_API_KEY`
-2. Copy `server/integration/fixtures/testEntities.example.ts` to `testEntities.ts`
-3. Fill in entity IDs from your Stash library
-
-**Running tests:**
-- `cd server && npm run test:integration` - Run against persistent test DB
-- `cd server && npm run test:integration:fresh` - Reset DB and test setup flow
-- `cd server && npm run test:integration:watch` - Watch mode for development
-
-**Pre-release validation:**
-Run `/pre-release` to execute all checks before tagging a release.
-
-### Test Stash Instance
-
-A dedicated test Stash instance (`stash-test` on unraid) is available for integration testing:
-- **URL**: `http://10.0.0.4:6971/graphql` (credentials in `.env` as `STASH_TEST_*`)
-- **Container**: `stash-test` on unraid
-- **Volumes**: `/data` (videos), `/images` (images)
-
-**Setting up test entities:**
-Test entities can be created/modified via Stash GraphQL API. Use curl with the API key:
-```bash
-curl -s 'http://10.0.0.4:6971/graphql' \
-  -H 'ApiKey: $STASH_TEST_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "mutation { ... }"}'
-```
-
-Common operations:
-- **Create group**: `groupCreate(input: { name: "..." })`
-- **Add scenes to group**: `sceneUpdate(input: { id: "X", groups: [{ group_id: "Y" }] })`
-- **Create gallery**: `galleryCreate(input: { title: "...", tag_ids: [...] })`
-- **Add images to gallery**: `imageUpdate(input: { id: "X", gallery_ids: ["Y"] })`
-- **Add tags to performer**: `performerUpdate(input: { id: "X", tag_ids: [...] })`
-- **Trigger scan**: `metadataScan(input: { paths: ["/images"] })`
-
-**Adding test media via SSH:**
-```bash
-ssh root@10.0.0.4
-# Images go to: /mnt/user/syslib/bunh/stash-test/img/
-# Videos go to: /mnt/user/syslib/bunh/stash-test/vid/
-```
-
-After adding files, trigger a scan in Stash to pick them up.
 
 ## Issue Tracking
 

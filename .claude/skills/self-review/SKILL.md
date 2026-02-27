@@ -1,6 +1,6 @@
 ---
 name: self-review
-description: Perform a code review before creating a PR
+description: Perform a code quality review before creating a PR. Use when reviewing changes, checking code quality, or doing a self-review of the current branch. Invoked as part of the work-ticket lifecycle after verification-before-completion and before finishing-a-development-branch.
 ---
 
 # Code Review Quality Check
@@ -22,9 +22,9 @@ Based on which files changed, invoke the corresponding skills to have their guid
 
 | Files changed | Skill to invoke |
 |---|---|
-| `client/src/components/**` (UI/layout) | `visual-style`, `responsive-design`, `web-design-guidelines` |
-| `client/src/components/**` (React logic) | `vercel-react-best-practices`, `vercel-composition-patterns` |
-| `server/controllers/**`, `server/routes/**` | `nodejs-backend-patterns`, `api-design-principles` |
+| `client/src/components/**` (UI/layout) | `visual-style`, `responsive-design` |
+| `client/src/components/**` (React logic) | `vercel-composition-patterns`, `react-spa-performance` |
+| `server/controllers/**`, `server/routes/**` | `express5-api-patterns`, `api-design-principles` |
 | `server/services/**` (TypeScript) | `typescript-advanced-types` |
 | `server/prisma/**`, migration files | `prisma-sqlite-expert` |
 | `server/graphql/**`, `codegen.yml` | `graphql-patterns` |
@@ -152,21 +152,6 @@ Expected: Build succeeds without errors
 - Nice-to-have improvements
 - Tech debt observations
 
-## Step 6: Create Pull Request
+## Step 6: Hand Off
 
-After all blocking issues are fixed, create a GitHub PR:
-
-```bash
-gh pr create --title "Brief descriptive title" --body "$(cat <<'EOF'
-## Summary
-- Bullet points of what this PR does from user perspective
-- Focus on behavior changes, not implementation details
-
-## Test plan
-- [ ] Manual testing steps if applicable
-- [ ] Automated test coverage notes
-EOF
-)"
-```
-
-Do not include Claude attribution in PR descriptions.
+After all blocking issues are fixed, report the review results and hand off to `finishing-a-development-branch` for PR creation or merge. Do NOT create a PR in this skill — that's handled by the finishing skill.

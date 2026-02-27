@@ -46,7 +46,7 @@ Run `/release-beta`:
 
 ### Stable Release
 
-Run `/release-alpha` (the skill name is historical — it creates stable releases):
+Run `/release-stable`:
 
 - Remove beta suffix: `3.3.2-beta.8` → `3.3.2`
 - Or increment: `3.3.2` → `3.3.3` or `3.4.0`
@@ -87,8 +87,8 @@ GitHub Actions (`.github/workflows/docker-build.yml`) triggers on `v*` tags:
 After GitHub Actions completes:
 
 ```bash
-# SSH to server
-ssh root@10.0.0.4
+# SSH to your deployment server
+ssh root@<server-ip>
 
 # Pull new image
 docker pull carrotwaxr/peek-stash-browser:latest  # or :beta

@@ -1,6 +1,6 @@
 ---
-name: release-alpha
-description: Release a stable version (non-beta) - bumps versions in both package.json files, commits, tags, and pushes
+name: release-stable
+description: Release a stable version (non-beta) - bumps versions in both package.json files, commits, tags, and pushes. Use when cutting a stable release, promoting from beta, or shipping a new version.
 ---
 
 # Release Stable Version

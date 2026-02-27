@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  client:
+    name: Client Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test:run
+
+  server:
+    name: Server Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Set up test database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: file:./test.db
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript Compile
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm run test:run
+        env:
+          DATABASE_URL: file:./test.db
+          JWT_SECRET: ci-test-secret
+
+  # Integration tests require access to a Stash test instance on the local network.
+  # This job only runs on self-hosted runners with network access to the test server.
+  # To enable: add a self-hosted runner on the same network as the Stash test instance,
+  # configure STASH_TEST_URL and STASH_TEST_API_KEY as repository secrets,
+  # and change 'if: false' to 'if: true' (or use a different condition).
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: false # Disabled until self-hosted runner or VPN is configured
+    needs: [server]
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Integration Tests
+        run: npm run test:integration
+        env:
+          STASH_TEST_URL: ${{ secrets.STASH_TEST_URL }}
+          STASH_TEST_API_KEY: ${{ secrets.STASH_TEST_API_KEY }}
