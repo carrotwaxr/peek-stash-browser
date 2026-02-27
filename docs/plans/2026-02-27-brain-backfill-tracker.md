@@ -30,8 +30,8 @@ Priority order based on bug history, complexity, and how often each area is touc
 | 4 | StashSyncService & entity caching | `server/services/StashSyncService.ts`, `StashEntityService.ts` | High | **Done** (5 memories, 24 tests added) |
 | 5 | Query builders | `server/services/SceneQueryBuilder.ts`, `PerformerQueryBuilder.ts`, etc. | High | **Done** (5 memories, 37 tests added) |
 | 6 | Authentication & route guards | `server/middleware/auth.ts`, JWT flow, proxy auth | Medium | **Done** (5 memories, 19 tests added) |
-| 7 | Playlist system & sharing | `server/controllers/playlist.ts`, `PlaylistShare` model | Medium | Not started |
-| 8 | Stats, rankings, user activity | `server/services/UserStatsService.ts`, `RankingComputeService.ts` | Medium | Not started |
+| 7 | Playlist system & sharing | `server/controllers/playlist.ts`, `PlaylistShare` model | Medium | **Done** (5 memories, 28 tests added) |
+| 8 | Stats, rankings, user activity | `server/services/UserStatsService.ts`, `RankingComputeService.ts` | Medium | **Done** (5 memories, 12 tests added) |
 | 9 | Setup wizard & instance management | `server/controllers/setup.ts`, setup flow | Low | Not started |
 | 10 | Client-side patterns | Routing, TanStack Query, component conventions, Tailwind patterns | Low | Not started |
 
