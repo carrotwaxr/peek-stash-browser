@@ -26,6 +26,15 @@ cd server && npm run lint
 cd client && npm test
 cd server && npm test
 cd server && npm run test:integration
+
+# E2E tests (requires docker-compose running, or set E2E_BASE_URL)
+npm run test:e2e
+npm run test:e2e:headed    # with browser visible
+npm run test:e2e:ui        # Playwright UI mode
+
+# Coverage
+cd client && npm run test:coverage
+cd server && npm run test:coverage
 ```
 
 Docker is required for the full dev environment. Direct Node.js (`npm run dev`) works for quick validation but isn't fully functional.
@@ -63,6 +72,7 @@ These skills contain detailed reference material. Invoke the relevant skill when
 | **API routes & controllers** | `express5-api-patterns` | Route handlers, middleware, proxy controllers, streaming endpoints |
 | **Database & migrations** | `prisma-sqlite-expert` | Schema design, FTS5, migration process (including FTS workaround) |
 | **Testing** | `writing-tests` | Vitest + RTL (client), integration tests (server), test Stash instance setup |
+| **E2E testing** | `playwright-skill` | Playwright E2E tests, locators, auth patterns, CI integration |
 | **UI components** | `visual-style` | Color system, spacing, theme variables, component conventions |
 | **React performance** | `react-spa-performance` | Code splitting, re-renders, virtualization, bundle optimization |
 | **Code review** | `self-review` | Quality checklist, invokes relevant skills per diff area |

@@ -94,5 +94,10 @@ server/integration/.env.integration
 # Local data directory (database backups, etc.)
 .peek-data/
 
+# Playwright
+playwright-report/
+test-results/
+e2e/.auth/
+
 # Claude planning documents (session-specific)
 docs/plans/

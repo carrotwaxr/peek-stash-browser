@@ -271,6 +271,56 @@ Common mutations:
 2. Copy `server/integration/fixtures/testEntities.example.ts` to `testEntities.ts`
 3. Fill in entity IDs from your Stash library
 
+## E2E Tests (Playwright)
+
+### Location & Naming
+
+```
+e2e/
+  auth.setup.ts       # Login and save storage state
+  global-setup.ts     # Bootstrap admin user on fresh DB
+  auth.spec.ts        # Auth flow tests
+  navigation.spec.ts  # Page navigation tests
+```
+
+File naming: `feature-name.spec.ts`
+
+### Configuration
+
+- Config: `playwright.config.ts` (project root)
+- Browser: Chromium only (expand later)
+- Auth: Storage state saved by setup project, reused by all tests
+- CI: Playwright starts server + client via `webServer` config
+- Local: Tests run against docker-compose at `localhost:6969`
+
+### Key Conventions
+
+- **Locator priority**: `getByRole` > `getByText` > `getByTestId` (same as RTL)
+- **No `waitForTimeout()`**: Use `expect(locator).toBeVisible()` or `waitForURL()`
+- **Web-first assertions**: `expect(locator)` auto-retries
+- **Isolate tests**: No shared state, no execution-order dependencies
+- **Mock external only**: Never mock the app itself; mock third-party APIs if needed
+
+### Running E2E Tests
+
+```bash
+# Requires docker-compose running (or set E2E_BASE_URL)
+npm run test:e2e              # Headless
+npm run test:e2e:headed       # With browser visible
+npm run test:e2e:ui           # Playwright UI mode
+```
+
+### Coverage Thresholds
+
+Both client and server enforce coverage thresholds in CI. If coverage drops below thresholds, the build fails.
+
+| Metric | Client | Server |
+|--------|--------|--------|
+| Statements | 30% | 35% |
+| Branches | 70% | 65% |
+| Functions | 33% | 45% |
+| Lines | 30% | 35% |
+
 ## Running Tests
 
 ```bash
@@ -282,7 +332,11 @@ cd client && npm run test:coverage
 # Server unit
 cd server && npm test
 cd server && npm run test:run
+cd server && npm run test:coverage
 
 # Server integration
 cd server && npm run test:integration
+
+# E2E
+npm run test:e2e
 ```

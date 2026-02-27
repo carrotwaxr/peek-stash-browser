@@ -64,7 +64,9 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "http://peek-server:8000",
+        target:
+          globalThis.process?.env?.VITE_API_PROXY_TARGET ||
+          "http://peek-server:8000",
         changeOrigin: true,
       },
     },

@@ -129,6 +129,14 @@ cd client && npm run build
 
 Expected: Build succeeds without errors
 
+### E2E (if docker-compose is running)
+
+```bash
+npm run test:e2e
+```
+
+Expected: All E2E tests pass
+
 ## Step 5: Issue Severity Guide
 
 **Blocking (must fix before PR):**

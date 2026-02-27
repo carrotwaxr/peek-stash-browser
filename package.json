@@ -4,6 +4,9 @@
   "private": true,
   "description": "Peek Stash Browser - Workspace root",
   "scripts": {
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:e2e:headed": "npx playwright test --headed",
     "screenshots": "node screenshots/capture.js",
     "screenshots:publish": "node screenshots/publish.js",
     "docs": ".venv/bin/mkdocs serve --livereload -a localhost:8001"
