@@ -29,7 +29,7 @@ Priority order based on bug history, complexity, and how often each area is touc
 | 3 | Multi-instance routing & composite keys | `server/services/StashInstanceManager.ts`, all `@@id` models | Critical | **Done** (5 memories, 6 tests added) |
 | 4 | StashSyncService & entity caching | `server/services/StashSyncService.ts`, `StashEntityService.ts` | High | **Done** (5 memories, 24 tests added) |
 | 5 | Query builders | `server/services/SceneQueryBuilder.ts`, `PerformerQueryBuilder.ts`, etc. | High | **Done** (5 memories, 37 tests added) |
-| 6 | Authentication & route guards | `server/middleware/auth.ts`, JWT flow, proxy auth | Medium | Not started |
+| 6 | Authentication & route guards | `server/middleware/auth.ts`, JWT flow, proxy auth | Medium | **Done** (5 memories, 19 tests added) |
 | 7 | Playlist system & sharing | `server/controllers/playlist.ts`, `PlaylistShare` model | Medium | Not started |
 | 8 | Stats, rankings, user activity | `server/services/UserStatsService.ts`, `RankingComputeService.ts` | Medium | Not started |
 | 9 | Setup wizard & instance management | `server/controllers/setup.ts`, setup flow | Low | Not started |
