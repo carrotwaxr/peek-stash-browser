@@ -46,7 +46,7 @@ Run `/release-beta`:
 
 ### Stable Release
 
-Run `/release-alpha` (the skill name is historical — it creates stable releases):
+Run `/release-stable`:
 
 - Remove beta suffix: `3.3.2-beta.8` → `3.3.2`
 - Or increment: `3.3.2` → `3.3.3` or `3.4.0`

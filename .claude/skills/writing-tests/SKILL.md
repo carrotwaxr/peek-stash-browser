@@ -241,6 +241,44 @@ npm run test:integration:fresh    # Fresh database (FRESH_DB=true)
 npm run test:integration:watch    # Watch mode
 ```
 
+### Test Stash Instance
+
+A dedicated test Stash instance (`stash-test` on unraid) is available for integration testing:
+- **URL**: `http://10.0.0.4:6971/graphql` (credentials in `.env` as `STASH_TEST_*`)
+- **Container**: `stash-test` on unraid
+- **Volumes**: `/data` (videos), `/images` (images)
+
+**Setting up test entities:**
+Test entities can be created/modified via Stash GraphQL API. Use curl with the API key:
+```bash
+curl -s 'http://10.0.0.4:6971/graphql' \
+  -H 'ApiKey: $STASH_TEST_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "mutation { ... }"}'
+```
+
+Common operations:
+- **Create group**: `groupCreate(input: { name: "..." })`
+- **Add scenes to group**: `sceneUpdate(input: { id: "X", groups: [{ group_id: "Y" }] })`
+- **Create gallery**: `galleryCreate(input: { title: "...", tag_ids: [...] })`
+- **Add images to gallery**: `imageUpdate(input: { id: "X", gallery_ids: ["Y"] })`
+- **Add tags to performer**: `performerUpdate(input: { id: "X", tag_ids: [...] })`
+- **Trigger scan**: `metadataScan(input: { paths: ["/images"] })`
+
+**Adding test media via SSH:**
+```bash
+ssh root@10.0.0.4
+# Images go to: /mnt/user/syslib/bunh/stash-test/img/
+# Videos go to: /mnt/user/syslib/bunh/stash-test/vid/
+```
+
+After adding files, trigger a scan in Stash to pick them up.
+
+**First-time setup:**
+1. Ensure `.env` has `STASH_URL` and `STASH_API_KEY`
+2. Copy `server/integration/fixtures/testEntities.example.ts` to `testEntities.ts`
+3. Fill in entity IDs from your Stash library
+
 ## Running Tests
 
 ```bash
