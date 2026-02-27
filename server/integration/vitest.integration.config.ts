@@ -16,5 +16,9 @@ export default defineConfig({
     hookTimeout: 60000, // 60s for setup/teardown hooks
     fileParallelism: false, // Run sequentially
     root: path.resolve(__dirname),
+    reporters: [
+      "default",
+      path.resolve(__dirname, "./helpers/summaryReporter.ts"),
+    ],
   },
 });

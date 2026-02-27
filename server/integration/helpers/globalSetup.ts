@@ -145,10 +145,32 @@ export async function setup() {
     // Close the HTTP server
     await stopServer();
 
-    // Disconnect Prisma to close database connections
+    // Disconnect Prisma — suppress stderr noise from SQLite cleanup
+    // Prisma emits benign connection-close warnings that pollute test output
     console.log("[Integration Tests] Disconnecting Prisma...");
     const { default: prisma } = await import("../../prisma/singleton.js");
-    await prisma.$disconnect();
+    const originalStderrWrite = process.stderr.write.bind(process.stderr);
+    const teardownLog: string[] = [];
+    process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
+      teardownLog.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      await prisma.$disconnect();
+    } finally {
+      process.stderr.write = originalStderrWrite;
+
+      // Write captured stderr to log file for debugging
+      if (teardownLog.length > 0) {
+        const resultsDir = path.resolve(__dirname, "../results");
+        fs.mkdirSync(resultsDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(resultsDir, "teardown.log"),
+          teardownLog.join("")
+        );
+      }
+    }
 
     console.log("[Integration Tests] Global teardown complete");
   };
