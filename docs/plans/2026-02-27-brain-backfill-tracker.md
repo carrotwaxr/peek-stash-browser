@@ -26,7 +26,7 @@ Priority order based on bug history, complexity, and how often each area is touc
 |---|------|-----------|----------|--------|
 | 1 | Video proxy & HLS rewriting | `server/controllers/video.ts`, `server/controllers/proxy.ts` | Critical | **Done** (10 memories) |
 | 2 | Exclusions & content restrictions | `server/services/ExclusionComputationService.ts`, related middleware | Critical | **Done** (5 memories, 18 tests added) |
-| 3 | Multi-instance routing & composite keys | `server/services/StashInstanceManager.ts`, all `@@id` models | Critical | Not started |
+| 3 | Multi-instance routing & composite keys | `server/services/StashInstanceManager.ts`, all `@@id` models | Critical | **Done** (5 memories, 6 tests added) |
 | 4 | StashSyncService & entity caching | `server/services/StashSyncService.ts`, `StashEntityService.ts` | High | Not started |
 | 5 | Query builders | `server/services/SceneQueryBuilder.ts`, `PerformerQueryBuilder.ts`, etc. | High | Not started |
 | 6 | Authentication & route guards | `server/middleware/auth.ts`, JWT flow, proxy auth | Medium | Not started |

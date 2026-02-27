@@ -408,6 +408,53 @@ describe("StashInstanceManager", () => {
     });
   });
 
+  describe("initialize error handling", () => {
+    it("throws when StashClient constructor fails", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_A]);
+
+      // Make StashClient constructor throw
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(() => {
+        throw new Error("Connection refused");
+      });
+      const { logger } = await import("../../utils/logger.js");
+
+      const manager = await importFresh();
+
+      await expect(manager.initialize()).rejects.toThrow("Connection refused");
+      expect(logger.error).toHaveBeenCalledWith(
+        `Failed to initialize Stash instance: ${INSTANCE_A.name}`,
+        expect.objectContaining({ error: "Connection refused" })
+      );
+    });
+  });
+
+  describe("getBaseUrl with unknown instanceId", () => {
+    it("throws when specific instanceId is not found", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_A]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(() => manager.getBaseUrl("nonexistent-id")).toThrow(
+        "No Stash instance configured"
+      );
+    });
+  });
+
+  describe("getApiKey with unknown instanceId", () => {
+    it("throws when specific instanceId is not found", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_A]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(() => manager.getApiKey("nonexistent-id")).toThrow(
+        "No Stash instance configured"
+      );
+    });
+  });
+
   describe("getConfig", () => {
     it("returns config for a known instance", async () => {
       mockFindMany.mockResolvedValue([INSTANCE_A]);

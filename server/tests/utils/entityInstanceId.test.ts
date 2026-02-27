@@ -164,6 +164,21 @@ describe("entityInstanceId", () => {
       });
     });
 
+    it("falls back when entity has null stashInstanceId", async () => {
+      mockPrisma.stashScene.findMany.mockResolvedValue([
+        { stashInstanceId: null },
+      ] as any);
+      const { logger } = await import("../../utils/logger.js");
+
+      const result = await getEntityInstanceId("scene", "42");
+
+      expect(result).toBe("aaa-111"); // Fallback
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Entity not found in database, using fallback instance",
+        expect.objectContaining({ entityType: "scene", entityId: "42" })
+      );
+    });
+
     it("falls back gracefully on database error", async () => {
       mockPrisma.stashScene.findMany.mockRejectedValue(
         new Error("DB timeout")
@@ -282,6 +297,37 @@ describe("entityInstanceId", () => {
           entityId: "p1",
           instanceCount: 2,
         })
+      );
+    });
+
+    it("skips entities with null stashInstanceId in batch results", async () => {
+      mockPrisma.stashScene.findMany.mockResolvedValue([
+        { id: "1", stashInstanceId: "aaa-111" },
+        { id: "2", stashInstanceId: null },
+      ] as any);
+
+      const result = await getEntityInstanceIds("scene", ["1", "2"]);
+
+      expect(result.get("1")).toBe("aaa-111");
+      // Entity with null stashInstanceId should get fallback
+      expect(result.get("2")).toBe("aaa-111");
+    });
+
+    it("skips null stashInstanceId entities in duplicate detection", async () => {
+      mockPrisma.stashPerformer.findMany.mockResolvedValue([
+        { id: "p1", stashInstanceId: null },
+        { id: "p1", stashInstanceId: "aaa-111" },
+      ] as any);
+      const { logger } = await import("../../utils/logger.js");
+
+      const result = await getEntityInstanceIds("performer", ["p1"]);
+
+      // Should use the non-null instance
+      expect(result.get("p1")).toBe("aaa-111");
+      // Should NOT warn about duplicates since the null one is skipped
+      expect(logger.warn).not.toHaveBeenCalledWith(
+        "Batch lookup: entity exists in multiple instances, using first by ID order",
+        expect.anything()
       );
     });
 
