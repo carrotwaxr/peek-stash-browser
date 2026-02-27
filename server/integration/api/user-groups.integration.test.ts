@@ -25,15 +25,19 @@ interface GroupsListResponse {
   groups: UserGroup[];
 }
 
+interface GroupMember {
+  id: number;
+  user: {
+    id: number;
+    username: string;
+    role: string;
+  };
+  joinedAt: string;
+}
+
 interface GroupResponse {
   group: UserGroup & {
-    members?: Array<{
-      id: number;
-      userId: number;
-      username: string;
-      role: string;
-      joinedAt: string;
-    }>;
+    members?: GroupMember[];
   };
 }
 
@@ -227,6 +231,51 @@ describe("User Groups API", () => {
       expect(getResponse.data.group.description).toBe("Test group for get by ID");
       expect(getResponse.data.group.members).toBeDefined();
       expect(Array.isArray(getResponse.data.group.members)).toBe(true);
+    });
+
+    it("returns members with nested user objects (regression: #438)", async () => {
+      // Create a group and add the admin user as a member
+      const groupName = `Member Shape Test ${Date.now()}`;
+      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
+        name: groupName,
+      });
+      expect(createResponse.ok).toBe(true);
+      const groupId = createResponse.data.group.id;
+      createdGroupIds.push(groupId);
+
+      // Get admin user ID
+      const usersResponse = await adminClient.get<{
+        users: Array<{ id: number; username: string; role: string }>;
+      }>("/api/user/all");
+      expect(usersResponse.ok).toBe(true);
+      const adminUser = usersResponse.data.users.find(
+        (u) => u.username === TEST_ADMIN.username
+      );
+      expect(adminUser).toBeDefined();
+
+      // Add admin as a member
+      const addResponse = await adminClient.post(`/api/groups/${groupId}/members`, {
+        userId: adminUser!.id,
+      });
+      expect(addResponse.ok).toBe(true);
+
+      // Fetch the group and verify the member structure has nested user object
+      const getResponse = await adminClient.get<GroupResponse>(
+        `/api/groups/${groupId}`
+      );
+      expect(getResponse.ok).toBe(true);
+      expect(getResponse.data.group.members).toHaveLength(1);
+
+      const member = getResponse.data.group.members![0];
+      // Must have nested user object — NOT flat userId/username
+      expect(member.user).toBeDefined();
+      expect(member.user.id).toBe(adminUser!.id);
+      expect(member.user.username).toBe(TEST_ADMIN.username);
+      expect(member.user.role).toBeDefined();
+      expect(member.joinedAt).toBeDefined();
+      // Ensure old flat shape is NOT present
+      expect((member as Record<string, unknown>).userId).toBeUndefined();
+      expect((member as Record<string, unknown>).username).toBeUndefined();
     });
 
     it("returns 404 for non-existent group", async () => {
