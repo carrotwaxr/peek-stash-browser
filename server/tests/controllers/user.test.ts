@@ -73,6 +73,7 @@ import {
   deleteUser,
   updateUserRole,
 } from "../../controllers/user.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockBcrypt = vi.mocked(bcrypt);
@@ -80,28 +81,6 @@ const mockValidatePassword = vi.mocked(validatePassword);
 
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 const USER = { id: 2, username: "testuser", role: "USER" };
-
-function mockReq(
-  body: Record<string, unknown> = {},
-  params: Record<string, string> = {},
-  user: typeof ADMIN | typeof USER | Record<string, unknown> = USER,
-  query: Record<string, string> = {}
-) {
-  return { body, params, user, query } as any;
-}
-
-function mockRes() {
-  const res: any = {
-    json: vi.fn().mockReturnThis(),
-    status: vi.fn().mockReturnThis(),
-    _getStatus: () => res.status.mock.calls[0]?.[0] ?? 200,
-    _getBody: () => {
-      const jsonCalls = res.json.mock.calls;
-      return jsonCalls[jsonCalls.length - 1]?.[0];
-    },
-  };
-  return res;
-}
 
 describe("User Controller", () => {
   beforeEach(() => {

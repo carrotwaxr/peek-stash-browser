@@ -81,7 +81,7 @@ import {
   getPlaylistShares,
   updatePlaylistShares,
 } from "../../controllers/playlist.js";
-import type { Request, Response } from "express";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
@@ -89,29 +89,6 @@ const mockGetUserGroups = vi.mocked(getUserGroups);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
-
-function createMockRequest(options: {
-  params?: Record<string, string>;
-  body?: Record<string, unknown>;
-  user?: { id: number; username: string; role: string };
-}): Partial<Request> {
-  return {
-    params: options.params || {},
-    body: options.body || {},
-    user: options.user,
-  } as Partial<Request>;
-}
-
-function createMockResponse() {
-  const responseJson = vi.fn();
-  const responseStatus = vi.fn(() => ({ json: responseJson }));
-  return {
-    json: responseJson,
-    status: responseStatus,
-    responseJson,
-    responseStatus,
-  };
-}
 
 describe("Playlist Controller Operations", () => {
   beforeEach(() => {
@@ -134,30 +111,26 @@ describe("Playlist Controller Operations", () => {
       };
       mockPrisma.playlist.create.mockResolvedValue(createdPlaylist as any);
 
-      const req = createMockRequest({
-        body: { name: "My Playlist" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "My Playlist" }, {}, USER);
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(201);
-      expect(responseJson).toHaveBeenCalledWith({ playlist: createdPlaylist });
+      expect(res._getStatus()).toBe(201);
+      expect(res._getBody()).toEqual({ playlist: createdPlaylist });
     });
 
     it("trims whitespace from name and description", async () => {
       mockPrisma.playlist.create.mockResolvedValue({ id: 1 } as any);
 
-      const req = createMockRequest({
-        body: { name: "  My Playlist  ", description: "  A description  " },
-        user: USER,
-      });
-      const { json, status } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq(
+        { name: "  My Playlist  ", description: "  A description  " },
+        {},
+        USER
+      );
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -170,60 +143,45 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("rejects empty name", async () => {
-      const req = createMockRequest({
-        body: { name: "" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "" }, {}, USER);
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
         error: "Playlist name is required",
       });
     });
 
     it("rejects whitespace-only name", async () => {
-      const req = createMockRequest({
-        body: { name: "   " },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "   " }, {}, USER);
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
         error: "Playlist name is required",
       });
     });
 
     it("rejects missing name", async () => {
-      const req = createMockRequest({
-        body: {},
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, {}, USER);
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
+      expect(res._getStatus()).toBe(400);
     });
 
     it("returns 401 when user is not authenticated", async () => {
-      const req = createMockRequest({
-        body: { name: "Test" },
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "Test" });
+      const res = mockRes();
 
-      await createPlaylist(req as any, res as any);
+      await createPlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res._getStatus()).toBe(401);
     });
   });
 
@@ -239,17 +197,12 @@ describe("Playlist Controller Operations", () => {
         _count: { items: 3 },
       } as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { name: "Updated" },
-        user: USER,
-      });
-      const { json, status, responseJson } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "Updated" }, { id: "1" }, USER);
+      const res = mockRes();
 
-      await updatePlaylist(req as any, res as any);
+      await updatePlaylist(req, res);
 
-      expect(json).toHaveBeenCalledWith(
+      expect(res._getBody()).toEqual(
         expect.objectContaining({
           playlist: expect.objectContaining({ name: "Updated" }),
         })
@@ -259,33 +212,23 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { name: "Hijack" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "Hijack" }, { id: "1" }, USER);
+      const res = mockRes();
 
-      await updatePlaylist(req as any, res as any);
+      await updatePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
+      expect(res._getStatus()).toBe(404);
       expect(mockPrisma.playlist.update).not.toHaveBeenCalled();
     });
 
     it("returns 400 for invalid playlist ID", async () => {
-      const req = createMockRequest({
-        params: { id: "abc" },
-        body: { name: "Test" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ name: "Test" }, { id: "abc" }, USER);
+      const res = mockRes();
 
-      await updatePlaylist(req as any, res as any);
+      await updatePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
         error: "Invalid playlist ID",
       });
     });
@@ -299,19 +242,15 @@ describe("Playlist Controller Operations", () => {
       } as any);
       mockPrisma.playlist.delete.mockResolvedValue({} as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await deletePlaylist(req as any, res as any);
+      await deletePlaylist(req, res);
 
       expect(mockPrisma.playlist.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(json).toHaveBeenCalledWith({
+      expect(res._getBody()).toEqual({
         success: true,
         message: "Playlist deleted",
       });
@@ -320,16 +259,12 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await deletePlaylist(req as any, res as any);
+      await deletePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
+      expect(res._getStatus()).toBe(404);
       expect(mockPrisma.playlist.delete).not.toHaveBeenCalled();
     });
   });
@@ -354,16 +289,12 @@ describe("Playlist Controller Operations", () => {
         _count: { items: 2 },
       } as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await duplicatePlaylist(req as any, res as any);
+      await duplicatePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(201);
+      expect(res._getStatus()).toBe(201);
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -391,16 +322,12 @@ describe("Playlist Controller Operations", () => {
         _count: { items: 0 },
       } as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await duplicatePlaylist(req as any, res as any);
+      await duplicatePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(201);
+      expect(res._getStatus()).toBe(201);
       // Duplicate is owned by the duplicating user
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -414,16 +341,12 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user has no access", async () => {
       mockGetAccess.mockResolvedValue({ level: "none" });
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await duplicatePlaylist(req as any, res as any);
+      await duplicatePlaylist(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
+      expect(res._getStatus()).toBe(404);
       expect(mockPrisma.playlist.create).not.toHaveBeenCalled();
     });
   });
@@ -441,16 +364,12 @@ describe("Playlist Controller Operations", () => {
         },
       ] as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await getPlaylistShares(req as any, res as any);
+      await getPlaylistShares(req, res);
 
-      expect(json).toHaveBeenCalledWith({
+      expect(res._getBody()).toEqual({
         shares: [
           {
             groupId: 10,
@@ -464,16 +383,12 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 for non-owned playlist", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        user: USER,
-      });
-      const { json, status, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
 
-      await getPlaylistShares(req as any, res as any);
+      await getPlaylistShares(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
+      expect(res._getStatus()).toBe(404);
     });
   });
 
@@ -496,17 +411,12 @@ describe("Playlist Controller Operations", () => {
         },
       ] as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { groupIds: [10] },
-        user: USER,
-      });
-      const { json, status } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
+      const res = mockRes();
 
-      await updatePlaylistShares(req as any, res as any);
+      await updatePlaylistShares(req, res);
 
-      expect(json).toHaveBeenCalledWith({
+      expect(res._getBody()).toEqual({
         shares: [
           expect.objectContaining({ groupId: 10, groupName: "Family" }),
         ],
@@ -520,18 +430,13 @@ describe("Playlist Controller Operations", () => {
       } as any);
       mockResolvePermissions.mockResolvedValue({ canShare: false } as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { groupIds: [10] },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
+      const res = mockRes();
 
-      await updatePlaylistShares(req as any, res as any);
+      await updatePlaylistShares(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(403);
+      expect(res._getBody()).toEqual({
         error: "You don't have permission to share playlists",
       });
     });
@@ -546,18 +451,17 @@ describe("Playlist Controller Operations", () => {
         { id: 10, name: "Family" },
       ]);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { groupIds: [10, 99] }, // 99 is not a user's group
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq(
+        { groupIds: [10, 99] }, // 99 is not a user's group
+        { id: "1" },
+        USER
+      );
+      const res = mockRes();
 
-      await updatePlaylistShares(req as any, res as any);
+      await updatePlaylistShares(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(403);
+      expect(res._getBody()).toEqual({
         error: "You can only share with groups you belong to",
       });
     });
@@ -570,19 +474,18 @@ describe("Playlist Controller Operations", () => {
       mockPrisma.$transaction.mockResolvedValue([]);
       mockPrisma.playlistShare.findMany.mockResolvedValue([]);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { groupIds: [] }, // Empty = clear all
-        user: USER,
-      });
-      const { json, status } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq(
+        { groupIds: [] }, // Empty = clear all
+        { id: "1" },
+        USER
+      );
+      const res = mockRes();
 
-      await updatePlaylistShares(req as any, res as any);
+      await updatePlaylistShares(req, res);
 
       // Should NOT check permissions when clearing shares
       expect(mockResolvePermissions).not.toHaveBeenCalled();
-      expect(json).toHaveBeenCalledWith({ shares: [] });
+      expect(res._getBody()).toEqual({ shares: [] });
     });
 
     it("returns 400 when groupIds is not an array", async () => {
@@ -591,18 +494,13 @@ describe("Playlist Controller Operations", () => {
         userId: 1,
       } as any);
 
-      const req = createMockRequest({
-        params: { id: "1" },
-        body: { groupIds: "not-an-array" },
-        user: USER,
-      });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
-      const res = { json, status } as unknown as Response;
+      const req = mockReq({ groupIds: "not-an-array" }, { id: "1" }, USER);
+      const res = mockRes();
 
-      await updatePlaylistShares(req as any, res as any);
+      await updatePlaylistShares(req, res);
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody()).toEqual({
         error: "groupIds must be an array",
       });
     });
