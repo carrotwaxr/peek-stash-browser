@@ -25,6 +25,20 @@ export type {
   TypedResponse,
 } from "./express.js";
 
+// User settings & preferences types
+export type {
+  CarouselPreference,
+  TableColumnsConfig,
+  FilterPreset,
+  FilterPresets,
+  DefaultFilterPresets,
+  SyncUpdates,
+  UserRestriction,
+} from "./user.js";
+
+// Proxy controller types
+export type { ProxyOptions } from "./proxy.js";
+
 // Library endpoint types
 export type {
   // Scenes
@@ -38,6 +52,7 @@ export type {
   UpdateSceneParams,
   UpdateSceneRequest,
   UpdateSceneResponse,
+  ScoredSceneId,
   // Performers
   FindPerformersRequest,
   FindPerformersResponse,
