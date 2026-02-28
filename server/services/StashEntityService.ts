@@ -650,14 +650,14 @@ class StashEntityService {
   /**
    * Get scene by ID (includes related entities)
    * @param id - Scene ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScene(id: string, instanceId?: string): Promise<NormalizedScene | null> {
+  async getScene(id: string, instanceId: string): Promise<NormalizedScene | null> {
     const cached = await prisma.stashScene.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
       include: {
         performers: { include: { performer: true } },
@@ -684,14 +684,14 @@ class StashEntityService {
   /**
    * Get scenes by IDs
    * @param ids - Array of scene IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIds(ids: string[], instanceId?: string): Promise<NormalizedScene[]> {
+  async getScenesByIds(ids: string[], instanceId: string): Promise<NormalizedScene[]> {
     const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -703,16 +703,16 @@ class StashEntityService {
    * Use this when you need the related entities, not just scene data.
    * This is more expensive than getScenesByIds due to the joins.
    * @param ids - Array of scene IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIdsWithRelations(ids: string[], instanceId?: string): Promise<NormalizedScene[]> {
+  async getScenesByIdsWithRelations(ids: string[], instanceId: string): Promise<NormalizedScene[]> {
     if (ids.length === 0) return [];
 
     const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
       include: {
         performers: { include: { performer: true } },
@@ -920,14 +920,14 @@ class StashEntityService {
   /**
    * Get performer by ID with computed counts
    * @param id - Performer ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getPerformer(id: string, instanceId?: string): Promise<NormalizedPerformer | null> {
+  async getPerformer(id: string, instanceId: string): Promise<NormalizedPerformer | null> {
     const cached = await prisma.stashPerformer.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -976,14 +976,14 @@ class StashEntityService {
   /**
    * Get performers by IDs
    * @param ids - Array of performer IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getPerformersByIds(ids: string[], instanceId?: string): Promise<NormalizedPerformer[]> {
+  async getPerformersByIds(ids: string[], instanceId: string): Promise<NormalizedPerformer[]> {
     const cached = await prisma.stashPerformer.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1148,14 +1148,14 @@ class StashEntityService {
   /**
    * Get studio by ID with computed counts
    * @param id - Studio ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getStudio(id: string, instanceId?: string): Promise<NormalizedStudio | null> {
+  async getStudio(id: string, instanceId: string): Promise<NormalizedStudio | null> {
     const cached = await prisma.stashStudio.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1215,14 +1215,14 @@ class StashEntityService {
   /**
    * Get studios by IDs
    * @param ids - Array of studio IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getStudiosByIds(ids: string[], instanceId?: string): Promise<NormalizedStudio[]> {
+  async getStudiosByIds(ids: string[], instanceId: string): Promise<NormalizedStudio[]> {
     const cached = await prisma.stashStudio.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1264,14 +1264,14 @@ class StashEntityService {
   /**
    * Get tag by ID with computed counts
    * @param id - Tag ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getTag(id: string, instanceId?: string): Promise<NormalizedTag | null> {
+  async getTag(id: string, instanceId: string): Promise<NormalizedTag | null> {
     const cached = await prisma.stashTag.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1332,14 +1332,14 @@ class StashEntityService {
   /**
    * Get tags by IDs
    * @param ids - Array of tag IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getTagsByIds(ids: string[], instanceId?: string): Promise<NormalizedTag[]> {
+  async getTagsByIds(ids: string[], instanceId: string): Promise<NormalizedTag[]> {
     const cached = await prisma.stashTag.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1376,14 +1376,14 @@ class StashEntityService {
   /**
    * Get gallery by ID with computed counts
    * @param id - Gallery ID
-   * @param instanceId - Optional Stash instance ID for multi-instance support
+   * @param instanceId - Stash instance ID for multi-instance support
    */
-  async getGallery(id: string, instanceId?: string): Promise<NormalizedGallery | null> {
+  async getGallery(id: string, instanceId: string): Promise<NormalizedGallery | null> {
     const cached = await prisma.stashGallery.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
       include: {
         performers: { include: { performer: true } },
@@ -1456,14 +1456,14 @@ class StashEntityService {
   /**
    * Get group by ID with computed counts
    * @param id - Group ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getGroup(id: string, instanceId?: string): Promise<NormalizedGroup | null> {
+  async getGroup(id: string, instanceId: string): Promise<NormalizedGroup | null> {
     const cached = await prisma.stashGroup.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1501,14 +1501,14 @@ class StashEntityService {
   /**
    * Get groups by IDs
    * @param ids - Array of group IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getGroupsByIds(ids: string[], instanceId?: string): Promise<NormalizedGroup[]> {
+  async getGroupsByIds(ids: string[], instanceId: string): Promise<NormalizedGroup[]> {
     const cached = await prisma.stashGroup.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
     });
 
@@ -1601,14 +1601,14 @@ class StashEntityService {
   /**
    * Get image by ID with relations
    * @param id - Image ID
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getImage(id: string, instanceId?: string): Promise<NormalizedImage | null> {
+  async getImage(id: string, instanceId: string): Promise<NormalizedImage | null> {
     const cached = await prisma.stashImage.findFirst({
       where: {
         id,
         deletedAt: null,
-        ...(instanceId && { stashInstanceId: instanceId }),
+        stashInstanceId: instanceId,
       },
       include: this.imageIncludes,
     });
@@ -1621,12 +1621,10 @@ class StashEntityService {
    * Get images by IDs with relations
    * Uses chunked queries for large ID sets to avoid Prisma's string conversion limit.
    * @param ids - Array of image IDs
-   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
+   * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getImagesByIds(ids: string[], instanceId?: string): Promise<NormalizedImage[]> {
+  async getImagesByIds(ids: string[], instanceId: string): Promise<NormalizedImage[]> {
     if (ids.length === 0) return [];
-
-    const instanceFilter = instanceId ? { stashInstanceId: instanceId } : {};
 
     // For smaller sets, use single query
     if (ids.length < 5000) {
@@ -1634,7 +1632,7 @@ class StashEntityService {
         where: {
           id: { in: ids },
           deletedAt: null,
-          ...instanceFilter,
+          stashInstanceId: instanceId,
         },
         include: this.imageIncludes,
       });
@@ -1651,7 +1649,7 @@ class StashEntityService {
         where: {
           id: { in: chunkIds },
           deletedAt: null,
-          ...instanceFilter,
+          stashInstanceId: instanceId,
         },
         include: this.imageIncludes,
       });

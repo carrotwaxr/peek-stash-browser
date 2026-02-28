@@ -9,6 +9,7 @@ import type {
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   imageQueryBuilder,
   type ImageFilter,
@@ -274,7 +275,7 @@ export const findImageById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    const imageInstanceId = req.query.instanceId as string | undefined;
+    const imageInstanceId = (req.query.instanceId as string | undefined) || stashInstanceManager.getDefaultConfig().id;
     const image = await stashEntityService.getImage(id, imageInstanceId);
 
     if (!image) {

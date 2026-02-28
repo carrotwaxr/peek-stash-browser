@@ -34,6 +34,8 @@ import type {
   DuplicatePlaylistResponse,
 } from "../types/api/index.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
+import { groupIdsByInstance } from "../utils/instanceUtils.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 
 /**
  * Default user fields for scenes (when no user data is merged yet).
@@ -95,11 +97,18 @@ export const getUserPlaylists = async (
           return playlist;
         }
 
-        const sceneIds = playlist.items.map((item) => item.sceneId);
-
         try {
-          // 1. Fetch scenes from cache with relations
-          const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
+          // 1. Fetch scenes from cache with relations, grouped by instance
+          const scenesByInstance = groupIdsByInstance(
+            playlist.items,
+            (item) => item.instanceId,
+            (item) => item.sceneId,
+            stashInstanceManager.getDefaultConfig().id
+          );
+          const scenes: NormalizedScene[] = [];
+          for (const [instId, ids] of scenesByInstance) {
+            scenes.push(...await stashEntityService.getScenesByIdsWithRelations(ids, instId));
+          }
 
           // 2. Apply user exclusions (filter out hidden/restricted scenes)
           const visibleScenes = await entityExclusionHelper.filterExcluded(
@@ -212,11 +221,18 @@ export const getSharedPlaylists = async (
         let itemsWithScenes: Array<{ instanceId: string | null; sceneId: string; scene: NormalizedScene | null }> = [];
 
         if (p.items.length > 0) {
-          const sceneIds = p.items.map((item) => item.sceneId);
-
           try {
-            // Fetch scenes from cache with relations
-            const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
+            // Fetch scenes from cache with relations, grouped by instance
+            const scenesByInstance = groupIdsByInstance(
+              p.items,
+              (item) => item.instanceId,
+              (item) => item.sceneId,
+              stashInstanceManager.getDefaultConfig().id
+            );
+            const scenes: NormalizedScene[] = [];
+            for (const [instId, ids] of scenesByInstance) {
+              scenes.push(...await stashEntityService.getScenesByIdsWithRelations(ids, instId));
+            }
 
             // Apply user exclusions (filter out hidden/restricted scenes)
             const visibleScenes = await entityExclusionHelper.filterExcluded(
@@ -315,11 +331,18 @@ export const getPlaylist = async (
 
     // Fetch scene details from cache for all items
     if (playlist.items.length > 0) {
-      const sceneIds = playlist.items.map((item) => item.sceneId);
-
       try {
-        // 1. Fetch scenes from cache with relations
-        const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
+        // 1. Fetch scenes from cache with relations, grouped by instance
+        const scenesByInstance = groupIdsByInstance(
+          playlist.items,
+          (item) => item.instanceId,
+          (item) => item.sceneId,
+          stashInstanceManager.getDefaultConfig().id
+        );
+        const scenes: NormalizedScene[] = [];
+        for (const [instId, ids] of scenesByInstance) {
+          scenes.push(...await stashEntityService.getScenesByIdsWithRelations(ids, instId));
+        }
 
         // 2. Apply user exclusions (filter out hidden/restricted scenes)
         const visibleScenes = await entityExclusionHelper.filterExcluded(

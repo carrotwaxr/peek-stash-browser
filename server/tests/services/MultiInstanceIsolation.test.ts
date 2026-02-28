@@ -145,7 +145,7 @@ describe("Multi-Instance Isolation", () => {
       });
     });
 
-    it("returns performer from any instance when no instanceId specified", async () => {
+    it("always filters by instanceId when specified (required parameter)", async () => {
       mockPrisma.stashPerformer.findFirst.mockResolvedValue({
         id: "perf1",
         stashInstanceId: "inst-b",
@@ -190,14 +190,15 @@ describe("Multi-Instance Isolation", () => {
       mockPrisma.galleryPerformer.count.mockResolvedValue(0);
       mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
 
-      const performer = await stashEntityService.getPerformer("perf1");
+      const performer = await stashEntityService.getPerformer("perf1", "inst-b");
 
       expect(performer).not.toBeNull();
-      // Without instanceId, stashInstanceId filter should not be in the query
+      // instanceId is required — query must always include stashInstanceId filter
       expect(mockPrisma.stashPerformer.findFirst).toHaveBeenCalledWith({
         where: {
           id: "perf1",
           deletedAt: null,
+          stashInstanceId: "inst-b",
         },
       });
     });
