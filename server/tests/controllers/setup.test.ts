@@ -85,28 +85,9 @@ import {
   updateStashInstance,
   deleteStashInstance,
 } from "../../controllers/setup.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
-
-/** Create a mock Express request */
-function mockReq(body: Record<string, unknown> = {}, params: Record<string, string> = {}) {
-  return { body, params } as any;
-}
-
-/** Create a mock Express response with chaining */
-function mockRes() {
-  const res: any = {
-    json: vi.fn().mockReturnThis(),
-    status: vi.fn().mockReturnThis(),
-    _getStatus: () => res.status.mock.calls[0]?.[0] ?? 200,
-    _getBody: () => {
-      // Get the last json call's argument
-      const jsonCalls = res.json.mock.calls;
-      return jsonCalls[jsonCalls.length - 1]?.[0];
-    },
-  };
-  return res;
-}
 
 describe("Setup Controller", () => {
   beforeEach(() => {

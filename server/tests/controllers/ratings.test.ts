@@ -50,33 +50,13 @@ import {
   updateGroupRating,
   updateImageRating,
 } from "../../controllers/ratings.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
-
-function mockReq(
-  body: Record<string, unknown> = {},
-  params: Record<string, string> = {},
-  user: typeof USER | undefined = USER
-) {
-  return { body, params, user } as any;
-}
-
-function mockRes() {
-  const res: any = {
-    json: vi.fn().mockReturnThis(),
-    status: vi.fn().mockReturnThis(),
-    _getStatus: () => res.status.mock.calls[0]?.[0] ?? 200,
-    _getBody: () => {
-      const jsonCalls = res.json.mock.calls;
-      return jsonCalls[jsonCalls.length - 1]?.[0];
-    },
-  };
-  return res;
-}
 
 /** Standard mock for a successful upsert */
 const UPSERT_RESULT = {
@@ -113,7 +93,7 @@ describe("Ratings Controller", () => {
     });
 
     it("returns 400 when entity ID is missing", async () => {
-      const req = mockReq({ rating: 50 }, {});
+      const req = mockReq({ rating: 50 }, {}, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
@@ -121,7 +101,7 @@ describe("Ratings Controller", () => {
     });
 
     it("returns 400 when rating is not a number", async () => {
-      const req = mockReq({ rating: "high" }, { sceneId: "1" });
+      const req = mockReq({ rating: "high" }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
@@ -129,7 +109,7 @@ describe("Ratings Controller", () => {
     });
 
     it("returns 400 when rating is below 0", async () => {
-      const req = mockReq({ rating: -1 }, { sceneId: "1" });
+      const req = mockReq({ rating: -1 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
@@ -137,7 +117,7 @@ describe("Ratings Controller", () => {
     });
 
     it("returns 400 when rating is above 100", async () => {
-      const req = mockReq({ rating: 101 }, { sceneId: "1" });
+      const req = mockReq({ rating: 101 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
@@ -146,7 +126,7 @@ describe("Ratings Controller", () => {
 
     it("accepts rating of 0 (boundary)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 0 }, { sceneId: "1" });
+      const req = mockReq({ rating: 0 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getBody().success).toBe(true);
@@ -154,7 +134,7 @@ describe("Ratings Controller", () => {
 
     it("accepts rating of 100 (boundary)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 100 }, { sceneId: "1" });
+      const req = mockReq({ rating: 100 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getBody().success).toBe(true);
@@ -162,14 +142,14 @@ describe("Ratings Controller", () => {
 
     it("accepts null rating (clearing a rating)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: null }, { sceneId: "1" });
+      const req = mockReq({ rating: null }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getBody().success).toBe(true);
     });
 
     it("returns 400 when favorite is not a boolean", async () => {
-      const req = mockReq({ favorite: "yes" }, { sceneId: "1" });
+      const req = mockReq({ favorite: "yes" }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
@@ -178,7 +158,7 @@ describe("Ratings Controller", () => {
 
     it("accepts favorite as true/false", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ favorite: true }, { sceneId: "1" });
+      const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getBody().success).toBe(true);
@@ -186,7 +166,7 @@ describe("Ratings Controller", () => {
 
     it("returns 500 when database throws", async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error("DB down"));
-      const req = mockReq({ rating: 50 }, { sceneId: "1" });
+      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(500);
@@ -201,7 +181,8 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
       const req = mockReq(
         { rating: 50, instanceId: "custom-instance" },
-        { sceneId: "1" }
+        { sceneId: "1" },
+        USER
       );
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -222,7 +203,7 @@ describe("Ratings Controller", () => {
 
     it("looks up instanceId from DB when not provided in request", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 50 }, { sceneId: "1" });
+      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -246,7 +227,7 @@ describe("Ratings Controller", () => {
   describe("upsert behavior", () => {
     it("creates with rating and default favorite when rating provided", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 75 }, { sceneId: "1" });
+      const req = mockReq({ rating: 75 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -266,7 +247,7 @@ describe("Ratings Controller", () => {
 
     it("creates with favorite and null rating when only favorite provided", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ favorite: true }, { sceneId: "1" });
+      const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -284,7 +265,7 @@ describe("Ratings Controller", () => {
     it("returns success with upserted record", async () => {
       const upsertResult = { id: 1, instanceId: "instance-1", rating: 85, favorite: true };
       mockPrisma.sceneRating.upsert.mockResolvedValue(upsertResult as any);
-      const req = mockReq({ rating: 85, favorite: true }, { sceneId: "1" });
+      const req = mockReq({ rating: 85, favorite: true }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -315,7 +296,7 @@ describe("Ratings Controller", () => {
     it("does not sync when syncToStash is disabled", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ syncToStash: false } as any);
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 50 }, { sceneId: "1" });
+      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -326,7 +307,7 @@ describe("Ratings Controller", () => {
     it("does not sync when getForSync returns null (no stash client)", async () => {
       mockInstanceManager.getForSync.mockReturnValue(null as any);
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 50 }, { sceneId: "1" });
+      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -337,7 +318,7 @@ describe("Ratings Controller", () => {
     it("succeeds even when Stash sync throws (non-blocking)", async () => {
       mockStash.sceneUpdate.mockRejectedValue(new Error("Stash down"));
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
-      const req = mockReq({ rating: 50 }, { sceneId: "1" });
+      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -351,7 +332,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash as rating100", async () => {
-        const req = mockReq({ rating: 85 }, { sceneId: "42" });
+        const req = mockReq({ rating: 85 }, { sceneId: "42" }, USER);
         const res = mockRes();
         await updateSceneRating(req, res);
 
@@ -361,7 +342,7 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (scene policy)", async () => {
-        const req = mockReq({ favorite: true }, { sceneId: "42" });
+        const req = mockReq({ favorite: true }, { sceneId: "42" }, USER);
         const res = mockRes();
         await updateSceneRating(req, res);
 
@@ -376,7 +357,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 90 }, { performerId: "10" });
+        const req = mockReq({ rating: 90 }, { performerId: "10" }, USER);
         const res = mockRes();
         await updatePerformerRating(req, res);
 
@@ -386,7 +367,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs favorite to Stash", async () => {
-        const req = mockReq({ favorite: true }, { performerId: "10" });
+        const req = mockReq({ favorite: true }, { performerId: "10" }, USER);
         const res = mockRes();
         await updatePerformerRating(req, res);
 
@@ -396,7 +377,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite together", async () => {
-        const req = mockReq({ rating: 95, favorite: true }, { performerId: "10" });
+        const req = mockReq({ rating: 95, favorite: true }, { performerId: "10" }, USER);
         const res = mockRes();
         await updatePerformerRating(req, res);
 
@@ -413,7 +394,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite", async () => {
-        const req = mockReq({ rating: 80, favorite: true }, { studioId: "5" });
+        const req = mockReq({ rating: 80, favorite: true }, { studioId: "5" }, USER);
         const res = mockRes();
         await updateStudioRating(req, res);
 
@@ -430,7 +411,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs favorite to Stash", async () => {
-        const req = mockReq({ favorite: true }, { tagId: "7" });
+        const req = mockReq({ favorite: true }, { tagId: "7" }, USER);
         const res = mockRes();
         await updateTagRating(req, res);
 
@@ -440,7 +421,7 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync rating to Stash (tag policy)", async () => {
-        const req = mockReq({ rating: 60 }, { tagId: "7" });
+        const req = mockReq({ rating: 60 }, { tagId: "7" }, USER);
         const res = mockRes();
         await updateTagRating(req, res);
 
@@ -455,7 +436,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 70 }, { galleryId: "3" });
+        const req = mockReq({ rating: 70 }, { galleryId: "3" }, USER);
         const res = mockRes();
         await updateGalleryRating(req, res);
 
@@ -465,7 +446,7 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (gallery policy)", async () => {
-        const req = mockReq({ favorite: true }, { galleryId: "3" });
+        const req = mockReq({ favorite: true }, { galleryId: "3" }, USER);
         const res = mockRes();
         await updateGalleryRating(req, res);
 
@@ -480,7 +461,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 55 }, { groupId: "8" });
+        const req = mockReq({ rating: 55 }, { groupId: "8" }, USER);
         const res = mockRes();
         await updateGroupRating(req, res);
 
@@ -490,7 +471,7 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (group policy)", async () => {
-        const req = mockReq({ favorite: true }, { groupId: "8" });
+        const req = mockReq({ favorite: true }, { groupId: "8" }, USER);
         const res = mockRes();
         await updateGroupRating(req, res);
 
@@ -505,7 +486,7 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 40 }, { imageId: "99" });
+        const req = mockReq({ rating: 40 }, { imageId: "99" }, USER);
         const res = mockRes();
         await updateImageRating(req, res);
 
@@ -515,7 +496,7 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (image policy)", async () => {
-        const req = mockReq({ favorite: true }, { imageId: "99" });
+        const req = mockReq({ favorite: true }, { imageId: "99" }, USER);
         const res = mockRes();
         await updateImageRating(req, res);
 
@@ -539,7 +520,7 @@ describe("Ratings Controller", () => {
     it.each(cases)(
       "returns 400 for missing %sId",
       async (_entity, handler, expectedError) => {
-        const req = mockReq({ rating: 50 }, {});
+        const req = mockReq({ rating: 50 }, {}, USER);
         const res = mockRes();
         await handler(req as any, res);
         expect(res._getStatus()).toBe(400);
@@ -570,7 +551,7 @@ describe("Ratings Controller", () => {
       async (_entity, handler, paramKey, modelKey) => {
         const model = mockPrisma[modelKey] as any;
         model.upsert.mockResolvedValue(UPSERT_RESULT);
-        const req = mockReq({ rating: 50 }, { [paramKey]: "1" });
+        const req = mockReq({ rating: 50 }, { [paramKey]: "1" }, USER);
         const res = mockRes();
         await handler(req as any, res);
         expect(res._getBody().success).toBe(true);
