@@ -11,6 +11,8 @@ import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 // Query builder options
 export interface GroupQueryOptions {
   userId: number;
@@ -587,7 +589,6 @@ class GroupQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGroup
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private transformRow(row: Record<string, any>): NormalizedGroup {
     // Parse URLs JSON if present
     let urls: string[] = [];
@@ -599,7 +600,6 @@ class GroupQueryBuilder {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const group: any = {
       id: row.id,
       instanceId: row.stashInstanceId, // For multi-instance correctness in populateRelations

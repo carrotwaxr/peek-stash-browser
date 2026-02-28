@@ -91,7 +91,7 @@ class UserHiddenEntityService {
     this.hiddenIdsCache.delete(userId);
 
     // Update pre-computed exclusions (async recompute)
-    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId, instanceId);
+    exclusionComputationService.removeHiddenEntity(userId, entityType, entityId, instanceId);
   }
 
   /**

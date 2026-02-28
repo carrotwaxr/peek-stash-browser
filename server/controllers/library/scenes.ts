@@ -91,12 +91,12 @@ export async function mergeScenesWithUserData(
   // Create lookup maps for O(1) access
   const watchMap = new Map(
     watchHistory.map((wh) => {
-      const oHistory = Array.isArray(wh.oHistory)
+      const oHistory = (Array.isArray(wh.oHistory)
         ? wh.oHistory
-        : JSON.parse((wh.oHistory as string) || "[]");
-      const playHistory = Array.isArray(wh.playHistory)
+        : JSON.parse((wh.oHistory as string) || "[]")) as NormalizedScene["o_history"];
+      const playHistory = (Array.isArray(wh.playHistory)
         ? wh.playHistory
-        : JSON.parse((wh.playHistory as string) || "[]");
+        : JSON.parse((wh.playHistory as string) || "[]")) as NormalizedScene["play_history"];
 
       return [
         `${wh.sceneId}${KEY_SEP}${wh.instanceId || ""}`,
@@ -108,8 +108,8 @@ export async function mergeScenesWithUserData(
           play_history: playHistory,
           o_history: oHistory,
           last_played_at:
-            playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
-          last_o_at: oHistory.length > 0 ? oHistory[oHistory.length - 1] : null,
+            playHistory.length > 0 ? (playHistory[playHistory.length - 1] ?? null) : null,
+          last_o_at: oHistory.length > 0 ? String(oHistory[oHistory.length - 1] ?? '') : null,
         },
       ];
     })
@@ -349,7 +349,7 @@ export async function applyQuickSceneFilters(
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
       // NOT nested: { group: { id, name }, scene_index }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- groups are flattened at runtime, type says SceneGroup (nested)
       const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
       const filterGroupIds = parsedGroups.map((p) => p.id);
       if (modifier === "INCLUDES") {
@@ -848,7 +848,7 @@ function getFieldValue(
     }
     // After transformScene, groups are flattened: { id, name, scene_index }
     const group = scene.groups.find(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- groups are flattened at runtime, type says SceneGroup (nested)
       (g: any) => String(g.id) === String(groupId)
     );
     return group?.scene_index ?? 999999; // Put scenes without scene_index at the end
@@ -1012,6 +1012,7 @@ export const findScenes = async (
       logger.info(`findScenes: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
       const dbStart = Date.now();
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional use in legacy fallback path when USE_SQL_QUERY_BUILDER=false
       const { scenes: paginatedScenes, total } = await stashEntityService.getScenesPaginated({
         page,
         perPage,
@@ -1047,6 +1048,7 @@ export const findScenes = async (
 
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional use in legacy fallback path when USE_SQL_QUERY_BUILDER=false
     let scenes = await stashEntityService.getAllScenes();
     logger.info(`findScenes: cache fetch took ${Date.now() - cacheStart}ms for ${scenes.length} scenes`);
 
@@ -1273,7 +1275,7 @@ export const updateScene = async (
       userId
     );
 
-    res.json({ success: true, scene: sceneWithUserHistory[0] });
+    res.json({ success: true, scene: sceneWithUserHistory[0] as NormalizedScene });
   } catch (error) {
     console.error("Error updating scene:", error);
     res.status(500).json({ error: "Failed to update scene" });
@@ -1492,12 +1494,12 @@ export const getRecommendedScenes = async (
     // Build watch history map
     const watchMap = new Map(
       watchHistory.map((wh) => {
-        const playHistory = Array.isArray(wh.playHistory)
+        const playHistory = (Array.isArray(wh.playHistory)
           ? wh.playHistory
-          : JSON.parse((wh.playHistory as string) || "[]");
-        const lastPlayedAt =
-          playHistory.length > 0
-            ? new Date(playHistory[playHistory.length - 1])
+          : JSON.parse((wh.playHistory as string) || "[]")) as string[];
+        const lastEntry = playHistory[playHistory.length - 1];
+        const lastPlayedAt = lastEntry != null
+            ? new Date(lastEntry)
             : null;
 
         return [
@@ -1616,8 +1618,10 @@ export const getRecommendedScenes = async (
     // This creates variety while maintaining general quality order
     const diversifiedScenes: ScoredSceneId[] = [];
     if (scoredScenes.length > 0) {
-      const maxScore = scoredScenes[0].score;
-      const minScore = scoredScenes[scoredScenes.length - 1].score;
+      const firstScene = scoredScenes[0] as ScoredSceneId;
+      const lastScene = scoredScenes[scoredScenes.length - 1] as ScoredSceneId;
+      const maxScore = firstScene.score;
+      const minScore = lastScene.score;
       const scoreRange = maxScore - minScore;
       const tierSize = scoreRange / 10; // 10 tiers
 
@@ -1628,7 +1632,7 @@ export const getRecommendedScenes = async (
           9,
           Math.floor((maxScore - scoredScene.score) / tierSize)
         );
-        tiers[tierIndex].push(scoredScene);
+        (tiers[tierIndex] as ScoredSceneId[]).push(scoredScene);
       }
 
       // Use seeded random for consistent shuffle order per user
@@ -1641,7 +1645,7 @@ export const getRecommendedScenes = async (
         // Fisher-Yates shuffle with seeded random
         for (let i = tier.length - 1; i > 0; i--) {
           const j = rng.nextInt(i + 1);
-          [tier[i], tier[j]] = [tier[j], tier[i]];
+          [tier[i], tier[j]] = [tier[j] as ScoredSceneId, tier[i] as ScoredSceneId];
         }
         diversifiedScenes.push(...tier);
       }

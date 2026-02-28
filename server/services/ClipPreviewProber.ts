@@ -49,7 +49,7 @@ export class ClipPreviewProber {
       }
 
       // Size matches placeholder exactly - need to verify via hash
-      return this.verifyNotPlaceholder(url);
+      return await this.verifyNotPlaceholder(url);
     } catch (err) {
       logger.debug("Preview probe error", { url, error: String(err) });
       return false;
@@ -88,7 +88,7 @@ export class ClipPreviewProber {
               if (contentRange) {
                 const match = contentRange.match(/\/(\d+)$/);
                 if (match) {
-                  resolve(parseInt(match[1], 10));
+                  resolve(parseInt(match[1] as string, 10));
                   return;
                 }
               }

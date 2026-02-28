@@ -23,7 +23,7 @@ const router = express.Router();
 // Login endpoint
 router.post("/login", authRateLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.body as { username: string; password: string };
 
     if (!username || !password) {
       return res
@@ -138,7 +138,7 @@ router.get(
 // Forgot password - check username and get recovery method
 router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
   try {
-    const { username } = req.body;
+    const { username } = req.body as { username: string };
 
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
@@ -164,7 +164,7 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 // Forgot password - verify recovery key and set new password
 router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
   try {
-    const { username, recoveryKey, newPassword } = req.body;
+    const { username, recoveryKey, newPassword } = req.body as { username: string; recoveryKey: string; newPassword: string };
 
     if (!username || !recoveryKey || !newPassword) {
       return res.status(400).json({ error: "All fields are required" });
@@ -224,7 +224,7 @@ router.post("/first-time-password", async (req, res) => {
       });
     }
 
-    const { username, newPassword } = req.body;
+    const { username, newPassword } = req.body as { username: string; newPassword: string };
 
     if (!username || !newPassword) {
       return res

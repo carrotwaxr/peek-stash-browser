@@ -205,9 +205,9 @@ export async function pingWatchHistory(
     // Increment play count ONCE per session when threshold is met
     let newPlayCount = watchHistory.playCount;
     let playCountIncremented = false;
-    const playHistoryArray = Array.isArray(watchHistory.playHistory)
+    const playHistoryArray = (Array.isArray(watchHistory.playHistory)
       ? watchHistory.playHistory
-      : JSON.parse((watchHistory.playHistory as string) || "[]");
+      : JSON.parse((watchHistory.playHistory as string) || "[]")) as string[];
 
     if (
       !hasIncrementedThisSession &&
@@ -377,9 +377,9 @@ export async function incrementOCounter(
       });
     } else {
       // Parse existing O history
-      const oHistory = Array.isArray(watchHistory.oHistory)
+      const oHistory = (Array.isArray(watchHistory.oHistory)
         ? watchHistory.oHistory
-        : JSON.parse((watchHistory.oHistory as string) || "[]");
+        : JSON.parse((watchHistory.oHistory as string) || "[]")) as string[];
 
       // Update with incremented O counter
       watchHistory = await prisma.watchHistory.update({
@@ -490,13 +490,13 @@ export async function getWatchHistory(
     }
 
     // Parse JSON fields
-    const oHistory = Array.isArray(watchHistory.oHistory)
+    const oHistory = (Array.isArray(watchHistory.oHistory)
       ? watchHistory.oHistory
-      : JSON.parse((watchHistory.oHistory as string) || "[]");
+      : JSON.parse((watchHistory.oHistory as string) || "[]")) as string[];
 
-    const playHistory = Array.isArray(watchHistory.playHistory)
+    const playHistory = (Array.isArray(watchHistory.playHistory)
       ? watchHistory.playHistory
-      : JSON.parse((watchHistory.playHistory as string) || "[]");
+      : JSON.parse((watchHistory.playHistory as string) || "[]")) as string[];
 
     res.json({
       exists: true,
@@ -534,7 +534,7 @@ export async function getAllWatchHistory(
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    let where: { userId: number; resumeTime?: { not: null } } = { userId };
+    const where: { userId: number; resumeTime?: { not: null } } = { userId };
 
     if (onlyInProgress) {
       // Only return scenes with resume time (partially watched)
@@ -550,12 +550,12 @@ export async function getAllWatchHistory(
     // Parse JSON fields for each record
     const parsed = watchHistory.map((record: WatchHistory) => ({
       ...record,
-      oHistory: Array.isArray(record.oHistory)
+      oHistory: (Array.isArray(record.oHistory)
         ? record.oHistory
-        : JSON.parse((record.oHistory as string) || "[]"),
-      playHistory: Array.isArray(record.playHistory)
+        : JSON.parse((record.oHistory as string) || "[]")) as string[],
+      playHistory: (Array.isArray(record.playHistory)
         ? record.playHistory
-        : JSON.parse((record.playHistory as string) || "[]"),
+        : JSON.parse((record.playHistory as string) || "[]")) as string[],
     }));
 
     res.json({ watchHistory: parsed });
@@ -771,10 +771,10 @@ export async function incrementPlayCount(
       where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
     });
 
-    const existingPlayHistory = existing
-      ? Array.isArray(existing.playHistory)
+    const existingPlayHistory: string[] = existing
+      ? (Array.isArray(existing.playHistory)
         ? existing.playHistory
-        : JSON.parse((existing.playHistory as string) || "[]")
+        : JSON.parse((existing.playHistory as string) || "[]")) as string[]
       : [];
 
     const newPlayHistory = [...existingPlayHistory, now.toISOString()];

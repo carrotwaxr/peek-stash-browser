@@ -76,12 +76,12 @@ main().catch(async (e) => {
 });
 
 // Cleanup on exit
-process.on("SIGTERM", async () => {
+process.on("SIGTERM", () => {
   stashSyncService.abort();
-  await prisma.$disconnect();
+  void prisma.$disconnect();
 });
 
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   stashSyncService.abort();
-  await prisma.$disconnect();
+  void prisma.$disconnect();
 });

@@ -1884,7 +1884,7 @@ class StashEntityService {
       organized: scene.organized,
 
       // URLs
-      urls: scene.urls ? JSON.parse(scene.urls) : [],
+      urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
 
       // File metadata
       files: scene.filePath ? [{
@@ -1914,7 +1914,7 @@ class StashEntityService {
       sceneStreams: this.generateSceneStreams(scene.id, scene.stashInstanceId),
 
       // Caption metadata for multi-language subtitle support
-      captions: scene.captions ? JSON.parse(scene.captions) : [],
+      captions: scene.captions ? (JSON.parse(scene.captions) as { language_code: string; caption_type: string }[]) : [],
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
@@ -1933,7 +1933,7 @@ class StashEntityService {
       galleries: [],
 
       // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
+      inheritedTagIds: scene.inheritedTagIds ? (JSON.parse(scene.inheritedTagIds) as string[]) : [],
     };
   }
 
@@ -1955,7 +1955,7 @@ class StashEntityService {
       organized: scene.organized,
 
       // URLs
-      urls: scene.urls ? JSON.parse(scene.urls) : [],
+      urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
 
       // File metadata
       files: scene.filePath ? [{
@@ -1985,7 +1985,7 @@ class StashEntityService {
       sceneStreams: [],
 
       // Caption metadata for multi-language subtitle support
-      captions: scene.captions ? JSON.parse(scene.captions) : [],
+      captions: scene.captions ? (JSON.parse(scene.captions) as { language_code: string; caption_type: string }[]) : [],
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
@@ -2004,7 +2004,7 @@ class StashEntityService {
       galleries: [],
 
       // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
+      inheritedTagIds: scene.inheritedTagIds ? (JSON.parse(scene.inheritedTagIds) as string[]) : [],
     };
   }
 
@@ -2072,7 +2072,7 @@ class StashEntityService {
 
     // Hydrate inherited tags with full tag objects
     if (scene.inheritedTagIds) {
-      const inheritedTagIds: string[] = JSON.parse(scene.inheritedTagIds);
+      const inheritedTagIds = JSON.parse(scene.inheritedTagIds) as string[];
       if (inheritedTagIds.length > 0) {
         // Look up tags in the tags array we already have, or create minimal stub
         base.inheritedTags = inheritedTagIds.map((tagId: string) => {
@@ -2108,7 +2108,7 @@ class StashEntityService {
       gallery_count: performer.galleryCount ?? 0,
       group_count: performer.groupCount ?? 0,
       details: performer.details,
-      alias_list: performer.aliasList ? JSON.parse(performer.aliasList) : [],
+      alias_list: performer.aliasList ? (JSON.parse(performer.aliasList) as string[]) : [],
       country: performer.country,
       ethnicity: performer.ethnicity,
       hair_color: performer.hairColor,
@@ -2176,8 +2176,8 @@ class StashEntityService {
       scene_marker_count: tag.sceneMarkerCount ?? 0,
       scene_count_via_performers: tag.sceneCountViaPerformers ?? 0,
       description: tag.description,
-      aliases: tag.aliases ? JSON.parse(tag.aliases) : [],
-      parents: tag.parentIds ? JSON.parse(tag.parentIds).map((id: string) => ({ id })) : [],
+      aliases: tag.aliases ? (JSON.parse(tag.aliases) as string[]) : [],
+      parents: tag.parentIds ? (JSON.parse(tag.parentIds) as string[]).map((id: string) => ({ id })) : [],
       image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
@@ -2204,7 +2204,7 @@ class StashEntityService {
       performer_count: group.performerCount ?? 0,
       director: group.director,
       synopsis: group.synopsis,
-      urls: group.urls ? JSON.parse(group.urls) : [],
+      urls: group.urls ? (JSON.parse(group.urls) as string[]) : [],
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
       front_image_path: this.transformUrl(group.frontImagePath, group.stashInstanceId),
@@ -2296,7 +2296,7 @@ class StashEntityService {
       date: ig.gallery.date,
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
-      urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
+      urls: ig.gallery.urls ? (JSON.parse(ig.gallery.urls) as string[]) : [],
       cover: this.transformUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
@@ -2329,7 +2329,7 @@ class StashEntityService {
       code: image.code,
       details: image.details,
       photographer: image.photographer,
-      urls: image.urls ? JSON.parse(image.urls) : [],
+      urls: image.urls ? (JSON.parse(image.urls) as string[]) : [],
       date: image.date,
       studio,
       studioId: image.studioId,

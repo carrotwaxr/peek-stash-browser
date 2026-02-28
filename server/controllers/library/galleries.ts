@@ -279,8 +279,8 @@ export const findGalleries = async (
     // For single-entity requests (detail pages), get gallery with computed counts
     let paginatedGalleries = galleries;
     if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
-      const existingGallery = paginatedGalleries[0];
-      const galleryWithCounts = await stashEntityService.getGallery(ids[0], existingGallery.instanceId);
+      const existingGallery = paginatedGalleries[0] as (typeof paginatedGalleries)[number];
+      const galleryWithCounts = await stashEntityService.getGallery(ids[0] as string, existingGallery.instanceId);
       if (galleryWithCounts) {
         paginatedGalleries = [
           {
@@ -339,7 +339,7 @@ export const findGalleryById = async (
     const { id } = req.params;
 
     const galleryInstanceId = (req.query.instanceId as string | undefined) || stashInstanceManager.getDefaultConfig().id;
-    let gallery = await stashEntityService.getGallery(id, galleryInstanceId);
+    const gallery = await stashEntityService.getGallery(id, galleryInstanceId);
 
     if (!gallery) {
       return res.status(404).json({ error: "Gallery not found" });

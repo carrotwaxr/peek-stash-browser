@@ -192,16 +192,16 @@ class UserStatsAggregationService {
       `,
     ]);
 
-    const scene = sceneStats[0] || {};
-    const image = imageStats[0] || {};
+    const scene = sceneStats[0];
+    const image = imageStats[0];
 
     return {
-      totalWatchTime: Number(scene.totalWatchTime) || 0,
-      totalPlayCount: Number(scene.totalPlayCount) || 0,
+      totalWatchTime: Number(scene?.totalWatchTime) || 0,
+      totalPlayCount: Number(scene?.totalPlayCount) || 0,
       totalOCount:
-        (Number(scene.totalOCount) || 0) + (Number(image.imageOCount) || 0),
-      totalImagesViewed: Number(image.totalImagesViewed) || 0,
-      uniqueScenesWatched: Number(scene.uniqueScenesWatched) || 0,
+        (Number(scene?.totalOCount) || 0) + (Number(image?.imageOCount) || 0),
+      totalImagesViewed: Number(image?.totalImagesViewed) || 0,
+      uniqueScenesWatched: Number(scene?.uniqueScenesWatched) || 0,
     };
   }
 
@@ -389,10 +389,11 @@ class UserStatsAggregationService {
     `;
 
     if (result.length === 0) return null;
+    const topResult = result[0] as (typeof result)[number];
 
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const scene = await prisma.stashScene.findFirst({
-      where: { id: result[0].sceneId },
+      where: { id: topResult.sceneId },
       select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
     });
 
@@ -403,7 +404,7 @@ class UserStatsAggregationService {
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
       imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
-      playCount: result[0].playCount,
+      playCount: topResult.playCount,
     };
   }
 
@@ -435,10 +436,11 @@ class UserStatsAggregationService {
     `;
 
     if (result.length === 0) return null;
+    const topResult = result[0] as (typeof result)[number];
 
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const image = await prisma.stashImage.findFirst({
-      where: { id: result[0].imageId },
+      where: { id: topResult.imageId },
       select: { id: true, title: true, filePath: true, pathThumbnail: true, stashInstanceId: true },
     });
 
@@ -449,7 +451,7 @@ class UserStatsAggregationService {
       title: image.title ?? null,
       filePath: image.filePath ?? null,
       imageUrl: transformUrl(image.pathThumbnail, image.stashInstanceId),
-      viewCount: result[0].viewCount,
+      viewCount: topResult.viewCount,
     };
   }
 
@@ -479,10 +481,11 @@ class UserStatsAggregationService {
     `;
 
     if (result.length === 0) return null;
+    const topResult = result[0] as (typeof result)[number];
 
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const scene = await prisma.stashScene.findFirst({
-      where: { id: result[0].sceneId },
+      where: { id: topResult.sceneId },
       select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
     });
 
@@ -493,7 +496,7 @@ class UserStatsAggregationService {
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
       imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
-      oCount: result[0].oCount,
+      oCount: topResult.oCount,
     };
   }
 
@@ -525,10 +528,11 @@ class UserStatsAggregationService {
     `;
 
     if (result.length === 0) return null;
+    const topResult = result[0] as (typeof result)[number];
 
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const performer = await prisma.stashPerformer.findFirst({
-      where: { id: result[0].performerId },
+      where: { id: topResult.performerId },
       select: { id: true, name: true, imagePath: true, stashInstanceId: true },
     });
 
@@ -538,7 +542,7 @@ class UserStatsAggregationService {
       id: performer.id,
       name: performer.name ?? "Unknown",
       imageUrl: transformUrl(performer.imagePath, performer.stashInstanceId),
-      oCount: result[0].oCounter,
+      oCount: topResult.oCounter,
     };
   }
 }

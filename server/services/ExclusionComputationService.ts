@@ -288,7 +288,7 @@ class ExclusionComputationService {
 
     // Process each restriction
     for (const restriction of restrictions) {
-      const entityIds: string[] = JSON.parse(restriction.entityIds);
+      const entityIds: string[] = JSON.parse(restriction.entityIds) as string[];
       const singularType = ENTITY_TYPE_MAP[restriction.entityType] || restriction.entityType;
 
       if (restriction.mode === "EXCLUDE") {
@@ -380,7 +380,7 @@ class ExclusionComputationService {
         where: { [sourceIdField]: { in: globalIds } },
         select: { [targetIdField]: true },
       });
-      for (const r of results) addCascade(targetEntityType, r[targetIdField]);
+      for (const r of results) addCascade(targetEntityType, r[targetIdField] as string);
     }
     if (scoped.length > 0) {
       const results = await junctionDelegate.findMany({
@@ -392,7 +392,7 @@ class ExclusionComputationService {
         },
         select: { [targetIdField]: true, [targetInstanceField]: true },
       });
-      for (const r of results) addCascade(targetEntityType, r[targetIdField], r[targetInstanceField]);
+      for (const r of results) addCascade(targetEntityType, r[targetIdField] as string, r[targetInstanceField]);
     }
   }
 
@@ -1336,12 +1336,12 @@ class ExclusionComputationService {
    * Handle user unhiding an entity.
    * Queues async recompute since cascades need recalculation.
    */
-  async removeHiddenEntity(
+  removeHiddenEntity(
     userId: number,
     entityType: string,
     entityId: string,
     instanceId: string = ""
-  ): Promise<void> {
+  ): void {
     logger.info("ExclusionComputationService.removeHiddenEntity", {
       userId,
       entityType,

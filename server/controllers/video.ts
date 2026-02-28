@@ -65,12 +65,12 @@ function rewriteHlsPlaylist(content: string, sceneId: string, _stashBaseUrl: str
       } else if (line.startsWith('/')) {
         // Absolute path: /scene/123/stream/segment.ts?apikey=xxx
         const [path, query] = line.split('?');
-        urlPath = path;
+        urlPath = path ?? '';
         queryParams = new URLSearchParams(query || '');
       } else {
         // Relative path: stream/segment.ts?apikey=xxx or segment.ts?apikey=xxx
         const [path, query] = line.split('?');
-        urlPath = path;
+        urlPath = path ?? '';
         queryParams = new URLSearchParams(query || '');
       }
 
@@ -88,7 +88,7 @@ function rewriteHlsPlaylist(content: string, sceneId: string, _stashBaseUrl: str
       let streamPath: string;
       const scenePathMatch = urlPath.match(/\/scene\/\d+\/(.+)/);
       if (scenePathMatch) {
-        streamPath = scenePathMatch[1];
+        streamPath = scenePathMatch[1] as string;
       } else {
         // If no scene path pattern, use the path as-is
         streamPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
@@ -128,7 +128,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     const instanceId = req.query.instanceId as string | undefined;
 
     // Combine path segments if subPath exists (for HLS segments like stream/segment_0.ts)
-    const fullStreamPath = subPath ? `${streamPath}/${subPath}` : streamPath;
+    const fullStreamPath = subPath ? `${streamPath}/${subPath}` : (streamPath as string);
 
     // Parse query string from original request, but remove instanceId (it's for Peek routing only)
     const urlParams = new URLSearchParams(req.url.split('?')[1] || '');
@@ -182,7 +182,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     if (isHlsPlaylist) {
       // For HLS playlists, read the entire response and rewrite URLs
       const playlistContent = await response.text();
-      const rewrittenContent = rewriteHlsPlaylist(playlistContent, sceneId, stashBaseUrl, instanceId);
+      const rewrittenContent = rewriteHlsPlaylist(playlistContent, sceneId as string, stashBaseUrl, instanceId);
 
       // Set headers for the rewritten playlist
       res.status(response.status);
@@ -241,7 +241,11 @@ export const getCaption = async (req: Request, res: Response) => {
       return res.status(400).send("Missing lang or type parameter");
     }
 
-    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId || '(not specified)'}`);
+    const langStr = lang as string;
+    const typeStr = type as string;
+    const instanceIdStr = (instanceId as string | undefined) ?? '(not specified)';
+
+    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${langStr}, type=${typeStr}, instanceId=${instanceIdStr}`);
 
     // Get Stash instance configuration
     let stashUrl: string;
@@ -257,7 +261,7 @@ export const getCaption = async (req: Request, res: Response) => {
     }
 
     // Construct Stash caption URL
-    const captionUrl = `${stashUrl}/scene/${sceneId}/caption?lang=${lang}&type=${type}`;
+    const captionUrl = `${stashUrl}/scene/${sceneId}/caption?lang=${langStr}&type=${typeStr}`;
     logger.debug(`[CAPTION] Fetching from Stash: ${captionUrl}`);
 
     // Fetch caption from Stash with API key
@@ -279,7 +283,7 @@ export const getCaption = async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
     res.send(captionData);
 
-    logger.info(`[CAPTION] Served caption: scene=${sceneId}, lang=${lang}, size=${captionData.length} bytes`);
+    logger.info(`[CAPTION] Served caption: scene=${sceneId}, lang=${langStr}, size=${captionData.length} bytes`);
   } catch (error) {
     logger.error("[CAPTION] Error serving caption", {
       error: error instanceof Error ? error.message : String(error),

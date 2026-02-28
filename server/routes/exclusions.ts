@@ -27,7 +27,7 @@ router.post(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      const userId = parseInt(req.params.userId, 10);
+      const userId = parseInt(req.params.userId as string, 10);
       if (isNaN(userId)) {
         return res.status(400).json({
           error: "Invalid user ID",

@@ -11,6 +11,8 @@ import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 // Query builder options
 export interface TagQueryOptions {
   userId: number;
@@ -589,14 +591,12 @@ class TagQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedTag
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns
   private transformRow(row: Record<string, any>): NormalizedTag {
     const directSceneCount = row.sceneCount || 0;
     const performerSceneCount = row.sceneCountViaPerformers || 0;
     // Use the greater of direct scene count or performer scene count
     const totalSceneCount = Math.max(directSceneCount, performerSceneCount);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedTag from DB row; Tag base type requires fields we don't populate
     const tag: any = {
       id: row.id,
       instanceId: row.stashInstanceId,

@@ -381,6 +381,7 @@ export async function executeCarouselQuery(
 
     // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
     const dbStart = Date.now();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
     const { scenes } = await stashEntityService.getScenesPaginated({
       page: 1,
       perPage: CAROUSEL_SCENE_LIMIT,
@@ -412,6 +413,7 @@ export async function executeCarouselQuery(
 
   // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
   let scenes = await stashEntityService.getAllScenes();
   logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
 

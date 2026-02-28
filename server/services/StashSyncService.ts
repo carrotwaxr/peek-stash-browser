@@ -201,7 +201,7 @@ function extractPhashes(files: Array<{ fingerprints?: Array<{ type: string; valu
   }
 
   return {
-    phash: allPhashes[0],
+    phash: allPhashes[0] as string,
     phashes: allPhashes.length > 1 ? JSON.stringify(allPhashes) : null,
   };
 }
@@ -765,7 +765,7 @@ class StashSyncService extends EventEmitter {
       case "image":
         return this.syncImages(stashInstanceId, isFullSync, lastSyncTime);
       default:
-        throw new Error(`Unknown entity type: ${entityType}`);
+        throw new Error(`Unknown entity type: ${entityType as string}`);
     }
   }
 
@@ -1036,7 +1036,7 @@ class StashSyncService extends EventEmitter {
    */
   private getFirstEnabledInstanceId(): string | undefined {
     const enabledInstances = stashInstanceManager.getAllEnabled();
-    return enabledInstances.length > 0 ? enabledInstances[0].id : undefined;
+    return enabledInstances.length > 0 ? enabledInstances[0]?.id : undefined;
   }
 
   // ==================== Scene Sync ====================
@@ -1453,7 +1453,7 @@ class StashSyncService extends EventEmitter {
             break;
           }
           default:
-            logger.warn(`Unknown entity type for cleanup: ${entityType}`);
+            logger.warn(`Unknown entity type for cleanup: ${entityType as string}`);
             return 0;
         }
 
@@ -1545,7 +1545,7 @@ class StashSyncService extends EventEmitter {
                 // Try to find a merge target
                 const matches = await mergeReconciliationService.findPhashMatches(scene.id);
                 if (matches.length > 0) {
-                  const target = matches[0]; // Use the recommended match
+                  const target = matches[0] as (typeof matches)[number]; // Use the recommended match
                   logger.info(`Detected merge: scene ${scene.id} -> ${target.sceneId}`);
                   await mergeReconciliationService.reconcileScene(
                     scene.id,
@@ -2806,8 +2806,8 @@ class StashSyncService extends EventEmitter {
         // Upsert clips
         const instanceId = stashInstanceId;
         for (let i = 0; i < markers.length; i++) {
-          const marker = markers[i];
-          const previewUrl = previewUrls[i];
+          const marker = markers[i] as (typeof markers)[number];
+          const previewUrl = previewUrls[i] as string;
 
           const clipData = {
             sceneId: marker.scene.id,

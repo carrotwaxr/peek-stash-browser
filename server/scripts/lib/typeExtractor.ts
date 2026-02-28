@@ -64,7 +64,7 @@ export function extractControllerTypes(
   const reqMatch = parameterList.match(/req:\s*(?:TypedAuthRequest|TypedRequest)<([^>]+)>/);
 
   if (reqMatch) {
-    const reqTypes = reqMatch[1];
+    const reqTypes = reqMatch[1] as string;
     const parts = splitTypeParams(reqTypes);
     if (parts[0] && parts[0] !== "unknown") {
       result.requestBody = { name: parts[0], definition: "", sourceFile: "" };
@@ -82,7 +82,7 @@ export function extractControllerTypes(
   const resMatch = parameterList.match(/res:\s*TypedResponse<([^>]+)>/);
 
   if (resMatch) {
-    const resType = resMatch[1];
+    const resType = resMatch[1] as string;
     const cleanType = resType.replace(/\s*\|\s*ApiErrorResponse/, "").trim();
     result.response = { name: cleanType, definition: "", sourceFile: "" };
   }

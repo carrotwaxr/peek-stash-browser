@@ -129,7 +129,7 @@ export const authenticateToken = async (
   res: Response,
   next: NextFunction
 ) => {
-  const token =
+  const token: unknown =
     req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
   if (!token) {
@@ -137,7 +137,7 @@ export const authenticateToken = async (
   }
 
   try {
-    const decoded = verifyToken(token);
+    const decoded = verifyToken(token as string);
     const user = await lookupUser({ id: decoded.id });
     if (!user) {
       return res.status(401).json({ error: "Invalid token. User not found." });
