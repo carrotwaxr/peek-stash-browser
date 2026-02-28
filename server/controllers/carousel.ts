@@ -22,6 +22,7 @@ import type {
   PreviewCarouselResponse,
   ExecuteCarouselByIdParams,
   ExecuteCarouselByIdResponse,
+  CarouselPreference,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -99,12 +100,6 @@ export const getCarousel = async (
     res.status(500).json({ error: "Failed to get carousel" });
   }
 };
-
-interface CarouselPreference {
-  id: string;
-  enabled: boolean;
-  order: number;
-}
 
 /**
  * Create a new custom carousel

@@ -13,6 +13,7 @@ import type {
   UpdateSceneResponse,
   ApiErrorResponse,
   AmbiguousLookupResponse,
+  ScoredSceneId,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -1562,12 +1563,6 @@ export const getRecommendedScenes = async (
     };
 
     // Phase 1: Score all scenes using lightweight data
-    interface ScoredSceneId {
-      id: string;
-      score: number;
-      oCounter: number;
-    }
-
     const scoredScenes: ScoredSceneId[] = [];
     const now = new Date();
 

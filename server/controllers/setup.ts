@@ -27,17 +27,9 @@ import type {
   UpdateStashInstanceResponse,
   DeleteStashInstanceParams,
   DeleteStashInstanceResponse,
+  CarouselPreference,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
-
-/**
- * Carousel preference configuration for user home page
- */
-interface CarouselPreference {
-  id: string;
-  enabled: boolean;
-  order: number;
-}
 
 // Default carousel preferences for new users
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [

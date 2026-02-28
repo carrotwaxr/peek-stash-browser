@@ -4,6 +4,7 @@ import https from "https";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import type { ProxyOptions } from "../types/api/proxy.js";
 import { logger } from "../utils/logger.js";
 
 // =============================================================================
@@ -91,14 +92,6 @@ function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey:
 // =============================================================================
 // Shared proxy helper
 // =============================================================================
-
-interface ProxyOptions {
-  fullUrl: string;
-  res: Response;
-  label: string;
-  defaultCacheControl: string;
-  timeoutMs: number;
-}
 
 /**
  * Shared helper that makes an HTTP(S) request to Stash and pipes the response

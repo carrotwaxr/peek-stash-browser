@@ -450,3 +450,12 @@ export interface GetImageParams extends Record<string, string> {
 export interface GetImageResponse extends NormalizedImage {
   stashUrl: string;
 }
+
+/**
+ * Scene recommendation scoring intermediate type
+ */
+export interface ScoredSceneId {
+  id: string;
+  score: number;
+  oCounter: number;
+}

@@ -6,93 +6,20 @@ import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import type { EntityType } from "../services/UserHiddenEntityService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import type {
+  CarouselPreference,
+  TableColumnsConfig,
+  FilterPreset,
+  FilterPresets,
+  DefaultFilterPresets,
+  SyncUpdates,
+  UserRestriction,
+} from "../types/api/user.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-dynamic-delete -- TODO(#467): migrate handlers to TypedAuthRequest with typed body */
-
-/**
- * Carousel preference configuration
- */
-interface CarouselPreference {
-  id: string;
-  enabled: boolean;
-  order: number;
-}
-
-/**
- * Table column configuration for a preset
- */
-interface TableColumnsConfig {
-  visible: string[];
-  order: string[];
-}
-
-/**
- * Filter preset for scene/performer/studio/tag filtering
- */
-interface FilterPreset {
-  id: string;
-  name: string;
-  filters: unknown;
-  sort?: string;
-  direction?: string;
-  viewMode?: string;
-  zoomLevel?: string;
-  tableColumns?: TableColumnsConfig | null;
-  createdAt?: string;
-  [key: string]: unknown;
-}
-
-/**
- * User filter presets collection
- */
-interface FilterPresets {
-  scene?: FilterPreset[];
-  performer?: FilterPreset[];
-  studio?: FilterPreset[];
-  tag?: FilterPreset[];
-  group?: FilterPreset[];
-  gallery?: FilterPreset[];
-  [key: string]: FilterPreset[] | undefined;
-}
-
-/**
- * Default filter presets (preset IDs for each artifact type)
- */
-interface DefaultFilterPresets {
-  scene?: string;
-  performer?: string;
-  studio?: string;
-  tag?: string;
-  group?: string;
-  gallery?: string;
-  [key: string]: string | undefined;
-}
-
-/**
- * Sync updates for entity ratings/favorites
- */
-interface SyncUpdates {
-  rating?: number | null;
-  rating100?: number | null;
-  favorite?: boolean;
-  [key: string]: unknown;
-}
-
-/**
- * User content restriction from database
- */
-interface UserRestriction {
-  id?: number;
-  userId?: string;
-  entityType: string;
-  mode: string;
-  entityIds: string[] | string;
-  restrictEmpty?: boolean;
-  [key: string]: unknown;
-}
 
 // Inline the default carousel preferences to avoid ESM loading issues
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [
