@@ -535,10 +535,10 @@ export const getGalleryImages = async (
     // Fetch the gallery data for inheritance context (with instanceId for multi-stash support)
     const gallery = await stashEntityService.getGallery(galleryId, instanceId);
 
-    // Build query options (filter by instanceId if provided for multi-stash support)
+    // Build query options (instanceId is always resolved — required for multi-stash support)
     const whereClause = {
       deletedAt: null,
-      ...(instanceId && { stashInstanceId: instanceId }),
+      stashInstanceId: instanceId,
       galleries: {
         some: { galleryId },
       },

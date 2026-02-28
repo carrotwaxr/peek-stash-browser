@@ -702,7 +702,7 @@ describe("StashEntityService", () => {
         stashInstanceId: "instance-alpha",
       });
 
-      const result = await stashEntityService.getScene("scene-1");
+      const result = await stashEntityService.getScene("scene-1", "instance-alpha");
 
       expect(result).not.toBeNull();
       expect(result!.instanceId).toBe("instance-alpha");
@@ -717,7 +717,7 @@ describe("StashEntityService", () => {
       // getGroup calls $queryRaw for scene/performer counts
       getMock(prisma.$queryRaw).mockResolvedValue([{ count: 0 }]);
 
-      const result = await stashEntityService.getGroup("group-1");
+      const result = await stashEntityService.getGroup("group-1", "instance-beta");
 
       expect(result).not.toBeNull();
       expect(result!.instanceId).toBe("instance-beta");
@@ -945,13 +945,14 @@ describe("StashEntityService", () => {
     it("should handle empty ID array in getByIds", async () => {
       getMock(prisma.stashScene.findMany).mockResolvedValue([]);
 
-      const result = await stashEntityService.getScenesByIds([]);
+      const result = await stashEntityService.getScenesByIds([], "test-instance");
 
       expect(result).toHaveLength(0);
       expect(prisma.stashScene.findMany).toHaveBeenCalledWith({
         where: {
           id: { in: [] },
           deletedAt: null,
+          stashInstanceId: "test-instance",
         },
       });
     });
