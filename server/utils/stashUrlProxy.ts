@@ -7,6 +7,8 @@
  */
 import { logger } from "./logger.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#434): replace any in transform functions with type-safe mutation */
+
 /**
  * Structural constraint for entities with image_path (performers, studios, tags).
  * Only constrains the fields actually accessed by transform functions.
@@ -185,7 +187,6 @@ const stripApiKeyFromUrl = (url: string): string => {
  */
 export const transformScene = <T extends SceneLike>(scene: T): T => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mutated: any = { ...scene };
 
     // Transform paths object if present
@@ -260,7 +261,6 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
  */
 export const transformGroup = <T extends GroupLike>(group: T): T => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mutated: any = { ...group };
 
     // Transform front and back image paths

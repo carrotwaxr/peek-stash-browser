@@ -87,8 +87,8 @@ export const setupAPI = () => {
 
     let version = "1.0.0";
     try {
-      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-      version = packageJson.version;
+      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as { version?: string };
+      version = packageJson.version ?? version;
     } catch (err) {
       logger.error("Failed to read package.json version:", {
         error: err,

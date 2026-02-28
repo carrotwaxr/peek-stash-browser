@@ -228,8 +228,7 @@ export const testStashConnection = async (
     } catch (error) {
       // Get the full error details including cause
       const errorMessage = error instanceof Error ? error.message : String(error);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorCause = error instanceof Error && (error as any).cause ? String((error as any).cause) : "";
+      const errorCause = error instanceof Error && (error as Error & { cause?: unknown }).cause ? String((error as Error & { cause?: unknown }).cause) : "";
       const fullError = errorCause ? `${errorMessage}: ${errorCause}` : errorMessage;
 
       logger.error("Stash connection test failed", {

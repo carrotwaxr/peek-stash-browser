@@ -69,7 +69,7 @@ export const getClipById = async (req: Request, res: Response) => {
     const userId = (req as AuthenticatedRequest).user.id;
     const { id } = req.params;
 
-    const clip = await clipService.getClipById(id, userId);
+    const clip = await clipService.getClipById(id as string, userId);
 
     if (!clip) {
       return res.status(404).json({ error: "Clip not found" });
@@ -93,7 +93,7 @@ export const getClipsForScene = async (req: Request, res: Response) => {
     const { includeUngenerated = "false", instanceId } = req.query;
 
     const clips = await clipService.getClipsForScene(
-      id,
+      id as string,
       userId,
       includeUngenerated === "true",
       instanceId ? [instanceId as string] : undefined

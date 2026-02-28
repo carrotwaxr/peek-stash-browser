@@ -46,7 +46,7 @@ export class DownloadService {
     if (!displayName && scene.filePath) {
       // Extract filename without extension from path
       const pathParts = scene.filePath.split("/");
-      const fileWithExt = pathParts[pathParts.length - 1];
+      const fileWithExt = pathParts[pathParts.length - 1] ?? "";
       displayName = fileWithExt.replace(/\.[^/.]+$/, ""); // Remove extension
     }
     const fileName = this.sanitizeFileName(displayName || sceneId) + ".mp4";

@@ -27,9 +27,11 @@ function mergeJsonArrays(arr1: unknown, arr2: unknown): string {
   });
   // Sort by timestamp/startTime if present
   deduped.sort((a, b) => {
-    const aTime = typeof a === "string" ? a : (a as Record<string, unknown>).startTime || (a as Record<string, unknown>).time || "";
-    const bTime = typeof b === "string" ? b : (b as Record<string, unknown>).startTime || (b as Record<string, unknown>).time || "";
-    return String(aTime).localeCompare(String(bTime));
+    const aRec = typeof a === "string" ? null : (a as Record<string, string | undefined>);
+    const bRec = typeof b === "string" ? null : (b as Record<string, string | undefined>);
+    const aTime = typeof a === "string" ? a : (aRec?.startTime ?? aRec?.time ?? "");
+    const bTime = typeof b === "string" ? b : (bRec?.startTime ?? bRec?.time ?? "");
+    return aTime.localeCompare(bTime);
   });
   return JSON.stringify(deduped);
 }
@@ -39,8 +41,8 @@ function parseJsonArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") {
     try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
+      const parsed: unknown = JSON.parse(value as string);
+      return Array.isArray(parsed) ? (parsed as unknown[]) : [];
     } catch {
       return [];
     }
@@ -155,9 +157,9 @@ class MergeReconciliationService {
     const scenePhashes: string[] = [scene.phash];
     if (scene.phashes) {
       try {
-        const parsed = JSON.parse(scene.phashes);
+        const parsed: unknown = JSON.parse(scene.phashes);
         if (Array.isArray(parsed)) {
-          scenePhashes.push(...parsed.filter((p: string) => p !== scene.phash));
+          scenePhashes.push(...(parsed as string[]).filter((p: string) => p !== scene.phash));
         }
       } catch {
         // Invalid JSON, ignore

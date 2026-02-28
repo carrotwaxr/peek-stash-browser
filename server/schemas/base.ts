@@ -18,7 +18,7 @@ export const PaginationSchema = z.object({
 /**
  * ISO timestamp string
  */
-export const TimestampSchema = z.string().datetime().nullable();
+export const TimestampSchema = z.iso.datetime().nullable();
 
 /**
  * Proxy URL path (starts with /api/proxy or is null)

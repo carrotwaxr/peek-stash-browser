@@ -9,7 +9,7 @@
  * - POST /api/admin/reconcile-all - Auto-reconcile all with exact phash matches
  */
 import express from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin, type AuthenticatedRequest } from "../middleware/auth.js";
 import { mergeReconciliationService } from "../services/MergeReconciliationService.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
@@ -50,7 +50,7 @@ router.get(
   authenticated(async (req, res) => {
     try {
       const { id } = req.params;
-      const matches = await mergeReconciliationService.findPhashMatches(id);
+      const matches = await mergeReconciliationService.findPhashMatches(id as string);
       res.json({ matches });
     } catch (error) {
       res.status(500).json({
@@ -67,17 +67,17 @@ router.get(
  */
 router.post(
   "/orphaned-scenes/:id/reconcile",
-  authenticated(async (req, res) => {
+  authenticated(async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
-      const { targetSceneId } = req.body;
+      const { targetSceneId } = req.body as { targetSceneId: string };
 
       if (!targetSceneId) {
         return res.status(400).json({ error: "targetSceneId is required" });
       }
 
       const result = await mergeReconciliationService.reconcileScene(
-        id,
+        id as string,
         targetSceneId,
         null, // Will be looked up if available
         req.user.id // Admin who initiated
@@ -105,7 +105,7 @@ router.post(
   authenticated(async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await mergeReconciliationService.discardOrphanedData(id);
+      const result = await mergeReconciliationService.discardOrphanedData(id as string);
 
       res.json({
         ok: true,
@@ -126,7 +126,7 @@ router.post(
  */
 router.post(
   "/reconcile-all",
-  authenticated(async (req, res) => {
+  authenticated(async (req: AuthenticatedRequest, res) => {
     try {
       const orphans = await mergeReconciliationService.findOrphanedScenesWithActivity();
       let reconciled = 0;

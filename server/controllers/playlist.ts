@@ -275,7 +275,7 @@ export const getSharedPlaylists = async (
           sharedAt: p.shares.length > 0
             ? p.shares.reduce((earliest, s) =>
                 s.sharedAt < earliest ? s.sharedAt : earliest,
-              p.shares[0].sharedAt).toISOString()
+              (p.shares[0] as (typeof p.shares)[number]).sharedAt).toISOString()
             : new Date().toISOString(),
           items: itemsWithScenes,
         };
@@ -626,7 +626,7 @@ export const addSceneToPlaylist = async (
 
     // Calculate next position
     const nextPosition =
-      playlist.items.length > 0 ? playlist.items[0].position + 1 : 0;
+      playlist.items.length > 0 ? (playlist.items[0] as (typeof playlist.items)[number]).position + 1 : 0;
 
     const item = await prisma.playlistItem.create({
       data: {

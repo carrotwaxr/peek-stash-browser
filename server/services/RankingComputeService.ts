@@ -134,13 +134,16 @@ class RankingComputeService {
     for (let i = 0; i < n; i++) {
       // Formula: percentile = 100 * (n - rank) / n
       // Where rank is 1-indexed position (1 = best)
-      scored[i].percentileRank = Math.round((100 * (n - i - 1)) / Math.max(n - 1, 1));
+      const item = scored[i] as (typeof scored)[number];
+      item.percentileRank = Math.round((100 * (n - i - 1)) / Math.max(n - 1, 1));
     }
 
     // Handle ties: entities with same engagement rate get same percentile
     for (let i = 1; i < n; i++) {
-      if (Math.abs(scored[i].engagementRate - scored[i - 1].engagementRate) < 0.0001) {
-        scored[i].percentileRank = scored[i - 1].percentileRank;
+      const current = scored[i] as (typeof scored)[number];
+      const previous = scored[i - 1] as (typeof scored)[number];
+      if (Math.abs(current.engagementRate - previous.engagementRate) < 0.0001) {
+        current.percentileRank = previous.percentileRank;
       }
     }
 

@@ -596,10 +596,11 @@ class ClipQueryBuilder {
       }
 
       // Fetch tags for this clip
-      const clipIds = [{ id: rows[0].id, instanceId: rows[0].stashInstanceId }];
+      const firstRow = rows[0] as (typeof rows)[number];
+      const clipIds = [{ id: firstRow.id, instanceId: firstRow.stashInstanceId }];
       const tagMap = await this.fetchClipTags(clipIds);
 
-      return this.transformRows(rows, tagMap)[0];
+      return this.transformRows(rows, tagMap)[0] ?? null;
     } catch (error) {
       logger.error("ClipQueryBuilder.getClipById failed", { error, clipId, userId });
       throw error;

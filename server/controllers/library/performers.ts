@@ -52,7 +52,7 @@ export function parseCareerLength(careerLengthStr: string | null | undefined): n
   const activePattern = /^(\d{4})\s*[-–—]\s*(present|current|now|\s*)$/i;
   const activeMatch = str.match(activePattern);
   if (activeMatch) {
-    const startYear = parseInt(activeMatch[1], 10);
+    const startYear = parseInt(activeMatch[1] as string, 10);
     if (startYear > 1900 && startYear <= currentYear) {
       return currentYear - startYear;
     }
@@ -63,8 +63,8 @@ export function parseCareerLength(careerLengthStr: string | null | undefined): n
   const rangePattern = /^(\d{4})\s*[-–—]\s*(\d{4})$/;
   const rangeMatch = str.match(rangePattern);
   if (rangeMatch) {
-    const startYear = parseInt(rangeMatch[1], 10);
-    const endYear = parseInt(rangeMatch[2], 10);
+    const startYear = parseInt(rangeMatch[1] as string, 10);
+    const endYear = parseInt(rangeMatch[2] as string, 10);
     if (startYear > 1900 && endYear >= startYear && endYear <= currentYear + 1) {
       return endYear - startYear;
     }
@@ -75,7 +75,7 @@ export function parseCareerLength(careerLengthStr: string | null | undefined): n
   const numericPattern = /^(\d+)\s*(years?|yrs?)?$/i;
   const numericMatch = str.match(numericPattern);
   if (numericMatch) {
-    const years = parseInt(numericMatch[1], 10);
+    const years = parseInt(numericMatch[1] as string, 10);
     if (years >= 0 && years <= 100) {
       return years;
     }
@@ -85,7 +85,7 @@ export function parseCareerLength(careerLengthStr: string | null | undefined): n
   const yearOnlyPattern = /^(\d{4})$/;
   const yearOnlyMatch = str.match(yearOnlyPattern);
   if (yearOnlyMatch) {
-    const startYear = parseInt(yearOnlyMatch[1], 10);
+    const startYear = parseInt(yearOnlyMatch[1] as string, 10);
     if (startYear > 1900 && startYear <= currentYear) {
       return currentYear - startYear;
     }

@@ -51,7 +51,7 @@ function normalizeCodec(codec: string | undefined | null): string {
   if (!codec) return "";
 
   // Convert to lowercase and remove common separators
-  let normalized = codec.toLowerCase().replace(/[.\s_-]/g, "");
+  const normalized = codec.toLowerCase().replace(/[.\s_-]/g, "");
 
   // Handle common variations
   if (normalized.startsWith("h264") || normalized === "avc" || normalized === "avc1") {

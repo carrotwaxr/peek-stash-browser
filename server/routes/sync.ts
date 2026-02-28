@@ -47,9 +47,9 @@ router.get(
 router.post(
   "/trigger",
   requireAdmin,
-  authenticated(async (req, res) => {
+  authenticated((req, res) => {
     try {
-      const { type = "incremental" } = req.body || {};
+      const { type = "incremental" } = (req.body || {}) as { type?: string };
 
       if (stashSyncService.isSyncing()) {
         return res.status(409).json({
@@ -89,7 +89,7 @@ router.post(
 router.post(
   "/abort",
   requireAdmin,
-  authenticated(async (req, res) => {
+  authenticated((req, res) => {
     try {
       if (!stashSyncService.isSyncing()) {
         return res.status(400).json({
@@ -134,7 +134,7 @@ router.post(
         });
       }
 
-      const { entity, id, action } = req.body || {};
+      const { entity, id, action } = (req.body || {}) as { entity?: string; id?: string; action?: string };
 
       if (!entity || !id || !action) {
         return res.status(400).json({
@@ -151,16 +151,18 @@ router.post(
         "group",
         "gallery",
         "image",
-      ];
-      if (!validEntities.includes(entity)) {
+      ] as const;
+      type SyncEntityType = typeof validEntities[number];
+      if (!validEntities.includes(entity as SyncEntityType)) {
         return res.status(400).json({
           error: "Invalid entity type",
           message: `Entity must be one of: ${validEntities.join(", ")}`,
         });
       }
 
-      const validActions = ["create", "update", "delete"];
-      if (!validActions.includes(action)) {
+      const validActions = ["create", "update", "delete"] as const;
+      type SyncAction = typeof validActions[number];
+      if (!validActions.includes(action as SyncAction)) {
         return res.status(400).json({
           error: "Invalid action",
           message: `Action must be one of: ${validActions.join(", ")}`,
@@ -168,7 +170,7 @@ router.post(
       }
 
       // Queue single entity sync (don't wait for completion)
-      stashSyncService.syncSingleEntity(entity, id, action).catch(() => {
+      stashSyncService.syncSingleEntity(entity as SyncEntityType, id, action as SyncAction).catch(() => {
         // Error is logged by the service
       });
 
@@ -201,11 +203,11 @@ router.post(
         });
       }
 
-      const { instanceId } = req.body || {};
+      const { instanceId } = (req.body || {}) as { instanceId?: string };
 
       // If no instance specified, get the first enabled instance
       const { stashInstanceManager } = await import("../services/StashInstanceManager.js");
-      let targetInstanceId = instanceId;
+      let targetInstanceId: string | undefined = instanceId;
       if (!targetInstanceId) {
         const enabledInstances = stashInstanceManager.getAllEnabled();
         if (enabledInstances.length === 0) {
@@ -214,7 +216,14 @@ router.post(
             message: "No enabled Stash instances found",
           });
         }
-        targetInstanceId = enabledInstances[0].id;
+        const firstInstance = enabledInstances[0];
+        if (!firstInstance) {
+          return res.status(400).json({
+            error: "No Stash instances",
+            message: "No enabled Stash instances found",
+          });
+        }
+        targetInstanceId = firstInstance.id;
       }
 
       const result = await stashSyncService.reProbeUngeneratedClips(targetInstanceId);
@@ -252,7 +261,7 @@ router.put(
         syncIntervalMinutes,
         enableScanSubscription,
         enablePluginWebhook,
-      } = req.body;
+      } = req.body as { syncIntervalMinutes?: number; enableScanSubscription?: boolean; enablePluginWebhook?: boolean };
 
       // Validate syncIntervalMinutes
       if (syncIntervalMinutes !== undefined) {

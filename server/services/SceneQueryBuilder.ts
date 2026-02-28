@@ -11,6 +11,8 @@ import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 // Query builder options
 export interface SceneQueryOptions {
   userId: number;
@@ -1242,7 +1244,6 @@ class SceneQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedScene
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a 30+ field interface adds maintenance overhead without real safety gain
   private transformRow(row: Record<string, any>): NormalizedScene {
     // Parse JSON fields
     const oHistory = this.parseJsonArray(row.userOHistory);
@@ -1252,7 +1253,6 @@ class SceneQueryBuilder {
     const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
 
     // Create scene object with studioId preserved for population
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedScene from DB row; Scene base type requires fields we don't populate (interactive, movies, etc.)
     const scene: any = {
       id: row.id,
       instanceId: row.stashInstanceId,

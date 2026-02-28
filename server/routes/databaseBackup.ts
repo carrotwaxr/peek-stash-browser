@@ -64,7 +64,7 @@ router.delete(
   authenticated(async (req, res) => {
     try {
       const { filename } = req.params;
-      await databaseBackupService.deleteBackup(filename);
+      await databaseBackupService.deleteBackup(filename as string);
       res.json({ ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

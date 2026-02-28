@@ -52,7 +52,7 @@ export const getGroup = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id, 10);
+  const groupId = parseInt(req.params.id as string, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -110,7 +110,7 @@ export const createGroup = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body;
+    req.body as { name: string; description?: string; canShare?: boolean; canDownloadFiles?: boolean; canDownloadPlaylists?: boolean };
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     return res.status(400).json({ error: "Group name is required" });
@@ -146,7 +146,7 @@ export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id, 10);
+  const groupId = parseInt(req.params.id as string, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -160,7 +160,7 @@ export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body;
+    req.body as { name?: string; description?: string; canShare?: boolean; canDownloadFiles?: boolean; canDownloadPlaylists?: boolean };
 
   // Build update data, only including provided fields
   const updateData: {
@@ -210,7 +210,7 @@ export const deleteGroup = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id, 10);
+  const groupId = parseInt(req.params.id as string, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -238,7 +238,7 @@ export const addMember = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id, 10);
+  const groupId = parseInt(req.params.id as string, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -251,7 +251,7 @@ export const addMember = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ error: "Group not found" });
   }
 
-  const { userId } = req.body;
+  const { userId } = req.body as { userId: number };
   if (!userId || typeof userId !== "number") {
     return res.status(400).json({ error: "User ID is required" });
   }
@@ -291,8 +291,8 @@ export const removeMember = async (
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id, 10);
-  const userId = parseInt(req.params.userId, 10);
+  const groupId = parseInt(req.params.id as string, 10);
+  const userId = parseInt(req.params.userId as string, 10);
 
   if (isNaN(groupId) || isNaN(userId)) {
     return res.status(400).json({ error: "Invalid group ID or user ID" });

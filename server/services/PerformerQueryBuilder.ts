@@ -12,6 +12,8 @@ import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { KEY_SEP } from "./UserStatsService.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 /** Deduplicate composite key objects by id+stashInstanceId */
 function dedupeKeys(items: { id: string; stashInstanceId: string }[]): { id: string; stashInstanceId: string }[] {
   const seen = new Set<string>();
@@ -875,9 +877,7 @@ class PerformerQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedPerformer
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a 30+ field interface adds maintenance overhead without real safety gain
   private transformRow(row: Record<string, any>): NormalizedPerformer {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedPerformer from DB row; Performer base type requires fields we don't populate
     const performer: any = {
       id: row.id,
       instanceId: row.stashInstanceId,

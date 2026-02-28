@@ -410,19 +410,17 @@ class UserStatsService {
         const whInstanceId = wh.instanceId || "";
 
         // Parse O history for timestamps
-        const oHistory = Array.isArray(wh.oHistory)
-          ? wh.oHistory
-          : JSON.parse((wh.oHistory as string) || "[]");
-        const playHistory = Array.isArray(wh.playHistory)
-          ? wh.playHistory
-          : JSON.parse((wh.playHistory as string) || "[]");
+        const oHistory: string[] = Array.isArray(wh.oHistory)
+          ? (wh.oHistory as string[])
+          : (JSON.parse((wh.oHistory as string) || "[]") as string[]);
+        const playHistory: string[] = Array.isArray(wh.playHistory)
+          ? (wh.playHistory as string[])
+          : (JSON.parse((wh.playHistory as string) || "[]") as string[]);
 
-        const lastPlayedAt =
-          playHistory.length > 0
-            ? new Date(playHistory[playHistory.length - 1])
-            : null;
-        const lastOAt =
-          oHistory.length > 0 ? new Date(oHistory[oHistory.length - 1]) : null;
+        const lastPlayEntry = playHistory.length > 0 ? playHistory[playHistory.length - 1] : undefined;
+        const lastPlayedAt = lastPlayEntry ? new Date(lastPlayEntry) : null;
+        const lastOEntry = oHistory.length > 0 ? oHistory[oHistory.length - 1] : undefined;
+        const lastOAt = lastOEntry ? new Date(lastOEntry) : null;
 
         // Aggregate performers (using composite key: performerId + instanceId)
         for (const performer of scene.performers || []) {
@@ -489,7 +487,7 @@ class UserStatsService {
               return {
                 userId,
                 instanceId: instanceId || "",
-                performerId,
+                performerId: performerId ?? "",
                 oCounter: stats.oCounter,
                 playCount: stats.playCount,
                 lastPlayedAt: stats.lastPlayedAt,
@@ -506,7 +504,7 @@ class UserStatsService {
               return {
                 userId,
                 instanceId: instanceId || "",
-                studioId,
+                studioId: studioId ?? "",
                 oCounter: stats.oCounter,
                 playCount: stats.playCount,
               };
@@ -520,7 +518,7 @@ class UserStatsService {
             return {
               userId,
               instanceId: instanceId || "",
-              tagId,
+              tagId: tagId ?? "",
               oCounter: stats.oCounter,
               playCount: stats.playCount,
             };

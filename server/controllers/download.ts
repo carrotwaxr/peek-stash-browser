@@ -68,7 +68,7 @@ export async function startSceneDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createSceneDownload(userId, sceneId);
+    const download = await downloadService.createSceneDownload(userId, sceneId as string);
 
     logger.info("Scene download created", {
       downloadId: download.id,
@@ -109,7 +109,7 @@ export async function startImageDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createImageDownload(userId, imageId);
+    const download = await downloadService.createImageDownload(userId, imageId as string);
 
     logger.info("Image download created", {
       downloadId: download.id,
@@ -140,7 +140,7 @@ export async function startPlaylistDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const playlistId = parseInt(req.params.playlistId, 10);
+    const playlistId = parseInt(req.params.playlistId as string, 10);
     if (isNaN(playlistId)) {
       return res.status(400).json({ error: "Invalid playlist ID" });
     }
@@ -234,7 +234,7 @@ export async function getDownloadStatus(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id, 10);
+    const downloadId = parseInt(req.params.id as string, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -272,7 +272,7 @@ export async function getDownloadFile(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id, 10);
+    const downloadId = parseInt(req.params.id as string, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -401,7 +401,7 @@ export async function deleteDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id, 10);
+    const downloadId = parseInt(req.params.id as string, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -440,7 +440,7 @@ export async function retryDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id, 10);
+    const downloadId = parseInt(req.params.id as string, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }

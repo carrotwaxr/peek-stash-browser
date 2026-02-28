@@ -11,6 +11,8 @@ import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 // Query builder options
 export interface GalleryQueryOptions {
   userId: number;
@@ -559,7 +561,6 @@ class GalleryQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGallery
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw SQL row with dynamic columns; defining a full interface adds maintenance overhead without real safety gain
   private transformRow(row: Record<string, any>): NormalizedGallery {
     // Parse URLs JSON if present
     let urls: string[] = [];
@@ -571,7 +572,6 @@ class GalleryQueryBuilder {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- building partial NormalizedGallery from DB row; Gallery base type requires fields we don't populate (chapters, files, etc.)
     const gallery: any = {
       id: row.id,
       instanceId: row.stashInstanceId,

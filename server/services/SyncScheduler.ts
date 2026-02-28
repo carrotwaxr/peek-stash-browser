@@ -195,7 +195,7 @@ class SyncScheduler {
 
     const intervalMs = intervalMinutes * 60 * 1000;
 
-    this.intervalId = setInterval(async () => {
+    this.intervalId = setInterval(() => void (async () => {
       if (stashSyncService.isSyncing()) {
         logger.debug("Scheduled sync skipped - sync already in progress");
         return;
@@ -209,7 +209,7 @@ class SyncScheduler {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-    }, intervalMs);
+    })(), intervalMs);
 
     logger.info(`Sync polling interval started: ${intervalMinutes} minutes`);
   }

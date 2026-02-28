@@ -11,6 +11,8 @@ import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
+
 // Query builder options
 export interface StudioQueryOptions {
   userId: number;
@@ -425,9 +427,7 @@ class StudioQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedStudio
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private transformRow(row: Record<string, any>): NormalizedStudio {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studio: any = {
       id: row.id,
       instanceId: row.stashInstanceId,

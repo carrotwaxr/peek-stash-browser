@@ -101,10 +101,10 @@ export function scheduleDownloadCleanup(): void {
   logger.info("Scheduling download cleanup job (runs every hour)");
 
   // Run immediately on startup
-  cleanupExpiredDownloads();
+  void cleanupExpiredDownloads();
 
   // Schedule to run every hour
   setInterval(() => {
-    cleanupExpiredDownloads();
+    void cleanupExpiredDownloads();
   }, CLEANUP_INTERVAL_MS);
 }

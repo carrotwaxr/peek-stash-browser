@@ -68,9 +68,9 @@ export async function incrementImageOCounter(
         },
       });
     } else {
-      const oHistory = Array.isArray(viewHistory.oHistory)
+      const oHistory = (Array.isArray(viewHistory.oHistory)
         ? viewHistory.oHistory
-        : JSON.parse((viewHistory.oHistory as string) || "[]");
+        : JSON.parse((viewHistory.oHistory as string) || "[]")) as string[];
 
       viewHistory = await prisma.imageViewHistory.update({
         where: { id: viewHistory.id },
@@ -145,9 +145,9 @@ export async function recordImageView(
         },
       });
     } else {
-      const existingViewHistory = Array.isArray(viewHistory.viewHistory)
+      const existingViewHistory = (Array.isArray(viewHistory.viewHistory)
         ? viewHistory.viewHistory
-        : JSON.parse((viewHistory.viewHistory as string) || "[]");
+        : JSON.parse((viewHistory.viewHistory as string) || "[]")) as string[];
 
       viewHistory = await prisma.imageViewHistory.update({
         where: { id: viewHistory.id },
@@ -208,13 +208,13 @@ export async function getImageViewHistory(
     res.json({
       exists: true,
       viewCount: viewHistory.viewCount,
-      viewHistory: Array.isArray(viewHistory.viewHistory)
+      viewHistory: (Array.isArray(viewHistory.viewHistory)
         ? viewHistory.viewHistory
-        : JSON.parse((viewHistory.viewHistory as string) || "[]"),
+        : JSON.parse((viewHistory.viewHistory as string) || "[]")) as string[],
       oCount: viewHistory.oCount,
-      oHistory: Array.isArray(viewHistory.oHistory)
+      oHistory: (Array.isArray(viewHistory.oHistory)
         ? viewHistory.oHistory
-        : JSON.parse((viewHistory.oHistory as string) || "[]"),
+        : JSON.parse((viewHistory.oHistory as string) || "[]")) as string[],
       lastViewedAt: viewHistory.lastViewedAt,
     });
   } catch (error) {

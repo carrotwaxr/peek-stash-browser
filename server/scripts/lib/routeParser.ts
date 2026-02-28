@@ -73,9 +73,9 @@ export function parseRouteFile(filePath: string, basePath: string): RouteDefinit
     }
 
     routes.push({
-      method: method.toUpperCase(),
-      path: routePath,
-      fullPath: basePath + routePath,
+      method: (method as string).toUpperCase(),
+      path: routePath as string,
+      fullPath: basePath + (routePath ?? ""),
       controllerName,
       controllerFile: extractControllerFile(content, controllerName),
       requiresAuth: hasFileAuth || hasAuthenticated,
@@ -95,7 +95,7 @@ function extractControllerFile(content: string, controllerName: string): string 
     "m"
   );
   const match = content.match(importRegex);
-  return match ? match[1].replace(/\.js$/, ".ts") : "unknown";
+  return match ? (match[1] as string).replace(/\.js$/, ".ts") : "unknown";
 }
 
 /**
@@ -118,7 +118,7 @@ export function parseApiMounts(apiFilePath: string): Map<string, string> {
   let match;
   while ((match = mountRegex.exec(content)) !== null) {
     const [, path, routeVar] = match;
-    mounts.set(routeVar, path);
+    mounts.set(routeVar as string, path as string);
   }
 
   return mounts;

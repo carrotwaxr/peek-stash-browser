@@ -193,7 +193,7 @@ function formatUptime(seconds: number): string {
  * Manually refresh the Stash cache
  * Admin-only endpoint to trigger cache refresh on demand
  */
-export const refreshCache = async (req: Request, res: Response) => {
+export const refreshCache = (req: Request, res: Response) => {
   try {
     logger.info("Manual cache refresh triggered by admin");
     // Trigger a full sync (non-blocking - runs in background)

@@ -70,7 +70,8 @@ async function mergeImagesWithUserData(
 /**
  * Transform ImageQueryBuilder result to match expected API response format
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- data transformer between ImageQueryBuilder's internal DB row format and API response; spread of dynamic fields prevents specific return type
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- data transformer between ImageQueryBuilder's internal DB row format and API response; all property accesses on Record<string, any> are inherently unsafe */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- spread of dynamic fields prevents specific return type
 function transformImageResult(image: Record<string, any>): any {
   return {
     ...image,
@@ -96,6 +97,7 @@ function transformImageResult(image: Record<string, any>): any {
     stashOCounter: undefined,
   };
 }
+/* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
 /**
  * Find images endpoint - uses SQL-native ImageQueryBuilder
@@ -233,6 +235,7 @@ export const findImages = async (
     });
 
     // Transform and add stashUrl to each image
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- transformImageResult intentionally returns any (dynamic DB row transformer)
     const imagesWithStashUrl = result.images.map((image) => ({
       ...transformImageResult(image),
       stashUrl: buildStashEntityUrl("image", image.id),
@@ -250,7 +253,7 @@ export const findImages = async (
     res.json({
       findImages: {
         count: result.total,
-        images: imagesWithStashUrl,
+        images: imagesWithStashUrl as NormalizedImage[],
       },
     });
   } catch (error) {
@@ -284,7 +287,7 @@ export const findImageById = async (
 
     // Merge with user data
     const images = await mergeImagesWithUserData([image], userId);
-    const mergedImage = images[0];
+    const mergedImage = images[0] as (typeof images)[number];
 
     // Add stashUrl
     const imageWithStashUrl = {

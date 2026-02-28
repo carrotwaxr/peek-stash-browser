@@ -23,7 +23,8 @@ function getFallbackInstanceId(): string | undefined {
     return undefined;
   }
   // Return the first (highest priority) instance's ID
-  return configs[0].id;
+  const first = configs[0];
+  return first?.id;
 }
 
 /**
@@ -57,8 +58,9 @@ export async function getEntityInstanceId(
             instanceIds: scenes.map(s => s.stashInstanceId),
           });
         }
-        if (scenes.length > 0 && scenes[0].stashInstanceId) {
-          return scenes[0].stashInstanceId;
+        const firstScene = scenes[0];
+        if (firstScene?.stashInstanceId) {
+          return firstScene.stashInstanceId;
         }
         break;
       }
@@ -76,8 +78,9 @@ export async function getEntityInstanceId(
             instanceIds: performers.map(p => p.stashInstanceId),
           });
         }
-        if (performers.length > 0 && performers[0].stashInstanceId) {
-          return performers[0].stashInstanceId;
+        const firstPerformer = performers[0];
+        if (firstPerformer?.stashInstanceId) {
+          return firstPerformer.stashInstanceId;
         }
         break;
       }
@@ -95,8 +98,9 @@ export async function getEntityInstanceId(
             instanceIds: studios.map(s => s.stashInstanceId),
           });
         }
-        if (studios.length > 0 && studios[0].stashInstanceId) {
-          return studios[0].stashInstanceId;
+        const firstStudio = studios[0];
+        if (firstStudio?.stashInstanceId) {
+          return firstStudio.stashInstanceId;
         }
         break;
       }
@@ -114,8 +118,9 @@ export async function getEntityInstanceId(
             instanceIds: tags.map(t => t.stashInstanceId),
           });
         }
-        if (tags.length > 0 && tags[0].stashInstanceId) {
-          return tags[0].stashInstanceId;
+        const firstTag = tags[0];
+        if (firstTag?.stashInstanceId) {
+          return firstTag.stashInstanceId;
         }
         break;
       }
@@ -133,8 +138,9 @@ export async function getEntityInstanceId(
             instanceIds: galleries.map(g => g.stashInstanceId),
           });
         }
-        if (galleries.length > 0 && galleries[0].stashInstanceId) {
-          return galleries[0].stashInstanceId;
+        const firstGallery = galleries[0];
+        if (firstGallery?.stashInstanceId) {
+          return firstGallery.stashInstanceId;
         }
         break;
       }
@@ -152,8 +158,9 @@ export async function getEntityInstanceId(
             instanceIds: groups.map(g => g.stashInstanceId),
           });
         }
-        if (groups.length > 0 && groups[0].stashInstanceId) {
-          return groups[0].stashInstanceId;
+        const firstGroup = groups[0];
+        if (firstGroup?.stashInstanceId) {
+          return firstGroup.stashInstanceId;
         }
         break;
       }
@@ -171,8 +178,9 @@ export async function getEntityInstanceId(
             instanceIds: images.map(i => i.stashInstanceId),
           });
         }
-        if (images.length > 0 && images[0].stashInstanceId) {
-          return images[0].stashInstanceId;
+        const firstImage = images[0];
+        if (firstImage?.stashInstanceId) {
+          return firstImage.stashInstanceId;
         }
         break;
       }

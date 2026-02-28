@@ -15,7 +15,8 @@ export function generateRecoveryKey(): string {
   const bytes = crypto.randomBytes(28);
   let key = "";
   for (let i = 0; i < 28; i++) {
-    key += RECOVERY_KEY_CHARS[bytes[i] % RECOVERY_KEY_CHARS.length];
+    const byteVal = bytes[i] ?? 0;
+    key += RECOVERY_KEY_CHARS.charAt(byteVal % RECOVERY_KEY_CHARS.length);
   }
   return key;
 }

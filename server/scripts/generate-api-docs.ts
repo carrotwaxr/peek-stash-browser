@@ -117,7 +117,7 @@ function findBasePath(
 
   const match = apiContent.match(importPattern);
   if (match) {
-    const varName = match[1];
+    const varName = match[1] as string;
     return mounts.get(varName) || null;
   }
 
@@ -161,6 +161,7 @@ function formatGroupName(basePath: string): string {
 }
 
 async function main() {
+  await Promise.resolve(); // async entry point for top-level .catch()
   console.log("Generating API documentation...");
 
   // Read API file content for import matching

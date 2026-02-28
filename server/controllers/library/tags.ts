@@ -144,9 +144,10 @@ export const findTags = async (
     // For single-entity requests (detail pages), get tag with computed counts
     let resultTags = tags;
     if (ids && ids.length === 1 && resultTags.length === 1) {
-      const tagWithCounts = await stashEntityService.getTag(ids[0], resultTags[0].instanceId);
+      const firstTag = resultTags[0] as (typeof resultTags)[number];
+      const tagWithCounts = await stashEntityService.getTag(ids[0] as string, firstTag.instanceId);
       if (tagWithCounts) {
-        const existingTag = resultTags[0];
+        const existingTag = firstTag;
         resultTags = [
           {
             ...existingTag,
@@ -446,6 +447,7 @@ export async function applyTagFilters(
       (filters.scenes_filter.id.value || []).map(String)
     );
     if (sceneIdSet.size > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
       const allScenes = await stashEntityService.getAllScenes();
       const allPerformers = await stashEntityService.getAllPerformers();
       const matchingScenes = allScenes.filter((s) =>
@@ -481,11 +483,12 @@ export async function applyTagFilters(
       (filters.scenes_filter.groups.value || []).map(String)
     );
     if (groupIdSet.size > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
       const allScenes = await stashEntityService.getAllScenes();
       const allPerformers = await stashEntityService.getAllPerformers();
       const matchingScenes = allScenes.filter((scene) => {
         if (!scene.groups) return false;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- groups are flattened at runtime, type says SceneGroup (nested)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- groups are flattened at runtime, type says SceneGroup (nested)
         return scene.groups.some((g: any) => groupIdSet.has(String(g.id)));
       });
 

@@ -10,6 +10,8 @@ import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-dynamic-delete -- TODO(#467): migrate handlers to TypedAuthRequest with typed body */
+
 /**
  * Carousel preference configuration
  */
@@ -756,7 +758,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const { userId } = req.params;
-    const userIdInt = parseInt(userId, 10);
+    const userIdInt = parseInt(userId as string, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -805,7 +807,7 @@ export const updateUserRole = async (
 
     const { userId } = req.params;
     const { role } = req.body;
-    const userIdInt = parseInt(userId, 10);
+    const userIdInt = parseInt(userId as string, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -1031,7 +1033,7 @@ export const deleteFilterPreset = async (
       "image",
       "clip",
     ];
-    if (!validTypes.includes(artifactType)) {
+    if (!artifactType || !validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
 
@@ -1216,7 +1218,7 @@ export const syncFromStash = async (
       return res.status(403).json({ error: "Only admins can sync from Stash" });
     }
 
-    const targetUserId = parseInt(req.params.userId);
+    const targetUserId = parseInt(req.params.userId as string);
     if (isNaN(targetUserId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -1945,7 +1947,7 @@ export const getUserRestrictions = async (
     }
 
     const restrictions = await prisma.userContentRestriction.findMany({
-      where: { userId: parseInt(userId) },
+      where: { userId: parseInt(userId as string) },
     });
 
     res.json({ restrictions });
@@ -1979,7 +1981,7 @@ export const updateUserRestrictions = async (
         .json({ error: "Only administrators can manage content restrictions" });
     }
 
-    const targetUserId = parseInt(userId);
+    const targetUserId = parseInt(userId as string);
 
     // Validate input
     if (!Array.isArray(restrictions)) {
@@ -2057,7 +2059,7 @@ export const deleteUserRestrictions = async (
         .json({ error: "Only administrators can manage content restrictions" });
     }
 
-    const targetUserId = parseInt(userId);
+    const targetUserId = parseInt(userId as string);
 
     await prisma.userContentRestriction.deleteMany({
       where: { userId: targetUserId },
@@ -2498,7 +2500,7 @@ export const getAnyUserPermissions = async (
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2528,7 +2530,7 @@ export const updateUserPermissionOverrides = async (
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2589,7 +2591,7 @@ export const getUserGroupMemberships = async (
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2636,7 +2638,7 @@ export const adminResetPassword = async (
 
     const { userId } = req.params;
     const { newPassword } = req.body;
-    const userIdInt = parseInt(userId, 10);
+    const userIdInt = parseInt(userId as string, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -2692,7 +2694,7 @@ export const adminRegenerateRecoveryKey = async (
     }
 
     const { userId } = req.params;
-    const userIdInt = parseInt(userId, 10);
+    const userIdInt = parseInt(userId as string, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
