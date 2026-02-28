@@ -12,6 +12,7 @@ import type {
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
@@ -337,7 +338,7 @@ export const findGalleryById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    const galleryInstanceId = req.query.instanceId as string | undefined;
+    const galleryInstanceId = (req.query.instanceId as string | undefined) || stashInstanceManager.getDefaultConfig().id;
     let gallery = await stashEntityService.getGallery(id, galleryInstanceId);
 
     if (!gallery) {
@@ -520,7 +521,7 @@ export const getGalleryImages = async (
   try {
     const { galleryId } = req.params;
     const userId = req.user?.id;
-    const instanceId = req.query.instance;
+    const instanceId = (req.query.instance as string | undefined) || stashInstanceManager.getDefaultConfig().id;
 
     // Pagination parameters (optional - defaults to loading all for backwards compat)
     const page = parseInt(req.query.page as string) || 1;

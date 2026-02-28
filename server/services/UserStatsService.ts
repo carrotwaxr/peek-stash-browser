@@ -1,6 +1,9 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashEntityService } from "./StashEntityService.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
+import { groupIdsByInstance } from "../utils/instanceUtils.js";
+import type { NormalizedScene } from "../types/index.js";
 
 // Separator for composite map keys (entityId + instanceId).
 // Using a character that won't appear in UUIDs or Stash numeric IDs.
@@ -150,7 +153,7 @@ class UserStatsService {
   ): Promise<void> {
     try {
       // Get scene from cache to find all related entities
-      const scene = await stashEntityService.getScene(sceneId, instanceId);
+      const scene = await stashEntityService.getScene(sceneId, instanceId || stashInstanceManager.getDefaultConfig().id);
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
         return;
@@ -385,8 +388,17 @@ class UserStatsService {
       >();
 
       // Batch load all scenes for the watch history (with relations for performers/tags/studio)
-      const sceneIds = watchHistory.map((wh) => wh.sceneId);
-      const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
+      // Group by instanceId to satisfy required parameter and avoid cross-instance collisions
+      const scenesByInstance = groupIdsByInstance(
+        watchHistory,
+        (wh) => wh.instanceId,
+        (wh) => wh.sceneId,
+        stashInstanceManager.getDefaultConfig().id
+      );
+      const scenes: NormalizedScene[] = [];
+      for (const [instId, ids] of scenesByInstance) {
+        scenes.push(...await stashEntityService.getScenesByIdsWithRelations(ids, instId));
+      }
       // Use composite key (id + instanceId) to avoid cross-instance collisions
       const sceneMap = new Map(scenes.map((s) => [`${s.id}\0${s.instanceId || ''}`, s]));
 

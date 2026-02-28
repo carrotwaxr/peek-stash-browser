@@ -57,6 +57,18 @@ vi.mock("../../services/StashEntityService.js", () => ({
   },
 }));
 
+// Mock StashInstanceManager (used for default instanceId fallback)
+vi.mock("../../services/StashInstanceManager.js", () => ({
+  stashInstanceManager: {
+    getDefaultConfig: () => ({
+      id: "test-instance",
+      name: "Test Stash",
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-api-key",
+    }),
+  },
+}));
+
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: {
