@@ -909,7 +909,7 @@ export const updatePerformer = async (
 
     res.json({ success: true, performer: updatedPerformer.performerUpdate as unknown as NormalizedPerformer });
   } catch (error) {
-    console.error("Error updating performer:", error);
+    logger.error("Error updating performer", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update performer" });
   }
 };

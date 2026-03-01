@@ -766,7 +766,7 @@ export const updateTag = async (
 
     res.json({ success: true, tag: updatedTag.tagUpdate as unknown as NormalizedTag });
   } catch (error) {
-    console.error("Error updating tag:", error);
+    logger.error("Error updating tag", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update tag" });
   }
 };

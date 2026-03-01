@@ -41,6 +41,7 @@ import userStatsRoutes from "../routes/userStats.js";
 import timelineRoutes from "../routes/timeline.js";
 import clipsRoutes from "../routes/clips.js";
 import { authenticated } from "../utils/routeHelpers.js";
+import { errorHandler } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -202,6 +203,9 @@ export const setupAPI = () => {
 
   // Video routes (playback, sessions, HLS streaming)
   app.use("/api", videoRoutes);
+
+  // Centralized error handler — MUST be registered after all routes
+  app.use(errorHandler);
 
   return app;
 };
