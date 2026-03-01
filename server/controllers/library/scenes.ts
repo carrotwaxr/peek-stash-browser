@@ -1278,7 +1278,7 @@ export const updateScene = async (
 
     res.json({ success: true, scene: sceneWithUserHistory[0] as NormalizedScene });
   } catch (error) {
-    console.error("Error updating scene:", error);
+    logger.error("Error updating scene", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update scene" });
   }
 };

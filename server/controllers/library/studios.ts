@@ -554,7 +554,7 @@ export const updateStudio = async (
 
     res.json({ success: true, studio: updatedStudio.studioUpdate as unknown as NormalizedStudio });
   } catch (error) {
-    console.error("Error updating studio:", error);
+    logger.error("Error updating studio", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update studio" });
   }
 };

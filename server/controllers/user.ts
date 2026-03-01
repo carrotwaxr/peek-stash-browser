@@ -154,7 +154,7 @@ export const getUserSettings = async (
       },
     });
   } catch (error) {
-    console.error("Error getting user settings:", error);
+    logger.error("Error getting user settings", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get user settings" });
   }
 };
@@ -485,7 +485,7 @@ export const updateUserSettings = async (
       },
     });
   } catch (error) {
-    console.error("Error updating user settings:", error);
+    logger.error("Error updating user settings", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update user settings" });
   }
 };
@@ -543,7 +543,7 @@ export const changePassword = async (
 
     res.json({ success: true, message: "Password changed successfully" });
   } catch (error) {
-    console.error("Error changing password:", error);
+    logger.error("Error changing password", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to change password" });
   }
 };
@@ -578,7 +578,7 @@ export const getRecoveryKey = async (
 
     res.json({ recoveryKey: formattedKey });
   } catch (error) {
-    console.error("Error getting recovery key:", error);
+    logger.error("Error getting recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get recovery key" });
   }
 };
@@ -609,7 +609,7 @@ export const regenerateRecoveryKey = async (
     // Return formatted key
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
-    console.error("Error regenerating recovery key:", error);
+    logger.error("Error regenerating recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to regenerate recovery key" });
   }
 };
@@ -655,7 +655,7 @@ export const getAllUsers = async (req: TypedAuthRequest, res: TypedResponse<GetA
       })),
     });
   } catch (error) {
-    console.error("Error getting all users:", error);
+    logger.error("Error getting all users", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get users" });
   }
 };
@@ -722,7 +722,7 @@ export const createUser = async (req: TypedAuthRequest<CreateUserBody>, res: Typ
 
     res.status(201).json({ success: true, user: newUser });
   } catch (error) {
-    console.error("Error creating user:", error);
+    logger.error("Error creating user", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to create user" });
   }
 };
@@ -767,7 +767,7 @@ export const deleteUser = async (req: TypedAuthRequest<never, DeleteUserParams>,
 
     res.json({ success: true, message: "User deleted successfully" });
   } catch (error) {
-    console.error("Error deleting user:", error);
+    logger.error("Error deleting user", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to delete user" });
   }
 };
@@ -820,7 +820,7 @@ export const updateUserRole = async (
 
     res.json({ success: true, user: updatedUser });
   } catch (error) {
-    console.error("Error updating user role:", error);
+    logger.error("Error updating user role", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update user role" });
   }
 };
@@ -860,7 +860,7 @@ export const getFilterPresets = async (
 
     res.json({ presets });
   } catch (error) {
-    console.error("Error getting filter presets:", error);
+    logger.error("Error getting filter presets", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get filter presets" });
   }
 };
@@ -983,7 +983,7 @@ export const saveFilterPreset = async (
 
     res.json({ success: true, preset: newPreset });
   } catch (error) {
-    console.error("Error saving filter preset:", error);
+    logger.error("Error saving filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to save filter preset" });
   }
 };
@@ -1054,7 +1054,7 @@ export const deleteFilterPreset = async (
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting filter preset:", error);
+    logger.error("Error deleting filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to delete filter preset" });
   }
 };
@@ -1090,7 +1090,7 @@ export const getDefaultFilterPresets = async (
 
     res.json({ defaults });
   } catch (error) {
-    console.error("Error getting default filter presets:", error);
+    logger.error("Error getting default filter presets", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get default filter presets" });
   }
 };
@@ -1177,7 +1177,7 @@ export const setDefaultFilterPreset = async (
 
     res.json({ success: true, defaults: currentDefaults });
   } catch (error) {
-    console.error("Error setting default filter preset:", error);
+    logger.error("Error setting default filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to set default filter preset" });
   }
 };
@@ -1943,7 +1943,7 @@ export const getUserRestrictions = async (
 
     res.json({ restrictions });
   } catch (error) {
-    console.error("Error getting user restrictions:", error);
+    logger.error("Error getting user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get content restrictions" });
   }
 };
@@ -2023,7 +2023,7 @@ export const updateUserRestrictions = async (
       restrictions: created,
     });
   } catch (error) {
-    console.error("Error updating user restrictions:", error);
+    logger.error("Error updating user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update content restrictions" });
   }
 };
@@ -2064,7 +2064,7 @@ export const deleteUserRestrictions = async (
       message: "All content restrictions removed successfully",
     });
   } catch (error) {
-    console.error("Error deleting user restrictions:", error);
+    logger.error("Error deleting user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to delete content restrictions" });
   }
 };
@@ -2125,7 +2125,7 @@ export const hideEntity = async (
 
     res.json({ success: true, message: "Entity hidden successfully" });
   } catch (error) {
-    console.error("Error hiding entity:", error);
+    logger.error("Error hiding entity", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to hide entity" });
   }
 };
@@ -2188,7 +2188,7 @@ export const unhideEntity = async (
 
     res.json({ success: true, message: "Entity restored successfully" });
   } catch (error) {
-    console.error("Error unhiding entity:", error);
+    logger.error("Error unhiding entity", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to restore entity" });
   }
 };
@@ -2242,7 +2242,7 @@ export const unhideAllEntities = async (
       count,
     });
   } catch (error) {
-    console.error("Error unhiding all entities:", error);
+    logger.error("Error unhiding all entities", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to restore all items" });
   }
 };
@@ -2292,7 +2292,7 @@ export const getHiddenEntities = async (
 
     res.json({ hiddenEntities });
   } catch (error) {
-    console.error("Error getting hidden entities:", error);
+    logger.error("Error getting hidden entities", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get hidden entities" });
   }
 };
@@ -2331,7 +2331,7 @@ export const getHiddenEntityIds = async (
 
     res.json({ hiddenIds: result });
   } catch (error) {
-    console.error("Error getting hidden entity IDs:", error);
+    logger.error("Error getting hidden entity IDs", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get hidden entity IDs" });
   }
 };
@@ -2402,7 +2402,7 @@ export const hideEntities = async (
         successCount++;
       } catch (error) {
         failCount++;
-        console.error(`Failed to hide ${entity.entityType} ${entity.entityId}:`, error);
+        logger.error(`Failed to hide ${entity.entityType} ${entity.entityId}`, { error: error instanceof Error ? error.message : "Unknown error" });
       }
     }
 
@@ -2413,7 +2413,7 @@ export const hideEntities = async (
       failCount,
     });
   } catch (error) {
-    console.error("Error hiding entities:", error);
+    logger.error("Error hiding entities", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to hide entities" });
   }
 };
@@ -2447,7 +2447,7 @@ export const updateHideConfirmation = async (
 
     res.json({ success: true, hideConfirmationDisabled });
   } catch (error) {
-    console.error("Error updating hide confirmation preference:", error);
+    logger.error("Error updating hide confirmation preference", { error: error instanceof Error ? error.message : "Unknown error" });
     res
       .status(500)
       .json({ error: "Failed to update hide confirmation preference" });
@@ -2474,7 +2474,7 @@ export const getUserPermissions = async (
 
     res.json({ permissions });
   } catch (error) {
-    console.error("Error getting user permissions:", error);
+    logger.error("Error getting user permissions", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get permissions" });
   }
 };
@@ -2504,7 +2504,7 @@ export const getAnyUserPermissions = async (
 
     res.json({ permissions });
   } catch (error) {
-    console.error("Error getting user permissions:", error);
+    logger.error("Error getting user permissions", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get permissions" });
   }
 };
@@ -2565,7 +2565,7 @@ export const updateUserPermissionOverrides = async (
       return res.status(400).json({ error: "Invalid override value - must be true, false, or null" });
     }
   } catch (error) {
-    console.error("Error updating permission overrides:", error);
+    logger.error("Error updating permission overrides", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update permission overrides" });
   }
 };
@@ -2607,7 +2607,7 @@ export const getUserGroupMemberships = async (
       groups: memberships.map((m) => m.group),
     });
   } catch (error) {
-    console.error("Error getting user group memberships:", error);
+    logger.error("Error getting user group memberships", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get user group memberships" });
   }
 };
@@ -2664,7 +2664,7 @@ export const adminResetPassword = async (
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error resetting user password:", error);
+    logger.error("Error resetting user password", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to reset user password" });
   }
 };
@@ -2712,7 +2712,7 @@ export const adminRegenerateRecoveryKey = async (
     // Return formatted key
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
-    console.error("Error regenerating user recovery key:", error);
+    logger.error("Error regenerating user recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to regenerate user recovery key" });
   }
 };
@@ -2762,7 +2762,7 @@ export const getUserStashInstances = async (
       availableInstances,
     });
   } catch (error) {
-    console.error("Error getting user Stash instances:", error);
+    logger.error("Error getting user Stash instances", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get Stash instance selection" });
   }
 };
@@ -2831,7 +2831,7 @@ export const updateUserStashInstances = async (
       selectedInstanceIds: instanceIds,
     });
   } catch (error) {
-    console.error("Error updating user Stash instances:", error);
+    logger.error("Error updating user Stash instances", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update Stash instance selection" });
   }
 };
@@ -2882,7 +2882,7 @@ export const getSetupStatus = async (
       instanceCount,
     });
   } catch (error) {
-    console.error("Error getting setup status:", error);
+    logger.error("Error getting setup status", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get setup status" });
   }
 };
@@ -2963,7 +2963,7 @@ export const completeSetup = async (
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error completing setup:", error);
+    logger.error("Error completing setup", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to complete setup" });
   }
 };

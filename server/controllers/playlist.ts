@@ -33,6 +33,7 @@ import type {
   UpdatePlaylistSharesResponse,
   DuplicatePlaylistResponse,
 } from "../types/api/index.js";
+import { logger } from "../utils/logger.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
@@ -138,10 +139,7 @@ export const getUserPlaylists = async (
             items: itemsWithScenes,
           };
         } catch (cacheError) {
-          console.error(
-            `Error fetching scenes for playlist ${playlist.id}:`,
-            cacheError
-          );
+          logger.error(`Error fetching scenes for playlist ${playlist.id}`, { error: cacheError instanceof Error ? cacheError.message : "Unknown error" });
           // Return playlist without scene details if cache fails
           return playlist;
         }
@@ -150,7 +148,7 @@ export const getUserPlaylists = async (
 
     res.json({ playlists: playlistsWithScenes });
   } catch (error) {
-    console.error("Error getting playlists:", error);
+    logger.error("Error getting playlists", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get playlists" });
   }
 };
@@ -258,10 +256,7 @@ export const getSharedPlaylists = async (
               scene: sceneMap.get(item.sceneId) || null,
             }));
           } catch (cacheError) {
-            console.error(
-              `Error fetching scenes for shared playlist ${p.id}:`,
-              cacheError
-            );
+            logger.error(`Error fetching scenes for shared playlist ${p.id}`, { error: cacheError instanceof Error ? cacheError.message : "Unknown error" });
           }
         }
 
@@ -284,7 +279,7 @@ export const getSharedPlaylists = async (
 
     res.json({ playlists: playlistsWithScenes });
   } catch (error) {
-    console.error("Error getting shared playlists:", error);
+    logger.error("Error getting shared playlists", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get shared playlists" });
   }
 };
@@ -393,7 +388,7 @@ export const getPlaylist = async (
           sharedViaGroups: access.level === "shared" ? access.groups : undefined,
         });
       } catch (cacheError) {
-        console.error("Error fetching scenes from cache:", cacheError);
+        logger.error("Error fetching scenes from cache", { error: cacheError instanceof Error ? cacheError.message : "Unknown error" });
         // Return playlist without scene details if cache fails
         res.json({
           playlist,
@@ -411,7 +406,7 @@ export const getPlaylist = async (
       });
     }
   } catch (error) {
-    console.error("Error getting playlist:", error);
+    logger.error("Error getting playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get playlist" });
   }
 };
@@ -452,7 +447,7 @@ export const createPlaylist = async (
 
     res.status(201).json({ playlist });
   } catch (error) {
-    console.error("Error creating playlist:", error);
+    logger.error("Error creating playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to create playlist" });
   }
 };
@@ -510,7 +505,7 @@ export const updatePlaylist = async (
 
     res.json({ playlist });
   } catch (error) {
-    console.error("Error updating playlist:", error);
+    logger.error("Error updating playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update playlist" });
   }
 };
@@ -553,7 +548,7 @@ export const deletePlaylist = async (
 
     res.json({ success: true, message: "Playlist deleted" });
   } catch (error) {
-    console.error("Error deleting playlist:", error);
+    logger.error("Error deleting playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to delete playlist" });
   }
 };
@@ -639,7 +634,7 @@ export const addSceneToPlaylist = async (
 
     res.status(201).json({ item });
   } catch (error) {
-    console.error("Error adding scene to playlist:", error);
+    logger.error("Error adding scene to playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to add scene to playlist" });
   }
 };
@@ -692,7 +687,7 @@ export const removeSceneFromPlaylist = async (
 
     res.json({ success: true, message: "Scene removed from playlist" });
   } catch (error) {
-    console.error("Error removing scene from playlist:", error);
+    logger.error("Error removing scene from playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to remove scene from playlist" });
   }
 };
@@ -762,7 +757,7 @@ export const reorderPlaylist = async (
 
     res.json({ success: true, message: "Playlist reordered" });
   } catch (error) {
-    console.error("Error reordering playlist:", error);
+    logger.error("Error reordering playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to reorder playlist" });
   }
 };
@@ -813,7 +808,7 @@ export const getPlaylistShares = async (
       })),
     });
   } catch (error) {
-    console.error("Error getting playlist shares:", error);
+    logger.error("Error getting playlist shares", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get playlist shares" });
   }
 };
@@ -899,7 +894,7 @@ export const updatePlaylistShares = async (
       })),
     });
   } catch (error) {
-    console.error("Error updating playlist shares:", error);
+    logger.error("Error updating playlist shares", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update playlist shares" });
   }
 };
@@ -969,7 +964,7 @@ export const duplicatePlaylist = async (
 
     res.status(201).json({ playlist: duplicate });
   } catch (error) {
-    console.error("Error duplicating playlist:", error);
+    logger.error("Error duplicating playlist", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to duplicate playlist" });
   }
 };

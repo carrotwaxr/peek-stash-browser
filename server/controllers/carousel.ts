@@ -63,7 +63,7 @@ export const getUserCarousels = async (
 
     res.json({ carousels });
   } catch (error) {
-    console.error("Error getting user carousels:", error);
+    logger.error("Error getting user carousels", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get carousels" });
   }
 };
@@ -96,7 +96,7 @@ export const getCarousel = async (
 
     res.json({ carousel });
   } catch (error) {
-    console.error("Error getting carousel:", error);
+    logger.error("Error getting carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to get carousel" });
   }
 };
@@ -173,7 +173,7 @@ export const createCarousel = async (
 
     res.status(201).json({ carousel });
   } catch (error) {
-    console.error("Error creating carousel:", error);
+    logger.error("Error creating carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to create carousel" });
   }
 };
@@ -225,7 +225,7 @@ export const updateCarousel = async (
 
     res.json({ carousel });
   } catch (error) {
-    console.error("Error updating carousel:", error);
+    logger.error("Error updating carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to update carousel" });
   }
 };
@@ -263,7 +263,7 @@ export const deleteCarousel = async (
 
     res.json({ success: true, message: "Carousel deleted" });
   } catch (error) {
-    console.error("Error deleting carousel:", error);
+    logger.error("Error deleting carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to delete carousel" });
   }
 };
@@ -299,7 +299,7 @@ export const previewCarousel = async (
 
     res.json({ scenes });
   } catch (error) {
-    console.error("Error previewing carousel:", error);
+    logger.error("Error previewing carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to preview carousel" });
   }
 };
@@ -488,7 +488,7 @@ export const executeCarouselById = async (
       scenes,
     });
   } catch (error) {
-    console.error("Error executing carousel:", error);
+    logger.error("Error executing carousel", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Failed to execute carousel query" });
   }
 };

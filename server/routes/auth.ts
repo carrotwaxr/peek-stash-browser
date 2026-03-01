@@ -16,6 +16,7 @@ import prisma from "../prisma/singleton.js";
 import rankingComputeService from "../services/RankingComputeService.js";
 import { generateRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
+import { logger } from "../utils/logger.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -90,7 +91,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
 
     // Recompute rankings asynchronously on login (fire-and-forget)
     rankingComputeService.recomputeAllRankings(user.id).catch((err) => {
-      console.error("Failed to recompute rankings on login:", err);
+      logger.error("Failed to recompute rankings on login", { error: err instanceof Error ? err.message : "Unknown error" });
     });
 
     res.json({
@@ -104,7 +105,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -156,7 +157,7 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 
     res.json({ hasRecoveryKey: !!user.recoveryKey });
   } catch (error) {
-    console.error("Forgot password init error:", error);
+    logger.error("Forgot password init error", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -203,7 +204,7 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Forgot password reset error:", error);
+    logger.error("Forgot password reset error", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -259,7 +260,7 @@ router.post("/first-time-password", async (req, res) => {
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {
-    console.error("First-time password error:", error);
+    logger.error("First-time password error", { error: error instanceof Error ? error.message : "Unknown error" });
     res.status(500).json({ error: "Server error" });
   }
 });
