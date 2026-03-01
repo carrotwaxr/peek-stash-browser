@@ -7,8 +7,6 @@
  */
 import { logger } from "./logger.js";
 
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#434): replace any in transform functions with type-safe mutation */
-
 /**
  * Structural constraint for entities with image_path (performers, studios, tags).
  * Only constrains the fields actually accessed by transform functions.
@@ -187,7 +185,9 @@ const stripApiKeyFromUrl = (url: string): string => {
  */
 export const transformScene = <T extends SceneLike>(scene: T): T => {
   try {
-    const mutated: any = { ...scene };
+    // Use SceneLike as intermediate type so all property mutations are type-checked.
+    // The spread copies all T properties at runtime; we only mutate SceneLike fields.
+    const mutated: SceneLike = { ...scene };
 
     // Transform paths object if present
     if (scene.paths) {
@@ -196,37 +196,27 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
           acc[key] = appendApiKeyToUrl(val as string);
           return acc;
         },
-        {} as Record<string, string>
+        {} as Record<string, string>,
       );
     }
 
     // Transform sceneStreams to strip API keys from URLs
     // The client will use Peek's proxy endpoint which will re-add the API key
-    if (
-      scene.sceneStreams &&
-      Array.isArray(scene.sceneStreams) &&
-      scene.sceneStreams.length > 0
-    ) {
-      mutated.sceneStreams = scene.sceneStreams.map(
-        (stream: { url: string; mime_type?: string | null; label?: string | null }) => ({
-          ...stream,
-          url: stripApiKeyFromUrl(stream.url),
-        })
-      );
+    if (scene.sceneStreams && scene.sceneStreams.length > 0) {
+      mutated.sceneStreams = scene.sceneStreams.map((stream) => ({
+        ...stream,
+        url: stripApiKeyFromUrl(stream.url),
+      }));
     }
 
     // Transform performers to add API key to image_path
-    if (scene.performers && Array.isArray(scene.performers)) {
-      mutated.performers = scene.performers.map((p: HasImagePath) =>
-        transformPerformer(p)
-      );
+    if (scene.performers && scene.performers.length > 0) {
+      mutated.performers = scene.performers.map((p) => transformPerformer(p));
     }
 
     // Transform tags to add API key to image_path
-    if (scene.tags && Array.isArray(scene.tags)) {
-      mutated.tags = scene.tags.map((t: { image_path?: string | null }) =>
-        transformTag(t)
-      );
+    if (scene.tags && scene.tags.length > 0) {
+      mutated.tags = scene.tags.map((t) => transformTag(t));
     }
 
     // Transform studio to add API key to image_path
@@ -235,7 +225,7 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
     }
 
     // Transform groups - flatten nested structure and add API keys to images
-    if (scene.groups && Array.isArray(scene.groups)) {
+    if (scene.groups && scene.groups.length > 0) {
       mutated.groups = scene.groups.map((g) => {
         // Stash returns groups as: { group: { id, name, ... }, scene_index: 2 }
         // We need to flatten and transform, preserving scene_index
@@ -248,7 +238,7 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
       });
     }
 
-    return mutated;
+    return mutated as T;
   } catch (error) {
     logger.error("Error transforming scene", { error });
     return scene; // Return original scene if transformation fails
@@ -261,7 +251,8 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
  */
 export const transformGroup = <T extends GroupLike>(group: T): T => {
   try {
-    const mutated: any = { ...group };
+    // Use GroupLike as intermediate type so all property mutations are type-checked.
+    const mutated: GroupLike = { ...group };
 
     // Transform front and back image paths
     if (group.front_image_path) {
@@ -277,13 +268,11 @@ export const transformGroup = <T extends GroupLike>(group: T): T => {
     }
 
     // Transform tags to add API key to image_path
-    if (group.tags && Array.isArray(group.tags)) {
-      mutated.tags = group.tags.map((t: { image_path?: string | null }) =>
-        transformTag(t)
-      );
+    if (group.tags && group.tags.length > 0) {
+      mutated.tags = group.tags.map((t) => transformTag(t));
     }
 
-    return mutated;
+    return mutated as T;
   } catch (error) {
     logger.error("Error transforming group", { error });
     return group; // Return original group if transformation fails
