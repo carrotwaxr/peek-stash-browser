@@ -5,13 +5,12 @@
  * Eliminates the need to load all studios into memory.
  */
 import type { PeekStudioFilter, NormalizedStudio, TagRef, PerformerRef, GroupRef, GalleryRef } from "../types/index.js";
+import type { StudioQueryRow } from "../types/internal/queryRows.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
 
 // Query builder options
 export interface StudioQueryOptions {
@@ -364,7 +363,7 @@ class StudioQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<StudioQueryRow[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -427,8 +426,8 @@ class StudioQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedStudio
    */
-  private transformRow(row: Record<string, any>): NormalizedStudio {
-    const studio: any = {
+  private transformRow(row: StudioQueryRow): NormalizedStudio {
+    const studio = {
       id: row.id,
       instanceId: row.stashInstanceId,
       name: row.name,
@@ -447,8 +446,8 @@ class StudioQueryBuilder {
       group_count: row.groupCount || 0,
 
       // Timestamps
-      created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt?.toISOString?.() || row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt || null,
+      updated_at: row.stashUpdatedAt || null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,
@@ -458,8 +457,8 @@ class StudioQueryBuilder {
       play_count: row.userPlayCount ?? 0,
 
       // Relations - populated separately
-      tags: [],
-      child_studios: [],
+      tags: [] as TagRef[],
+      child_studios: [] as NormalizedStudio[],
     };
 
     return studio as NormalizedStudio;

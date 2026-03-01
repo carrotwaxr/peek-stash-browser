@@ -5,13 +5,13 @@
  * Eliminates the need to load all scenes into memory.
  */
 import type { PeekSceneFilter, NormalizedScene, PerformerRef, TagRef, StudioRef, GroupRef, GalleryRef } from "../types/index.js";
+import type { SceneQueryRow } from "../types/internal/queryRows.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues } from "../utils/sqlFilterBuilders.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
 
 // Query builder options
 export interface SceneQueryOptions {
@@ -1163,7 +1163,7 @@ class SceneQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<SceneQueryRow[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query - use simplified count without JOINs when possible
@@ -1244,16 +1244,16 @@ class SceneQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedScene
    */
-  private transformRow(row: Record<string, any>): NormalizedScene {
+  private transformRow(row: SceneQueryRow): NormalizedScene {
     // Parse JSON fields
-    const oHistory = this.parseJsonArray(row.userOHistory);
-    const playHistory = this.parseJsonArray(row.userPlayHistory);
+    const oHistory = parseJsonArray(row.userOHistory);
+    const playHistory = parseJsonArray(row.userPlayHistory);
 
     // Determine last_o_at from o_history
     const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
 
     // Create scene object with studioId preserved for population
-    const scene: any = {
+    const scene = {
       id: row.id,
       instanceId: row.stashInstanceId,
       title: row.title || getSceneFallbackTitle(row.filePath),
@@ -1266,7 +1266,7 @@ class SceneQueryBuilder {
       updated_at: row.stashUpdatedAt || null,
 
       // URLs
-      urls: this.parseJsonArray(row.urls),
+      urls: parseJsonArray(row.urls),
 
       // Store studioId for later population
       studioId: row.studioId,
@@ -1315,18 +1315,18 @@ class SceneQueryBuilder {
       sceneStreams: this.parseSceneStreams(row.streams),
 
       // Caption metadata for multi-language subtitle support
-      captions: row.captions ? JSON.parse(row.captions) : [],
+      captions: row.captions ? JSON.parse(row.captions) as unknown[] : [],
 
       // Relations - populated separately after query
-      studio: null,
-      performers: [],
-      tags: [],
-      groups: [],
-      galleries: [],
+      studio: null as StudioRef | null,
+      performers: [] as PerformerRef[],
+      tags: [] as TagRef[],
+      groups: [] as GroupRef[],
+      galleries: [] as GalleryRef[],
 
       // Inherited tags - IDs parsed here, hydrated with names in populateRelations
-      inheritedTagIds: this.parseJsonArray(row.inheritedTagIds),
-      inheritedTags: [], // Will be populated in populateRelations
+      inheritedTagIds: parseJsonArray(row.inheritedTagIds),
+      inheritedTags: [] as TagRef[], // Will be populated in populateRelations
     };
 
     return scene as NormalizedScene;
@@ -1634,30 +1634,11 @@ class SceneQueryBuilder {
   }
 
   /**
-   * Safely parse a JSON array string
-   */
-  private parseJsonArray(json: string | null): string[] {
-    if (!json) return [];
-    try {
-      const parsed = JSON.parse(json);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  /**
    * Parse sceneStreams JSON and keep the raw stream URLs
    * The frontend will handle URL rewriting to proxy-stream endpoint
    */
   private parseSceneStreams(json: string | null): unknown[] {
-    if (!json) return [];
-    try {
-      const parsed = JSON.parse(json);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return parseJsonArray<unknown>(json);
   }
 
   /**

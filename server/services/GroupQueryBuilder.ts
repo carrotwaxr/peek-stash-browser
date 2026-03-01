@@ -5,13 +5,13 @@
  * Eliminates the need to load all groups into memory.
  */
 import type { PeekGroupFilter, NormalizedGroup, PerformerRef, TagRef, StudioRef, GalleryRef } from "../types/index.js";
+import type { GroupQueryRow } from "../types/internal/queryRows.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
 
 // Query builder options
 export interface GroupQueryOptions {
@@ -528,7 +528,7 @@ class GroupQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<GroupQueryRow[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -589,25 +589,15 @@ class GroupQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGroup
    */
-  private transformRow(row: Record<string, any>): NormalizedGroup {
-    // Parse URLs JSON if present
-    let urls: string[] = [];
-    if (row.urls) {
-      try {
-        urls = JSON.parse(row.urls);
-      } catch {
-        urls = [];
-      }
-    }
-
-    const group: any = {
+  private transformRow(row: GroupQueryRow): NormalizedGroup {
+    const group = {
       id: row.id,
       instanceId: row.stashInstanceId, // For multi-instance correctness in populateRelations
       name: row.name,
       date: row.date || null,
       director: row.director || null,
       synopsis: row.synopsis || null,
-      urls,
+      urls: parseJsonArray(row.urls),
 
       // Counts
       scene_count: row.sceneCount || 0,
@@ -619,8 +609,8 @@ class GroupQueryBuilder {
       back_image_path: this.transformUrl(row.backImagePath, row.stashInstanceId),
 
       // Timestamps
-      created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt?.toISOString?.() || row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt || null,
+      updated_at: row.stashUpdatedAt || null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,
@@ -628,10 +618,10 @@ class GroupQueryBuilder {
       favorite: Boolean(row.userFavorite),
 
       // Relations - populated separately
-      studio: row.studioId ? { id: row.studioId, name: "" } : null,
+      studio: row.studioId ? { id: row.studioId, name: "" } as StudioRef : null,
       studioId: row.studioId || null, // For multi-instance correctness in populateRelations
-      tags: [],
-      scenes: [],
+      tags: [] as TagRef[],
+      scenes: [] as { id: string }[],
     };
 
     return group as NormalizedGroup;

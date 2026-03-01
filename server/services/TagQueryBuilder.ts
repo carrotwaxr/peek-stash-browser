@@ -5,13 +5,13 @@
  * Eliminates the need to load all tags into memory.
  */
 import type { PeekTagFilter, NormalizedTag, PerformerRef, StudioRef, GroupRef, GalleryRef } from "../types/index.js";
+import type { TagQueryRow } from "../types/internal/queryRows.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
 
 // Query builder options
 export interface TagQueryOptions {
@@ -528,7 +528,7 @@ class TagQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<TagQueryRow[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -591,19 +591,19 @@ class TagQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedTag
    */
-  private transformRow(row: Record<string, any>): NormalizedTag {
+  private transformRow(row: TagQueryRow): NormalizedTag {
     const directSceneCount = row.sceneCount || 0;
     const performerSceneCount = row.sceneCountViaPerformers || 0;
     // Use the greater of direct scene count or performer scene count
     const totalSceneCount = Math.max(directSceneCount, performerSceneCount);
 
-    const tag: any = {
+    const tag = {
       id: row.id,
       instanceId: row.stashInstanceId,
       name: row.name,
       description: row.description || null,
-      aliases: this.parseJsonArray(row.aliases),
-      parents: this.parseJsonArray(row.parentIds).map((id: string) => ({ id, name: "" })),
+      aliases: parseJsonArray(row.aliases),
+      parents: parseJsonArray(row.parentIds).map((id: string) => ({ id, name: "" })),
 
       // Image path - transform to proxy URL with instanceId for multi-instance routing
       image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
@@ -620,8 +620,8 @@ class TagQueryBuilder {
       scene_marker_count: row.sceneMarkerCount || 0,
 
       // Timestamps
-      created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt?.toISOString?.() || row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt || null,
+      updated_at: row.stashUpdatedAt || null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,
@@ -631,7 +631,7 @@ class TagQueryBuilder {
       play_count: row.userPlayCount ?? 0,
 
       // Relations
-      children: [],
+      children: [] as NormalizedTag[],
     };
 
     return tag as NormalizedTag;
@@ -858,20 +858,6 @@ class TagQueryBuilder {
       tag.galleries = galleriesByTag.get(tagKey) || [];
     }
   }
-
-  /**
-   * Safely parse a JSON array string
-   */
-  private parseJsonArray(json: string | null): string[] {
-    if (!json) return [];
-    try {
-      const parsed = JSON.parse(json);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
 
   /**
    * Transform a Stash URL/path to a proxy URL
