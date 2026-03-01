@@ -108,12 +108,22 @@ These are **mandatory** — do not skip or rationalize around them.
 
 **Before creating a PR:**
 - All tests pass: `cd client && npm test` and `cd server && npm test`
+- Coverage thresholds pass: `cd client && npm run test:coverage` and `cd server && npm run test:coverage`
 - Lint clean: `cd client && npm run lint` and `cd server && npm run lint`
 - TypeScript compiles: `cd server && npx tsc --noEmit`
 - Client builds: `cd client && npm run build`
 - Integration tests pass (if touching server logic): `cd server && npm run test:integration`
 - Self-review completed via `self-review` skill
 - Documentation updated if behavior changed (invoke `updating-docs`)
+
+**Coverage thresholds** (enforced in CI via `vitest.config` — ratchet up after coverage PRs):
+
+| Metric | Client | Server |
+|--------|--------|--------|
+| Statements | 33% | 53% |
+| Branches | 75% | 71% |
+| Functions | 37% | 62% |
+| Lines | 33% | 53% |
 
 **Before merging:**
 - CI passes (when available)
