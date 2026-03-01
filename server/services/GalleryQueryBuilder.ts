@@ -5,13 +5,13 @@
  * Eliminates the need to load all galleries into memory.
  */
 import type { PeekGalleryFilter, NormalizedGallery, PerformerRef, TagRef, StudioRef } from "../types/index.js";
+import type { GalleryQueryRow } from "../types/internal/queryRows.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any -- TODO(#469): type QueryBuilder SQL row interfaces */
 
 // Query builder options
 export interface GalleryQueryOptions {
@@ -498,7 +498,7 @@ class GalleryQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<GalleryQueryRow[]>(sql, ...params);
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -561,18 +561,8 @@ class GalleryQueryBuilder {
   /**
    * Transform a raw database row into a NormalizedGallery
    */
-  private transformRow(row: Record<string, any>): NormalizedGallery {
-    // Parse URLs JSON if present
-    let urls: string[] = [];
-    if (row.urls) {
-      try {
-        urls = JSON.parse(row.urls);
-      } catch {
-        urls = [];
-      }
-    }
-
-    const gallery: any = {
+  private transformRow(row: GalleryQueryRow): NormalizedGallery {
+    const gallery = {
       id: row.id,
       instanceId: row.stashInstanceId,
       title: row.title || getGalleryFallbackTitle(row.folderPath, row.fileBasename),
@@ -581,7 +571,7 @@ class GalleryQueryBuilder {
       details: row.details || null,
       photographer: row.photographer || null,
       url: row.url || null,
-      urls,
+      urls: parseJsonArray(row.urls),
 
       // Counts
       image_count: row.imageCount || 0,
@@ -597,19 +587,22 @@ class GalleryQueryBuilder {
       coverHeight: row.coverHeight || null,
 
       // Timestamps
-      created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
-      updated_at: row.stashUpdatedAt?.toISOString?.() || row.stashUpdatedAt || null,
+      created_at: row.stashCreatedAt || null,
+      updated_at: row.stashUpdatedAt || null,
 
       // User data - Peek user data ONLY
       rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
       favorite: Boolean(row.userFavorite),
 
+      // Files - empty, populated elsewhere if needed
+      files: [] as Array<{ basename: string }>,
+
       // Relations - populated separately
-      studio: row.studioId ? { id: row.studioId, name: "" } : null,
-      performers: [],
-      tags: [],
-      scenes: [],
+      studio: row.studioId ? { id: row.studioId, name: "" } as StudioRef : null,
+      performers: [] as PerformerRef[],
+      tags: [] as TagRef[],
+      scenes: [] as Array<{ id: string; title: string | null; paths: { screenshot: string | null } }>,
     };
 
     return gallery as NormalizedGallery;
