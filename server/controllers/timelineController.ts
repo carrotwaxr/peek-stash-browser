@@ -1,26 +1,31 @@
 // server/controllers/timelineController.ts
-import type { Response } from "express";
-import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { timelineService, type Granularity, type TimelineEntityType, type TimelineFilters } from "../services/TimelineService.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type {
+  GetDateDistributionParams,
+  GetDateDistributionQuery,
+  GetDateDistributionResponse,
+} from "../types/api/timeline.js";
 import { logger } from "../utils/logger.js";
 
 const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
 const VALID_GRANULARITIES: Granularity[] = ["years", "months", "weeks", "days"];
 
 export async function getDateDistribution(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetDateDistributionParams, GetDateDistributionQuery>,
+  res: TypedResponse<GetDateDistributionResponse | ApiErrorResponse>
 ): Promise<void> {
   const { entityType } = req.params;
-  const granularity = (req.query.granularity as string) || "months";
+  const granularity = req.query.granularity ?? "months";
   const userId = req.user.id;
 
   // Parse optional filter params
   const filters: TimelineFilters = {};
-  if (req.query.performerId) filters.performerId = req.query.performerId as string;
-  if (req.query.tagId) filters.tagId = req.query.tagId as string;
-  if (req.query.studioId) filters.studioId = req.query.studioId as string;
-  if (req.query.groupId) filters.groupId = req.query.groupId as string;
+  if (req.query.performerId) filters.performerId = req.query.performerId;
+  if (req.query.tagId) filters.tagId = req.query.tagId;
+  if (req.query.studioId) filters.studioId = req.query.studioId;
+  if (req.query.groupId) filters.groupId = req.query.groupId;
 
   if (!VALID_ENTITY_TYPES.includes(entityType as TimelineEntityType)) {
     res.status(400).json({ error: "Invalid entity type" });

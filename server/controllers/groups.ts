@@ -5,16 +5,34 @@
  * Admin-only for management operations, with a user-facing endpoint
  * to get their own group memberships.
  */
-import { Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type {
+  GetAllUserGroupsResponse,
+  GetUserGroupParams,
+  GetUserGroupResponse,
+  CreateUserGroupBody,
+  CreateUserGroupResponse,
+  UpdateUserGroupParams,
+  UpdateUserGroupBody,
+  UpdateUserGroupResponse,
+  DeleteUserGroupParams,
+  DeleteUserGroupResponse,
+  AddMemberParams,
+  AddMemberBody,
+  AddMemberResponse,
+  RemoveMemberParams,
+  RemoveMemberResponse,
+  GetCurrentUserGroupsResponse,
+} from "../types/api/groups.js";
 
 /**
  * Get all groups with member counts (admin only)
  */
 export const getAllGroups = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetAllUserGroupsResponse | ApiErrorResponse>
 ) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
@@ -47,12 +65,12 @@ export const getAllGroups = async (
 /**
  * Get single group with members (admin only)
  */
-export const getGroup = async (req: AuthenticatedRequest, res: Response) => {
+export const getGroup = async (req: TypedAuthRequest<never, GetUserGroupParams>, res: TypedResponse<GetUserGroupResponse | ApiErrorResponse>) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id as string, 10);
+  const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -104,13 +122,13 @@ export const getGroup = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Create a new group (admin only)
  */
-export const createGroup = async (req: AuthenticatedRequest, res: Response) => {
+export const createGroup = async (req: TypedAuthRequest<CreateUserGroupBody>, res: TypedResponse<CreateUserGroupResponse | ApiErrorResponse>) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
   const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body as { name: string; description?: string; canShare?: boolean; canDownloadFiles?: boolean; canDownloadPlaylists?: boolean };
+    req.body;
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     return res.status(400).json({ error: "Group name is required" });
@@ -141,12 +159,12 @@ export const createGroup = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Update a group (admin only)
  */
-export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
+export const updateGroup = async (req: TypedAuthRequest<UpdateUserGroupBody, UpdateUserGroupParams>, res: TypedResponse<UpdateUserGroupResponse | ApiErrorResponse>) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id as string, 10);
+  const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -160,7 +178,7 @@ export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body as { name?: string; description?: string; canShare?: boolean; canDownloadFiles?: boolean; canDownloadPlaylists?: boolean };
+    req.body;
 
   // Build update data, only including provided fields
   const updateData: {
@@ -205,12 +223,12 @@ export const updateGroup = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Delete a group (admin only)
  */
-export const deleteGroup = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteGroup = async (req: TypedAuthRequest<never, DeleteUserGroupParams>, res: TypedResponse<DeleteUserGroupResponse | ApiErrorResponse>) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id as string, 10);
+  const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -233,12 +251,12 @@ export const deleteGroup = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Add a user to a group (admin only)
  */
-export const addMember = async (req: AuthenticatedRequest, res: Response) => {
+export const addMember = async (req: TypedAuthRequest<AddMemberBody, AddMemberParams>, res: TypedResponse<AddMemberResponse | ApiErrorResponse>) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id as string, 10);
+  const groupId = parseInt(req.params.id, 10);
   if (isNaN(groupId)) {
     return res.status(400).json({ error: "Invalid group ID" });
   }
@@ -251,7 +269,7 @@ export const addMember = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ error: "Group not found" });
   }
 
-  const { userId } = req.body as { userId: number };
+  const { userId } = req.body;
   if (!userId || typeof userId !== "number") {
     return res.status(400).json({ error: "User ID is required" });
   }
@@ -284,15 +302,15 @@ export const addMember = async (req: AuthenticatedRequest, res: Response) => {
  * Remove a user from a group (admin only)
  */
 export const removeMember = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, RemoveMemberParams>,
+  res: TypedResponse<RemoveMemberResponse | ApiErrorResponse>
 ) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const groupId = parseInt(req.params.id as string, 10);
-  const userId = parseInt(req.params.userId as string, 10);
+  const groupId = parseInt(req.params.id, 10);
+  const userId = parseInt(req.params.userId, 10);
 
   if (isNaN(groupId) || isNaN(userId)) {
     return res.status(400).json({ error: "Invalid group ID or user ID" });
@@ -328,8 +346,8 @@ export const removeMember = async (
  * Used for sharing UI to show which groups the user belongs to.
  */
 export const getUserGroups = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetCurrentUserGroupsResponse | ApiErrorResponse>
 ) => {
   if (!req.user?.id) {
     return res.status(401).json({ error: "User not found" });

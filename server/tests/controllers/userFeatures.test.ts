@@ -854,7 +854,8 @@ describe("User Controller — Features", () => {
       const res = mockRes();
       await updateUserStashInstances(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().invalidIds).toEqual(["inst-99"]);
+      expect(res._getBody().error).toBe("Invalid instance IDs");
+      expect(res._getBody().details).toBe("inst-99");
     });
 
     it("clears selections when empty array", async () => {

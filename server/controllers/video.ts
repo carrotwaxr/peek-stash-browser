@@ -1,5 +1,6 @@
-import { Request, Response } from "express";
+import type { Response } from "express";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import type { TypedRequest } from "../types/api/express.js";
 import { logger } from "../utils/logger.js";
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
@@ -122,13 +123,13 @@ function rewriteHlsPlaylist(content: string, sceneId: string, _stashBaseUrl: str
  * SECURITY: For HLS playlists (.m3u8), we rewrite internal URLs to strip the Stash API key
  * and route segment requests through Peek's proxy.
  */
-export const proxyStashStream = async (req: Request, res: Response) => {
+export const proxyStashStream = async (req: TypedRequest<never, { sceneId: string; streamPath: string; subPath?: string }, { instanceId?: string }>, res: Response) => {
   try {
     const { sceneId, streamPath, subPath } = req.params;
-    const instanceId = req.query.instanceId as string | undefined;
+    const instanceId = req.query.instanceId;
 
     // Combine path segments if subPath exists (for HLS segments like stream/segment_0.ts)
-    const fullStreamPath = subPath ? `${streamPath}/${subPath}` : (streamPath as string);
+    const fullStreamPath = subPath ? `${streamPath}/${subPath}` : streamPath;
 
     // Parse query string from original request, but remove instanceId (it's for Peek routing only)
     const urlParams = new URLSearchParams(req.url.split('?')[1] || '');
@@ -182,7 +183,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     if (isHlsPlaylist) {
       // For HLS playlists, read the entire response and rewrite URLs
       const playlistContent = await response.text();
-      const rewrittenContent = rewriteHlsPlaylist(playlistContent, sceneId as string, stashBaseUrl, instanceId);
+      const rewrittenContent = rewriteHlsPlaylist(playlistContent, sceneId, stashBaseUrl, instanceId);
 
       // Set headers for the rewritten playlist
       res.status(response.status);
@@ -232,7 +233,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
  * Stash stores captions as separate .vtt or .srt files alongside video files
  * This endpoint proxies those files and converts SRT to VTT if needed
  */
-export const getCaption = async (req: Request, res: Response) => {
+export const getCaption = async (req: TypedRequest<never, { sceneId: string }, { lang?: string; type?: string; instanceId?: string }>, res: Response) => {
   try {
     const { sceneId } = req.params;
     const { lang, type, instanceId } = req.query;
@@ -241,9 +242,9 @@ export const getCaption = async (req: Request, res: Response) => {
       return res.status(400).send("Missing lang or type parameter");
     }
 
-    const langStr = lang as string;
-    const typeStr = type as string;
-    const instanceIdStr = (instanceId as string | undefined) ?? '(not specified)';
+    const langStr = lang;
+    const typeStr = type;
+    const instanceIdStr = instanceId ?? '(not specified)';
 
     logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${langStr}, type=${typeStr}, instanceId=${instanceIdStr}`);
 
@@ -252,7 +253,7 @@ export const getCaption = async (req: Request, res: Response) => {
     let apiKey: string;
 
     try {
-      const creds = getInstanceCredentials(instanceId as string | undefined);
+      const creds = getInstanceCredentials(instanceId);
       stashUrl = creds.baseUrl;
       apiKey = creds.apiKey;
     } catch (error) {

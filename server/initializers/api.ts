@@ -40,6 +40,7 @@ import watchHistoryRoutes from "../routes/watchHistory.js";
 import userStatsRoutes from "../routes/userStats.js";
 import timelineRoutes from "../routes/timeline.js";
 import clipsRoutes from "../routes/clips.js";
+import { authenticated } from "../utils/routeHelpers.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -187,7 +188,7 @@ export const setupAPI = () => {
     "/api/scenes/:id/clips",
     authenticate,
     requireCacheReady,
-    getClipsForScene
+    authenticated(getClipsForScene)
   );
 
   // Library routes (all entities)

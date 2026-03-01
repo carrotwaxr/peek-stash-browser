@@ -1,10 +1,26 @@
-import type { Response } from "express";
-import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { DownloadStatus, DownloadType } from "@prisma/client";
 import { downloadService } from "../services/DownloadService.js";
 import { playlistZipService } from "../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type {
+  StartSceneDownloadParams,
+  StartSceneDownloadResponse,
+  StartImageDownloadParams,
+  StartImageDownloadResponse,
+  StartPlaylistDownloadParams,
+  StartPlaylistDownloadResponse,
+  GetUserDownloadsResponse,
+  GetDownloadStatusParams,
+  GetDownloadStatusResponse,
+  GetDownloadFileParams,
+  DeleteDownloadParams,
+  DeleteDownloadResponse,
+  RetryDownloadParams,
+  RetryDownloadResponse,
+} from "../types/api/download.js";
 import { logger } from "../utils/logger.js";
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
@@ -49,8 +65,8 @@ function serializeDownload(download: {
  * POST /api/downloads/scene/:sceneId
  */
 export async function startSceneDownload(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, StartSceneDownloadParams>,
+  res: TypedResponse<StartSceneDownloadResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -68,7 +84,7 @@ export async function startSceneDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createSceneDownload(userId, sceneId as string);
+    const download = await downloadService.createSceneDownload(userId, sceneId);
 
     logger.info("Scene download created", {
       downloadId: download.id,
@@ -90,8 +106,8 @@ export async function startSceneDownload(
  * POST /api/downloads/image/:imageId
  */
 export async function startImageDownload(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, StartImageDownloadParams>,
+  res: TypedResponse<StartImageDownloadResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -109,7 +125,7 @@ export async function startImageDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createImageDownload(userId, imageId as string);
+    const download = await downloadService.createImageDownload(userId, imageId);
 
     logger.info("Image download created", {
       downloadId: download.id,
@@ -131,8 +147,8 @@ export async function startImageDownload(
  * POST /api/downloads/playlist/:playlistId
  */
 export async function startPlaylistDownload(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, StartPlaylistDownloadParams>,
+  res: TypedResponse<StartPlaylistDownloadResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -140,7 +156,7 @@ export async function startPlaylistDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const playlistId = parseInt(req.params.playlistId as string, 10);
+    const playlistId = parseInt(req.params.playlistId, 10);
     if (isNaN(playlistId)) {
       return res.status(400).json({ error: "Invalid playlist ID" });
     }
@@ -159,8 +175,7 @@ export async function startPlaylistDownload(
       const totalSizeMB = Math.ceil(Number(totalSize) / (1024 * 1024));
       return res.status(400).json({
         error: "Playlist exceeds maximum download size",
-        totalSizeMB,
-        maxSizeMB: MAX_PLAYLIST_SIZE_MB,
+        details: `Total: ${totalSizeMB}MB, max: ${MAX_PLAYLIST_SIZE_MB}MB`,
       });
     }
 
@@ -198,8 +213,8 @@ export async function startPlaylistDownload(
  * GET /api/downloads
  */
 export async function getUserDownloads(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetUserDownloadsResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -225,8 +240,8 @@ export async function getUserDownloads(
  * GET /api/downloads/:id
  */
 export async function getDownloadStatus(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetDownloadStatusParams>,
+  res: TypedResponse<GetDownloadStatusResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -234,7 +249,7 @@ export async function getDownloadStatus(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id as string, 10);
+    const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -263,8 +278,8 @@ export async function getDownloadStatus(
  * GET /api/downloads/:id/file
  */
 export async function getDownloadFile(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetDownloadFileParams>,
+  res: TypedResponse<ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -272,7 +287,7 @@ export async function getDownloadFile(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id as string, 10);
+    const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -291,7 +306,7 @@ export async function getDownloadFile(
     if (download.status !== DownloadStatus.COMPLETED) {
       return res.status(400).json({
         error: "Download is not ready",
-        status: download.status,
+        details: `Current status: ${download.status}`,
       });
     }
 
@@ -392,8 +407,8 @@ export async function getDownloadFile(
  * DELETE /api/downloads/:id
  */
 export async function deleteDownload(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, DeleteDownloadParams>,
+  res: TypedResponse<DeleteDownloadResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -401,7 +416,7 @@ export async function deleteDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id as string, 10);
+    const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -431,8 +446,8 @@ export async function deleteDownload(
  * POST /api/downloads/:id/retry
  */
 export async function retryDownload(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, RetryDownloadParams>,
+  res: TypedResponse<RetryDownloadResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -440,7 +455,7 @@ export async function retryDownload(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const downloadId = parseInt(req.params.id as string, 10);
+    const downloadId = parseInt(req.params.id, 10);
     if (isNaN(downloadId)) {
       return res.status(400).json({ error: "Invalid download ID" });
     }
@@ -465,7 +480,7 @@ export async function retryDownload(
     if (download.status !== DownloadStatus.FAILED) {
       return res.status(400).json({
         error: "Only failed downloads can be retried",
-        currentStatus: download.status,
+        details: `Current status: ${download.status}`,
       });
     }
 

@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
 import http from "http";
 import https from "https";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import type { TypedRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
 import type { ProxyOptions } from "../types/api/proxy.js";
 import { logger } from "../utils/logger.js";
 
@@ -181,7 +182,7 @@ function proxyHttpRequest({ fullUrl, res, label, defaultCacheControl, timeoutMs 
  * GET /api/proxy/scene/:id/preview
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
-export const proxyScenePreview = async (req: Request, res: Response) => {
+export const proxyScenePreview = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
   const { id } = req.params;
 
   if (!id) {
@@ -241,7 +242,7 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
  * GET /api/proxy/scene/:id/webp
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
-export const proxySceneWebp = async (req: Request, res: Response) => {
+export const proxySceneWebp = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
   const { id } = req.params;
 
   if (!id) {
@@ -301,7 +302,7 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
  * Handles images, sprites, and other static media
  * GET /api/proxy/stash?path=/xxx&instanceId=yyy
  */
-export const proxyStashMedia = async (req: Request, res: Response) => {
+export const proxyStashMedia = async (req: TypedRequest<never, Record<string, string>, { path?: string; instanceId?: string }>, res: TypedResponse<ApiErrorResponse>) => {
   const { path, instanceId } = req.query;
 
   if (!path || typeof path !== "string") {
@@ -319,7 +320,7 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    const creds = getInstanceCredentials(instanceId as string | undefined);
+    const creds = getInstanceCredentials(instanceId);
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
@@ -361,7 +362,7 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
  * Falls back to screenshot if stream is unavailable.
  * Uses the clip's stashInstanceId to route to correct Stash server.
  */
-export const proxyClipPreview = async (req: Request, res: Response) => {
+export const proxyClipPreview = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
   const { id } = req.params;
 
   if (!id) {
@@ -423,7 +424,7 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
  * :type = "thumbnail" | "preview" | "image"
  * Uses the image's stashInstanceId to route to correct Stash server.
  */
-export const proxyImage = async (req: Request, res: Response) => {
+export const proxyImage = async (req: TypedRequest<never, { imageId: string; type: string }>, res: TypedResponse<ApiErrorResponse>) => {
   const { imageId, type } = req.params;
 
   if (!imageId) {

@@ -1,16 +1,25 @@
-import { Request, Response } from "express";
 import { clipService } from "../services/ClipService.js";
 import { logger } from "../utils/logger.js";
-import { AuthenticatedRequest } from "../middleware/auth.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type {
+  GetClipsQuery,
+  GetClipsResponse,
+  GetClipByIdParams,
+  GetClipByIdResponse,
+  GetClipsForSceneParams,
+  GetClipsForSceneQuery,
+  GetClipsForSceneResponse,
+} from "../types/api/clips.js";
 import { parseRandomSort } from "../utils/seededRandom.js";
 
 /**
  * GET /api/clips
  * Browse clips with filtering
  */
-export const getClips = async (req: Request, res: Response) => {
+export const getClips = async (req: TypedAuthRequest<never, Record<string, string>, GetClipsQuery>, res: TypedResponse<GetClipsResponse | ApiErrorResponse>) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
+    const userId = req.user.id;
     const {
       page = "1",
       perPage = "24",
@@ -27,32 +36,30 @@ export const getClips = async (req: Request, res: Response) => {
     } = req.query;
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField: sortBy, randomSeed } = parseRandomSort(sortByRaw as string, userId);
+    const { sortField: sortBy, randomSeed } = parseRandomSort(sortByRaw, userId);
 
     const result = await clipService.getClips(userId, {
-      page: parseInt(page as string, 10),
-      perPage: parseInt(perPage as string, 10),
+      page: parseInt(page, 10),
+      perPage: parseInt(perPage, 10),
       sortBy,
       sortDir: sortDir as "asc" | "desc",
       isGenerated: isGenerated === "true",
-      sceneId: sceneId as string | undefined,
-      tagIds: tagIds ? (tagIds as string).split(",") : undefined,
-      sceneTagIds: sceneTagIds ? (sceneTagIds as string).split(",") : undefined,
-      performerIds: performerIds
-        ? (performerIds as string).split(",")
-        : undefined,
-      studioId: studioId as string | undefined,
-      q: q as string | undefined,
+      sceneId,
+      tagIds: tagIds ? tagIds.split(",") : undefined,
+      sceneTagIds: sceneTagIds ? sceneTagIds.split(",") : undefined,
+      performerIds: performerIds ? performerIds.split(",") : undefined,
+      studioId,
+      q,
       randomSeed,
-      allowedInstanceIds: instanceId ? [instanceId as string] : undefined,
+      allowedInstanceIds: instanceId ? [instanceId] : undefined,
     });
 
     res.json({
       clips: result.clips,
       total: result.total,
-      page: parseInt(page as string, 10),
-      perPage: parseInt(perPage as string, 10),
-      totalPages: Math.ceil(result.total / parseInt(perPage as string, 10)),
+      page: parseInt(page, 10),
+      perPage: parseInt(perPage, 10),
+      totalPages: Math.ceil(result.total / parseInt(perPage, 10)),
     });
   } catch (error) {
     logger.error("Failed to get clips", { error });
@@ -64,12 +71,12 @@ export const getClips = async (req: Request, res: Response) => {
  * GET /api/clips/:id
  * Get single clip
  */
-export const getClipById = async (req: Request, res: Response) => {
+export const getClipById = async (req: TypedAuthRequest<never, GetClipByIdParams>, res: TypedResponse<GetClipByIdResponse | ApiErrorResponse>) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
+    const userId = req.user.id;
     const { id } = req.params;
 
-    const clip = await clipService.getClipById(id as string, userId);
+    const clip = await clipService.getClipById(id, userId);
 
     if (!clip) {
       return res.status(404).json({ error: "Clip not found" });
@@ -86,17 +93,17 @@ export const getClipById = async (req: Request, res: Response) => {
  * GET /api/scenes/:id/clips
  * Get clips for a scene
  */
-export const getClipsForScene = async (req: Request, res: Response) => {
+export const getClipsForScene = async (req: TypedAuthRequest<never, GetClipsForSceneParams, GetClipsForSceneQuery>, res: TypedResponse<GetClipsForSceneResponse | ApiErrorResponse>) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
+    const userId = req.user.id;
     const { id } = req.params;
     const { includeUngenerated = "false", instanceId } = req.query;
 
     const clips = await clipService.getClipsForScene(
-      id as string,
+      id,
       userId,
       includeUngenerated === "true",
-      instanceId ? [instanceId as string] : undefined
+      instanceId ? [instanceId] : undefined
     );
 
     res.json({ clips });
