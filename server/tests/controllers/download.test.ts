@@ -211,8 +211,7 @@ describe("Download Controller", () => {
       expect(responseStatus).toHaveBeenCalledWith(400);
       expect(responseJson).toHaveBeenCalledWith({
         error: "Playlist exceeds maximum download size",
-        totalSizeMB: expect.any(Number),
-        maxSizeMB: 10240,
+        details: expect.stringContaining("max: 10240MB"),
       });
     });
 
@@ -553,7 +552,7 @@ describe("Download Controller", () => {
       expect(responseStatus).toHaveBeenCalledWith(400);
       expect(responseJson).toHaveBeenCalledWith({
         error: "Download is not ready",
-        status: "PROCESSING",
+        details: "Current status: PROCESSING",
       });
     });
   });
@@ -729,7 +728,7 @@ describe("Download Controller", () => {
       expect(responseStatus).toHaveBeenCalledWith(400);
       expect(responseJson).toHaveBeenCalledWith({
         error: "Only failed downloads can be retried",
-        currentStatus: "COMPLETED",
+        details: "Current status: COMPLETED",
       });
     });
   });

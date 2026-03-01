@@ -1,15 +1,16 @@
-import { Request, Response } from "express";
 import { promises as fs } from "fs";
 import os from "os";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { stashSyncService } from "../services/StashSyncService.js";
+import type { TypedRequest, TypedResponse } from "../types/api/express.js";
+import type { GetStatsResponse, RefreshCacheResponse } from "../types/api/stats.js";
 import { logger } from "../utils/logger.js";
 
 /**
  * Get comprehensive server statistics
  * Includes system metrics, cache stats, and database size
  */
-export const getStats = async (req: Request, res: Response) => {
+export const getStats = async (_req: TypedRequest, res: TypedResponse<GetStatsResponse>) => {
   try {
     // Get cache stats with fallback
     let cacheStats;
@@ -193,7 +194,7 @@ function formatUptime(seconds: number): string {
  * Manually refresh the Stash cache
  * Admin-only endpoint to trigger cache refresh on demand
  */
-export const refreshCache = (req: Request, res: Response) => {
+export const refreshCache = (_req: TypedRequest, res: TypedResponse<RefreshCacheResponse>) => {
   try {
     logger.info("Manual cache refresh triggered by admin");
     // Trigger a full sync (non-blocking - runs in background)
@@ -213,6 +214,7 @@ export const refreshCache = (req: Request, res: Response) => {
 
     res.status(500).json({
       success: false,
+      message: "Failed to refresh cache",
       error: "Failed to refresh cache",
     });
   }

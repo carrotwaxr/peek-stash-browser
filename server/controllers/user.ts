@@ -1,7 +1,5 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
-import { Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import type { EntityType } from "../services/UserHiddenEntityService.js";
@@ -14,12 +12,69 @@ import type {
   DefaultFilterPresets,
   SyncUpdates,
   UserRestriction,
+  NavPreference,
+  LandingPagePreference,
+  GetUserSettingsResponse,
+  UpdateUserSettingsParams,
+  UpdateUserSettingsBody,
+  UpdateUserSettingsResponse,
+  ChangePasswordBody,
+  ChangePasswordResponse,
+  GetRecoveryKeyResponse,
+  RegenerateRecoveryKeyResponse,
+  GetAllUsersResponse,
+  CreateUserBody,
+  CreateUserResponse,
+  DeleteUserParams,
+  DeleteUserResponse,
+  UpdateUserRoleParams,
+  UpdateUserRoleBody,
+  UpdateUserRoleResponse,
+  GetFilterPresetsResponse,
+  SaveFilterPresetBody,
+  SaveFilterPresetResponse,
+  DeleteFilterPresetParams,
+  DeleteFilterPresetResponse,
+  GetDefaultFilterPresetsResponse,
+  SetDefaultFilterPresetBody,
+  SetDefaultFilterPresetResponse,
+  SyncFromStashParams,
+  SyncFromStashBody,
+  SyncFromStashResponse,
+  GetUserRestrictionsParams,
+  UpdateUserRestrictionsBody,
+  UpdateUserRestrictionsResponse,
+  DeleteUserRestrictionsParams,
+  DeleteUserRestrictionsResponse,
+  HideEntityBody,
+  HideEntityResponse,
+  UnhideEntityParams,
+  UnhideEntityQuery,
+  UnhideEntityResponse,
+  UnhideAllEntitiesQuery,
+  UnhideAllEntitiesResponse,
+  GetHiddenEntitiesQuery,
+  GetHiddenEntityIdsResponse,
+  HideEntitiesBody,
+  HideEntitiesResponse,
+  UpdateHideConfirmationBody,
+  UpdateHideConfirmationResponse,
+  UpdatePermissionOverridesBody,
+  GetUserPermissionsParams,
+  GetUserGroupMembershipsParams,
+  AdminResetPasswordParams,
+  AdminResetPasswordBody,
+  AdminResetPasswordResponse,
+  AdminRegenerateRecoveryKeyParams,
+  AdminRegenerateRecoveryKeyResponse,
+  UpdateUserStashInstancesBody,
+  CompleteSetupBody,
 } from "../types/api/user.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-dynamic-delete -- TODO(#467): migrate handlers to TypedAuthRequest with typed body */
 
 // Inline the default carousel preferences to avoid ESM loading issues
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [
@@ -37,8 +92,8 @@ const getDefaultCarouselPreferences = (): CarouselPreference[] => [
  * Get user settings
  */
 export const getUserSettings = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetUserSettingsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -79,23 +134,23 @@ export const getUserSettings = async (
 
     res.json({
       settings: {
-        preferredQuality: user.preferredQuality,
-        preferredPlaybackMode: user.preferredPlaybackMode,
-        preferredPreviewQuality: user.preferredPreviewQuality,
+        preferredQuality: user.preferredQuality ?? "auto",
+        preferredPlaybackMode: user.preferredPlaybackMode ?? "auto",
+        preferredPreviewQuality: user.preferredPreviewQuality ?? null,
         enableCast: user.enableCast,
-        theme: user.theme,
+        theme: user.theme ?? "dark",
         carouselPreferences:
-          user.carouselPreferences || getDefaultCarouselPreferences(),
-        navPreferences: user.navPreferences || null,
+          (user.carouselPreferences as CarouselPreference[] | null) ?? getDefaultCarouselPreferences(),
+        navPreferences: (user.navPreferences as NavPreference[] | null) ?? null,
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
         hideConfirmationDisabled: user.hideConfirmationDisabled,
-        unitPreference: user.unitPreference || "metric",
-        wallPlayback: user.wallPlayback || "autoplay",
-        tableColumnDefaults: user.tableColumnDefaults || null,
-        cardDisplaySettings: user.cardDisplaySettings || null,
-        landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
-        lightboxDoubleTapAction: user.lightboxDoubleTapAction || "favorite",
+        unitPreference: user.unitPreference ?? "metric",
+        wallPlayback: user.wallPlayback ?? "autoplay",
+        tableColumnDefaults: (user.tableColumnDefaults as Record<string, TableColumnsConfig> | null) ?? null,
+        cardDisplaySettings: (user.cardDisplaySettings as Record<string, unknown> | null) ?? null,
+        landingPagePreference: (user.landingPagePreference as LandingPagePreference | null) ?? { pages: ["home"], randomize: false },
+        lightboxDoubleTapAction: user.lightboxDoubleTapAction ?? "favorite",
       },
     });
   } catch (error) {
@@ -108,8 +163,8 @@ export const getUserSettings = async (
  * Update user settings
  */
 export const updateUserSettings = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateUserSettingsBody, UpdateUserSettingsParams>,
+  res: TypedResponse<UpdateUserSettingsResponse | ApiErrorResponse>
 ) => {
   try {
     const currentUserId = req.user?.id;
@@ -380,15 +435,15 @@ export const updateUserSettings = async (
         }),
         ...(enableCast !== undefined && { enableCast }),
         ...(theme !== undefined && { theme }),
-        ...(carouselPreferences !== undefined && { carouselPreferences }),
-        ...(navPreferences !== undefined && { navPreferences }),
+        ...(carouselPreferences !== undefined && { carouselPreferences: carouselPreferences as never }),
+        ...(navPreferences !== undefined && { navPreferences: navPreferences as never }),
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
         ...(syncToStash !== undefined && { syncToStash }),
         ...(unitPreference !== undefined && { unitPreference }),
         ...(wallPlayback !== undefined && { wallPlayback }),
-        ...(tableColumnDefaults !== undefined && { tableColumnDefaults }),
-        ...(cardDisplaySettings !== undefined && { cardDisplaySettings }),
-        ...(landingPagePreference !== undefined && { landingPagePreference }),
+        ...(tableColumnDefaults !== undefined && { tableColumnDefaults: tableColumnDefaults as never }),
+        ...(cardDisplaySettings !== undefined && { cardDisplaySettings: cardDisplaySettings as never }),
+        ...(landingPagePreference !== undefined && { landingPagePreference: landingPagePreference as never }),
         ...(lightboxDoubleTapAction !== undefined && { lightboxDoubleTapAction }),
       },
       select: {
@@ -412,21 +467,21 @@ export const updateUserSettings = async (
     });
 
     res.json({
-      success: true,
+      success: true as const,
       settings: {
-        preferredQuality: updatedUser.preferredQuality,
-        preferredPlaybackMode: updatedUser.preferredPlaybackMode,
-        theme: updatedUser.theme,
+        preferredQuality: updatedUser.preferredQuality ?? "auto",
+        preferredPlaybackMode: updatedUser.preferredPlaybackMode ?? "auto",
+        theme: updatedUser.theme ?? "dark",
         carouselPreferences:
-          updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
-        navPreferences: updatedUser.navPreferences || null,
+          (updatedUser.carouselPreferences as CarouselPreference[] | null) ?? getDefaultCarouselPreferences(),
+        navPreferences: (updatedUser.navPreferences as NavPreference[] | null) ?? null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
-        wallPlayback: updatedUser.wallPlayback || "autoplay",
-        tableColumnDefaults: updatedUser.tableColumnDefaults || null,
-        cardDisplaySettings: updatedUser.cardDisplaySettings || null,
-        landingPagePreference: updatedUser.landingPagePreference || { pages: ["home"], randomize: false },
-        lightboxDoubleTapAction: updatedUser.lightboxDoubleTapAction || "favorite",
+        wallPlayback: updatedUser.wallPlayback ?? "autoplay",
+        tableColumnDefaults: (updatedUser.tableColumnDefaults as Record<string, TableColumnsConfig> | null) ?? null,
+        cardDisplaySettings: (updatedUser.cardDisplaySettings as Record<string, unknown> | null) ?? null,
+        landingPagePreference: (updatedUser.landingPagePreference as LandingPagePreference | null) ?? { pages: ["home"], randomize: false },
+        lightboxDoubleTapAction: updatedUser.lightboxDoubleTapAction ?? "favorite",
       },
     });
   } catch (error) {
@@ -439,8 +494,8 @@ export const updateUserSettings = async (
  * Change user password
  */
 export const changePassword = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<ChangePasswordBody>,
+  res: TypedResponse<ChangePasswordResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -497,8 +552,8 @@ export const changePassword = async (
  * Get current user's recovery key (formatted for display)
  */
 export const getRecoveryKey = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -532,8 +587,8 @@ export const getRecoveryKey = async (
  * Regenerate current user's recovery key
  */
 export const regenerateRecoveryKey = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<RegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -562,7 +617,7 @@ export const regenerateRecoveryKey = async (
 /**
  * Get all users (admin only)
  */
-export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
+export const getAllUsers = async (req: TypedAuthRequest, res: TypedResponse<GetAllUsersResponse | ApiErrorResponse>) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -608,7 +663,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Create new user (admin only)
  */
-export const createUser = async (req: AuthenticatedRequest, res: Response) => {
+export const createUser = async (req: TypedAuthRequest<CreateUserBody>, res: TypedResponse<CreateUserResponse | ApiErrorResponse>) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -654,7 +709,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       data: {
         username,
         password: hashedPassword,
-        role: role || "USER",
+        role: (role || "USER") as "ADMIN" | "USER",
         carouselPreferences: getDefaultCarouselPreferences() as never,
       },
       select: {
@@ -675,7 +730,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Delete user (admin only)
  */
-export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteUser = async (req: TypedAuthRequest<never, DeleteUserParams>, res: TypedResponse<DeleteUserResponse | ApiErrorResponse>) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -685,7 +740,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const { userId } = req.params;
-    const userIdInt = parseInt(userId as string, 10);
+    const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -721,8 +776,8 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
  * Update user role (admin only)
  */
 export const updateUserRole = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateUserRoleBody, UpdateUserRoleParams>,
+  res: TypedResponse<UpdateUserRoleResponse | ApiErrorResponse>
 ) => {
   try {
     // Check if user is admin
@@ -734,7 +789,7 @@ export const updateUserRole = async (
 
     const { userId } = req.params;
     const { role } = req.body;
-    const userIdInt = parseInt(userId as string, 10);
+    const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -774,8 +829,8 @@ export const updateUserRole = async (
  * Get user's filter presets
  */
 export const getFilterPresets = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetFilterPresetsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -796,7 +851,7 @@ export const getFilterPresets = async (
     }
 
     // Return empty preset structure if none exists
-    const presets = user.filterPresets || {
+    const presets = (user.filterPresets as FilterPresets | null) ?? {
       scene: [],
       performer: [],
       studio: [],
@@ -814,8 +869,8 @@ export const getFilterPresets = async (
  * Save a new filter preset
  */
 export const saveFilterPreset = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<SaveFilterPresetBody>,
+  res: TypedResponse<SaveFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -937,8 +992,8 @@ export const saveFilterPreset = async (
  * Delete a filter preset
  */
 export const deleteFilterPreset = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, DeleteFilterPresetParams>,
+  res: TypedResponse<DeleteFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -985,7 +1040,7 @@ export const deleteFilterPreset = async (
 
     // If this was the default preset, clear the default
     if (currentDefaults[artifactType] === presetId) {
-      delete currentDefaults[artifactType];
+      currentDefaults[artifactType] = undefined;
     }
 
     // Update user
@@ -1008,8 +1063,8 @@ export const deleteFilterPreset = async (
  * Get default filter presets
  */
 export const getDefaultFilterPresets = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetDefaultFilterPresetsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -1031,7 +1086,7 @@ export const getDefaultFilterPresets = async (
     }
 
     // Return empty object if no defaults set
-    const defaults = user.defaultFilterPresets || {};
+    const defaults = (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
 
     res.json({ defaults });
   } catch (error) {
@@ -1046,8 +1101,8 @@ export const getDefaultFilterPresets = async (
  * (scene_performer, scene_tag, scene_studio, scene_group)
  */
 export const setDefaultFilterPreset = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<SetDefaultFilterPresetBody>,
+  res: TypedResponse<SetDefaultFilterPresetResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -1109,7 +1164,7 @@ export const setDefaultFilterPreset = async (
       currentDefaults[context] = presetId;
     } else {
       // If presetId is null/undefined, clear the default
-      delete currentDefaults[context];
+      currentDefaults[context] = undefined;
     }
 
     // Update user
@@ -1133,8 +1188,8 @@ export const setDefaultFilterPreset = async (
  * Admin only - syncs data for a specific user
  */
 export const syncFromStash = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<SyncFromStashBody, SyncFromStashParams>,
+  res: TypedResponse<SyncFromStashResponse | ApiErrorResponse>
 ) => {
   const startTime = Date.now();
   try {
@@ -1145,7 +1200,7 @@ export const syncFromStash = async (
       return res.status(403).json({ error: "Only admins can sync from Stash" });
     }
 
-    const targetUserId = parseInt(req.params.userId as string);
+    const targetUserId = parseInt(req.params.userId);
     if (isNaN(targetUserId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -1153,14 +1208,23 @@ export const syncFromStash = async (
     // Get sync options from request body
     const { options } = req.body;
 
-    // Default options if not provided
-    const syncOptions = options || {
+    // Default options if not provided — fully typed with required sub-objects
+    const defaultSyncOptions = {
       scenes: { rating: true, favorite: false, oCounter: false },
       performers: { rating: true, favorite: true },
       studios: { rating: true, favorite: true },
       tags: { rating: false, favorite: true },
-      galleries: { rating: true }, // Galleries only have rating, no favorite
-      groups: { rating: true }, // Groups only have rating, no favorite
+      galleries: { rating: true },
+      groups: { rating: true },
+    };
+
+    const syncOptions = {
+      scenes: { ...defaultSyncOptions.scenes, ...options?.scenes },
+      performers: { ...defaultSyncOptions.performers, ...options?.performers },
+      studios: { ...defaultSyncOptions.studios, ...options?.studios },
+      tags: { ...defaultSyncOptions.tags, ...options?.tags },
+      galleries: { ...defaultSyncOptions.galleries, ...options?.galleries },
+      groups: { ...defaultSyncOptions.groups, ...options?.groups },
     };
 
     // Get Stash instances from manager
@@ -1855,8 +1919,8 @@ export const syncFromStash = async (
  * Get content restrictions for a user (Admin only)
  */
 export const getUserRestrictions = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetUserRestrictionsParams>,
+  res: TypedResponse<{ restrictions: unknown[] } | ApiErrorResponse>
 ) => {
   try {
     const { userId } = req.params;
@@ -1874,7 +1938,7 @@ export const getUserRestrictions = async (
     }
 
     const restrictions = await prisma.userContentRestriction.findMany({
-      where: { userId: parseInt(userId as string) },
+      where: { userId: parseInt(userId) },
     });
 
     res.json({ restrictions });
@@ -1889,12 +1953,12 @@ export const getUserRestrictions = async (
  * Replaces all existing restrictions with new ones
  */
 export const updateUserRestrictions = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateUserRestrictionsBody, GetUserRestrictionsParams>,
+  res: TypedResponse<UpdateUserRestrictionsResponse | ApiErrorResponse>
 ) => {
   try {
     const { userId } = req.params;
-    const { restrictions } = req.body; // Array of {entityType, mode, entityIds, restrictEmpty}
+    const { restrictions } = req.body;
     const requestingUser = req.user;
 
     if (!requestingUser) {
@@ -1908,7 +1972,7 @@ export const updateUserRestrictions = async (
         .json({ error: "Only administrators can manage content restrictions" });
     }
 
-    const targetUserId = parseInt(userId as string);
+    const targetUserId = parseInt(userId);
 
     // Validate input
     if (!Array.isArray(restrictions)) {
@@ -1968,8 +2032,8 @@ export const updateUserRestrictions = async (
  * Delete all content restrictions for a user (Admin only)
  */
 export const deleteUserRestrictions = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, DeleteUserRestrictionsParams>,
+  res: TypedResponse<DeleteUserRestrictionsResponse | ApiErrorResponse>
 ) => {
   try {
     const { userId } = req.params;
@@ -1986,7 +2050,7 @@ export const deleteUserRestrictions = async (
         .json({ error: "Only administrators can manage content restrictions" });
     }
 
-    const targetUserId = parseInt(userId as string);
+    const targetUserId = parseInt(userId);
 
     await prisma.userContentRestriction.deleteMany({
       where: { userId: targetUserId },
@@ -2009,8 +2073,8 @@ export const deleteUserRestrictions = async (
  * Hide an entity for the current user
  */
 export const hideEntity = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<HideEntityBody>,
+  res: TypedResponse<HideEntityResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2057,7 +2121,7 @@ export const hideEntity = async (
       "../services/UserHiddenEntityService.js"
     );
 
-    await userHiddenEntityService.hideEntity(userId, entityType, entityId, instanceId || "");
+    await userHiddenEntityService.hideEntity(userId, entityType as EntityType, entityId, instanceId ?? "");
 
     res.json({ success: true, message: "Entity hidden successfully" });
   } catch (error) {
@@ -2070,8 +2134,8 @@ export const hideEntity = async (
  * Unhide (restore) an entity for the current user
  */
 export const unhideEntity = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, UnhideEntityParams, UnhideEntityQuery>,
+  res: TypedResponse<UnhideEntityResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2107,7 +2171,7 @@ export const unhideEntity = async (
       "../services/UserHiddenEntityService.js"
     );
 
-    const unhideInstanceId = (req.query.instanceId as string) || "";
+    const unhideInstanceId = req.query.instanceId ?? "";
 
     // Validate instanceId if provided
     if (unhideInstanceId) {
@@ -2134,8 +2198,8 @@ export const unhideEntity = async (
  * Optionally filter by entity type
  */
 export const unhideAllEntities = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, Record<string, string>, UnhideAllEntitiesQuery>,
+  res: TypedResponse<UnhideAllEntitiesResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2157,7 +2221,7 @@ export const unhideAllEntities = async (
         "gallery",
         "image",
       ];
-      if (!validTypes.includes(entityType as string)) {
+      if (!validTypes.includes(entityType)) {
         return res.status(400).json({ error: "Invalid entity type" });
       }
     }
@@ -2169,7 +2233,7 @@ export const unhideAllEntities = async (
 
     const count = await userHiddenEntityService.unhideAll(
       userId,
-      entityType as string | undefined
+      entityType
     );
 
     res.json({
@@ -2188,8 +2252,8 @@ export const unhideAllEntities = async (
  * Optionally filter by entity type
  */
 export const getHiddenEntities = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, Record<string, string>, GetHiddenEntitiesQuery>,
+  res: TypedResponse<{ hiddenEntities: unknown[] } | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2237,8 +2301,8 @@ export const getHiddenEntities = async (
  * Get hidden entity IDs organized by type (for filtering)
  */
 export const getHiddenEntityIds = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetHiddenEntityIdsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2276,8 +2340,8 @@ export const getHiddenEntityIds = async (
  * Hide multiple entities in a single request
  */
 export const hideEntities = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<HideEntitiesBody>,
+  res: TypedResponse<HideEntitiesResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2331,9 +2395,9 @@ export const hideEntities = async (
       try {
         await userHiddenEntityService.hideEntity(
           userId,
-          entity.entityType,
+          entity.entityType as EntityType,
           entity.entityId,
-          entity.instanceId || ""
+          entity.instanceId ?? ""
         );
         successCount++;
       } catch (error) {
@@ -2358,8 +2422,8 @@ export const hideEntities = async (
  * Update hide confirmation preference
  */
 export const updateHideConfirmation = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateHideConfirmationBody>,
+  res: TypedResponse<UpdateHideConfirmationResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2394,8 +2458,8 @@ export const updateHideConfirmation = async (
  * Get current user's resolved permissions
  */
 export const getUserPermissions = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
     if (!req.user) {
@@ -2419,15 +2483,15 @@ export const getUserPermissions = async (
  * Admin endpoint to get any user's permissions
  */
 export const getAnyUserPermissions = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetUserPermissionsParams>,
+  res: TypedResponse<{ permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId as string);
+    const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2449,15 +2513,15 @@ export const getAnyUserPermissions = async (
  * Admin endpoint to update user permission overrides
  */
 export const updateUserPermissionOverrides = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdatePermissionOverridesBody, GetUserPermissionsParams>,
+  res: TypedResponse<{ success: true; permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId as string);
+    const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2510,15 +2574,15 @@ export const updateUserPermissionOverrides = async (
  * Get user's group memberships (admin only)
  */
 export const getUserGroupMemberships = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, GetUserGroupMembershipsParams>,
+  res: TypedResponse<{ groups: unknown[] } | ApiErrorResponse>
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
-    const userId = parseInt(req.params.userId as string);
+    const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -2552,8 +2616,8 @@ export const getUserGroupMemberships = async (
  * Admin: Reset a user's password
  */
 export const adminResetPassword = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<AdminResetPasswordBody, AdminResetPasswordParams>,
+  res: TypedResponse<AdminResetPasswordResponse | ApiErrorResponse>
 ) => {
   try {
     // Check if user is admin
@@ -2565,7 +2629,7 @@ export const adminResetPassword = async (
 
     const { userId } = req.params;
     const { newPassword } = req.body;
-    const userIdInt = parseInt(userId as string, 10);
+    const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -2609,8 +2673,8 @@ export const adminResetPassword = async (
  * Admin: Regenerate a user's recovery key
  */
 export const adminRegenerateRecoveryKey = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<never, AdminRegenerateRecoveryKeyParams>,
+  res: TypedResponse<AdminRegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
     // Check if user is admin
@@ -2621,7 +2685,7 @@ export const adminRegenerateRecoveryKey = async (
     }
 
     const { userId } = req.params;
-    const userIdInt = parseInt(userId as string, 10);
+    const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -2666,8 +2730,8 @@ export const adminRegenerateRecoveryKey = async (
  * - availableInstances: All enabled instances for selection UI
  */
 export const getUserStashInstances = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<{ selectedInstanceIds: string[]; availableInstances: unknown[] } | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2712,8 +2776,8 @@ export const getUserStashInstances = async (
  * - Non-empty array means "show only these instances"
  */
 export const updateUserStashInstances = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateUserStashInstancesBody>,
+  res: TypedResponse<{ success: true; selectedInstanceIds: string[] } | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2742,7 +2806,7 @@ export const updateUserStashInstances = async (
       if (invalidIds.length > 0) {
         return res.status(400).json({
           error: "Invalid instance IDs",
-          invalidIds,
+          details: invalidIds.join(", "),
         });
       }
     }
@@ -2777,8 +2841,8 @@ export const updateUserStashInstances = async (
  * GET /api/user/setup-status
  */
 export const getSetupStatus = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<{ setupCompleted: boolean; recoveryKey: string | null; instances: unknown[]; instanceCount: number } | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2828,8 +2892,8 @@ export const getSetupStatus = async (
  * POST /api/user/complete-setup
  */
 export const completeSetup = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<CompleteSetupBody>,
+  res: TypedResponse<{ success: true } | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -2871,7 +2935,7 @@ export const completeSetup = async (
       if (invalidIds.length > 0) {
         return res.status(400).json({
           error: "Invalid instance IDs",
-          invalidIds,
+          details: (invalidIds as string[]).join(", "),
         });
       }
 
