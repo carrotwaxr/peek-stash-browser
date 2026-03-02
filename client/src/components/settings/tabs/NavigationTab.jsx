@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { migrateCarouselPreferences } from "../../../constants/carousels.js";
-import { migrateNavPreferences } from "../../../constants/navigation.js";
-import { showError, showSuccess } from "../../../utils/toast.jsx";
-import CarouselSettings from "../CarouselSettings.jsx";
-import LandingPageSettings from "../LandingPageSettings.jsx";
-import NavigationSettings from "../NavigationSettings.jsx";
+import { migrateCarouselPreferences } from "../../../constants/carousels";
+import { migrateNavPreferences } from "../../../constants/navigation";
+import { showError, showSuccess } from "../../../utils/toast";
+import CarouselSettings from "../CarouselSettings";
+import LandingPageSettings from "../LandingPageSettings";
+import NavigationSettings from "../NavigationSettings";
 
 const api = axios.create({
   baseURL: "/api",

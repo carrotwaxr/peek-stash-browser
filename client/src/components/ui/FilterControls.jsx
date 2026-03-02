@@ -1,6 +1,6 @@
 import { forwardRef, useEffect } from "react";
-import Button from "./Button.jsx";
-import SearchableSelect from "./SearchableSelect.jsx";
+import Button from "./Button";
+import SearchableSelect from "./SearchableSelect";
 
 /**
  * Reusable Sort Control Component

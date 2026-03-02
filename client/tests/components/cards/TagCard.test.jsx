@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
-import TagCard from "../../../src/components/cards/TagCard.jsx";
+import TagCard from "../../../src/components/cards/TagCard";
 
 describe("TagCard", () => {
   const mockTag = {

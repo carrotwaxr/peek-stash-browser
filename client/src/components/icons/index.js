@@ -1,2 +1,2 @@
 // Icon system exports
-export { ThemedIcon } from "./ThemedIcon.jsx";
+export { ThemedIcon } from "./ThemedIcon";

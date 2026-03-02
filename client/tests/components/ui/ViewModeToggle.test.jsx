@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import ViewModeToggle from "../../../src/components/ui/ViewModeToggle.jsx";
+import ViewModeToggle from "../../../src/components/ui/ViewModeToggle";
 
 describe("ViewModeToggle", () => {
   it("renders trigger button with current mode icon", () => {

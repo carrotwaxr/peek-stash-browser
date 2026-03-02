@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTagTree } from "../../src/utils/buildTagTree.js";
+import { buildTagTree } from "../../src/utils/buildTagTree";
 
 describe("buildTagTree", () => {
   it("returns empty array for empty input", () => {

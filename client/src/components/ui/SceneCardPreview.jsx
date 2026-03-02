@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../../hooks/useAuth.js";
+import { useAuth } from "../../hooks/useAuth";
 import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
-} from "../../utils/spriteSheet.js";
+} from "../../utils/spriteSheet";
 
 /**
  * Animated preview for scene cards with user-controlled quality preference and smart fallback

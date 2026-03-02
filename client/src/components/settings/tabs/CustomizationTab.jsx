@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useUnitPreference } from "../../../contexts/UnitPreferenceContext.js";
-import { showError, showSuccess } from "../../../utils/toast.jsx";
-import CardDisplaySettings from "../CardDisplaySettings.jsx";
-import TableColumnSettings from "../TableColumnSettings.jsx";
+import { useUnitPreference } from "../../../contexts/UnitPreferenceContext";
+import { showError, showSuccess } from "../../../utils/toast";
+import CardDisplaySettings from "../CardDisplaySettings";
+import TableColumnSettings from "../TableColumnSettings";
 
 const api = axios.create({
   baseURL: "/api",

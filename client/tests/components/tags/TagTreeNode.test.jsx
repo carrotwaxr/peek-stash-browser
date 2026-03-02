@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import TagTreeNode from "../../../src/components/tags/TagTreeNode.jsx";
+import TagTreeNode from "../../../src/components/tags/TagTreeNode";
 
 // Wrapper to provide router context
 const renderWithRouter = (ui) => {

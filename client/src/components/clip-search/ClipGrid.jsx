@@ -1,6 +1,6 @@
-import { getGridClasses } from "../../constants/grids.js";
-import ClipCard from "../cards/ClipCard.jsx";
-import { SkeletonSceneCard } from "../ui/index.js";
+import { getGridClasses } from "../../constants/grids";
+import ClipCard from "../cards/ClipCard";
+import { SkeletonSceneCard } from "../ui/index";
 
 /**
  * ClipGrid - Grid display for clip entities

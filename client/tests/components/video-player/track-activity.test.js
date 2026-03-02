@@ -33,7 +33,7 @@ vi.mock("video.js", () => ({
 }));
 
 // Import after mock
-import TrackActivityPlugin from "../../../src/components/video-player/plugins/track-activity.js";
+import TrackActivityPlugin from "../../../src/components/video-player/plugins/track-activity";
 
 describe("TrackActivityPlugin", () => {
   let plugin;

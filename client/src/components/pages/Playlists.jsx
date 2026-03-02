@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { getSharedPlaylists } from "../../services/api.js";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { showError, showSuccess } from "../../utils/toast";
+import { getSharedPlaylists } from "../../services/api";
 import {
   Button,
   ConfirmDialog,
@@ -11,7 +11,7 @@ import {
   Paper,
   TabNavigation,
   TAB_COUNT_LOADING,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const api = axios.create({
   baseURL: "/api",

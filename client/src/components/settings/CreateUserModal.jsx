@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Paper } from "../ui/index.js";
+import { Button, Paper } from "../ui/index";
 
 const CreateUserModal = ({ onClose, onUserCreated, api }) => {
   const [username, setUsername] = useState("");

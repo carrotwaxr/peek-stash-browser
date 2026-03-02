@@ -1,5 +1,5 @@
 import { ArrowUp, ArrowDown } from "lucide-react";
-import { getColumnSortField } from "../../config/tableColumns.js";
+import { getColumnSortField } from "../../config/tableColumns";
 
 /**
  * TableHeader - Renders a table header row with sortable columns

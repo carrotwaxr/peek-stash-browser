@@ -1,6 +1,6 @@
 // client/src/components/pages/UserStats/components/StatCard.jsx
 
-import { Paper } from "../../../ui/index.js";
+import { Paper } from "../../../ui/index";
 
 /**
  * Simple stat display card

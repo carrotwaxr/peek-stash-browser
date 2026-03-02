@@ -1,7 +1,7 @@
-import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
-import { LazyImage } from "./CardComponents.jsx";
-import Lightbox from "./Lightbox.jsx";
-import Pagination from "./Pagination.jsx";
+import { getImageTitle } from "../../utils/imageGalleryInheritance";
+import { LazyImage } from "./CardComponents";
+import Lightbox from "./Lightbox";
+import Pagination from "./Pagination";
 
 /**
  * Reusable component for displaying a paginated grid of images with lightbox support.

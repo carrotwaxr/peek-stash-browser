@@ -1,6 +1,6 @@
-import { LayoutRenderer } from './LayoutRenderer.jsx';
-import EmptyState from './EmptyState.jsx';
-import Pagination from './Pagination.jsx';
+import { LayoutRenderer } from './LayoutRenderer';
+import EmptyState from './EmptyState';
+import Pagination from './Pagination';
 
 /**
  * SearchResults - Layout-agnostic results renderer

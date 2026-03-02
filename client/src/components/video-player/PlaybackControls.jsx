@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { apiPost, getMyPermissions, libraryApi } from "../../services/api.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { ThemedIcon } from "../icons/index.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { apiPost, getMyPermissions, libraryApi } from "../../services/api";
+import { showError, showSuccess } from "../../utils/toast";
+import { ThemedIcon } from "../icons/index";
 import {
   AddToPlaylistButton,
   Button,
   FavoriteButton,
   OCounterButton,
   RatingSlider,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const PlaybackControls = () => {
   const { scene, sceneLoading, videoLoading, oCounter, dispatch } =

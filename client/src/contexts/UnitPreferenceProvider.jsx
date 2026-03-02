@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { UnitPreferenceContext } from "./UnitPreferenceContext.js";
-import { UNITS } from "../utils/unitConversions.js";
+import { UnitPreferenceContext } from "./UnitPreferenceContext";
+import { UNITS } from "../utils/unitConversions";
 
 const api = axios.create({ baseURL: "/api", withCredentials: true });
 

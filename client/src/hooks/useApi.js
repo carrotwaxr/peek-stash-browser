@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "./useAuth.js";
+import { useAuth } from "./useAuth";
 
 /**
  * Base hook for data fetching with loading states and error handling

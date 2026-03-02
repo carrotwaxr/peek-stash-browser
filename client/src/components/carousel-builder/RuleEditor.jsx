@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
-import { Button } from "../ui/index.js";
-import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig.js";
-import SearchableSelect from "../ui/SearchableSelect.jsx";
+import { Button } from "../ui/index";
+import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig";
+import SearchableSelect from "../ui/SearchableSelect";
 
 /**
  * RuleEditor Component

@@ -1,4 +1,4 @@
-import { getGridClasses } from '../../../constants/grids.js';
+import { getGridClasses } from '../../../constants/grids';
 
 /**
  * GridLayout - Responsive grid layout

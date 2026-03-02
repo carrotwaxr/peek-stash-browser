@@ -2,14 +2,14 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useFilterState } from "../../src/hooks/useFilterState.js";
+import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API
 vi.mock("../../src/services/api.js", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api.js";
+import { apiGet } from "../../src/services/api";
 
 const createWrapper = (initialEntries = ["/"]) => {
   return ({ children }) => (

@@ -1,29 +1,29 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getGridClasses } from "../../constants/grids.js";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
-import { useTableColumns } from "../../hooks/useTableColumns.js";
-import { useWallPlayback } from "../../hooks/useWallPlayback.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { libraryApi } from "../../services/api.js";
-import { GalleryCard } from "../cards/index.js";
+import { getGridClasses } from "../../constants/grids";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { libraryApi } from "../../services/api";
+import { GalleryCard } from "../cards/index";
 import {
   SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
-} from "../ui/index.js";
-import { TableView, ColumnConfigPopover } from "../table/index.js";
-import WallView from "../wall/WallView.jsx";
-import TimelineView from "../timeline/TimelineView.jsx";
-import { FolderView } from "../folder/index.js";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
+} from "../ui/index";
+import { TableView, ColumnConfigPopover } from "../table/index";
+import WallView from "../wall/WallView";
+import TimelineView from "../timeline/TimelineView";
+import { FolderView } from "../folder/index";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for galleries page
 const VIEW_MODES = [

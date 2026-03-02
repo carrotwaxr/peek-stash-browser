@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Users, X, Plus } from "lucide-react";
-import { Button, Paper } from "../ui/index.js";
-import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember } from "../../services/api.js";
+import { Button, Paper } from "../ui/index";
+import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember } from "../../services/api";
 
 /**
  * GroupModal - Create or Edit a user group

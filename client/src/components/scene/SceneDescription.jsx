@@ -1,5 +1,5 @@
-import { getSceneDescription } from "../../utils/format.js";
-import { Tooltip } from "../ui/index.js";
+import { getSceneDescription } from "../../utils/format";
+import { Tooltip } from "../ui/index";
 
 /**
  * Scene description with truncation and tooltip

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
-import PerformerCard from "../../../src/components/cards/PerformerCard.jsx";
+import PerformerCard from "../../../src/components/cards/PerformerCard";
 
 describe("PerformerCard", () => {
   const mockPerformer = {

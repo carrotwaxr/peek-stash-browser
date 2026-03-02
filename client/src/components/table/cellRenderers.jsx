@@ -3,15 +3,15 @@
 
 import { Link } from "react-router-dom";
 import { Heart } from "lucide-react";
-import RatingBadge from "../ui/RatingBadge.jsx";
-import MultiValueCell from "./MultiValueCell.jsx";
+import RatingBadge from "../ui/RatingBadge";
+import MultiValueCell from "./MultiValueCell";
 import {
   formatDuration,
   formatFileSize,
   formatDate,
   calculateAge,
-} from "./formatters.js";
-import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks.js";
+} from "./formatters";
+import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 
 // ============================================================================
 // Cell Components

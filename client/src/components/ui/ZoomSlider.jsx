@@ -1,4 +1,4 @@
-import { ZOOM_LEVELS } from "../wall/wallConfig.js";
+import { ZOOM_LEVELS } from "../wall/wallConfig";
 
 /**
  * 3-level zoom control for Wall view (S/M/L).

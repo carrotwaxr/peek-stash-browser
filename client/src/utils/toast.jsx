@@ -4,7 +4,7 @@ import {
   InfoMessage,
   SuccessMessage,
   WarningMessage,
-} from "../components/ui/index.js";
+} from "../components/ui/index";
 
 /**
  * Toast utility functions for showing notifications

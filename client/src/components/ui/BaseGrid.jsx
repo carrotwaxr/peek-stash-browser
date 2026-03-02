@@ -1,6 +1,6 @@
-import { getGridClasses } from "../../constants/grids.js";
-import EmptyState from "./EmptyState.jsx";
-import Pagination from "./Pagination.jsx";
+import { getGridClasses } from "../../constants/grids";
+import EmptyState from "./EmptyState";
+import Pagination from "./Pagination";
 
 /**
  * BaseGrid - Base grid component for layout, responsive columns, pagination, and loading/empty states

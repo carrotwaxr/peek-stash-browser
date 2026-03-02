@@ -1,17 +1,17 @@
 /* eslint-disable react-refresh/only-export-components */
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
+import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { libraryApi } from "../../services/api";
 import { CardCountIndicators } from "./CardCountIndicators";
-import EntityMenu from "./EntityMenu.jsx";
+import EntityMenu from "./EntityMenu";
 import FavoriteButton from "./FavoriteButton";
-import HideConfirmationDialog from "./HideConfirmationDialog.jsx";
+import HideConfirmationDialog from "./HideConfirmationDialog";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
-import { ExpandableDescription } from "./ExpandableDescription.jsx";
-import MarqueeText from "./MarqueeText.jsx";
+import { ExpandableDescription } from "./ExpandableDescription";
+import MarqueeText from "./MarqueeText";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard

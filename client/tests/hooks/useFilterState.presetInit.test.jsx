@@ -13,8 +13,8 @@ vi.mock("../../src/services/api.js", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api.js";
-import { useFilterState } from "../../src/hooks/useFilterState.js";
+import { apiGet } from "../../src/services/api";
+import { useFilterState } from "../../src/hooks/useFilterState";
 
 const createWrapper = (initialEntries = ["/"]) => {
   return ({ children }) => (

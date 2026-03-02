@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { BarChart3, Info, RefreshCw } from "lucide-react";
-import { usePageTitle } from "../../../hooks/usePageTitle.js";
-import { useUserStats } from "../../../hooks/useUserStats.js";
-import { PageHeader, PageLayout, LoadingSpinner, Tooltip } from "../../ui/index.js";
+import { usePageTitle } from "../../../hooks/usePageTitle";
+import { useUserStats } from "../../../hooks/useUserStats";
+import { PageHeader, PageLayout, LoadingSpinner, Tooltip } from "../../ui/index";
 import {
   LibraryOverview,
   EngagementTotals,
   TopList,
   HighlightCard,
-} from "./components/index.js";
+} from "./components/index";
 
 /**
  * Section info tooltip: wraps content with consistent sizing

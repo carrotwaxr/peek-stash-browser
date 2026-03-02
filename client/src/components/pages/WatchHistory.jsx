@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { History, Trash2 } from "lucide-react";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
-import { apiDelete, libraryApi } from "../../services/api.js";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useAllWatchHistory } from "../../hooks/useWatchHistory";
+import { apiDelete, libraryApi } from "../../services/api";
 import {
   Button,
   LoadingSpinner,
   PageHeader,
   PageLayout,
   SceneListItem,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const WatchHistory = () => {
   usePageTitle("Watch History");

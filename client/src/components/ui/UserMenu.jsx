@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import { ThemedIcon } from "../icons/index.js";
-import Button from "./Button.jsx";
+import { useAuth } from "../../hooks/useAuth";
+import { useTVMode } from "../../hooks/useTVMode";
+import { ThemedIcon } from "../icons/index";
+import Button from "./Button";
 
 const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);

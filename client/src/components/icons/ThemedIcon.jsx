@@ -1,6 +1,6 @@
 import * as LucideIcons from "lucide-react";
-import { getIconName } from "../../themes/icons/iconSets.js";
-import { useTheme } from "../../themes/useTheme.js";
+import { getIconName } from "../../themes/icons/iconSets";
+import { useTheme } from "../../themes/useTheme";
 
 // Theme-aware icon component that automatically uses the right icon for the current theme
 export const ThemedIcon = ({

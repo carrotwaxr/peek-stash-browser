@@ -1,20 +1,20 @@
 import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
-import { useWallPlayback } from "../../hooks/useWallPlayback.js";
-import { useTableColumns } from "../../hooks/useTableColumns.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getScenePathWithTime } from "../../utils/entityLinks.js";
-import { getClips } from "../../services/api.js";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getScenePathWithTime } from "../../utils/entityLinks";
+import { getClips } from "../../services/api";
 import {
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
-} from "../ui/index.js";
-import { TableView, ColumnConfigPopover } from "../table/index.js";
-import WallView from "../wall/WallView.jsx";
-import ClipGrid from "./ClipGrid.jsx";
+} from "../ui/index";
+import { TableView, ColumnConfigPopover } from "../table/index";
+import WallView from "../wall/WallView";
+import ClipGrid from "./ClipGrid";
 
 // View modes available for clip search
 const VIEW_MODES = [

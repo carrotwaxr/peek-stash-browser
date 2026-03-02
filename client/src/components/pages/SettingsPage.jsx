@@ -1,20 +1,20 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import SectionSelector from "../settings/SectionSelector.jsx";
-import SettingsLayout from "../settings/SettingsLayout.jsx";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import ThemeTab from "../settings/tabs/ThemeTab.jsx";
-import PlaybackTab from "../settings/tabs/PlaybackTab.jsx";
-import CustomizationTab from "../settings/tabs/CustomizationTab.jsx";
-import ContentTab from "../settings/tabs/ContentTab.jsx";
-import AccountTab from "../settings/tabs/AccountTab.jsx";
-import NavigationTab from "../settings/tabs/NavigationTab.jsx";
-import UserManagementTab from "../settings/tabs/UserManagementTab.jsx";
-import ServerConfigTab from "../settings/tabs/ServerConfigTab.jsx";
-import MergeRecoveryTab from "../settings/tabs/MergeRecoveryTab.jsx";
-import BackupTab from "../settings/tabs/BackupTab.jsx";
+import { useAuth } from "../../hooks/useAuth";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import SectionSelector from "../settings/SectionSelector";
+import SettingsLayout from "../settings/SettingsLayout";
+import { PageHeader, PageLayout } from "../ui/index";
+import ThemeTab from "../settings/tabs/ThemeTab";
+import PlaybackTab from "../settings/tabs/PlaybackTab";
+import CustomizationTab from "../settings/tabs/CustomizationTab";
+import ContentTab from "../settings/tabs/ContentTab";
+import AccountTab from "../settings/tabs/AccountTab";
+import NavigationTab from "../settings/tabs/NavigationTab";
+import UserManagementTab from "../settings/tabs/UserManagementTab";
+import ServerConfigTab from "../settings/tabs/ServerConfigTab";
+import MergeRecoveryTab from "../settings/tabs/MergeRecoveryTab";
+import BackupTab from "../settings/tabs/BackupTab";
 
 // Tab definitions
 const USER_TABS = [

@@ -1,12 +1,12 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useAsyncData } from "../../src/hooks/useApi.js";
+import { useAsyncData } from "../../src/hooks/useApi";
 
 vi.mock("../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
-import { useAuth } from "../../src/hooks/useAuth.js";
+import { useAuth } from "../../src/hooks/useAuth";
 
 describe("useAsyncData", () => {
   beforeEach(() => {

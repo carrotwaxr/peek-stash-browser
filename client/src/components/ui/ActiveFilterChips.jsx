@@ -1,5 +1,5 @@
 import { LucideX } from "lucide-react";
-import Button from "./Button.jsx";
+import Button from "./Button";
 
 /**
  * Display active filters as removable chips/badges

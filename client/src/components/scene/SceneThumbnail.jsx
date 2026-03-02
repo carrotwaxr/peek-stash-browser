@@ -1,8 +1,8 @@
 import {
   formatDurationCompact,
   formatResolution,
-} from "../../utils/format.js";
-import { SceneCardPreview } from "../ui/index.js";
+} from "../../utils/format";
+import { SceneCardPreview } from "../ui/index";
 
 /**
  * Scene thumbnail with animated preview and progress bar overlay

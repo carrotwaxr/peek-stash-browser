@@ -24,12 +24,12 @@ vi.mock("../../../src/utils/toast.jsx", () => ({
 }));
 
 // Import after mocks
-import CardDisplaySettings from "../../../src/components/settings/CardDisplaySettings.jsx";
-import { showSuccess, showError } from "../../../src/utils/toast.jsx";
+import CardDisplaySettings from "../../../src/components/settings/CardDisplaySettings";
+import { showSuccess, showError } from "../../../src/utils/toast";
 import {
   getAvailableSettings,
   ENTITY_DISPLAY_CONFIG,
-} from "../../../src/config/entityDisplayConfig.js";
+} from "../../../src/config/entityDisplayConfig";
 
 describe("CardDisplaySettings", () => {
   // Default settings matching the new config structure

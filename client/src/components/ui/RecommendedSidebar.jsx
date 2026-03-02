@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { getSceneTitle } from "../../utils/format.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { useLazyLoad } from "./CardComponents.jsx";
+import { getSceneTitle } from "../../utils/format";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { useLazyLoad } from "./CardComponents";
 
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar

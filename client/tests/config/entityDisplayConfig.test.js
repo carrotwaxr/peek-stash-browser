@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ENTITY_DISPLAY_CONFIG, getViewModes } from "../../src/config/entityDisplayConfig.js";
+import { ENTITY_DISPLAY_CONFIG, getViewModes } from "../../src/config/entityDisplayConfig";
 
 describe("entityDisplayConfig", () => {
   describe("timeline view mode", () => {

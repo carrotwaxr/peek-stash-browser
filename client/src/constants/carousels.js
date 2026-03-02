@@ -1,5 +1,5 @@
 import { Clock, Heart, PlayCircle, Star } from "lucide-react";
-import { ENTITY_ICONS } from "./entityIcons.js";
+import { ENTITY_ICONS } from "./entityIcons";
 
 /**
  * Shared carousel definitions for homepage and settings

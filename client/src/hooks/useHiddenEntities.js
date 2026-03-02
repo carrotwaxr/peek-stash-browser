@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
-import { useAuth } from "./useAuth.js";
-import { apiPost, apiPut, apiDelete, apiGet } from "../services/api.js";
-import { showSuccess, showError } from "../utils/toast.jsx";
+import { useAuth } from "./useAuth";
+import { apiPost, apiPut, apiDelete, apiGet } from "../services/api";
+import { showSuccess, showError } from "../utils/toast";
 
 /**
  * Hook for managing hidden entities

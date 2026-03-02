@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFolderTree, UNTAGGED_FOLDER_ID } from "../../src/utils/buildFolderTree.js";
+import { buildFolderTree, UNTAGGED_FOLDER_ID } from "../../src/utils/buildFolderTree";
 
 // Helper to create test tags with hierarchy
 const createTag = (id, name, parents = [], children = []) => ({

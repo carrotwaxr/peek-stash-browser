@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
-import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { libraryApi } from "../../services/api.js";
-import SceneCarousel from "./SceneCarousel.jsx";
+import { useAllWatchHistory } from "../../hooks/useWatchHistory";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { libraryApi } from "../../services/api";
+import SceneCarousel from "./SceneCarousel";
 
 /**
  * Continue Watching carousel component

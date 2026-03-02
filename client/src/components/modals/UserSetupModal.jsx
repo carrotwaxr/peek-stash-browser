@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Copy, Check, Server } from "lucide-react";
-import { userSetupApi } from "../../services/api.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { Button } from "../ui/index.js";
+import { userSetupApi } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
+import { Button } from "../ui/index";
 
 const UserSetupModal = ({ onComplete }) => {
   const { updateUser } = useAuth();

@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import axios from "axios";
-import { showError, showSuccess, showWarning } from "../../utils/toast.jsx";
-import { ThemedIcon } from "../icons/index.js";
-import Button from "./Button.jsx";
-import Paper from "./Paper.jsx";
+import { showError, showSuccess, showWarning } from "../../utils/toast";
+import { ThemedIcon } from "../icons/index";
+import Button from "./Button";
+import Paper from "./Paper";
 
 const api = axios.create({
   baseURL: "/api",

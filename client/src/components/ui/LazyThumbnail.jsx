@@ -1,4 +1,4 @@
-import { useLazyLoad } from "./CardComponents.jsx";
+import { useLazyLoad } from "./CardComponents";
 
 /**
  * LazyThumbnail - Lazy-loaded thumbnail component

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { migrateNavPreferences } from "../../constants/navigation.js";
-import { useGlobalNavigation } from "../../hooks/useGlobalNavigation.js";
-import useScrollRestoration from "../../hooks/useScrollRestoration.js";
-import { apiGet } from "../../services/api.js";
-import Sidebar from "./Sidebar.jsx";
-import TopBar from "./TopBar.jsx";
+import { migrateNavPreferences } from "../../constants/navigation";
+import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
+import useScrollRestoration from "../../hooks/useScrollRestoration";
+import { apiGet } from "../../services/api";
+import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 
 /**
  * GlobalLayout - Top-level layout with sidebar navigation

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import UserSetupModal from "../../../src/components/modals/UserSetupModal.jsx";
+import UserSetupModal from "../../../src/components/modals/UserSetupModal";
 
 // Mock the API
 vi.mock("../../../src/services/api.js", () => ({
@@ -18,7 +18,7 @@ vi.mock("../../../src/hooks/useAuth.js", () => ({
   }),
 }));
 
-import { userSetupApi } from "../../../src/services/api.js";
+import { userSetupApi } from "../../../src/services/api";
 
 describe("UserSetupModal", () => {
   beforeEach(() => {

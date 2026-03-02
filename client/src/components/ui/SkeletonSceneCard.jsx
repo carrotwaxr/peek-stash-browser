@@ -3,7 +3,7 @@
  * Used in carousels and grids while data is loading
  * Respects card display settings to prevent layout shifts
  */
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 
 const SkeletonSceneCard = ({ entityType = "scene" }) => {
   const { getSettings } = useCardDisplaySettings();

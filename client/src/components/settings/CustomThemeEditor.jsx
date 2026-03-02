@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { fontOptions } from "../../themes/themes.js";
-import { Button, Paper } from "../ui/index.js";
+import { fontOptions } from "../../themes/themes";
+import { Button, Paper } from "../ui/index";
 
 /**
  * Color picker input component

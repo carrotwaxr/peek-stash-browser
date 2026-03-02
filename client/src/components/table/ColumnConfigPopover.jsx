@@ -7,7 +7,7 @@ import {
   ChevronsDown as LucideChevronsDown,
   X as LucideX,
 } from "lucide-react";
-import Button from "../ui/Button.jsx";
+import Button from "../ui/Button";
 
 /**
  * ColumnConfigPopover - Popover component for configuring table column visibility and order

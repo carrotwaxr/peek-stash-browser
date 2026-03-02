@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, RotateCcw } from "lucide-react";
-import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { getSceneTitle } from "../../utils/format.js";
+import { useHiddenEntities } from "../../hooks/useHiddenEntities";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { getSceneTitle } from "../../utils/format";
 import {
   Button,
   EmptyState,
@@ -11,7 +11,7 @@ import {
   PageHeader,
   PageLayout,
   TabNavigation,
-} from "../ui/index.js";
+} from "../ui/index";
 
 /**
  * HiddenItemsPage - View and restore hidden entities

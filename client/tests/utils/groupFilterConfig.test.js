@@ -5,7 +5,7 @@
  * into the GraphQL filter format expected by the backend
  */
 import { describe, it, expect } from "vitest";
-import { buildGroupFilter } from "../../src/utils/filterConfig.js";
+import { buildGroupFilter } from "../../src/utils/filterConfig";
 
 describe("buildGroupFilter", () => {
   describe("Boolean Filters", () => {

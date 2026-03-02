@@ -1,19 +1,19 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { useTVMode } from "../../hooks/useTVMode";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
 import {
   formatDurationCompact,
   formatResolution,
   getSceneDescription,
   getSceneTitle,
-} from "../../utils/format.js";
-import { formatRelativeTime } from "../../utils/date.js";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
-import BaseCard from "./BaseCard.jsx";
-import { SceneCardPreview, TooltipEntityGrid } from "./index.js";
+} from "../../utils/format";
+import { formatRelativeTime } from "../../utils/date";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
+import BaseCard from "./BaseCard";
+import { SceneCardPreview, TooltipEntityGrid } from "./index";
 
 /**
  * Build scene subtitle with studio, code, and date

@@ -14,7 +14,7 @@ import {
   _buildStudioFilter,
   _buildTagFilter,
   _buildGroupFilter,
-} from "../../src/utils/filterConfig.js";
+} from "../../src/utils/filterConfig";
 
 describe("buildSceneFilter", () => {
   describe("Orientation Filter", () => {

@@ -3,27 +3,27 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import {
   ScenePlayerProvider,
   useScenePlayer,
-} from "../../contexts/ScenePlayerContext.jsx";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { makeCompositeKey } from "../../utils/compositeKey.js";
-import { canDirectPlayVideo } from "../../utils/videoFormat.js";
-import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
-import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
+} from "../../contexts/ScenePlayerContext";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { makeCompositeKey } from "../../utils/compositeKey";
+import { canDirectPlayVideo } from "../../utils/videoFormat";
+import PlaylistSidebar from "../playlist/PlaylistSidebar";
+import PlaylistStatusCard from "../playlist/PlaylistStatusCard";
 import {
   Button,
   ExternalPlayerButton,
   Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
-} from "../ui/index.js";
-import { GalleryGrid, GroupGrid } from "../grids/index.js";
-import PlaybackControls from "../video-player/PlaybackControls.jsx";
-import VideoPlayer from "../video-player/VideoPlayer.jsx";
-import ViewInStashButton from "../ui/ViewInStashButton.jsx";
-import SceneDetails from "./SceneDetails.jsx";
-import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation.jsx";
+} from "../ui/index";
+import { GalleryGrid, GroupGrid } from "../grids/index";
+import PlaybackControls from "../video-player/PlaybackControls";
+import VideoPlayer from "../video-player/VideoPlayer";
+import ViewInStashButton from "../ui/ViewInStashButton";
+import SceneDetails from "./SceneDetails";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 
 // Inner component that reads from context
 const SceneContent = () => {

@@ -10,7 +10,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Pagination from "../../../src/components/ui/Pagination.jsx";
+import Pagination from "../../../src/components/ui/Pagination";
 
 // Mock TV mode hook
 vi.mock("../../../src/hooks/useTVMode.js", () => ({

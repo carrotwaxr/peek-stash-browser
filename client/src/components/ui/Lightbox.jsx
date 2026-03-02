@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Heart, Info, Maximize, Minimize, Pause, Play, Plus, X } from "lucide-react";
 import { useSwipeable } from "react-swipeable";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { useFullscreen } from "../../hooks/useFullscreen.js";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { apiGet, imageViewHistoryApi, libraryApi } from "../../services/api.js";
-import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
-import MetadataDrawer from "./MetadataDrawer.jsx";
+import { useFullscreen } from "../../hooks/useFullscreen";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { apiGet, imageViewHistoryApi, libraryApi } from "../../services/api";
+import { getImageTitle } from "../../utils/imageGalleryInheritance";
+import MetadataDrawer from "./MetadataDrawer";
 
 // Percentage of screen width on each side that triggers navigation on click
 const EDGE_ZONE_PERCENT = 0.15;

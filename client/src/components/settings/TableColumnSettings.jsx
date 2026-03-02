@@ -9,8 +9,8 @@ import {
   getColumnsForEntity,
   getDefaultVisibleColumns,
   getDefaultColumnOrder,
-} from "../../config/tableColumns.js";
-import Button from "../ui/Button.jsx";
+} from "../../config/tableColumns";
+import Button from "../ui/Button";
 
 const ENTITY_TYPES = [
   { id: "scene", label: "Scenes" },

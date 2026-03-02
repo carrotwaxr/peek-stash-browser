@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { TVModeContext } from "../contexts/TVModeContext.js";
+import { TVModeContext } from "../contexts/TVModeContext";
 
 export const useTVMode = () => {
   const context = useContext(TVModeContext);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { LANDING_PAGE_OPTIONS } from "../../constants/navigation.js";
-import { Button, Switch } from "../ui/index.js";
+import { LANDING_PAGE_OPTIONS } from "../../constants/navigation";
+import { Button, Switch } from "../ui/index";
 
 /**
  * Landing page preference settings component

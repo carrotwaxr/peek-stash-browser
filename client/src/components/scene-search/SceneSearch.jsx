@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
-import { useTableColumns } from "../../hooks/useTableColumns.js";
-import { useWallPlayback } from "../../hooks/useWallPlayback.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { libraryApi } from "../../services/api.js";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { libraryApi } from "../../services/api";
 import {
   SceneCard,
   SyncProgressBanner,
@@ -15,13 +15,13 @@ import {
   PageHeader,
   PageLayout,
   SearchControls,
-} from "../ui/index.js";
-import { TableView, ColumnConfigPopover } from "../table/index.js";
-import SceneGrid from "./SceneGrid.jsx";
-import WallView from "../wall/WallView.jsx";
-import TimelineView from "../timeline/TimelineView.jsx";
-import { FolderView } from "../folder/index.js";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
+} from "../ui/index";
+import { TableView, ColumnConfigPopover } from "../table/index";
+import SceneGrid from "./SceneGrid";
+import WallView from "../wall/WallView";
+import TimelineView from "../timeline/TimelineView";
+import { FolderView } from "../folder/index";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for scene search
 const VIEW_MODES = [

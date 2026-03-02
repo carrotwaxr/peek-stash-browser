@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
-import ImageCard from "../../../src/components/cards/ImageCard.jsx";
+import ImageCard from "../../../src/components/cards/ImageCard";
 
 describe("ImageCard", () => {
   const mockImage = {

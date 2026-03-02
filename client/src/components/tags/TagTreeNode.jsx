@@ -6,9 +6,9 @@ import {
   ExternalLink,
   Droplets,
 } from "lucide-react";
-import { ENTITY_ICONS } from "../../constants/entityIcons.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { ENTITY_ICONS } from "../../constants/entityIcons";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
 
 // Color utilities matching CardCountIndicators
 const hueify = (color, direction = "lighter", amount = 12) => {

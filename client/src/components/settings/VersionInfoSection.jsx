@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Paper } from "../ui/index.js";
+import { Button, Paper } from "../ui/index";
 
 const VersionInfoSection = ({ clientVersion, api }) => {
   const [serverVersion, setServerVersion] = useState(null);

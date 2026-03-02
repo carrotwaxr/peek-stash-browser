@@ -10,17 +10,17 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import { Button } from "../ui/index.js";
-import IconPickerButton from "./IconPickerButton.jsx";
-import RuleEditor from "./RuleEditor.jsx";
-import CarouselPreview from "./CarouselPreview.jsx";
-import { libraryApi } from "../../services/api.js";
+import { Button } from "../ui/index";
+import IconPickerButton from "./IconPickerButton";
+import RuleEditor from "./RuleEditor";
+import CarouselPreview from "./CarouselPreview";
+import { libraryApi } from "../../services/api";
 import {
   SCENE_SORT_OPTIONS,
   CAROUSEL_FILTER_DEFINITIONS,
   buildSceneFilter,
   carouselRulesToFilterState,
-} from "../../utils/filterConfig.js";
+} from "../../utils/filterConfig";
 
 // Simple ID generator for rule keys (doesn't need to be cryptographically secure)
 let ruleIdCounter = 0;

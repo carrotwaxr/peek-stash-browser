@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
 
 /**
  * Renders a list of tag chips, sorted alphabetically

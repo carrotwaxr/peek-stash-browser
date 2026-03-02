@@ -7,9 +7,9 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
-import { apiPost } from "../../services/api.js";
-import { getSceneTitle } from "../../utils/format.js";
-import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
+import { apiPost } from "../../services/api";
+import { getSceneTitle } from "../../utils/format";
+import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
 import "./plugins/markers.js";
@@ -113,7 +113,7 @@ function getBestTranscodeQuality(sourceHeight) {
  * @param {number} sourceHeight - Height of the source video
  * @returns {Array<{quality: string, height: number}>} Available quality options
  */
-// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getAvailableQualities(sourceHeight) {
   return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
 }
@@ -132,7 +132,7 @@ export function useVideoPlayer({
   playerRef,
   scene,
   quality,
-  isAutoFallback, // eslint-disable-line no-unused-vars
+  isAutoFallback, // eslint-disable-line @typescript-eslint/no-unused-vars
   ready,
   shouldAutoplay,
   playlist,

@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import TimelineBar from "../../../src/components/timeline/TimelineBar.jsx";
+import TimelineBar from "../../../src/components/timeline/TimelineBar";
 
 describe("TimelineBar", () => {
   const defaultProps = {

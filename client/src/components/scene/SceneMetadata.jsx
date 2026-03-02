@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CardCountIndicators, MediaImage } from "../ui/index.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { CardCountIndicators, MediaImage } from "../ui/index";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
 
 /**
  * Combine direct tags with inherited tags from server

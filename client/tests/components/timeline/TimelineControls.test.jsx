@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import TimelineControls from "../../../src/components/timeline/TimelineControls.jsx";
+import TimelineControls from "../../../src/components/timeline/TimelineControls";
 
 describe("TimelineControls", () => {
   const defaultProps = {

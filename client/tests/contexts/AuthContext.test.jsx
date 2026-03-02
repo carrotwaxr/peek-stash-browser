@@ -2,8 +2,8 @@ import { waitFor, act } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { AuthProvider } from "../../src/contexts/AuthContext.jsx";
-import { useAuth } from "../../src/hooks/useAuth.js";
+import { AuthProvider } from "../../src/contexts/AuthContext";
+import { useAuth } from "../../src/hooks/useAuth";
 
 // ---------------------------------------------------------------------------
 // Helpers

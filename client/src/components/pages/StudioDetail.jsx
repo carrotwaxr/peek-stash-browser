@@ -4,16 +4,16 @@ import {
   useParams,
   useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useImagesPagination } from "../../hooks/useImagesPagination.js";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { libraryApi } from "../../services/api.js";
-import { makeCompositeKey } from "../../utils/compositeKey.js";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import SceneSearch from "../scene-search/SceneSearch.jsx";
+import { useImagesPagination } from "../../hooks/useImagesPagination";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
+import { libraryApi } from "../../services/api";
+import { makeCompositeKey } from "../../utils/compositeKey";
+import { getEntityPath } from "../../utils/entityLinks";
+import SceneSearch from "../scene-search/SceneSearch";
 import {
   Button,
   FavoriteButton,
@@ -24,9 +24,9 @@ import {
   RatingSlider,
   TabNavigation,
   TagChips,
-} from "../ui/index.js";
-import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index.js";
-import ViewInStashButton from "../ui/ViewInStashButton.jsx";
+} from "../ui/index";
+import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
+import ViewInStashButton from "../ui/ViewInStashButton";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
@@ -384,7 +384,7 @@ const StudioImage = ({ studio }) => {
 };
 
 // Studio Stats Component
-const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-line no-unused-vars
+const StudioStats = ({ studio, studioId: _studioId }) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "scenes";
 

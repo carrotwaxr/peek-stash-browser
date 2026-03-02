@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import { UNITS } from "../utils/unitConversions.js";
+import { UNITS } from "../utils/unitConversions";
 
 export const UnitPreferenceContext = createContext({
   unitPreference: UNITS.METRIC,

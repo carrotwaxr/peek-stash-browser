@@ -3,9 +3,9 @@ import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 import {
   NAV_DEFINITIONS,
   getNavDefinition,
-} from "../../constants/navigation.js";
-import { ThemedIcon } from "../icons/index.js";
-import { Button } from "../ui/index.js";
+} from "../../constants/navigation";
+import { ThemedIcon } from "../icons/index";
+import { Button } from "../ui/index";
 
 /**
  * NavigationSettings component

@@ -6,8 +6,8 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext.jsx", () => ({
   useCardDisplaySettings: vi.fn(),
 }));
 
-import SkeletonSceneCard from "../../../src/components/ui/SkeletonSceneCard.jsx";
-import { useCardDisplaySettings } from "../../../src/contexts/CardDisplaySettingsContext.jsx";
+import SkeletonSceneCard from "../../../src/components/ui/SkeletonSceneCard";
+import { useCardDisplaySettings } from "../../../src/contexts/CardDisplaySettingsContext";
 
 describe("SkeletonSceneCard", () => {
   const mockGetSettings = vi.fn();

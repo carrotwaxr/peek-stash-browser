@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth } from "./useAuth.js";
+import { useAuth } from "./useAuth";
 
 /**
  * Hook for making cancellable API queries with automatic state management.

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useFilterState } from "../../hooks/useFilterState.js";
+import { useTVMode } from "../../hooks/useTVMode";
+import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useFilterState } from "../../hooks/useFilterState";
 import {
   CLIP_FILTER_OPTIONS,
   CLIP_SORT_OPTIONS,
@@ -46,7 +46,7 @@ import {
   SortControl,
   ViewModeToggle,
   ZoomSlider,
-} from "./index.js";
+} from "./index";
 
 const buildFilter = (artifactType, filters, unitPreference) => {
   switch (artifactType) {

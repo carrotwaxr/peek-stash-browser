@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useAuth } from "../../../hooks/useAuth.js";
-import UserManagementSection from "../UserManagementSection.jsx";
+import { useAuth } from "../../../hooks/useAuth";
+import UserManagementSection from "../UserManagementSection";
 
 const api = axios.create({
   baseURL: "/api",

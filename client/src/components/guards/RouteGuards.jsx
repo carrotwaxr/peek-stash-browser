@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth.js';
-import { REDIRECT_STORAGE_KEY } from '../../services/api.js';
-import UserSetupModal from '../modals/UserSetupModal.jsx';
+import { useAuth } from '../../hooks/useAuth';
+import { REDIRECT_STORAGE_KEY } from '../../services/api';
+import UserSetupModal from '../modals/UserSetupModal';
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">

@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { ImageCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { ImageCard } from "../cards/index";
 
 /**
  * ImageGrid - Grid for displaying images with search and filtering

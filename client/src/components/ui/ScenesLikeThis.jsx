@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
-import SceneGrid from "../scene-search/SceneGrid.jsx";
-import Pagination from "./Pagination.jsx";
+import SceneGrid from "../scene-search/SceneGrid";
+import Pagination from "./Pagination";
 
 const ScenesLikeThis = ({ sceneId, onCountChange }) => {
   const [searchParams, setSearchParams] = useSearchParams();

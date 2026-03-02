@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import TableHeader from "./TableHeader.jsx";
-import { getCellRenderer } from "./cellRenderers.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
+import TableHeader from "./TableHeader";
+import { getCellRenderer } from "./cellRenderers";
+import { useConfig } from "../../contexts/ConfigContext";
 
 /**
  * TableView - Main table view component for displaying entity lists

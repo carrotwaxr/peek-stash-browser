@@ -1,7 +1,7 @@
 // client/tests/components/ui/MarqueeText.test.jsx
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import MarqueeText from "../../../src/components/ui/MarqueeText.jsx";
+import MarqueeText from "../../../src/components/ui/MarqueeText";
 
 // Mock ResizeObserver
 const mockResizeObserver = vi.fn(() => ({

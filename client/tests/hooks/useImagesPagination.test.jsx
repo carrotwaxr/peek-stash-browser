@@ -1,7 +1,7 @@
 // client/src/hooks/__tests__/useImagesPagination.test.jsx
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { useImagesPagination } from "../../src/hooks/useImagesPagination.js";
+import { useImagesPagination } from "../../src/hooks/useImagesPagination";
 
 describe("useImagesPagination", () => {
   const createMockFetchImages = (images = [], count = 0) => {

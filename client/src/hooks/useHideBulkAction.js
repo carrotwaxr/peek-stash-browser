@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useHiddenEntities } from "./useHiddenEntities.js";
-import { showSuccess, showError } from "../utils/toast.jsx";
+import { useHiddenEntities } from "./useHiddenEntities";
+import { showSuccess, showError } from "../utils/toast";
 
 /**
  * Hook for bulk hide action with confirmation dialog support

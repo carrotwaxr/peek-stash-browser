@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useDebouncedCallback } from "../../hooks/useDebounce.js";
+import { useDebouncedCallback } from "../../hooks/useDebounce";
 
 /**
  * Inline slider for rating on detail pages

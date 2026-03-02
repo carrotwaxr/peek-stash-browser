@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ClipCard from "../cards/ClipCard.jsx";
+import ClipCard from "../cards/ClipCard";
 
 /**
  * ClipList - Displays clips for a scene with toggle for ungenerated

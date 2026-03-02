@@ -40,7 +40,7 @@ vi.mock("../../../src/components/ui/SceneCardPreview.jsx", () => ({
 }));
 
 // Import after mocks
-import SceneCard from "../../../src/components/ui/SceneCard.jsx";
+import SceneCard from "../../../src/components/ui/SceneCard";
 
 describe("SceneCard respects card display settings", () => {
   const mockScene = {

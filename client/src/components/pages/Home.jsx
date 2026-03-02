@@ -6,20 +6,20 @@ import { LucideEyeOff, LucidePlus } from "lucide-react";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
-} from "../../constants/carousels.js";
-import { useAsyncData } from "../../hooks/useApi.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useHideBulkAction } from "../../hooks/useHideBulkAction.js";
-import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { libraryApi } from "../../services/api.js";
+} from "../../constants/carousels";
+import { useAsyncData } from "../../hooks/useApi";
+import { useAuth } from "../../hooks/useAuth";
+import { useHideBulkAction } from "../../hooks/useHideBulkAction";
+import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { libraryApi } from "../../services/api";
 import {
   carouselRulesToFilterState,
   SCENE_FILTER_OPTIONS,
-} from "../../utils/filterConfig.js";
-import { buildSearchParams } from "../../utils/urlParams.js";
+} from "../../utils/filterConfig";
+import { buildSearchParams } from "../../utils/urlParams";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -30,7 +30,7 @@ import {
   PageHeader,
   PageLayout,
   SceneCarousel,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const axiosApi = axios.create({
   baseURL: "/api",

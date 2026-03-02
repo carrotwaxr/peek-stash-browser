@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import ClipList from "../../../src/components/clips/ClipList.jsx";
-import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext.jsx";
+import ClipList from "../../../src/components/clips/ClipList";
+import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext";
 
 // Mock the api module
 vi.mock("../../../src/services/api.js", () => ({

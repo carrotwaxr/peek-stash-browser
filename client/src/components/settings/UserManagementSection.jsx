@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Users, Edit2, Trash2, Shield, Download, Share2, Plus } from "lucide-react";
-import { getGroups, deleteGroup } from "../../services/api.js";
-import { formatDate } from "../../utils/date.js";
-import CreateUserModal from "./CreateUserModal.jsx";
-import GroupModal from "./GroupModal.jsx";
-import SyncFromStashModal from "./SyncFromStashModal.jsx";
-import UserEditModal from "./UserEditModal.jsx";
-import { Button, Paper } from "../ui/index.js";
+import { getGroups, deleteGroup } from "../../services/api";
+import { formatDate } from "../../utils/date";
+import CreateUserModal from "./CreateUserModal";
+import GroupModal from "./GroupModal";
+import SyncFromStashModal from "./SyncFromStashModal";
+import UserEditModal from "./UserEditModal";
+import { Button, Paper } from "../ui/index";
 
 const UserManagementSection = ({
   users,

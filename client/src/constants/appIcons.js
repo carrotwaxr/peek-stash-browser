@@ -3,13 +3,13 @@
  * For entity icons (Scene, Performer, Studio, etc.), see entityIcons.js
  *
  * Usage:
- *   import { FEATURE_ICONS, ACTION_ICONS } from "../constants/appIcons.js";
+ *   import { FEATURE_ICONS, ACTION_ICONS } from "../constants/appIcons";
  *
  *   // For ThemedIcon (string names)
  *   <ThemedIcon name={FEATURE_ICONS.watchHistory} />
  *
  *   // For direct Lucide imports
- *   import { APP_ICON_COMPONENTS } from "../constants/appIcons.js";
+ *   import { APP_ICON_COMPONENTS } from "../constants/appIcons";
  *   const HistoryIcon = APP_ICON_COMPONENTS.watchHistory;
  */
 import {

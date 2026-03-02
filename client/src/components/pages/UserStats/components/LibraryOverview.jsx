@@ -1,7 +1,7 @@
 // client/src/components/pages/UserStats/components/LibraryOverview.jsx
 
-import { ENTITY_ICONS } from "../../../../constants/entityIcons.js";
-import StatCard from "./StatCard.jsx";
+import { ENTITY_ICONS } from "../../../../constants/entityIcons";
+import StatCard from "./StatCard";
 
 /**
  * Compact row of library count stats

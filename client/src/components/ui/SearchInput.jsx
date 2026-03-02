@@ -2,8 +2,8 @@
  * Reusable search input component with debouncing
  */
 import { useEffect, useRef, useState } from "react";
-import { useDebouncedValue } from "../../hooks/useDebounce.js";
-import Button from "./Button.jsx";
+import { useDebouncedValue } from "../../hooks/useDebounce";
+import Button from "./Button";
 
 const SearchInput = ({
   placeholder = "Search...",

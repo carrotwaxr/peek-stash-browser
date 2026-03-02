@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiGet } from "../services/api.js";
+import { apiGet } from "../services/api";
 
 /**
  * Hook to get the user's wallPlayback preference.

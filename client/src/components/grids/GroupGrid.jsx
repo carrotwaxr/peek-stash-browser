@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { GroupCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { GroupCard } from "../cards/index";
 
 /**
  * GroupGrid - Grid for displaying groups/collections with search and filtering

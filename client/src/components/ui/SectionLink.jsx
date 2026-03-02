@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getSiteInfo, getDomainFromUrl } from "../../utils/siteInfo.js";
+import { getSiteInfo, getDomainFromUrl } from "../../utils/siteInfo";
 
 /**
  * External link component with site icon/favicon

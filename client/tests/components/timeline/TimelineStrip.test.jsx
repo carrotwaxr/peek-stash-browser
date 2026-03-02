@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import TimelineStrip from "../../../src/components/timeline/TimelineStrip.jsx";
+import TimelineStrip from "../../../src/components/timeline/TimelineStrip";
 
 describe("TimelineStrip", () => {
   const defaultDistribution = [

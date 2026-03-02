@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { getDefaultSettings } from "../config/entityDisplayConfig.js";
+import { getDefaultSettings } from "../config/entityDisplayConfig";
 
 const api = axios.create({
   baseURL: "/api",

@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { GalleryCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { GalleryCard } from "../cards/index";
 
 /**
  * GalleryGrid - Grid for displaying galleries with search and filtering

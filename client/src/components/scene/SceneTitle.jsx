@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { formatRelativeTime } from "../../utils/date.js";
-import { getSceneTitle } from "../../utils/format.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { formatRelativeTime } from "../../utils/date";
+import { getSceneTitle } from "../../utils/format";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
 
 /**
  * Scene title with link and subtitle (studio • code • date)

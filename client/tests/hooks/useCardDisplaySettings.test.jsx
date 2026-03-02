@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { getDefaultSettings } from "../../src/config/entityDisplayConfig.js";
+import { getDefaultSettings } from "../../src/config/entityDisplayConfig";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const { mockGet, mockPut } = vi.hoisted(() => {
@@ -21,7 +21,7 @@ vi.mock("axios", () => ({
 }));
 
 // Import after mock setup
-import { CardDisplaySettingsProvider, useCardDisplaySettings } from "../../src/contexts/CardDisplaySettingsContext.jsx";
+import { CardDisplaySettingsProvider, useCardDisplaySettings } from "../../src/contexts/CardDisplaySettingsContext";
 
 describe("useCardDisplaySettings", () => {
   beforeEach(() => {

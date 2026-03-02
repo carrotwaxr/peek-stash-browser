@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
-import { useDebouncedValue } from "../../hooks/useDebounce.js";
-import { libraryApi } from "../../services/api.js";
-import { getCache, setCache } from "../../utils/filterCache.js";
-import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey.js";
-import Button from "./Button.jsx";
+import { useDebouncedValue } from "../../hooks/useDebounce";
+import { libraryApi } from "../../services/api";
+import { getCache, setCache } from "../../utils/filterCache";
+import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
+import Button from "./Button";
 
 /**
  * Searchable select component with caching and debounced search

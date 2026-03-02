@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Paper } from "../ui/index.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
+import { Paper } from "../ui/index";
+import { useAuth } from "../../hooks/useAuth";
+import { showSuccess, showError } from "../../utils/toast";
 
 const api = axios.create({
   baseURL: "/api",

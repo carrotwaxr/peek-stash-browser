@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import TimelineMobileSheet from "../../../src/components/timeline/TimelineMobileSheet.jsx";
+import TimelineMobileSheet from "../../../src/components/timeline/TimelineMobileSheet";
 
 describe("TimelineMobileSheet", () => {
   const defaultProps = {

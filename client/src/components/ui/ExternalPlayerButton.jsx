@@ -1,7 +1,7 @@
 import { ExternalLink, ChevronDown, Copy } from "lucide-react";
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { showSuccess, showError } from "../../utils/toast.jsx";
+import { showSuccess, showError } from "../../utils/toast";
 
 /**
  * Button to open the current scene in an external media player.

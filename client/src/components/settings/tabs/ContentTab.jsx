@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Server } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useHiddenEntities } from "../../../hooks/useHiddenEntities.js";
-import { apiGet, apiPut } from "../../../services/api.js";
+import { useHiddenEntities } from "../../../hooks/useHiddenEntities";
+import { apiGet, apiPut } from "../../../services/api";
 
 const ContentTab = () => {
   const { hideConfirmationDisabled, updateHideConfirmation } = useHiddenEntities();

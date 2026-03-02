@@ -1,5 +1,5 @@
 import { Droplets, Eye } from "lucide-react";
-import { ENTITY_ICONS } from "../../constants/entityIcons.js";
+import { ENTITY_ICONS } from "../../constants/entityIcons";
 import Tooltip from "./Tooltip";
 
 const hueify = (color, direction = "lighter", amount = 12) => {

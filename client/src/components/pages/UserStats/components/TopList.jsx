@@ -1,11 +1,11 @@
 // client/src/components/pages/UserStats/components/TopList.jsx
 
 import { Link } from "react-router-dom";
-import { Paper } from "../../../ui/index.js";
+import { Paper } from "../../../ui/index";
 import {
   formatDurationHumanReadable,
   getFilenameFromPath,
-} from "../../../../utils/format.js";
+} from "../../../../utils/format";
 
 /**
  * Get fallback icon for entity type

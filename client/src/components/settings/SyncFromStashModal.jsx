@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Paper } from "../ui/index.js";
+import { Button, Paper } from "../ui/index";
 
 const SyncFromStashModal = ({ user, onClose, onSyncComplete, api }) => {
   const [syncing, setSyncing] = useState(false);

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getOrderedNavItems } from "../../constants/navigation.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import { PeekLogo } from "../branding/PeekLogo.jsx";
-import { ThemedIcon } from "../icons/index.js";
-import Button from "./Button.jsx";
-import HelpModal from "./HelpModal.jsx";
-import Tooltip from "./Tooltip.jsx";
+import { getOrderedNavItems } from "../../constants/navigation";
+import { useAuth } from "../../hooks/useAuth";
+import { useTVMode } from "../../hooks/useTVMode";
+import { PeekLogo } from "../branding/PeekLogo";
+import { ThemedIcon } from "../icons/index";
+import Button from "./Button";
+import HelpModal from "./HelpModal";
+import Tooltip from "./Tooltip";
 
 /**
  * Sidebar Navigation Component

@@ -2,7 +2,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
-import { useFilterState } from "../../src/hooks/useFilterState.js";
+import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API calls
 vi.mock("../../src/services/api.js", () => ({

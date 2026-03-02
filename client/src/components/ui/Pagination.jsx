@@ -5,9 +5,9 @@ import {
   LucideArrowRight,
   LucideArrowRightToLine,
 } from "lucide-react";
-import Button from "./Button.jsx";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js";
+import Button from "./Button";
+import { useTVMode } from "../../hooks/useTVMode";
+import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 
 /**
  * Reusable pagination component

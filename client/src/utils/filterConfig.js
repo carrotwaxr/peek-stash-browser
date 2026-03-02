@@ -7,7 +7,7 @@ import {
   feetInchesToCm,
   lbsToKg,
   inchesToCm,
-} from "./unitConversions.js";
+} from "./unitConversions";
 
 // Scene sorting options (alphabetically organized by label)
 // Note: scene_index is added dynamically when group filter is active

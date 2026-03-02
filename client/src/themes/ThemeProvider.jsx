@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { ThemeContext } from "./ThemeContext.js";
+import { ThemeContext } from "./ThemeContext";
 import {
   themes as builtInThemes,
   defaultTheme,
   generateThemeCSSVars,
-} from "./themes.js";
+} from "./themes";
 
 const api = axios.create({
   baseURL: "/api",

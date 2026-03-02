@@ -7,7 +7,7 @@ import {
   formatFileSize,
   formatBitRate,
   getSceneTitle,
-} from "../../src/utils/format.js";
+} from "../../src/utils/format";
 
 describe("format utilities", () => {
   describe("formatDurationHumanReadable", () => {

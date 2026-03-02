@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import StashInstanceSection from "../../../src/components/settings/StashInstanceSection.jsx";
+import StashInstanceSection from "../../../src/components/settings/StashInstanceSection";
 
 // Mock useAuth hook
 vi.mock("../../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(),
 }));
 
-import { useAuth } from "../../../src/hooks/useAuth.js";
+import { useAuth } from "../../../src/hooks/useAuth";
 
 describe("StashInstanceSection", () => {
   const mockApi = {

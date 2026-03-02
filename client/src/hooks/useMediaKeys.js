@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
-import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts.js";
-import { isInRatingMode } from "./useRatingHotkeys.js";
+import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts";
+import { isInRatingMode } from "./useRatingHotkeys";
 
 /**
  * Hook for video player keyboard shortcuts

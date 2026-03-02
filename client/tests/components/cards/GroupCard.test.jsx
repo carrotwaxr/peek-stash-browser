@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
-import GroupCard from "../../../src/components/cards/GroupCard.jsx";
+import GroupCard from "../../../src/components/cards/GroupCard";
 
 describe("GroupCard", () => {
   const mockGroup = {

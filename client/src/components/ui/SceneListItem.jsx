@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatRelativeTime } from "../../utils/date.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { useCardSelection } from "../../hooks/useCardSelection.js";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { formatRelativeTime } from "../../utils/date";
+import { useConfig } from "../../contexts/ConfigContext";
+import { useCardSelection } from "../../hooks/useCardSelection";
+import { getEntityPath } from "../../utils/entityLinks";
 import {
   SceneMetadata,
   SceneStats,
   SceneThumbnail,
   SceneTitle,
-} from "../scene/index.js";
-import { ExpandableDescription } from "./ExpandableDescription.jsx";
-import { getSceneDescription } from "../../utils/format.js";
+} from "../scene/index";
+import { ExpandableDescription } from "./ExpandableDescription";
+import { getSceneDescription } from "../../utils/format";
 
 /**
  * Shared row-based scene list item component

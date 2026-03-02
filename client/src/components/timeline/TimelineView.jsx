@@ -1,12 +1,12 @@
 // client/src/components/timeline/TimelineView.jsx
 import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react";
-import TimelineControls from "./TimelineControls.jsx";
-import TimelineStrip from "./TimelineStrip.jsx";
-import TimelineMobileSheet from "./TimelineMobileSheet.jsx";
-import { useTimelineState, parsePeriodToDateRange } from "./useTimelineState.js";
-import { useMediaQuery } from "../../hooks/useMediaQuery.js";
-import { getGridClasses } from "../../constants/grids.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import TimelineControls from "./TimelineControls";
+import TimelineStrip from "./TimelineStrip";
+import TimelineMobileSheet from "./TimelineMobileSheet";
+import { useTimelineState, parsePeriodToDateRange } from "./useTimelineState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { getGridClasses } from "../../constants/grids";
+import LoadingSpinner from "../ui/LoadingSpinner";
 
 function TimelineView({
   entityType,

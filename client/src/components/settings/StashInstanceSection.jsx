@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Paper, Button } from "../ui/index.js";
-import { useAuth } from "../../hooks/useAuth.js";
+import { Paper, Button } from "../ui/index";
+import { useAuth } from "../../hooks/useAuth";
 
 const StashInstanceSection = ({ api }) => {
   const { user } = useAuth();

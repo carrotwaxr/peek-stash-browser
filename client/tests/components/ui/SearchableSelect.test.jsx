@@ -62,7 +62,7 @@ vi.mock("../../../src/services/api.js", () => ({
 }));
 
 // Import after mocks are set up
-import SearchableSelect from "../../../src/components/ui/SearchableSelect.jsx";
+import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
 // --- Helpers ---
 

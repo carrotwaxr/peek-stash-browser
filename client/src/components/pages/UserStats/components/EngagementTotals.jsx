@@ -1,9 +1,9 @@
 // client/src/components/pages/UserStats/components/EngagementTotals.jsx
 
 import { Clock, Play, Heart } from "lucide-react";
-import { ENTITY_ICONS } from "../../../../constants/entityIcons.js";
-import StatCard from "./StatCard.jsx";
-import { formatDurationHumanReadable } from "../../../../utils/format.js";
+import { ENTITY_ICONS } from "../../../../constants/entityIcons";
+import StatCard from "./StatCard";
+import { formatDurationHumanReadable } from "../../../../utils/format";
 
 /**
  * Hero section with engagement totals

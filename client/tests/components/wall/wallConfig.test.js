@@ -4,7 +4,7 @@ import {
   ZOOM_LEVELS,
   DEFAULT_ZOOM,
   DEFAULT_VIEW_MODE,
-} from "../../../src/components/wall/wallConfig.js";
+} from "../../../src/components/wall/wallConfig";
 
 describe("wallConfig", () => {
   describe("scene config", () => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { Button } from "./index.js";
+import { Button } from "./index";
 
 // Determine current page from URL
 const getCurrentPage = (location) => {

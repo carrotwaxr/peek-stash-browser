@@ -11,8 +11,8 @@ import {
   Loader2,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { Button } from "../ui/index.js";
-import { libraryApi } from "../../services/api.js";
+import { Button } from "../ui/index";
+import { libraryApi } from "../../services/api";
 
 /**
  * Carousel metadata mapping fetchKey to display information

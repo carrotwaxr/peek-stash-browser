@@ -1,7 +1,7 @@
 /**
  * Utility functions for persisting filter/sort state to URL query parameters
  */
-import { makeCompositeKey } from "./compositeKey.js";
+import { makeCompositeKey } from "./compositeKey";
 
 /**
  * Serialize filter state to URL query parameters

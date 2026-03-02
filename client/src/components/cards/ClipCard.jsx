@@ -1,13 +1,13 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BaseCard } from "../ui/BaseCard.jsx";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getScenePathWithTime } from "../../utils/entityLinks.js";
-import { formatDuration } from "../../utils/format.js";
-import ClipCardPreview from "./ClipCardPreview.jsx";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getScenePathWithTime } from "../../utils/entityLinks";
+import { formatDuration } from "../../utils/format";
+import ClipCardPreview from "./ClipCardPreview";
 
 /**
  * ClipCard - Card for displaying clip entities

@@ -1,12 +1,12 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BaseCard } from "../ui/BaseCard.jsx";
-import GenderIcon from "../ui/GenderIcon.jsx";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
+import { BaseCard } from "../ui/BaseCard";
+import GenderIcon from "../ui/GenderIcon";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
 /**
  * PerformerCard - Card for displaying performer entities

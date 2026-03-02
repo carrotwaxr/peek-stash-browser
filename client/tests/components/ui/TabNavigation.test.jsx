@@ -11,7 +11,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import TabNavigation, { TAB_COUNT_LOADING } from "../../../src/components/ui/TabNavigation.jsx";
+import TabNavigation, { TAB_COUNT_LOADING } from "../../../src/components/ui/TabNavigation";
 
 // We need to test URL updates, so we'll use a wrapper component
 const TabNavigationTestWrapper = ({ initialRoute = "/", ...props }) => {

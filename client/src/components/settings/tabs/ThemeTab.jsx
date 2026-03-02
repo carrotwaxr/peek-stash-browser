@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { useTheme } from "../../../themes/useTheme.js";
-import CustomThemeManager from "../CustomThemeManager.jsx";
-import { Button } from "../../ui/index.js";
+import { useTheme } from "../../../themes/useTheme";
+import CustomThemeManager from "../CustomThemeManager";
+import { Button } from "../../ui/index";
 
 const ThemeTab = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();

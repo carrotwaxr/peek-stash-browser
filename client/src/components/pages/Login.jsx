@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useTheme } from "../../themes/useTheme.js";
-import { Button } from "../ui/index.js";
-import { REDIRECT_STORAGE_KEY } from "../../services/api.js";
-import { getLandingPage } from "../../constants/navigation.js";
+import { useAuth } from "../../hooks/useAuth";
+import { useTheme } from "../../themes/useTheme";
+import { Button } from "../ui/index";
+import { REDIRECT_STORAGE_KEY } from "../../services/api";
+import { getLandingPage } from "../../constants/navigation";
 
 const Login = () => {
   const { login } = useAuth();

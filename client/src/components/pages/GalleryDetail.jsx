@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { libraryApi } from "../../services/api.js";
-import { makeCompositeKey } from "../../utils/compositeKey.js";
-import { galleryTitle } from "../../utils/gallery.js";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import SceneSearch from "../scene-search/SceneSearch.jsx";
-import WallView from "../wall/WallView.jsx";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
+import { libraryApi } from "../../services/api";
+import { makeCompositeKey } from "../../utils/compositeKey";
+import { galleryTitle } from "../../utils/gallery";
+import { getEntityPath } from "../../utils/entityLinks";
+import SceneSearch from "../scene-search/SceneSearch";
+import WallView from "../wall/WallView";
 import {
   Button,
   FavoriteButton,
@@ -23,8 +23,8 @@ import {
   RatingSlider,
   TabNavigation,
   TagChips,
-} from "../ui/index.js";
-import ViewInStashButton from "../ui/ViewInStashButton.jsx";
+} from "../ui/index";
+import ViewInStashButton from "../ui/ViewInStashButton";
 
 const PER_PAGE = 100;
 

@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
-import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
-import { useCardSelection } from "../../hooks/useCardSelection.js";
-import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav.js";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
+import { useCardSelection } from "../../hooks/useCardSelection";
+import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
 import {
   CardContainer,
   CardDescription,
@@ -10,8 +10,8 @@ import {
   CardMenuRow,
   CardRatingRow,
   CardTitle,
-} from "./CardComponents.jsx";
-import EntityMenu from "./EntityMenu.jsx";
+} from "./CardComponents";
+import EntityMenu from "./EntityMenu";
 
 /**
  * BaseCard - Composable card component that assembles primitives

@@ -1,11 +1,11 @@
 // client/src/components/folder/FolderView.jsx
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getGridClasses } from "../../constants/grids.js";
-import { buildFolderTree } from "../../utils/buildFolderTree.js";
-import FolderCard from "./FolderCard.jsx";
-import FolderBreadcrumb from "./FolderBreadcrumb.jsx";
-import FolderTreeSidebar from "./FolderTreeSidebar.jsx";
+import { getGridClasses } from "../../constants/grids";
+import { buildFolderTree } from "../../utils/buildFolderTree";
+import FolderCard from "./FolderCard";
+import FolderBreadcrumb from "./FolderBreadcrumb";
+import FolderTreeSidebar from "./FolderTreeSidebar";
 
 /**
  * Folder view for browsing content by tag hierarchy.
@@ -20,7 +20,7 @@ const FolderView = ({
   loading = false,
   emptyMessage = "No items found",
   onFolderPathChange, // Callback when folder path changes (for API filtering)
-  filters = null, // eslint-disable-line no-unused-vars -- Not used directly but for API consistency
+  filters = null, // eslint-disable-line @typescript-eslint/no-unused-vars -- Not used directly but for API consistency
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 

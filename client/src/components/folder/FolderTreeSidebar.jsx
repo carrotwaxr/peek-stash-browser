@@ -1,7 +1,7 @@
 // client/src/components/folder/FolderTreeSidebar.jsx
 import { useState, useMemo, useEffect, useRef } from "react";
 import { LucideChevronRight, LucideChevronDown, LucideFolder, LucideFolderOpen } from "lucide-react";
-import { buildTagTree } from "../../utils/buildTagTree.js";
+import { buildTagTree } from "../../utils/buildTagTree";
 
 /**
  * Collapsible tree sidebar for folder view on desktop.

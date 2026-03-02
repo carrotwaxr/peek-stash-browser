@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { RowsPhotoAlbum } from "react-photo-album";
 import "react-photo-album/rows.css";
-import WallItem from "./WallItem.jsx";
-import { wallConfig, ZOOM_LEVELS, DEFAULT_ZOOM } from "./wallConfig.js";
+import WallItem from "./WallItem";
+import { wallConfig, ZOOM_LEVELS, DEFAULT_ZOOM } from "./wallConfig";
 
 /**
  * Justified gallery view using react-photo-album.

@@ -4,8 +4,8 @@ import {
   LucideUser,
   LucideVenus,
 } from "lucide-react";
-import IntersexIcon from "./icons/IntersexIcon.jsx";
-import NonBinaryIcon from "./icons/NonBinaryIcon.jsx";
+import IntersexIcon from "./icons/IntersexIcon";
+import NonBinaryIcon from "./icons/NonBinaryIcon";
 
 /**
  * Reusable gender icon component supporting all Stash gender values

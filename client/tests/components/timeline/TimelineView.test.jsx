@@ -54,7 +54,7 @@ vi.mock("../../../src/components/timeline/TimelineStrip.jsx", () => ({
   ),
 }));
 
-import TimelineView from "../../../src/components/timeline/TimelineView.jsx";
+import TimelineView from "../../../src/components/timeline/TimelineView";
 
 describe("TimelineView", () => {
   const defaultHookReturn = {

@@ -10,7 +10,7 @@ vi.mock("../../../src/services/api.js", () => ({
   forgotPasswordReset: (...args) => mockForgotPasswordReset(...args),
 }));
 
-import ForgotPasswordPage from "../../../src/components/pages/ForgotPasswordPage.jsx";
+import ForgotPasswordPage from "../../../src/components/pages/ForgotPasswordPage";
 
 const renderPage = () => {
   return render(

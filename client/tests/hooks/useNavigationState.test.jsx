@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useNavigationState } from "../../src/hooks/useNavigationState.js";
+import { useNavigationState } from "../../src/hooks/useNavigationState";
 
 // Wrapper to provide router context with location state
 const createWrapper = (initialEntries = ["/"], state = null) => {

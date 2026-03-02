@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import ZoomSlider from "../ui/ZoomSlider.jsx";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import ZoomSlider from "../ui/ZoomSlider";
 import {
   ENTITY_DISPLAY_CONFIG,
   getEntityTypes,
@@ -8,8 +8,8 @@ import {
   getViewModes,
   SETTING_LABELS,
   SETTING_DESCRIPTIONS,
-} from "../../config/entityDisplayConfig.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
+} from "../../config/entityDisplayConfig";
+import { showSuccess, showError } from "../../utils/toast";
 
 const Toggle = ({ label, checked, onChange, description }) => (
   <label className="flex items-start gap-3 cursor-pointer">

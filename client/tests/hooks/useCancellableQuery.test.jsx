@@ -1,12 +1,12 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useCancellableQuery } from "../../src/hooks/useCancellableQuery.js";
+import { useCancellableQuery } from "../../src/hooks/useCancellableQuery";
 
 vi.mock("../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
-import { useAuth } from "../../src/hooks/useAuth.js";
+import { useAuth } from "../../src/hooks/useAuth";
 
 describe("useCancellableQuery", () => {
   beforeEach(() => {

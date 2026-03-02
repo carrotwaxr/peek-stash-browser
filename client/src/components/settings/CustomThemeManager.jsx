@@ -1,10 +1,10 @@
 import { useState } from "react";
 import axios from "axios";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useTheme } from "../../themes/useTheme.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { Button, ConfirmDialog, Paper } from "../ui/index.js";
-import CustomThemeEditor from "./CustomThemeEditor.jsx";
+import { useTheme } from "../../themes/useTheme";
+import { showError, showSuccess } from "../../utils/toast";
+import { Button, ConfirmDialog, Paper } from "../ui/index";
+import CustomThemeEditor from "./CustomThemeEditor";
 
 const api = axios.create({
   baseURL: "/api",

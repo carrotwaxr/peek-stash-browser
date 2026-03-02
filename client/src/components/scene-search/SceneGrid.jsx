@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare, LucideEyeOff, LucidePlus } from "lucide-react";
-import { getGridClasses } from "../../constants/grids.js";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { useHideBulkAction } from "../../hooks/useHideBulkAction.js";
+import { getGridClasses } from "../../constants/grids";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { useHideBulkAction } from "../../hooks/useHideBulkAction";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -14,7 +14,7 @@ import {
   Pagination,
   SceneCard,
   SkeletonSceneCard,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const SceneGrid = ({
   scenes,
@@ -29,10 +29,10 @@ const SceneGrid = ({
   fromPageTitle,
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
-  enableKeyboard = true, // eslint-disable-line no-unused-vars
-  isTVMode = false, // eslint-disable-line no-unused-vars
+  enableKeyboard = true, // eslint-disable-line @typescript-eslint/no-unused-vars
+  isTVMode = false, // eslint-disable-line @typescript-eslint/no-unused-vars
   tvGridZoneActive = false,
-  gridNavigation = null, // eslint-disable-line no-unused-vars
+  gridNavigation = null, // eslint-disable-line @typescript-eslint/no-unused-vars
   gridItemProps = null,
 }) => {
   const gridRef = useRef();

@@ -1,4 +1,4 @@
-import LoadingSpinner from "./LoadingSpinner.jsx";
+import LoadingSpinner from "./LoadingSpinner";
 
 /**
  * Reusable banner component for library sync state

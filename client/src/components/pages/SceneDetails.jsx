@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getClipsForScene } from "../../services/api.js";
-import ClipList from "../clips/ClipList.jsx";
-import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
-import { formatBitRate, formatFileSize } from "../../utils/format.js";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getClipsForScene } from "../../services/api";
+import ClipList from "../clips/ClipList";
+import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
+import { formatBitRate, formatFileSize } from "../../utils/format";
+import { getEntityPath } from "../../utils/entityLinks";
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";

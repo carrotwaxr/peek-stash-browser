@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
-import SceneGrid from "../scene-search/SceneGrid.jsx";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useTVMode } from "../../hooks/useTVMode";
+import SceneGrid from "../scene-search/SceneGrid";
 import { Info } from "lucide-react";
 import {
   SyncProgressBanner,
@@ -12,7 +12,7 @@ import {
   PageLayout,
   Pagination,
   Tooltip,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const RecommendationInfoContent = () => (
   <div className="text-sm max-w-sm">

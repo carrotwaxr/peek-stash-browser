@@ -1,4 +1,4 @@
-import { GridLayout } from './layouts/GridLayout.jsx';
+import { GridLayout } from './layouts/GridLayout';
 
 /**
  * LayoutRenderer - Pluggable layout system

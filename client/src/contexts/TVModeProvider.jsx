@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TVModeContext } from "./TVModeContext.js";
+import { TVModeContext } from "./TVModeContext";
 
 export const TVModeProvider = ({ children }) => {
   const [isTVMode, setIsTVMode] = useState(() => {

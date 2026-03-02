@@ -8,10 +8,10 @@ import {
   Repeat1,
   Shuffle,
 } from "lucide-react";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
-import { getSceneTitle } from "../../utils/format.js";
-import { Button } from "../ui/index.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
+import { getSceneTitle } from "../../utils/format";
+import { Button } from "../ui/index";
 
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist

@@ -3,7 +3,7 @@
  * Single source of truth for icons representing entity types throughout the app.
  *
  * Usage:
- *   import { ENTITY_ICONS, getEntityIcon } from "../constants/entityIcons.js";
+ *   import { ENTITY_ICONS, getEntityIcon } from "../constants/entityIcons";
  *
  *   // Get icon component directly
  *   const SceneIcon = ENTITY_ICONS.scene;

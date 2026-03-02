@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { StudioCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { StudioCard } from "../cards/index";
 
 /**
  * StudioGrid - Grid for displaying studios with search and filtering

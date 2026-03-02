@@ -10,7 +10,7 @@ import {
   cmToInches,
   inchesToCm,
   formatLength,
-} from "../../src/utils/unitConversions.js";
+} from "../../src/utils/unitConversions";
 
 describe("unitConversions", () => {
   describe("UNITS constant", () => {

@@ -1,6 +1,6 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useUserStats } from "../../src/hooks/useUserStats.js";
+import { useUserStats } from "../../src/hooks/useUserStats";
 
 vi.mock("../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
@@ -10,8 +10,8 @@ vi.mock("../../src/services/api.js", () => ({
   apiGet: vi.fn(),
 }));
 
-import { useAuth } from "../../src/hooks/useAuth.js";
-import { apiGet } from "../../src/services/api.js";
+import { useAuth } from "../../src/hooks/useAuth";
+import { apiGet } from "../../src/services/api";
 
 describe("useUserStats", () => {
   const mockStats = {

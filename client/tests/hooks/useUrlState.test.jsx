@@ -2,7 +2,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useUrlState } from "../../src/hooks/useUrlState.js";
+import { useUrlState } from "../../src/hooks/useUrlState";
 
 // Wrapper to provide router context
 const createWrapper = (initialEntries = ["/"]) => {

@@ -1,15 +1,15 @@
  
 import { useState, useEffect } from "react";
 import { User, X, Shield, Users, Key, Trash2, Lock } from "lucide-react";
-import { Button, Paper } from "../ui/index.js";
-import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../services/api.js";
-import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
+import { Button, Paper } from "../ui/index";
+import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../services/api";
+import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
  * This is separated to ensure hooks are always called (user is guaranteed to exist)
  */
-/* eslint-disable no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 const UserEditModalContent = ({
   user,
   groups = [],
@@ -30,7 +30,7 @@ const UserEditModalContent = ({
   const [role, setRole] = useState(user.role || "USER");
   const [userGroups, setUserGroups] = useState([]);
   const [permissions, setPermissions] = useState(null);
-  /* eslint-enable no-unused-vars */
+   
 
   // Password reset state
   const [showPasswordReset, setShowPasswordReset] = useState(false);

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CardStatusIcons } from "../ui/index.js";
+import { CardStatusIcons } from "../ui/index";
 
 /**
  * Scene stats: o counter, play count, organized, resolution, file size

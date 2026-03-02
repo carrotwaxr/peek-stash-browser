@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import FavoriteButton from "./FavoriteButton.jsx";
-import OCounterButton from "./OCounterButton.jsx";
-import RatingBadge from "./RatingBadge.jsx";
-import RatingSliderDialog from "./RatingSliderDialog.jsx";
-import SectionLink from "./SectionLink.jsx";
-import TagChips from "./TagChips.jsx";
+import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import FavoriteButton from "./FavoriteButton";
+import OCounterButton from "./OCounterButton";
+import RatingBadge from "./RatingBadge";
+import RatingSliderDialog from "./RatingSliderDialog";
+import SectionLink from "./SectionLink";
+import TagChips from "./TagChips";
 
 /**
  * Adaptive metadata drawer that opens on the longer viewport axis:

@@ -1,7 +1,7 @@
 import { useRef } from "react";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import ClipSearch from "../clip-search/ClipSearch.jsx";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import ClipSearch from "../clip-search/ClipSearch";
 
 const Clips = () => {
   usePageTitle("Clips");

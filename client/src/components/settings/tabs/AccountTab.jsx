@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Copy, RefreshCw, Eye, EyeOff } from "lucide-react";
-import { showError, showSuccess } from "../../../utils/toast.jsx";
-import { Button } from "../../ui/index.js";
-import { getRecoveryKey, regenerateRecoveryKey } from "../../../services/api.js";
+import { showError, showSuccess } from "../../../utils/toast";
+import { Button } from "../../ui/index";
+import { getRecoveryKey, regenerateRecoveryKey } from "../../../services/api";
 
 const api = axios.create({
   baseURL: "/api",

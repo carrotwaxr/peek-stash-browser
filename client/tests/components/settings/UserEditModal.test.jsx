@@ -36,7 +36,7 @@ vi.mock("../../../src/services/api.js", () => ({
 }));
 
 // Import component after mocks
-import UserEditModal from "../../../src/components/settings/UserEditModal.jsx";
+import UserEditModal from "../../../src/components/settings/UserEditModal";
 
 describe("UserEditModal", () => {
   const mockUser = {

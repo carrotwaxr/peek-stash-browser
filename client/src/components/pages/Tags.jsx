@@ -1,26 +1,26 @@
 // client/src/components/pages/Tags.jsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getGridClasses } from "../../constants/grids.js";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
-import { useTableColumns } from "../../hooks/useTableColumns.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { libraryApi } from "../../services/api.js";
-import { TagCard } from "../cards/index.js";
-import { TagHierarchyView } from "../tags/index.js";
+import { getGridClasses } from "../../constants/grids";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { libraryApi } from "../../services/api";
+import { TagCard } from "../cards/index";
+import { TagHierarchyView } from "../tags/index";
 import {
   SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
-} from "../ui/index.js";
-import { TableView, ColumnConfigPopover } from "../table/index.js";
+} from "../ui/index";
+import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes for Tags page
 const VIEW_MODES = [

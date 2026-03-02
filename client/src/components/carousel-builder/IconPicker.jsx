@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as LucideIcons from "lucide-react";
 import { Search, X } from "lucide-react";
-import { CAROUSEL_ICONS } from "./carouselIcons.js";
+import { CAROUSEL_ICONS } from "./carouselIcons";
 
 /**
  * IconPicker Component

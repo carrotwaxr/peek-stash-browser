@@ -6,9 +6,9 @@ import {
   LucideSave,
   LucideTrash2,
 } from "lucide-react";
-import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api.js";
-import Button from "./Button.jsx";
-import { ErrorMessage, InfoMessage, SuccessMessage } from "./index.js";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api";
+import Button from "./Button";
+import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 
 // Helper to get context label for UI
 const getContextLabel = (ctx) => {

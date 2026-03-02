@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import Button from "./Button.jsx";
-import SceneCard from "./SceneCard.jsx";
-import SkeletonSceneCard from "./SkeletonSceneCard.jsx";
+import Button from "./Button";
+import SceneCard from "./SceneCard";
+import SkeletonSceneCard from "./SkeletonSceneCard";
 
 const SceneCarousel = ({
   title,

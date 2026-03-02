@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, apiPost } from "../services/api.js";
-import { useAuth } from "./useAuth.js";
+import { apiGet, apiPost } from "../services/api";
+import { useAuth } from "./useAuth";
 
 /**
  * Hook for watch history state and O counter
@@ -15,7 +15,7 @@ import { useAuth } from "./useAuth.js";
  * @param {Object} playerRef - React ref to Video.js player instance (unused, kept for API compat)
  * @returns {Object} Watch history state and methods
  */
-export function useWatchHistory(sceneId, _playerRef = { current: null }) { // eslint-disable-line no-unused-vars
+export function useWatchHistory(sceneId, _playerRef = { current: null }) {  
   const { isAuthenticated } = useAuth();
   const [watchHistory, setWatchHistory] = useState(null);
   const [loading, setLoading] = useState(true);

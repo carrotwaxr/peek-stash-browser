@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useKeyboardShortcuts } from "./useKeyboardShortcuts.js";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 /**
  * Hook for global navigation keyboard shortcuts (Stash-style)

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { Clock, Cpu, Database, HardDrive, RefreshCw, Film } from "lucide-react";
-import { Button, Paper } from "../ui/index.js";
-import { useAuth } from "../../hooks/useAuth.js";
+import { Button, Paper } from "../ui/index";
+import { useAuth } from "../../hooks/useAuth";
 
 const api = axios.create({
   baseURL: "/api",

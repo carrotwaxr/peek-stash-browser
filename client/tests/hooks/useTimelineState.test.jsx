@@ -1,13 +1,13 @@
 // client/tests/hooks/useTimelineState.test.jsx
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useTimelineState } from "../../src/components/timeline/useTimelineState.js";
+import { useTimelineState } from "../../src/components/timeline/useTimelineState";
 
 vi.mock("../../src/services/api.js", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api.js";
+import { apiGet } from "../../src/services/api";
 
 describe("useTimelineState", () => {
   beforeEach(() => {

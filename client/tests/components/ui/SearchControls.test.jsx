@@ -11,7 +11,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import SearchControls from "../../../src/components/ui/SearchControls.jsx";
+import SearchControls from "../../../src/components/ui/SearchControls";
 
 // Create a mock state object that can be manipulated per test
 let mockFilterState = {};

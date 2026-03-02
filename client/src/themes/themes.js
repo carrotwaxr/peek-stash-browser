@@ -6,7 +6,7 @@ import {
   generateStatusColors,
   generateTextScale,
   generateToastColors,
-} from "../utils/colorScale.js";
+} from "../utils/colorScale";
 
 export const generateThemeCSSVars = (config) => {
   // Calculate tertiary as lighter/darker than card for skeleton placeholder contrast

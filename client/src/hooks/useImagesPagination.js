@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePaginatedLightbox } from "./usePaginatedLightbox.js";
+import { usePaginatedLightbox } from "./usePaginatedLightbox";
 
 /**
  * Hook for managing paginated images with lightbox support.

@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { PerformerCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { PerformerCard } from "../cards/index";
 
 /**
  * PerformerGrid - Grid for displaying performers with search and filtering

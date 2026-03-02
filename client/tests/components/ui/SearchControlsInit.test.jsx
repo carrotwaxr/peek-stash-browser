@@ -12,7 +12,7 @@
 import { render, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import SearchControls from "../../../src/components/ui/SearchControls.jsx";
+import SearchControls from "../../../src/components/ui/SearchControls";
 
 // Track the mock state that useFilterState will return
 let mockFilterState = {};

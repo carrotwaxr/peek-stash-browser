@@ -1,7 +1,7 @@
 // client/tests/hooks/useMediaQuery.test.js
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useMediaQuery } from "../../src/hooks/useMediaQuery.js";
+import { useMediaQuery } from "../../src/hooks/useMediaQuery";
 
 describe("useMediaQuery", () => {
   let matchMediaMock;

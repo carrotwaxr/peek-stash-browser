@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { setupApi } from "../../services/api.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useTheme } from "../../themes/useTheme.js";
-import { Button } from "../ui/index.js";
+import { setupApi } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
+import { useTheme } from "../../themes/useTheme";
+import { Button } from "../ui/index";
 
 // Step 1: Welcome screen - defined outside to avoid recreation on re-render
 const WelcomeStep = ({ theme, onNext }) => (

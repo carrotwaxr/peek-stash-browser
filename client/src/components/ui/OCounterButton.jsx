@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { LucideDroplets } from "lucide-react";
-import { apiPost } from "../../services/api.js";
+import { apiPost } from "../../services/api";
 
 /**
  * Interactive O Counter button component

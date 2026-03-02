@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { getOrderedNavItems } from "../../constants/navigation.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { useScrollDirection } from "../../hooks/useScrollDirection.js";
-import { PeekLogo } from "../branding/PeekLogo.jsx";
-import { ThemedIcon } from "../icons/index.js";
-import Button from "./Button.jsx";
-import HelpModal from "./HelpModal.jsx";
-import UserMenu from "./UserMenu.jsx";
+import { getOrderedNavItems } from "../../constants/navigation";
+import { useAuth } from "../../hooks/useAuth";
+import { useScrollDirection } from "../../hooks/useScrollDirection";
+import { PeekLogo } from "../branding/PeekLogo";
+import { ThemedIcon } from "../icons/index";
+import Button from "./Button";
+import HelpModal from "./HelpModal";
+import UserMenu from "./UserMenu";
 
 const Navigation = ({ navPreferences = [] }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

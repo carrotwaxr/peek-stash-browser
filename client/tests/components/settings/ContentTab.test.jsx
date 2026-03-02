@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import ContentTab from "../../../src/components/settings/tabs/ContentTab.jsx";
+import ContentTab from "../../../src/components/settings/tabs/ContentTab";
 
 // Mock hooks and API
 vi.mock("../../../src/hooks/useHiddenEntities.js", () => ({
@@ -16,7 +16,7 @@ vi.mock("../../../src/services/api.js", () => ({
   apiPut: vi.fn(),
 }));
 
-import { apiGet } from "../../../src/services/api.js";
+import { apiGet } from "../../../src/services/api";
 
 describe("ContentTab", () => {
   beforeEach(() => {

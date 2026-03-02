@@ -3,7 +3,7 @@ import {
   getColumnsForEntity,
   getDefaultVisibleColumns,
   getDefaultColumnOrder,
-} from "../config/tableColumns.js";
+} from "../config/tableColumns";
 
 /**
  * Hook for managing table column visibility and order with a three-tier preference system:

@@ -1,29 +1,29 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getGridClasses } from "../../constants/grids.js";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
-import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
-import { useWallPlayback } from "../../hooks/useWallPlayback.js";
-import { useTableColumns } from "../../hooks/useTableColumns.js";
-import { libraryApi } from "../../services/api.js";
-import { ImageCard } from "../cards/index.js";
+import { getGridClasses } from "../../constants/grids";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { libraryApi } from "../../services/api";
+import { ImageCard } from "../cards/index";
 import {
   SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
-} from "../ui/index.js";
-import Lightbox from "../ui/Lightbox.jsx";
-import WallView from "../wall/WallView.jsx";
-import TimelineView from "../timeline/TimelineView.jsx";
-import { TableView, ColumnConfigPopover } from "../table/index.js";
-import { FolderView } from "../folder/index.js";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
+} from "../ui/index";
+import Lightbox from "../ui/Lightbox";
+import WallView from "../wall/WallView";
+import TimelineView from "../timeline/TimelineView";
+import { TableView, ColumnConfigPopover } from "../table/index";
+import { FolderView } from "../folder/index";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for images page
 const VIEW_MODES = [

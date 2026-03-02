@@ -1,7 +1,7 @@
 // client/src/components/folder/FolderCard.jsx
 import { Folder } from "lucide-react";
-import { ENTITY_ICONS } from "../../constants/entityIcons.js";
-import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree.js";
+import { ENTITY_ICONS } from "../../constants/entityIcons";
+import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree";
 
 /**
  * Card component for displaying a folder (tag) in folder view.

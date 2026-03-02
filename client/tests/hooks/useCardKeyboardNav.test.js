@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { useCardKeyboardNav } from "../../src/hooks/useCardKeyboardNav.js";
+import { useCardKeyboardNav } from "../../src/hooks/useCardKeyboardNav";
 import { useNavigate } from "react-router-dom";
 
 vi.mock("react-router-dom", () => ({

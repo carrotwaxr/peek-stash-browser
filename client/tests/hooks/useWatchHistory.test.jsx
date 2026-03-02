@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   useWatchHistory,
   useAllWatchHistory,
-} from "../../src/hooks/useWatchHistory.js";
+} from "../../src/hooks/useWatchHistory";
 
 vi.mock("../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
@@ -14,8 +14,8 @@ vi.mock("../../src/services/api.js", () => ({
   apiPost: vi.fn(),
 }));
 
-import { useAuth } from "../../src/hooks/useAuth.js";
-import { apiGet, apiPost } from "../../src/services/api.js";
+import { useAuth } from "../../src/hooks/useAuth";
+import { apiGet, apiPost } from "../../src/services/api";
 
 describe("useWatchHistory", () => {
   beforeEach(() => {

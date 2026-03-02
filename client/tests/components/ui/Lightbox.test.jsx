@@ -1,7 +1,7 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Lightbox from "../../../src/components/ui/Lightbox.jsx";
+import Lightbox from "../../../src/components/ui/Lightbox";
 
 // Mock the API
 vi.mock("../../../services/api.js", () => ({

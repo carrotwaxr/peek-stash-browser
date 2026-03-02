@@ -4,9 +4,9 @@ import {
   ChevronsDownUp as LucideChevronsDownUp,
   ChevronsUpDown as LucideChevronsUpDown,
 } from "lucide-react";
-import { buildTagTree } from "../../utils/buildTagTree.js";
-import TagTreeNode from "./TagTreeNode.jsx";
-import Button from "../ui/Button.jsx";
+import { buildTagTree } from "../../utils/buildTagTree";
+import TagTreeNode from "./TagTreeNode";
+import Button from "../ui/Button";
 
 /**
  * Hierarchy view for tags - displays tags as an expandable tree.

@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid.jsx";
-import { TagCard } from "../cards/index.js";
+import { SearchableGrid } from "../ui/SearchableGrid";
+import { TagCard } from "../cards/index";
 
 /**
  * TagGrid - Grid for displaying tags with search and filtering

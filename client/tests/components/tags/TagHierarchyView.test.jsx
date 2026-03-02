@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import TagHierarchyView from "../../../src/components/tags/TagHierarchyView.jsx";
+import TagHierarchyView from "../../../src/components/tags/TagHierarchyView";
 
 // Wrapper to provide router context
 const renderWithRouter = (ui) => {

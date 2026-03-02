@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { apiGet, apiPost, apiDelete } from "../../services/api.js";
-import { Button, PageHeader, PageLayout } from "../ui/index.js";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { showError, showSuccess } from "../../utils/toast";
+import { apiGet, apiPost, apiDelete } from "../../services/api";
+import { Button, PageHeader, PageLayout } from "../ui/index";
 
 /**
  * Format bytes to human readable string

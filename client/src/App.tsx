@@ -1,54 +1,54 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import Login from "./components/pages/Login.jsx";
-import ForgotPasswordPage from "./components/pages/ForgotPasswordPage.jsx";
-import SetupWizard from "./components/pages/SetupWizard.jsx";
-import { GlobalLayout } from "./components/ui/index.js";
-import { AuthProvider } from "./contexts/AuthContext.jsx";
-import { ConfigProvider } from "./contexts/ConfigContext.jsx";
-import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
-import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider.jsx";
-import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext.jsx";
-import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards.jsx";
-import { setupApi } from "./services/api.js";
-import { ThemeProvider } from "./themes/ThemeProvider.jsx";
+import Login from "./components/pages/Login";
+import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
+import SetupWizard from "./components/pages/SetupWizard";
+import { GlobalLayout } from "./components/ui/index";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ConfigProvider } from "./contexts/ConfigContext";
+import { TVModeProvider } from "./contexts/TVModeProvider";
+import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider";
+import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
+import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards";
+import { setupApi } from "./services/api";
+import { ThemeProvider } from "./themes/ThemeProvider";
 import "./themes/base.css";
 
 // Lazy load page components for code splitting
-const Home = lazy(() => import("./components/pages/Home.jsx"));
-const Scenes = lazy(() => import("./components/pages/Scenes.jsx"));
-const Recommended = lazy(() => import("./components/pages/Recommended.jsx"));
-const Performers = lazy(() => import("./components/pages/Performers.jsx"));
-const Studios = lazy(() => import("./components/pages/Studios.jsx"));
-const Tags = lazy(() => import("./components/pages/Tags.jsx"));
-const Groups = lazy(() => import("./components/pages/Groups.jsx"));
-const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
-const Images = lazy(() => import("./components/pages/Images.jsx"));
+const Home = lazy(() => import("./components/pages/Home"));
+const Scenes = lazy(() => import("./components/pages/Scenes"));
+const Recommended = lazy(() => import("./components/pages/Recommended"));
+const Performers = lazy(() => import("./components/pages/Performers"));
+const Studios = lazy(() => import("./components/pages/Studios"));
+const Tags = lazy(() => import("./components/pages/Tags"));
+const Groups = lazy(() => import("./components/pages/Groups"));
+const Galleries = lazy(() => import("./components/pages/Galleries"));
+const Images = lazy(() => import("./components/pages/Images"));
 const GalleryDetail = lazy(
-  () => import("./components/pages/GalleryDetail.jsx")
+  () => import("./components/pages/GalleryDetail")
 );
-const GroupDetail = lazy(() => import("./components/pages/GroupDetail.jsx"));
-const Scene = lazy(() => import("./components/pages/Scene.jsx"));
+const GroupDetail = lazy(() => import("./components/pages/GroupDetail"));
+const Scene = lazy(() => import("./components/pages/Scene"));
 const PerformerDetail = lazy(
-  () => import("./components/pages/PerformerDetail.jsx")
+  () => import("./components/pages/PerformerDetail")
 );
-const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
-const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
-const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
+const StudioDetail = lazy(() => import("./components/pages/StudioDetail"));
+const TagDetail = lazy(() => import("./components/pages/TagDetail"));
+const Playlists = lazy(() => import("./components/pages/Playlists"));
 const PlaylistDetail = lazy(
-  () => import("./components/pages/PlaylistDetail.jsx")
+  () => import("./components/pages/PlaylistDetail")
 );
-const SettingsPage = lazy(() => import("./components/pages/SettingsPage.jsx"));
-const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
-const UserStats = lazy(() => import("./components/pages/UserStats/index.js"));
+const SettingsPage = lazy(() => import("./components/pages/SettingsPage"));
+const WatchHistory = lazy(() => import("./components/pages/WatchHistory"));
+const UserStats = lazy(() => import("./components/pages/UserStats"));
 const HiddenItemsPage = lazy(
-  () => import("./components/pages/HiddenItemsPage.jsx")
+  () => import("./components/pages/HiddenItemsPage")
 );
-const Downloads = lazy(() => import("./components/pages/Downloads.jsx"));
-const Clips = lazy(() => import("./components/pages/Clips.jsx"));
+const Downloads = lazy(() => import("./components/pages/Downloads"));
+const Clips = lazy(() => import("./components/pages/Clips"));
 const CarouselBuilder = lazy(
-  () => import("./components/carousel-builder/CarouselBuilder.jsx")
+  () => import("./components/carousel-builder/CarouselBuilder")
 );
 
 // Loading fallback component

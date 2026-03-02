@@ -21,15 +21,15 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
-import { apiPost, duplicatePlaylist, getMyPermissions } from "../../services/api.js";
-import SharePlaylistModal from "../playlists/SharePlaylistModal.jsx";
-import { getSceneTitle } from "../../utils/format.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { ThemedIcon } from "../icons/index.js";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { apiPost, duplicatePlaylist, getMyPermissions } from "../../services/api";
+import SharePlaylistModal from "../playlists/SharePlaylistModal";
+import { getSceneTitle } from "../../utils/format";
+import { showError, showSuccess } from "../../utils/toast";
+import { ThemedIcon } from "../icons/index";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -39,7 +39,7 @@ import {
   PageLayout,
   Paper,
   SceneListItem,
-} from "../ui/index.js";
+} from "../ui/index";
 
 const api = axios.create({
   baseURL: "/api",

@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
-import { useAuth } from "../../hooks/useAuth.js";
-import { libraryApi } from "../../services/api.js";
-import SearchResults from "./SearchResults.jsx";
-import SearchControls from "./SearchControls.jsx";
+import { useAuth } from "../../hooks/useAuth";
+import { libraryApi } from "../../services/api";
+import SearchResults from "./SearchResults";
+import SearchControls from "./SearchControls";
 
 /**
  * SearchableGrid - SearchResults with integrated search controls and data fetching
@@ -28,7 +28,7 @@ export const SearchableGrid = ({
   hideLockedFilters = false,
   renderItem,
   defaultSort = "name",
-  // eslint-disable-next-line no-unused-vars
+   
   defaultFilters: _defaultFilters = {},
   onResultsChange,
   emptyMessage,

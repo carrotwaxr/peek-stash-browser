@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks.js";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 
 /**
  * Individual item in the WallView with hover overlay and optional video preview.

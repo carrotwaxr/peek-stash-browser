@@ -1,5 +1,5 @@
-import { useFocusTrap } from "../../hooks/useFocusTrap.js";
-import Button from "./Button.jsx";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+import Button from "./Button";
 
 /**
  * Reusable confirmation dialog component

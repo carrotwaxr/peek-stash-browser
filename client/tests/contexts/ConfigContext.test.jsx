@@ -8,11 +8,11 @@ vi.mock("../../src/services/api.js", () => ({
   },
 }));
 
-import { setupApi } from "../../src/services/api.js";
+import { setupApi } from "../../src/services/api";
 import {
   ConfigProvider,
   useConfig,
-} from "../../src/contexts/ConfigContext.jsx";
+} from "../../src/contexts/ConfigContext";
 
 /**
  * Helper component that renders config values as text for assertion.

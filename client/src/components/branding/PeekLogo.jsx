@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth.js";
-import { getLandingPage } from "../../constants/navigation.js";
+import { useAuth } from "../../hooks/useAuth";
+import { getLandingPage } from "../../constants/navigation";
 
 export const PeekLogo = ({
   size = "default", // 'small', 'default', 'large'

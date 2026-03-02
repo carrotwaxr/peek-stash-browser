@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as LucideIcons from "lucide-react";
-import IconPicker from "./IconPicker.jsx";
+import IconPicker from "./IconPicker";
 
 /**
  * IconPickerButton Component

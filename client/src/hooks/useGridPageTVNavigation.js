@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useTVMode } from "./useTVMode.js";
-import { useTVNavigation } from "./useTVNavigation.js";
-import { useSpatialNavigation } from "./useSpatialNavigation.js";
+import { useTVMode } from "./useTVMode";
+import { useTVNavigation } from "./useTVNavigation";
+import { useSpatialNavigation } from "./useSpatialNavigation";
 
 /**
  * Shared TV navigation logic for grid pages (Performers, Scenes, Studios, etc.)

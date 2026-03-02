@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useKeyboardShortcuts } from "./useKeyboardShortcuts.js";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 /**
  * Global rating mode state - shared across hooks

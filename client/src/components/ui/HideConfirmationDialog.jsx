@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ConfirmDialog from "./ConfirmDialog.jsx";
+import ConfirmDialog from "./ConfirmDialog";
 
 /**
  * HideConfirmationDialog - Confirms hiding an entity with "don't ask again" option

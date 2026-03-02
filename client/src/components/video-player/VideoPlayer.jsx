@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import "video.js/dist/video-js.css";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
-import { useWatchHistory } from "../../hooks/useWatchHistory.js";
-import { getClipsForScene } from "../../services/api.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
+import { useWatchHistory } from "../../hooks/useWatchHistory";
+import { getClipsForScene } from "../../services/api";
 import "./VideoPlayer.css";
-import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
-import { useVideoPlayer } from "./useVideoPlayer.js";
+import { useOrientationFullscreen } from "./useOrientationFullscreen";
+import { useVideoPlayer } from "./useVideoPlayer";
 
 const api = axios.create({
   baseURL: "/api",

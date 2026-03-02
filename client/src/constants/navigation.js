@@ -1,4 +1,4 @@
-import { ENTITY_ICON_NAMES } from "./entityIcons.js";
+import { ENTITY_ICON_NAMES } from "./entityIcons";
 
 /**
  * Navigation item definitions with stable keys

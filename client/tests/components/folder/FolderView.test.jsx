@@ -2,7 +2,7 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
-import FolderView from "../../../src/components/folder/FolderView.jsx";
+import FolderView from "../../../src/components/folder/FolderView";
 
 // Helper to capture URL search params
 let capturedSearchParams = null;

@@ -1,8 +1,8 @@
 // client/src/components/pages/UserStats/components/HighlightCard.jsx
 
 import { Link } from "react-router-dom";
-import { Paper } from "../../../ui/index.js";
-import { getFilenameFromPath } from "../../../../utils/format.js";
+import { Paper } from "../../../ui/index";
+import { getFilenameFromPath } from "../../../../utils/format";
 
 /**
  * Get display name for highlight item

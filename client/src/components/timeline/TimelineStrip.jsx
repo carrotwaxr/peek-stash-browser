@@ -1,7 +1,7 @@
 // client/src/components/timeline/TimelineStrip.jsx
 import { memo, useRef, useState, useCallback, useEffect, useMemo } from "react";
-import TimelineBar from "./TimelineBar.jsx";
-import TimelineEdgeNav from "./TimelineEdgeNav.jsx";
+import TimelineBar from "./TimelineBar";
+import TimelineEdgeNav from "./TimelineEdgeNav";
 import { format, parse } from "date-fns";
 
 // Extract context (year, month) from period for marker detection

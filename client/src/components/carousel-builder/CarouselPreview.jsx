@@ -1,6 +1,6 @@
 import { AlertCircle, Eye, Loader2, ImageOff } from "lucide-react";
-import { getSceneTitle } from "../../utils/format.js";
-import { useLazyLoad } from "../ui/CardComponents.jsx";
+import { getSceneTitle } from "../../utils/format";
+import { useLazyLoad } from "../ui/CardComponents";
 
 /**
  * CarouselPreview Component

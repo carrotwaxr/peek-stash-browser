@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useImagesPagination } from "../../hooks/useImagesPagination.js";
-import { useNavigationState } from "../../hooks/useNavigationState.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions.js";
-import { libraryApi } from "../../services/api.js";
-import { makeCompositeKey } from "../../utils/compositeKey.js";
-import SceneSearch from "../scene-search/SceneSearch.jsx";
+import { useImagesPagination } from "../../hooks/useImagesPagination";
+import { useNavigationState } from "../../hooks/useNavigationState";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions";
+import { libraryApi } from "../../services/api";
+import { makeCompositeKey } from "../../utils/compositeKey";
+import SceneSearch from "../scene-search/SceneSearch";
 import {
   Button,
   FavoriteButton,
@@ -23,9 +23,9 @@ import {
   SectionLink,
   TabNavigation,
   TagChips,
-} from "../ui/index.js";
-import { GalleryGrid, GroupGrid } from "../grids/index.js";
-import ViewInStashButton from "../ui/ViewInStashButton.jsx";
+} from "../ui/index";
+import { GalleryGrid, GroupGrid } from "../grids/index";
+import ViewInStashButton from "../ui/ViewInStashButton";
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
@@ -473,7 +473,7 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer, performerId: _performerId }) => { // eslint-disable-line no-unused-vars
+const PerformerStats = ({ performer, performerId: _performerId }) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { apiGet } from "../services/api.js";
-import { parseSearchParams, buildSearchParams } from "../utils/urlParams.js";
+import { apiGet } from "../services/api";
+import { parseSearchParams, buildSearchParams } from "../utils/urlParams";
 
 /**
  * High-level hook for filter state management with URL sync and presets.

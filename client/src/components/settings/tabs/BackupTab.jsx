@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Trash2 } from "lucide-react";
-import { showError, showSuccess } from "../../../utils/toast.jsx";
-import { Button } from "../../ui/index.js";
+import { showError, showSuccess } from "../../../utils/toast";
+import { Button } from "../../ui/index";
 
 const api = axios.create({
   baseURL: "/api",

@@ -9,9 +9,9 @@ import {
   Repeat1,
   Shuffle,
 } from "lucide-react";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
-import { Button, useLazyLoad } from "../ui/index.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
+import { Button, useLazyLoad } from "../ui/index";
 
 /**
  * PlaylistSidebar - Vertical playlist controls optimized for sidebar display

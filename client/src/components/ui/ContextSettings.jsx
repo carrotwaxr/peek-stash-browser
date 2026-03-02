@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideSettings } from "lucide-react";
 import axios from "axios";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { showError, showSuccess } from "../../utils/toast";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import {
   getAvailableSettings,
   getViewModes,
   SETTING_LABELS,
-} from "../../config/entityDisplayConfig.js";
-import ZoomSlider from "./ZoomSlider.jsx";
+} from "../../config/entityDisplayConfig";
+import ZoomSlider from "./ZoomSlider";
 
 const api = axios.create({
   baseURL: "/api",

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Share2 } from "lucide-react";
-import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../services/api.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
-import { Button, Paper } from "../ui/index.js";
+import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../services/api";
+import { showError, showSuccess } from "../../utils/toast";
+import { Button, Paper } from "../ui/index";
 
 const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
   const [loading, setLoading] = useState(true);

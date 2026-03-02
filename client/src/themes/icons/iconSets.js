@@ -5,8 +5,8 @@
 // NOTE: App icons are defined in constants/appIcons.js for features, actions, etc.
 // This file provides theme-specific overrides and can extend icons per theme.
 
-import { ENTITY_ICON_NAMES } from "../../constants/entityIcons.js";
-import { FEATURE_ICONS, ACTION_ICONS, NAV_ICONS, UI_ICONS, BRAND_ICONS } from "../../constants/appIcons.js";
+import { ENTITY_ICON_NAMES } from "../../constants/entityIcons";
+import { FEATURE_ICONS, ACTION_ICONS, NAV_ICONS, UI_ICONS, BRAND_ICONS } from "../../constants/appIcons";
 
 const iconSets = {
   peek: {

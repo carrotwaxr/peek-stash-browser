@@ -1,7 +1,7 @@
 // client/src/hooks/__tests__/useCardSelection.test.js
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useCardSelection } from "../../src/hooks/useCardSelection.js";
+import { useCardSelection } from "../../src/hooks/useCardSelection";
 
 describe("useCardSelection", () => {
   beforeEach(() => {

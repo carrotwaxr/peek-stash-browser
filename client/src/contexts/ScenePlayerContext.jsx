@@ -6,9 +6,9 @@ import {
   useReducer,
 } from "react";
 import axios from "axios";
-import { initialState, scenePlayerReducer } from "./scenePlayerReducer.js";
-import { useConfig } from "./ConfigContext.jsx";
-import { getEntityPath } from "../utils/entityLinks.js";
+import { initialState, scenePlayerReducer } from "./scenePlayerReducer";
+import { useConfig } from "./ConfigContext";
+import { getEntityPath } from "../utils/entityLinks";
 
 const api = axios.create({
   baseURL: "/api",
