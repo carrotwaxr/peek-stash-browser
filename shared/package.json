@@ -12,6 +12,58 @@
     "./*.js": {
       "types": "./dist/*.d.ts",
       "default": "./types/*.ts"
+    },
+    "./instanceAwareId.js": {
+      "types": "./dist/instanceAwareId.d.ts",
+      "default": "./types/instanceAwareId.ts"
+    },
+    "./api/clips.js": {
+      "types": "./dist/api/clips.d.ts",
+      "default": "./types/api/clips.ts"
+    },
+    "./api/common.js": {
+      "types": "./dist/api/common.d.ts",
+      "default": "./types/api/common.ts"
+    },
+    "./api/download.js": {
+      "types": "./dist/api/download.d.ts",
+      "default": "./types/api/download.ts"
+    },
+    "./api/groups.js": {
+      "types": "./dist/api/groups.d.ts",
+      "default": "./types/api/groups.ts"
+    },
+    "./api/imageViewHistory.js": {
+      "types": "./dist/api/imageViewHistory.d.ts",
+      "default": "./types/api/imageViewHistory.ts"
+    },
+    "./api/ratings.js": {
+      "types": "./dist/api/ratings.d.ts",
+      "default": "./types/api/ratings.ts"
+    },
+    "./api/setup.js": {
+      "types": "./dist/api/setup.d.ts",
+      "default": "./types/api/setup.ts"
+    },
+    "./api/stats.js": {
+      "types": "./dist/api/stats.d.ts",
+      "default": "./types/api/stats.ts"
+    },
+    "./api/timeline.js": {
+      "types": "./dist/api/timeline.d.ts",
+      "default": "./types/api/timeline.ts"
+    },
+    "./api/user.js": {
+      "types": "./dist/api/user.d.ts",
+      "default": "./types/api/user.ts"
+    },
+    "./api/userStats.js": {
+      "types": "./dist/api/userStats.d.ts",
+      "default": "./types/api/userStats.ts"
+    },
+    "./api/watchHistory.js": {
+      "types": "./dist/api/watchHistory.d.ts",
+      "default": "./types/api/watchHistory.ts"
     }
   },
   "scripts": {
