@@ -47,16 +47,16 @@ const RecommendationInfoContent = () => (
 const Recommended = () => {
   usePageTitle("Recommended");
   const [searchParams, setSearchParams] = useSearchParams();
-  const pageRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const { isTVMode } = useTVMode();
 
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<{ message: string; errorType: string | null } | null>(null);
   const [totalCount, setTotalCount] = useState(0);
-  const [message, setMessage] = useState(null);
-  const [initMessage, setInitMessage] = useState(null);
-  const [criteria, setCriteria] = useState(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [initMessage, setInitMessage] = useState<string | null>(null);
+  const [criteria, setCriteria] = useState<Record<string, number> | null>(null);
 
   // Get pagination params from URL
   const page = parseInt(searchParams.get("page")) || 1;
@@ -123,7 +123,7 @@ const Recommended = () => {
   }, [page, perPage]);
 
   // Handle page change
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", newPage.toString());
     setSearchParams(newParams);
@@ -140,7 +140,7 @@ const Recommended = () => {
   };
 
   // Handle per page change
-  const handlePerPageChange = (newPerPage) => {
+  const handlePerPageChange = (newPerPage: number) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("per_page", newPerPage.toString());
     newParams.set("page", "1"); // Reset to page 1 when changing per page
@@ -158,7 +158,7 @@ const Recommended = () => {
   };
 
   // Handle successful hide - remove scene from state
-  const handleHideSuccess = (sceneId) => {
+  const handleHideSuccess = (sceneId: string) => {
     setScenes((prev) => prev.filter((s) => s.id !== sceneId));
     setTotalCount((prev) => Math.max(0, prev - 1));
   };

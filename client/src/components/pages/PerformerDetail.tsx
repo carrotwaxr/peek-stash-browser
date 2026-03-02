@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
@@ -28,11 +28,11 @@ import { GalleryGrid, GroupGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
 
 const PerformerDetail = () => {
-  const { performerId } = useParams();
+  const { performerId } = useParams<{ performerId: string }>();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [performer, setPerformer] = useState(null);
-  const [rating, setRating] = useState(null);
+  const [performer, setPerformer] = useState<Record<string, unknown> | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -78,17 +78,17 @@ const PerformerDetail = () => {
     fetchPerformer();
   }, [performerId, instanceId]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating("performer", performerId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(performer.rating); // Revert on error
+      setRating((performer as Record<string, unknown>)?.rating as number | null); // Revert on error
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite("performer", performerId, newValue, instanceId);
@@ -252,7 +252,12 @@ const PerformerDetail = () => {
 };
 
 // Reusable component for detail field (label/value pair)
-const DetailField = ({ label, value }) => {
+interface DetailFieldProps {
+  label: string;
+  value: React.ReactNode;
+}
+
+const DetailField = ({ label, value }: DetailFieldProps) => {
   if (!value) return null;
 
   return (
@@ -271,7 +276,15 @@ const DetailField = ({ label, value }) => {
 };
 
 // Reusable component for stat field (label/value pair in stats card)
-const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
+interface StatFieldProps {
+  label: string;
+  value: string | number | null | undefined;
+  valueColor?: string;
+  onClick?: () => void;
+  isActive?: boolean;
+}
+
+const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: StatFieldProps) => {
   if (!value && value !== 0) return null;
 
   const clickable = onClick && value > 0;
@@ -301,7 +314,11 @@ const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, 
 };
 
 // Reusable component for section headings
-const SectionHeader = ({ children }) => {
+interface SectionHeaderProps {
+  children: React.ReactNode;
+}
+
+const SectionHeader = ({ children }: SectionHeaderProps) => {
   return (
     <h3
       className="text-sm font-medium mb-2"
@@ -313,7 +330,12 @@ const SectionHeader = ({ children }) => {
 };
 
 // Reusable component for card containers
-const Card = ({ children, title }) => {
+interface CardProps {
+  children: React.ReactNode;
+  title?: string;
+}
+
+const Card = ({ children, title }: CardProps) => {
   return (
     <div
       className="p-4 rounded-lg p-6 mb-6"
@@ -334,11 +356,15 @@ const Card = ({ children, title }) => {
   );
 };
 
-const PerformerDetails = ({ performer }) => {
+interface PerformerDetailsProps {
+  performer: Record<string, unknown> | null;
+}
+
+const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
   const { unitPreference, isLoading: isLoadingUnits } = useUnitPreference();
 
   // Calculate age from birthdate
-  const getAge = (birthdate) => {
+  const getAge = (birthdate: string): number | null => {
     if (!birthdate) return null;
     const birth = new Date(birthdate);
     const today = new Date();
@@ -473,11 +499,16 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer, performerId: _performerId }) => {  
+interface PerformerStatsProps {
+  performer: Record<string, unknown> | null;
+  performerId: string | undefined;
+}
+
+const PerformerStats = ({ performer, performerId: _performerId }: PerformerStatsProps) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (tabId === 'scenes') {
       newParams.delete('tab');
@@ -607,7 +638,11 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
   );
 };
 
-const PerformerImage = ({ performer }) => {
+interface PerformerImageProps {
+  performer: Record<string, unknown> | null;
+}
+
+const PerformerImage = ({ performer }: PerformerImageProps) => {
   return (
     <div
       className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
@@ -644,7 +679,12 @@ const PerformerImage = ({ performer }) => {
   );
 };
 
-const PerformerLinks = ({ performer, settings }) => {
+interface PerformerLinksProps {
+  performer: Record<string, unknown> | null;
+  settings: Record<string, unknown>;
+}
+
+const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
   const hasLinks =
     performer?.twitter ||
     performer?.instagram ||
@@ -700,13 +740,19 @@ const PerformerLinks = ({ performer, settings }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ performerId, instanceId, performerName }) => {
+interface ImagesTabProps {
+  performerId: string | undefined;
+  instanceId: string | null;
+  performerName: string | undefined;
+}
+
+const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
 
-  const handleImagePageChange = useCallback((newPage) => {
+  const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
     if (newPage === 1) {
       params.delete('page');
@@ -718,7 +764,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }) => {
   }, [searchParams, setSearchParams]);
 
   const fetchImages = useCallback(
-    async (page, perPage) => {
+    async (page: number, perPage: number) => {
       const data = await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {

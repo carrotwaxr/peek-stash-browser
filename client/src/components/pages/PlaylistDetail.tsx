@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -41,33 +41,33 @@ import {
 } from "../ui/index";
 
 const PlaylistDetail = () => {
-  const { playlistId } = useParams();
+  const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
-  const [playlist, setPlaylist] = useState(null);
-  const [scenes, setScenes] = useState([]);
+  const [playlist, setPlaylist] = useState<Record<string, unknown> | null>(null);
+  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
-  const [sceneToRemove, setSceneToRemove] = useState(null);
+  const [sceneToRemove, setSceneToRemove] = useState<Record<string, unknown> | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState(null);
+  const [permissions, setPermissions] = useState<Record<string, unknown> | null>(null);
   const [isOwner, setIsOwner] = useState(true);
-  const [ownerName, setOwnerName] = useState(null);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
   // Selection state for multi-select (view mode only)
-  const [selectedScenes, setSelectedScenes] = useState([]);
+  const [selectedScenes, setSelectedScenes] = useState<Record<string, unknown>[]>([]);
   const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
 
-  const handleToggleSelect = useCallback((scene) => {
+  const handleToggleSelect = useCallback((scene: Record<string, unknown>) => {
     setSelectedScenes((prev) => {
       const isSelected = prev.some((s) => s.id === scene.id);
       return isSelected
@@ -145,7 +145,7 @@ const PlaylistDetail = () => {
     }
   };
 
-  const updatePlaylist = async (e) => {
+  const updatePlaylist = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       await apiPut(`/playlists/${playlistId}`, {
@@ -160,7 +160,7 @@ const PlaylistDetail = () => {
     }
   };
 
-  const handleRemoveClick = (scene) => {
+  const handleRemoveClick = (scene: Record<string, unknown>) => {
     setSceneToRemove(scene);
     setRemoveConfirmOpen(true);
   };
@@ -186,7 +186,7 @@ const PlaylistDetail = () => {
   };
 
   // Position control handlers for reordering
-  const moveItem = useCallback((fromIndex, toIndex) => {
+  const moveItem = useCallback((fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= scenes.length) return;
     if (fromIndex === toIndex) return;
 
@@ -196,23 +196,23 @@ const PlaylistDetail = () => {
     setScenes(newScenes);
   }, [scenes]);
 
-  const handleMoveTop = useCallback((index) => {
+  const handleMoveTop = useCallback((index: number) => {
     moveItem(index, 0);
   }, [moveItem]);
 
-  const handleMoveUp = useCallback((index) => {
+  const handleMoveUp = useCallback((index: number) => {
     moveItem(index, index - 1);
   }, [moveItem]);
 
-  const handleMoveDown = useCallback((index) => {
+  const handleMoveDown = useCallback((index: number) => {
     moveItem(index, index + 1);
   }, [moveItem]);
 
-  const handleMoveBottom = useCallback((index) => {
+  const handleMoveBottom = useCallback((index: number) => {
     moveItem(index, scenes.length - 1);
   }, [moveItem, scenes.length]);
 
-  const handleSetPosition = useCallback((fromIndex, newPosition) => {
+  const handleSetPosition = useCallback((fromIndex: number, newPosition: number) => {
     // Convert 1-indexed input to 0-indexed
     let targetIndex = newPosition - 1;
 

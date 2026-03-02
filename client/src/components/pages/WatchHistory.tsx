@@ -16,7 +16,7 @@ const WatchHistory = () => {
 
   const [sortBy, setSortBy] = useState("recent"); // recent, most_watched, longest_duration
   const [filterBy, setFilterBy] = useState("all"); // all, in_progress, completed
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -119,7 +119,7 @@ const WatchHistory = () => {
     }
   }, [watchHistoryList, loadingHistory, sortBy, filterBy]);
 
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number | null | undefined): string => {
     if (!seconds) return "0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);

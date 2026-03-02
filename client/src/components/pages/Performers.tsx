@@ -9,7 +9,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import {
   SyncProgressBanner,
   ErrorMessage,
@@ -31,8 +31,8 @@ const Performers = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("performers");
 
   // Table columns hook for table view
@@ -50,7 +50,7 @@ const Performers = () => {
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
+    (newQuery: LibrarySearchParams) => {
       execute((signal) => getPerformers(newQuery, signal));
     },
     [execute]
@@ -227,7 +227,7 @@ const Performers = () => {
   );
 };
 
-const getPerformers = async (query, signal) => {
+const getPerformers = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findPerformers(query, signal);
 
   // Extract performers and count from server response structure

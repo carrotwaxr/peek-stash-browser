@@ -8,7 +8,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import { StudioCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -30,8 +30,8 @@ const Studios = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = 3;
 
   // Table columns hook for table view
@@ -49,7 +49,7 @@ const Studios = () => {
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
+    (newQuery: LibrarySearchParams) => {
       execute((signal) => getStudios(newQuery, signal));
     },
     [execute]
@@ -205,7 +205,7 @@ const Studios = () => {
   );
 };
 
-const getStudios = async (query, signal) => {
+const getStudios = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findStudios(query, signal);
 
   // Extract studios and count from server response structure

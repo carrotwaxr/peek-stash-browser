@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
@@ -12,10 +12,15 @@ import {
   TAB_COUNT_LOADING,
 } from "../ui/index";
 
+interface PlaylistThumbnailGridProps {
+  items: Record<string, unknown>[];
+  totalCount: number;
+}
+
 /**
  * Reusable 2x2 thumbnail grid for playlist preview
  */
-const PlaylistThumbnailGrid = ({ items, totalCount }) => {
+const PlaylistThumbnailGrid = ({ items, totalCount }: PlaylistThumbnailGridProps) => {
   if (!items || items.length === 0) return null;
 
   return (
@@ -60,16 +65,16 @@ const PlaylistThumbnailGrid = ({ items, totalCount }) => {
 const Playlists = () => {
   usePageTitle("Playlists");
   const [searchParams] = useSearchParams();
-  const [playlists, setPlaylists] = useState([]);
+  const [playlists, setPlaylists] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [playlistToDelete, setPlaylistToDelete] = useState(null);
-  const [sharedPlaylists, setSharedPlaylists] = useState([]);
+  const [playlistToDelete, setPlaylistToDelete] = useState<Record<string, unknown> | null>(null);
+  const [sharedPlaylists, setSharedPlaylists] = useState<Record<string, unknown>[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
   const [sharedLoaded, setSharedLoaded] = useState(false);
 
@@ -107,7 +112,7 @@ const Playlists = () => {
     }
   };
 
-  const createPlaylist = async (e) => {
+  const createPlaylist = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
@@ -130,7 +135,7 @@ const Playlists = () => {
     }
   };
 
-  const handleDeleteClick = (playlist) => {
+  const handleDeleteClick = (playlist: Record<string, unknown>) => {
     setPlaylistToDelete(playlist);
     setDeleteConfirmOpen(true);
   };

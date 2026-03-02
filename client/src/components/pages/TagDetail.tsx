@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
@@ -26,11 +26,11 @@ import { GalleryGrid, GroupGrid, PerformerGrid, StudioGrid } from "../grids/inde
 import ViewInStashButton from "../ui/ViewInStashButton";
 
 const TagDetail = () => {
-  const { tagId } = useParams();
+  const { tagId } = useParams<{ tagId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [tag, setTag] = useState(null);
-  const [rating, setRating] = useState(null);
+  const [tag, setTag] = useState<Record<string, unknown> | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -64,7 +64,7 @@ const TagDetail = () => {
   const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // Handler for toggling include sub-tags
-  const handleIncludeSubTagsChange = (checked) => {
+  const handleIncludeSubTagsChange = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams);
     if (checked) {
       newParams.set('includeSubTags', 'true');
@@ -98,17 +98,17 @@ const TagDetail = () => {
     fetchTag();
   }, [tagId, instanceId]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating("tag", tagId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(tag.rating);
+      setRating((tag as Record<string, unknown>)?.rating as number | null);
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite("tag", tagId, newValue, instanceId);
@@ -381,7 +381,12 @@ const TagDetail = () => {
 };
 
 // Reusable component for Card wrapper
-const Card = ({ title, children }) => {
+interface CardProps {
+  title?: string;
+  children: React.ReactNode;
+}
+
+const Card = ({ title, children }: CardProps) => {
   return (
     <div
       className="p-6 rounded-lg border"
@@ -405,7 +410,11 @@ const Card = ({ title, children }) => {
 
 // Tag Image Component (16:9 aspect ratio to match tag cards)
 // Uses MediaImage to handle video tag images (e.g., from feederbox tag-import plugin)
-const TagImage = ({ tag }) => {
+interface TagImageProps {
+  tag: Record<string, unknown> | null;
+}
+
+const TagImage = ({ tag }: TagImageProps) => {
   const [showPlaceholder, setShowPlaceholder] = useState(false);
 
   return (
@@ -440,11 +449,16 @@ const TagImage = ({ tag }) => {
 };
 
 // Tag Stats Component
-const TagStats = ({ tag, tagId: _tagId }) => {  
+interface TagStatsProps {
+  tag: Record<string, unknown> | null;
+  tagId: string | undefined;
+}
+
+const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (tabId === 'scenes') {
       newParams.delete('tab');
@@ -455,7 +469,7 @@ const TagStats = ({ tag, tagId: _tagId }) => {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
-  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
+  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && value > 0;
@@ -541,7 +555,12 @@ const TagStats = ({ tag, tagId: _tagId }) => {
 };
 
 // Tag Details Component (Parent Tags, Child Tags, Aliases)
-const TagDetails = ({ tag, hasMultipleInstances }) => {
+interface TagDetailsProps {
+  tag: Record<string, unknown> | null;
+  hasMultipleInstances: boolean;
+}
+
+const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
   return (
     <>
       {tag?.parents && tag.parents.length > 0 && (
@@ -596,13 +615,20 @@ const TagDetails = ({ tag, hasMultipleInstances }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }) => {
+interface TagImagesTabProps {
+  tagId: string | undefined;
+  instanceId: string | null;
+  tagName: string | undefined;
+  includeSubTags?: boolean;
+}
+
+const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
 
-  const handleImagePageChange = useCallback((newPage) => {
+  const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
     if (newPage === 1) {
       params.delete('page');
@@ -614,7 +640,7 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }) => {
   }, [searchParams, setSearchParams]);
 
   const fetchImages = useCallback(
-    async (page, perPage) => {
+    async (page: number, perPage: number) => {
       const data = await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {

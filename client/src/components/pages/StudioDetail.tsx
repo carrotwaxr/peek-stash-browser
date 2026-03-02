@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Link,
   useParams,
@@ -29,11 +29,11 @@ import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
 
 const StudioDetail = () => {
-  const { studioId } = useParams();
+  const { studioId } = useParams<{ studioId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [studio, setStudio] = useState(null);
-  const [rating, setRating] = useState(null);
+  const [studio, setStudio] = useState<Record<string, unknown> | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -66,7 +66,7 @@ const StudioDetail = () => {
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // Handler for toggling include sub-studios
-  const handleIncludeSubStudiosChange = (checked) => {
+  const handleIncludeSubStudiosChange = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams);
     if (checked) {
       newParams.set("includeSubStudios", "true");
@@ -100,17 +100,17 @@ const StudioDetail = () => {
     fetchStudio();
   }, [studioId, instanceId]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating("studio", studioId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(studio.rating);
+      setRating((studio as Record<string, unknown>)?.rating as number | null);
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite("studio", studioId, newValue, instanceId);
@@ -328,7 +328,12 @@ const StudioDetail = () => {
 };
 
 // Reusable component for Card wrapper
-const Card = ({ title, children }) => {
+interface CardProps {
+  title?: string;
+  children: React.ReactNode;
+}
+
+const Card = ({ title, children }: CardProps) => {
   return (
     <div
       className="p-6 rounded-lg border"
@@ -350,7 +355,11 @@ const Card = ({ title, children }) => {
 };
 
 // Studio Image Component (Logo - 1:1 aspect ratio)
-const StudioImage = ({ studio }) => {
+interface StudioImageProps {
+  studio: Record<string, unknown> | null;
+}
+
+const StudioImage = ({ studio }: StudioImageProps) => {
   return (
     <div
       className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
@@ -384,11 +393,16 @@ const StudioImage = ({ studio }) => {
 };
 
 // Studio Stats Component
-const StudioStats = ({ studio, studioId: _studioId }) => {  
+interface StudioStatsProps {
+  studio: Record<string, unknown> | null;
+  studioId: string | undefined;
+}
+
+const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "scenes";
 
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (tabId === "scenes") {
       newParams.delete("tab");
@@ -404,7 +418,7 @@ const StudioStats = ({ studio, studioId: _studioId }) => {
     value,
     valueColor = "var(--text-primary)",
     onClick,
-    isActive }) => {
+    isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && value > 0;
@@ -509,7 +523,13 @@ const StudioStats = ({ studio, studioId: _studioId }) => {
 };
 
 // Studio Details Component
-const StudioDetails = ({ studio, settings, hasMultipleInstances }) => {
+interface StudioDetailsProps {
+  studio: Record<string, unknown> | null;
+  settings: Record<string, unknown>;
+  hasMultipleInstances: boolean;
+}
+
+const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetailsProps) => {
   const showDetails = settings?.showDescriptionOnDetail !== false;
 
   return (
@@ -647,13 +667,20 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false }) => {
+interface StudioImagesTabProps {
+  studioId: string | undefined;
+  instanceId: string | null;
+  studioName: string | undefined;
+  includeSubStudios?: boolean;
+}
+
+const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false }: StudioImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
 
-  const handleImagePageChange = useCallback((newPage) => {
+  const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
     if (newPage === 1) {
       params.delete('page');
@@ -665,7 +692,7 @@ const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false
   }, [searchParams, setSearchParams]);
 
   const fetchImages = useCallback(
-    async (page, perPage) => {
+    async (page: number, perPage: number) => {
       const data = await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {

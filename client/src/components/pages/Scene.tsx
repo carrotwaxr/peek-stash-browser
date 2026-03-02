@@ -28,8 +28,8 @@ import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 // Inner component that reads from context
 const SceneContent = () => {
   const navigate = useNavigate();
-  const pageRef = useRef(null);
-  const leftColumnRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
 
   // Read state from context
   const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
@@ -47,7 +47,7 @@ const SceneContent = () => {
   // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  const [sidebarHeight, setSidebarHeight] = useState(null);
+  const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'similar';
   // TAB_COUNT_LOADING means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
@@ -284,7 +284,7 @@ const SceneContent = () => {
 
 // Outer component that wraps everything in ScenePlayerProvider
 const Scene = () => {
-  const { sceneId } = useParams();
+  const { sceneId } = useParams<{ sceneId: string }>();
   const location = useLocation();
 
   // Extract instance ID from URL query params for multi-instance support
@@ -293,7 +293,7 @@ const Scene = () => {
 
   // Capture location state in a ref to preserve it across re-renders
   // React Router sometimes loses state on initial render, so we store it once it arrives
-  const locationStateRef = useRef(null);
+  const locationStateRef = useRef<Record<string, unknown> | null>(null);
 
   // Update ref synchronously during render (not in useEffect)
   if (location.state && !locationStateRef.current) {

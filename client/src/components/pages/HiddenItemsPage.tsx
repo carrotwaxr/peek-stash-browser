@@ -19,7 +19,7 @@ import {
 const HiddenItemsPage = () => {
   const { getHiddenEntities, unhideEntity, unhideAll } = useHiddenEntities();
   const [activeTab, setActiveTab] = useState("all");
-  const [hiddenItems, setHiddenItems] = useState([]);
+  const [hiddenItems, setHiddenItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoringAll, setRestoringAll] = useState(false);
 
@@ -49,7 +49,7 @@ const HiddenItemsPage = () => {
     loadHiddenItems();
   }, [loadHiddenItems]);
 
-  const handleRestore = async (item) => {
+  const handleRestore = async (item: Record<string, unknown>) => {
     const entityName = getEntityName(item);
     const success = await unhideEntity({
       entityType: item.entityType,
@@ -77,18 +77,19 @@ const HiddenItemsPage = () => {
   };
 
   // Group items by type for "All" tab
-  const groupedItems =
+  const groupedItems: Record<string, Record<string, unknown>[]> =
     activeTab === "all"
-      ? hiddenItems.reduce((acc, item) => {
-          if (!acc[item.entityType]) {
-            acc[item.entityType] = [];
+      ? hiddenItems.reduce((acc: Record<string, Record<string, unknown>[]>, item) => {
+          const type = item.entityType as string;
+          if (!acc[type]) {
+            acc[type] = [];
           }
-          acc[item.entityType].push(item);
+          acc[type].push(item);
           return acc;
         }, {})
       : { [activeTab]: hiddenItems };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
       year: "numeric",
@@ -97,14 +98,14 @@ const HiddenItemsPage = () => {
     });
   };
 
-  const capitalizeType = (type) => {
+  const capitalizeType = (type: string): string => {
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
   /**
    * Get display name for an entity based on its type
    */
-  const getEntityName = (item) => {
+  const getEntityName = (item: Record<string, unknown>): string => {
     if (!item.entity) return "Unknown";
 
     // Scenes use getSceneTitle which handles basename fallback

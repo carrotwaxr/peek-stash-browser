@@ -9,7 +9,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import { ImageCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -37,8 +37,8 @@ const VIEW_MODES = [
 const Images = () => {
   usePageTitle("Images");
   const [searchParams] = useSearchParams();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("images");
   const { wallPlayback } = useWallPlayback();
 
@@ -66,14 +66,14 @@ const Images = () => {
   );
 
   // Track timeline date filter for filtering by selected period
-  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+  const [timelineDateFilter, setTimelineDateFilter] = useState<{ start: string; end: string } | null>(null);
 
   // Track folder tag filter for filtering by selected folder
-  const [folderTagFilter, setFolderTagFilter] = useState(null);
+  const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
 
   // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    let filters = {};
+    let filters: Record<string, unknown> = {};
 
     // Add timeline date filter when in timeline view
     if (currentViewMode === "timeline" && timelineDateFilter) {
@@ -100,11 +100,11 @@ const Images = () => {
   const [effectivePerPage, setEffectivePerPage] = useState(urlPerPage);
 
   // Ref to expose SearchControls pagination handler for external use
-  const paginationHandlerRef = useRef(null);
+  const paginationHandlerRef = useRef<((page: number) => void) | null>(null);
 
   // Ref to store the lightbox consumePendingLightboxIndex function
   // This avoids circular dependency between usePaginatedLightbox and useCancellableQuery
-  const consumePendingLightboxIndexRef = useRef(null);
+  const consumePendingLightboxIndexRef = useRef<(() => void) | null>(null);
 
   // Query hook with onDataChange to consume pending lightbox index when data loads
   const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery({
@@ -140,15 +140,15 @@ const Images = () => {
   consumePendingLightboxIndexRef.current = lightbox.consumePendingLightboxIndex;
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
-      execute((signal) => getImages(newQuery, signal));
+    (newQuery: LibrarySearchParams) => {
+      execute((signal: AbortSignal) => getImages(newQuery, signal));
     },
     [execute]
   );
 
   // Handle image click - open lightbox
   const handleImageClick = useCallback(
-    (image) => {
+    (image: Record<string, unknown>) => {
       const index = currentImages.findIndex((img) => img.id === image.id);
       openLightbox(index >= 0 ? index : 0);
     },
@@ -156,7 +156,7 @@ const Images = () => {
   );
 
   // Handle O counter change from card - update local state
-  const handleOCounterChange = useCallback((imageId, newCount) => {
+  const handleOCounterChange = useCallback((imageId: string, newCount: number) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
@@ -166,7 +166,7 @@ const Images = () => {
   }, [setData]);
 
   // Handle rating change from card - update local state
-  const handleRatingChange = useCallback((imageId, newRating) => {
+  const handleRatingChange = useCallback((imageId: string, newRating: number | null) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
@@ -176,7 +176,7 @@ const Images = () => {
   }, [setData]);
 
   // Handle favorite change from card - update local state
-  const handleFavoriteChange = useCallback((imageId, newFavorite) => {
+  const handleFavoriteChange = useCallback((imageId: string, newFavorite: boolean) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
@@ -400,7 +400,7 @@ const Images = () => {
   );
 };
 
-const getImages = async (query, signal) => {
+const getImages = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findImages(query, signal);
 
   const findImages = response?.findImages;

@@ -10,7 +10,7 @@ import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import { GalleryCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -39,8 +39,8 @@ const Galleries = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("galleries");
   const { wallPlayback } = useWallPlayback();
 
@@ -70,14 +70,14 @@ const Galleries = () => {
   );
 
   // Track timeline date filter for filtering by selected period
-  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+  const [timelineDateFilter, setTimelineDateFilter] = useState<{ start: string; end: string } | null>(null);
 
   // Track folder tag filter for filtering by selected folder
-  const [folderTagFilter, setFolderTagFilter] = useState(null);
+  const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
 
   // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    let filters = {};
+    const filters: Record<string, unknown> = {};
 
     // Add timeline date filter when in timeline view
     if (currentViewMode === "timeline" && timelineDateFilter) {
@@ -97,14 +97,14 @@ const Galleries = () => {
   }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
+    (newQuery: LibrarySearchParams) => {
       execute((signal) => getGalleries(newQuery, signal));
     },
     [execute]
   );
 
   const handleGalleryClick = useCallback(
-    (gallery) => {
+    (gallery: { id: string; stashInstanceId?: string }) => {
       navigate(getEntityPath('gallery', gallery, hasMultipleInstances), {
         state: { fromPageTitle: "Galleries" },
       });
@@ -286,7 +286,7 @@ const Galleries = () => {
   );
 };
 
-const getGalleries = async (query, signal) => {
+const getGalleries = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findGalleries(query, signal);
 
   const findGalleries = response?.findGalleries;

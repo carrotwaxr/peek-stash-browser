@@ -9,7 +9,14 @@ import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
 import { formatBitRate, formatFileSize } from "../../utils/format";
 import { getEntityPath } from "../../utils/entityLinks";
 
-const formatDuration = (seconds) => {
+interface SceneDetailsProps {
+  showDetails: boolean;
+  setShowDetails: (value: boolean) => void;
+  showTechnicalDetails: boolean;
+  setShowTechnicalDetails: (value: boolean) => void;
+}
+
+const formatDuration = (seconds: number | undefined | null): string => {
   if (!seconds) return "Unknown";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -27,7 +34,7 @@ const formatDuration = (seconds) => {
  * Merge and deduplicate tags from scene direct tags and inherited tags
  * (inherited tags are pre-computed on server from performers, studio, groups)
  */
-const mergeAllTags = (scene) => {
+const mergeAllTags = (scene: Record<string, unknown>) => {
   const tagMap = new Map();
 
   // Add direct scene tags
@@ -48,14 +55,14 @@ const SceneDetails = ({
   setShowDetails,
   showTechnicalDetails,
   setShowTechnicalDetails,
-}) => {
+}: SceneDetailsProps) => {
   const { scene, sceneLoading, compatibility } = useScenePlayer();
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene");
   const { hasMultipleInstances } = useConfig();
 
   // Clips state
-  const [clips, setClips] = useState([]);
+  const [clips, setClips] = useState<Record<string, unknown>[]>([]);
   const [clipsLoading, setClipsLoading] = useState(true);
   const [showClips, setShowClips] = useState(false); // Collapsed by default
 
@@ -78,7 +85,7 @@ const SceneDetails = ({
   }, [scene?.id, scene?.instanceId]);
 
   // Handle clip click - dispatch event to seek video player
-  const handleClipClick = (clip) => {
+  const handleClipClick = (clip: { seconds: number }) => {
     // Dispatch custom event that VideoPlayer listens for
     window.dispatchEvent(
       new CustomEvent("seekToTime", {

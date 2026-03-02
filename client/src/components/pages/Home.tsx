@@ -37,12 +37,12 @@ const SCENES_PER_CAROUSEL = 12;
 /**
  * Check if an ID is a custom carousel (prefixed with "custom-")
  */
-const isCustomCarousel = (id) => id && id.startsWith("custom-");
+const isCustomCarousel = (id: string) => id && id.startsWith("custom-");
 
 /**
  * Get the "See More" URL for a hardcoded carousel based on its fetchKey
  */
-const getSeeMoreUrl = (fetchKey) => {
+const getSeeMoreUrl = (fetchKey: string): string | null => {
   const urlMap = {
     recentlyAddedScenes: "/scenes?sort=created_at&dir=DESC",
     highRatedScenes: "/scenes?sort=random&rating_min=80",
@@ -51,13 +51,13 @@ const getSeeMoreUrl = (fetchKey) => {
     favoriteStudioScenes: "/scenes?sort=random&studioFavorite=true",
     continueWatching: "/watch-history",
   };
-  return urlMap[fetchKey] || null;
+  return urlMap[fetchKey as keyof typeof urlMap] || null;
 };
 
 /**
  * Build a "See More" URL for a custom carousel from its rules
  */
-const buildCustomCarouselUrl = (rules, sort, direction) => {
+const buildCustomCarouselUrl = (rules: Record<string, unknown> | null | undefined, sort: string | undefined, direction: string | undefined): string => {
   if (!rules || typeof rules !== "object") {
     return "/scenes";
   }
@@ -86,12 +86,12 @@ const Home = () => {
   const location = useLocation();
   const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
-  const [carouselPreferences, setCarouselPreferences] = useState([]);
-  const [customCarousels, setCustomCarousels] = useState([]);
+  const [carouselPreferences, setCarouselPreferences] = useState<Record<string, unknown>[]>([]);
+  const [customCarousels, setCustomCarousels] = useState<Record<string, unknown>[]>([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
-  const [selectedScenes, setSelectedScenes] = useState([]);
+  const [selectedScenes, setSelectedScenes] = useState<Record<string, unknown>[]>([]);
   const [isInitializing, setIsInitializing] = useState(false);
-  const [initMessage, setInitMessage] = useState(null);
+  const [initMessage, setInitMessage] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -124,7 +124,7 @@ const Home = () => {
      
   }, [location.key]);
 
-  const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {
+  const createSceneClickHandler = (scenes: Record<string, unknown>[], carouselTitle: string) => (scene: Record<string, unknown>) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
     navigate(getEntityPath('scene', scene, hasMultipleInstances), {
@@ -149,7 +149,7 @@ const Home = () => {
     return true; // Prevent fallback navigation in SceneCard
   };
 
-  const handleToggleSelect = (scene) => {
+  const handleToggleSelect = (scene: Record<string, unknown>) => {
     setSelectedScenes((prev) => {
       const isSelected = prev.some((s) => s.id === scene.id);
       if (isSelected) {
@@ -170,7 +170,7 @@ const Home = () => {
     onComplete: handleClearSelection,
   });
 
-  const handleInitializing = useCallback((initializing) => {
+  const handleInitializing = useCallback((initializing: boolean) => {
     if (initializing) {
       setIsInitializing(true);
       setInitMessage("Server is syncing library, please wait...");
@@ -366,6 +366,17 @@ const Home = () => {
 /**
  * HomeCarousel - Renders a hardcoded carousel using useHomeCarouselQueries
  */
+interface HomeCarouselProps {
+  title: string;
+  icon: React.ReactNode;
+  fetchKey: string;
+  createSceneClickHandler: (scenes: Record<string, unknown>[], title: string) => (scene: Record<string, unknown>) => void;
+  carouselQueries: Record<string, () => Promise<unknown>>;
+  selectedScenes: Record<string, unknown>[];
+  onToggleSelect: (scene: Record<string, unknown>) => void;
+  onInitializing: (value: boolean) => void;
+}
+
 const HomeCarousel = ({
   title,
   icon,
@@ -375,7 +386,7 @@ const HomeCarousel = ({
   selectedScenes,
   onToggleSelect,
   onInitializing,
-}) => {
+}: HomeCarouselProps) => {
   const [retryCount, setRetryCount] = useState(0);
   const fetchFunction = carouselQueries[fetchKey];
   const {
@@ -437,6 +448,17 @@ const HomeCarousel = ({
  * CustomCarousel - Renders a user-defined custom carousel
  * Fetches scenes from /api/carousels/:id/execute
  */
+interface CustomCarouselProps {
+  carouselId: string;
+  carousel: Record<string, unknown>;
+  title: string;
+  icon: React.ReactNode;
+  createSceneClickHandler: (scenes: Record<string, unknown>[], title: string) => (scene: Record<string, unknown>) => void;
+  selectedScenes: Record<string, unknown>[];
+  onToggleSelect: (scene: Record<string, unknown>) => void;
+  onInitializing: (value: boolean) => void;
+}
+
 const CustomCarousel = ({
   carouselId,
   carousel,
@@ -446,10 +468,10 @@ const CustomCarousel = ({
   selectedScenes,
   onToggleSelect,
   onInitializing,
-}) => {
-  const [scenes, setScenes] = useState([]);
+}: CustomCarouselProps) => {
+  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Record<string, unknown> | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const fetchCarousel = useCallback(async () => {

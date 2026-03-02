@@ -29,14 +29,14 @@ import ViewInStashButton from "../ui/ViewInStashButton";
 const PER_PAGE = 100;
 
 const GalleryDetail = () => {
-  const { galleryId } = useParams();
+  const { galleryId } = useParams<{ galleryId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [gallery, setGallery] = useState(null);
-  const [images, setImages] = useState([]);
+  const [gallery, setGallery] = useState<Record<string, unknown> | null>(null);
+  const [images, setImages] = useState<Record<string, unknown>[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [imagesLoading, setImagesLoading] = useState(true);
-  const [rating, setRating] = useState(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -68,7 +68,7 @@ const GalleryDetail = () => {
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
 
-  const handleImagePageChange = useCallback((newPage) => {
+  const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
     if (newPage === 1) {
       params.delete('page');
@@ -80,7 +80,7 @@ const GalleryDetail = () => {
   }, [searchParams, setSearchParams]);
 
   // Fetch function for prefetching adjacent pages
-  const fetchPage = useCallback(async (page) => {
+  const fetchPage = useCallback(async (page: number) => {
     const data = await libraryApi.getGalleryImages(galleryId, {
       page,
       per_page: PER_PAGE,
@@ -144,7 +144,7 @@ const GalleryDetail = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryId, instanceId, lightbox.currentPage]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating("gallery", galleryId, newRating, instanceId);
@@ -154,7 +154,7 @@ const GalleryDetail = () => {
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite("gallery", galleryId, newValue, instanceId);

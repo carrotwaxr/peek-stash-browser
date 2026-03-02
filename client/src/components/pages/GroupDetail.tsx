@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useNavigationState } from "../../hooks/useNavigationState";
@@ -24,11 +24,11 @@ import { PerformerGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
 
 const GroupDetail = () => {
-  const { groupId } = useParams();
+  const { groupId } = useParams<{ groupId: string }>();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [group, setGroup] = useState(null);
-  const [rating, setRating] = useState(null);
+  const [group, setGroup] = useState<Record<string, unknown> | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -75,17 +75,17 @@ const GroupDetail = () => {
     fetchGroup();
   }, [groupId, instanceId]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating("group", groupId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(group.rating);
+      setRating((group as Record<string, unknown>)?.rating as number | null);
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite("group", groupId, newValue, instanceId);
@@ -240,7 +240,12 @@ const GroupDetail = () => {
 };
 
 // Reusable component for Card wrapper
-const Card = ({ title, children }) => {
+interface CardProps {
+  title?: string;
+  children: React.ReactNode;
+}
+
+const Card = ({ title, children }: CardProps) => {
   return (
     <div
       className="p-6 rounded-lg border"
@@ -262,7 +267,11 @@ const Card = ({ title, children }) => {
 };
 
 // Group Image Flipper Component with Front/Back Toggle
-const GroupImageFlipper = ({ group }) => {
+interface GroupImageFlipperProps {
+  group: Record<string, unknown> | null;
+}
+
+const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
   const [showFront, setShowFront] = useState(true);
 
   const hasFrontImage = group?.front_image_path;
@@ -360,11 +369,15 @@ const GroupImageFlipper = ({ group }) => {
 };
 
 // Group Stats Component
-const GroupStats = ({ group }) => {
+interface GroupStatsProps {
+  group: Record<string, unknown> | null;
+}
+
+const GroupStats = ({ group }: GroupStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (tabId === 'scenes') {
       newParams.delete('tab');
@@ -375,7 +388,7 @@ const GroupStats = ({ group }) => {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
-  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
+  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && value > 0;
@@ -437,7 +450,12 @@ const GroupStats = ({ group }) => {
 };
 
 // Group Details Component (Studio, Tags, Parent/Sub Collections)
-const GroupDetails = ({ group, hasMultipleInstances }) => {
+interface GroupDetailsProps {
+  group: Record<string, unknown> | null;
+  hasMultipleInstances: boolean;
+}
+
+const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
   return (
     <>
       {group?.studio && (

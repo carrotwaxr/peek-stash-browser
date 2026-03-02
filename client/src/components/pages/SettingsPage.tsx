@@ -71,13 +71,13 @@ const SettingsPage = () => {
   }, [tabParam, activeSection, defaultTab, tabs, navigate]);
 
   // Handle section change
-  const handleSectionChange = (newSection) => {
+  const handleSectionChange = (newSection: string) => {
     const newDefaultTab = newSection === "user" ? USER_TABS[0].id : SERVER_TABS[0].id;
     navigate(`/settings?section=${newSection}&tab=${newDefaultTab}`, { replace: true });
   };
 
   // Handle tab change
-  const handleTabChange = (newTab) => {
+  const handleTabChange = (newTab: string) => {
     const params = new URLSearchParams(searchParams);
     params.set("tab", newTab);
     navigate(`/settings?${params.toString()}`, { replace: true });

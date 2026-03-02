@@ -9,7 +9,7 @@ import { Button, PageHeader, PageLayout } from "../ui/index";
  * @param {number} bytes - Size in bytes
  * @returns {string} Formatted size string
  */
-const formatSize = (bytes) => {
+const formatSize = (bytes: number | null | undefined): string => {
   if (bytes === null || bytes === undefined) return "-";
   if (bytes === 0) return "0 B";
 
@@ -26,7 +26,7 @@ const formatSize = (bytes) => {
  * @param {string} dateStr - ISO date string
  * @returns {string} Formatted date string
  */
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return "-";
   const date = new Date(dateStr);
   return date.toLocaleString();
@@ -37,7 +37,7 @@ const formatDate = (dateStr) => {
  * @param {string} fileName - File name with extension
  * @returns {string} Display name without extension
  */
-const getDisplayName = (fileName) => {
+const getDisplayName = (fileName: string | null | undefined): string => {
   if (!fileName) return "Untitled";
   // Remove extension for display
   return fileName.replace(/\.[^/.]+$/, "") || "Untitled";
@@ -48,7 +48,7 @@ const getDisplayName = (fileName) => {
  * @param {string} status - Download status
  * @returns {JSX.Element} Status badge
  */
-const getStatusBadge = (status) => {
+const getStatusBadge = (status: string) => {
   const statusStyles = {
     PENDING: {
       backgroundColor: "rgba(59, 130, 246, 0.2)",
@@ -72,7 +72,7 @@ const getStatusBadge = (status) => {
     },
   };
 
-  const style = statusStyles[status] || statusStyles.PENDING;
+  const style = statusStyles[status as keyof typeof statusStyles] || statusStyles.PENDING;
 
   return (
     <span
@@ -92,7 +92,7 @@ const getStatusBadge = (status) => {
  * @param {Object} download - Download object
  * @returns {JSX.Element} Thumbnail or type icon
  */
-const getDownloadThumbnail = (download) => {
+const getDownloadThumbnail = (download: Record<string, unknown>) => {
   // For scenes and images, show actual thumbnail
   if (download.type === "SCENE" && download.entityId) {
     return (
@@ -174,9 +174,9 @@ const getDownloadThumbnail = (download) => {
 
 const Downloads = () => {
   usePageTitle("Downloads");
-  const [downloads, setDownloads] = useState([]);
+  const [downloads, setDownloads] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const pollIntervalRef = useRef(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadDownloads = useCallback(async () => {
     try {
@@ -214,7 +214,7 @@ const Downloads = () => {
     };
   }, [hasActiveDownloads, loadDownloads]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     try {
       await apiDelete(`/downloads/${id}`);
       showSuccess("Download removed");
@@ -224,7 +224,7 @@ const Downloads = () => {
     }
   };
 
-  const handleRetry = async (id) => {
+  const handleRetry = async (id: string) => {
     try {
       await apiPost(`/downloads/${id}/retry`);
       showSuccess("Download queued for retry");

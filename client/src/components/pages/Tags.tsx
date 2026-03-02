@@ -10,7 +10,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import { TagCard } from "../cards/index";
 import { TagHierarchyView } from "../tags/index";
 import {
@@ -34,8 +34,8 @@ const Tags = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("tags");
 
   // Table columns hook for table view
@@ -65,7 +65,7 @@ const Tags = () => {
   } = useCancellableQuery({ initialLoading: false });
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
+    (newQuery: LibrarySearchParams) => {
       execute((signal) => getTags(newQuery, signal));
     },
     [execute]
@@ -231,7 +231,7 @@ const Tags = () => {
   );
 };
 
-const getTags = async (query, signal) => {
+const getTags = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findTags(query, signal);
 
   // Extract tags and count from server response structure
@@ -244,7 +244,7 @@ const getTags = async (query, signal) => {
 };
 
 // Fetch all tags for hierarchy view (no pagination)
-const getAllTags = async (signal) => {
+const getAllTags = async (signal: AbortSignal) => {
   const query = {
     filter: {
       per_page: -1, // Fetch all

@@ -9,7 +9,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { libraryApi, LibrarySearchParams } from "../../api";
 import { GroupCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -31,8 +31,8 @@ const Groups = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("groups");
 
   // Table columns hook for table view
@@ -50,7 +50,7 @@ const Groups = () => {
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
+    (newQuery: LibrarySearchParams) => {
       execute((signal) => getGroups(newQuery, signal));
     },
     [execute]
@@ -206,7 +206,7 @@ const Groups = () => {
   );
 };
 
-const getGroups = async (query, signal) => {
+const getGroups = async (query: LibrarySearchParams, signal: AbortSignal) => {
   const response = await libraryApi.findGroups(query, signal);
 
   // Extract groups and count from server response structure
