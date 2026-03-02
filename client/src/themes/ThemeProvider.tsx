@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { apiGet } from "../api";
 import { ThemeContext } from "./ThemeContext";
 import {
   themes as builtInThemes,
   defaultTheme,
   generateThemeCSSVars,
 } from "./themes";
-
-const api = axios.create({
-  baseURL: "/api",
-  withCredentials: true,
-});
 
 export const ThemeProvider = ({ children }) => {
   const [customThemes, setCustomThemes] = useState([]);
@@ -26,8 +21,8 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     const loadCustomThemes = async () => {
       try {
-        const response = await api.get("/themes/custom");
-        const themes = response.data.themes || [];
+        const data = await apiGet("/themes/custom");
+        const themes = data.themes || [];
         setCustomThemes(themes);
 
         // Merge built-in themes with custom themes
@@ -61,8 +56,8 @@ export const ThemeProvider = ({ children }) => {
 
   const refreshCustomThemes = async () => {
     try {
-      const response = await api.get("/themes/custom");
-      const themes = response.data.themes || [];
+      const data = await apiGet("/themes/custom");
+      const themes = data.themes || [];
       setCustomThemes(themes);
 
       // Merge built-in themes with custom themes

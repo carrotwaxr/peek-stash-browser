@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   scenePlayerReducer,
   initialState,
-} from "@/contexts/scenePlayerReducer.js";
+} from "@/contexts/scenePlayerReducer";
 
 // ---------------------------------------------------------------------------
 // Helpers

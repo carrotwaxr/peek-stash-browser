@@ -5,19 +5,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks (must be defined before imports that use them)
 // ---------------------------------------------------------------------------
 
-vi.mock("axios", () => {
-  const mockPost = vi.fn();
-  return {
-    default: { create: vi.fn(() => ({ post: mockPost })) },
-    __mockPost: mockPost,
-  };
-});
+const mockPost = vi.fn();
+vi.mock("@/api", () => ({
+  apiPost: (...args) => mockPost(...args),
+}));
 
-vi.mock("@/contexts/ConfigContext.jsx", () => ({
+vi.mock("@/contexts/ConfigContext", () => ({
   useConfig: vi.fn(() => ({ hasMultipleInstances: false })),
 }));
 
-vi.mock("@/utils/entityLinks.js", () => ({
+vi.mock("@/utils/entityLinks", () => ({
   getEntityPath: vi.fn(() => "/scene/123"),
 }));
 
@@ -25,13 +22,12 @@ vi.mock("@/utils/entityLinks.js", () => ({
 // Imports (after mocks are registered)
 // ---------------------------------------------------------------------------
 
-import { __mockPost } from "axios";
-import { useConfig } from "@/contexts/ConfigContext.jsx";
-import { getEntityPath } from "@/utils/entityLinks.js";
+import { useConfig } from "@/contexts/ConfigContext";
+import { getEntityPath } from "@/utils/entityLinks";
 import {
   ScenePlayerProvider,
   useScenePlayer,
-} from "@/contexts/ScenePlayerContext.jsx";
+} from "@/contexts/ScenePlayerContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,7 +41,7 @@ const mockScene = {
 };
 
 const mockApiResponse = (scene = mockScene) => ({
-  data: { findScenes: { scenes: [scene] } },
+  findScenes: { scenes: [scene] },
 });
 
 /**
@@ -76,7 +72,7 @@ describe("ScenePlayerContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: API returns a scene
-    __mockPost.mockResolvedValue(mockApiResponse());
+    mockPost.mockResolvedValue(mockApiResponse());
     // Suppress console.error from intentional error tests
     vi.spyOn(console, "error").mockImplementation(() => {});
     // Spy on window.history.replaceState
@@ -232,15 +228,15 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.scene).toEqual(mockScene);
       expect(result.current.oCounter).toBe(5);
-      expect(__mockPost).toHaveBeenCalledWith("/library/scenes", {
+      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
         ids: ["scene-42"],
         scene_filter: { instance_id: "inst-1" },
       });
     });
 
     it("dispatches LOAD_SCENE_ERROR when scene is not found", async () => {
-      __mockPost.mockResolvedValue({
-        data: { findScenes: { scenes: [] } },
+      mockPost.mockResolvedValue({
+        findScenes: { scenes: [] },
       });
 
       const { result } = renderHook(() => useScenePlayer(), {
@@ -258,7 +254,7 @@ describe("ScenePlayerContext", () => {
 
     it("dispatches LOAD_SCENE_ERROR on API network failure", async () => {
       const networkError = new Error("Network error");
-      __mockPost.mockRejectedValue(networkError);
+      mockPost.mockRejectedValue(networkError);
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper(),
@@ -281,7 +277,7 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(__mockPost).toHaveBeenCalledWith("/library/scenes", {
+      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
         ids: ["scene-42"],
         scene_filter: { instance_id: "inst-abc" },
       });
@@ -296,14 +292,14 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(__mockPost).toHaveBeenCalledWith("/library/scenes", {
+      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
         ids: ["scene-42"],
       });
     });
 
     it("sets oCounter to 0 when scene has no o_counter", async () => {
       const sceneNoCounter = { id: "s-1", title: "No Counter" };
-      __mockPost.mockResolvedValue(mockApiResponse(sceneNoCounter));
+      mockPost.mockResolvedValue(mockApiResponse(sceneNoCounter));
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper(),
@@ -331,7 +327,7 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      expect(__mockPost).toHaveBeenCalledWith(
+      expect(mockPost).toHaveBeenCalledWith(
         "/library/scenes",
         expect.objectContaining({ ids: ["scene-99"] })
       );
@@ -359,7 +355,7 @@ describe("ScenePlayerContext", () => {
       });
 
       // Should use playlist scene ID, not prop sceneId
-      expect(__mockPost).toHaveBeenCalledWith("/library/scenes", {
+      expect(mockPost).toHaveBeenCalledWith("/library/scenes", {
         ids: ["playlist-scene-1"],
         scene_filter: { instance_id: "pl-inst-1" },
       });
@@ -372,7 +368,7 @@ describe("ScenePlayerContext", () => {
 
   describe("incrementOCounter", () => {
     it("sends increment request and updates counter on success", async () => {
-      __mockPost.mockImplementation((url) => {
+      mockPost.mockImplementation((url) => {
         if (url === "/library/scenes") {
           return Promise.resolve(mockApiResponse());
         }
@@ -397,7 +393,7 @@ describe("ScenePlayerContext", () => {
         await result.current.incrementOCounter();
       });
 
-      expect(__mockPost).toHaveBeenCalledWith("/watch-history/increment-o", {
+      expect(mockPost).toHaveBeenCalledWith("/watch-history/increment-o", {
         sceneId: "scene-42",
       });
       expect(result.current.oCounter).toBe(prevCounter + 1);
@@ -405,7 +401,7 @@ describe("ScenePlayerContext", () => {
     });
 
     it("handles increment error gracefully", async () => {
-      __mockPost.mockImplementation((url) => {
+      mockPost.mockImplementation((url) => {
         if (url === "/library/scenes") {
           return Promise.resolve(mockApiResponse());
         }
@@ -436,8 +432,8 @@ describe("ScenePlayerContext", () => {
     });
 
     it("does not call API when scene is null", async () => {
-      __mockPost.mockResolvedValue({
-        data: { findScenes: { scenes: [] } },
+      mockPost.mockResolvedValue({
+        findScenes: { scenes: [] },
       });
 
       const { result } = renderHook(() => useScenePlayer(), {
@@ -449,14 +445,14 @@ describe("ScenePlayerContext", () => {
         expect(result.current.sceneLoading).toBe(false);
       });
 
-      __mockPost.mockClear();
+      mockPost.mockClear();
 
       await act(async () => {
         await result.current.incrementOCounter();
       });
 
       // Should not have called any API since scene is null
-      expect(__mockPost).not.toHaveBeenCalledWith(
+      expect(mockPost).not.toHaveBeenCalledWith(
         "/watch-history/increment-o",
         expect.anything()
       );

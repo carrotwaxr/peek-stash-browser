@@ -5,14 +5,10 @@ import {
   useEffect,
   useReducer,
 } from "react";
-import axios from "axios";
+import { apiPost } from "../api";
 import { initialState, scenePlayerReducer } from "./scenePlayerReducer";
 import { useConfig } from "./ConfigContext";
 import { getEntityPath } from "../utils/entityLinks";
-
-const api = axios.create({
-  baseURL: "/api",
-});
 
 const ScenePlayerContext = createContext(null);
 
@@ -61,8 +57,8 @@ export function ScenePlayerProvider({
       if (sceneInstanceId) {
         requestBody.scene_filter = { instance_id: sceneInstanceId };
       }
-      const response = await api.post("/library/scenes", requestBody);
-      const scene = response.data?.findScenes?.scenes?.[0];
+      const data = await apiPost("/library/scenes", requestBody);
+      const scene = data?.findScenes?.scenes?.[0];
 
       if (!scene) {
         throw new Error("Scene not found");
@@ -90,7 +86,7 @@ export function ScenePlayerProvider({
 
     dispatch({ type: "INCREMENT_O_COUNTER_START" });
     try {
-      await api.post("/watch-history/increment-o", { sceneId: state.scene.id });
+      await apiPost("/watch-history/increment-o", { sceneId: state.scene.id });
       dispatch({ type: "INCREMENT_O_COUNTER_SUCCESS" });
     } catch (error) {
       console.error("Error incrementing O counter:", error);

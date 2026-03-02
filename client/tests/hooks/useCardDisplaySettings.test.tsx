@@ -10,14 +10,10 @@ const { mockGet, mockPut } = vi.hoisted(() => {
   };
 });
 
-// Mock axios.create
-vi.mock("axios", () => ({
-  default: {
-    create: () => ({
-      get: mockGet,
-      put: mockPut,
-    }),
-  },
+// Mock the typed API client
+vi.mock("../../src/api", () => ({
+  apiGet: (...args) => mockGet(...args),
+  apiPut: (...args) => mockPut(...args),
 }));
 
 // Import after mock setup
@@ -26,11 +22,9 @@ import { CardDisplaySettingsProvider, useCardDisplaySettings } from "../../src/c
 describe("useCardDisplaySettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default mock - empty settings
-    mockGet.mockResolvedValue({
-      data: { settings: { cardDisplaySettings: null } },
-    });
-    mockPut.mockResolvedValue({ data: { success: true } });
+    // Default mock - empty settings (apiGet returns body directly, no .data wrapper)
+    mockGet.mockResolvedValue({ settings: { cardDisplaySettings: null } });
+    mockPut.mockResolvedValue({ success: true });
   });
 
   describe("without provider", () => {
@@ -119,13 +113,11 @@ describe("useCardDisplaySettings", () => {
 
     it("merges user settings with defaults", async () => {
       mockGet.mockResolvedValueOnce({
-        data: {
-          settings: {
-            cardDisplaySettings: {
-              scene: {
-                showCodeOnCard: false,
-                showRating: false,
-              },
+        settings: {
+          cardDisplaySettings: {
+            scene: {
+              showCodeOnCard: false,
+              showRating: false,
             },
           },
         },
@@ -195,11 +187,9 @@ describe("useCardDisplaySettings", () => {
 
     it("calls API with merged settings", async () => {
       mockGet.mockResolvedValueOnce({
-        data: {
-          settings: {
-            cardDisplaySettings: {
-              performer: { showRating: false },
-            },
+        settings: {
+          cardDisplaySettings: {
+            performer: { showRating: false },
           },
         },
       });
@@ -276,7 +266,7 @@ describe("useCardDisplaySettings", () => {
 
     it("handles null cardDisplaySettings from API", async () => {
       mockGet.mockResolvedValueOnce({
-        data: { settings: { cardDisplaySettings: null } },
+        settings: { cardDisplaySettings: null },
       });
 
       const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
@@ -292,7 +282,7 @@ describe("useCardDisplaySettings", () => {
 
     it("handles undefined cardDisplaySettings from API", async () => {
       mockGet.mockResolvedValueOnce({
-        data: { settings: {} },
+        settings: {},
       });
 
       const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });

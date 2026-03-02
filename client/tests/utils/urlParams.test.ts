@@ -4,7 +4,7 @@
  * for card indicator click navigation.
  */
 import { describe, it, expect } from "vitest";
-import { buildSearchParams, parseSearchParams } from "@/utils/urlParams.js";
+import { buildSearchParams, parseSearchParams } from "@/utils/urlParams";
 
 // Minimal filterOptions for testing - matches the shape from filterConfig.js
 const mockFilterOptions = [

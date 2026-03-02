@@ -1,12 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { apiGet, apiPut } from "../api";
 import { getDefaultSettings } from "../config/entityDisplayConfig";
-
-const api = axios.create({
-  baseURL: "/api",
-  withCredentials: true,
-});
 
 const CardDisplaySettingsContext = createContext(null);
 
@@ -18,8 +13,8 @@ export const CardDisplaySettingsProvider = ({ children }) => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await api.get("/user/settings");
-        setSettings(response.data.settings.cardDisplaySettings || {});
+        const data = await apiGet("/user/settings");
+        setSettings(data.settings.cardDisplaySettings || {});
       } catch (error) {
         console.error("Failed to load card display settings:", error);
       } finally {
@@ -51,7 +46,7 @@ export const CardDisplaySettingsProvider = ({ children }) => {
     setSettings(newSettings);
 
     try {
-      await api.put("/user/settings", {
+      await apiPut("/user/settings", {
         cardDisplaySettings: newSettings,
       });
     } catch (error) {

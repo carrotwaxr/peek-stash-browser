@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
-import axios from "axios";
 import toast from "react-hot-toast";
+import { apiGet, apiPut } from "../api";
 import { UnitPreferenceContext } from "./UnitPreferenceContext";
 import { UNITS } from "../utils/unitConversions";
-
-const api = axios.create({ baseURL: "/api", withCredentials: true });
 
 export const UnitPreferenceProvider = ({ children }) => {
   const [unitPreference, setUnitPreferenceState] = useState(UNITS.METRIC);
@@ -13,8 +11,8 @@ export const UnitPreferenceProvider = ({ children }) => {
   useEffect(() => {
     const loadUnitPreference = async () => {
       try {
-        const response = await api.get("/user/settings");
-        const { settings } = response.data;
+        const data = await apiGet("/user/settings");
+        const { settings } = data;
         setUnitPreferenceState(settings.unitPreference || UNITS.METRIC);
       } catch {
         setUnitPreferenceState(UNITS.METRIC);
@@ -29,7 +27,7 @@ export const UnitPreferenceProvider = ({ children }) => {
     const previousUnit = unitPreference;
     setUnitPreferenceState(newUnit);
     try {
-      await api.put("/user/settings", { unitPreference: newUnit });
+      await apiPut("/user/settings", { unitPreference: newUnit });
     } catch (error) {
       console.error("Failed to save unit preference:", error);
       // Revert to previous value on error

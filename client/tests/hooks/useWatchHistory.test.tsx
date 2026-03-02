@@ -5,7 +5,7 @@ import {
   useAllWatchHistory,
 } from "../../src/hooks/useWatchHistory";
 
-vi.mock("../../src/hooks/useAuth.js", () => ({
+vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
