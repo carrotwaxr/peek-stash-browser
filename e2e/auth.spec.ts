@@ -50,10 +50,9 @@ test.describe("Unauthenticated access", () => {
 
   test("login page renders correctly", async ({ page }) => {
     await page.goto("/login");
-    // Wait for the setup status check to complete (LoginGuard shows Loading... until done)
     await expect(
       page.getByRole("heading", { name: /peek stash browser/i })
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible();
     await expect(page.getByText("Sign in to your account")).toBeVisible();
     await expect(page.getByLabel("Username")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
@@ -65,8 +64,6 @@ test.describe("Unauthenticated access", () => {
 
   test("login with invalid credentials shows error", async ({ page }) => {
     await page.goto("/login");
-    // Wait for login form to render (setup status check must complete first)
-    await expect(page.getByLabel("Username")).toBeVisible({ timeout: 15_000 });
     await page.getByLabel("Username").fill("nonexistent");
     await page.getByLabel("Password").fill("wrongpassword");
     await page.getByRole("button", { name: "Sign in" }).click();

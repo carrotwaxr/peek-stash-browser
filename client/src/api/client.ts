@@ -91,12 +91,20 @@ export async function apiFetch<T = unknown>(
         );
       }
 
+      // Don't redirect if already on /login or /setup — would cause infinite reload
+      const currentUrl = window.location.pathname;
+      if (currentUrl === "/login" || currentUrl === "/setup") {
+        throw new ApiError(
+          (errorData?.error as string) || `Auth failure on ${endpoint}`,
+          response.status,
+          errorData,
+        );
+      }
+
       if (!isRedirectingToLogin) {
         isRedirectingToLogin = true;
-        const currentUrl = window.location.pathname + window.location.search;
-        if (currentUrl !== "/login" && currentUrl !== "/setup") {
-          sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
-        }
+        const fullUrl = window.location.pathname + window.location.search;
+        sessionStorage.setItem(REDIRECT_STORAGE_KEY, fullUrl);
         window.location.href = "/login";
         return new Promise<T>(() => {});
       }
