@@ -13,10 +13,6 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
 
-    /* JS interop — remove allowJs once migration is complete */
-    "allowJs": true,
-    "checkJs": false,
-
     /* Emit */
     "noEmit": true,
     "isolatedModules": true,

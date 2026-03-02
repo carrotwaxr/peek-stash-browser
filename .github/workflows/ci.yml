@@ -29,8 +29,15 @@ jobs:
 
       - run: npm ci
 
+      - name: Build shared types
+        working-directory: shared
+        run: npm ci && npm run build
+
       - name: Lint
         run: npm run lint
+
+      - name: TypeScript Compile
+        run: npx tsc --noEmit
 
       - name: Build
         run: npm run build

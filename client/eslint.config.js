@@ -6,9 +6,9 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage']),
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       reactRefresh.configs.vite,
@@ -30,7 +30,9 @@ export default defineConfig([
     rules: {
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      // Use TS-aware no-unused-vars for .ts/.tsx files
+      // tsc handles undefined checks natively
+      'no-undef': 'off',
+      // Use TS-aware no-unused-vars
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', {
         varsIgnorePattern: '^[A-Z_]',
@@ -38,13 +40,6 @@ export default defineConfig([
         destructuredArrayIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-    },
-  },
-  // Disable no-undef for TypeScript files — tsc handles this natively
-  {
-    files: ['**/*.{ts,tsx}'],
-    rules: {
-      'no-undef': 'off',
     },
   },
 ])
