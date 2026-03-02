@@ -6,7 +6,35 @@
  */
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi } from "vitest";
+
+// ============================================================================
+// Query Client Wrapper
+// ============================================================================
+
+/**
+ * Creates a wrapper with a fresh QueryClient for testing hooks that use
+ * TanStack Query (useQuery, useMutation, useQueryClient).
+ *
+ * Each call returns a new wrapper with an isolated QueryClient to prevent
+ * cross-test state leakage.
+ *
+ * @example
+ * const { result } = renderHook(() => useMyQueryHook(), {
+ *   wrapper: createQueryWrapper()
+ * });
+ */
+export const createQueryWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return ({ children }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
 
 // ============================================================================
 // Router Wrapper

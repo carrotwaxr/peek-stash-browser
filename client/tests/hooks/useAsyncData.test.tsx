@@ -1,16 +1,19 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useAsyncData } from "../../src/hooks/useApi";
+import { createQueryWrapper } from "../testUtils";
 
-vi.mock("../../src/hooks/useAuth.js", () => ({
+vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
 
+const useAuthMock = vi.mocked(useAuth);
+
 describe("useAsyncData", () => {
   beforeEach(() => {
-    useAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
   });
 
   describe("initial fetch", () => {
@@ -18,7 +21,9 @@ describe("useAsyncData", () => {
       const mockData = { users: [{ id: "1" }] };
       const fetchFn = vi.fn().mockResolvedValue(mockData);
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(result.current.loading).toBe(true);
 
@@ -35,7 +40,9 @@ describe("useAsyncData", () => {
       const error = new Error("Server error");
       const fetchFn = vi.fn().mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -52,7 +59,9 @@ describe("useAsyncData", () => {
       });
       const fetchFn = vi.fn().mockRejectedValue(error);
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -65,38 +74,41 @@ describe("useAsyncData", () => {
 
   describe("auth gate", () => {
     it("does not fetch when not authenticated", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
       const fetchFn = vi.fn().mockResolvedValue({});
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+      // When disabled, isLoading is false immediately (isPending && !isFetching)
+      expect(result.current.loading).toBe(false);
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch while auth is loading", async () => {
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: true });
+      const fetchFn = vi.fn().mockResolvedValue({});
+
+      renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
       });
 
       expect(fetchFn).not.toHaveBeenCalled();
     });
 
-    it("does not fetch while auth is loading", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
-      const fetchFn = vi.fn().mockResolvedValue({});
-
-      renderHook(() => useAsyncData(fetchFn));
-
-      // Should not call fetchFn while auth is loading
-      expect(fetchFn).not.toHaveBeenCalled();
-    });
-
     it("fetches when auth resolves to authenticated", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: true });
       const fetchFn = vi.fn().mockResolvedValue({ data: "test" });
 
-      const { result, rerender } = renderHook(() => useAsyncData(fetchFn));
+      const { result, rerender } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(fetchFn).not.toHaveBeenCalled();
 
       // Auth resolves
-      useAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+      useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
       rerender();
 
       await waitFor(() => {
@@ -114,7 +126,7 @@ describe("useAsyncData", () => {
 
       const { result, rerender } = renderHook(
         ({ dep }) => useAsyncData(fetchFn, [dep]),
-        { initialProps: { dep: "a" } }
+        { initialProps: { dep: "a" }, wrapper: createQueryWrapper() },
       );
 
       await waitFor(() => {
@@ -139,17 +151,22 @@ describe("useAsyncData", () => {
         .mockResolvedValueOnce({ version: 1 })
         .mockResolvedValueOnce({ version: 2 });
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.data).toEqual({ version: 1 });
       });
 
-      await act(async () => {
-        await result.current.refetch();
+      act(() => {
+        result.current.refetch();
       });
 
-      expect(result.current.data).toEqual({ version: 2 });
+      await waitFor(() => {
+        expect(result.current.data).toEqual({ version: 2 });
+      });
+
       expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 
@@ -159,17 +176,22 @@ describe("useAsyncData", () => {
         .mockRejectedValueOnce(new Error("Failed"))
         .mockResolvedValueOnce({ recovered: true });
 
-      const { result } = renderHook(() => useAsyncData(fetchFn));
+      const { result } = renderHook(() => useAsyncData(fetchFn), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();
       });
 
-      await act(async () => {
-        await result.current.refetch();
+      act(() => {
+        result.current.refetch();
       });
 
-      expect(result.current.error).toBeNull();
+      await waitFor(() => {
+        expect(result.current.error).toBeNull();
+      });
+
       expect(result.current.data).toEqual({ recovered: true });
     });
   });

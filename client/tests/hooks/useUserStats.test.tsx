@@ -1,17 +1,26 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useUserStats } from "../../src/hooks/useUserStats";
+import { createQueryWrapper } from "../testUtils";
 
-vi.mock("../../src/hooks/useAuth.js", () => ({
+vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
+  queryKeys: {
+    user: {
+      stats: () => ["user", "stats"],
+    },
+  },
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
 import { apiGet } from "../../src/api";
+
+const useAuthMock = vi.mocked(useAuth);
+const apiGetMock = vi.mocked(apiGet);
 
 describe("useUserStats", () => {
   const mockStats = {
@@ -22,61 +31,71 @@ describe("useUserStats", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
-    apiGet.mockResolvedValue(mockStats);
+    useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    apiGetMock.mockResolvedValue(mockStats);
   });
 
   describe("initial fetch", () => {
     it("fetches stats on mount with default sort", async () => {
-      const { result } = renderHook(() => useUserStats());
+      const { result } = renderHook(() => useUserStats(), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
       // Default sortBy is "engagement" — should not add query param
-      expect(apiGet).toHaveBeenCalledWith("/user-stats");
+      expect(apiGetMock).toHaveBeenCalledWith("/user-stats");
       expect(result.current.data).toEqual(mockStats);
       expect(result.current.error).toBeNull();
     });
 
     it("adds sortBy param when not engagement", async () => {
-      renderHook(() => useUserStats({ sortBy: "oCount" }));
+      renderHook(() => useUserStats({ sortBy: "oCount" }), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
-        expect(apiGet).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
+        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
       });
     });
 
     it("adds sortBy param for playCount", async () => {
-      renderHook(() => useUserStats({ sortBy: "playCount" }));
+      renderHook(() => useUserStats({ sortBy: "playCount" }), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
-        expect(apiGet).toHaveBeenCalledWith("/user-stats?sortBy=playCount");
+        expect(apiGetMock).toHaveBeenCalledWith(
+          "/user-stats?sortBy=playCount",
+        );
       });
     });
   });
 
   describe("auth gate", () => {
     it("does not fetch when not authenticated", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
-      const { result } = renderHook(() => useUserStats());
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+      const { result } = renderHook(() => useUserStats(), {
+        wrapper: createQueryWrapper(),
       });
 
-      expect(apiGet).not.toHaveBeenCalled();
+      // When disabled, isLoading is false immediately
+      expect(result.current.loading).toBe(false);
+      expect(apiGetMock).not.toHaveBeenCalled();
       expect(result.current.data).toBeNull();
     });
   });
 
   describe("error handling", () => {
     it("sets error message on failure", async () => {
-      apiGet.mockRejectedValue(new Error("Forbidden"));
+      apiGetMock.mockRejectedValue(new Error("Forbidden"));
 
-      const { result } = renderHook(() => useUserStats());
+      const { result } = renderHook(() => useUserStats(), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -87,9 +106,11 @@ describe("useUserStats", () => {
     });
 
     it("uses fallback message when error has no message", async () => {
-      apiGet.mockRejectedValue({});
+      apiGetMock.mockRejectedValue({});
 
-      const { result } = renderHook(() => useUserStats());
+      const { result } = renderHook(() => useUserStats(), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -102,65 +123,48 @@ describe("useUserStats", () => {
   describe("refresh", () => {
     it("re-fetches stats", async () => {
       const updatedStats = { ...mockStats, totalScenes: 200 };
-      apiGet
+      apiGetMock
         .mockResolvedValueOnce(mockStats)
         .mockResolvedValueOnce(updatedStats);
 
-      const { result } = renderHook(() => useUserStats());
+      const { result } = renderHook(() => useUserStats(), {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.data).toEqual(mockStats);
       });
 
-      await act(async () => {
-        await result.current.refresh();
+      act(() => {
+        result.current.refresh();
       });
-
-      expect(result.current.data).toEqual(updatedStats);
-    });
-
-    it("accepts showLoading parameter", async () => {
-      apiGet.mockResolvedValue(mockStats);
-
-      const { result } = renderHook(() => useUserStats());
 
       await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+        expect(result.current.data).toEqual(updatedStats);
       });
-
-      // Refresh with showLoading=false should not set loading to true
-      // (this is for sort changes where we want to avoid flicker)
-      let loadingDuringRefresh = null;
-      apiGet.mockImplementation(() => {
-        loadingDuringRefresh = result.current.loading;
-        return Promise.resolve(mockStats);
-      });
-
-      await act(async () => {
-        await result.current.refresh(false);
-      });
-
-      expect(loadingDuringRefresh).toBe(false);
     });
   });
 
   describe("sort change re-fetch", () => {
     it("re-fetches when sortBy changes", async () => {
-      apiGet.mockResolvedValue(mockStats);
+      apiGetMock.mockResolvedValue(mockStats);
 
       const { rerender } = renderHook(
         ({ sortBy }) => useUserStats({ sortBy }),
-        { initialProps: { sortBy: "engagement" } }
+        {
+          initialProps: { sortBy: "engagement" as const },
+          wrapper: createQueryWrapper(),
+        },
       );
 
       await waitFor(() => {
-        expect(apiGet).toHaveBeenCalledWith("/user-stats");
+        expect(apiGetMock).toHaveBeenCalledWith("/user-stats");
       });
 
-      rerender({ sortBy: "oCount" });
+      rerender({ sortBy: "oCount" as const });
 
       await waitFor(() => {
-        expect(apiGet).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
+        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=oCount");
       });
     });
   });
