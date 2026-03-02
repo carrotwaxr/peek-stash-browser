@@ -3,11 +3,11 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useTimelineState } from "../../src/components/timeline/useTimelineState";
 
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api";
+import { apiGet } from "../../src/api";
 
 describe("useTimelineState", () => {
   beforeEach(() => {

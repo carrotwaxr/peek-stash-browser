@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, apiPost } from "../services/api";
+import { apiGet, apiPost } from "../api";
 import { useAuth } from "./useAuth";
 
 /**

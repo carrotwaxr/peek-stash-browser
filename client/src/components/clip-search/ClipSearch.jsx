@@ -5,7 +5,7 @@ import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getScenePathWithTime } from "../../utils/entityLinks";
-import { getClips } from "../../services/api";
+import { getClips } from "../../api";
 import {
   ErrorMessage,
   PageHeader,

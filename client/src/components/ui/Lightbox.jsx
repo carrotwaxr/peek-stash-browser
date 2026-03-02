@@ -4,7 +4,7 @@ import { useSwipeable } from "react-swipeable";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { apiGet, imageViewHistoryApi, libraryApi } from "../../services/api";
+import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import MetadataDrawer from "./MetadataDrawer";
 

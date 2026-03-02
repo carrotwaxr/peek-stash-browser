@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 const mockForgotPasswordInit = vi.fn();
 const mockForgotPasswordReset = vi.fn();
 
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   forgotPasswordInit: (...args) => mockForgotPasswordInit(...args),
   forgotPasswordReset: (...args) => mockForgotPasswordReset(...args),
 }));

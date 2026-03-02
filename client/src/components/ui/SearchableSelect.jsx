@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
 import { useDebouncedValue } from "../../hooks/useDebounce";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { getCache, setCache } from "../../utils/filterCache";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
 import Button from "./Button";

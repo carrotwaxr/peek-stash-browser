@@ -5,7 +5,7 @@ import "video.js/dist/video-js.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
-import { getClipsForScene } from "../../services/api";
+import { getClipsForScene } from "../../api";
 import "./VideoPlayer.css";
 import { useOrientationFullscreen } from "./useOrientationFullscreen";
 import { useVideoPlayer } from "./useVideoPlayer";

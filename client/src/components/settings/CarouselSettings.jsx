@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "../ui/index";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 
 /**
  * Carousel metadata mapping fetchKey to display information

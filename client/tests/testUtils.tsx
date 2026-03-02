@@ -74,7 +74,7 @@ export const renderWithProviders = (
  * @returns {object} Mock API object
  *
  * @example
- * vi.mock("../services/api.js", () => createMockApi());
+ * vi.mock("../api", () => createMockApi());
  */
 export const createMockApi = () => ({
   apiGet: vi.fn().mockResolvedValue({}),

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
 import { Button } from "../ui/index";
-import { REDIRECT_STORAGE_KEY } from "../../services/api";
+import { REDIRECT_STORAGE_KEY } from "../../api";
 import { getLandingPage } from "../../constants/navigation";
 
 const Login = () => {

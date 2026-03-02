@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
-import { getSharedPlaylists } from "../../services/api";
+import { getSharedPlaylists } from "../../api";
 import {
   Button,
   ConfirmDialog,

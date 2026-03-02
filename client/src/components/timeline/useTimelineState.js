@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { apiGet } from "../../services/api";
+import { apiGet } from "../../api";
 import {
   startOfYear,
   endOfYear,

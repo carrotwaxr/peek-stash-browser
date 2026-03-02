@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getClipPreviewUrl } from "../../services/api";
+import { getClipPreviewUrl } from "../../api";
 
 /**
  * Animated preview for clip cards

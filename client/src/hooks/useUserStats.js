@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "./useAuth";
-import { apiGet } from "../services/api";
+import { apiGet } from "../api";
 
 /**
  * Valid sort options for top lists

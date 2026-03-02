@@ -5,7 +5,7 @@ import ClipCard from "../../../src/components/cards/ClipCard";
 import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext";
 
 // Mock the api module
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   getClipPreviewUrl: (id) => `/api/proxy/clip/${id}/preview`,
 }));
 

@@ -2,7 +2,7 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { CardCountIndicators } from "./CardCountIndicators";
 import EntityMenu from "./EntityMenu";
 import FavoriteButton from "./FavoriteButton";

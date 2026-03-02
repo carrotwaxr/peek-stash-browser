@@ -18,7 +18,7 @@ const mockApiPost = vi.fn();
 const mockApiPut = vi.fn();
 const mockApiDelete = vi.fn();
 
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   apiGet: (...args) => mockApiGet(...args),
   apiPost: (...args) => mockApiPost(...args),
   apiPut: (...args) => mockApiPut(...args),

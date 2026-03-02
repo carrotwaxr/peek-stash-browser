@@ -53,7 +53,7 @@ vi.mock("../../../src/hooks/useFilterState.js", () => ({
   useFilterState: () => mockFilterState,
 }));
 
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ presets: {}, defaults: {} }),
   apiPost: vi.fn().mockResolvedValue({}),
   libraryApi: {

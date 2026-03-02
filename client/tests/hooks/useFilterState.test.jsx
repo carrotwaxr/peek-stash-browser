@@ -5,11 +5,11 @@ import { MemoryRouter } from "react-router-dom";
 import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api";
+import { apiGet } from "../../src/api";
 
 const createWrapper = (initialEntries = ["/"]) => {
   return ({ children }) => (

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
 import { useAuth } from "../../hooks/useAuth";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import SearchResults from "./SearchResults";
 import SearchControls from "./SearchControls";
 

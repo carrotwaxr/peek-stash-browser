@@ -11,12 +11,12 @@ vi.mock("../../../src/hooks/useHiddenEntities.js", () => ({
   }),
 }));
 
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   apiGet: vi.fn(),
   apiPut: vi.fn(),
 }));
 
-import { apiGet } from "../../../src/services/api";
+import { apiGet } from "../../../src/api";
 
 describe("ContentTab", () => {
   beforeEach(() => {

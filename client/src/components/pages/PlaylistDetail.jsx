@@ -25,7 +25,7 @@ import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { apiPost, duplicatePlaylist, getMyPermissions } from "../../services/api";
+import { apiPost, duplicatePlaylist, getMyPermissions } from "../../api";
 import SharePlaylistModal from "../playlists/SharePlaylistModal";
 import { getSceneTitle } from "../../utils/format";
 import { showError, showSuccess } from "../../utils/toast";

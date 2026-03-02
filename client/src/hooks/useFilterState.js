@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { apiGet } from "../services/api";
+import { apiGet } from "../api";
 import { parseSearchParams, buildSearchParams } from "../utils/urlParams";
 
 /**

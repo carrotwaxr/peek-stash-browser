@@ -40,6 +40,7 @@ export default defineConfig({
         manualChunks: {
           // Separate vendor chunks for better caching
           "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "query-vendor": ["@tanstack/react-query"],
           "video-vendor": ["video.js"],
           "ui-vendor": ["lucide-react", "react-hot-toast"],
         },

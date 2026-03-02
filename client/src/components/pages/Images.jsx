@@ -9,7 +9,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { ImageCard } from "../cards/index";
 import {
   SyncProgressBanner,

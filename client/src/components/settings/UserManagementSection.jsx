@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Users, Edit2, Trash2, Shield, Download, Share2, Plus } from "lucide-react";
-import { getGroups, deleteGroup } from "../../services/api";
+import { getGroups, deleteGroup } from "../../api";
 import { formatDate } from "../../utils/date";
 import CreateUserModal from "./CreateUserModal";
 import GroupModal from "./GroupModal";

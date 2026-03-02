@@ -7,7 +7,7 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
-import { apiPost } from "../../services/api";
+import { apiPost } from "../../api";
 import { getSceneTitle } from "../../utils/format";
 import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils";
 import "./vtt-thumbnails.js";

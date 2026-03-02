@@ -4,7 +4,7 @@
  */
 
 import { formatDistanceToNow } from "date-fns";
-import { getClipPreviewUrl } from "../../services/api";
+import { getClipPreviewUrl } from "../../api";
 
 const formatDate = (dateStr) => {
   if (!dateStr) return null;

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { migrateNavPreferences } from "../../constants/navigation";
 import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
 import useScrollRestoration from "../../hooks/useScrollRestoration";
-import { apiGet } from "../../services/api";
+import { apiGet } from "../../api";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 

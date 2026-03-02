@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { User, X, Shield, Users, Key, Trash2, Lock } from "lucide-react";
 import { Button, Paper } from "../ui/index";
-import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../services/api";
+import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../api";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 /**

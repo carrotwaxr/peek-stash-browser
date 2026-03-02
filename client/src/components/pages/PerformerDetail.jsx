@@ -8,7 +8,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import SceneSearch from "../scene-search/SceneSearch";
 import {

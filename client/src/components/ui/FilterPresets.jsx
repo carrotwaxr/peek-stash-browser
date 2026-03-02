@@ -6,7 +6,7 @@ import {
   LucideSave,
   LucideTrash2,
 } from "lucide-react";
-import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import Button from "./Button";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 

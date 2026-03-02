@@ -9,11 +9,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 // Mock the API module before importing anything that uses it
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
 
-import { apiGet } from "../../src/services/api";
+import { apiGet } from "../../src/api";
 import { useFilterState } from "../../src/hooks/useFilterState";
 
 const createWrapper = (initialEntries = ["/"]) => {

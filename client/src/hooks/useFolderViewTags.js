@@ -1,7 +1,7 @@
 // client/src/hooks/useFolderViewTags.js
 import { useState, useEffect, useRef, useMemo } from "react";
-import { libraryApi } from "../services/api";
-import { apiPost } from "../services/api";
+import { libraryApi } from "../api";
+import { apiPost } from "../api";
 
 /**
  * Hook to fetch all tags with hierarchy for folder view.

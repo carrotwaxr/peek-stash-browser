@@ -14,7 +14,7 @@ import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import {
   carouselRulesToFilterState,
   SCENE_FILTER_OPTIONS,

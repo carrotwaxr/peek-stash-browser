@@ -46,7 +46,7 @@ vi.mock("../../../src/hooks/useDebounce.js", () => ({
   useDebouncedValue: (value) => value,
 }));
 
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   libraryApi: {
     findTags: mockFindTags,
     findTagsMinimal: mockFindTagsMinimal,

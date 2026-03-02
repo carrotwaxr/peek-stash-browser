@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useAuth } from "./useAuth";
-import { apiPost, apiPut, apiDelete, apiGet } from "../services/api";
+import { apiPost, apiPut, apiDelete, apiGet } from "../api";
 import { showSuccess, showError } from "../utils/toast";
 
 /**

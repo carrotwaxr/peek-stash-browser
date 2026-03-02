@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
-import { setupApi } from "../services/api";
+import { setupApi } from "../api";
 
 /**
  * Config context for app-wide configuration values.

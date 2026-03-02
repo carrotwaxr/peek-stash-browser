@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getClipsForScene } from "../../services/api";
+import { getClipsForScene } from "../../api";
 import ClipList from "../clips/ClipList";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
 import { formatBitRate, formatFileSize } from "../../utils/format";

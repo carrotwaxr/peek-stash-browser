@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
-import { apiGet, apiPost, apiDelete } from "../../services/api";
+import { apiGet, apiPost, apiDelete } from "../../api";
 import { Button, PageHeader, PageLayout } from "../ui/index";
 
 /**

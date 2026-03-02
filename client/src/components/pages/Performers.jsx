@@ -9,7 +9,7 @@ import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import {
   SyncProgressBanner,
   ErrorMessage,

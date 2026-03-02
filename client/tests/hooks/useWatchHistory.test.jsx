@@ -9,13 +9,13 @@ vi.mock("../../src/hooks/useAuth.js", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
 }));
 
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
-import { apiGet, apiPost } from "../../src/services/api";
+import { apiGet, apiPost } from "../../src/api";
 
 describe("useWatchHistory", () => {
   beforeEach(() => {

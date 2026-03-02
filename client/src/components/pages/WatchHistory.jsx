@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { History, Trash2 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
-import { apiDelete, libraryApi } from "../../services/api";
+import { apiDelete, libraryApi } from "../../api";
 import {
   Button,
   LoadingSpinner,

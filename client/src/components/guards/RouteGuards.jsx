@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { REDIRECT_STORAGE_KEY } from '../../services/api';
+import { REDIRECT_STORAGE_KEY } from '../../api';
 import UserSetupModal from '../modals/UserSetupModal';
 
 const LoadingSpinner = () => (

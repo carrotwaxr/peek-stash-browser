@@ -3,7 +3,7 @@ import axios from "axios";
 import { Copy, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
-import { getRecoveryKey, regenerateRecoveryKey } from "../../../services/api";
+import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
 
 const api = axios.create({
   baseURL: "/api",

@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Lightbox from "../../../src/components/ui/Lightbox";
 
 // Mock the API
-vi.mock("../../../services/api.js", () => ({
+vi.mock("../../../api", () => ({
   apiGet: vi.fn().mockResolvedValue({ settings: {} }),
   libraryApi: {
     updateRating: vi.fn().mockResolvedValue({}),

@@ -1,4 +1,4 @@
-import { commonFilters, libraryApi } from "../services/api";
+import { commonFilters, libraryApi } from "../api";
 
 export const useHomeCarouselQueries = (perCarousel = 12) => {
   return {

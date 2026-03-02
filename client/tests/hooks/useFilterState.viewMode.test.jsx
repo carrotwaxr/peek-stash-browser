@@ -5,7 +5,7 @@ import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API calls
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   apiGet: vi.fn((url) => {
     if (url === "/user/filter-presets") {
       return Promise.resolve({ presets: {} });

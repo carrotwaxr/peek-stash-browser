@@ -27,7 +27,7 @@ const {
 }));
 
 // Mock API functions
-vi.mock("../../../src/services/api.js", () => ({
+vi.mock("../../../src/api", () => ({
   getUserGroupMemberships: mockGetUserGroupMemberships,
   addGroupMember: mockAddGroupMember,
   removeGroupMember: mockRemoveGroupMember,

@@ -7,7 +7,7 @@ import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { galleryTitle } from "../../utils/gallery";
 import { getEntityPath } from "../../utils/entityLinks";

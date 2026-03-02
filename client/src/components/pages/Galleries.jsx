@@ -10,7 +10,7 @@ import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import { GalleryCard } from "../cards/index";
 import {
   SyncProgressBanner,

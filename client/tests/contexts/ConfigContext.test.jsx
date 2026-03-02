@@ -2,13 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../src/services/api.js", () => ({
+vi.mock("../../src/api", () => ({
   setupApi: {
     getSetupStatus: vi.fn(),
   },
 }));
 
-import { setupApi } from "../../src/services/api";
+import { setupApi } from "../../src/api";
 import {
   ConfigProvider,
   useConfig,

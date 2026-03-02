@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { forgotPasswordInit, forgotPasswordReset } from "../../services/api";
+import { forgotPasswordInit, forgotPasswordReset } from "../../api";
 import { Button } from "../ui/index";
 
 const ForgotPasswordPage = () => {

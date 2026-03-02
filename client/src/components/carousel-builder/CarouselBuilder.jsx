@@ -14,7 +14,7 @@ import { Button } from "../ui/index";
 import IconPickerButton from "./IconPickerButton";
 import RuleEditor from "./RuleEditor";
 import CarouselPreview from "./CarouselPreview";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import {
   SCENE_SORT_OPTIONS,
   CAROUSEL_FILTER_DEFINITIONS,

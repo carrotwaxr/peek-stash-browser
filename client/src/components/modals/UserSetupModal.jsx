@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy, Check, Server } from "lucide-react";
-import { userSetupApi } from "../../services/api";
+import { userSetupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { Button } from "../ui/index";
 

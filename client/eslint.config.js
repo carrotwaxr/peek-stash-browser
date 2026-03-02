@@ -40,4 +40,11 @@ export default defineConfig([
       }],
     },
   },
+  // Disable no-undef for TypeScript files — tsc handles this natively
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-undef': 'off',
+    },
+  },
 ])

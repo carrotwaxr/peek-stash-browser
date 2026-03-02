@@ -4,7 +4,7 @@ import { PlayCircle } from "lucide-react";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../services/api";
+import { libraryApi } from "../../api";
 import SceneCarousel from "./SceneCarousel";
 
 /**

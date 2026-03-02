@@ -11,7 +11,9 @@ import { TVModeProvider } from "./contexts/TVModeProvider";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider";
 import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
 import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards";
-import { setupApi } from "./services/api";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { setupApi, queryClient } from "./api";
 import { ThemeProvider } from "./themes/ThemeProvider";
 import "./themes/base.css";
 
@@ -393,24 +395,27 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ConfigProvider>
-          <UnitPreferenceProvider>
-            <TVModeProvider>
-              <CardDisplaySettingsProvider>
-                <AppContent />
-                <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    duration: 3000,
-                    style: {
-                      padding: "0",
-                    },
-                  }}
-                />
-              </CardDisplaySettingsProvider>
-            </TVModeProvider>
-          </UnitPreferenceProvider>
-        </ConfigProvider>
+        <QueryClientProvider client={queryClient}>
+          <ConfigProvider>
+            <UnitPreferenceProvider>
+              <TVModeProvider>
+                <CardDisplaySettingsProvider>
+                  <AppContent />
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      duration: 3000,
+                      style: {
+                        padding: "0",
+                      },
+                    }}
+                  />
+                </CardDisplaySettingsProvider>
+              </TVModeProvider>
+            </UnitPreferenceProvider>
+          </ConfigProvider>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>
   );

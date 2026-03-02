@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Share2 } from "lucide-react";
-import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../services/api";
+import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../api";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
