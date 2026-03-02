@@ -12,6 +12,7 @@ import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface TagQueryOptions {
@@ -201,7 +202,8 @@ class TagQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier } = filter;
+    const { value, modifier } = filter;
+    const ids = coerceEntityRefs(value);
 
     return buildJunctionFilter(
       ids, "PerformerTag", "tagId", "tagInstanceId",
@@ -220,7 +222,8 @@ class TagQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier } = filter;
+    const { value, modifier } = filter;
+    const ids = coerceEntityRefs(value);
 
     return buildJunctionFilter(
       ids, "StudioTag", "tagId", "tagInstanceId",

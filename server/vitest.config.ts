@@ -1,6 +1,12 @@
+import path from "path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@peek/shared-types": path.resolve(__dirname, "../shared/types"),
+    },
+  },
   test: {
     globals: true,
     environment: "node",

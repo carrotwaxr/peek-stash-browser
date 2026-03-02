@@ -20,6 +20,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -90,7 +91,7 @@ export const findStudios = async (
 
     // Merge root-level ids with studio_filter
     const normalizedIds = ids
-      ? { value: ids, modifier: "INCLUDES" }
+      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : studio_filter?.ids;
     const mergedFilter: PeekStudioFilter = {
       ...studio_filter,
@@ -245,7 +246,7 @@ export function applyStudioFilters(
 
   // Filter by IDs (for detail pages)
   if (filters.ids?.value && filters.ids.value.length > 0) {
-    const idSet = new Set(filters.ids.value);
+    const idSet = new Set(filters.ids.value as string[]);
     filtered = filtered.filter((s) => idSet.has(s.id));
   }
 

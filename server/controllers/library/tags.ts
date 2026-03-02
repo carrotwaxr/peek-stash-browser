@@ -20,6 +20,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -90,7 +91,7 @@ export const findTags = async (
 
     // Merge root-level ids with tag_filter
     const normalizedIds = ids
-      ? { value: ids, modifier: "INCLUDES" }
+      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : tag_filter?.ids;
     const mergedFilter: PeekTagFilter = {
       ...tag_filter,
@@ -236,7 +237,7 @@ export async function applyTagFilters(
 
   // Filter by IDs (for detail pages)
   if (filters.ids?.value && filters.ids.value.length > 0) {
-    const idSet = new Set(filters.ids.value);
+    const idSet = new Set(filters.ids.value as string[]);
     filtered = filtered.filter((t) => idSet.has(t.id));
   }
 

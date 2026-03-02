@@ -15,6 +15,7 @@ import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -71,7 +72,7 @@ export async function applyGroupFilters(
 
   // Filter by IDs (for detail pages)
   if (filters.ids?.value && filters.ids.value.length > 0) {
-    const idSet = new Set(filters.ids.value);
+    const idSet = new Set(filters.ids.value as string[]);
     filtered = filtered.filter((g) => idSet.has(g.id));
   }
 
@@ -172,7 +173,7 @@ export const findGroups = async (
 
     // Merge root-level ids with group_filter
     const normalizedIds = ids
-      ? { value: ids, modifier: "INCLUDES" }
+      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : group_filter?.ids;
     const mergedFilter: PeekGroupFilter & Record<string, unknown> = {
       ...group_filter,
