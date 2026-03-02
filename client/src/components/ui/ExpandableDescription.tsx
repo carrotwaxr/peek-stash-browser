@@ -11,7 +11,12 @@ import { useTruncationDetection } from "../../hooks/useTruncationDetection";
  * - The "more" button is positioned absolutely over that reserved space
  * - This ensures "more" appears at the end of the text regardless of line count
  */
-export const ExpandableDescription = ({ description, maxLines = 3 }) => {
+interface Props {
+  description: string | null | undefined;
+  maxLines?: number;
+}
+
+export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
   const [ref] = useTruncationDetection();
   const [isExpanded, setIsExpanded] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });

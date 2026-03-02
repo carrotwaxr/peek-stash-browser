@@ -14,6 +14,24 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 import BaseCard from "./BaseCard";
 import { SceneCardPreview, TooltipEntityGrid } from "./index";
+import type { NormalizedScene } from "@peek/shared-types";
+
+interface Props {
+  scene: NormalizedScene;
+  onClick?: (scene: NormalizedScene) => boolean | void;
+  onFocus?: (event: React.FocusEvent<HTMLElement>) => void;
+  tabIndex?: number;
+  className?: string;
+  isSelected?: boolean;
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  selectionMode?: boolean;
+  autoplayOnScroll?: boolean;
+  hideRatingControls?: boolean;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  fromPageTitle?: string;
+  enableKeyboard?: boolean;
+  showProgress?: boolean;
+}
 
 /**
  * Build scene subtitle with studio, code, and date
@@ -65,7 +83,7 @@ const computeAllTags = (scene) => {
  * Enhanced scene card component with keyboard navigation support
  * Now uses BaseCard for consistency with other entity cards
  */
-const SceneCard = forwardRef(
+const SceneCard = forwardRef<HTMLDivElement, Props>(
   (
     {
       scene,

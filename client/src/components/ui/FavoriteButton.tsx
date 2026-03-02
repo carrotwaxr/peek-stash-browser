@@ -1,5 +1,14 @@
 import { Heart } from "lucide-react";
 
+interface Props {
+  isFavorite: boolean;
+  onChange?: (value: boolean) => void;
+  size?: "small" | "medium" | "large" | number;
+  variant?: "card" | "detail";
+  className?: string;
+  disabled?: boolean;
+}
+
 /**
  * Standalone favorite toggle button
  * Filled heart when favorited (theme accent-primary), outline when not
@@ -11,7 +20,7 @@ const FavoriteButton = ({
   variant = "card", // eslint-disable-line @typescript-eslint/no-unused-vars
   className = "",
   disabled = false,
-}) => {
+}: Props) => {
   const sizeMap = {
     small: 20,
     medium: 24,

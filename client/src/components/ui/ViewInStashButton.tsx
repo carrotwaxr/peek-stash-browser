@@ -1,5 +1,11 @@
 import { useAuth } from "../../hooks/useAuth";
 
+interface Props {
+  stashUrl: string;
+  className?: string;
+  size?: number;
+}
+
 /**
  * Button that opens the entity in Stash in a new tab
  * Only visible to admin users
@@ -9,7 +15,7 @@ import { useAuth } from "../../hooks/useAuth";
  * @param {string} [props.className] - Additional CSS classes
  * @param {string} [props.size] - Icon size (default: 20)
  */
-export default function ViewInStashButton({ stashUrl, className = "", size = 20 }) {
+export default function ViewInStashButton({ stashUrl, className = "", size = 20 }: Props) {
   const { user } = useAuth();
 
   // Only show button to admin users

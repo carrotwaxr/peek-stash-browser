@@ -7,9 +7,26 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import MetadataDrawer from "./MetadataDrawer";
+import type { NormalizedImage } from "@peek/shared-types";
 
 // Percentage of screen width on each side that triggers navigation on click
 const EDGE_ZONE_PERCENT = 0.15;
+
+interface Props {
+  images: NormalizedImage[];
+  initialIndex?: number;
+  isOpen: boolean;
+  onClose: () => void;
+  autoPlay?: boolean;
+  onImagesUpdate?: (images: NormalizedImage[]) => void;
+  onPageBoundary?: (direction: "next" | "prev") => boolean;
+  totalCount?: number;
+  pageOffset?: number;
+  onIndexChange?: (index: number) => void;
+  isPageTransitioning?: boolean;
+  transitionKey?: number;
+  prefetchImages?: NormalizedImage[];
+}
 
 const Lightbox = ({
   images,
@@ -18,15 +35,14 @@ const Lightbox = ({
   onClose,
   autoPlay = false,
   onImagesUpdate,
-  // Cross-page navigation support
-  onPageBoundary, // (direction: 'next' | 'prev') => boolean - returns true if page change handled
-  totalCount, // Total images across all pages (for counter display)
-  pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
-  onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
-  isPageTransitioning = false, // Whether we're loading a new page (show loading state, hide current image)
-  transitionKey = 0, // Increments on each page boundary crossing to force index reset
-  prefetchImages = [], // Images from adjacent pages to prefetch into browser cache
-}) => {
+  onPageBoundary,
+  totalCount,
+  pageOffset = 0,
+  onIndexChange,
+  isPageTransitioning = false,
+  transitionKey = 0,
+  prefetchImages = [],
+}: Props) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);

@@ -1,15 +1,18 @@
+import { type ReactNode } from "react";
+import type { NormalizedScene } from "@peek/shared-types";
 import Button from "./Button";
+
+interface Props {
+  selectedScenes: NormalizedScene[];
+  onClearSelection: () => void;
+  actions: ReactNode;
+}
 
 /**
  * Generic Bulk Action Bar for multiselect
  * Shows selected count and renders provided action buttons
- *
- * @param {Object} props
- * @param {Array} props.selectedScenes - Array of selected scene objects
- * @param {Function} props.onClearSelection - Callback to clear selection
- * @param {React.ReactNode} props.actions - Action buttons to render on the right side
  */
-const BulkActionBar = ({ selectedScenes, onClearSelection, actions }) => {
+const BulkActionBar = ({ selectedScenes, onClearSelection, actions }: Props) => {
   const selectedCount = selectedScenes.length;
 
   return (

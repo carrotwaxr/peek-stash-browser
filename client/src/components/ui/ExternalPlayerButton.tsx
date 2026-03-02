@@ -3,6 +3,13 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { showSuccess, showError } from "../../utils/toast";
 
+interface Props {
+  sceneId: string;
+  instanceId: string;
+  title: string;
+  className?: string;
+}
+
 /**
  * Button to open the current scene in an external media player.
  *
@@ -28,7 +35,7 @@ export default function ExternalPlayerButton({
   instanceId,
   title,
   className = "",
-}) {
+}: Props) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);

@@ -1,5 +1,13 @@
 import Button from "./Button";
 
+interface Props {
+  message: string;
+  className?: string;
+  title?: string;
+  mode?: "inline" | "toast";
+  onClose?: () => void;
+}
+
 /**
  * Reusable info display component
  * Supports both inline and toast display modes
@@ -8,9 +16,9 @@ const InfoMessage = ({
   message,
   className = "",
   title = "Info",
-  mode = "inline", // "inline" or "toast"
+  mode = "inline",
   onClose,
-}) => {
+}: Props) => {
   if (!message) return null;
 
   const baseClasses =

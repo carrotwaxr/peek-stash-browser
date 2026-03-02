@@ -3,6 +3,16 @@ import { useDebouncedCallback } from "../../hooks/useDebounce";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  initialRating: number | null | undefined;
+  onSave: (rating: number | null) => void;
+  entityType: string;
+  entityTitle?: string;
+  anchorEl: HTMLElement | null;
+}
+
 /**
  * Lightweight popover for editing rating from cards
  * Appears near the badge, auto-saves on change
@@ -16,7 +26,7 @@ const RatingSliderDialog = ({
   entityType,
   entityTitle,
   anchorEl,
-}) => {
+}: Props) => {
   // Track null separately - null means unrated, not 0
   const [value, setValue] = useState(
     initialRating === null || initialRating === undefined

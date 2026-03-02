@@ -1,4 +1,9 @@
+import { type ReactNode } from "react";
 import { useEffect, useState } from "react";
+
+interface Props {
+  children: ReactNode;
+}
 import { migrateNavPreferences } from "../../constants/navigation";
 import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
 import useScrollRestoration from "../../hooks/useScrollRestoration";
@@ -14,7 +19,7 @@ import TopBar from "./TopBar";
  * - TopBar (logo, help, settings, user menu)
  * - Main content area with responsive spacing
  */
-const GlobalLayout = ({ children }) => {
+const GlobalLayout = ({ children }: Props) => {
   const [navPreferences, setNavPreferences] = useState([]);
 
   useEffect(() => {

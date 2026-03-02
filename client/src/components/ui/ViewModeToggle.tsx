@@ -1,5 +1,19 @@
+import { type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList, LucideCalendar, LucideFolderOpen, LucideChevronDown } from "lucide-react";
+
+interface ViewMode {
+  id: string;
+  label: string;
+  icon?: LucideIcon;
+}
+
+interface Props {
+  modes?: ViewMode[];
+  value?: string;
+  onChange: (modeId: string) => void;
+  className?: string;
+}
 
 // Default modes for backward compatibility
 const DEFAULT_MODES = [
@@ -25,7 +39,7 @@ const MODE_ICONS = {
  * @param {string} value - Currently selected mode id
  * @param {function} onChange - Called with mode id when selection changes
  */
-const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => {
+const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Props) => {
   // Local state for immediate visual feedback (optimistic update)
   const [localValue, setLocalValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);

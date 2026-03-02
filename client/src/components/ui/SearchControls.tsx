@@ -92,37 +92,72 @@ const getSortOptions = (artifactType) => {
   }
 };
 
+interface ViewModeConfig {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+interface SettingConfig {
+  key: string;
+  label: string;
+  type: "select" | "toggle";
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface SearchControlsProps {
+  artifactType?: string;
+  context?: string;
+  children: React.ReactNode;
+  initialSort?: string;
+  onQueryChange: (query: Record<string, unknown>) => void;
+  onPerPageStateChange?: (perPage: number) => void;
+  paginationHandlerRef?: React.MutableRefObject<((page: number) => void) | null>;
+  permanentFilters?: Record<string, unknown>;
+  permanentFiltersMetadata?: Record<string, unknown>;
+  totalPages: number;
+  totalCount: number;
+  syncToUrl?: boolean;
+  supportsWallView?: boolean;
+  viewModes?: ViewModeConfig[];
+  onViewModeChange?: (mode: string) => void;
+  wallPlayback?: string;
+  onWallPlaybackChange?: (key: string, value: string) => void;
+  currentTableColumns?: Record<string, unknown> | null;
+  tableColumnsPopover?: React.ReactNode;
+  contextSettings?: SettingConfig[];
+  deferInitialQueryUntilFiltersReady?: boolean;
+  tvSearchZoneActive?: boolean;
+  tvTopPaginationZoneActive?: boolean;
+  tvBottomPaginationZoneActive?: boolean;
+}
+
 const SearchControls = ({
   artifactType = "scene",
-  context, // Optional context override (e.g., "scene_performer", "scene_tag")
+  context,
   children,
   initialSort = "o_counter",
   onQueryChange,
-  onPerPageStateChange, // Callback to notify parent of perPage state changes (fixes stale URL param bug)
-  paginationHandlerRef, // Optional ref to expose handlePageChange for TV mode
+  onPerPageStateChange,
+  paginationHandlerRef,
   permanentFilters = {},
   permanentFiltersMetadata = {},
   totalPages,
   totalCount,
   syncToUrl = true,
-  // View mode props
   supportsWallView = false,
-  viewModes, // Array of mode configs for ViewModeToggle (optional, overrides supportsWallView)
-  onViewModeChange, // Callback when view mode changes (optional)
+  viewModes,
+  onViewModeChange,
   wallPlayback = "autoplay",
-  onWallPlaybackChange, // Callback when wall playback setting changes
-  // Table view props
-  currentTableColumns = null, // Current table columns config for saving to presets
-  tableColumnsPopover = null, // ColumnConfigPopover component to render in toolbar
-  // Context settings - config array for the settings cog
-  contextSettings = [], // Array of setting configs: [{key, label, type, options}]
-  // Timeline view props
-  deferInitialQueryUntilFiltersReady = false, // When true, wait for permanentFilters to be non-empty before initial query
-  // TV Mode props
+  onWallPlaybackChange,
+  currentTableColumns = null,
+  tableColumnsPopover = null,
+  contextSettings = [],
+  deferInitialQueryUntilFiltersReady = false,
   tvSearchZoneActive = false,
   tvTopPaginationZoneActive = false,
   tvBottomPaginationZoneActive = false,
-}) => {
+}: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);

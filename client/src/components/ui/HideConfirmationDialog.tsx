@@ -1,6 +1,14 @@
 import { useState } from "react";
 import ConfirmDialog from "./ConfirmDialog";
 
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (dontAskAgain: boolean) => void;
+  entityType: string;
+  entityName: string;
+}
+
 /**
  * HideConfirmationDialog - Confirms hiding an entity with "don't ask again" option
  */
@@ -10,7 +18,7 @@ const HideConfirmationDialog = ({
   onConfirm,
   entityType,
   entityName,
-}) => {
+}: Props) => {
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
   const handleConfirm = () => {

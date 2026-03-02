@@ -21,7 +21,17 @@ import Tooltip from "./Tooltip";
  * - Listens for custom 'tvZoneChange' events from page components
  * - When mainNav zone is active: Up/Down navigate through items, Enter selects
  */
-const Sidebar = ({ navPreferences = [] }) => {
+interface NavPreference {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences?: NavPreference[];
+}
+
+const Sidebar = ({ navPreferences = [] }: Props) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();

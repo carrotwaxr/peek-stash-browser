@@ -1,9 +1,15 @@
+interface Props {
+  rating: number | null | undefined;
+  onClick?: () => void;
+  size?: "small" | "medium";
+}
+
 /**
  * Rating badge with metallic medal appearance based on rating value
  * Displays rating as 0.0-10.0 with copper/silver/gold gradients
  * Circular medal shape with realistic metallic sheen and depth
  */
-const RatingBadge = ({ rating, onClick, size = "small" }) => {
+const RatingBadge = ({ rating, onClick, size = "small" }: Props) => {
   const getRatingGradient = (rating) => {
     if (rating === null || rating === undefined) {
       // No rating - transparent badge with low opacity

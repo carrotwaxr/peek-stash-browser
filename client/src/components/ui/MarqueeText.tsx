@@ -1,4 +1,12 @@
+import { type CSSProperties, type ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+
+interface Props {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  autoplayOnScroll?: boolean;
+}
 
 /**
  * MarqueeText - Auto-scrolling text for overflowing content
@@ -25,7 +33,7 @@ const MarqueeText = ({
   className = "",
   style = {},
   autoplayOnScroll = true,
-}) => {
+}: Props) => {
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);

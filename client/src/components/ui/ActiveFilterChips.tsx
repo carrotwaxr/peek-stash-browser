@@ -1,17 +1,29 @@
 import { LucideX } from "lucide-react";
 import Button from "./Button";
 
-/**
- * Display active filters as removable chips/badges
- *
- * @param {Object} props
- * @param {Object} props.filters - Current filter values
- * @param {Array} props.filterOptions - Filter configuration from filterConfig.js
- * @param {Function} props.onRemoveFilter - Callback when a filter is removed
- * @param {Function} props.onChipClick - Callback when a chip body is clicked (receives filter key)
- * @param {Object} props.permanentFilters - Filters that can't be removed
- * @param {Object} props.permanentFiltersMetadata - Display names for permanent filters
- */
+interface FilterOption {
+  key: string;
+  label: string;
+  type: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface PermanentFiltersMetadata {
+  performers?: Array<{ id: string; name: string }>;
+  studios?: Array<{ id: string; name: string }>;
+  tags?: Array<{ id: string; name: string }>;
+  [key: string]: unknown;
+}
+
+interface Props {
+  filters: Record<string, unknown>;
+  filterOptions: FilterOption[];
+  onRemoveFilter: (key: string) => void;
+  onChipClick?: (key: string) => void;
+  permanentFilters?: Record<string, unknown>;
+  permanentFiltersMetadata?: PermanentFiltersMetadata;
+}
+
 const ActiveFilterChips = ({
   filters,
   filterOptions,
@@ -19,7 +31,7 @@ const ActiveFilterChips = ({
   onChipClick,
   permanentFilters = {},
   permanentFiltersMetadata = {},
-}) => {
+}: Props) => {
   const getFilterLabel = (filterKey, filterValue, filterConfig) => {
     const { label, type, options } = filterConfig;
 

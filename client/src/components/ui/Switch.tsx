@@ -1,3 +1,11 @@
+interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  id?: string;
+  className?: string;
+}
+
 /**
  * Toggle switch component
  * A styled checkbox that looks like a toggle switch
@@ -9,8 +17,8 @@ export default function Switch({
   id,
   className = "",
   ...props
-}) {
-  const handleChange = (e) => {
+}: Props) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
       onChange(e.target.checked);
     }

@@ -9,7 +9,17 @@ import Button from "./Button";
 import HelpModal from "./HelpModal";
 import UserMenu from "./UserMenu";
 
-const Navigation = ({ navPreferences = [] }) => {
+interface NavPreference {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences?: NavPreference[];
+}
+
+const Navigation = ({ navPreferences = [] }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();

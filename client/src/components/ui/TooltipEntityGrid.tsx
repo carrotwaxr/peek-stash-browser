@@ -2,6 +2,24 @@ import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 
+interface EntityItem {
+  id: string;
+  name?: string;
+  title?: string;
+  instanceId?: string;
+  image_path?: string | null;
+  front_image_path?: string | null;
+  back_image_path?: string | null;
+  cover?: string | null;
+}
+
+interface Props {
+  entityType: string;
+  entities: EntityItem[] | null | undefined;
+  title: string;
+  parentInstanceId?: string;
+}
+
 /**
  * Responsive grid item for entity tooltips
  * Uses proper aspect ratios and object-contain like cards
@@ -12,7 +30,7 @@ import { getEntityPath } from "../../utils/entityLinks";
  * @param {string} title - Grid title (e.g., "Performers", "Tags")
  * @param {string} parentInstanceId - Instance ID from parent entity (fallback when entities don't have their own)
  */
-export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceId }) => {
+export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceId }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
   if (!entities || entities.length === 0) return null;

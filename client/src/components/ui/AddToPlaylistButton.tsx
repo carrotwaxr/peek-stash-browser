@@ -6,17 +6,31 @@ import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
 import Paper from "./Paper";
 
+import { type ReactNode } from "react";
+
+interface Props {
+  sceneId?: string;
+  sceneIds?: string[];
+  compact?: boolean;
+  buttonText?: string;
+  icon?: ReactNode;
+  dropdownPosition?: "below" | "above";
+  onSuccess?: () => void;
+  excludePlaylistIds?: string[];
+  variant?: "primary" | "secondary" | "tertiary" | "destructive";
+}
+
 const AddToPlaylistButton = ({
   sceneId,
   sceneIds,
   compact = false,
   buttonText,
   icon,
-  dropdownPosition: dropdownPositionProp, // "below", "above", or undefined for auto
-  onSuccess, // Optional callback called after successful add
-  excludePlaylistIds = [], // Playlist IDs to exclude from the list
-  variant = "primary", // Button variant
-}) => {
+  dropdownPosition: dropdownPositionProp,
+  onSuccess,
+  excludePlaylistIds = [],
+  variant = "primary",
+}: Props) => {
   const [showMenu, setShowMenu] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(false);

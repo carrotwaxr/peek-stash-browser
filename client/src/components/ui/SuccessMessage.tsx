@@ -1,5 +1,13 @@
 import Button from "./Button";
 
+interface Props {
+  message: string;
+  className?: string;
+  title?: string;
+  mode?: "inline" | "toast";
+  onClose?: () => void;
+}
+
 /**
  * Reusable success display component
  * Supports both inline and toast display modes
@@ -8,9 +16,9 @@ const SuccessMessage = ({
   message,
   className = "",
   title = "Success",
-  mode = "inline", // "inline" or "toast"
+  mode = "inline",
   onClose,
-}) => {
+}: Props) => {
   if (!message) return null;
 
   const baseClasses =

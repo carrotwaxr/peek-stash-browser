@@ -1,5 +1,16 @@
+import { type ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+interface Props {
+  children: ReactNode;
+  content: ReactNode;
+  position?: "top" | "bottom" | "left" | "right";
+  className?: string;
+  disabled?: boolean;
+  clickable?: boolean;
+  hoverDisabled?: boolean;
+}
 
 /**
  * Reusable tooltip component with portal rendering to avoid overflow clipping
@@ -11,9 +22,9 @@ const Tooltip = ({
   position = "top",
   className = "",
   disabled = false,
-  clickable = false, // Enable click-to-open mode for mobile
-  hoverDisabled = false, // Disable hover trigger (useful when parent handles interaction)
-}) => {
+  clickable = false,
+  hoverDisabled = false,
+}: Props) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({
     top: 0,

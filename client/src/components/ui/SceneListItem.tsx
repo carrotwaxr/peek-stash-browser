@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -12,19 +12,31 @@ import {
 } from "../scene/index";
 import { ExpandableDescription } from "./ExpandableDescription";
 import { getSceneDescription } from "../../utils/format";
+import type { NormalizedScene } from "@peek/shared-types";
 
-/**
- * Shared row-based scene list item component
- * Used by both Playlists and Watch History
- *
- * @param {Object} scene - Scene object
- * @param {Object} watchHistory - Optional watch history data {resumeTime, playCount, playDuration, lastPlayedAt, oCount}
- * @param {React.ReactNode} actionButtons - Optional action buttons (e.g., Remove button)
- * @param {React.ReactNode} dragHandle - Optional content to show before the thumbnail (e.g., position controls)
- * @param {Object} linkState - Optional state to pass to Link component
- * @param {boolean} exists - Whether the scene exists (for deleted scenes)
- * @param {string} sceneId - Scene ID (for when scene is deleted)
- */
+interface WatchHistoryData {
+  resumeTime?: number;
+  playCount?: number;
+  playDuration?: number;
+  lastPlayedAt?: string | null;
+  oCount?: number;
+  oHistory?: string[] | string;
+}
+
+interface Props {
+  scene: NormalizedScene | null;
+  watchHistory?: WatchHistoryData | null;
+  actionButtons?: ReactNode;
+  dragHandle?: ReactNode;
+  linkState?: Record<string, unknown>;
+  exists?: boolean;
+  sceneId?: string;
+  showSessionOIndicator?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  selectionMode?: boolean;
+}
+
 const SceneListItem = ({
   scene,
   watchHistory,
@@ -33,11 +45,11 @@ const SceneListItem = ({
   linkState,
   exists = true,
   sceneId,
-  showSessionOIndicator = false, // Show if O was clicked in the last session
+  showSessionOIndicator = false,
   isSelected = false,
   onToggleSelect,
   selectionMode = false,
-}) => {
+}: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
 

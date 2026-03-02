@@ -44,6 +44,32 @@ const getContextLabel = (ctx) => {
  * @param {Object} props.currentTableColumns - Current table columns config { visible: [], order: [] }
  * @param {Function} props.onLoadPreset - Callback when a preset is loaded
  */
+interface PresetData {
+  filters: Record<string, unknown>;
+  sort: string;
+  direction: string;
+  viewMode?: string;
+  zoomLevel?: string;
+  gridDensity?: string;
+  tableColumns?: Record<string, unknown> | null;
+  perPage?: number | null;
+}
+
+interface Props {
+  artifactType: string;
+  context?: string;
+  currentFilters: Record<string, unknown>;
+  permanentFilters?: Record<string, unknown>;
+  currentSort: string;
+  currentDirection: string;
+  currentViewMode?: string;
+  currentZoomLevel?: string;
+  currentGridDensity?: string;
+  currentTableColumns?: Record<string, unknown> | null;
+  currentPerPage?: number;
+  onLoadPreset: (preset: PresetData) => void;
+}
+
 const FilterPresets = ({
   artifactType,
   context,
@@ -57,7 +83,7 @@ const FilterPresets = ({
   currentTableColumns = null,
   currentPerPage = 24,
   onLoadPreset,
-}) => {
+}: Props) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [presets, setPresets] = useState([]);

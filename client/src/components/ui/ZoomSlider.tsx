@@ -1,9 +1,15 @@
 import { ZOOM_LEVELS } from "../wall/wallConfig";
 
+interface Props {
+  value?: string;
+  onChange: (level: string) => void;
+  className?: string;
+}
+
 /**
  * 3-level zoom control for Wall view (S/M/L).
  */
-const ZoomSlider = ({ value = "medium", onChange, className = "" }) => {
+const ZoomSlider = ({ value = "medium", onChange, className = "" }: Props) => {
   const levels = Object.entries(ZOOM_LEVELS);
 
   return (

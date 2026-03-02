@@ -4,7 +4,12 @@ import { apiGet } from "../../api";
 import SceneGrid from "../scene-search/SceneGrid";
 import Pagination from "./Pagination";
 
-const ScenesLikeThis = ({ sceneId, onCountChange }) => {
+interface Props {
+  sceneId: string;
+  onCountChange?: (count: number) => void;
+}
+
+const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);

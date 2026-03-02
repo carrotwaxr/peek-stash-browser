@@ -1,6 +1,18 @@
-import { forwardRef, useEffect } from "react";
+import { forwardRef, useEffect, type ReactNode, type MutableRefObject } from "react";
 import Button from "./Button";
 import SearchableSelect from "./SearchableSelect";
+
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface SortControlProps {
+  options: SortOption[];
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+}
 
 /**
  * Reusable Sort Control Component
@@ -10,7 +22,7 @@ export const SortControl = ({
   value,
   onChange,
   label,
-}) => {
+}: SortControlProps) => {
   // Standardized styles (same as FilterControl)
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -48,7 +60,29 @@ export const SortControl = ({
 /**
  * Reusable Filter Control Component
  */
-export const FilterControl = forwardRef(({
+interface FilterControlProps {
+  type?: "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range";
+  label: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  options?: SortOption[];
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  entityType?: string;
+  multi?: boolean;
+  countFilterContext?: string | null;
+  modifierOptions?: SortOption[];
+  modifierValue?: string;
+  onModifierChange?: (value: string) => void;
+  supportsHierarchy?: boolean;
+  hierarchyLabel?: string;
+  hierarchyValue?: number | undefined;
+  onHierarchyChange?: (value: number | undefined) => void;
+  isHighlighted?: boolean;
+}
+
+export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
   type = "select",
   label,
   value,
@@ -57,18 +91,17 @@ export const FilterControl = forwardRef(({
   placeholder = "",
   min,
   max,
-  entityType, // for searchable-select
-  multi, // for searchable-select
-  countFilterContext, // for searchable-select - filter to entities with content in this context
-  modifierOptions, // for multi-criterion modifiers
-  modifierValue, // current modifier value
-  onModifierChange, // modifier change handler
-  // Hierarchy support for tags/studios
+  entityType,
+  multi,
+  countFilterContext,
+  modifierOptions,
+  modifierValue,
+  onModifierChange,
   supportsHierarchy = false,
   hierarchyLabel = "Include children",
-  hierarchyValue, // current depth value (undefined/0 = off, -1 = all)
-  onHierarchyChange, // hierarchy change handler
-  isHighlighted = false, // for highlight animation when chip is clicked
+  hierarchyValue,
+  onHierarchyChange,
+  isHighlighted = false,
 }, ref) => {
   // Standardized styles for all inputs in the filter panel
   const baseInputStyle = {
@@ -437,6 +470,17 @@ FilterControl.displayName = "FilterControl";
 /**
  * Collapsible Filter Panel Component with manual submit
  */
+interface FilterPanelProps {
+  children: ReactNode;
+  onClear: () => void;
+  hasActiveFilters: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onSubmit: () => void;
+  highlightedFilterKey?: string | null;
+  filterRefs?: MutableRefObject<Record<string, HTMLElement | null>>;
+}
+
 export const FilterPanel = ({
   children,
   onClear,
@@ -446,7 +490,7 @@ export const FilterPanel = ({
   onSubmit,
   highlightedFilterKey,
   filterRefs,
-}) => {
+}: FilterPanelProps) => {
   // Scroll to highlighted filter when it changes
   useEffect(() => {
     if (highlightedFilterKey && filterRefs?.current?.[highlightedFilterKey]) {

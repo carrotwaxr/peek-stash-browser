@@ -1,8 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import Button from "./Button";
 import SceneCard from "./SceneCard";
 import SkeletonSceneCard from "./SkeletonSceneCard";
+import type { NormalizedScene } from "@peek/shared-types";
+
+interface Props {
+  title: string;
+  titleIcon?: ReactNode;
+  scenes: NormalizedScene[];
+  loading?: boolean;
+  onSceneClick?: (scene: NormalizedScene) => boolean | void;
+  showProgress?: boolean;
+  selectedScenes?: NormalizedScene[];
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  seeMoreUrl?: string;
+}
 
 const SceneCarousel = ({
   title,
@@ -13,7 +26,7 @@ const SceneCarousel = ({
   selectedScenes = [],
   onToggleSelect,
   seeMoreUrl,
-}) => {
+}: Props) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef(null);

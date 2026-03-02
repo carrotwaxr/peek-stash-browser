@@ -1,6 +1,30 @@
-import { Droplets, Eye } from "lucide-react";
+import { type ReactNode } from "react";
+import { type LucideIcon, Droplets, Eye } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import Tooltip from "./Tooltip";
+
+interface IndicatorItem {
+  type: string;
+  count: number;
+  tooltipContent?: ReactNode;
+  onClick?: (e: React.MouseEvent) => void;
+}
+
+interface CardCountIndicatorsProps {
+  indicators: IndicatorItem[];
+  showZeroCounts?: boolean;
+  size?: number;
+}
+
+interface CardCountIndicatorProps {
+  count: number;
+  icon: LucideIcon;
+  iconColor?: string;
+  iconSize?: number;
+  tooltipContent?: ReactNode;
+  label?: ((count: number) => string) | null;
+  onClick?: ((e: React.MouseEvent) => void) | null;
+}
 
 const hueify = (color, direction = "lighter", amount = 12) => {
   return `lch(from ${color} calc(l ${
@@ -65,7 +89,7 @@ export const CardCountIndicators = ({
   indicators,
   showZeroCounts = false,
   size = 20,
-}) => {
+}: CardCountIndicatorsProps) => {
   return (
     <div className="flex flex-wrap items-center justify-center gap-4">
       {indicators.map((indicator, index) => {
@@ -98,7 +122,7 @@ const CardCountIndicator = ({
   tooltipContent = null,
   label = null,
   onClick = null,
-}) => {
+}: CardCountIndicatorProps) => {
   const Icon = icon;
 
   const guts = (

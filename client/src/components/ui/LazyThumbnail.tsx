@@ -1,10 +1,18 @@
+import { type ReactNode } from "react";
 import { useLazyLoad } from "./CardComponents";
+
+interface Props {
+  src: string | null | undefined;
+  alt: string;
+  fallback: ReactNode;
+  className?: string;
+}
 
 /**
  * LazyThumbnail - Lazy-loaded thumbnail component
  * Uses intersection observer to only load images when they're visible
  */
-const LazyThumbnail = ({ src, alt, fallback, className }) => {
+const LazyThumbnail = ({ src, alt, fallback, className }: Props) => {
   const [ref, shouldLoad] = useLazyLoad();
 
   return (

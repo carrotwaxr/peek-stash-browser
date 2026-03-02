@@ -1,11 +1,16 @@
 import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
+import type { TagRef } from "@peek/shared-types";
+
+interface Props {
+  tags: TagRef[] | null | undefined;
+}
 
 /**
  * Renders a list of tag chips, sorted alphabetically
  */
-const TagChips = ({ tags }) => {
+const TagChips = ({ tags }: Props) => {
   const { hasMultipleInstances } = useConfig();
   if (!tags || tags.length === 0) return null;
 

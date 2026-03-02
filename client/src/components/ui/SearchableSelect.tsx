@@ -19,6 +19,15 @@ import Button from "./Button";
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
  */
 
+interface Props {
+  entityType: "performers" | "studios" | "tags" | "groups" | "galleries";
+  value: string | string[];
+  onChange: (value: string | string[]) => void;
+  multi?: boolean;
+  placeholder?: string;
+  countFilterContext?: "scenes" | "galleries" | "images" | "performers" | "groups" | null;
+}
+
 const SearchableSelect = ({
   entityType,
   value,
@@ -26,7 +35,7 @@ const SearchableSelect = ({
   multi = false,
   placeholder = "Select...",
   countFilterContext = null,
-}) => {
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState([]);

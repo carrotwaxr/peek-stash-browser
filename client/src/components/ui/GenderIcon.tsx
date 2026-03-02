@@ -23,7 +23,13 @@ import NonBinaryIcon from "./icons/NonBinaryIcon";
  * @param {number} size - Icon size in pixels (default: 24)
  * @param {string} className - Optional additional CSS classes
  */
-const GenderIcon = ({ gender, size = 24, className = "" }) => {
+interface Props {
+  gender: string | null | undefined;
+  size?: number;
+  className?: string;
+}
+
+const GenderIcon = ({ gender, size = 24, className = "" }: Props) => {
   // Gender-specific colors based on traditional and pride flag colors
   const getGenderConfig = () => {
     switch (gender) {

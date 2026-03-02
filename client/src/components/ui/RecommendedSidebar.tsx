@@ -12,7 +12,12 @@ import { useLazyLoad } from "./CardComponents";
  * @param {string} sceneId - Current scene ID for fetching similar scenes
  * @param {number} maxHeight - Maximum height in pixels to match left column
  */
-const RecommendedSidebar = ({ sceneId, maxHeight }) => {
+interface Props {
+  sceneId: string;
+  maxHeight?: number;
+}
+
+const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
   const [scenes, setScenes] = useState([]);
@@ -184,7 +189,13 @@ const formatDuration = (seconds) => {
 /**
  * SidebarThumbnail - Lazy-loaded thumbnail for sidebar items
  */
-const SidebarThumbnail = ({ thumbnail, alt, duration }) => {
+interface SidebarThumbnailProps {
+  thumbnail: string | null | undefined;
+  alt: string;
+  duration: number | null | undefined;
+}
+
+const SidebarThumbnail = ({ thumbnail, alt, duration }: SidebarThumbnailProps) => {
   const [ref, shouldLoad] = useLazyLoad();
 
   return (

@@ -1,7 +1,17 @@
+import { type ReactNode } from "react";
+
+interface Props {
+  icon?: ReactNode;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  className?: string;
+}
+
 /**
  * Reusable empty state component
  */
-const EmptyState = ({ icon, title, description, action, className = "" }) => {
+const EmptyState = ({ icon, title, description, action, className = "" }: Props) => {
   const defaultIcon = (
     <svg
       className="w-16 h-16 mx-auto mb-4"

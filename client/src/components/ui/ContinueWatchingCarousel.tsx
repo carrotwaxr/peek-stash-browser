@@ -6,16 +6,23 @@ import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import { libraryApi } from "../../api";
 import SceneCarousel from "./SceneCarousel";
+import type { NormalizedScene } from "@peek/shared-types";
 
 /**
  * Continue Watching carousel component
  * Shows scenes that have been partially watched with resume times
  */
+interface Props {
+  selectedScenes?: NormalizedScene[];
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  onInitializing?: (isInitializing: boolean) => void;
+}
+
 const ContinueWatchingCarousel = ({
   selectedScenes = [],
   onToggleSelect,
   onInitializing,
-}) => {
+}: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
   const {

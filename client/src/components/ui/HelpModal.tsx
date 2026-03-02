@@ -3,6 +3,10 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { Button } from "./index";
 
+interface Props {
+  onClose: () => void;
+}
+
 // Determine current page from URL
 const getCurrentPage = (location) => {
   const path = location.pathname;
@@ -26,7 +30,7 @@ const getCurrentPage = (location) => {
  * Help Modal - Shows context-aware help documentation
  * Currently displays keyboard shortcuts for the current page
  */
-const HelpModal = ({ onClose }) => {
+const HelpModal = ({ onClose }: Props) => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("hotkeys");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

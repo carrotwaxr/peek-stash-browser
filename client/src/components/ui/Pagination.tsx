@@ -9,6 +9,21 @@ import Button from "./Button";
 import { useTVMode } from "../../hooks/useTVMode";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 
+interface Props {
+  currentPage?: number;
+  totalPages: number;
+  onPageChange?: (page: number) => void;
+  perPage?: number;
+  onPerPageChange?: (perPage: number) => void;
+  totalCount?: number;
+  showInfo?: boolean;
+  showPerPageSelector?: boolean;
+  className?: string;
+  tvActive?: boolean;
+  onEscapeUp?: () => void;
+  onEscapeDown?: () => void;
+}
+
 /**
  * Reusable pagination component
  */
@@ -25,11 +40,10 @@ const Pagination = ({
   showInfo = true,
   showPerPageSelector = true,
   className = "",
-  // TV Mode props
   tvActive = false,
   onEscapeUp,
   onEscapeDown,
-}) => {
+}: Props) => {
   const { isTVMode } = useTVMode();
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);

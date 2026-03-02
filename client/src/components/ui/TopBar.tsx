@@ -19,7 +19,17 @@ import UserMenu from "./UserMenu";
  * - Desktop: Navigation is in sidebar
  * - Auto-hides on scroll down
  */
-const TopBar = ({ navPreferences = [] }) => {
+interface NavPreference {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences?: NavPreference[];
+}
+
+const TopBar = ({ navPreferences = [] }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();

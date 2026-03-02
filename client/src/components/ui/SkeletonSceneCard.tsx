@@ -5,7 +5,11 @@
  */
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 
-const SkeletonSceneCard = ({ entityType = "scene" }) => {
+interface Props {
+  entityType?: string;
+}
+
+const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings(entityType);
 

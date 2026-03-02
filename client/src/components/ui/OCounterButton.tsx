@@ -15,6 +15,16 @@ import { apiPost } from "../../api";
  * @param {string} variant - Style variant: card (transparent), page (with background), lightbox
  * @param {boolean} interactive - Enable click-to-increment (default: true if sceneId or imageId provided)
  */
+interface Props {
+  sceneId?: string;
+  imageId?: string;
+  initialCount?: number;
+  onChange?: (count: number) => void;
+  size?: "small" | "medium" | "large";
+  variant?: "card" | "page" | "lightbox";
+  interactive?: boolean;
+}
+
 const OCounterButton = ({
   sceneId,
   imageId,
@@ -23,7 +33,7 @@ const OCounterButton = ({
   size = "small",
   variant = "card",
   interactive = true,
-}) => {
+}: Props) => {
   const [count, setCount] = useState(initialCount ?? 0);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);

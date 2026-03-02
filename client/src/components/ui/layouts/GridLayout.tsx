@@ -1,27 +1,17 @@
+import { type ReactNode } from 'react';
 import { getGridClasses } from '../../../constants/grids';
 
-/**
- * GridLayout - Responsive grid layout
- *
- * Pure layout component - only knows about:
- * - Grid classes (responsive columns)
- * - Skeleton rendering while loading
- *
- * Doesn't know about:
- * - Entities
- * - Data fetching
- * - Pagination (handled by SearchResults)
- *
- * @param {Object} props
- * @param {string} props.entityType - Entity type for grid selection ('scene' vs 'standard')
- * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
- * @param {Array} props.items - Items to render
- * @param {Function} props.renderItem - Function to render each item (item, index) => ReactNode
- * @param {boolean} [props.loading] - Loading state
- * @param {Function} [props.renderSkeleton] - Custom skeleton renderer
- * @param {number} [props.skeletonCount] - Number of skeleton items
- * @param {string} [props.className] - Additional CSS classes
- */
+interface Props {
+  entityType: string;
+  density?: "small" | "medium" | "large";
+  items: unknown[];
+  renderItem: (item: unknown, index: number) => ReactNode;
+  loading?: boolean;
+  renderSkeleton?: () => ReactNode;
+  skeletonCount?: number;
+  className?: string;
+}
+
 export const GridLayout = ({
   entityType,
   density = "medium",
@@ -31,7 +21,7 @@ export const GridLayout = ({
   renderSkeleton,
   skeletonCount = 12,
   className = "",
-}) => {
+}: Props) => {
   // Determine grid type based on entity
   const gridType = entityType === 'scene' ? 'scene' : 'standard';
   const gridClasses = getGridClasses(gridType, density);

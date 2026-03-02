@@ -1,10 +1,15 @@
 import LoadingSpinner from "./LoadingSpinner";
 
+interface Props {
+  message?: string;
+  className?: string;
+}
+
 /**
  * Reusable banner component for library sync state
  * Shows a prominent info banner with spinner when library is syncing
  */
-const SyncProgressBanner = ({ message, className = "" }) => {
+const SyncProgressBanner = ({ message, className = "" }: Props) => {
   return (
     <div
       className={`mb-6 px-6 py-4 rounded-lg border-l-4 ${className}`}

@@ -24,13 +24,34 @@ import ZoomSlider from "./ZoomSlider";
  * @param {Object} currentValues - Current values for each setting key
  * @param {Function} onSettingChange - Called with (key, value) when setting changes
  */
+interface SettingOption {
+  value: string;
+  label: string;
+}
+
+interface SettingConfig {
+  key: string;
+  label: string;
+  type: "select" | "toggle";
+  options?: SettingOption[];
+  toggleLabel?: string;
+}
+
+interface Props {
+  settings?: SettingConfig[];
+  currentValues?: Record<string, string | boolean>;
+  onSettingChange?: (key: string, value: string | boolean) => void;
+  className?: string;
+  entityType?: string | null;
+}
+
 const ContextSettings = ({
   settings = [],
   currentValues = {},
   onSettingChange,
   className = "",
   entityType = null,
-}) => {
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const containerRef = useRef(null);

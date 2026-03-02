@@ -15,6 +15,20 @@ import TagChips from "./TagChips";
  * - Landscape (wider): opens from the right as a side panel
  * - Portrait (taller): opens from the bottom as a sheet
  */
+import type { NormalizedImage } from "@peek/shared-types";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  image: NormalizedImage | null;
+  rating: number | null;
+  isFavorite: boolean;
+  oCounter: number;
+  onRatingChange: (rating: number | null) => void;
+  onFavoriteChange: (isFavorite: boolean) => void;
+  onOCounterChange: (count: number) => void;
+}
+
 const MetadataDrawer = ({
   open,
   onClose,
@@ -25,7 +39,7 @@ const MetadataDrawer = ({
   onRatingChange,
   onFavoriteChange,
   onOCounterChange,
-}) => {
+}: Props) => {
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(
     () => window.innerWidth > window.innerHeight

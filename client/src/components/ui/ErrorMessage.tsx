@@ -1,5 +1,14 @@
 import Button from "./Button";
 
+interface Props {
+  error: string | Error | null | undefined;
+  onRetry?: () => void;
+  className?: string;
+  showRetry?: boolean;
+  title?: string;
+  mode?: "inline" | "toast";
+}
+
 /**
  * Reusable error display component
  * Supports both inline and toast display modes
@@ -10,8 +19,8 @@ const ErrorMessage = ({
   className = "",
   showRetry = true,
   title = "Error",
-  mode = "inline", // "inline" or "toast"
-}) => {
+  mode = "inline",
+}: Props) => {
   if (!error) return null;
 
   // Extract error message from error object or use string directly

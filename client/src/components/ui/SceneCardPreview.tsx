@@ -4,39 +4,18 @@ import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
 } from "../../utils/spriteSheet";
+import type { NormalizedScene } from "@peek/shared-types";
 
-/**
- * Animated preview for scene cards with user-controlled quality preference and smart fallback
- *
- * Preview Quality Modes (user preference):
- * - sprite: Low quality (160px VTT sprite sheet) - default, always available
- * - webp: High quality (640px WebP animation) - falls back to sprite if unavailable
- * - mp4: High quality (640px MP4 video) - falls back to sprite if unavailable
- *
- * Fallback Logic:
- * - sprite preference: Only use sprite (no HTTP requests for high quality)
- * - webp/mp4 preference: Try high quality, fallback to sprite on 404
- * - No cross-fallback between webp and mp4
- *
- * Preview behavior based on input method and layout:
- * - When autoplayOnScroll=true: Preview when scrolled into view (mobile-first)
- * - When autoplayOnScroll=false on hover-capable devices: Preview on hover
- * - When autoplayOnScroll=false on touch-only devices: No preview (static screenshot)
- *
- * Performance optimizations:
- * - Screenshots use IntersectionObserver for true lazy loading (only load when visible)
- * - Animations only fetched when user hovers or scrolls into view
- * - Results cached to prevent re-fetching on subsequent interactions
- * - Combined with backend concurrency limiting to prevent overwhelming Stash
- *
- * @param {Object} scene - Scene object with paths.preview, paths.webp, paths.sprite, paths.vtt
- * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
- * @param {number} cycleInterval - Milliseconds between sprite changes for VTT previews (default: 800ms)
- * @param {number} spriteCount - Number of sprites to cycle through for VTT previews (default: 5)
- * @param {string} duration - Formatted duration string for bottom-left overlay (e.g., "2h03m")
- * @param {string} resolution - Formatted resolution string for top-right overlay (e.g., "1080p")
- * @param {string} objectFit - CSS object-fit value: "contain" (default) or "cover" for cropping
- */
+interface Props {
+  scene: NormalizedScene;
+  autoplayOnScroll?: boolean;
+  cycleInterval?: number;
+  spriteCount?: number;
+  duration?: string | null;
+  resolution?: string | null;
+  objectFit?: "contain" | "cover";
+}
+
 const SceneCardPreview = ({
   scene,
   autoplayOnScroll = false,
@@ -45,7 +24,7 @@ const SceneCardPreview = ({
   duration = null,
   resolution = null,
   objectFit = "contain",
-}) => {
+}: Props) => {
   const { user } = useAuth();
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);

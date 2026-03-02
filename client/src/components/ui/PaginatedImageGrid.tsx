@@ -2,20 +2,35 @@ import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import { LazyImage } from "./CardComponents";
 import Lightbox from "./Lightbox";
 import Pagination from "./Pagination";
+import type { NormalizedImage } from "@peek/shared-types";
 
-/**
- * Reusable component for displaying a paginated grid of images with lightbox support.
- * Works with useImagesPagination hook.
- *
- * @param {Object} props
- * @param {Array} props.images - Array of image objects
- * @param {number} props.totalCount - Total number of images across all pages
- * @param {boolean} props.isLoading - Whether images are loading
- * @param {Object} props.lightbox - Lightbox state from usePaginatedLightbox
- * @param {Function} props.setImages - Function to update images (for lightbox edits)
- * @param {string} props.emptyMessage - Message to show when no images
- * @param {string} props.className - Additional className for wrapper
- */
+interface LightboxState {
+  currentPage: number;
+  totalPages: number;
+  setCurrentPage: (page: number) => void;
+  lightboxIndex: number;
+  lightboxOpen: boolean;
+  lightboxAutoPlay: boolean;
+  openLightbox: (index: number) => void;
+  closeLightbox: () => void;
+  onPageBoundary: (direction: "next" | "prev") => boolean;
+  pageOffset: number;
+  onIndexChange: (index: number) => void;
+  isPageTransitioning: boolean;
+  transitionKey: number;
+  prefetchImages: NormalizedImage[];
+}
+
+interface Props {
+  images: NormalizedImage[];
+  totalCount: number;
+  isLoading: boolean;
+  lightbox: LightboxState;
+  setImages: (images: NormalizedImage[]) => void;
+  emptyMessage?: string;
+  className?: string;
+}
+
 const PaginatedImageGrid = ({
   images,
   totalCount,
@@ -24,7 +39,7 @@ const PaginatedImageGrid = ({
   setImages,
   emptyMessage = "No images found",
   className = "",
-}) => {
+}: Props) => {
   // Render grid content based on loading/empty state
   const renderGridContent = () => {
     if (isLoading) {

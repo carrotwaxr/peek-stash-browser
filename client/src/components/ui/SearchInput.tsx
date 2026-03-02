@@ -5,6 +5,16 @@ import { useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "../../hooks/useDebounce";
 import Button from "./Button";
 
+interface Props {
+  placeholder?: string;
+  onSearch: (query: string) => void;
+  value?: string;
+  debounceMs?: number;
+  className?: string;
+  autoFocus?: boolean;
+  clearOnSearch?: boolean;
+}
+
 const SearchInput = ({
   placeholder = "Search...",
   onSearch,
@@ -13,7 +23,7 @@ const SearchInput = ({
   className = "",
   autoFocus = false,
   clearOnSearch = false,
-}) => {
+}: Props) => {
   const [query, setQuery] = useState(value || "");
   const debouncedQuery = useDebouncedValue(query, debounceMs);
   // Track if user explicitly cleared - ignore stale callbacks until debounce catches up

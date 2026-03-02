@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "../../hooks/useDebounce";
 
+interface Props {
+  rating: number | null | undefined;
+  onChange: (rating: number | null) => void;
+  label?: string;
+  showClearButton?: boolean;
+}
+
 /**
  * Inline slider for rating on detail pages
  * Replaces star rating with gradient slider
@@ -11,7 +18,7 @@ const RatingSlider = ({
   onChange,
   label = "Rating",
   showClearButton = true,
-}) => {
+}: Props) => {
   // Track whether item is rated (null = unrated, number = rated)
   const [value, setValue] = useState(
     rating === null || rating === undefined ? null : rating / 10

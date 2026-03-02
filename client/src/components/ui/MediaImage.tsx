@@ -1,4 +1,14 @@
+import { type CSSProperties } from "react";
 import { useState, useCallback, useEffect } from "react";
+
+interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "onLoad" | "onError"> {
+  src: string | null | undefined;
+  alt?: string;
+  className?: string;
+  onLoad?: () => void;
+  onError?: () => void;
+  style?: CSSProperties;
+}
 
 /**
  * MediaImage - Smart image component that detects video content and renders appropriately
@@ -25,7 +35,7 @@ const MediaImage = ({
   onError,
   style = {},
   ...props
-}) => {
+}: Props) => {
   const [isVideo, setIsVideo] = useState(false);
   const [hasError, setHasError] = useState(false);
 

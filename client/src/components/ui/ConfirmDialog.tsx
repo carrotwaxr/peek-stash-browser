@@ -1,5 +1,17 @@
+import { type ReactNode } from "react";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import Button from "./Button";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  message: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  confirmStyle?: "danger" | "primary";
+}
 
 /**
  * Reusable confirmation dialog component
@@ -13,8 +25,8 @@ const ConfirmDialog = ({
   message,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  confirmStyle = "danger", // "danger" or "primary"
-}) => {
+  confirmStyle = "danger",
+}: Props) => {
   // Focus trap to keep keyboard navigation within modal
   const dialogRef = useFocusTrap(isOpen, onClose);
 

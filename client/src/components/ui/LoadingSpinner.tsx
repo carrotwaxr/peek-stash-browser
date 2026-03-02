@@ -1,7 +1,12 @@
+interface Props {
+  size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
+}
+
 /**
  * Reusable loading spinner component
  */
-const LoadingSpinner = ({ size = "md", className = "" }) => {
+const LoadingSpinner = ({ size = "md", className = "" }: Props) => {
   const sizeClasses = {
     sm: "w-4 h-4",
     md: "w-8 h-8",
