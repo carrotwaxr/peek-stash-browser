@@ -70,6 +70,10 @@ jobs:
       - name: TypeScript Compile
         run: npx tsc --noEmit
 
+      - name: Check type sync (server ↔ shared)
+        working-directory: .
+        run: bash scripts/check-type-sync.sh
+
       - name: Test with coverage
         run: npm run test:coverage
         env:
