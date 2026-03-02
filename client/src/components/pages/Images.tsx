@@ -1,0 +1,415 @@
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { getGridClasses } from "../../constants/grids";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useGridColumns } from "../../hooks/useGridColumns";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { libraryApi } from "../../api";
+import { ImageCard } from "../cards/index";
+import {
+  SyncProgressBanner,
+  ErrorMessage,
+  PageHeader,
+  PageLayout,
+  SearchControls,
+} from "../ui/index";
+import Lightbox from "../ui/Lightbox";
+import WallView from "../wall/WallView";
+import TimelineView from "../timeline/TimelineView";
+import { TableView, ColumnConfigPopover } from "../table/index";
+import { FolderView } from "../folder/index";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
+
+// View modes available for images page
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
+  { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
+  { id: "folder", label: "Folder view" },
+];
+
+const Images = () => {
+  usePageTitle("Images");
+  const [searchParams] = useSearchParams();
+  const pageRef = useRef(null);
+  const gridRef = useRef(null);
+  const columns = useGridColumns("images");
+  const { wallPlayback } = useWallPlayback();
+
+  // Table columns hook for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("image");
+
+  // Track current view mode for timeline date filter and folder view
+  // Initialize from URL to stay in sync with useFilterState on back navigation
+  const [currentViewMode, setCurrentViewMode] = useState(
+    searchParams.get("view") || "grid"
+  );
+
+  // Fetch tags for folder view (only when folder view is active)
+  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
+    currentViewMode === "folder"
+  );
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Track folder tag filter for filtering by selected folder
+  const [folderTagFilter, setFolderTagFilter] = useState(null);
+
+  // Merge timeline/folder filters into permanent filters based on view mode
+  const effectivePermanentFilters = useMemo(() => {
+    let filters = {};
+
+    // Add timeline date filter when in timeline view
+    if (currentViewMode === "timeline" && timelineDateFilter) {
+      filters.date = timelineDateFilter;
+    }
+
+    // Add folder tag filter when in folder view
+    if (currentViewMode === "folder" && folderTagFilter) {
+      filters.tags = {
+        value: [folderTagFilter],
+        modifier: "INCLUDES",
+        depth: -1, // Include child tags (hierarchical)
+      };
+    }
+
+    return filters;
+  }, [currentViewMode, timelineDateFilter, folderTagFilter]);
+
+  // Extract URL pagination params early (needed for hooks)
+  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
+  const urlPage = parseInt(searchParams.get("page")) || 1;
+
+  // Track effective perPage from SearchControls state (fixes stale URL param bug)
+  const [effectivePerPage, setEffectivePerPage] = useState(urlPerPage);
+
+  // Ref to expose SearchControls pagination handler for external use
+  const paginationHandlerRef = useRef(null);
+
+  // Ref to store the lightbox consumePendingLightboxIndex function
+  // This avoids circular dependency between usePaginatedLightbox and useCancellableQuery
+  const consumePendingLightboxIndexRef = useRef(null);
+
+  // Query hook with onDataChange to consume pending lightbox index when data loads
+  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery({
+    onDataChange: () => {
+      // Synchronously consume pending lightbox index when new data arrives
+      // This fixes flicker during cross-page navigation
+      consumePendingLightboxIndexRef.current?.();
+    },
+  });
+
+  const currentImages = useMemo(() => data?.images || [], [data?.images]);
+  const totalCount = data?.count || 0;
+  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
+  const pageOffset = (urlPage - 1) * urlPerPage;
+
+  // Paginated lightbox with external pagination (synced to URL)
+  const lightbox = usePaginatedLightbox({
+    perPage: urlPerPage,
+    totalCount,
+    externalPage: urlPage,
+    onExternalPageChange: (newPage) => {
+      // Delegate to SearchControls pagination handler
+      if (paginationHandlerRef.current) {
+        paginationHandlerRef.current(newPage);
+      }
+    },
+  });
+
+  // Destructure for stable references in callbacks
+  const { openLightbox } = lightbox;
+
+  // Store the consume function in ref for the onDataChange callback
+  consumePendingLightboxIndexRef.current = lightbox.consumePendingLightboxIndex;
+
+  const handleQueryChange = useCallback(
+    (newQuery) => {
+      execute((signal) => getImages(newQuery, signal));
+    },
+    [execute]
+  );
+
+  // Handle image click - open lightbox
+  const handleImageClick = useCallback(
+    (image) => {
+      const index = currentImages.findIndex((img) => img.id === image.id);
+      openLightbox(index >= 0 ? index : 0);
+    },
+    [currentImages, openLightbox]
+  );
+
+  // Handle O counter change from card - update local state
+  const handleOCounterChange = useCallback((imageId, newCount) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, oCounter: newCount } : img
+      ),
+    }));
+  }, [setData]);
+
+  // Handle rating change from card - update local state
+  const handleRatingChange = useCallback((imageId, newRating) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, rating100: newRating } : img
+      ),
+    }));
+  }, [setData]);
+
+  // Handle favorite change from card - update local state
+  const handleFavoriteChange = useCallback((imageId, newFavorite) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, favorite: newFavorite } : img
+      ),
+    }));
+  }, [setData]);
+
+  // TV Navigation - use shared hook for all grid pages
+  // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
+  const {
+    isTVMode,
+    _tvNavigation,
+    searchControlsProps,
+    gridItemProps,
+  } = useGridPageTVNavigation({
+    items: currentImages,
+    columns,
+    totalPages,
+    onItemSelect: handleImageClick,
+  });
+
+  useInitialFocus(
+    pageRef,
+    '[tabindex="0"]',
+    !isLoading && currentImages.length > 0 && isTVMode
+  );
+
+  if (error && !initMessage) {
+    return (
+      <PageLayout>
+        <PageHeader title="Images" />
+        <ErrorMessage error={error} />
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout>
+      <div ref={pageRef}>
+        <PageHeader
+          title="Images"
+          subtitle="Browse all images in your library"
+        />
+
+        {initMessage && <SyncProgressBanner message={initMessage} />}
+
+        <SearchControls
+          artifactType="image"
+          initialSort="created_at"
+          onQueryChange={handleQueryChange}
+          onPerPageStateChange={setEffectivePerPage}
+          permanentFilters={effectivePermanentFilters}
+          deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          supportsWallView={true}
+          wallPlayback={wallPlayback}
+          viewModes={VIEW_MODES}
+          onViewModeChange={setCurrentViewMode}
+          currentTableColumns={getColumnConfig()}
+          tableColumnsPopover={
+            <ColumnConfigPopover
+              allColumns={allColumns}
+              visibleColumnIds={visibleColumnIds}
+              columnOrder={columnOrder}
+              onToggleColumn={toggleColumn}
+              onMoveColumn={moveColumn}
+            />
+          }
+          {...searchControlsProps}
+          paginationHandlerRef={paginationHandlerRef}
+        >
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
+            viewMode === "table" ? (
+              <TableView
+                items={currentImages}
+                columns={visibleColumns}
+                sort={{ field: sortField, direction: sortDirection }}
+                onSort={onSort}
+                onHideColumn={hideColumn}
+                entityType="image"
+                isLoading={isLoading}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
+              />
+            ) : viewMode === "wall" ? (
+              <WallView
+                items={currentImages}
+                entityType="image"
+                zoomLevel={zoomLevel}
+                playbackMode={wallPlayback}
+                onItemClick={handleImageClick}
+                loading={isLoading}
+                emptyMessage="No images found"
+              />
+            ) : viewMode === "timeline" ? (
+              <TimelineView
+                entityType="image"
+                items={currentImages}
+                renderItem={(image, index, { onItemClick }) => (
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    onClick={() => onItemClick?.(image)}
+                    fromPageTitle="Images"
+                    tabIndex={0}
+                    onOCounterChange={handleOCounterChange}
+                    onRatingChange={handleRatingChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                )}
+                onItemClick={handleImageClick}
+                onDateFilterChange={setTimelineDateFilter}
+                onPeriodChange={setTimelinePeriod}
+                initialPeriod={timelinePeriod}
+                loading={isLoading}
+                emptyMessage="No images found for this time period"
+                gridDensity={gridDensity}
+              />
+            ) : viewMode === "folder" ? (
+              <FolderView
+                items={currentImages}
+                tags={folderTags}
+                gridDensity={gridDensity}
+                loading={isLoading || tagsLoading}
+                emptyMessage="No images found"
+                onFolderPathChange={setFolderTagFilter}
+                renderItem={(image) => (
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    onClick={() => handleImageClick(image)}
+                    fromPageTitle="Images"
+                    tabIndex={0}
+                    onOCounterChange={handleOCounterChange}
+                    onRatingChange={handleRatingChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                )}
+              />
+            ) : isLoading ? (
+              <div className={getGridClasses("standard", gridDensity)}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "16rem",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
+                {currentImages.map((image, index) => {
+                  const itemProps = gridItemProps(index);
+                  return (
+                    <ImageCard
+                      key={image.id}
+                      image={image}
+                      onClick={() => handleImageClick(image)}
+                      fromPageTitle="Images"
+                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
+                      onOCounterChange={handleOCounterChange}
+                      onRatingChange={handleRatingChange}
+                      onFavoriteChange={handleFavoriteChange}
+                      {...itemProps}
+                    />
+                  );
+                })}
+              </div>
+            )
+          }
+        </SearchControls>
+
+        {/* Lightbox for viewing images */}
+        {currentImages.length > 0 && (
+          <Lightbox
+            isOpen={lightbox.lightboxOpen}
+            images={currentImages.map((img) => ({
+              ...img,
+              paths: {
+                image: img.paths?.image || `/api/proxy/image/${img.id}/image`,
+                preview: img.paths?.preview || img.paths?.thumbnail,
+                thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
+              },
+              oCounter: img.oCounter ?? 0,
+            }))}
+            initialIndex={lightbox.lightboxIndex}
+            onClose={lightbox.closeLightbox}
+            onImagesUpdate={(updatedImages) => {
+              // Sync updated images back to page state
+              setData((prev) => ({
+                ...prev,
+                images: prev.images.map((img) => {
+                  const updated = updatedImages.find((u) => u.id === img.id);
+                  return updated ? { ...img, ...updated } : img;
+                }),
+              }));
+            }}
+            // Cross-page navigation support
+            onPageBoundary={lightbox.onPageBoundary}
+            totalCount={totalCount}
+            pageOffset={pageOffset}
+            onIndexChange={lightbox.onIndexChange}
+            isPageTransitioning={lightbox.isPageTransitioning}
+            transitionKey={lightbox.transitionKey}
+          />
+        )}
+      </div>
+    </PageLayout>
+  );
+};
+
+const getImages = async (query, signal) => {
+  const response = await libraryApi.findImages(query, signal);
+
+  const findImages = response?.findImages;
+  const result = {
+    images: findImages?.images || [],
+    count: findImages?.count || 0,
+  };
+
+  return result;
+};
+
+export default Images;

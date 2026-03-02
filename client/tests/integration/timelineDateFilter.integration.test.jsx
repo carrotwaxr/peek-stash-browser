@@ -6,7 +6,7 @@
  * when in timeline view.
  */
 import { describe, it, expect } from "vitest";
-import { buildGalleryFilter, buildImageFilter, buildSceneFilter } from "../../src/utils/filterConfig.js";
+import { buildGalleryFilter, buildImageFilter, buildSceneFilter } from "../../src/utils/filterConfig";
 
 // Test the filter builders directly - the core of Bug #1
 describe("Date Filter Integration", () => {
