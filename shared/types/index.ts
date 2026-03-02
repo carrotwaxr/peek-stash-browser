@@ -17,3 +17,6 @@ export type {
   WithInstanceId,
   SceneScoringData,
 } from "./entities.js";
+
+// API contract types
+export * from "./api/index.js";

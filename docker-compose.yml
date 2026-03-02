@@ -1,8 +1,8 @@
 services:
   peek-server:
     build:
-      context: ./server
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: server/Dockerfile.dev
     restart: unless-stopped
     ports:
       - "${PEEK_BACKEND_PORT:-8000}:8000"
@@ -13,10 +13,11 @@ services:
       - CONFIG_DIR=/app/data
     volumes:
       # Hot reloading - mount source code
-      - ./server:/app
-      - /app/node_modules
+      - ./server:/app/server
+      - ./shared:/app/shared:ro
+      - /app/server/node_modules
       # Mount .env file for hot reloading
-      - ./.env:/app/../.env:ro
+      - ./.env:/app/.env:ro
       # Peek config/data directory (bind mount for production/Unraid)
       - ${PEEK_DATA_DIR:-./.peek-data}:/app/data
     networks:

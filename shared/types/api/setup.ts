@@ -1,4 +1,4 @@
-// server/types/api/setup.ts
+// shared/types/api/setup.ts
 /**
  * Setup API Types
  *

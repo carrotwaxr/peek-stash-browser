@@ -11,7 +11,7 @@
  *   import type { Scene, Performer } from "../graphql/types.js";
  */
 
-// Normalized entity types (standalone interfaces matching transform output)
+// Normalized entity types (from shared — single source of truth)
 export type {
   NormalizedScene,
   NormalizedPerformer,
@@ -30,7 +30,7 @@ export type {
   SceneFile,
   ScenePaths,
   SceneStream,
-} from "./entities.js";
+} from "@peek/shared-types";
 
 // Base filter types from Stash GraphQL
 export type {

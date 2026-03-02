@@ -1,4 +1,4 @@
-// server/types/api/userStats.ts
+// shared/types/api/userStats.ts
 /**
  * User Stats API Types
  *

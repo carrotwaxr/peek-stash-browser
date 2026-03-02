@@ -1,4 +1,4 @@
-// server/types/api/watchHistory.ts
+// shared/types/api/watchHistory.ts
 /**
  * Watch History API Types
  *

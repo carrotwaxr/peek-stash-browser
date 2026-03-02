@@ -3,10 +3,16 @@
  * API Types Index
  *
  * Re-exports all API request/response types for easy importing.
+ * Types from shared/ are dependency-free contracts; types from ./local files
+ * have server-internal dependencies (Express, Prisma, GraphQL).
  *
  * Usage:
  *   import type { FindScenesRequest, FindScenesResponse } from "../types/api/index.js";
  */
+
+// ---------------------------------------------------------------------------
+// Shared API types (canonical definitions in shared/types/api/)
+// ---------------------------------------------------------------------------
 
 // Common types
 export type {
@@ -16,14 +22,7 @@ export type {
   ApiSuccessResponse,
   CacheNotReadyResponse,
   AmbiguousLookupResponse,
-} from "./common.js";
-
-// Express typed helpers
-export type {
-  TypedRequest,
-  TypedAuthRequest,
-  TypedResponse,
-} from "./express.js";
+} from "@peek/shared-types/api/common.js";
 
 // User settings & preferences types
 export type {
@@ -92,7 +91,172 @@ export type {
   AdminRegenerateRecoveryKeyResponse,
   UpdateUserStashInstancesBody,
   CompleteSetupBody,
-} from "./user.js";
+} from "@peek/shared-types/api/user.js";
+
+// Ratings endpoint types
+export type {
+  UpdateRatingRequest,
+  UpdateRatingResponse,
+  UpdateSceneRatingParams,
+  UpdatePerformerRatingParams,
+  UpdateStudioRatingParams,
+  UpdateTagRatingParams,
+  UpdateGalleryRatingParams,
+  UpdateGroupRatingParams,
+  UpdateImageRatingParams,
+} from "@peek/shared-types/api/ratings.js";
+
+// Watch History endpoint types
+export type {
+  WatchHistoryData,
+  FullWatchHistoryRecord,
+  PingWatchHistoryRequest,
+  PingWatchHistoryResponse,
+  SaveActivityRequest,
+  SaveActivityResponse,
+  IncrementPlayCountRequest,
+  IncrementPlayCountResponse,
+  IncrementOCounterRequest,
+  IncrementOCounterResponse,
+  GetAllWatchHistoryQuery,
+  GetAllWatchHistoryResponse,
+  GetWatchHistoryParams,
+  GetWatchHistoryResponse,
+  ClearAllWatchHistoryResponse,
+} from "@peek/shared-types/api/watchHistory.js";
+
+// Image View History endpoint types
+export type {
+  IncrementImageOCounterRequest,
+  IncrementImageOCounterResponse,
+  RecordImageViewRequest,
+  RecordImageViewResponse,
+  GetImageViewHistoryParams,
+  GetImageViewHistoryResponse,
+} from "@peek/shared-types/api/imageViewHistory.js";
+
+// Setup endpoint types
+export type {
+  GetSetupStatusResponse,
+  CreateFirstAdminRequest,
+  CreateFirstAdminResponse,
+  TestStashConnectionRequest,
+  TestStashConnectionResponse,
+  CreateFirstStashInstanceRequest,
+  CreateFirstStashInstanceResponse,
+  GetStashInstanceResponse,
+  ResetSetupRequest,
+  ResetSetupResponse,
+  // Multi-instance management (admin)
+  StashInstanceData,
+  GetAllStashInstancesResponse,
+  CreateStashInstanceRequest,
+  CreateStashInstanceResponse,
+  UpdateStashInstanceParams,
+  UpdateStashInstanceRequest,
+  UpdateStashInstanceResponse,
+  DeleteStashInstanceParams,
+  DeleteStashInstanceResponse,
+  // User instance selection
+  GetUserStashInstancesResponse,
+  UpdateUserStashInstancesRequest,
+  UpdateUserStashInstancesResponse,
+} from "@peek/shared-types/api/setup.js";
+
+// User Stats endpoint types
+export type {
+  LibraryStats,
+  EngagementStats,
+  TopScene,
+  TopPerformer,
+  TopStudio,
+  TopTag,
+  HighlightScene,
+  HighlightImage,
+  HighlightPerformer,
+  UserStatsResponse,
+} from "@peek/shared-types/api/userStats.js";
+
+// Download endpoint types
+export type {
+  SerializedDownload,
+  StartSceneDownloadParams,
+  StartSceneDownloadResponse,
+  StartImageDownloadParams,
+  StartImageDownloadResponse,
+  StartPlaylistDownloadParams,
+  StartPlaylistDownloadResponse,
+  GetUserDownloadsResponse,
+  GetDownloadStatusParams,
+  GetDownloadStatusResponse,
+  GetDownloadFileParams,
+  DeleteDownloadParams,
+  DeleteDownloadResponse,
+  RetryDownloadParams,
+  RetryDownloadResponse,
+} from "@peek/shared-types/api/download.js";
+
+// User Groups endpoint types (user groups, not Stash groups)
+export type {
+  GroupData,
+  GroupMember,
+  GroupWithMembers,
+  GetAllUserGroupsResponse,
+  GetUserGroupParams,
+  GetUserGroupResponse,
+  CreateUserGroupBody,
+  CreateUserGroupResponse,
+  UpdateUserGroupParams,
+  UpdateUserGroupBody,
+  UpdateUserGroupResponse,
+  DeleteUserGroupParams,
+  DeleteUserGroupResponse,
+  AddMemberParams,
+  AddMemberBody,
+  AddMemberResponse,
+  RemoveMemberParams,
+  RemoveMemberResponse,
+  GetCurrentUserGroupsResponse,
+} from "@peek/shared-types/api/groups.js";
+
+// Clips endpoint types
+export type {
+  GetClipsQuery,
+  GetClipsResponse,
+  GetClipByIdParams,
+  GetClipsForSceneParams,
+  GetClipsForSceneQuery,
+  GetClipsForSceneResponse,
+} from "@peek/shared-types/api/clips.js";
+
+// Timeline endpoint types
+export type {
+  GetDateDistributionParams,
+  GetDateDistributionQuery,
+  DateDistributionEntry,
+  GetDateDistributionResponse,
+} from "@peek/shared-types/api/timeline.js";
+
+// Server Stats endpoint types
+export type {
+  StatsSystemInfo,
+  StatsProcessInfo,
+  StatsCacheInfo,
+  StatsDatabaseInfo,
+  GetStatsResponse,
+  RefreshCacheResponse,
+} from "@peek/shared-types/api/stats.js";
+
+// ---------------------------------------------------------------------------
+// Server-local API types (dependencies on Express, Prisma, GraphQL)
+// ---------------------------------------------------------------------------
+
+// Express typed helpers
+export type {
+  TypedRequest,
+  TypedAuthRequest,
+  TypedResponse,
+} from "./express.js";
 
 // Proxy controller types
 export type { ProxyOptions } from "./proxy.js";
@@ -157,48 +321,6 @@ export type {
   GetImageParams,
   GetImageResponse,
 } from "./library.js";
-
-// Ratings endpoint types
-export type {
-  UpdateRatingRequest,
-  UpdateRatingResponse,
-  UpdateSceneRatingParams,
-  UpdatePerformerRatingParams,
-  UpdateStudioRatingParams,
-  UpdateTagRatingParams,
-  UpdateGalleryRatingParams,
-  UpdateGroupRatingParams,
-  UpdateImageRatingParams,
-} from "./ratings.js";
-
-// Watch History endpoint types
-export type {
-  WatchHistoryData,
-  FullWatchHistoryRecord,
-  PingWatchHistoryRequest,
-  PingWatchHistoryResponse,
-  SaveActivityRequest,
-  SaveActivityResponse,
-  IncrementPlayCountRequest,
-  IncrementPlayCountResponse,
-  IncrementOCounterRequest,
-  IncrementOCounterResponse,
-  GetAllWatchHistoryQuery,
-  GetAllWatchHistoryResponse,
-  GetWatchHistoryParams,
-  GetWatchHistoryResponse,
-  ClearAllWatchHistoryResponse,
-} from "./watchHistory.js";
-
-// Image View History endpoint types
-export type {
-  IncrementImageOCounterRequest,
-  IncrementImageOCounterResponse,
-  RecordImageViewRequest,
-  RecordImageViewResponse,
-  GetImageViewHistoryParams,
-  GetImageViewHistoryResponse,
-} from "./imageViewHistory.js";
 
 // Playlist endpoint types
 export type {
@@ -267,115 +389,3 @@ export type {
   DuplicateCustomThemeParams,
   DuplicateCustomThemeResponse,
 } from "./customTheme.js";
-
-// Setup endpoint types
-export type {
-  GetSetupStatusResponse,
-  CreateFirstAdminRequest,
-  CreateFirstAdminResponse,
-  TestStashConnectionRequest,
-  TestStashConnectionResponse,
-  CreateFirstStashInstanceRequest,
-  CreateFirstStashInstanceResponse,
-  GetStashInstanceResponse,
-  ResetSetupRequest,
-  ResetSetupResponse,
-  // Multi-instance management (admin)
-  StashInstanceData,
-  GetAllStashInstancesResponse,
-  CreateStashInstanceRequest,
-  CreateStashInstanceResponse,
-  UpdateStashInstanceParams,
-  UpdateStashInstanceRequest,
-  UpdateStashInstanceResponse,
-  DeleteStashInstanceParams,
-  DeleteStashInstanceResponse,
-  // User instance selection
-  GetUserStashInstancesResponse,
-  UpdateUserStashInstancesRequest,
-  UpdateUserStashInstancesResponse,
-} from "./setup.js";
-
-// User Stats endpoint types
-export type {
-  LibraryStats,
-  EngagementStats,
-  TopScene,
-  TopPerformer,
-  TopStudio,
-  TopTag,
-  HighlightScene,
-  HighlightImage,
-  HighlightPerformer,
-  UserStatsResponse,
-} from "./userStats.js";
-
-// Download endpoint types
-export type {
-  SerializedDownload,
-  StartSceneDownloadParams,
-  StartSceneDownloadResponse,
-  StartImageDownloadParams,
-  StartImageDownloadResponse,
-  StartPlaylistDownloadParams,
-  StartPlaylistDownloadResponse,
-  GetUserDownloadsResponse,
-  GetDownloadStatusParams,
-  GetDownloadStatusResponse,
-  GetDownloadFileParams,
-  DeleteDownloadParams,
-  DeleteDownloadResponse,
-  RetryDownloadParams,
-  RetryDownloadResponse,
-} from "./download.js";
-
-// User Groups endpoint types (user groups, not Stash groups)
-export type {
-  GroupData,
-  GroupMember,
-  GroupWithMembers,
-  GetAllUserGroupsResponse,
-  GetUserGroupParams,
-  GetUserGroupResponse,
-  CreateUserGroupBody,
-  CreateUserGroupResponse,
-  UpdateUserGroupParams,
-  UpdateUserGroupBody,
-  UpdateUserGroupResponse,
-  DeleteUserGroupParams,
-  DeleteUserGroupResponse,
-  AddMemberParams,
-  AddMemberBody,
-  AddMemberResponse,
-  RemoveMemberParams,
-  RemoveMemberResponse,
-  GetCurrentUserGroupsResponse,
-} from "./groups.js";
-
-// Clips endpoint types
-export type {
-  GetClipsQuery,
-  GetClipsResponse,
-  GetClipByIdParams,
-  GetClipsForSceneParams,
-  GetClipsForSceneQuery,
-  GetClipsForSceneResponse,
-} from "./clips.js";
-
-// Timeline endpoint types
-export type {
-  GetDateDistributionParams,
-  GetDateDistributionQuery,
-  DateDistributionEntry,
-  GetDateDistributionResponse,
-} from "./timeline.js";
-
-// Server Stats endpoint types
-export type {
-  StatsSystemInfo,
-  StatsProcessInfo,
-  StatsCacheInfo,
-  StatsDatabaseInfo,
-  GetStatsResponse,
-  RefreshCacheResponse,
-} from "./stats.js";
