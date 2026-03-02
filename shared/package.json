@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./types/index.ts"
+    },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./types/*.ts"
+    }
+  },
   "scripts": {
     "build": "tsc"
   },

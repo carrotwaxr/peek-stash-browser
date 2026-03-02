@@ -12,6 +12,7 @@ import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface GroupQueryOptions {
@@ -313,7 +314,7 @@ class GroupQueryBuilder {
     }
 
     return buildJunctionFilter(
-      ids, "GroupTag", "groupId", "groupInstanceId",
+      coerceEntityRefs(ids), "GroupTag", "groupId", "groupInstanceId",
       "tagId", "tagInstanceId", "g", modifier || "INCLUDES"
     );
   }

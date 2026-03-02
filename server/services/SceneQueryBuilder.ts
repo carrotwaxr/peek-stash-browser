@@ -12,6 +12,7 @@ import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface SceneQueryOptions {
@@ -141,7 +142,7 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
@@ -161,7 +162,7 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
@@ -182,7 +183,7 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier || "INCLUDES";
 
     return buildDirectFilter(ids, "s.studioId", "s.stashInstanceId", modifier);
@@ -199,7 +200,7 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
@@ -219,7 +220,7 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
@@ -1695,7 +1696,7 @@ class SceneQueryBuilder {
     return this.execute({
       userId,
       filters: {
-        ids: { value: ids, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(ids), modifier: "INCLUDES" },
       },
       applyExclusions: false, // IDs already filtered, don't double-exclude
       allowedInstanceIds, // Pass through for multi-instance filtering

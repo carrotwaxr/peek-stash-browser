@@ -23,6 +23,7 @@ import {
   PeekGalleryFilter,
 } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -100,7 +101,7 @@ export async function applyGalleryFilters(
 
   // Filter by IDs
   if (filters.ids?.value && filters.ids.value.length > 0) {
-    const idSet = new Set(filters.ids.value);
+    const idSet = new Set(filters.ids.value as string[]);
     filtered = filtered.filter((g) => idSet.has(g.id));
   }
 
@@ -230,7 +231,7 @@ export const findGalleries = async (
 
     // Merge root-level ids with gallery_filter
     const normalizedIds = ids
-      ? { value: ids, modifier: "INCLUDES" }
+      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : gallery_filter?.ids;
     const mergedFilter: PeekGalleryFilter & Record<string, unknown> = {
       ...gallery_filter,

@@ -142,7 +142,7 @@ export const createCarousel = async (
         userId,
         title: title.trim(),
         icon: icon || "Film",
-        rules,
+        rules: rules as unknown as Prisma.InputJsonValue,
         sort: sort || "random",
         direction: direction || "DESC",
       },
@@ -217,7 +217,7 @@ export const updateCarousel = async (
       data: {
         ...(title !== undefined && { title: title.trim() }),
         ...(icon !== undefined && { icon }),
-        ...(rules !== undefined && { rules }),
+        ...(rules !== undefined && { rules: rules as unknown as Prisma.InputJsonValue }),
         ...(sort !== undefined && { sort }),
         ...(direction !== undefined && { direction }),
       },

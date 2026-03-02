@@ -12,6 +12,7 @@ import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface GalleryQueryOptions {
@@ -161,15 +162,16 @@ class GalleryQueryBuilder {
     }
 
     // INCLUDES_ALL is special for studios: a gallery can only have one studio
+    const entityRefs = coerceEntityRefs(ids);
     if (modifier === "INCLUDES_ALL") {
       if (ids.length === 1) {
-        return buildDirectFilter(ids, "g.studioId", "g.stashInstanceId", "INCLUDES");
+        return buildDirectFilter(entityRefs, "g.studioId", "g.stashInstanceId", "INCLUDES");
       }
       // Multiple studios in INCLUDES_ALL means no gallery can match (a gallery has at most one studio)
       return { sql: "1 = 0", params: [] };
     }
 
-    return buildDirectFilter(ids, "g.studioId", "g.stashInstanceId", modifier);
+    return buildDirectFilter(entityRefs, "g.studioId", "g.stashInstanceId", modifier);
   }
 
   /**
@@ -232,7 +234,7 @@ class GalleryQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const ids = filter.value;
+    const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier ?? "INCLUDES";
 
     return buildJunctionFilter(ids, "GalleryPerformer", "galleryId", "galleryInstanceId", "performerId", "performerInstanceId", "g", modifier);
@@ -259,7 +261,7 @@ class GalleryQueryBuilder {
       ids = await expandTagIds(ids, depth);
     }
 
-    return buildJunctionFilter(ids, "GalleryTag", "galleryId", "galleryInstanceId", "tagId", "tagInstanceId", "g", modifier);
+    return buildJunctionFilter(coerceEntityRefs(ids), "GalleryTag", "galleryId", "galleryInstanceId", "tagId", "tagInstanceId", "g", modifier);
   }
 
   /**

@@ -38,6 +38,7 @@ import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { parseCompositeFilterValues } from "../../utils/sqlFilterBuilders.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { logger } from "../../utils/logger.js";
 import { SeededRandom, parseRandomSort, generateDailySeed } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -915,7 +916,7 @@ export const findScenes = async (
 
     // Normalize ids to PeekSceneFilter format
     const normalizedIds = ids
-      ? { value: ids, modifier: "INCLUDES" }
+      ? { value: coerceEntityRefs(ids), modifier: "INCLUDES" }
       : scene_filter?.ids;
     const mergedFilter: PeekSceneFilter = { ...scene_filter, ids: normalizedIds };
     const _requestingUser = req.user;
@@ -930,7 +931,7 @@ export const findScenes = async (
       // Build filters object
       const filters: PeekSceneFilter = { ...scene_filter };
       if (ids && ids.length > 0) {
-        filters.ids = { value: ids, modifier: "INCLUDES" };
+        filters.ids = { value: coerceEntityRefs(ids), modifier: "INCLUDES" };
       }
 
       // Extract specific instance ID for disambiguation (from scene_filter.instance_id)

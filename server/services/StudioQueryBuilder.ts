@@ -11,6 +11,7 @@ import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface StudioQueryOptions {
@@ -158,7 +159,7 @@ class StudioQueryBuilder {
     }
 
     return buildJunctionFilter(
-      ids, "StudioTag", "studioId", "studioInstanceId",
+      coerceEntityRefs(ids), "StudioTag", "studioId", "studioInstanceId",
       "tagId", "tagInstanceId", "s", modifier || "INCLUDES"
     );
   }

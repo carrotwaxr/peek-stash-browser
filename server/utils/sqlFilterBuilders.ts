@@ -5,6 +5,9 @@
  * logic for numeric comparisons, date ranges, text matching, and favorites.
  */
 
+import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
+import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
+
 export interface FilterClause {
   sql: string;
   params: (string | number | boolean)[];
@@ -23,21 +26,16 @@ export interface ParsedFilterValue {
  * Parse composite filter values (e.g., "82:uuid-server1") into separate
  * entity IDs and instance IDs. Supports both bare IDs and composite keys.
  *
- * @param values - Array of filter values, either bare IDs or "id:instanceId" composites
- * @returns Object with separate arrays for SQL parameterization
+ * Uses the shared parseEntityRef utility for consistent parsing.
+ *
+ * @param values - Array of entity reference values (InstanceAwareId or string)
+ * @returns Object with parsed components and whether any had instance IDs
  */
-export function parseCompositeFilterValues(values: string[]): {
+export function parseCompositeFilterValues(values: readonly (InstanceAwareId | string)[]): {
   parsed: ParsedFilterValue[];
   hasInstanceIds: boolean;
 } {
-  const parsed = values.map((v) => {
-    const colonIdx = v.indexOf(":");
-    if (colonIdx === -1) {
-      return { id: v, instanceId: undefined };
-    }
-    return { id: v.substring(0, colonIdx), instanceId: v.substring(colonIdx + 1) };
-  });
-
+  const parsed = values.map((v) => parseEntityRef(v));
   const hasInstanceIds = parsed.some((p) => p.instanceId !== undefined);
   return { parsed, hasInstanceIds };
 }
@@ -47,7 +45,7 @@ export function parseCompositeFilterValues(values: string[]): {
  * Generates SQL for INCLUDES, INCLUDES_ALL, or EXCLUDES with optional
  * instanceId constraints when composite keys are provided.
  *
- * @param ids - Array of filter values (bare IDs or "id:instanceId" composites)
+ * @param ids - Array of entity references (InstanceAwareId composite keys)
  * @param junctionTable - Junction table name (e.g., "ScenePerformer")
  * @param parentIdCol - Parent entity ID column in junction table (e.g., "sceneId")
  * @param parentInstanceCol - Parent entity instance column (e.g., "sceneInstanceId")
@@ -57,7 +55,7 @@ export function parseCompositeFilterValues(values: string[]): {
  * @param modifier - Filter modifier: INCLUDES, INCLUDES_ALL, or EXCLUDES
  */
 export function buildJunctionFilter(
-  ids: string[],
+  ids: InstanceAwareId[],
   junctionTable: string,
   parentIdCol: string,
   parentInstanceCol: string,
@@ -136,13 +134,13 @@ export function buildJunctionFilter(
  * Build a direct column entity filter with instance-aware matching.
  * For entities that use a direct FK (e.g., studios) rather than a junction table.
  *
- * @param ids - Array of filter values (bare IDs or "id:instanceId" composites)
+ * @param ids - Array of entity references (InstanceAwareId composite keys)
  * @param idColumn - Column for entity ID (e.g., "s.studioId")
  * @param instanceColumn - Column for entity instance (e.g., "s.studioInstanceId")
  * @param modifier - Filter modifier: INCLUDES or EXCLUDES
  */
 export function buildDirectFilter(
-  ids: string[],
+  ids: InstanceAwareId[],
   idColumn: string,
   instanceColumn: string,
   modifier: string
