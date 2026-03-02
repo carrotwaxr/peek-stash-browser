@@ -38,6 +38,8 @@ import { transformScene } from "../utils/stashUrlProxy.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 
+const KEY_SEP = "\0";
+
 /**
  * Default user fields for scenes (when no user data is merged yet).
  * These override any values from Stash to ensure Peek user data takes precedence.
@@ -123,15 +125,15 @@ export const getUserPlaylists = async (
             transformScene(s)
           );
 
-          // Create a map of scene ID to scene data
+          // Create a map of composite key to scene data (avoids cross-instance ID collisions)
           const sceneMap = new Map(
-            transformedScenes.map((s) => [s.id, s])
+            transformedScenes.map((s) => [`${s.id}${KEY_SEP}${s.instanceId}`, s])
           );
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
           const itemsWithScenes = playlist.items.map((item) => ({
             ...item,
-            scene: sceneMap.get(item.sceneId) || null,
+            scene: sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) || null,
           }));
 
           return {
@@ -244,16 +246,16 @@ export const getSharedPlaylists = async (
               transformScene(s)
             );
 
-            // Create a map of scene ID to scene data
+            // Create a map of composite key to scene data (avoids cross-instance ID collisions)
             const sceneMap = new Map(
-              transformedScenes.map((s) => [s.id, s])
+              transformedScenes.map((s) => [`${s.id}${KEY_SEP}${s.instanceId}`, s])
             );
 
             // Attach scene data to each playlist item
             itemsWithScenes = p.items.map((item) => ({
               instanceId: item.instanceId,
               sceneId: item.sceneId,
-              scene: sceneMap.get(item.sceneId) || null,
+              scene: sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) || null,
             }));
           } catch (cacheError) {
             logger.error(`Error fetching scenes for shared playlist ${p.id}`, { error: cacheError instanceof Error ? cacheError.message : "Unknown error" });
@@ -366,16 +368,16 @@ export const getPlaylist = async (
           transformScene(s)
         );
 
-        // Create a map of scene ID to scene data
+        // Create a map of composite key to scene data (avoids cross-instance ID collisions)
         const sceneMap = new Map(
-          transformedScenes.map((s) => [s.id, s])
+          transformedScenes.map((s) => [`${s.id}${KEY_SEP}${s.instanceId}`, s])
         );
 
         // Attach scene data to each playlist item
         // Note: Items with restricted/hidden scenes will have scene: null
         const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
-          scene: sceneMap.get(item.sceneId) || null,
+          scene: sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) || null,
         }));
 
         res.json({
