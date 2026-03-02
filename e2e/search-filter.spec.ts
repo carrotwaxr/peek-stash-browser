@@ -23,7 +23,7 @@ test.describe("Search and Filter", () => {
     // Navigate away
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Navigate back to scenes with the query param

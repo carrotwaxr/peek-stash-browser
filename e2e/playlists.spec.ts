@@ -15,7 +15,7 @@ test.describe("Playlist CRUD", () => {
 
     // Main heading
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Tab buttons should be visible (showEmpty + showSingleTab means both always show)
@@ -31,7 +31,7 @@ test.describe("Playlist CRUD", () => {
   test("shows playlists or empty state after loading", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // After loading, page shows either playlist cards or empty state
@@ -57,7 +57,7 @@ test.describe("Playlist CRUD", () => {
   test("shared tab shows empty state", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Switch to Shared tab
@@ -80,7 +80,7 @@ test.describe("Playlist CRUD", () => {
   test("can create a new playlist", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Click the New Playlist button
@@ -114,7 +114,7 @@ test.describe("Playlist CRUD", () => {
   test("create modal cancel closes without creating", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Open the modal
@@ -137,7 +137,7 @@ test.describe("Playlist CRUD", () => {
   test("create button disabled when name is empty", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Open the modal
@@ -162,7 +162,7 @@ test.describe("Playlist CRUD", () => {
   test("can navigate to playlist detail", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // First create a playlist to navigate to
@@ -190,7 +190,7 @@ test.describe("Playlist CRUD", () => {
   test("can delete a playlist with confirmation", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Create a playlist to delete
@@ -239,7 +239,7 @@ test.describe("Playlist CRUD", () => {
   test("delete confirmation cancel keeps playlist", async ({ page }) => {
     await page.goto("/playlists");
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
 
     // Create a playlist

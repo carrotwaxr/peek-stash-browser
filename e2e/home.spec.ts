@@ -112,7 +112,7 @@ test.describe("Home Page", () => {
     // Should navigate to playlists page
     await expect(page).toHaveURL(/\/playlists/, { timeout: 10_000 });
     await expect(
-      page.getByRole("heading", { name: "Playlists" })
+      page.getByRole("heading", { name: "Playlists", exact: true })
     ).toBeVisible({ timeout: 10_000 });
   });
 
