@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
  * @param {string} gridType - Type of grid: 'scenes', 'performers', 'studios', or 'tags'
  * @returns {number} Current number of columns
  */
-export const useGridColumns = (gridType = "default") => {
+export const useGridColumns = (gridType: string = "default") => {
   const [columns, setColumns] = useState(4);
 
   useEffect(() => {

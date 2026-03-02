@@ -2,10 +2,17 @@ import { useState } from "react";
 import { fontOptions } from "../../themes/themes";
 import { Button, Paper } from "../ui/index";
 
+interface ColorInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  description?: string;
+}
+
 /**
  * Color picker input component
  */
-const ColorInput = ({ label, value, onChange, description }) => {
+const ColorInput = ({ label, value, onChange, description }: ColorInputProps) => {
   return (
     <div>
       <label
@@ -45,10 +52,22 @@ const ColorInput = ({ label, value, onChange, description }) => {
   );
 };
 
+interface FontOption {
+  value: string;
+  label: string;
+}
+
+interface FontSelectorProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: FontOption[];
+}
+
 /**
  * Font selector component
  */
-const FontSelector = ({ label, value, onChange, options }) => {
+const FontSelector = ({ label, value, onChange, options }: FontSelectorProps) => {
   return (
     <div>
       <label
@@ -77,10 +96,50 @@ const FontSelector = ({ label, value, onChange, options }) => {
   );
 };
 
+interface ThemeConfig {
+  mode: "dark" | "light";
+  fonts: {
+    brand: string;
+    heading: string;
+    body: string;
+    mono: string;
+  };
+  colors: {
+    background: string;
+    backgroundSecondary: string;
+    backgroundCard: string;
+    text: string;
+    border: string;
+  };
+  accents: {
+    primary: string;
+    secondary: string;
+  };
+  status: {
+    success: string;
+    error: string;
+    info: string;
+    warning: string;
+  };
+}
+
+interface ThemeData {
+  id?: string;
+  name: string;
+  config: ThemeConfig;
+}
+
+interface CustomThemeEditorProps {
+  theme: ThemeData | null;
+  onSave: (data: { name: string; config: ThemeConfig }) => void;
+  onCancel: () => void;
+  isNew?: boolean;
+}
+
 /**
  * Custom theme editor component
  */
-const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
+const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }: CustomThemeEditorProps) => {
   const [name, setName] = useState(theme?.name || "");
   const [config, setConfig] = useState(
     theme?.config || {
@@ -113,7 +172,7 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
 
   const [errors, setErrors] = useState({});
 
-  const updateConfig = (path, value) => {
+  const updateConfig = (path: string, value: string) => {
     setConfig((prev) => {
       const newConfig = { ...prev };
       const keys = path.split(".");
@@ -126,7 +185,7 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
     });
   };
 
-  const validateHexColor = (color) => {
+  const validateHexColor = (color: string) => {
     return /^#[0-9A-Fa-f]{6}$/.test(color);
   };
 

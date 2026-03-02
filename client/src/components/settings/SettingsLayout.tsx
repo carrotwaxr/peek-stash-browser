@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+
+interface TabDefinition {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  tabs: TabDefinition[];
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+  children: ReactNode;
+}
 
 /**
  * SettingsLayout - Reusable layout for settings with horizontal tab navigation
  * Handles mobile scrolling, active tab indication, and tab content rendering
  */
-const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
+const SettingsLayout = ({ tabs, activeTab, onTabChange, children }: Props) => {
   const SCROLL_THRESHOLD = 1;
   const tabContainerRef = useRef(null);
   const [showLeftFade, setShowLeftFade] = useState(false);

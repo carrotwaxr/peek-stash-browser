@@ -1,8 +1,19 @@
 import { Link } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { formatRelativeTime } from "../../utils/date";
 import { getSceneTitle } from "../../utils/format";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
+
+interface Props {
+  scene: NormalizedScene;
+  linkState?: Record<string, unknown>;
+  showDate?: boolean;
+  showSubtitle?: boolean;
+  titleClassName?: string;
+  dateClassName?: string;
+  maxLines?: number | null;
+}
 
 /**
  * Scene title with link and subtitle (studio • code • date)
@@ -12,11 +23,11 @@ const SceneTitle = ({
   scene,
   linkState,
   showDate = true,
-  showSubtitle = false, // New: show subtitle with studio • code • date (like SceneCard)
+  showSubtitle = false,
   titleClassName = "",
   dateClassName = "",
-  maxLines = null, // Optional: limit title to specific number of lines
-}) => {
+  maxLines = null,
+}: Props) => {
   const { hasMultipleInstances } = useConfig();
   const title = getSceneTitle(scene);
   const date = scene.date ? formatRelativeTime(scene.date) : null;

@@ -11,7 +11,14 @@ import {
 } from "../../config/entityDisplayConfig";
 import { showSuccess, showError } from "../../utils/toast";
 
-const Toggle = ({ label, checked, onChange, description }) => (
+interface ToggleProps {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  description?: string;
+}
+
+const Toggle = ({ label, checked, onChange, description }: ToggleProps) => (
   <label className="flex items-start gap-3 cursor-pointer">
     <input
       type="checkbox"
@@ -33,7 +40,20 @@ const Toggle = ({ label, checked, onChange, description }) => (
   </label>
 );
 
-const Dropdown = ({ label, value, options, onChange, description }) => (
+interface DropdownOption {
+  id: string;
+  label: string;
+}
+
+interface DropdownProps {
+  label: string;
+  value: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+  description?: string;
+}
+
+const Dropdown = ({ label, value, options, onChange, description }: DropdownProps) => (
   <div className="flex flex-col gap-1">
     <label className="flex items-center justify-between gap-3">
       <div>
@@ -64,13 +84,17 @@ const Dropdown = ({ label, value, options, onChange, description }) => (
   </div>
 );
 
-const EntitySettingsSection = ({ entityType }) => {
+interface EntitySettingsSectionProps {
+  entityType: string;
+}
+
+const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
   const { getSettings, updateSettings } = useCardDisplaySettings();
   const settings = getSettings(entityType);
   const availableSettings = getAvailableSettings(entityType);
   const viewModes = getViewModes(entityType);
 
-  const handleChange = async (key, value) => {
+  const handleChange = async (key: string, value: string | boolean) => {
     try {
       await updateSettings(entityType, key, value);
       showSuccess("Setting saved");

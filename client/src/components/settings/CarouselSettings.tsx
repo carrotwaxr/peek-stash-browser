@@ -51,14 +51,25 @@ const MAX_CUSTOM_CAROUSELS = 15;
 /**
  * Check if an ID is a custom carousel (prefixed with "custom-")
  */
-const isCustomCarousel = (id) => id && id.startsWith("custom-");
+const isCustomCarousel = (id: string) => id && id.startsWith("custom-");
+
+interface CarouselPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+interface Props {
+  carouselPreferences?: CarouselPreference[];
+  onSave: (preferences: CarouselPreference[]) => void;
+}
 
 /**
  * CarouselSettings Component
  * Allows users to enable/disable and reorder homepage carousels using up/down buttons
  * Now supports custom user-defined carousels with edit/delete functionality
  */
-const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
+const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   const navigate = useNavigate();
   const [userPreferences, setUserPreferences] = useState(null);
   const [customCarousels, setCustomCarousels] = useState([]);
@@ -117,7 +128,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     return merged;
   }, [carouselPreferences, customCarousels, loadingCustom, userPreferences]);
 
-  const moveUp = (index) => {
+  const moveUp = (index: number) => {
     if (index === 0) return;
 
     const newPreferences = [...preferences];
@@ -135,7 +146,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setHasChanges(true);
   };
 
-  const moveDown = (index) => {
+  const moveDown = (index: number) => {
     if (index === preferences.length - 1) return;
 
     const newPreferences = [...preferences];
@@ -153,7 +164,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setHasChanges(true);
   };
 
-  const toggleEnabled = (id) => {
+  const toggleEnabled = (id: string) => {
     const updated = preferences.map((pref) =>
       pref.id === id ? { ...pref, enabled: !pref.enabled } : pref
     );
@@ -175,13 +186,13 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     navigate("/settings/carousels/new");
   };
 
-  const handleEditCarousel = (carouselId) => {
+  const handleEditCarousel = (carouselId: string) => {
     // carouselId is the full "custom-{uuid}" format, extract the uuid
     const actualId = carouselId.replace("custom-", "");
     navigate(`/settings/carousels/${actualId}/edit`);
   };
 
-  const handleDeleteCarousel = async (carouselId) => {
+  const handleDeleteCarousel = async (carouselId: string) => {
     const actualId = carouselId.replace("custom-", "");
 
     setDeletingId(carouselId);
@@ -209,7 +220,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   /**
    * Get display info for a carousel preference
    */
-  const getCarouselInfo = (prefId) => {
+  const getCarouselInfo = (prefId: string) => {
     if (isCustomCarousel(prefId)) {
       const actualId = prefId.replace("custom-", "");
       const carousel = customCarousels.find((c) => c.id === actualId);

@@ -1,6 +1,6 @@
 import { commonFilters, libraryApi } from "../api";
 
-export const useHomeCarouselQueries = (perCarousel = 12) => {
+export const useHomeCarouselQueries = (perCarousel: number = 12) => {
   return {
     favoritePerformerScenes: async () => {
       const response = await libraryApi.findScenes(

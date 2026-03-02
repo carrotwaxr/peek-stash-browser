@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api";
 import { Clock, Cpu, Database, HardDrive, RefreshCw, Film } from "lucide-react";
 import { Button, Paper } from "../ui/index";
@@ -312,7 +312,17 @@ const ServerStatsSection = () => {
   );
 };
 
-// Reusable stat card component
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  subtitle?: string | null;
+  icon?: React.ReactNode;
+  valueColor?: string;
+  progress?: number;
+  compact?: boolean;
+}
+
+/** Reusable stat card component */
 const StatCard = ({
   label,
   value,
@@ -321,7 +331,7 @@ const StatCard = ({
   valueColor,
   progress,
   compact,
-}) => {
+}: StatCardProps) => {
   return (
     <div
       className={`rounded-lg ${compact ? "p-3" : "p-4"}`}

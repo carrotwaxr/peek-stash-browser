@@ -2,16 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 
+interface MultiValueItem {
+  id: string | number;
+  name: string;
+  linkTo?: string;
+}
+
+interface Props {
+  items: MultiValueItem[] | null | undefined;
+  maxVisible?: number;
+  emptyText?: string;
+}
+
 /**
  * Component for displaying multiple values in a table cell with truncation
  * Shows first N items comma-separated, with a "+X more" button that opens a popover
- *
- * @param {Object} props
- * @param {Array<{id: string|number, name: string, linkTo?: string}>} props.items - Array of items to display
- * @param {number} props.maxVisible - Maximum number of items to show before truncating (default: 2)
- * @param {string} props.emptyText - Text to show when items is empty (default: "-")
  */
-const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }) => {
+const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);

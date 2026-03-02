@@ -3,17 +3,43 @@ import { Button } from "../ui/index";
 import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig";
 import SearchableSelect from "../ui/SearchableSelect";
 
+interface CarouselRule {
+  id: string;
+  filterKey: string;
+  value: unknown;
+  modifier?: string;
+  depth?: number;
+}
+
+interface FilterDefinition {
+  key: string;
+  label: string;
+  type: string;
+  multi?: boolean;
+  entityType?: string;
+  modifierOptions?: Array<{ value: string; label: string }>;
+  defaultModifier?: string;
+  supportsHierarchy?: boolean;
+  options?: Array<{ value: string; label: string }>;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  valueUnit?: string;
+}
+
+interface Props {
+  rule: CarouselRule;
+  usedFilterKeys: Set<string>;
+  onChange: (updates: Partial<CarouselRule>) => void;
+  onRemove: () => void;
+}
+
 /**
  * RuleEditor Component
  * Edits a single filter rule for the carousel builder.
  * Renders appropriate input based on filter type.
- *
- * @param {Object} rule - The rule being edited
- * @param {Set} usedFilterKeys - Keys already used by other rules
- * @param {function} onChange - Callback when rule changes
- * @param {function} onRemove - Callback to remove this rule
  */
-const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }) => {
+const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
   const filterDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === rule.filterKey);
 
   // Get available filters (current + unused)
@@ -133,11 +159,17 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }) => {
   );
 };
 
+interface RuleValueInputProps {
+  filterDef: FilterDefinition | undefined;
+  rule: CarouselRule;
+  onChange: (updates: Partial<CarouselRule>) => void;
+}
+
 /**
  * RuleValueInput Component
  * Renders the appropriate input for the filter type.
  */
-const RuleValueInput = ({ filterDef, rule, onChange }) => {
+const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
   if (!filterDef) {
     return <span style={{ color: "var(--text-secondary)" }}>Unknown filter</span>;
   }
@@ -211,11 +243,17 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
   }
 };
 
+interface RangeInputProps {
+  filterDef: FilterDefinition;
+  value: { min?: number; max?: number } | undefined;
+  onChange: (value: { min?: number; max?: number }) => void;
+}
+
 /**
  * RangeInput Component
  * Min/max input for numeric range filters.
  */
-const RangeInput = ({ filterDef, value, onChange }) => {
+const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
   const handleMinChange = (e) => {
     const min = e.target.value === "" ? undefined : parseInt(e.target.value);
     onChange({ ...value, min });
@@ -266,11 +304,16 @@ const RangeInput = ({ filterDef, value, onChange }) => {
   );
 };
 
+interface DateRangeInputProps {
+  value: { min?: string; max?: string } | undefined;
+  onChange: (value: { min?: string; max?: string }) => void;
+}
+
 /**
  * DateRangeInput Component
  * Date pickers for date range filters.
  */
-const DateRangeInput = ({ value, onChange }) => {
+const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
   const handleFromChange = (e) => {
     const min = e.target.value || undefined;
     onChange({ ...value, min });

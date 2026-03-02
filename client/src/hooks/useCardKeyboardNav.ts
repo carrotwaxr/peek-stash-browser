@@ -8,7 +8,12 @@ import { useNavigate } from "react-router-dom";
  * @param {Function} options.onCustomAction - Optional override action
  * @returns {Object} - { onKeyDown }
  */
-export const useCardKeyboardNav = ({ linkTo, onCustomAction }) => {
+interface UseCardKeyboardNavOptions {
+  linkTo?: string;
+  onCustomAction?: () => void;
+}
+
+export const useCardKeyboardNav = ({ linkTo, onCustomAction }: UseCardKeyboardNavOptions) => {
   const navigate = useNavigate();
 
   const onKeyDown = useCallback(

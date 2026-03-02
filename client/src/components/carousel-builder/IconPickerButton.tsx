@@ -2,14 +2,16 @@ import { useState } from "react";
 import * as LucideIcons from "lucide-react";
 import IconPicker from "./IconPicker";
 
+interface Props {
+  icon: string;
+  onChange: (icon: string) => void;
+}
+
 /**
  * IconPickerButton Component
  * Compact button that shows current icon and opens picker on click.
- *
- * @param {string} icon - Current icon name
- * @param {function} onChange - Callback when icon changes
  */
-const IconPickerButton = ({ icon, onChange }) => {
+const IconPickerButton = ({ icon, onChange }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const IconComponent = LucideIcons[icon] || LucideIcons.Film;
 

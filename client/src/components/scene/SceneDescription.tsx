@@ -1,5 +1,13 @@
+import type { NormalizedScene } from "@peek/shared-types";
 import { getSceneDescription } from "../../utils/format";
 import { Tooltip } from "../ui/index";
+
+interface Props {
+  scene: NormalizedScene;
+  maxLength?: number;
+  lineClamp?: number;
+  className?: string;
+}
 
 /**
  * Scene description with truncation and tooltip
@@ -9,7 +17,7 @@ const SceneDescription = ({
   maxLength = 150,
   lineClamp = 2,
   className = "",
-}) => {
+}: Props) => {
   const description = getSceneDescription(scene);
 
   if (!description) return null;

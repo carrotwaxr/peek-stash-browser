@@ -5,6 +5,29 @@ import { Button, Paper } from "../ui/index";
 import { apiPut, apiDelete, getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../api";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
+interface UserData {
+  id: number;
+  username: string;
+  role: string;
+  setupCompleted?: boolean;
+}
+
+interface GroupData {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+interface UserEditModalContentProps {
+  user: UserData;
+  groups?: GroupData[];
+  currentUser: UserData | null;
+  onClose: () => void;
+  onSave?: () => void;
+  onMessage?: (message: string) => void;
+  onError?: (message: string) => void;
+}
+
 /**
  * UserEditModalContent - Inner component that handles the modal content
  * This is separated to ensure hooks are always called (user is guaranteed to exist)
@@ -18,7 +41,7 @@ const UserEditModalContent = ({
   onSave,
   onMessage,
   onError,
-}) => {
+}: UserEditModalContentProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -75,7 +98,7 @@ const UserEditModalContent = ({
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
 
-  const handleGroupToggle = async (groupId, isCurrentlyMember) => {
+  const handleGroupToggle = async (groupId: number, isCurrentlyMember: boolean) => {
     try {
       if (isCurrentlyMember) {
         await removeGroupMember(groupId, user.id);
@@ -92,7 +115,7 @@ const UserEditModalContent = ({
     }
   };
 
-  const handlePermissionOverride = async (permissionKey, newValue) => {
+  const handlePermissionOverride = async (permissionKey: string, newValue: boolean | null) => {
     try {
       const overrideKey = `${permissionKey}Override`;
       const response = await updateUserPermissionOverrides(user.id, {
@@ -173,7 +196,7 @@ const UserEditModalContent = ({
     }
   };
 
-  const renderInheritanceLabel = (source) => {
+  const renderInheritanceLabel = (source: string) => {
     if (source === "override") {
       return (
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -713,7 +736,7 @@ const UserEditModalContent = ({
  * @param {Function} props.onError - Callback for error messages
  * @param {Object} props.api - API instance for requests
  */
-const UserEditModal = (props) => {
+const UserEditModal = (props: UserEditModalContentProps & { user: UserData | null }) => {
   // Early return before any hooks - this wrapper has no hooks
   if (!props.user) return null;
 

@@ -2,13 +2,33 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPut } from "../../api";
 import { Button, Paper, SearchableSelect } from "../ui/index";
 
+interface UserData {
+  id: number;
+  username: string;
+}
+
+interface Props {
+  user: UserData;
+  onClose: () => void;
+  onSave?: () => void;
+}
+
+type RestrictionMode = "NONE" | "EXCLUDE" | "INCLUDE";
+type EntityType = "groups" | "tags" | "studios" | "galleries";
+
+interface RestrictionConfig {
+  mode: RestrictionMode;
+  entityIds: string[];
+  restrictEmpty: boolean;
+}
+
 /**
  * Content Restrictions Modal
  *
  * Allows admins to configure per-user content restrictions for Collections, Tags, Studios, and Galleries.
  * Supports INCLUDE (show only) and EXCLUDE (hide) modes with "restrict empty" option.
  */
-const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
+const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -53,7 +73,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }
   };
 
-  const handleModeChange = (entityType, mode) => {
+  const handleModeChange = (entityType: EntityType, mode: RestrictionMode) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -65,7 +85,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }));
   };
 
-  const handleEntityIdsChange = (entityType, entityIds) => {
+  const handleEntityIdsChange = (entityType: EntityType, entityIds: string[]) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -75,7 +95,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }));
   };
 
-  const handleRestrictEmptyChange = (entityType, checked) => {
+  const handleRestrictEmptyChange = (entityType: EntityType, checked: boolean) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -113,7 +133,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }
   };
 
-  const getEntityLabel = (entityType) => {
+  const getEntityLabel = (entityType: string) => {
     const labels = {
       groups: "Collections",
       tags: "Tags",
@@ -123,7 +143,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return labels[entityType] || entityType;
   };
 
-  const getEntityDescription = (entityType) => {
+  const getEntityDescription = (entityType: string) => {
     const descriptions = {
       groups:
         "Most reliable for content organization as groups are typically static and manually curated.",
@@ -135,7 +155,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return descriptions[entityType] || "";
   };
 
-  const getModeDescription = (mode) => {
+  const getModeDescription = (mode: string) => {
     const descriptions = {
       NONE: "No restrictions - user can see all content",
       EXCLUDE: "Hide selected items and any content associated with them",
@@ -144,7 +164,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return descriptions[mode] || "";
   };
 
-  const renderEntitySection = (entityType) => {
+  const renderEntitySection = (entityType: EntityType) => {
     const config = restrictions[entityType];
 
     return (

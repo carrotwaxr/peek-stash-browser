@@ -1,16 +1,31 @@
+import type { ReactNode } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { getColumnSortField } from "../../config/tableColumns";
 
+interface ColumnDef {
+  id: string;
+  label: string;
+  sortable: boolean;
+  width: string;
+  mandatory: boolean;
+}
+
+interface SortState {
+  field: string;
+  direction: "ASC" | "DESC";
+}
+
+interface Props {
+  columns: ColumnDef[];
+  sort?: SortState | null;
+  onSort?: (field: string, direction: "ASC" | "DESC") => void;
+  onColumnContextMenu?: (columnId: string, event: React.MouseEvent) => void;
+  entityType: string;
+  columnsPopover?: ReactNode;
+}
+
 /**
  * TableHeader - Renders a table header row with sortable columns
- *
- * @param {Object} props
- * @param {Array<{id: string, label: string, sortable: boolean, width: string, mandatory: boolean}>} props.columns - Column definitions
- * @param {Object} props.sort - Current sort state { field, direction }
- * @param {Function} props.onSort - Called when sortable header clicked (field, direction)
- * @param {Function} props.onColumnContextMenu - Called on right-click for non-mandatory columns (columnId, event)
- * @param {string} props.entityType - Entity type for sort field mapping
- * @param {React.ReactNode} props.columnsPopover - Optional columns config popover to render in first header cell
  */
 const TableHeader = ({
   columns,
@@ -19,7 +34,7 @@ const TableHeader = ({
   onColumnContextMenu,
   entityType,
   columnsPopover,
-}) => {
+}: Props) => {
   /**
    * Handle click on a sortable column header
    * - If clicking the same column that's sorted: toggle direction

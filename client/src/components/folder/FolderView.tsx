@@ -1,11 +1,29 @@
 // client/src/components/folder/FolderView.jsx
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { buildFolderTree } from "../../utils/buildFolderTree";
 import FolderCard from "./FolderCard";
 import FolderBreadcrumb from "./FolderBreadcrumb";
 import FolderTreeSidebar from "./FolderTreeSidebar";
+
+interface TagItem {
+  id: string;
+  name: string;
+  parents?: Array<{ id: string }>;
+  image_path?: string | null;
+}
+
+interface Props {
+  items: Array<Record<string, unknown>>;
+  tags: TagItem[];
+  renderItem: (item: Record<string, unknown>) => ReactNode;
+  gridDensity?: string;
+  loading?: boolean;
+  emptyMessage?: string;
+  onFolderPathChange?: (tagId: string | null) => void;
+  filters?: Record<string, unknown> | null;
+}
 
 /**
  * Folder view for browsing content by tag hierarchy.
@@ -19,9 +37,9 @@ const FolderView = ({
   gridDensity = "medium",
   loading = false,
   emptyMessage = "No items found",
-  onFolderPathChange, // Callback when folder path changes (for API filtering)
-  filters = null, // eslint-disable-line @typescript-eslint/no-unused-vars -- Not used directly but for API consistency
-}) => {
+  onFolderPathChange,
+  filters: _filters = null, // eslint-disable-line @typescript-eslint/no-unused-vars
+}: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Parse path from URL

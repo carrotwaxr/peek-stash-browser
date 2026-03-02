@@ -2,11 +2,21 @@ import { useState, useEffect } from "react";
 import { LANDING_PAGE_OPTIONS } from "../../constants/navigation";
 import { Button, Switch } from "../ui/index";
 
+interface LandingPagePreference {
+  pages: string[];
+  randomize: boolean;
+}
+
+interface Props {
+  landingPagePreference: LandingPagePreference | null;
+  onSave: (preference: LandingPagePreference) => void;
+}
+
 /**
  * Landing page preference settings component
  * Allows users to configure which page to land on after login
  */
-const LandingPageSettings = ({ landingPagePreference, onSave }) => {
+const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
   const [randomize, setRandomize] = useState(
     landingPagePreference?.randomize || false
   );
@@ -24,7 +34,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }) => {
     setValidationError("");
   }, [landingPagePreference]);
 
-  const handleRandomizeToggle = (checked) => {
+  const handleRandomizeToggle = (checked: boolean) => {
     setRandomize(checked);
     setHasChanges(true);
     setValidationError("");
@@ -35,7 +45,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }) => {
     }
   };
 
-  const handlePageSelect = (pageKey) => {
+  const handlePageSelect = (pageKey: string) => {
     setHasChanges(true);
     setValidationError("");
 

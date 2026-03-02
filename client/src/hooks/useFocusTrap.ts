@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 /**
  * Custom hook for trapping focus within a container (modal, dropdown, etc.)
@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
  * @param {Function} onEscape Optional callback when Escape is pressed
  * @returns {Object} Ref to attach to container element
  */
-export const useFocusTrap = (enabled = true, onEscape = null) => {
+export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = null) => {
   const containerRef = useRef(null);
   const previousActiveElement = useRef(null);
 
@@ -103,8 +103,8 @@ export const useFocusTrap = (enabled = true, onEscape = null) => {
  * @param {boolean} enabled Whether to auto-focus on mount
  */
 export const useInitialFocus = (
-  containerRef,
-  selector = null,
+  containerRef: React.RefObject<HTMLElement | null>,
+  selector: string | null = null,
   enabled = true
 ) => {
   useEffect(() => {

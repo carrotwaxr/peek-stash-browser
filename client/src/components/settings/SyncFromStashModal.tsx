@@ -2,7 +2,18 @@ import { useState } from "react";
 import { apiPost } from "../../api";
 import { Button, Paper } from "../ui/index";
 
-const SyncFromStashModal = ({ user, onClose, onSyncComplete }) => {
+interface UserData {
+  id: number;
+  username: string;
+}
+
+interface Props {
+  user: UserData;
+  onClose: () => void;
+  onSyncComplete: (username: string) => void;
+}
+
+const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState(null);
@@ -15,7 +26,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }) => {
     groups: { rating: true },
   });
 
-  const toggleSyncOption = (entityType, field) => {
+  const toggleSyncOption = (entityType: string, field: string) => {
     setSyncOptions((prev) => ({
       ...prev,
       [entityType]: {
@@ -319,7 +330,12 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }) => {
 };
 
 // Helper components
-const SyncOptionGroup = ({ title, children }) => (
+interface SyncOptionGroupProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+const SyncOptionGroup = ({ title, children }: SyncOptionGroupProps) => (
   <div
     className="p-4 rounded-lg"
     style={{
@@ -337,7 +353,13 @@ const SyncOptionGroup = ({ title, children }) => (
   </div>
 );
 
-const SyncCheckbox = ({ label, checked, onChange }) => (
+interface SyncCheckboxProps {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}
+
+const SyncCheckbox = ({ label, checked, onChange }: SyncCheckboxProps) => (
   <label className="flex items-center gap-2 cursor-pointer">
     <input
       type="checkbox"
@@ -350,7 +372,12 @@ const SyncCheckbox = ({ label, checked, onChange }) => (
   </label>
 );
 
-const SyncResultItem = ({ label, stats }) => {
+interface SyncResultItemProps {
+  label: string;
+  stats: { checked?: number; created?: number; updated?: number } | null;
+}
+
+const SyncResultItem = ({ label, stats }: SyncResultItemProps) => {
   if (!stats) return null;
   return (
     <div>

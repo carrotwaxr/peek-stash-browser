@@ -22,10 +22,20 @@ const ENTITY_TYPES = [
   { id: "group", label: "Groups" },
 ];
 
+interface ColumnConfig {
+  visible: string[];
+  order: string[];
+}
+
+interface Props {
+  tableColumnDefaults: Record<string, ColumnConfig> | null;
+  onSave: (defaults: Record<string, ColumnConfig>) => Promise<void>;
+}
+
 /**
  * Settings component for configuring default table columns per entity type.
  */
-const TableColumnSettings = ({ tableColumnDefaults, onSave }) => {
+const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const [activeEntity, setActiveEntity] = useState("scene");
   const [localDefaults, setLocalDefaults] = useState(tableColumnDefaults || {});
   const [hasChanges, setHasChanges] = useState(false);
@@ -37,7 +47,7 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }) => {
     order: getDefaultColumnOrder(activeEntity),
   };
 
-  const handleToggleColumn = (columnId) => {
+  const handleToggleColumn = (columnId: string) => {
     const column = allColumns.find((c) => c.id === columnId);
     if (column?.mandatory) return;
 
@@ -55,7 +65,7 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }) => {
     setHasChanges(true);
   };
 
-  const handleMoveColumn = (columnId, direction) => {
+  const handleMoveColumn = (columnId: string, direction: "top" | "up" | "down" | "bottom") => {
     const currentIndex = currentConfig.order.indexOf(columnId);
     if (currentIndex === -1) return;
 

@@ -9,15 +9,22 @@ import {
 } from "lucide-react";
 import Button from "../ui/Button";
 
+interface ColumnDefinition {
+  id: string;
+  label: string;
+  mandatory?: boolean;
+}
+
+interface Props {
+  allColumns: ColumnDefinition[];
+  visibleColumnIds: string[];
+  columnOrder: string[];
+  onToggleColumn?: (columnId: string) => void;
+  onMoveColumn?: (columnId: string, direction: "up" | "down" | "top" | "bottom") => void;
+}
+
 /**
  * ColumnConfigPopover - Popover component for configuring table column visibility and order
- *
- * @param {Object} props
- * @param {Array<{id: string, label: string, mandatory?: boolean}>} props.allColumns - All column definitions
- * @param {Array<string>} props.visibleColumnIds - Array of currently visible column IDs
- * @param {Array<string>} props.columnOrder - Array of column IDs in current order
- * @param {Function} props.onToggleColumn - Called when column visibility toggled (columnId)
- * @param {Function} props.onMoveColumn - Called when column moved (columnId, direction: "up"|"down"|"top"|"bottom")
  */
 const ColumnConfigPopover = ({
   allColumns,
@@ -25,7 +32,7 @@ const ColumnConfigPopover = ({
   columnOrder,
   onToggleColumn,
   onMoveColumn,
-}) => {
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);

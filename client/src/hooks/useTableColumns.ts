@@ -17,7 +17,17 @@ import {
  * @param {Object} options.userDefaultColumns - User's default columns { visible: [], order: [] }
  * @returns {Object} Column state and management functions
  */
-export const useTableColumns = (entityType, options = {}) => {
+interface ColumnConfig {
+  visible?: string[];
+  order?: string[];
+}
+
+interface UseTableColumnsOptions {
+  presetColumns?: ColumnConfig;
+  userDefaultColumns?: ColumnConfig;
+}
+
+export const useTableColumns = (entityType: string, options: UseTableColumnsOptions = {}) => {
   const { presetColumns, userDefaultColumns } = options;
 
   // Get all column definitions for this entity type

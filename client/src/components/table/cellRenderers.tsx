@@ -17,12 +17,14 @@ import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 // Cell Components
 // ============================================================================
 
+interface RatingCellProps {
+  rating: number | null | undefined;
+}
+
 /**
  * RatingCell - Shows rating badge with bronze/silver/gold gradient (0-100 scale)
- * @param {Object} props
- * @param {number} props.rating - Rating value (0-100)
  */
-export const RatingCell = ({ rating }) => {
+export const RatingCell = ({ rating }: RatingCellProps) => {
   if (rating === null || rating === undefined) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -31,12 +33,14 @@ export const RatingCell = ({ rating }) => {
   return <RatingBadge rating={rating} size="small" />;
 };
 
+interface FavoriteCellProps {
+  favorite: boolean;
+}
+
 /**
  * FavoriteCell - Shows heart icon if favorite
- * @param {Object} props
- * @param {boolean} props.favorite - Whether entity is favorited
  */
-export const FavoriteCell = ({ favorite }) => {
+export const FavoriteCell = ({ favorite }: FavoriteCellProps) => {
   return (
     <span className="inline-flex items-center justify-center">
       <Heart
@@ -51,10 +55,8 @@ export const FavoriteCell = ({ favorite }) => {
 
 /**
  * Get thumbnail dimensions based on entity type
- * @param {string} entityType - The entity type
- * @returns {{ width: string, height: string }} Tailwind classes for width and height
  */
-const getThumbnailDimensions = (entityType) => {
+const getThumbnailDimensions = (entityType: string | undefined): { width: string; height: string } => {
   const normalizedType = entityType?.toLowerCase();
   // Portrait entities (2/3 aspect ratio)
   if (["performer", "performers", "gallery", "galleries", "group", "groups"].includes(normalizedType)) {
@@ -68,15 +70,17 @@ const getThumbnailDimensions = (entityType) => {
   return { width: "w-16", height: "h-10" };
 };
 
+interface ThumbnailCellProps {
+  src: string | null | undefined;
+  alt?: string;
+  linkTo?: string;
+  entityType?: string;
+}
+
 /**
  * ThumbnailCell - Small image thumbnail with optional link
- * @param {Object} props
- * @param {string} props.src - Image source URL
- * @param {string} props.alt - Alt text for image
- * @param {string} props.linkTo - Optional link destination
- * @param {string} props.entityType - Entity type for aspect ratio (optional)
  */
-export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }) => {
+export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }: ThumbnailCellProps) => {
   const { width, height } = getThumbnailDimensions(entityType);
   const sizeClasses = `${width} ${height}`;
 
@@ -114,13 +118,15 @@ export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }) => {
   return image;
 };
 
+interface LinkCellProps {
+  text: string | null | undefined;
+  linkTo?: string;
+}
+
 /**
  * LinkCell - Text link to detail page
- * @param {Object} props
- * @param {string} props.text - Text to display
- * @param {string} props.linkTo - Link destination
  */
-export const LinkCell = ({ text, linkTo }) => {
+export const LinkCell = ({ text, linkTo }: LinkCellProps) => {
   if (!text) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -140,13 +146,15 @@ export const LinkCell = ({ text, linkTo }) => {
   );
 };
 
+interface TruncatedTextCellProps {
+  text: string | null | undefined;
+  maxLength?: number;
+}
+
 /**
  * TruncatedTextCell - Text with truncation and title for full content
- * @param {Object} props
- * @param {string} props.text - Text to display
- * @param {number} props.maxLength - Maximum characters to show (default: 50)
  */
-const TruncatedTextCell = ({ text, maxLength = 50 }) => {
+const TruncatedTextCell = ({ text, maxLength = 50 }: TruncatedTextCellProps) => {
   if (!text) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -164,12 +172,14 @@ const TruncatedTextCell = ({ text, maxLength = 50 }) => {
   );
 };
 
+interface SimpleValueCellProps {
+  value: string | number | boolean | null | undefined;
+}
+
 /**
  * SimpleValueCell - Simple text or number value
- * @param {Object} props
- * @param {*} props.value - Value to display
  */
-const SimpleValueCell = ({ value }) => {
+const SimpleValueCell = ({ value }: SimpleValueCellProps) => {
   if (value === null || value === undefined || value === "") {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -266,14 +276,16 @@ const performerRenderers = {
   o_counter: (performer) => <SimpleValueCell value={performer.o_counter} />,
 };
 
+interface StudioLogoCellProps {
+  src: string | null | undefined;
+  alt?: string;
+  linkTo?: string;
+}
+
 /**
  * StudioLogoCell - Studio logo with object-contain (no cropping)
- * @param {Object} props
- * @param {string} props.src - Image source URL
- * @param {string} props.alt - Alt text for image
- * @param {string} props.linkTo - Optional link destination
  */
-const StudioLogoCell = ({ src, alt = "", linkTo }) => {
+const StudioLogoCell = ({ src, alt = "", linkTo }: StudioLogoCellProps) => {
   if (!src) {
     return (
       <div
@@ -518,13 +530,15 @@ const groupRenderers = {
   },
 };
 
+interface TagLinkCellProps {
+  tag: { id: string; name: string; instanceId?: string } | null | undefined;
+  hasMultipleInstances: boolean;
+}
+
 /**
  * TagLinkCell - Tag displayed as a link with theme secondary color
- * @param {Object} props
- * @param {Object} props.tag - Tag object
- * @param {boolean} props.hasMultipleInstances - Whether multiple instances are configured
  */
-const TagLinkCell = ({ tag, hasMultipleInstances }) => {
+const TagLinkCell = ({ tag, hasMultipleInstances }: TagLinkCellProps) => {
   if (!tag) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
@@ -620,14 +634,14 @@ const entityRenderers = {
   clips: clipRenderers,
 };
 
+interface CellRendererOptions {
+  hasMultipleInstances?: boolean;
+}
+
 /**
  * Get a cell renderer function for a specific column and entity type
- * @param {string} columnId - The column ID
- * @param {string} entityType - The entity type (scene, performer, studio, tag, gallery, image, group)
- * @param {Object} options - Options to pass to the renderer (e.g., { hasMultipleInstances: boolean })
- * @returns {Function} A function (entity) => ReactNode
  */
-export const getCellRenderer = (columnId, entityType, options = {}) => {
+export const getCellRenderer = (columnId: string, entityType: string, options: CellRendererOptions = {}) => {
   const normalizedType = entityType?.toLowerCase();
   const renderers = entityRenderers[normalizedType];
 

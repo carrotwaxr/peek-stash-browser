@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import type { NormalizedScene, TagRef } from "@peek/shared-types";
 import { CardCountIndicators, MediaImage } from "../ui/index";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -7,7 +8,7 @@ import { getEntityPath } from "../../utils/entityLinks";
 /**
  * Combine direct tags with inherited tags from server
  */
-const getAllTags = (scene) => {
+const getAllTags = (scene: NormalizedScene): TagRef[] => {
   const tagMap = new Map();
   // Direct scene tags
   if (scene.tags) {
@@ -20,10 +21,15 @@ const getAllTags = (scene) => {
   return Array.from(tagMap.values());
 };
 
+interface TagThumbnailLinkProps {
+  tag: TagRef;
+  hasMultipleInstances: boolean;
+}
+
 /**
  * Tag thumbnail link component that handles video tag images
  */
-const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
+const TagThumbnailLink = ({ tag, hasMultipleInstances }: TagThumbnailLinkProps) => {
   const [showPlaceholder, setShowPlaceholder] = useState(false);
 
   return (
@@ -52,10 +58,14 @@ const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
   );
 };
 
+interface Props {
+  scene: NormalizedScene;
+}
+
 /**
  * Scene metadata: performers and tags with image-rich tooltips
  */
-const SceneMetadata = ({ scene }) => {
+const SceneMetadata = ({ scene }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
   // Get merged and deduped tags

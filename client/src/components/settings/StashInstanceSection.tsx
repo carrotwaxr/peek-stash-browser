@@ -52,12 +52,12 @@ const StashInstanceSection = () => {
     loadInstances();
   }, [loadInstances]);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleString();
   };
 
-  const getDisplayUrl = (url) => {
+  const getDisplayUrl = (url: string | null | undefined) => {
     if (!url) return "N/A";
     try {
       const parsed = new URL(url);
@@ -82,7 +82,7 @@ const StashInstanceSection = () => {
     setShowAddForm(true);
   };
 
-  const handleEdit = (instance) => {
+  const handleEdit = (instance: Record<string, unknown>) => {
     setFormData({
       name: instance.name,
       description: instance.description || "",
@@ -180,7 +180,7 @@ const StashInstanceSection = () => {
     }
   };
 
-  const handleDelete = async (instance) => {
+  const handleDelete = async (instance: { id: number; name: string }) => {
     if (!confirm(`Are you sure you want to delete "${instance.name}"? This cannot be undone.`)) {
       return;
     }
@@ -193,7 +193,7 @@ const StashInstanceSection = () => {
     }
   };
 
-  const handleToggleEnabled = async (instance) => {
+  const handleToggleEnabled = async (instance: { id: number; enabled: boolean }) => {
     try {
       await apiPut(`/setup/stash-instance/${instance.id}`, {
         enabled: !instance.enabled,

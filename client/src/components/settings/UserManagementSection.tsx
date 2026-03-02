@@ -8,13 +8,30 @@ import SyncFromStashModal from "./SyncFromStashModal";
 import UserEditModal from "./UserEditModal";
 import { Button, Paper } from "../ui/index";
 
+interface UserItem {
+  id: number;
+  username: string;
+  role: string;
+  syncToStash?: boolean;
+  createdAt: string;
+  groups?: Array<{ id: number; name: string }>;
+}
+
+interface Props {
+  users: UserItem[];
+  currentUser: UserItem | null;
+  onUsersChanged: () => void;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
+}
+
 const UserManagementSection = ({
   users,
   currentUser,
   onUsersChanged,
   onMessage,
   onError,
-}) => {
+}: Props) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncTargetUser, setSyncTargetUser] = useState(null);
@@ -44,12 +61,12 @@ const UserManagementSection = ({
     setShowGroupModal(true);
   };
 
-  const handleEditGroup = (group) => {
+  const handleEditGroup = (group: Record<string, unknown>) => {
     setEditingGroup(group);
     setShowGroupModal(true);
   };
 
-  const handleDeleteGroup = async (group) => {
+  const handleDeleteGroup = async (group: { id: number; name: string }) => {
     if (!confirm(`Are you sure you want to delete the group "${group.name}"?\n\nThis will remove the group from all members but will not delete any users.`)) {
       return;
     }
@@ -77,7 +94,7 @@ const UserManagementSection = ({
     onUsersChanged(); // Refresh users to update their group badges
   };
 
-  const renderPermissionBadges = (group) => {
+  const renderPermissionBadges = (group: Record<string, unknown>) => {
     const badges = [];
 
     if (group?.canShare) {
@@ -142,7 +159,7 @@ const UserManagementSection = ({
     return <div className="flex flex-wrap gap-1">{badges}</div>;
   };
 
-  const toggleSyncToStash = async (userId, username, currentSyncToStash) => {
+  const toggleSyncToStash = async (userId: number, username: string, currentSyncToStash: boolean | undefined) => {
     const newSyncToStash = !currentSyncToStash;
 
     try {
@@ -158,7 +175,7 @@ const UserManagementSection = ({
     }
   };
 
-  const openSyncModal = (user) => {
+  const openSyncModal = (user: UserItem) => {
     setSyncTargetUser(user);
     setShowSyncModal(true);
   };

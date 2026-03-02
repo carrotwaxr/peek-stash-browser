@@ -13,7 +13,12 @@ import { useRef, useCallback } from "react";
  *   - containerElRef: Regular ref object to read container element (for event handling)
  *   - setCurrentItemRef: Callback ref to pass to current item's ref prop
  */
-export const useScrollToCurrentItem = (currentIndex, options = {}) => {
+interface UseScrollToCurrentItemOptions {
+  direction?: "horizontal" | "vertical";
+  delay?: number;
+}
+
+export const useScrollToCurrentItem = (currentIndex: number, options: UseScrollToCurrentItemOptions = {}) => {
   const { direction = "horizontal", delay = 100 } = options;
 
   const containerElRef = useRef(null);

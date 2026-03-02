@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
-const formatBytes = (bytes) => {
+const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
@@ -13,7 +13,7 @@ const formatBytes = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
-const formatDate = (dateString) => {
+const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleDateString(undefined, {
     year: "numeric",

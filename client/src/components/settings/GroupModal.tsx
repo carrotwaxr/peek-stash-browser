@@ -3,17 +3,33 @@ import { Users, X, Plus } from "lucide-react";
 import { Button, Paper } from "../ui/index";
 import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember } from "../../api";
 
+interface GroupData {
+  id: number;
+  name: string;
+  description?: string;
+  canShare?: boolean;
+  canDownloadFiles?: boolean;
+  canDownloadPlaylists?: boolean;
+}
+
+interface UserItem {
+  id: number;
+  username: string;
+  role: string;
+}
+
+interface Props {
+  group: GroupData | null;
+  users?: UserItem[];
+  onClose: (saved?: boolean) => void;
+  onSave?: () => void;
+  onMessage?: (message: string) => void;
+}
+
 /**
  * GroupModal - Create or Edit a user group
- *
- * @param {Object} props
- * @param {Object|null} props.group - Group object for edit mode, null for create mode
- * @param {Array} props.users - List of all users (for adding members)
- * @param {Function} props.onClose - Callback when modal is closed/cancelled
- * @param {Function} props.onSave - Callback when group is successfully saved
- * @param {Function} props.onMessage - Callback for success messages
  */
-const GroupModal = ({ group, onClose, onSave, users = [], onMessage }) => {
+const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) => {
   const isEditMode = !!group;
 
   // Form state
@@ -89,7 +105,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }) => {
     }
   };
 
-  const handleRemoveMember = async (userId) => {
+  const handleRemoveMember = async (userId: number) => {
     const removedMember = members.find((m) => m.user.id === userId);
     try {
       await removeGroupMember(group.id, userId);
@@ -105,7 +121,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }) => {
     (user) => !members.some((m) => m.user.id === user.id)
   );
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {

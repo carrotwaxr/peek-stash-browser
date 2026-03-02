@@ -3,15 +3,17 @@ import * as LucideIcons from "lucide-react";
 import { Search, X } from "lucide-react";
 import { CAROUSEL_ICONS } from "./carouselIcons";
 
+interface Props {
+  selectedIcon: string;
+  onSelect: (icon: string) => void;
+  onClose: () => void;
+}
+
 /**
  * IconPicker Component
  * Grid-based icon selector with search functionality for choosing carousel icons.
- *
- * @param {string} selectedIcon - Currently selected icon name
- * @param {function} onSelect - Callback when an icon is selected
- * @param {function} onClose - Callback when picker is closed
  */
-const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
+const IconPicker = ({ selectedIcon, onSelect, onClose }: Props) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredIcons = CAROUSEL_ICONS.filter((iconName) =>

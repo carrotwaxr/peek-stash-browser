@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { apiGet } from "../../api";
 import { Button, Paper } from "../ui/index";
 
-const VersionInfoSection = ({ clientVersion }) => {
+interface Props {
+  clientVersion: string;
+}
+
+const VersionInfoSection = ({ clientVersion }: Props) => {
   const [serverVersion, setServerVersion] = useState(null);
   const [latestVersion, setLatestVersion] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -51,13 +55,13 @@ const VersionInfoSection = ({ clientVersion }) => {
     checkForUpdates();
   }, [loadServerVersion, checkForUpdates]);
 
-  const parseVersion = (v) => {
+  const parseVersion = (v: string) => {
     const [core, pre] = v.split("-");
     const parts = core.split(".").map(Number);
     return { major: parts[0] || 0, minor: parts[1] || 0, patch: parts[2] || 0, pre: pre || null };
   };
 
-  const compareVersions = (current, latest) => {
+  const compareVersions = (current: string, latest: string) => {
     if (!current || !latest) return false;
     const c = parseVersion(current);
     const l = parseVersion(latest);

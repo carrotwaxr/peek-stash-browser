@@ -35,7 +35,7 @@ const SyncSettingsSection = () => {
     loadSettings();
   }, []);
 
-  const handleChange = async (e) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = Number(e.target.value);
     const previous = syncInterval;
     setSyncInterval(value);
