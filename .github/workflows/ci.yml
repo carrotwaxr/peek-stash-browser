@@ -64,15 +64,15 @@ jobs:
         env:
           DATABASE_URL: file:./test.db
 
+      - name: Build shared types
+        working-directory: shared
+        run: npm ci && npm run build
+
       - name: Lint
         run: npm run lint
 
       - name: TypeScript Compile
         run: npx tsc --noEmit
-
-      - name: Check type sync (server ↔ shared)
-        working-directory: .
-        run: bash scripts/check-type-sync.sh
 
       - name: Test with coverage
         run: npm run test:coverage

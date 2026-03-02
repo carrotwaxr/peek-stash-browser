@@ -1,4 +1,4 @@
-// server/types/api/ratings.ts
+// shared/types/api/ratings.ts
 /**
  * Ratings API Types
  *

@@ -1,4 +1,4 @@
-// server/types/api/imageViewHistory.ts
+// shared/types/api/imageViewHistory.ts
 /**
  * Image View History API Types
  *

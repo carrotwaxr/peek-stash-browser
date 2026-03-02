@@ -5,16 +5,22 @@ WORKDIR /app
 # Install system dependencies (OpenSSL for Prisma, SQLite for CLI tools)
 RUN apt-get update && apt-get install -y openssl sqlite3 && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-COPY package*.json ./
+# Build shared type declarations
+COPY shared/ ./shared/
+WORKDIR /app/shared
+RUN npm ci && npm run build
+
+# Install server dependencies
+WORKDIR /app/server
+COPY server/package*.json ./
 RUN npm install
 
 # Copy prisma schema and generate client
-COPY prisma ./prisma
+COPY server/prisma ./prisma
 RUN npx prisma generate
 
 # Copy source code (this will be overridden by volume mount)
-COPY . .
+COPY server/ .
 
 EXPOSE 8000
 

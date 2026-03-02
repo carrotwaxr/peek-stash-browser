@@ -25,6 +25,13 @@ RUN npm run build && rm -f dist/stats.html
 # ===========================
 FROM node:22-slim AS backend-build
 
+# Build shared type declarations first
+WORKDIR /app/shared
+COPY shared/package*.json ./
+RUN npm ci --no-audit --prefer-offline
+COPY shared/ ./
+RUN npm run build
+
 WORKDIR /app/server
 
 # Install build dependencies (cached with BuildKit)
