@@ -19,7 +19,17 @@ async function globalSetup() {
 
   try {
     const status = await api.get("/api/setup/status");
-    const data = await status.json();
+
+    // In dev environments, setup may already be complete and the endpoint
+    // can return non-JSON (e.g., 500 with empty body). Treat parse failures
+    // or non-OK responses as "setup already complete".
+    let data: { setupComplete?: boolean; hasUsers?: boolean; hasStashInstance?: boolean };
+    try {
+      data = await status.json();
+    } catch {
+      // JSON parse failed — likely setup is already complete (dev environment)
+      return;
+    }
 
     if (data.setupComplete) {
       return;
