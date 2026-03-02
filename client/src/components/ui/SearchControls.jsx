@@ -330,7 +330,7 @@ const SearchControls = ({
   const permanentFiltersReady = !deferInitialQueryUntilFiltersReady ||
     Object.keys(permanentFilters).length > 0;
 
-  // Trigger initial query when hook is initialized and filters are ready
+  // Effect 1: Fire initial search query when hook is initialized and filters are ready
   useEffect(() => {
     if (!isInitialized || hasTriggeredInitialQuery.current || !permanentFiltersReady) return;
     hasTriggeredInitialQuery.current = true;
@@ -349,12 +349,19 @@ const SearchControls = ({
       ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
     onQueryChange(query);
+  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
-    // Notify parent of initial viewMode and perPage so it stays in sync
-    // (e.g., when a default preset sets viewMode to "hierarchy")
+  // Effect 2: Notify parent of initial viewMode and perPage after first query fires
+  // Separated from the query effect to isolate concerns — this syncs parent state
+  // (e.g., when a default preset sets viewMode to "hierarchy")
+  const hasNotifiedParent = useRef(false);
+  useEffect(() => {
+    if (!hasTriggeredInitialQuery.current || hasNotifiedParent.current) return;
+    hasNotifiedParent.current = true;
+
     onViewModeChange?.(viewMode);
     onPerPageStateChange?.(perPage);
-  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed, onViewModeChange, viewMode, onPerPageStateChange]);
+  }, [onViewModeChange, viewMode, onPerPageStateChange, perPage]);
 
   // Track previous permanentFilters to detect changes
   const prevPermanentFiltersRef = useRef(permanentFilters);
