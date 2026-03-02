@@ -1,11 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
+import { useQuery } from "@tanstack/react-query";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getScenePathWithTime } from "../../utils/entityLinks";
-import { getClips } from "../../api";
+import { getClips, type GetClipsOptions } from "../../api";
+import { queryKeys } from "../../api/queryKeys";
 import {
   ErrorMessage,
   PageHeader,
@@ -41,7 +42,14 @@ const ClipSearch = ({
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
 
-  const { data, isLoading, error, execute } = useCancellableQuery();
+  // Clip query params (set when SearchControls calls onQueryChange)
+  const [clipQueryParams, setClipQueryParams] = useState<GetClipsOptions | null>(null);
+  const { data, isLoading: queryLoading, error } = useQuery({
+    queryKey: queryKeys.clips.list((clipQueryParams ?? {}) as Record<string, unknown>),
+    queryFn: () => getClips(clipQueryParams!),
+    enabled: clipQueryParams !== null,
+  });
+  const isLoading = clipQueryParams === null || queryLoading;
 
   // Wall playback preference
   const { wallPlayback, updateWallPlayback } = useWallPlayback();
@@ -63,8 +71,8 @@ const ClipSearch = ({
     parseInt(searchParams.get("per_page")) || 24
   );
 
-  const currentClips = data?.clips || [];
-  const totalCount = data?.total || 0;
+  const currentClips = (data as Record<string, unknown>)?.clips as unknown[] || [];
+  const totalCount = (data as Record<string, unknown>)?.total as number || 0;
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   /**
@@ -72,55 +80,52 @@ const ClipSearch = ({
    * Converts the GraphQL-style query to Peek REST API params
    */
   const handleQueryChange = useCallback(
-    (query) => {
-      execute(async () => {
-        // Extract filter values from the clip_filter
-        const clipFilter = query.clip_filter || {};
+    (query: Record<string, unknown>) => {
+      const filter = query.filter as Record<string, unknown> | undefined;
+      const clipFilter = (query.clip_filter || {}) as Record<string, unknown>;
 
-        // Build API params
-        const params = {
-          page: query.filter?.page || 1,
-          perPage: query.filter?.per_page || 24,
-          sortBy: query.filter?.sort || "stashCreatedAt",
-          sortDir: query.filter?.direction?.toLowerCase() || "desc",
-          q: query.filter?.q || undefined,
-        };
+      // Build API params
+      const params: GetClipsOptions = {
+        page: (filter?.page as number) || 1,
+        perPage: (filter?.per_page as number) || 24,
+        sortBy: (filter?.sort as string) || "stashCreatedAt",
+        sortDir: (filter?.direction as string)?.toLowerCase() || "desc",
+        q: (filter?.q as string) || undefined,
+      };
 
-        // Handle isGenerated filter
-        if (clipFilter.isGenerated !== undefined) {
-          params.isGenerated = clipFilter.isGenerated;
-        }
+      // Handle isGenerated filter
+      if (clipFilter.isGenerated !== undefined) {
+        params.isGenerated = clipFilter.isGenerated as boolean;
+      }
 
-        // Handle tag IDs filter
-        if (clipFilter.tagIds && clipFilter.tagIds.length > 0) {
-          params.tagIds = clipFilter.tagIds;
-        }
+      // Handle tag IDs filter
+      if (clipFilter.tagIds && (clipFilter.tagIds as string[]).length > 0) {
+        params.tagIds = clipFilter.tagIds as string[];
+      }
 
-        // Handle scene tag IDs filter
-        if (clipFilter.sceneTagIds && clipFilter.sceneTagIds.length > 0) {
-          params.sceneTagIds = clipFilter.sceneTagIds;
-        }
+      // Handle scene tag IDs filter
+      if (clipFilter.sceneTagIds && (clipFilter.sceneTagIds as string[]).length > 0) {
+        params.sceneTagIds = clipFilter.sceneTagIds as string[];
+      }
 
-        // Handle performer IDs filter
-        if (clipFilter.performerIds && clipFilter.performerIds.length > 0) {
-          params.performerIds = clipFilter.performerIds;
-        }
+      // Handle performer IDs filter
+      if (clipFilter.performerIds && (clipFilter.performerIds as string[]).length > 0) {
+        params.performerIds = clipFilter.performerIds as string[];
+      }
 
-        // Handle studio ID filter
-        if (clipFilter.studioId) {
-          params.studioId = clipFilter.studioId;
-        }
+      // Handle studio ID filter
+      if (clipFilter.studioId) {
+        params.studioId = clipFilter.studioId as string;
+      }
 
-        // Merge permanent filters
-        if (permanentFilters.sceneId) {
-          params.sceneId = permanentFilters.sceneId;
-        }
+      // Merge permanent filters
+      if ((permanentFilters as Record<string, unknown>).sceneId) {
+        params.sceneId = (permanentFilters as Record<string, unknown>).sceneId as string;
+      }
 
-        const result = await getClips(params);
-        return result;
-      });
+      setClipQueryParams(params);
     },
-    [execute, permanentFilters]
+    [permanentFilters]
   );
 
   const handleClipClick = (clip) => {

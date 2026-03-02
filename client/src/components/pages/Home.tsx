@@ -6,7 +6,7 @@ import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
 } from "../../constants/carousels";
-import { useAsyncData } from "../../hooks/useApi";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/useAuth";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries";
@@ -388,13 +388,18 @@ const HomeCarousel = ({
   onInitializing,
 }: HomeCarouselProps) => {
   const [retryCount, setRetryCount] = useState(0);
+  const queryClient = useQueryClient();
   const fetchFunction = carouselQueries[fetchKey];
+  const queryKey = ["homeCarousel", fetchKey] as const;
   const {
     data: scenes,
-    loading,
+    isLoading: loading,
     error,
-    refetch,
-  } = useAsyncData(fetchFunction, [fetchKey]);
+  } = useQuery({
+    queryKey,
+    queryFn: () => fetchFunction(),
+  });
+  const refetch = () => queryClient.invalidateQueries({ queryKey: [...queryKey] });
 
   // Handle server initialization state
   useEffect(() => {

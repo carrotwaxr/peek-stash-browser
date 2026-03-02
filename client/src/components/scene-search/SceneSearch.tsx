@@ -1,13 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { useSceneList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
+import { queryKeys } from "../../api/queryKeys";
 import {
   SceneCard,
   SyncProgressBanner,
@@ -83,7 +86,14 @@ const SceneSearch = ({
     getColumnConfig,
   } = useTableColumns("scene");
 
-  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading: queryLoading, error } = useSceneList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   // Track current view mode for context settings
   // Initialize from URL to stay in sync with useFilterState on back navigation
@@ -158,21 +168,30 @@ const SceneSearch = ({
     return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
   }, [currentViewMode]);
 
-  // Handle successful hide - remove scene from state
-  const handleHideSuccess = (sceneId) => {
-    setData((prevData) => {
-      if (!prevData) return prevData;
+  // Handle successful hide - remove scene from cache
+  const handleHideSuccess = (sceneId: string) => {
+    if (!queryParams) return;
+    const qk = queryKeys.scenes.list(undefined, (queryParams ?? {}) as Record<string, unknown>);
+    queryClient.setQueryData(qk, (old: unknown) => {
+      if (!old || typeof old !== "object") return old;
+      const oldData = old as Record<string, unknown>;
+      const fs = oldData.findScenes as Record<string, unknown> | undefined;
+      if (!fs?.scenes) return old;
       return {
-        ...prevData,
-        scenes: prevData.scenes.filter((s) => s.id !== sceneId),
-        count: Math.max(0, prevData.count - 1),
+        ...oldData,
+        findScenes: {
+          ...fs,
+          scenes: (fs.scenes as unknown[]).filter((s: unknown) => (s as Record<string, unknown>).id !== sceneId),
+          count: Math.max(0, ((fs.count as number) || 0) - 1),
+        },
       };
     });
   };
 
-  const handleSceneClick = (scene) => {
+  const handleSceneClick = (scene: Record<string, unknown>) => {
     // Navigate to video player page with scene data and virtual playlist context
-    const currentScenes = data?.scenes || [];
+    const findScenes = (data as Record<string, unknown>)?.findScenes as Record<string, unknown> | undefined;
+    const currentScenes = (findScenes?.scenes as unknown[]) || [];
     const currentIndex = currentScenes.findIndex((s) => s.id === scene.id);
 
     // Build navigation state
@@ -203,15 +222,16 @@ const SceneSearch = ({
   };
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
-      execute((signal) => getScenes(newQuery, signal));
+    (newQuery: LibrarySearchParams) => {
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  const currentScenes = data?.scenes || [];
+  const findScenesData = (data as Record<string, unknown>)?.findScenes as Record<string, unknown> | undefined;
+  const currentScenes = (findScenesData?.scenes as unknown[]) || [];
 
-  const totalCount = data?.count || 0;
+  const totalCount = (findScenesData?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -371,18 +391,6 @@ const SceneSearch = ({
       </SearchControls>
     </PageLayout>
   );
-};
-
-const getScenes = async (query, signal) => {
-  const response = await libraryApi.findScenes(query, signal);
-
-  // Extract scenes and count from server response structure
-  const findScenes = response?.findScenes;
-  const result = {
-    scenes: findScenes?.scenes || [],
-    count: findScenes?.count || 0,
-  };
-  return result;
 };
 
 export default SceneSearch;

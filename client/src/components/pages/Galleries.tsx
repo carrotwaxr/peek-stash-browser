@@ -5,12 +5,13 @@ import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { useGalleryList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
 import { GalleryCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -56,7 +57,13 @@ const Galleries = () => {
     getColumnConfig,
   } = useTableColumns("gallery");
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = useGalleryList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   // Track current view mode for timeline date filter and folder view
   // Initialize from URL to stay in sync with useFilterState on back navigation
@@ -98,9 +105,9 @@ const Galleries = () => {
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal) => getGalleries(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
   const handleGalleryClick = useCallback(
@@ -112,8 +119,9 @@ const Galleries = () => {
     [navigate, hasMultipleInstances]
   );
 
-  const currentGalleries = data?.galleries || [];
-  const totalCount = data?.count || 0;
+  const findGalleries = (data as Record<string, unknown>)?.findGalleries as Record<string, unknown> | undefined;
+  const currentGalleries = (findGalleries?.galleries as unknown[]) || [];
+  const totalCount = (findGalleries?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -284,18 +292,6 @@ const Galleries = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getGalleries = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findGalleries(query, signal);
-
-  const findGalleries = response?.findGalleries;
-  const result = {
-    galleries: findGalleries?.galleries || [],
-    count: findGalleries?.count || 0,
-  };
-
-  return result;
 };
 
 export default Galleries;

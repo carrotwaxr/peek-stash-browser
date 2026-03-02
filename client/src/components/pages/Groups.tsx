@@ -5,11 +5,12 @@ import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { useGroupList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
 import { GroupCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -47,17 +48,24 @@ const Groups = () => {
     getColumnConfig,
   } = useTableColumns("group");
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = useGroupList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal) => getGroups(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  const currentGroups = data?.groups || [];
-  const totalCount = data?.count || 0;
+  const findGroups = (data as Record<string, unknown>)?.findGroups as Record<string, unknown> | undefined;
+  const currentGroups = (findGroups?.groups as unknown[]) || [];
+  const totalCount = (findGroups?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -204,18 +212,6 @@ const Groups = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getGroups = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findGroups(query, signal);
-
-  // Extract groups and count from server response structure
-  const findGroups = response?.findGroups;
-  const result = {
-    groups: findGroups?.groups || [],
-    count: findGroups?.count || 0,
-  };
-  return result;
 };
 
 export default Groups;

@@ -5,11 +5,12 @@ import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { usePerformerList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
 import {
   SyncProgressBanner,
   ErrorMessage,
@@ -47,17 +48,24 @@ const Performers = () => {
     getColumnConfig,
   } = useTableColumns("performer");
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = usePerformerList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal) => getPerformers(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  const currentPerformers = data?.performers || [];
-  const totalCount = data?.count || 0;
+  const findPerformers = (data as Record<string, unknown>)?.findPerformers as Record<string, unknown> | undefined;
+  const currentPerformers = (findPerformers?.performers as unknown[]) || [];
+  const totalCount = (findPerformers?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -225,19 +233,6 @@ const Performers = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getPerformers = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findPerformers(query, signal);
-
-  // Extract performers and count from server response structure
-  const findPerformers = response?.findPerformers;
-  const result = {
-    performers: findPerformers?.performers || [],
-    count: findPerformers?.count || 0,
-  };
-
-  return result;
 };
 
 export default Performers;

@@ -4,11 +4,12 @@ import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { useStudioList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
 import { StudioCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -46,17 +47,24 @@ const Studios = () => {
     getColumnConfig,
   } = useTableColumns("studio");
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = useStudioList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal) => getStudios(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  const currentStudios = data?.studios || [];
-  const totalCount = data?.count || 0;
+  const findStudios = (data as Record<string, unknown>)?.findStudios as Record<string, unknown> | undefined;
+  const currentStudios = (findStudios?.studios as unknown[]) || [];
+  const totalCount = (findStudios?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -203,18 +211,6 @@ const Studios = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getStudios = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findStudios(query, signal);
-
-  // Extract studios and count from server response structure
-  const findStudios = response?.findStudios;
-  const result = {
-    studios: findStudios?.studios || [],
-    count: findStudios?.count || 0,
-  };
-  return result;
 };
 
 export default Studios;

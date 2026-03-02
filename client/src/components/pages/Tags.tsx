@@ -1,16 +1,18 @@
-// client/src/components/pages/Tags.jsx
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { libraryApi, type LibrarySearchParams } from "../../api";
+import { useTagList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "../../api/queryKeys";
 import { TagCard } from "../cards/index";
 import { TagHierarchyView } from "../tags/index";
 import {
@@ -55,32 +57,36 @@ const Tags = () => {
     searchParams.get("view_mode") || "grid"
   );
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = useTagList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
-  // Separate query for hierarchy view (fetches all tags, starts not loading)
-  const {
-    data: hierarchyData,
-    isLoading: hierarchyLoading,
-    execute: executeHierarchy,
-  } = useCancellableQuery({ initialLoading: false });
+  // Separate query for hierarchy view (fetches all tags)
+  const allTagsParams: LibrarySearchParams = {
+    filter: { per_page: -1, sort: "name", direction: "ASC" },
+  };
+  const { data: hierarchyRaw, isLoading: hierarchyLoading } = useQuery({
+    queryKey: queryKeys.tags.list(undefined, allTagsParams as Record<string, unknown>),
+    queryFn: ({ signal }) => libraryApi.findTags(allTagsParams, signal),
+    enabled: activeViewMode === "hierarchy",
+  });
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal) => getTags(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  // Fetch all tags when switching to hierarchy view
-  useEffect(() => {
-    if (activeViewMode === "hierarchy" && !hierarchyData) {
-      executeHierarchy((signal) => getAllTags(signal));
-    }
-  }, [activeViewMode, executeHierarchy, hierarchyData]);
-
-  const currentTags = data?.tags || [];
-  const totalCount = data?.count || 0;
-  const hierarchyTags = hierarchyData?.tags || [];
+  const findTags = (data as Record<string, unknown>)?.findTags as Record<string, unknown> | undefined;
+  const currentTags = (findTags?.tags as unknown[]) || [];
+  const totalCount = (findTags?.count as number) || 0;
+  const hierarchyFindTags = (hierarchyRaw as Record<string, unknown>)?.findTags as Record<string, unknown> | undefined;
+  const hierarchyTags = (hierarchyFindTags?.tags as unknown[]) || [];
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -154,7 +160,7 @@ const Tags = () => {
             // Hierarchy view
             if (viewMode === "hierarchy") {
               // Show loading if we don't have hierarchy data yet
-              const showLoading = hierarchyLoading || !hierarchyData;
+              const showLoading = hierarchyLoading || !hierarchyRaw;
               return (
                 <TagHierarchyView
                   tags={hierarchyTags}
@@ -229,35 +235,6 @@ const Tags = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getTags = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findTags(query, signal);
-
-  // Extract tags and count from server response structure
-  const findTags = response?.findTags;
-  const result = {
-    tags: findTags?.tags || [],
-    count: findTags?.count || 0,
-  };
-  return result;
-};
-
-// Fetch all tags for hierarchy view (no pagination)
-const getAllTags = async (signal: AbortSignal) => {
-  const query = {
-    filter: {
-      per_page: -1, // Fetch all
-      sort: "name",
-      direction: "ASC",
-    },
-  };
-  const response = await libraryApi.findTags(query, signal);
-  const findTags = response?.findTags;
-  return {
-    tags: findTags?.tags || [],
-    count: findTags?.count || 0,
-  };
 };
 
 export default Tags;

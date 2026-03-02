@@ -1,15 +1,18 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { libraryApi, LibrarySearchParams } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { useImageList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
+import { queryKeys } from "../../api/queryKeys";
 import { ImageCard } from "../cards/index";
 import {
   SyncProgressBanner,
@@ -103,20 +106,30 @@ const Images = () => {
   const paginationHandlerRef = useRef<((page: number) => void) | null>(null);
 
   // Ref to store the lightbox consumePendingLightboxIndex function
-  // This avoids circular dependency between usePaginatedLightbox and useCancellableQuery
   const consumePendingLightboxIndexRef = useRef<(() => void) | null>(null);
 
-  // Query hook with onDataChange to consume pending lightbox index when data loads
-  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery({
-    onDataChange: () => {
-      // Synchronously consume pending lightbox index when new data arrives
-      // This fixes flicker during cross-page navigation
-      consumePendingLightboxIndexRef.current?.();
-    },
-  });
+  // TanStack Query for images
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading: queryLoading, error } = useImageList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
-  const currentImages = useMemo(() => data?.images || [], [data?.images]);
-  const totalCount = data?.count || 0;
+  // Consume pending lightbox index when new data arrives
+  const prevDataRef = useRef<unknown>(undefined);
+  useEffect(() => {
+    if (data !== undefined && data !== prevDataRef.current) {
+      prevDataRef.current = data;
+      consumePendingLightboxIndexRef.current?.();
+    }
+  }, [data]);
+
+  const findImages = (data as Record<string, unknown>)?.findImages as Record<string, unknown> | undefined;
+  const currentImages = useMemo(() => (findImages?.images as unknown[]) || [], [findImages?.images]);
+  const totalCount = (findImages?.count as number) || 0;
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
   const pageOffset = (urlPage - 1) * urlPerPage;
 
@@ -141,9 +154,9 @@ const Images = () => {
 
   const handleQueryChange = useCallback(
     (newQuery: LibrarySearchParams) => {
-      execute((signal: AbortSignal) => getImages(newQuery, signal));
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
   // Handle image click - open lightbox
@@ -155,35 +168,45 @@ const Images = () => {
     [currentImages, openLightbox]
   );
 
+  // Helper to optimistically update image data in the query cache
+  const updateImageInCache = useCallback(
+    (imageId: string, updates: Record<string, unknown>) => {
+      if (!queryParams) return;
+      const qk = queryKeys.images.list(undefined, (queryParams ?? {}) as Record<string, unknown>);
+      queryClient.setQueryData(qk, (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const oldData = old as Record<string, unknown>;
+        const fi = oldData.findImages as Record<string, unknown> | undefined;
+        if (!fi?.images) return old;
+        return {
+          ...oldData,
+          findImages: {
+            ...fi,
+            images: (fi.images as unknown[]).map((img: unknown) => {
+              const i = img as Record<string, unknown>;
+              return i.id === imageId ? { ...i, ...updates } : i;
+            }),
+          },
+        };
+      });
+    },
+    [queryClient, queryParams]
+  );
+
   // Handle O counter change from card - update local state
   const handleOCounterChange = useCallback((imageId: string, newCount: number) => {
-    setData((prev) => ({
-      ...prev,
-      images: prev.images.map((img) =>
-        img.id === imageId ? { ...img, oCounter: newCount } : img
-      ),
-    }));
-  }, [setData]);
+    updateImageInCache(imageId, { oCounter: newCount });
+  }, [updateImageInCache]);
 
   // Handle rating change from card - update local state
   const handleRatingChange = useCallback((imageId: string, newRating: number | null) => {
-    setData((prev) => ({
-      ...prev,
-      images: prev.images.map((img) =>
-        img.id === imageId ? { ...img, rating100: newRating } : img
-      ),
-    }));
-  }, [setData]);
+    updateImageInCache(imageId, { rating100: newRating });
+  }, [updateImageInCache]);
 
   // Handle favorite change from card - update local state
   const handleFavoriteChange = useCallback((imageId: string, newFavorite: boolean) => {
-    setData((prev) => ({
-      ...prev,
-      images: prev.images.map((img) =>
-        img.id === imageId ? { ...img, favorite: newFavorite } : img
-      ),
-    }));
-  }, [setData]);
+    updateImageInCache(imageId, { favorite: newFavorite });
+  }, [updateImageInCache]);
 
   // TV Navigation - use shared hook for all grid pages
   // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
@@ -377,14 +400,26 @@ const Images = () => {
             initialIndex={lightbox.lightboxIndex}
             onClose={lightbox.closeLightbox}
             onImagesUpdate={(updatedImages) => {
-              // Sync updated images back to page state
-              setData((prev) => ({
-                ...prev,
-                images: prev.images.map((img) => {
-                  const updated = updatedImages.find((u) => u.id === img.id);
-                  return updated ? { ...img, ...updated } : img;
-                }),
-              }));
+              // Sync updated images back to cache
+              if (!queryParams) return;
+              const qk = queryKeys.images.list(undefined, (queryParams ?? {}) as Record<string, unknown>);
+              queryClient.setQueryData(qk, (old: unknown) => {
+                if (!old || typeof old !== "object") return old;
+                const oldData = old as Record<string, unknown>;
+                const fi = oldData.findImages as Record<string, unknown> | undefined;
+                if (!fi?.images) return old;
+                return {
+                  ...oldData,
+                  findImages: {
+                    ...fi,
+                    images: (fi.images as unknown[]).map((img: unknown) => {
+                      const i = img as Record<string, unknown>;
+                      const updated = updatedImages.find((u) => u.id === i.id);
+                      return updated ? { ...i, ...updated } : i;
+                    }),
+                  },
+                };
+              });
             }}
             // Cross-page navigation support
             onPageBoundary={lightbox.onPageBoundary}
@@ -398,18 +433,6 @@ const Images = () => {
       </div>
     </PageLayout>
   );
-};
-
-const getImages = async (query: LibrarySearchParams, signal: AbortSignal) => {
-  const response = await libraryApi.findImages(query, signal);
-
-  const findImages = response?.findImages;
-  const result = {
-    images: findImages?.images || [],
-    count: findImages?.count || 0,
-  };
-
-  return result;
 };
 
 export default Images;
