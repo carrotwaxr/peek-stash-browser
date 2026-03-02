@@ -60,6 +60,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@peek/shared-types": "file:../shared",
     "@prisma/client": "^6.17.0",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
