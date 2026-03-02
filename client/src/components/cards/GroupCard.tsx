@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedGroup } from "@peek/shared-types";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
@@ -7,10 +8,14 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
-/**
- * GroupCard - Card for displaying group/collection entities
- */
-const GroupCard = forwardRef(
+interface Props {
+  group: NormalizedGroup & { sub_group_count?: number; description?: string | null };
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const GroupCard = forwardRef<HTMLDivElement, Props>(
   ({ group, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();

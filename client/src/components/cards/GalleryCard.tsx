@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedGallery } from "@peek/shared-types";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
@@ -8,10 +9,14 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
-/**
- * GalleryCard - Card for displaying gallery entities
- */
-const GalleryCard = forwardRef(
+interface Props {
+  gallery: NormalizedGallery;
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const GalleryCard = forwardRef<HTMLDivElement, Props>(
   ({ gallery, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();

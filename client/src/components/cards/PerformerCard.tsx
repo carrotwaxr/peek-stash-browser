@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedPerformer } from "@peek/shared-types";
 import { BaseCard } from "../ui/BaseCard";
 import GenderIcon from "../ui/GenderIcon";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -8,11 +9,15 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
-/**
- * PerformerCard - Card for displaying performer entities
- * Uses BaseCard with performer-specific configuration
- */
-const PerformerCard = forwardRef(
+interface Props {
+  performer: NormalizedPerformer;
+  fromPageTitle?: string;
+  isTVMode?: boolean;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const PerformerCard = forwardRef<HTMLDivElement, Props>(
   ({ performer, fromPageTitle, isTVMode, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();

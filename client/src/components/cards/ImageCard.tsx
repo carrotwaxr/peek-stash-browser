@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import type { NormalizedImage } from "@peek/shared-types";
 import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -7,10 +8,18 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 
-/**
- * Format resolution string from width/height
- */
-const formatResolution = (width, height) => {
+interface Props {
+  image: NormalizedImage;
+  onClick?: (image: NormalizedImage) => void;
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onOCounterChange?: (entityId: string, count: number) => void;
+  onRatingChange?: (entityId: string, rating: number) => void;
+  onFavoriteChange?: (entityId: string, value: boolean) => void;
+}
+
+const formatResolution = (width: number | null, height: number | null) => {
   if (!width || !height) return null;
   if (height >= 2160) return "4K";
   if (height >= 1440) return "1440p";
@@ -24,7 +33,7 @@ const formatResolution = (width, height) => {
  * ImageCard - Card for displaying image entities
  * Supports onClick for lightbox integration
  */
-const ImageCard = forwardRef(
+const ImageCard = forwardRef<HTMLDivElement, Props>(
   ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
     const { getSettings } = useCardDisplaySettings();
     const imageSettings = getSettings("image");
@@ -128,7 +137,7 @@ const ImageCard = forwardRef(
 
     // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
     const handleClick = onClick
-      ? (e) => {
+      ? (e: React.MouseEvent<HTMLDivElement>) => {
           e.preventDefault();
           onClick(image);
         }

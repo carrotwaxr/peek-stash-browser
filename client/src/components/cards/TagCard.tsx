@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedTag } from "@peek/shared-types";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
@@ -7,10 +8,14 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
-/**
- * TagCard - Card for displaying tag entities
- */
-const TagCard = forwardRef(
+interface Props {
+  tag: NormalizedTag & { child_count?: number };
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const TagCard = forwardRef<HTMLDivElement, Props>(
   ({ tag, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();

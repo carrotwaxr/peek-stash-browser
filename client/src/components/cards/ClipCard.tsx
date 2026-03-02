@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useMemo, type FocusEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -9,11 +9,34 @@ import { getScenePathWithTime } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import ClipCardPreview from "./ClipCardPreview";
 
-/**
- * ClipCard - Card for displaying clip entities
- * Uses BaseCard for consistency with other entity cards
- */
-const ClipCard = forwardRef(
+export interface Clip {
+  id: string;
+  title?: string | null;
+  sceneId: string;
+  instanceId?: string;
+  seconds?: number | null;
+  endSeconds?: number | null;
+  isGenerated?: boolean;
+  primaryTag?: { id: string; name: string } | null;
+  tags?: Array<{ id: string; name: string }>;
+  scene?: {
+    title?: string | null;
+    instanceId?: string;
+    pathScreenshot?: string | null;
+  } | null;
+}
+
+interface Props {
+  clip: Clip;
+  onClick?: (clip: Clip) => void;
+  onFocus?: (e: FocusEvent<HTMLDivElement>) => void;
+  tabIndex?: number;
+  className?: string;
+  fromPageTitle?: string;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const ClipCard = forwardRef<HTMLDivElement, Props>(
   (
     {
       clip,

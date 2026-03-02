@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedStudio } from "@peek/shared-types";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
@@ -7,10 +8,14 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 
-/**
- * StudioCard - Card for displaying studio entities
- */
-const StudioCard = forwardRef(
+interface Props {
+  studio: NormalizedStudio;
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const StudioCard = forwardRef<HTMLDivElement, Props>(
   ({ studio, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
