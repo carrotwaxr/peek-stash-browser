@@ -13,6 +13,7 @@ import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { KEY_SEP } from "./UserStatsService.js";
 import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 /** Deduplicate composite key objects by id+stashInstanceId */
 function dedupeKeys(items: { id: string; stashInstanceId: string }[]): { id: string; stashInstanceId: string }[] {
@@ -197,7 +198,7 @@ class PerformerQueryBuilder {
     }
 
     return buildJunctionFilter(
-      ids, "PerformerTag", "performerId", "performerInstanceId",
+      coerceEntityRefs(ids), "PerformerTag", "performerId", "performerInstanceId",
       "tagId", "tagInstanceId", "p", modifier || "INCLUDES"
     );
   }

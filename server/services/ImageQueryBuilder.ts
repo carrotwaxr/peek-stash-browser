@@ -8,6 +8,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { getImageFallbackTitle } from "../utils/titleUtils.js";
 import { buildFavoriteFilter, buildDateFilter, buildJunctionFilter, buildDirectFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import type { NormalizedImage, PerformerRef, TagRef, GalleryRef } from "../types/index.js";
 
 // Query builder options
@@ -177,7 +178,8 @@ class ImageQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
+    const { value, modifier = "INCLUDES" } = filter;
+    const ids = coerceEntityRefs(value);
     return buildJunctionFilter(ids, "ImagePerformer", "imageId", "imageInstanceId", "performerId", "performerInstanceId", "i", modifier);
   }
 
@@ -189,7 +191,8 @@ class ImageQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
+    const { value, modifier = "INCLUDES" } = filter;
+    const ids = coerceEntityRefs(value);
     return buildJunctionFilter(ids, "ImageTag", "imageId", "imageInstanceId", "tagId", "tagInstanceId", "i", modifier);
   }
 
@@ -201,7 +204,8 @@ class ImageQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
+    const { value, modifier = "INCLUDES" } = filter;
+    const ids = coerceEntityRefs(value);
     return buildDirectFilter(ids, "i.studioId", "i.stashInstanceId", modifier);
   }
 
@@ -213,7 +217,8 @@ class ImageQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const { value: ids, modifier = "INCLUDES" } = filter;
+    const { value, modifier = "INCLUDES" } = filter;
+    const ids = coerceEntityRefs(value);
     return buildJunctionFilter(ids, "ImageGallery", "imageId", "imageInstanceId", "galleryId", "galleryInstanceId", "i", modifier);
   }
 

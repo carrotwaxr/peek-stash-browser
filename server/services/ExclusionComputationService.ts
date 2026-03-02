@@ -14,6 +14,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
@@ -54,14 +55,12 @@ interface ScopedExclusion {
 }
 
 /**
- * Parse a composite key ("id:instanceId" or bare "id") into components.
- * The frontend's SearchableSelect stores entity IDs in composite format
- * to support multi-instance disambiguation.
+ * Parse a composite key and normalize instanceId to empty string (not undefined)
+ * for the exclusion split logic that relies on truthiness.
  */
 function parseCompositeKey(key: string): { id: string; instanceId: string } {
-  const colonIdx = key.indexOf(":");
-  if (colonIdx === -1) return { id: key, instanceId: "" };
-  return { id: key.substring(0, colonIdx), instanceId: key.substring(colonIdx + 1) };
+  const { id, instanceId } = parseEntityRef(key);
+  return { id, instanceId: instanceId ?? "" };
 }
 
 /**
