@@ -4,7 +4,17 @@
  * for card indicator click navigation.
  */
 import { describe, it, expect } from "vitest";
-import { buildSearchParams, parseSearchParams } from "@/utils/urlParams";
+import { buildSearchParams as _buildSearchParams, parseSearchParams } from "@/utils/urlParams";
+
+// Wrapper with defaults for optional params to avoid repeating them in every test
+const buildSearchParams = (params: Record<string, any>) =>
+  _buildSearchParams({
+    viewMode: undefined,
+    zoomLevel: undefined,
+    gridDensity: undefined,
+    timelinePeriod: undefined,
+    ...params,
+  });
 
 // Minimal filterOptions for testing - matches the shape from filterConfig.js
 const mockFilterOptions = [

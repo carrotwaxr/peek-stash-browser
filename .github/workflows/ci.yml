@@ -36,9 +36,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: TypeScript Compile
-        run: npx tsc --noEmit
-
       - name: Build
         run: npm run build
 

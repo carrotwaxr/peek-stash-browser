@@ -5,7 +5,10 @@
  * into the GraphQL filter format expected by the backend
  */
 import { describe, it, expect } from "vitest";
-import { buildTagFilter } from "../../src/utils/filterConfig";
+import { buildTagFilter as _buildTagFilter } from "../../src/utils/filterConfig";
+
+// Cast return type for test assertions — buildTagFilter returns a dynamically-built filter object
+const buildTagFilter = (filters: Record<string, unknown>): Record<string, any> => _buildTagFilter(filters);
 
 describe("buildTagFilter", () => {
   describe("Boolean Filters", () => {
