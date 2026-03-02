@@ -1,34 +1,34 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import deepEqual from "fast-deep-equal";
 import { useAuth } from "../../hooks/useAuth";
 import { libraryApi } from "../../api";
 import SearchResults from "./SearchResults";
 import SearchControls from "./SearchControls";
 
-/**
- * SearchableGrid - SearchResults with integrated search controls and data fetching
- *
- * @param {Object} props
- * @param {'scene'|'performer'|'gallery'|'group'|'studio'|'tag'|'image'} props.entityType
- * @param {Object} [props.lockedFilters] - Filters that cannot be changed by user
- * @param {boolean} [props.hideLockedFilters] - Hide locked filters from UI
- * @param {Function} props.renderItem - Function to render each item
- * @param {Object} [props.defaultSort] - Default sort configuration
- * @param {Object} [props.defaultFilters] - Default filters
- * @param {Function} [props.onResultsChange] - Callback when results change
- * @param {string} [props.emptyMessage] - Empty state message
- * @param {string} [props.emptyDescription] - Empty state description
- * @param {number} [props.skeletonCount] - Number of skeleton items during loading
- * @param {boolean} [props.syncToUrl] - Whether to sync state to URL (default: true)
- * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
- */
+type EntityType = "scene" | "performer" | "gallery" | "group" | "studio" | "tag" | "image";
+
+export interface SearchableGridProps {
+  entityType: EntityType;
+  lockedFilters?: Record<string, unknown>;
+  hideLockedFilters?: boolean;
+  renderItem: (item: unknown, index: number, helpers: { onHideSuccess: (entityId: string) => void }) => ReactNode;
+  defaultSort?: string;
+  defaultFilters?: Record<string, unknown>;
+  onResultsChange?: (results: { items: unknown[]; count: number }) => void;
+  emptyMessage?: string;
+  emptyDescription?: string;
+  skeletonCount?: number;
+  syncToUrl?: boolean;
+  density?: "small" | "medium" | "large";
+}
+
 export const SearchableGrid = ({
   entityType,
   lockedFilters = {},
   hideLockedFilters = false,
   renderItem,
   defaultSort = "name",
-   
+
   defaultFilters: _defaultFilters = {},
   onResultsChange,
   emptyMessage,
@@ -36,7 +36,7 @@ export const SearchableGrid = ({
   skeletonCount = 24,
   syncToUrl = true,
   density = "medium",
-}) => {
+}: SearchableGridProps) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [lastQuery, setLastQuery] = useState(null);
