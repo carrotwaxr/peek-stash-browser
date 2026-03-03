@@ -208,7 +208,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
             : undefined,
         },
       ];
-    }, [scene, allTags, navigate, hasMultipleInstances]);
+    }, [scene, sceneRecord, allTags, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];

@@ -105,7 +105,7 @@ const PerformerDetail = () => {
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
    
-  (useRatingHotkeys as any)({
+  useRatingHotkeys({
     enabled: !isLoading && !!performer,
     setRating: handleRatingChange,
     toggleFavorite });

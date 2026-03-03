@@ -44,7 +44,7 @@ const PlaybackControls = () => {
     const fetchPermissions = async () => {
       try {
         const result = await getMyPermissions();
-        setPermissions((result as any).permissions);
+        setPermissions(result.permissions);
       } catch (error) {
         // Silently fail - permissions will remain null and download button won't show
         console.error("Failed to fetch permissions:", error);

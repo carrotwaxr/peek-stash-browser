@@ -16,6 +16,8 @@ interface VendorHTMLElement extends HTMLElement {
   msRequestFullscreen?: () => Promise<void>;
 }
 
+const doc = document as VendorDocument;
+
 /**
  * Hook to manage browser fullscreen state with optional auto-fullscreen on landscape rotation
  * @param {Object} options
@@ -26,8 +28,6 @@ interface VendorHTMLElement extends HTMLElement {
 export function useFullscreen({ autoOnLandscape = false, enabled = true } = {}) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const userDeclinedRef = useRef(false);
-
-  const doc = document as VendorDocument;
   const supportsFullscreen = Boolean(
     doc.fullscreenEnabled ||
       doc.webkitFullscreenEnabled ||

@@ -178,7 +178,7 @@ const Galleries = () => {
           supportsWallView={true}
           wallPlayback={wallPlayback}
            
-          viewModes={VIEW_MODES as any}
+          viewModes={VIEW_MODES}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={

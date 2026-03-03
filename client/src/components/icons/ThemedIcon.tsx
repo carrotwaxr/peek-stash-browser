@@ -8,7 +8,7 @@ interface ThemedIconProps {
   size?: number;
   className?: string;
   color?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const ThemedIcon = ({
@@ -27,7 +27,7 @@ export const ThemedIcon = ({
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("");
 
-  const LucideIcon = (LucideIcons as any)[pascalCaseName];
+  const LucideIcon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon | undefined>)[pascalCaseName];
 
   if (!LucideIcon) {
     return null;

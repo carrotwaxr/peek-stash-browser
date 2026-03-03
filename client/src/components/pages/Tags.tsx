@@ -86,7 +86,7 @@ const Tags = () => {
   const currentTags = (findTags?.tags as Record<string, unknown>[]) || [];
   const totalCount = (findTags?.count as number) || 0;
   const hierarchyFindTags = (hierarchyRaw as Record<string, unknown>)?.findTags as Record<string, unknown> | undefined;
-  const hierarchyTags = (hierarchyFindTags?.tags as unknown[]) || [];
+  const hierarchyTags = (hierarchyFindTags?.tags as Array<{ id: string; name?: string; parents?: Array<{ id: string }>; [key: string]: unknown }>) || [];
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -143,7 +143,7 @@ const Tags = () => {
           totalPages={activeViewMode === "hierarchy" ? 0 : totalPages}
           totalCount={activeViewMode === "hierarchy" ? 0 : totalCount}
            
-          viewModes={VIEW_MODES as any}
+          viewModes={VIEW_MODES}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -164,7 +164,7 @@ const Tags = () => {
               return (
                 <TagHierarchyView
                    
-                  tags={hierarchyTags as any}
+                  tags={hierarchyTags}
                   isLoading={showLoading}
                   searchQuery={searchParams.get("q") || ""}
                   sortField={sortField}

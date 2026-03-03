@@ -38,7 +38,7 @@ export const useGridPageTVNavigation = ({
     zones: ["search", "topPagination", "grid", "bottomPagination", "mainNav"],
     initialZone: "grid",
     enabled: isTVMode,
-  } as any);
+  });
 
   // Spatial navigation for grid
   const gridNavigation = useSpatialNavigation({

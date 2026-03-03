@@ -145,7 +145,7 @@ const Performers = () => {
           totalPages={totalPages}
           totalCount={totalCount}
            
-          viewModes={VIEW_MODES as any}
+          viewModes={VIEW_MODES}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover

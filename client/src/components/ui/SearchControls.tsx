@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LucideArrowDown, LucideArrowUp } from "lucide-react";
+import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
 import { useTVMode } from "../../hooks/useTVMode";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
@@ -95,7 +95,7 @@ const getSortOptions = (artifactType: string) => {
 interface ViewModeConfig {
   id: string;
   label: string;
-  icon: React.ElementType;
+  icon?: LucideIcon;
 }
 
 interface SettingConfig {
@@ -729,20 +729,22 @@ const SearchControls = ({
     );
   }, [filters]);
 
+  const groupFilters = (filters as Record<string, any>)?.groups;
+
   const sortOptions = useMemo(() => {
     const baseOptions = getSortOptions(artifactType);
-    
+
     // For scenes, conditionally include scene_index based on group filter
     if (artifactType === "scene") {
-      const hasGroupFilter = (filters as Record<string, any>)?.groups?.length > 0;
+      const hasGroupFilter = groupFilters?.length > 0;
       if (hasGroupFilter) {
         return SCENE_SORT_OPTIONS; // Full list with scene_index
       }
       return SCENE_SORT_OPTIONS_BASE; // Without scene_index
     }
-    
+
     return baseOptions;
-  }, [artifactType, (filters as Record<string, any>)?.groups]);
+  }, [artifactType, groupFilters]);
 
   // Show loading state while fetching default presets
   if (isLoadingPresets) {
@@ -930,7 +932,7 @@ const SearchControls = ({
             className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
           >
             <ViewModeToggle
-              modes={viewModes as any}
+              modes={viewModes}
               value={viewMode}
               onChange={handleViewModeChange}
             />

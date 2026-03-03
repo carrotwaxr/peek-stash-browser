@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
@@ -406,7 +406,7 @@ const HomeCarousel = ({
   const [retryCount, setRetryCount] = useState(0);
   const queryClient = useQueryClient();
   const fetchFunction = carouselQueries[fetchKey];
-  const queryKey = ["homeCarousel", fetchKey] as const;
+  const queryKey = useMemo(() => ["homeCarousel", fetchKey] as const, [fetchKey]);
   const {
     data: scenes,
     isLoading: loading,
@@ -416,8 +416,6 @@ const HomeCarousel = ({
     queryFn: () => fetchFunction(),
   });
   const errorAny = error as (Error & { isInitializing?: boolean }) | null;
-  const refetch = () => queryClient.invalidateQueries({ queryKey: [...queryKey] });
-
   // Handle server initialization state
   useEffect(() => {
     if (errorAny?.isInitializing) {
@@ -426,7 +424,7 @@ const HomeCarousel = ({
         onInitializing(true);
         const timer = setTimeout(() => {
           setRetryCount((prev) => prev + 1);
-          refetch();
+          queryClient.invalidateQueries({ queryKey: [...queryKey] });
         }, 5000); // Retry every 5 seconds
         return () => clearTimeout(timer);
       } else {
@@ -440,7 +438,7 @@ const HomeCarousel = ({
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
     }
-  }, [errorAny, refetch, retryCount, onInitializing, title]);
+  }, [error, errorAny, queryClient, queryKey, retryCount, onInitializing, title]);
 
   // Silently skip failed carousels (non-initialization errors only)
   if (errorAny && !errorAny.isInitializing) {

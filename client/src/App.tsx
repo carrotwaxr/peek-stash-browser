@@ -15,6 +15,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { setupApi, queryClient } from "./api";
 import { ThemeProvider } from "./themes/ThemeProvider";
+import type { GetSetupStatusResponse } from "@peek/shared-types";
 import "./themes/base.css";
 
 // Lazy load page components for code splitting
@@ -62,7 +63,7 @@ const PageLoader = () => (
 
 // Main app component with authentication and routing
 const AppContent = () => {
-  const [setupStatus, setSetupStatus] = useState<any>(null);
+  const [setupStatus, setSetupStatus] = useState<GetSetupStatusResponse | null>(null);
   const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
@@ -84,7 +85,7 @@ const AppContent = () => {
 
   // Handler for when setup completes - triggers re-check and navigation
   const handleSetupComplete = () => {
-    setSetupStatus({ ...(setupStatus as any), setupComplete: true });
+    setSetupStatus({ ...setupStatus!, setupComplete: true });
     // Navigate to home after setup (user is already logged in via auto-login)
     window.location.href = "/";
   };

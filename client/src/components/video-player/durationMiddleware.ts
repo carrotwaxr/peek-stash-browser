@@ -32,7 +32,7 @@ function offsetMiddleware(player: any) {
       const { cues } = tracks[i];
       if (cues) {
         for (let j = 0; j < cues.length; j++) {
-          const cue = cues[j] as any;
+          const cue = cues[j] as TextTrackCue & { _startTime?: number; _endTime?: number };
           if (cue._startTime === undefined || cue._endTime === undefined) {
             continue;
           }
