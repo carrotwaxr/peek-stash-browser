@@ -12,7 +12,7 @@ import {
 function pressKey(
   key: string,
   options: Partial<KeyboardEventInit> = {},
-  useCapture = false
+  _useCapture = false
 ) {
   const event = new KeyboardEvent("keydown", {
     key,
