@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { LucideDroplets } from "lucide-react";
-import { apiPost } from "../../api";
+import { useIncrementOCounter } from "../../api/hooks";
 
 /**
  * Interactive O Counter button component
@@ -36,8 +36,8 @@ const OCounterButton = ({
   interactive = true,
 }: Props) => {
   const [count, setCount] = useState(initialCount ?? 0);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const incrementMutation = useIncrementOCounter();
 
   // Sync count when initialCount changes
   useEffect(() => {
@@ -63,34 +63,28 @@ const OCounterButton = ({
     e.stopPropagation();
 
     // Only allow incrementing for scenes/images with interactive mode
-    if (!interactive || isUpdating || !entityId) {
+    if (!interactive || incrementMutation.isPending || !entityId) {
       return;
     }
 
+    const previousCount = count;
     const newCount = count + 1;
     setCount(newCount); // Optimistic update
     setIsAnimating(true);
-    setIsUpdating(true);
 
     try {
-      let response: { success?: boolean; oCount?: number } | undefined;
-      if (sceneId) {
-        response = await apiPost("/watch-history/increment-o", { sceneId }) as { success?: boolean; oCount?: number };
-      } else if (imageId) {
-        response = await apiPost("/image-view-history/increment-o", { imageId }) as { success?: boolean; oCount?: number };
-      }
+      const response = await incrementMutation.mutateAsync({ sceneId, imageId });
 
       if (response?.success) {
-        setCount(response.oCount ?? count); // Update with server value
-        onChange?.(response.oCount ?? count);
+        setCount(response.oCount ?? newCount); // Update with server value
+        onChange?.(response.oCount ?? newCount);
       }
     } catch (err) {
       console.error(`Error incrementing O counter for ${entityType}:`, err);
-      setCount(count); // Revert on error
+      setCount(previousCount); // Revert on error
     } finally {
       setTimeout(() => {
         setIsAnimating(false);
-        setIsUpdating(false);
       }, 600);
     }
   };
@@ -98,7 +92,7 @@ const OCounterButton = ({
   return (
     <button
       onClick={handleClick}
-      disabled={isUpdating}
+      disabled={incrementMutation.isPending}
       className={`flex items-center ${config.gap} ${config.padding} rounded transition-all hover:scale-105 active:scale-95 relative ${
         isAnimating ? "animate-pulse" : ""
       }`}
@@ -108,11 +102,11 @@ const OCounterButton = ({
         border: variant === "card" || variant === "lightbox" ? "none" : "1px solid var(--border-color)",
         cursor:
           interactive && entityId
-            ? isUpdating
+            ? incrementMutation.isPending
               ? "not-allowed"
               : "pointer"
             : "default",
-        opacity: isUpdating ? 0.7 : 1,
+        opacity: incrementMutation.isPending ? 0.7 : 1,
       }}
       aria-label={
         interactive && entityId

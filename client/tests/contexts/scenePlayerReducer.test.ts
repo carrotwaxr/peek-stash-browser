@@ -63,7 +63,6 @@ describe("scenePlayerReducer", () => {
         compatibility: null,
 
         oCounter: 0,
-        oCounterLoading: false,
       });
     });
   });
@@ -428,53 +427,15 @@ describe("scenePlayerReducer", () => {
   });
 
   // -------------------------------------------------------------------------
-  // O Counter lifecycle
+  // O Counter
   // -------------------------------------------------------------------------
-  describe("O Counter lifecycle", () => {
-    it("INCREMENT_O_COUNTER_START sets oCounterLoading true", () => {
+  describe("O Counter", () => {
+    it("SET_O_COUNTER sets the counter value", () => {
       const result = scenePlayerReducer(initialState, {
-        type: "INCREMENT_O_COUNTER_START",
+        type: "SET_O_COUNTER",
+        payload: 42,
       });
-      expect(result.oCounterLoading).toBe(true);
-    });
-
-    it("INCREMENT_O_COUNTER_SUCCESS increments oCounter by 1 and clears loading", () => {
-      const state = { ...initialState, oCounter: 3, oCounterLoading: true };
-      const result = scenePlayerReducer(state, {
-        type: "INCREMENT_O_COUNTER_SUCCESS",
-      });
-
-      expect(result.oCounter).toBe(4);
-      expect(result.oCounterLoading).toBe(false);
-    });
-
-    it("INCREMENT_O_COUNTER_ERROR clears loading without changing counter", () => {
-      const state = { ...initialState, oCounter: 3, oCounterLoading: true };
-      const result = scenePlayerReducer(state, {
-        type: "INCREMENT_O_COUNTER_ERROR",
-      });
-
-      expect(result.oCounter).toBe(3);
-      expect(result.oCounterLoading).toBe(false);
-    });
-
-    it("full cycle: START -> SUCCESS increments correctly", () => {
-      let state: any = { ...initialState, oCounter: 0 };
-
-      state = scenePlayerReducer(state, { type: "INCREMENT_O_COUNTER_START" });
-      expect(state.oCounterLoading).toBe(true);
-
-      state = scenePlayerReducer(state, {
-        type: "INCREMENT_O_COUNTER_SUCCESS",
-      });
-      expect(state.oCounter).toBe(1);
-      expect(state.oCounterLoading).toBe(false);
-
-      state = scenePlayerReducer(state, { type: "INCREMENT_O_COUNTER_START" });
-      state = scenePlayerReducer(state, {
-        type: "INCREMENT_O_COUNTER_SUCCESS",
-      });
-      expect(state.oCounter).toBe(2);
+      expect(result.oCounter).toBe(42);
     });
   });
 
@@ -1403,13 +1364,6 @@ describe("scenePlayerReducer", () => {
           initialQuality: "1080p",
         },
       });
-      expect(snapshot(state)).toEqual(frozen);
-    });
-
-    it("does not mutate state on INCREMENT_O_COUNTER_SUCCESS", () => {
-      const state = { ...initialState, oCounter: 5, oCounterLoading: true };
-      const frozen = snapshot(state);
-      scenePlayerReducer(state, { type: "INCREMENT_O_COUNTER_SUCCESS" });
       expect(snapshot(state)).toEqual(frozen);
     });
 

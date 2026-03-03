@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const { mockGetSettings } = vi.hoisted(() => ({
@@ -60,8 +61,11 @@ describe("SceneCard respects card display settings", () => {
     details: "This is a test scene description that should be visible.",
   } as any;
 
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter>{children}</MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 
   beforeEach(() => {
