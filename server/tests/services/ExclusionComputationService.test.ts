@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Mock UserInstanceService before importing service
+vi.mock("../../services/UserInstanceService.js", () => ({
+  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["test-instance-1"]),
+  buildInstanceFilterClause: vi.fn().mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
+    if (ids.length === 0) return { sql: "1 = 0", params: [] };
+    const placeholders = ids.map(() => "?").join(", ");
+    return { sql: `${col} IN (${placeholders})`, params: ids };
+  }),
+}));
+
 // Mock prisma before importing service
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
-    $queryRawUnsafe: vi.fn(),
+    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
     $executeRaw: vi.fn(),
     userExcludedEntity: {
       deleteMany: vi.fn(),
@@ -536,6 +546,7 @@ describe("computeCascadeExclusions", () => {
     mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     // Default count responses for entity stats
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
@@ -661,8 +672,10 @@ describe("computeCascadeExclusions", () => {
       { sceneId: "scene1", tagId: "tag1" },
     ]);
 
-    // Tag inherited by another scene (via $queryRaw)
-    mockPrisma.$queryRaw.mockResolvedValue([{ id: "scene2" }]);
+    // Tag inherited by another scene (via $queryRawUnsafe for global inherited tag path)
+    mockPrisma.$queryRawUnsafe = vi.fn()
+      .mockResolvedValueOnce([{ id: "scene2" }])  // inherited tag query
+      .mockResolvedValue([]);  // empty exclusion queries
 
     // Tag on a performer
     mockPrisma.performerTag.findMany.mockResolvedValue([
@@ -913,6 +926,7 @@ describe("composite key parsing in restrictions (#412)", () => {
     mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.$executeRaw.mockResolvedValue(undefined);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
@@ -959,8 +973,10 @@ describe("composite key parsing in restrictions (#412)", () => {
     expect(sceneGroupCalls.length).toBeGreaterThan(0);
     const lastCall = sceneGroupCalls[sceneGroupCalls.length - 1][0];
     // The query should use the scoped path (groupId + groupInstanceId), not "6:inst1" as groupId
+    // Also includes instance filter on target side
     expect(lastCall.where).toEqual({
       OR: [{ groupId: "6", groupInstanceId: "inst1" }],
+      sceneInstanceId: { in: ["test-instance-1"] },
     });
 
     // Verify exclusions include the group (with parsed ID) and cascade scenes
@@ -1014,12 +1030,13 @@ describe("composite key parsing in restrictions (#412)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    // Bare ID should go into globalIds path (no instance scoping)
+    // Bare ID should go into globalIds path (no instance scoping for source, but target filtered)
     const sceneGroupCalls = mockPrisma.sceneGroup.findMany.mock.calls;
     expect(sceneGroupCalls.length).toBeGreaterThan(0);
     const lastCall = sceneGroupCalls[sceneGroupCalls.length - 1][0];
     expect(lastCall.where).toEqual({
       groupId: { in: ["6"] },
+      sceneInstanceId: { in: ["test-instance-1"] },
     });
 
     const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
@@ -1168,10 +1185,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries for empty exclusions
-    // Returns data with correct column aliases for each query
+    // Mock raw queries for empty exclusions (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - return empty galleries
@@ -1216,9 +1232,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries
+    // Mock raw queries (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - none empty
@@ -1259,9 +1275,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries
+    // Mock raw queries (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-2: galleries and performers - none empty
@@ -1303,9 +1319,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries
+    // Mock raw queries (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-3: galleries, performers, studios - none empty
@@ -1348,9 +1364,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries
+    // Mock raw queries (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-4: galleries, performers, studios, groups - none empty
@@ -1393,10 +1409,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries - new implementation uses NOT EXISTS and returns empty arrays
+    // Mock raw queries - now uses $queryRawUnsafe, returns empty arrays
     // when entities have visible content (they are NOT empty)
-    // All queries should return empty arrays since entities have visible content
-    mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
@@ -1420,10 +1435,9 @@ describe("computeEmptyExclusions", () => {
 
     // No cascades from image hiding in our model
 
-    // Mock $queryRaw to return proper results for each query type
-    // Each query returns data with correct column aliases
+    // Mock $queryRawUnsafe to return proper results for each query type
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries with images - gallery1 has image1 (which is excluded)
@@ -1481,10 +1495,9 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock different results for each entity type query
-    // Each query uses different column aliases matching the actual SQL
+    // Mock different results for each entity type query (now uses $queryRawUnsafe)
     let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - return gallery with no images
@@ -1795,6 +1808,7 @@ describe("removeHiddenEntity", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
     mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -1865,6 +1879,7 @@ describe("recomputeAllUsers", () => {
     mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
     mockPrisma.userEntityStats.upsert.mockResolvedValue({});
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
     mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -1954,6 +1969,7 @@ describe("instance-scoped cascades", () => {
     mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
     mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -1985,11 +2001,13 @@ describe("instance-scoped cascades", () => {
     await exclusionComputationService.recomputeForUser(1);
 
     // Verify the scoped path was used (OR clause with performerId + performerInstanceId)
+    // Also includes instance filter on target side
     const spCalls = mockPrisma.scenePerformer.findMany.mock.calls;
     expect(spCalls.length).toBeGreaterThan(0);
     const lastCall = spCalls[spCalls.length - 1][0];
     expect(lastCall.where).toEqual({
       OR: [{ performerId: "perf1", performerInstanceId: "instA" }],
+      sceneInstanceId: { in: ["test-instance-1"] },
     });
 
     // Verify cascade scene carries the instanceId
@@ -2022,12 +2040,13 @@ describe("instance-scoped cascades", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    // Verify the scoped path was used for sceneTag
+    // Verify the scoped path was used for sceneTag, with instance filter on target side
     const stCalls = mockPrisma.sceneTag.findMany.mock.calls;
     expect(stCalls.length).toBeGreaterThan(0);
     const lastCall = stCalls[stCalls.length - 1][0];
     expect(lastCall.where).toEqual({
       OR: [{ tagId: "tag1", tagInstanceId: "instB" }],
+      sceneInstanceId: { in: ["test-instance-1"] },
     });
   });
 
@@ -2228,6 +2247,7 @@ describe("INCLUDE mode for non-group entity types", () => {
     mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.$executeRaw.mockResolvedValue(undefined);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
@@ -2468,6 +2488,7 @@ describe("error handling", () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
     mockPrisma.stashScene.findMany.mockResolvedValue([]);
     mockPrisma.sceneTag.findMany.mockResolvedValue([]);

@@ -172,11 +172,37 @@ export async function selectTestInstanceOnly(): Promise<string> {
 }
 
 /**
+ * Select only the primary test instance for a specific client (non-admin user).
+ * Uses the cached test instance ID from a prior selectTestInstanceOnly() call.
+ *
+ * @param client - The TestClient to set instance selection for
+ */
+export async function selectTestInstanceForClient(client: TestClient): Promise<string> {
+  if (!cachedTestInstanceId) {
+    // Ensure we discover the test instance first
+    await selectTestInstanceOnly();
+  }
+  await client.put("/api/user/stash-instances", {
+    instanceIds: [cachedTestInstanceId],
+  });
+  return cachedTestInstanceId!;
+}
+
+/**
  * Reset user instance selection to all instances.
  * Call this in afterAll if you need to restore default behavior.
  */
 export async function selectAllInstances(): Promise<void> {
   await adminClient.put("/api/user/stash-instances", {
+    instanceIds: [],
+  });
+}
+
+/**
+ * Reset instance selection for a specific client to all instances.
+ */
+export async function selectAllInstancesForClient(client: TestClient): Promise<void> {
+  await client.put("/api/user/stash-instances", {
     instanceIds: [],
   });
 }
