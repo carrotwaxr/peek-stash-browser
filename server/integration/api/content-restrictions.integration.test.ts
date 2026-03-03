@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import { TestClient, adminClient, selectTestInstanceOnly, selectAllInstances, selectTestInstanceForClient, selectAllInstancesForClient } from "../helpers/testClient.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 
 describe("Content Restrictions Integration Tests", () => {
@@ -9,6 +9,9 @@ describe("Content Restrictions Integration Tests", () => {
   beforeAll(async () => {
     // Ensure admin client is logged in
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+
+    // Scope to test instance only — avoids scanning production data during recompute
+    await selectTestInstanceOnly();
 
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
@@ -41,9 +44,17 @@ describe("Content Restrictions Integration Tests", () => {
     // Create and login the test user client
     testUserClient = new TestClient();
     await testUserClient.login("restriction_test_user", "test_password_123");
+
+    // Also scope the test user to test instance only
+    await selectTestInstanceForClient(testUserClient);
   });
 
   afterAll(async () => {
+    // Restore instance selections
+    await selectAllInstances();
+    if (testUserClient) {
+      await selectAllInstancesForClient(testUserClient);
+    }
     // Clean up: delete the test user
     if (testUserId) {
       await adminClient.delete(`/api/user/${testUserId}`);
@@ -97,7 +108,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
         expect(response.data.restrictions).toHaveLength(1);
-      });
+      }, 30_000); // PUT restrictions triggers exclusion recompute
 
       it("should update existing restrictions", async () => {
         const restrictions = [
@@ -116,7 +127,7 @@ describe("Content Restrictions Integration Tests", () => {
 
         expect(response.ok).toBe(true);
         expect(response.data.success).toBe(true);
-      }, 60_000); // Exclusion recompute with restrictEmpty: true is expensive
+      }, 30_000); // INCLUDE + restrictEmpty: true scans all entities per type; may queue behind prior recompute
 
       it("should validate entity type", async () => {
         const restrictions = [
@@ -199,7 +210,7 @@ describe("Content Restrictions Integration Tests", () => {
         }>(`/api/user/${testUserId}/restrictions`);
 
         expect(getResponse.data.restrictions).toHaveLength(0);
-      }, 60_000); // PUT + DELETE both trigger exclusion recompute
+      }, 30_000); // PUT + DELETE both trigger exclusion recompute; may queue behind prior
 
       it("should reject non-admin access", async () => {
         const response = await testUserClient.delete(
@@ -226,7 +237,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
-      });
+      }, 30_000); // Hide triggers addHiddenEntity with cascade computation
 
       it("should cascade exclusions when hiding performer with scenes", async () => {
         // First, clean up any existing hidden entities for this user
@@ -264,7 +275,7 @@ describe("Content Restrictions Integration Tests", () => {
         await testUserClient.delete(
           `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}`
         );
-      });
+      }, 30_000); // unhideAll recompute + performer cascade + cleanup recompute
 
       it("should require entity type and ID", async () => {
         const response = await testUserClient.post<{ error: string }>(
@@ -361,7 +372,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
-      });
+      }, 30_000); // Hide + unhide both trigger exclusion recompute
     });
 
     describe("DELETE /api/user/hidden-entities/all", () => {
@@ -386,7 +397,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
         expect(response.data.count).toBeGreaterThanOrEqual(0);
-      }, 60_000); // Exclusion recompute can chain if a pending recompute exists
+      }, 30_000); // 2 hides + unhideAll; recompute can chain behind pending ops
 
       it("should unhide all entities of a specific type", async () => {
         // Hide some scenes
@@ -404,7 +415,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
         expect(response.data.success).toBe(true);
-      });
+      }, 30_000); // Hide + unhideAll triggers exclusion recompute
     });
   });
 
@@ -420,7 +431,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.status).toBe(200);
         expect(response.data.ok).toBe(true);
         expect(response.data.message).toContain("Recomputed");
-      }, 60_000); // Exclusion recompute can be slow with empty-entity scanning
+      }, 30_000); // Recompute can be slow; may queue behind prior background ops
 
       it("should reject invalid user ID", async () => {
         const response = await adminClient.post<{ error: string }>(
@@ -463,7 +474,7 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.data.ok).toBe(true);
         expect(typeof response.data.success).toBe("number");
         expect(response.data.failed).toBe(0);
-      }, 60_000); // Recomputes all users' exclusions
+      }, 30_000); // Recomputes all users' exclusions; may queue behind pending ops
 
       it("should reject non-admin access", async () => {
         const response = await testUserClient.post(
