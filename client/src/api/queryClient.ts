@@ -1,8 +1,8 @@
 /**
  * TanStack Query client configuration.
  *
- * Configures global defaults including 503 retry logic that replaces
- * useCancellableQuery's manual retry behavior.
+ * Configures global defaults including 503 retry logic for server
+ * initialization and network errors.
  */
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "./client";
