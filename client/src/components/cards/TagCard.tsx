@@ -56,7 +56,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.scene_count,
           onClick:
             tag.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag, hasMultipleInstances))
               : undefined,
         },
         {
@@ -64,7 +64,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.image_count,
           onClick:
             tag.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag, hasMultipleInstances))
               : undefined,
         },
         {
@@ -101,7 +101,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
         title={tag.name}
         subtitle={subtitle}
         description={tag.description}
-        linkTo={getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={getEntityPath('tag', tag, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

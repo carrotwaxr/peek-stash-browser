@@ -77,19 +77,19 @@ export const useFilterState = ({
 
         // Load presets
         const [presetsRes, defaultsRes] = await Promise.all([
-          apiGet("/user/filter-presets"),
-          apiGet("/user/default-presets"),
+          apiGet<{ presets: Record<string, Array<{ id: string; name: string; filters: Record<string, unknown>; sort?: string; direction?: string; perPage?: number; viewMode?: string; zoomLevel?: string; gridDensity?: string; tableColumns?: Record<string, unknown> | null }>> }>("/user/filter-presets"),
+          apiGet<{ defaults: Record<string, string> }>("/user/default-presets"),
         ]);
 
-        const allPresets = (presetsRes as any)?.presets || {};
-        const defaults = (defaultsRes as any)?.defaults || {};
+        const allPresets = presetsRes?.presets || {};
+        const defaults = defaultsRes?.defaults || {};
         const defaultPresetId = defaults[effectiveContext];
 
         const presetArtifactType = effectiveContext.startsWith("scene_")
           ? "scene"
           : effectiveContext;
         const presets = allPresets[presetArtifactType] || [];
-        const defaultPreset = presets.find((p: any) => p.id === defaultPresetId);
+        const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
         // Parse URL params
         const urlState = parseSearchParams(searchParams, filterOptions, {
@@ -151,7 +151,7 @@ export const useFilterState = ({
 
         // Set state
         setFiltersState(finalState.filters);
-        setSortState({ field: finalState.sortField, direction: finalState.sortDirection });
+        setSortState({ field: finalState.sortField ?? initialSort ?? "random", direction: finalState.sortDirection ?? "DESC" });
         setPaginationState({ page: finalState.currentPage, perPage: finalState.perPage });
         setSearchTextState(finalState.searchText);
         setViewModeState(finalState.viewMode as string);

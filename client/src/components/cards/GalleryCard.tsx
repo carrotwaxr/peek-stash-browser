@@ -76,7 +76,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.image_count,
         // Config says 'nav' for gallery->images
         onClick: getIndicatorBehavior('gallery', 'images') === 'nav' && gallery.image_count > 0
-          ? () => navigate(appendInstanceParam(`/images?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/images?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
           : undefined,
       },
       {
@@ -85,7 +85,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         tooltipContent: scenesTooltip,
         // Config says 'nav' for gallery->scenes
         onClick: getIndicatorBehavior('gallery', 'scenes') === 'nav' && gallery.scenes?.length > 0
-          ? () => navigate(appendInstanceParam(`/scenes?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/scenes?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
           : undefined,
       },
       {
@@ -93,7 +93,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.performers?.length || 0,
         tooltipContent: performersTooltip,
         onClick: getIndicatorBehavior('gallery', 'performers') === 'nav' && gallery.performers?.length > 0
-          ? () => navigate(appendInstanceParam(`/performers?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/performers?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
           : undefined,
       },
       {
@@ -101,7 +101,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.tags?.length || 0,
         tooltipContent: tagsTooltip,
         onClick: getIndicatorBehavior('gallery', 'tags') === 'nav' && gallery.tags?.length > 0
-          ? () => navigate(appendInstanceParam(`/tags?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/tags?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
           : undefined,
       },
     ];
@@ -114,10 +114,10 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="gallery"
         imagePath={gallery.cover}
-        title={galleryTitle(gallery as unknown as Record<string, unknown>) as React.ReactNode}
+        title={galleryTitle(gallery)}
         subtitle={subtitle}
         description={gallery.details}
-        linkTo={getEntityPath('gallery', gallery as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={getEntityPath('gallery', gallery, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

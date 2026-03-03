@@ -27,7 +27,6 @@ const ENTITY_PATHS: Record<string, string> = {
 interface EntityLike {
   id?: string | number;
   instanceId?: string;
-  [key: string]: unknown;
 }
 
 export function getEntityPath(entityType: string, entity: EntityLike | string, hasMultipleInstances: boolean) {

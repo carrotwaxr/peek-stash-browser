@@ -307,10 +307,10 @@ const SceneListItem = ({
                       </div>
 
                       {/* Description */}
-                      {getSceneDescription(scene as unknown as Record<string, unknown>) && (
+                      {getSceneDescription(scene) && (
                         <div className="mb-2">
                           <ExpandableDescription
-                            description={getSceneDescription(scene as unknown as Record<string, unknown>)}
+                            description={getSceneDescription(scene)}
                             maxLines={2}
                           />
                         </div>

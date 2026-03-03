@@ -29,7 +29,7 @@ const SceneTitle = ({
   maxLines = null,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
-  const title = getSceneTitle(scene as unknown as Record<string, unknown>);
+  const title = getSceneTitle(scene);
   const date = scene.date ? formatRelativeTime(scene.date) : null;
 
   // Build subtitle with studio, code, and date (like SceneCard)
@@ -98,7 +98,7 @@ const SceneTitle = ({
   return (
     <div>
       <Link
-        to={getEntityPath('scene', scene as unknown as Record<string, unknown>, hasMultipleInstances)}
+        to={getEntityPath('scene', scene, hasMultipleInstances)}
         state={linkState}
         onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}

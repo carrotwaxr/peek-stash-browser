@@ -31,19 +31,22 @@ export function formatBitRate(bitsPerSecond: number) {
 /**
  * Get scene display title - uses title if available, otherwise falls back to first file basename
  */
-export function getSceneTitle(scene: Record<string, unknown> | null) {
+interface SceneTitleInput {
+  title?: string | null;
+  files?: Array<{ basename?: string; path?: string }>;
+}
+
+export function getSceneTitle(scene: SceneTitleInput | null) {
   if (!scene) return "Unknown Scene";
 
   // Use title if it exists and is not empty
-  const title = scene.title as string | undefined;
-  if (title && title.trim()) {
-    return title.trim();
+  if (scene.title && scene.title.trim()) {
+    return scene.title.trim();
   }
 
   // Fallback to first file basename
-  const files = scene.files as Array<Record<string, unknown>> | undefined;
-  if (files && files.length > 0 && files[0].basename) {
-    return (files[0].basename as string).replace(/\.[^/.]+$/, ""); // Remove file extension
+  if (scene.files && scene.files.length > 0 && scene.files[0].basename) {
+    return scene.files[0].basename.replace(/\.[^/.]+$/, ""); // Remove file extension
   }
 
   return "Unknown Scene";
@@ -52,9 +55,13 @@ export function getSceneTitle(scene: Record<string, unknown> | null) {
 /**
  * Get scene description, handling empty cases
  */
-export function getSceneDescription(scene: Record<string, unknown> | null) {
+interface SceneDetailsInput {
+  details?: string | null;
+}
+
+export function getSceneDescription(scene: SceneDetailsInput | null) {
   if (!scene || !scene.details) return "";
-  return (scene.details as string).trim();
+  return scene.details.trim();
 }
 
 /**
