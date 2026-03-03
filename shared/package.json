@@ -4,66 +4,67 @@
   "private": true,
   "type": "module",
   "types": "dist/index.d.ts",
+  "main": "dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./types/index.ts"
+      "default": "./dist/index.js"
     },
     "./*.js": {
       "types": "./dist/*.d.ts",
-      "default": "./types/*.ts"
+      "default": "./dist/*.js"
     },
     "./instanceAwareId.js": {
       "types": "./dist/instanceAwareId.d.ts",
-      "default": "./types/instanceAwareId.ts"
+      "default": "./dist/instanceAwareId.js"
     },
     "./api/clips.js": {
       "types": "./dist/api/clips.d.ts",
-      "default": "./types/api/clips.ts"
+      "default": "./dist/api/clips.js"
     },
     "./api/common.js": {
       "types": "./dist/api/common.d.ts",
-      "default": "./types/api/common.ts"
+      "default": "./dist/api/common.js"
     },
     "./api/download.js": {
       "types": "./dist/api/download.d.ts",
-      "default": "./types/api/download.ts"
+      "default": "./dist/api/download.js"
     },
     "./api/groups.js": {
       "types": "./dist/api/groups.d.ts",
-      "default": "./types/api/groups.ts"
+      "default": "./dist/api/groups.js"
     },
     "./api/imageViewHistory.js": {
       "types": "./dist/api/imageViewHistory.d.ts",
-      "default": "./types/api/imageViewHistory.ts"
+      "default": "./dist/api/imageViewHistory.js"
     },
     "./api/ratings.js": {
       "types": "./dist/api/ratings.d.ts",
-      "default": "./types/api/ratings.ts"
+      "default": "./dist/api/ratings.js"
     },
     "./api/setup.js": {
       "types": "./dist/api/setup.d.ts",
-      "default": "./types/api/setup.ts"
+      "default": "./dist/api/setup.js"
     },
     "./api/stats.js": {
       "types": "./dist/api/stats.d.ts",
-      "default": "./types/api/stats.ts"
+      "default": "./dist/api/stats.js"
     },
     "./api/timeline.js": {
       "types": "./dist/api/timeline.d.ts",
-      "default": "./types/api/timeline.ts"
+      "default": "./dist/api/timeline.js"
     },
     "./api/user.js": {
       "types": "./dist/api/user.d.ts",
-      "default": "./types/api/user.ts"
+      "default": "./dist/api/user.js"
     },
     "./api/userStats.js": {
       "types": "./dist/api/userStats.d.ts",
-      "default": "./types/api/userStats.ts"
+      "default": "./dist/api/userStats.js"
     },
     "./api/watchHistory.js": {
       "types": "./dist/api/watchHistory.d.ts",
-      "default": "./types/api/watchHistory.ts"
+      "default": "./dist/api/watchHistory.js"
     }
   },
   "scripts": {

@@ -5,6 +5,7 @@
 **/dist
 **/.next
 **/build
+**/tsconfig.tsbuildinfo
 
 # Test files (not needed for production build)
 **/tests

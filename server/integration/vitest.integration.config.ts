@@ -6,6 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@peek/shared-types": path.resolve(__dirname, "../../shared/types"),
+    },
+  },
   test: {
     globals: true,
     environment: "node",
