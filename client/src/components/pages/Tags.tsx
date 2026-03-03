@@ -142,7 +142,7 @@ const Tags = () => {
           onViewModeChange={setActiveViewMode}
           totalPages={activeViewMode === "hierarchy" ? 0 : totalPages}
           totalCount={activeViewMode === "hierarchy" ? 0 : totalCount}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -163,7 +163,7 @@ const Tags = () => {
               const showLoading = hierarchyLoading || !hierarchyRaw;
               return (
                 <TagHierarchyView
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TagItem is not exported from TagHierarchyView
+                   
                   tags={hierarchyTags as any}
                   isLoading={showLoading}
                   searchQuery={searchParams.get("q") || ""}

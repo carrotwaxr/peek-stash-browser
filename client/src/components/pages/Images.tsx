@@ -257,7 +257,7 @@ const Images = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           viewModes={VIEW_MODES as any}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}

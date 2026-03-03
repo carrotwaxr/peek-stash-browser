@@ -104,7 +104,7 @@ const PerformerDetail = () => {
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   (useRatingHotkeys as any)({
     enabled: !isLoading && !!performer,
     setRating: handleRatingChange,

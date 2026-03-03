@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { BaseCard, type BaseCardProps } from "../../../src/components/ui/BaseCard";
 
 // Cast for createElement usage since BaseCard is a forwardRef component
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const BaseCardComponent = BaseCard as any;
 
 describe("BaseCard", () => {

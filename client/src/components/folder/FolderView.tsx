@@ -38,7 +38,7 @@ const FolderView = ({
   loading = false,
   emptyMessage = "No items found",
   onFolderPathChange,
-  filters: _filters = null, // eslint-disable-line @typescript-eslint/no-unused-vars
+  filters: _filters = null,  
 }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 

@@ -197,7 +197,7 @@ const SimpleValueCell = ({ value }: SimpleValueCellProps) => {
 // Entity-Specific Cell Renderers
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type Entity = Record<string, any>;
 type RendererFn = (entity: Entity, options?: CellRendererOptions) => React.ReactNode;
 type RendererMap = Record<string, RendererFn>;

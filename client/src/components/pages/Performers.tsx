@@ -144,7 +144,7 @@ const Performers = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
