@@ -8,7 +8,7 @@ import {
   generateToastColors,
 } from "../utils/colorScale";
 
-interface ThemeConfig {
+export interface ThemeConfig {
   mode: string;
   fonts: { brand: string; heading: string; body: string; mono: string };
   colors: { background: string; backgroundSecondary: string; backgroundCard: string; text: string; border: string };

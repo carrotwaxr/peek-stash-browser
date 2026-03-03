@@ -9,6 +9,31 @@ import {
   inchesToCm,
 } from "./unitConversions";
 
+/** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
+export interface FilterOption {
+  key: string;
+  type: string;
+  label?: string;
+  multi?: boolean;
+  defaultValue?: unknown;
+  placeholder?: string;
+  entityType?: string;
+  options?: Array<{ value: string; label: string }>;
+  modifierKey?: string;
+  modifierOptions?: Array<{ value: string; label: string }>;
+  defaultModifier?: string;
+  hierarchyKey?: string;
+  supportsHierarchy?: boolean;
+  hierarchyLabel?: string;
+  countFilterContext?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  valueUnit?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}
+
 // Scene sorting options (alphabetically organized by label)
 // Note: scene_index is added dynamically when group filter is active
 export const SCENE_SORT_OPTIONS_BASE = [

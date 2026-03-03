@@ -1,10 +1,15 @@
 import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import type { TagRef } from "@peek/shared-types";
+
+interface TagLike {
+  id: string;
+  name: string;
+  instanceId?: string;
+}
 
 interface Props {
-  tags: TagRef[] | null | undefined;
+  tags: TagLike[] | null | undefined;
 }
 
 /**

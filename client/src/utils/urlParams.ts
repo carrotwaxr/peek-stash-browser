@@ -2,22 +2,7 @@
  * Utility functions for persisting filter/sort state to URL query parameters
  */
 import { makeCompositeKey } from "./compositeKey";
-
-/**
- * Serialize filter state to URL query parameters
- *
- * @param {Object} filters - Filter state object
- * @param {Array} filterOptions - Filter configuration from filterConfig.js
- * @returns {URLSearchParams} URL search params object
- */
-interface FilterOption {
-  key: string;
-  type: string;
-  multi?: boolean;
-  modifierKey?: string;
-  hierarchyKey?: string;
-  options?: Array<{ value: string; label: string }>;
-}
+import type { FilterOption } from "./filterConfig";
 
 interface SearchState {
   searchText: string;
