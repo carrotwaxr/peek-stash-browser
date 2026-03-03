@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import { TestClient, adminClient, selectTestInstanceOnly, selectAllInstances, selectTestInstanceForClient, selectAllInstancesForClient } from "../helpers/testClient.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
@@ -34,6 +34,9 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     // Ensure admin client is logged in
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
 
+    // Scope to test instance only — avoids scanning production data during recompute
+    await selectTestInstanceOnly();
+
     // Create a test user for restriction testing
     const createResponse = await adminClient.post<{
       success: boolean;
@@ -66,6 +69,9 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     testUserClient = new TestClient();
     await testUserClient.login("include_mode_test_user", "test_password_123");
 
+    // Also scope the test user to test instance only
+    await selectTestInstanceForClient(testUserClient);
+
     // Get 3 existing tag IDs from the database using the correct POST endpoint
     const tagsResponse = await adminClient.post<FindTagsResponse>("/api/library/tags", {
       filter: { per_page: 10 },
@@ -87,6 +93,11 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
   });
 
   afterAll(async () => {
+    // Restore instance selections
+    await selectAllInstances();
+    if (testUserClient) {
+      await selectAllInstancesForClient(testUserClient);
+    }
     // Clean up restrictions
     if (testUserId) {
       await adminClient.delete(`/api/user/${testUserId}/restrictions`);
@@ -98,7 +109,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
   });
 
   describe("INCLUDE mode tag restrictions", () => {
-    it("should exclude tags not in the INCLUDE list", { timeout: 120000 }, async () => {
+    it("should exclude tags not in the INCLUDE list", { timeout: 30_000 }, async () => {
       // Set INCLUDE mode restriction allowing only tag1 and tag2
       const restrictions = [
         {
@@ -174,10 +185,11 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       // The user should see fewer tags than the total (restrictions are working)
       // Note: Some included tags may also be excluded due to cascade/empty rules
       // The important thing is that the INCLUDE list works as a filter
-      expect(userTagsResponse.data.findTags.count).toBeLessThan(255); // Assuming ~255 total tags
+      // With test instance scoping, the total is ~11 tags (not 255+)
+      expect(userTagsResponse.data.findTags.count).toBeLessThan(20);
     });
 
-    it("should handle INCLUDE mode with empty list (exclude all)", { timeout: 120000 }, async () => {
+    it("should handle INCLUDE mode with empty list (exclude all)", { timeout: 30_000 }, async () => {
       // Set INCLUDE mode with empty list - this should exclude ALL tags
       const restrictions = [
         {
