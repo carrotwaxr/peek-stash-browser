@@ -40,13 +40,13 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
   const [canDownloadPlaylists, setCanDownloadPlaylists] = useState(false);
 
   // Members state (only used in edit mode)
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState<Array<{ user: UserItem }>>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
 
   // General state
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Load group details when editing
   useEffect(() => {
@@ -61,18 +61,18 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       setLoadingMembers(true);
       setError(null);
 
-      const response = await getGroup(group.id);
-      const groupData = response.group;
+      const response = await getGroup(String(group!.id));
+      const groupData = response.group as Record<string, unknown>;
 
       // Populate form fields
-      setName(groupData.name || "");
-      setDescription(groupData.description || "");
-      setCanShare(groupData.canShare ?? false);
-      setCanDownloadFiles(groupData.canDownloadFiles ?? false);
-      setCanDownloadPlaylists(groupData.canDownloadPlaylists ?? false);
-      setMembers(groupData.members || []);
+      setName((groupData.name as string) || "");
+      setDescription((groupData.description as string) || "");
+      setCanShare((groupData.canShare as boolean) ?? false);
+      setCanDownloadFiles((groupData.canDownloadFiles as boolean) ?? false);
+      setCanDownloadPlaylists((groupData.canDownloadPlaylists as boolean) ?? false);
+      setMembers((groupData.members as Array<{ user: UserItem }>) || []);
     } catch (err) {
-      setError(err.message || "Failed to load group details");
+      setError((err as Error).message || "Failed to load group details");
     } finally {
       setLoadingMembers(false);
     }
@@ -84,7 +84,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
     const userId = parseInt(selectedUserId, 10);
     const addedUser = users.find((u) => u.id === userId);
     try {
-      await addGroupMember(group.id, userId);
+      await addGroupMember(String(group!.id), userId);
       // Find the user details from the users list
       if (addedUser) {
         setMembers((prev) => [
@@ -101,18 +101,18 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       }
       setSelectedUserId("");
     } catch (err) {
-      setError(err.message || `Failed to add ${addedUser?.username || "member"}`);
+      setError((err as Error).message || `Failed to add ${addedUser?.username || "member"}`);
     }
   };
 
   const handleRemoveMember = async (userId: number) => {
     const removedMember = members.find((m) => m.user.id === userId);
     try {
-      await removeGroupMember(group.id, userId);
+      await removeGroupMember(String(group!.id), String(userId));
       setMembers((prev) => prev.filter((m) => m.user.id !== userId));
       onMessage?.(`Removed ${removedMember?.user?.username || "member"} from group`);
     } catch (err) {
-      setError(err.message || `Failed to remove ${removedMember?.user?.username || "member"}`);
+      setError((err as Error).message || `Failed to remove ${removedMember?.user?.username || "member"}`);
     }
   };
 
@@ -142,7 +142,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       };
 
       if (isEditMode) {
-        await updateGroup(group.id, groupData);
+        await updateGroup(String(group!.id), groupData);
       } else {
         await createGroup(groupData);
       }
@@ -153,7 +153,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
         onClose(true);
       }
     } catch (err) {
-      setError(err.message || `Failed to ${isEditMode ? "update" : "create"} group`);
+      setError((err as Error).message || `Failed to ${isEditMode ? "update" : "create"} group`);
     } finally {
       setLoading(false);
     }
@@ -163,7 +163,7 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
     onClose(false);
   };
 
-  const modalTitle = isEditMode ? `Edit Group: ${group.name}` : "Create Group";
+  const modalTitle = isEditMode ? `Edit Group: ${group!.name}` : "Create Group";
 
   return (
     <div

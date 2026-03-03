@@ -24,29 +24,29 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
 
     // Build subtitle from child count
     const subtitle =
-      tag.child_count > 0
+      (tag.child_count ?? 0) > 0
         ? `${tag.child_count} subtag${tag.child_count !== 1 ? "s" : ""}`
         : null;
 
     const indicators = useMemo(() => {
       const performersTooltip = getIndicatorBehavior('tag', 'performers') === 'rich' &&
-        tag.performers?.length > 0 && (
+        (tag.performers?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" parentInstanceId={tag.instanceId} />
         );
 
       const studiosTooltip = getIndicatorBehavior('tag', 'studios') === 'rich' &&
-        tag.studios?.length > 0 && (
+        (tag.studios?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" parentInstanceId={tag.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('tag', 'groups') === 'rich' &&
-        tag.groups?.length > 0 && (
+        (tag.groups?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" parentInstanceId={tag.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
-        tag.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" parentInstanceId={tag.instanceId} />
+        (tag.galleries?.length ?? 0) > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={tag.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={tag.instanceId} />
         );
 
       return [
@@ -56,7 +56,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.scene_count,
           onClick:
             tag.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
@@ -64,7 +64,7 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.image_count,
           onClick:
             tag.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
@@ -101,11 +101,11 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
         title={tag.name}
         subtitle={subtitle}
         description={tag.description}
-        linkTo={getEntityPath('tag', tag, hasMultipleInstances)}
+        linkTo={getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={
           tag.rating100 !== undefined
             ? {
@@ -115,10 +115,10 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
                 initialFavorite: tag.favorite || false,
                 initialOCounter: tag.o_counter,
                 onHideSuccess,
-                showRating: tagSettings.showRating,
-                showFavorite: tagSettings.showFavorite,
-                showOCounter: tagSettings.showOCounter,
-                showMenu: tagSettings.showMenu,
+                showRating: tagSettings.showRating as boolean | undefined,
+                showFavorite: tagSettings.showFavorite as boolean | undefined,
+                showOCounter: tagSettings.showOCounter as boolean | undefined,
+                showMenu: tagSettings.showMenu as boolean | undefined,
               }
             : undefined
         }

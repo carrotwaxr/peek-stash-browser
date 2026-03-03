@@ -13,7 +13,23 @@
  * @param {string} vttContent - The raw VTT file content
  * @returns {Array<Object>} Array of cue objects with timing and sprite position
  */
-function parseVTT(vttContent) {
+interface SpriteCue {
+  startTime: number;
+  endTime: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface SpritePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function parseVTT(vttContent: string): SpriteCue[] {
   const cues = [];
   const lines = vttContent.split("\n");
 
@@ -28,7 +44,7 @@ function parseVTT(vttContent) {
 
     // Look for timestamp lines (format: 00:00:00.000 --> 00:00:10.000)
     if (line.includes("-->")) {
-      const [startTime, endTime] = line.split("-->").map((t) => t.trim());
+      const [startTime, endTime] = line.split("-->").map((t: string) => t.trim());
 
       // Next line should have the sprite position
       i++;
@@ -61,7 +77,7 @@ function parseVTT(vttContent) {
  * @param {string} timestamp - VTT timestamp string
  * @returns {number} Time in seconds
  */
-function parseTimestamp(timestamp) {
+function parseTimestamp(timestamp: string): number {
   const parts = timestamp.split(":");
   let hours = 0,
     minutes = 0,
@@ -86,7 +102,7 @@ function parseTimestamp(timestamp) {
  * @param {Object} cue - VTT cue object
  * @returns {Object} Sprite position { x, y, width, height }
  */
-function extractSpritePosition(cue) {
+function extractSpritePosition(cue: SpriteCue): SpritePosition {
   return {
     x: cue.x,
     y: cue.y,
@@ -100,7 +116,7 @@ function extractSpritePosition(cue) {
  * @param {string} vttUrl - URL to the VTT file
  * @returns {Promise<Array<Object>>} Promise resolving to parsed cues
  */
-export async function fetchAndParseVTT(vttUrl) {
+export async function fetchAndParseVTT(vttUrl: string): Promise<SpriteCue[]> {
   try {
     const response = await fetch(vttUrl);
     if (!response.ok) {
@@ -120,7 +136,7 @@ export async function fetchAndParseVTT(vttUrl) {
  * @param {number} count - Number of sprites to return
  * @returns {Array<Object>} Array of sprite positions
  */
-export function getEvenlySpacedSprites(cues, count = 5) {
+export function getEvenlySpacedSprites(cues: SpriteCue[], count = 5): SpritePosition[] {
   if (!cues || cues.length === 0) return [];
 
   if (cues.length <= count) {

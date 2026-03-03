@@ -12,7 +12,7 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("USER");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

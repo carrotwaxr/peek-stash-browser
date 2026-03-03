@@ -21,8 +21,8 @@ interface Props {
 const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
-  const buttonRef = useRef(null);
-  const popoverRef = useRef(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // Determine if we have items
   const hasItems = items && items.length > 0;
@@ -61,12 +61,12 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   useEffect(() => {
     if (!isPopoverOpen) return;
 
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (
         buttonRef.current &&
-        !buttonRef.current.contains(e.target) &&
+        !buttonRef.current.contains(e.target as Node) &&
         popoverRef.current &&
-        !popoverRef.current.contains(e.target)
+        !popoverRef.current.contains(e.target as Node)
       ) {
         setIsPopoverOpen(false);
       }
@@ -106,7 +106,7 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   }
 
   // Render a single item (as link or text)
-  const renderItem = (item, isInPopover = false) => {
+  const renderItem = (item: MultiValueItem, isInPopover = false) => {
     if (item.linkTo) {
       return (
         <Link
@@ -128,7 +128,7 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
   };
 
   // Handle "+X more" button click
-  const handleMoreClick = (e) => {
+  const handleMoreClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     calculatePosition();
     setIsPopoverOpen(!isPopoverOpen);

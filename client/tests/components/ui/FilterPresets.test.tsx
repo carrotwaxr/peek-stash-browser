@@ -19,10 +19,10 @@ const mockApiPut = vi.fn();
 const mockApiDelete = vi.fn();
 
 vi.mock("../../../src/api", () => ({
-  apiGet: (...args) => mockApiGet(...args),
-  apiPost: (...args) => mockApiPost(...args),
-  apiPut: (...args) => mockApiPut(...args),
-  apiDelete: (...args) => mockApiDelete(...args),
+  apiGet: (...args: unknown[]) => mockApiGet(...args),
+  apiPost: (...args: unknown[]) => mockApiPost(...args),
+  apiPut: (...args: unknown[]) => mockApiPut(...args),
+  apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
 
 // Mock window.confirm for delete confirmation
@@ -90,7 +90,7 @@ describe("FilterPresets", () => {
       const user = userEvent.setup();
       render(<FilterPresets {...defaultProps} />);
 
-      const loadButton = screen.getByText("Load Preset").closest("button");
+      const loadButton = screen.getByText("Load Preset").closest("button")!;
       await user.click(loadButton);
 
       await waitFor(() => {
@@ -114,7 +114,7 @@ describe("FilterPresets", () => {
         expect(mockApiGet).toHaveBeenCalled();
       });
 
-      const loadButton = screen.getByText("Load Preset").closest("button");
+      const loadButton = screen.getByText("Load Preset").closest("button")!;
       await user.click(loadButton);
 
       await waitFor(() => {
@@ -132,7 +132,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      const loadButton = screen.getByText("Load Preset").closest("button");
+      const loadButton = screen.getByText("Load Preset").closest("button")!;
       await user.click(loadButton);
 
       await waitFor(() => {
@@ -170,7 +170,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      const loadButton = screen.getByText("Load Preset").closest("button");
+      const loadButton = screen.getByText("Load Preset").closest("button")!;
       await user.click(loadButton);
 
       await waitFor(() => {
@@ -202,7 +202,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      const loadButton = screen.getByText("Load Preset").closest("button");
+      const loadButton = screen.getByText("Load Preset").closest("button")!;
       await user.click(loadButton);
 
       await waitFor(() => {
@@ -224,7 +224,7 @@ describe("FilterPresets", () => {
       const user = userEvent.setup();
       render(<FilterPresets {...defaultProps} />);
 
-      const saveButton = screen.getByText("Save Preset").closest("button");
+      const saveButton = screen.getByText("Save Preset").closest("button")!;
       await user.click(saveButton);
 
       await waitFor(() => {
@@ -238,7 +238,7 @@ describe("FilterPresets", () => {
       render(<FilterPresets {...defaultProps} />);
 
       // Open save dialog
-      await user.click(screen.getByText("Save Preset").closest("button"));
+      await user.click(screen.getByText("Save Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
@@ -254,7 +254,7 @@ describe("FilterPresets", () => {
       render(<FilterPresets {...defaultProps} />);
 
       // Open save dialog
-      await user.click(screen.getByText("Save Preset").closest("button"));
+      await user.click(screen.getByText("Save Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe("FilterPresets", () => {
       );
 
       // Open save dialog
-      await user.click(screen.getByText("Save Preset").closest("button"));
+      await user.click(screen.getByText("Save Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
@@ -325,7 +325,7 @@ describe("FilterPresets", () => {
       render(<FilterPresets {...defaultProps} />);
 
       // Open save dialog
-      await user.click(screen.getByText("Save Preset").closest("button"));
+      await user.click(screen.getByText("Save Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
@@ -352,7 +352,7 @@ describe("FilterPresets", () => {
       render(<FilterPresets {...defaultProps} />);
 
       // Open save dialog
-      await user.click(screen.getByText("Save Preset").closest("button"));
+      await user.click(screen.getByText("Save Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
@@ -378,7 +378,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      await user.click(screen.getByText("Load Preset").closest("button"));
+      await user.click(screen.getByText("Load Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Favorites")).toBeInTheDocument();
@@ -406,7 +406,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      await user.click(screen.getByText("Load Preset").closest("button"));
+      await user.click(screen.getByText("Load Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Favorites")).toBeInTheDocument();
@@ -441,7 +441,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      await user.click(screen.getByText("Load Preset").closest("button"));
+      await user.click(screen.getByText("Load Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Favorites")).toBeInTheDocument();
@@ -471,7 +471,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      await user.click(screen.getByText("Load Preset").closest("button"));
+      await user.click(screen.getByText("Load Preset").closest("button")!);
 
       await waitFor(() => {
         expect(screen.getByText("Favorites")).toBeInTheDocument();
@@ -510,7 +510,7 @@ describe("FilterPresets", () => {
       });
 
       // Open dropdown
-      await user.click(screen.getByText("Load Preset").closest("button"));
+      await user.click(screen.getByText("Load Preset").closest("button")!);
 
       // Should still show scene presets
       await waitFor(() => {

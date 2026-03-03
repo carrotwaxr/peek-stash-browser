@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -21,7 +21,7 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for studios page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "table", label: "Table view" },
 ];
@@ -63,19 +63,18 @@ const Studios = () => {
   );
 
   const findStudios = (data as Record<string, unknown>)?.findStudios as Record<string, unknown> | undefined;
-  const currentStudios = (findStudios?.studios as unknown[]) || [];
+  const currentStudios = (findStudios?.studios as Record<string, unknown>[]) || [];
   const totalCount = (findStudios?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -123,7 +122,8 @@ const Studios = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -136,13 +136,13 @@ const Studios = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) =>
+          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
+                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="studio"
@@ -173,9 +173,9 @@ const Studios = () => {
               )
             ) : viewMode === "table" ? (
               <TableView
-                items={currentStudios}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentStudios as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="studio"
@@ -192,21 +192,21 @@ const Studios = () => {
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentStudios.map((studio, index) => {
-                  const itemProps = gridItemProps(index);
+                {currentStudios.map((studio: Record<string, unknown>, index: number) => {
+                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
                   return (
                     <StudioCard
-                      key={studio.id}
-                      studio={studio}
+                      key={studio.id as string}
+                      studio={studio as unknown as import("@peek/shared-types").NormalizedStudio}
                       fromPageTitle="Studios"
-                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
-                      {...itemProps}
+                      tabIndex={isTVMode ? _tabIndex : -1}
+                      {...restItemProps}
                     />
                   );
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>

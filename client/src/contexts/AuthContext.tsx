@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { AuthContext } from "./AuthContextProvider";
+import type { AuthUser } from "./AuthContextProvider";
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const checkAuth = async () => {
     try {
@@ -28,7 +29,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (credentials) => {
+  const login = async (credentials: { username: string; password: string }) => {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: {
@@ -67,7 +68,7 @@ export const AuthProvider = ({ children }) => {
    * Update user state with partial data (for local preference updates)
    * This allows updating specific user fields without a full auth refresh
    */
-  const updateUser = (partialUser) => {
+  const updateUser = (partialUser: Partial<AuthUser>) => {
     setUser((prev) => (prev ? { ...prev, ...partialUser } : null));
   };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGridClasses } from "../../constants/grids";
@@ -29,7 +29,7 @@ import { FolderView } from "../folder/index";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for images page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
@@ -96,8 +96,8 @@ const Images = () => {
   }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
   // Extract URL pagination params early (needed for hooks)
-  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
-  const urlPage = parseInt(searchParams.get("page")) || 1;
+  const urlPerPage = parseInt(searchParams.get("per_page") ?? "24") || 24;
+  const urlPage = parseInt(searchParams.get("page") ?? "1") || 1;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(urlPerPage);
@@ -128,7 +128,7 @@ const Images = () => {
   }, [data]);
 
   const findImages = (data as Record<string, unknown>)?.findImages as Record<string, unknown> | undefined;
-  const currentImages = useMemo(() => (findImages?.images as unknown[]) || [], [findImages?.images]);
+  const currentImages = useMemo(() => (findImages?.images as Record<string, unknown>[]) || [], [findImages?.images]);
   const totalCount = (findImages?.count as number) || 0;
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
   const pageOffset = (urlPage - 1) * urlPerPage;
@@ -162,7 +162,7 @@ const Images = () => {
   // Handle image click - open lightbox
   const handleImageClick = useCallback(
     (image: Record<string, unknown>) => {
-      const index = currentImages.findIndex((img) => img.id === image.id);
+      const index = currentImages.findIndex((img: Record<string, unknown>) => img.id === image.id);
       openLightbox(index >= 0 ? index : 0);
     },
     [currentImages, openLightbox]
@@ -212,7 +212,6 @@ const Images = () => {
   // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
   const {
     isTVMode,
-    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -258,7 +257,8 @@ const Images = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -273,12 +273,12 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
+          {(({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }: { viewMode: string; gridDensity: string; zoomLevel: number; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void; timelinePeriod: string; setTimelinePeriod: (period: string) => void }) =>
             viewMode === "table" ? (
               <TableView
-                items={currentImages}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentImages as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="image"
@@ -295,10 +295,10 @@ const Images = () => {
               />
             ) : viewMode === "wall" ? (
               <WallView
-                items={currentImages}
+                items={currentImages as Record<string, unknown>[]}
                 entityType="image"
-                zoomLevel={zoomLevel}
-                playbackMode={wallPlayback}
+                zoomLevel={zoomLevel as unknown as "small" | "medium" | "large"}
+                playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
                 onItemClick={handleImageClick}
                 loading={isLoading}
                 emptyMessage="No images found"
@@ -306,11 +306,11 @@ const Images = () => {
             ) : viewMode === "timeline" ? (
               <TimelineView
                 entityType="image"
-                items={currentImages}
-                renderItem={(image, index, { onItemClick }) => (
+                items={currentImages as Record<string, unknown>[]}
+                renderItem={(image: Record<string, unknown>, index: number, { onItemClick }: { onItemClick?: (item: Record<string, unknown>) => void }) => (
                   <ImageCard
-                    key={image.id}
-                    image={image}
+                    key={image.id as string}
+                    image={image as unknown as import("@peek/shared-types").NormalizedImage}
                     onClick={() => onItemClick?.(image)}
                     fromPageTitle="Images"
                     tabIndex={0}
@@ -321,7 +321,7 @@ const Images = () => {
                 )}
                 onItemClick={handleImageClick}
                 onDateFilterChange={setTimelineDateFilter}
-                onPeriodChange={setTimelinePeriod}
+                onPeriodChange={setTimelinePeriod as (period: string | null) => void}
                 initialPeriod={timelinePeriod}
                 loading={isLoading}
                 emptyMessage="No images found for this time period"
@@ -329,16 +329,16 @@ const Images = () => {
               />
             ) : viewMode === "folder" ? (
               <FolderView
-                items={currentImages}
+                items={currentImages as Record<string, unknown>[]}
                 tags={folderTags}
                 gridDensity={gridDensity}
                 loading={isLoading || tagsLoading}
                 emptyMessage="No images found"
                 onFolderPathChange={setFolderTagFilter}
-                renderItem={(image) => (
+                renderItem={(image: Record<string, unknown>) => (
                   <ImageCard
-                    key={image.id}
-                    image={image}
+                    key={image.id as string}
+                    image={image as unknown as import("@peek/shared-types").NormalizedImage}
                     onClick={() => handleImageClick(image)}
                     fromPageTitle="Images"
                     tabIndex={0}
@@ -363,40 +363,43 @@ const Images = () => {
               </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentImages.map((image, index) => {
-                  const itemProps = gridItemProps(index);
+                {currentImages.map((image: Record<string, unknown>, index: number) => {
+                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
                   return (
                     <ImageCard
-                      key={image.id}
-                      image={image}
-                      onClick={() => handleImageClick(image)}
+                      key={image.id as string}
+                      image={image as unknown as import("@peek/shared-types").NormalizedImage}
+                      onClick={() => handleImageClick(image as Record<string, unknown>)}
                       fromPageTitle="Images"
-                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
+                      tabIndex={isTVMode ? _tabIndex : -1}
                       onOCounterChange={handleOCounterChange}
                       onRatingChange={handleRatingChange}
                       onFavoriteChange={handleFavoriteChange}
-                      {...itemProps}
+                      {...restItemProps}
                     />
                   );
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
 
         {/* Lightbox for viewing images */}
         {currentImages.length > 0 && (
           <Lightbox
             isOpen={lightbox.lightboxOpen}
-            images={currentImages.map((img) => ({
-              ...img,
-              paths: {
-                image: img.paths?.image || `/api/proxy/image/${img.id}/image`,
-                preview: img.paths?.preview || img.paths?.thumbnail,
-                thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
-              },
-              oCounter: img.oCounter ?? 0,
-            }))}
+            images={currentImages.map((img: Record<string, unknown>) => {
+              const paths = img.paths as Record<string, string> | undefined;
+              return {
+                ...(img as Record<string, unknown>),
+                paths: {
+                  image: paths?.image || `/api/proxy/image/${img.id as string}/image`,
+                  preview: paths?.preview || paths?.thumbnail,
+                  thumbnail: paths?.thumbnail || `/api/proxy/image/${img.id as string}/thumbnail`,
+                },
+                oCounter: (img.oCounter as number) ?? 0,
+              };
+            }) as unknown as import("@peek/shared-types").NormalizedImage[]}
             initialIndex={lightbox.lightboxIndex}
             onClose={lightbox.closeLightbox}
             onImagesUpdate={(updatedImages) => {

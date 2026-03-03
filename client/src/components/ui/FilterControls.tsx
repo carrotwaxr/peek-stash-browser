@@ -60,6 +60,17 @@ export const SortControl = ({
 /**
  * Reusable Filter Control Component
  */
+interface RangeValue {
+  min?: string;
+  max?: string;
+  feetMin?: string;
+  inchesMin?: string;
+  feetMax?: string;
+  inchesMax?: string;
+  start?: string;
+  end?: string;
+}
+
 interface FilterControlProps {
   type?: "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range";
   label: string;
@@ -142,7 +153,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             {modifierOptions && modifierOptions.length > 0 && (
               <select
                 value={modifierValue}
-                onChange={(e) => onModifierChange(e.target.value)}
+                onChange={(e) => onModifierChange?.(e.target.value)}
                 className={inputClasses}
                 style={baseInputStyle}
               >
@@ -155,7 +166,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             )}
             {/* Main select */}
             <select
-              value={value}
+              value={value as string}
               onChange={(e) => onChange(e.target.value)}
               className={inputClasses}
               style={baseInputStyle}
@@ -180,7 +191,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             {modifierOptions && modifierOptions.length > 0 && (
               <select
                 value={effectiveModifierValue}
-                onChange={(e) => onModifierChange(e.target.value)}
+                onChange={(e) => onModifierChange?.(e.target.value)}
                 className={inputClasses}
                 style={{
                   ...baseInputStyle,
@@ -198,12 +209,12 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             )}
             {/* Main select */}
             <SearchableSelect
-              entityType={entityType}
-              value={value}
-              onChange={onChange}
+              entityType={entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
+              value={value as string | string[]}
+              onChange={onChange as (value: string | string[]) => void}
               multi={multi}
               placeholder={placeholder || `Select ${label}...`}
-              countFilterContext={countFilterContext}
+              countFilterContext={countFilterContext as "performers" | "scenes" | "galleries" | "groups" | "images" | null | undefined}
             />
             {/* Hierarchy checkbox (for tags/studios) */}
             {supportsHierarchy && onHierarchyChange && (
@@ -239,7 +250,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
         return (
           <input
             type="number"
-            value={value}
+            value={value as string | number | undefined}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
             min={min}
@@ -252,7 +263,7 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
         return (
           <input
             type="text"
-            value={value}
+            value={value as string | undefined}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
             className={inputClasses}
@@ -263,19 +274,20 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
         return (
           <input
             type="date"
-            value={value}
+            value={value as string | undefined}
             onChange={(e) => onChange(e.target.value)}
             className={inputClasses}
             style={baseInputStyle}
           />
         );
-      case "range":
+      case "range": {
+        const rangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex space-x-2">
             <input
               type="number"
-              value={value?.min || ""}
-              onChange={(e) => onChange({ ...value, min: e.target.value })}
+              value={rangeVal.min || ""}
+              onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
               placeholder="Min"
               min={min}
               max={max}
@@ -284,8 +296,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             />
             <input
               type="number"
-              value={value?.max || ""}
-              onChange={(e) => onChange({ ...value, max: e.target.value })}
+              value={rangeVal.max || ""}
+              onChange={(e) => onChange({ ...rangeVal, max: e.target.value })}
               placeholder="Max"
               min={min}
               max={max}
@@ -294,8 +306,10 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             />
           </div>
         );
-      case "imperial-height-range":
+      }
+      case "imperial-height-range": {
         // Imperial height input with feet and inches fields
+        const heightVal = (value || {}) as RangeValue;
         return (
           <div className="space-y-2">
             <fieldset>
@@ -313,8 +327,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
                   <input
                     id="height-feet-min"
                     type="number"
-                    value={value?.feetMin || ""}
-                    onChange={(e) => onChange({ ...value, feetMin: e.target.value })}
+                    value={heightVal.feetMin || ""}
+                    onChange={(e) => onChange({ ...heightVal, feetMin: e.target.value })}
                     placeholder="Feet"
                     min={0}
                     max={8}
@@ -330,8 +344,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
                   <input
                     id="height-inches-min"
                     type="number"
-                    value={value?.inchesMin || ""}
-                    onChange={(e) => onChange({ ...value, inchesMin: e.target.value })}
+                    value={heightVal.inchesMin || ""}
+                    onChange={(e) => onChange({ ...heightVal, inchesMin: e.target.value })}
                     placeholder="Inches"
                     min={0}
                     max={11}
@@ -357,8 +371,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
                   <input
                     id="height-feet-max"
                     type="number"
-                    value={value?.feetMax || ""}
-                    onChange={(e) => onChange({ ...value, feetMax: e.target.value })}
+                    value={heightVal.feetMax || ""}
+                    onChange={(e) => onChange({ ...heightVal, feetMax: e.target.value })}
                     placeholder="Feet"
                     min={0}
                     max={8}
@@ -374,8 +388,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
                   <input
                     id="height-inches-max"
                     type="number"
-                    value={value?.inchesMax || ""}
-                    onChange={(e) => onChange({ ...value, inchesMax: e.target.value })}
+                    value={heightVal.inchesMax || ""}
+                    onChange={(e) => onChange({ ...heightVal, inchesMax: e.target.value })}
                     placeholder="Inches"
                     min={0}
                     max={11}
@@ -388,7 +402,9 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
             </fieldset>
           </div>
         );
-      case "date-range":
+      }
+      case "date-range": {
+        const dateRangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex flex-col space-y-2">
             <div>
@@ -400,8 +416,8 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
               </div>
               <input
                 type="date"
-                value={value?.start || ""}
-                onChange={(e) => onChange({ ...value, start: e.target.value })}
+                value={dateRangeVal.start || ""}
+                onChange={(e) => onChange({ ...dateRangeVal, start: e.target.value })}
                 className={inputClasses}
                 style={baseInputStyle}
               />
@@ -415,35 +431,38 @@ export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
               </div>
               <input
                 type="date"
-                value={value?.end || ""}
-                onChange={(e) => onChange({ ...value, end: e.target.value })}
+                value={dateRangeVal.end || ""}
+                onChange={(e) => onChange({ ...dateRangeVal, end: e.target.value })}
                 className={inputClasses}
                 style={baseInputStyle}
               />
             </div>
           </div>
         );
-      case "time-range":
+      }
+      case "time-range": {
+        const timeRangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex space-x-2">
             <input
               type="time"
-              value={value?.start || ""}
-              onChange={(e) => onChange({ ...value, start: e.target.value })}
+              value={timeRangeVal.start || ""}
+              onChange={(e) => onChange({ ...timeRangeVal, start: e.target.value })}
               placeholder="Start"
               className="px-3 py-2 border rounded-md text-sm w-full"
               style={baseInputStyle}
             />
             <input
               type="time"
-              value={value?.end || ""}
-              onChange={(e) => onChange({ ...value, end: e.target.value })}
+              value={timeRangeVal.end || ""}
+              onChange={(e) => onChange({ ...timeRangeVal, end: e.target.value })}
               placeholder="End"
               className="px-3 py-2 border rounded-md text-sm w-full"
               style={baseInputStyle}
             />
           </div>
         );
+      }
       default:
         return null;
     }

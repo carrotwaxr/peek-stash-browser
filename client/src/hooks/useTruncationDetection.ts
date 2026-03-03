@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
  * @returns {[React.RefObject, boolean]} - [ref to attach to element, whether content is truncated]
  */
 export const useTruncationDetection = () => {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
   useEffect(() => {

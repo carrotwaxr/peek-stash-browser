@@ -3,9 +3,57 @@ import { setupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
 import { Button } from "../ui/index";
+import type { ThemeDefinition } from "../../themes/ThemeContext";
+
+interface WelcomeStepProps {
+  theme: ThemeDefinition | undefined;
+  onNext: () => void;
+}
+
+interface AdminPasswordStepProps {
+  theme: ThemeDefinition | undefined;
+  error: string;
+  loading: boolean;
+  adminPassword: string;
+  confirmPassword: string;
+  onAdminPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onConfirmPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBack: () => void;
+  onSubmit: () => void;
+}
+
+interface StashConfigStepProps {
+  theme: ThemeDefinition | undefined;
+  error: string;
+  loading: boolean;
+  testing: boolean;
+  testSuccess: boolean;
+  stashUrl: string;
+  stashApiKey: string;
+  onStashUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onStashApiKeyChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onTestConnection: () => void;
+  onBack: () => void;
+  onSubmit: () => void;
+}
+
+interface CompleteStepProps {
+  theme: ThemeDefinition | undefined;
+  onComplete: () => void;
+}
+
+interface SetupStatus {
+  hasUsers: boolean;
+  hasStashInstance: boolean;
+}
+
+interface SetupWizardProps {
+  onSetupComplete: () => void;
+  setupStatus: SetupStatus | null;
+}
 
 // Step 1: Welcome screen - defined outside to avoid recreation on re-render
-const WelcomeStep = ({ theme, onNext }) => (
+const WelcomeStep = ({ theme, onNext }: WelcomeStepProps) => (
   <div className="space-y-6">
     <div className="text-center">
       <h2
@@ -91,7 +139,7 @@ const AdminPasswordStep = ({
   onConfirmPasswordChange,
   onBack,
   onSubmit,
-}) => (
+}: AdminPasswordStepProps) => (
   <div className="space-y-6">
     <div>
       <h2
@@ -231,7 +279,7 @@ const StashConfigStep = ({
   onTestConnection,
   onBack,
   onSubmit,
-}) => (
+}: StashConfigStepProps) => (
   <div className="space-y-6">
     <div>
       <h2
@@ -362,7 +410,7 @@ const StashConfigStep = ({
 );
 
 // Step 4: Complete - defined outside to avoid recreation on re-render
-const CompleteStep = ({ theme, onComplete }) => (
+const CompleteStep = ({ theme, onComplete }: CompleteStepProps) => (
   <div className="space-y-6 text-center">
     <div
       className="text-6xl mb-4"
@@ -391,7 +439,7 @@ const CompleteStep = ({ theme, onComplete }) => (
   </div>
 );
 
-const SetupWizard = ({ onSetupComplete, setupStatus }) => {
+const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
   const { theme } = useTheme();
   const { login } = useAuth();
   const [currentStep, setCurrentStep] = useState(() => {
@@ -469,11 +517,11 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
           setCurrentStep(2); // Go to Stash config
         }
       } else {
-        setError(response.error || "Failed to create admin user");
+        setError("Failed to create admin user");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setError(
-        "Failed to create admin user: " + (err.message || "Unknown error")
+        "Failed to create admin user: " + ((err as Error).message || "Unknown error")
       );
     } finally {
       setLoading(false);
@@ -493,8 +541,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
       } else {
         setError(response.error || "Connection test failed");
       }
-    } catch (err) {
-      setError(err.data?.error || err.message || "Connection test failed");
+    } catch (err: unknown) {
+      const apiErr = err as { data?: { error?: string }; message?: string };
+      setError(apiErr.data?.error || apiErr.message || "Connection test failed");
     } finally {
       setTesting(false);
     }
@@ -513,12 +562,13 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
       if (response.success) {
         setCurrentStep(3);
       } else {
-        setError(response.error || "Failed to save Stash configuration");
+        setError("Failed to save Stash configuration");
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      const apiErr = err as { data?: { error?: string }; message?: string };
       setError(
-        err.data?.error ||
-          err.message ||
+        apiErr.data?.error ||
+          apiErr.message ||
           "Failed to save Stash configuration"
       );
     } finally {
@@ -538,8 +588,8 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
             loading={loading}
             adminPassword={adminPassword}
             confirmPassword={confirmPassword}
-            onAdminPasswordChange={(e) => setAdminPassword(e.target.value)}
-            onConfirmPasswordChange={(e) => setConfirmPassword(e.target.value)}
+            onAdminPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) => setAdminPassword(e.target.value)}
+            onConfirmPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
             onBack={() => setCurrentStep(0)}
             onSubmit={createAdminUser}
           />
@@ -554,11 +604,11 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
             testSuccess={testSuccess}
             stashUrl={stashUrl}
             stashApiKey={stashApiKey}
-            onStashUrlChange={(e) => {
+            onStashUrlChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setStashUrl(e.target.value);
               setTestSuccess(false); // Reset test status when URL changes
             }}
-            onStashApiKeyChange={(e) => {
+            onStashApiKeyChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setStashApiKey(e.target.value);
               setTestSuccess(false); // Reset test status when API key changes
             }}

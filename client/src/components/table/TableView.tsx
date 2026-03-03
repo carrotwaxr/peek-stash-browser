@@ -43,10 +43,10 @@ const TableView = ({
   const { hasMultipleInstances } = useConfig();
 
   // Context menu state: { columnId, x, y } or null
-  const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenu, setContextMenu] = useState<{ columnId: string; x: number; y: number } | null>(null);
 
   // Scroll state for showing/hiding the scroll hint
-  const scrollContainerRef = useRef(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const checkScrollState = useCallback(() => {
@@ -75,7 +75,7 @@ const TableView = ({
    * Handle right-click on column header
    * Opens context menu for non-mandatory columns
    */
-  const handleColumnContextMenu = (columnId, event) => {
+  const handleColumnContextMenu = (columnId: string, event: React.MouseEvent) => {
     event.preventDefault();
     setContextMenu({
       columnId,
@@ -150,7 +150,7 @@ const TableView = ({
 
     return items.map((item, index) => (
       <tr
-        key={item.id || index}
+        key={(item.id as React.Key) || index}
         className="transition-colors hover:bg-[var(--bg-card)]"
         style={{
           backgroundColor: index % 2 === 1 ? "var(--bg-secondary)" : "transparent",

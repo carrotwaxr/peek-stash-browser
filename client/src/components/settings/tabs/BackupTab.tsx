@@ -24,16 +24,22 @@ const formatDate = (dateString: string) => {
   });
 };
 
+interface BackupItem {
+  filename: string;
+  createdAt: string;
+  size: number;
+}
+
 const BackupTab = () => {
-  const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState<BackupItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiGet("/admin/database/backups");
+      const data = await apiGet<{ backups: BackupItem[] }>("/admin/database/backups");
       setBackups(data.backups);
     } catch {
       showError("Failed to load backups");
@@ -59,7 +65,7 @@ const BackupTab = () => {
     }
   };
 
-  const handleDeleteBackup = async (filename) => {
+  const handleDeleteBackup = async (filename: string) => {
     if (!confirm(`Are you sure you want to delete this backup?\n\n${filename}\n\nThis cannot be undone.`)) {
       return;
     }
@@ -136,7 +142,7 @@ const BackupTab = () => {
                 <Button
                   onClick={() => handleDeleteBackup(backup.filename)}
                   disabled={deleting === backup.filename}
-                  variant="danger"
+                  variant="destructive"
                   size="sm"
                 >
                   {deleting === backup.filename ? (

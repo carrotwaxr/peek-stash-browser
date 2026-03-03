@@ -170,15 +170,15 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }: CustomThe
     }
   );
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const updateConfig = (path: string, value: string) => {
     setConfig((prev) => {
       const newConfig = { ...prev };
       const keys = path.split(".");
-      let current = newConfig;
+      let current: Record<string, unknown> = newConfig as unknown as Record<string, unknown>;
       for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]];
+        current = current[keys[i]] as Record<string, unknown>;
       }
       current[keys[keys.length - 1]] = value;
       return newConfig;
@@ -190,7 +190,7 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }: CustomThe
   };
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!name || name.trim().length === 0) {
       newErrors.name = "Theme name is required";
@@ -215,11 +215,11 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }: CustomThe
 
     colorFields.forEach((field) => {
       const keys = field.split(".");
-      let value = config;
+      let value: unknown = config;
       keys.forEach((key) => {
-        value = value[key];
+        value = (value as Record<string, unknown>)[key];
       });
-      if (!validateHexColor(value)) {
+      if (!validateHexColor(value as string)) {
         newErrors[field] = "Invalid hex color format";
       }
     });
@@ -230,7 +230,7 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }: CustomThe
 
   const handleSave = () => {
     if (validate()) {
-      onSave({ name: name.trim(), config });
+      onSave({ name: name.trim(), config: config as ThemeConfig });
     }
   };
 

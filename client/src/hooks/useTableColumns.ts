@@ -38,47 +38,47 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
 
   // Get all column IDs for validation
   const allColumnIds = useMemo(
-    () => new Set(allColumns.map((col) => col.id)),
+    () => new Set(allColumns.map((col: any) => col.id)),
     [allColumns]
   );
 
   // Get mandatory column IDs
   const mandatoryColumnIds = useMemo(
-    () => new Set(allColumns.filter((col) => col.mandatory).map((col) => col.id)),
+    () => new Set(allColumns.filter((col: any) => col.mandatory).map((col: any) => col.id)),
     [allColumns]
   );
 
   // Determine initial visible columns based on priority
-  const getInitialVisibleColumnIds = useCallback(() => {
+  const getInitialVisibleColumnIds = useCallback((): string[] => {
     // Priority 1: Preset columns
-    if (presetColumns?.visible?.length > 0) {
-      return presetColumns.visible.filter((id) => allColumnIds.has(id));
+    if (presetColumns?.visible && presetColumns.visible.length > 0) {
+      return presetColumns.visible.filter((id: string) => allColumnIds.has(id));
     }
     // Priority 2: User default columns
-    if (userDefaultColumns?.visible?.length > 0) {
-      return userDefaultColumns.visible.filter((id) => allColumnIds.has(id));
+    if (userDefaultColumns?.visible && userDefaultColumns.visible.length > 0) {
+      return userDefaultColumns.visible.filter((id: string) => allColumnIds.has(id));
     }
     // Priority 3: System default columns
     return getDefaultVisibleColumns(entityType);
   }, [presetColumns, userDefaultColumns, entityType, allColumnIds]);
 
   // Determine initial column order based on priority
-  const getInitialColumnOrder = useCallback(() => {
+  const getInitialColumnOrder = useCallback((): string[] => {
     // Priority 1: Preset columns
-    if (presetColumns?.order?.length > 0) {
-      return presetColumns.order.filter((id) => allColumnIds.has(id));
+    if (presetColumns?.order && presetColumns.order.length > 0) {
+      return presetColumns.order.filter((id: string) => allColumnIds.has(id));
     }
     // Priority 2: User default columns
-    if (userDefaultColumns?.order?.length > 0) {
-      return userDefaultColumns.order.filter((id) => allColumnIds.has(id));
+    if (userDefaultColumns?.order && userDefaultColumns.order.length > 0) {
+      return userDefaultColumns.order.filter((id: string) => allColumnIds.has(id));
     }
     // Priority 3: System default columns
     return getDefaultColumnOrder(entityType);
   }, [presetColumns, userDefaultColumns, entityType, allColumnIds]);
 
   // State for visible column IDs and column order
-  const [visibleColumnIds, setVisibleColumnIds] = useState(getInitialVisibleColumnIds);
-  const [columnOrder, setColumnOrder] = useState(getInitialColumnOrder);
+  const [visibleColumnIds, setVisibleColumnIds] = useState<string[]>(getInitialVisibleColumnIds);
+  const [columnOrder, setColumnOrder] = useState<string[]>(getInitialColumnOrder);
 
   /**
    * Compute visible columns with full metadata, in display order
@@ -91,13 +91,13 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    */
   const visibleColumns = useMemo(() => {
     // Start with current order, filtering to valid columns
-    const orderedIds = columnOrder.filter((id) => allColumnIds.has(id));
+    const orderedIds = columnOrder.filter((id: string) => allColumnIds.has(id));
 
     // Find any columns in allColumns that aren't in the order (new columns)
     const orderedSet = new Set(orderedIds);
     const missingIds = allColumns
-      .filter((col) => !orderedSet.has(col.id))
-      .map((col) => col.id);
+      .filter((col: any) => !orderedSet.has(col.id))
+      .map((col: any) => col.id);
 
     // Combine: ordered columns + missing columns at end
     const fullOrder = [...orderedIds, ...missingIds];
@@ -109,7 +109,7 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
     );
 
     // Map to full column objects
-    const columnMap = new Map(allColumns.map((col) => [col.id, col]));
+    const columnMap = new Map(allColumns.map((col: any) => [col.id, col]));
     return filteredIds.map((id) => columnMap.get(id)).filter(Boolean);
   }, [columnOrder, allColumnIds, allColumns, visibleColumnIds, mandatoryColumnIds]);
 
@@ -117,15 +117,15 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    * Toggle column visibility (cannot hide mandatory columns)
    * @param {string} columnId - The column ID to toggle
    */
-  const toggleColumn = useCallback((columnId) => {
+  const toggleColumn = useCallback((columnId: string) => {
     if (mandatoryColumnIds.has(columnId)) {
       return; // Cannot toggle mandatory columns
     }
 
-    setVisibleColumnIds((prev) => {
+    setVisibleColumnIds((prev: string[]) => {
       const isVisible = prev.includes(columnId);
       if (isVisible) {
-        return prev.filter((id) => id !== columnId);
+        return prev.filter((id: string) => id !== columnId);
       } else {
         return [...prev, columnId];
       }
@@ -136,12 +136,12 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    * Hide a column (cannot hide mandatory columns)
    * @param {string} columnId - The column ID to hide
    */
-  const hideColumn = useCallback((columnId) => {
+  const hideColumn = useCallback((columnId: string) => {
     if (mandatoryColumnIds.has(columnId)) {
       return; // Cannot hide mandatory columns
     }
 
-    setVisibleColumnIds((prev) => prev.filter((id) => id !== columnId));
+    setVisibleColumnIds((prev: string[]) => prev.filter((id: string) => id !== columnId));
   }, [mandatoryColumnIds]);
 
   /**
@@ -149,8 +149,8 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    * @param {string} columnId - The column ID to move
    * @param {"top" | "up" | "down" | "bottom"} direction - Direction to move
    */
-  const moveColumn = useCallback((columnId, direction) => {
-    setColumnOrder((prev) => {
+  const moveColumn = useCallback((columnId: string, direction: "top" | "up" | "down" | "bottom") => {
+    setColumnOrder((prev: string[]) => {
       const currentIndex = prev.indexOf(columnId);
       if (currentIndex === -1) return prev;
 
@@ -205,14 +205,14 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    * @param {boolean} useUserDefaults - If true, use user defaults; if false, use system defaults
    */
   const resetToDefaults = useCallback((useUserDefaults = true) => {
-    if (useUserDefaults && userDefaultColumns?.visible?.length > 0) {
-      setVisibleColumnIds(userDefaultColumns.visible.filter((id) => allColumnIds.has(id)));
+    if (useUserDefaults && userDefaultColumns?.visible && userDefaultColumns.visible.length > 0) {
+      setVisibleColumnIds(userDefaultColumns.visible.filter((id: string) => allColumnIds.has(id)));
     } else {
       setVisibleColumnIds(getDefaultVisibleColumns(entityType));
     }
 
-    if (useUserDefaults && userDefaultColumns?.order?.length > 0) {
-      setColumnOrder(userDefaultColumns.order.filter((id) => allColumnIds.has(id)));
+    if (useUserDefaults && userDefaultColumns?.order && userDefaultColumns.order.length > 0) {
+      setColumnOrder(userDefaultColumns.order.filter((id: string) => allColumnIds.has(id)));
     } else {
       setColumnOrder(getDefaultColumnOrder(entityType));
     }
@@ -222,12 +222,12 @@ export const useTableColumns = (entityType: string, options: UseTableColumnsOpti
    * Apply columns from a loaded preset
    * @param {{ visible?: string[], order?: string[] }} presetCols - Preset column configuration
    */
-  const applyPresetColumns = useCallback((presetCols) => {
-    if (presetCols?.visible?.length > 0) {
-      setVisibleColumnIds(presetCols.visible.filter((id) => allColumnIds.has(id)));
+  const applyPresetColumns = useCallback((presetCols: ColumnConfig) => {
+    if (presetCols?.visible && presetCols.visible.length > 0) {
+      setVisibleColumnIds(presetCols.visible.filter((id: string) => allColumnIds.has(id)));
     }
-    if (presetCols?.order?.length > 0) {
-      setColumnOrder(presetCols.order.filter((id) => allColumnIds.has(id)));
+    if (presetCols?.order && presetCols.order.length > 0) {
+      setColumnOrder(presetCols.order.filter((id: string) => allColumnIds.has(id)));
     }
   }, [allColumnIds]);
 

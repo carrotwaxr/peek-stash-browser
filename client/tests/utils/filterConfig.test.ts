@@ -10,10 +10,6 @@ import {
   buildGalleryFilter,
   buildImageFilter,
   buildPerformerFilter,
-  _buildPerformerFilter,
-  _buildStudioFilter,
-  _buildTagFilter,
-  _buildGroupFilter,
 } from "../../src/utils/filterConfig";
 
 describe("buildSceneFilter", () => {

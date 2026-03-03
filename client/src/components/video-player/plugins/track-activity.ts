@@ -4,7 +4,19 @@ const intervalSeconds = 1; // check every second
 const sendInterval = 10; // send every 10 seconds
 
 class TrackActivityPlugin extends videojs.getPlugin("plugin") {
-  constructor(player) {
+  totalPlayDuration: number;
+  currentPlayDuration: number;
+  minimumPlayPercent: number;
+  incrementPlayCount: () => Promise<void>;
+  saveActivity: (resumeTime: number, playDuration: number) => Promise<void>;
+  enabled: boolean;
+  playCountIncremented: boolean;
+  intervalID: number | undefined;
+  lastResumeTime: number;
+  lastDuration: number;
+  declare player: any;
+
+  constructor(player: any) {
     super(player);
 
     this.totalPlayDuration = 0;
@@ -66,7 +78,7 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
     this.playCountIncremented = false;
   }
 
-  setEnabled(enabled) {
+  setEnabled(enabled: boolean) {
     this.enabled = enabled;
     if (!enabled) {
       this.stop();

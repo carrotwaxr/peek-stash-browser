@@ -14,7 +14,7 @@ import { MemoryRouter } from "react-router-dom";
 import TabNavigation, { TAB_COUNT_LOADING } from "../../../src/components/ui/TabNavigation";
 
 // We need to test URL updates, so we'll use a wrapper component
-const TabNavigationTestWrapper = ({ initialRoute = "/", ...props }) => {
+const TabNavigationTestWrapper = ({ initialRoute = "/", ...props }: { initialRoute?: string } & React.ComponentProps<typeof TabNavigation>) => {
   return (
     <MemoryRouter initialEntries={[initialRoute]}>
       <TabNavigation {...props} />
@@ -192,7 +192,7 @@ describe("TabNavigation", () => {
         />
       );
 
-      const galleriesTab = screen.getByText("Galleries").closest("button");
+      const galleriesTab = screen.getByText("Galleries").closest("button")!;
       await user.click(galleriesTab);
 
       expect(onTabChange).toHaveBeenCalledWith("galleries");
@@ -210,7 +210,7 @@ describe("TabNavigation", () => {
         />
       );
 
-      const scenesTab = screen.getByText("Scenes").closest("button");
+      const scenesTab = screen.getByText("Scenes").closest("button")!;
       // Tab is disabled so click shouldn't do anything
       await user.click(scenesTab);
 
@@ -252,7 +252,7 @@ describe("TabNavigation", () => {
       const tabsWithUndefined = [
         { id: "scenes", label: "Scenes", count: 50 },
         { id: "settings", label: "Settings" }, // No count
-      ];
+      ] as any[];
 
       render(
         <TabNavigationTestWrapper

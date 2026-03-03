@@ -13,17 +13,30 @@ import { usePaginatedLightbox } from "./usePaginatedLightbox";
  * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided)
  * @returns {Object} All state and handlers needed for PaginatedImageGrid
  */
+interface ImageItem {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface UseImagesPaginationOptions {
+  fetchImages: (page: number, perPage: number) => Promise<{ images?: ImageItem[]; count?: number }>;
+  dependencies?: unknown[];
+  perPage?: number;
+  externalPage: number;
+  onExternalPageChange: (page: number) => void;
+}
+
 export function useImagesPagination({
   fetchImages,
   dependencies = [],
   perPage = 100,
   externalPage,
   onExternalPageChange,
-}) {
-  const [images, setImages] = useState([]);
+}: UseImagesPaginationOptions) {
+  const [images, setImages] = useState<ImageItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<unknown>(null);
   const fetchImagesRef = useRef(fetchImages);
 
   // Keep fetchImages ref up to date
@@ -32,7 +45,7 @@ export function useImagesPagination({
   }, [fetchImages]);
 
   // Fetch function for prefetching adjacent pages
-  const fetchPage = useCallback(async (page) => {
+  const fetchPage = useCallback(async (page: number) => {
     const result = await fetchImagesRef.current(page, perPage);
     return { images: result.images || [] };
   }, [perPage]);
@@ -71,7 +84,7 @@ export function useImagesPagination({
   }, [lightbox.currentPage, ...dependencies]);
 
   // Wrapper to update images (for lightbox modifications like rating changes)
-  const handleImagesUpdate = useCallback((updatedImages) => {
+  const handleImagesUpdate = useCallback((updatedImages: ImageItem[]) => {
     setImages(updatedImages);
   }, []);
 

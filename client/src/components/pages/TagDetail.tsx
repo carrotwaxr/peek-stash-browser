@@ -24,6 +24,15 @@ import {
 } from "../ui/index";
 import { GalleryGrid, GroupGrid, PerformerGrid, StudioGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
+import type { NormalizedImage } from "@peek/shared-types";
+
+interface EntityRef {
+  id: string;
+  name?: string;
+  instanceId?: string;
+  image_path?: string;
+  [key: string]: unknown;
+}
 
 const TagDetail = () => {
   const { tagId } = useParams<{ tagId: string }>();
@@ -51,12 +60,12 @@ const TagDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: 'scenes', label: 'Scenes', count: tag?.scene_count || 0 },
-    { id: 'galleries', label: 'Galleries', count: tag?.gallery_count || 0 },
-    { id: 'images', label: 'Images', count: tag?.image_count || 0 },
-    { id: 'performers', label: 'Performers', count: tag?.performer_count || 0 },
-    { id: 'studios', label: 'Studios', count: tag?.studio_count || 0 },
-    { id: 'groups', label: 'Collections', count: tag?.group_count || 0 },
+    { id: 'scenes', label: 'Scenes', count: (tag?.scene_count as number) || 0 },
+    { id: 'galleries', label: 'Galleries', count: (tag?.gallery_count as number) || 0 },
+    { id: 'images', label: 'Images', count: (tag?.image_count as number) || 0 },
+    { id: 'performers', label: 'Performers', count: (tag?.performer_count as number) || 0 },
+    { id: 'studios', label: 'Studios', count: (tag?.studio_count as number) || 0 },
+    { id: 'groups', label: 'Collections', count: (tag?.group_count as number) || 0 },
   ];
   const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
 
@@ -75,19 +84,19 @@ const TagDetail = () => {
   };
 
   // Check if tag has children (for showing toggle)
-  const hasChildren = tag?.children && tag.children.length > 0;
+  const hasChildren = !!(tag?.children && (tag.children as EntityRef[]).length > 0);
 
   // Set page title to tag name
-  usePageTitle(tag?.name || "Tag");
+  usePageTitle((tag?.name as string) || "Tag");
 
   useEffect(() => {
     const fetchTag = async () => {
       try {
         setIsLoading(true);
-        const tagData = await libraryApi.findTagById(tagId, instanceId);
+        const tagData = await libraryApi.findTagById(tagId!, instanceId!) as Record<string, unknown> | null;
         setTag(tagData);
-        setRating(tagData.rating);
-        setIsFavorite(tagData.favorite || false);
+        setRating((tagData as Record<string, unknown> | null)?.rating as number | null ?? null);
+        setIsFavorite(((tagData as Record<string, unknown> | null)?.favorite as boolean) || false);
       } catch {
         // Error loading tag - will show loading spinner
       } finally {
@@ -101,7 +110,7 @@ const TagDetail = () => {
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("tag", tagId, newRating, instanceId);
+      await libraryApi.updateRating("tag", tagId!, newRating, instanceId!);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((tag as Record<string, unknown>)?.rating as number | null);
@@ -111,10 +120,10 @@ const TagDetail = () => {
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("tag", tagId, newValue, instanceId);
+      await libraryApi.updateFavorite("tag", tagId!, newValue, instanceId!);
     } catch (error) {
       console.error("Failed to update favorite:", error);
-      setIsFavorite(tag.favorite || false);
+      setIsFavorite((tag?.favorite as boolean) || false);
     }
   };
 
@@ -191,27 +200,29 @@ const TagDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              <div className="flex gap-4 items-center">
-                <span>{tag?.name || `Tag ${tagId}`}</span>
-                {settings.showFavorite && (
-                  <FavoriteButton
-                    isFavorite={isFavorite}
-                    onChange={handleFavoriteChange}
-                    size="large"
-                  />
-                )}
-                <ViewInStashButton stashUrl={tag?.stashUrl} size={24} />
-              </div>
+              (
+                <div className="flex gap-4 items-center">
+                  <span>{(tag?.name as string) || `Tag ${tagId}`}</span>
+                  {!!settings.showFavorite && (
+                    <FavoriteButton
+                      isFavorite={isFavorite}
+                      onChange={handleFavoriteChange}
+                      size="large"
+                    />
+                  )}
+                  <ViewInStashButton stashUrl={tag?.stashUrl as string} size={24} />
+                </div>
+              ) as unknown as string
             }
             subtitle={
-              tag?.aliases?.length
-                ? `Also known as: ${tag?.aliases.join(", ")}`
+              (tag?.aliases as string[] | undefined)?.length
+                ? `Also known as: ${(tag?.aliases as string[]).join(", ")}`
                 : null
             }
           />
 
           {/* Rating Slider */}
-          {settings.showRating && (
+          {!!settings.showRating && (
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
@@ -230,14 +241,14 @@ const TagDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          {settings.showDescriptionOnDetail && tag?.description && (
+          {!!settings.showDescriptionOnDetail && !!tag?.description && (
             <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <Card title="Details">
                 <p
                   className="text-sm whitespace-pre-wrap"
                   style={{ color: "var(--text-primary)" }}
                 >
-                  {tag.description}
+                  {tag.description as React.ReactNode}
                 </p>
               </Card>
             </div>
@@ -270,7 +281,7 @@ const TagDetail = () => {
                   className="text-sm font-medium"
                   style={{ color: "var(--text-primary)" }}
                 >
-                  Include sub-tags ({tag.children.length})
+                  Include sub-tags ({(tag.children as EntityRef[]).length})
                 </span>
               </label>
             </div>
@@ -294,16 +305,16 @@ const TagDetail = () => {
                   context="scene_tag"
                   permanentFilters={{
                     tags: {
-                      value: [makeCompositeKey(tagId, instanceId)],
+                      value: [makeCompositeKey(tagId!, instanceId)],
                       modifier: "INCLUDES",
                       ...(includeSubTags && { depth: -1 }),
                     },
                   }}
                   permanentFiltersMetadata={{
-                    tags: [{ id: makeCompositeKey(tagId, instanceId), name: tag?.name || "Unknown Tag" }],
+                    tags: [{ id: makeCompositeKey(tagId!, instanceId), name: (tag?.name as string) || "Unknown Tag" }],
                   }}
-                  title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
-                  fromPageTitle={tag?.name || "Tag"}
+                  title={`Scenes tagged with ${(tag?.name as string) || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
+                  fromPageTitle={(tag?.name as string) || "Tag"}
                 />
               )}
 
@@ -313,7 +324,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId, instanceId)],
+                        value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
                         ...(includeSubTags && { depth: -1 }),
                       },
@@ -325,7 +336,7 @@ const TagDetail = () => {
               )}
 
               {activeTab === 'images' && (
-                <ImagesTab tagId={tagId} instanceId={instanceId} tagName={tag?.name} includeSubTags={includeSubTags} />
+                <ImagesTab tagId={tagId} instanceId={instanceId} tagName={tag?.name as string | undefined} includeSubTags={includeSubTags} />
               )}
 
               {activeTab === 'performers' && (
@@ -333,7 +344,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId, instanceId)],
+                        value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -348,7 +359,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     studio_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId, instanceId)],
+                        value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -363,7 +374,7 @@ const TagDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       tags: {
-                        value: [makeCompositeKey(tagId, instanceId)],
+                        value: [makeCompositeKey(tagId!, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -427,8 +438,8 @@ const TagImage = ({ tag }: TagImageProps) => {
     >
       {tag?.image_path && !showPlaceholder ? (
         <MediaImage
-          src={tag.image_path}
-          alt={tag.name}
+          src={tag.image_path as string}
+          alt={tag.name as string | undefined}
           className="w-full h-full object-cover"
           onError={() => setShowPlaceholder(true)}
         />
@@ -454,7 +465,7 @@ interface TagStatsProps {
   tagId: string | undefined;
 }
 
-const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {  
+const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
@@ -472,7 +483,7 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
   const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
     if (!value && value !== 0) return null;
 
-    const clickable = onClick && value > 0;
+    const clickable = onClick && Number(value) > 0;
 
     return (
       <div className="flex justify-between">
@@ -504,47 +515,47 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatField
           label="Scenes:"
-          value={tag?.scene_count}
+          value={tag?.scene_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('scenes')}
           isActive={activeTab === 'scenes'}
         />
         <StatField
           label="Markers:"
-          value={tag?.scene_marker_count}
+          value={tag?.scene_marker_count as number | undefined}
           valueColor="var(--accent-primary)"
         />
         <StatField
           label="Images:"
-          value={tag?.image_count}
+          value={tag?.image_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('images')}
           isActive={activeTab === 'images'}
         />
         <StatField
           label="Galleries:"
-          value={tag?.gallery_count}
+          value={tag?.gallery_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('galleries')}
           isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Performers:"
-          value={tag?.performer_count}
+          value={tag?.performer_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('performers')}
           isActive={activeTab === 'performers'}
         />
         <StatField
           label="Studios:"
-          value={tag?.studio_count}
+          value={tag?.studio_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('studios')}
           isActive={activeTab === 'studios'}
         />
         <StatField
           label="Collections:"
-          value={tag?.group_count}
+          value={tag?.group_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('groups')}
           isActive={activeTab === 'groups'}
@@ -561,12 +572,15 @@ interface TagDetailsProps {
 }
 
 const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
+  const parents = tag?.parents as EntityRef[] | undefined;
+  const children = tag?.children as EntityRef[] | undefined;
+
   return (
     <>
-      {tag?.parents && tag.parents.length > 0 && (
+      {parents && parents.length > 0 && (
         <Card title="Parent Tags">
           <div className="flex flex-wrap gap-2">
-            {tag.parents.map((parent) => {
+            {parents.map((parent: EntityRef) => {
               // Generate a color based on tag ID for consistency
               const hue = (parseInt(parent.id, 10) * 137.5) % 360;
               return (
@@ -587,10 +601,10 @@ const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
         </Card>
       )}
 
-      {tag?.children && tag.children.length > 0 && (
+      {children && children.length > 0 && (
         <Card title="Child Tags">
           <div className="flex flex-wrap gap-2">
-            {tag.children.map((child) => {
+            {children.map((child: EntityRef) => {
               // Generate a color based on tag ID for consistency
               const hue = (parseInt(child.id, 10) * 137.5) % 360;
               return (
@@ -626,7 +640,7 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagIm
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
 
   const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -645,34 +659,34 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagIm
         filter: { page, per_page: perPage },
         image_filter: {
           tags: {
-            value: [makeCompositeKey(tagId, instanceId)],
+            value: [makeCompositeKey(tagId!, instanceId)],
             modifier: "INCLUDES",
             ...(includeSubTags && { depth: -1 }),
           },
         },
-      });
+      }) as Record<string, Record<string, unknown>>;
       return {
-        images: data.findImages?.images || [],
-        count: data.findImages?.count || 0,
+        images: (data.findImages?.images || []) as NormalizedImage[],
+        count: (data.findImages?.count || 0) as number,
       };
     },
     [tagId, instanceId, includeSubTags]
   );
 
-  const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
-    fetchImages,
-    dependencies: [tagId, instanceId, includeSubTags],
+  const paginationResult = useImagesPagination({
+    fetchImages: fetchImages as unknown as Parameters<typeof useImagesPagination>[0]['fetchImages'],
+    dependencies: [tagId, instanceId, includeSubTags] as never[],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });
 
   return (
     <PaginatedImageGrid
-      images={images}
-      totalCount={totalCount}
-      isLoading={isLoading}
-      lightbox={lightbox}
-      setImages={setImages}
+      images={paginationResult.images as unknown as NormalizedImage[]}
+      totalCount={paginationResult.totalCount as number}
+      isLoading={paginationResult.isLoading as boolean}
+      lightbox={paginationResult.lightbox as Parameters<typeof PaginatedImageGrid>[0]['lightbox']}
+      setImages={paginationResult.setImages as unknown as (images: NormalizedImage[]) => void}
       emptyMessage={`No images found with tag "${tagName}"`}
       className="mt-6"
     />

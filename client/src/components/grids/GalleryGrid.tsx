@@ -24,7 +24,7 @@ const GalleryGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="date"
       density={density}
-      renderItem={(gallery, _index, { onHideSuccess }) => (
+      renderItem={(gallery: any, _index: number, { onHideSuccess }: any) => (
         <GalleryCard
           key={gallery.id}
           gallery={gallery}

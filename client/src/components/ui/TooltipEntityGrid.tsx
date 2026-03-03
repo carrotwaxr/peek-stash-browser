@@ -57,15 +57,15 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
 
   // Get link path for entity using centralized utility
   // If entity doesn't have instanceId, use parentInstanceId as fallback
-  const getLinkPath = (entity) => {
+  const getLinkPath = (entity: EntityItem) => {
     const entityWithInstance = entity.instanceId
       ? entity
       : { ...entity, instanceId: parentInstanceId };
-    return getEntityPath(entityType, entityWithInstance, hasMultipleInstances);
+    return getEntityPath(entityType, entityWithInstance as Parameters<typeof getEntityPath>[1], hasMultipleInstances);
   };
 
   // Get image path for entity
-  const getImagePath = (entity) => {
+  const getImagePath = (entity: EntityItem) => {
     if (entityType === "group") {
       return entity.front_image_path || entity.back_image_path;
     }
@@ -76,7 +76,7 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
   };
 
   // Get display name for entity (galleries use title, others use name)
-  const getDisplayName = (entity) => {
+  const getDisplayName = (entity: EntityItem) => {
     return entity.name || entity.title || `${entityType} ${entity.id}`;
   };
 
@@ -89,7 +89,7 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
       group: "🎬",
       gallery: "🖼️",
     };
-    return emojiMap[entityType] || "📁";
+    return emojiMap[entityType as keyof typeof emojiMap] || "📁";
   };
 
   const aspectRatio = getAspectRatio();
@@ -152,7 +152,7 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
             >
               {getImagePath(entity) ? (
                 <img
-                  src={getImagePath(entity)}
+                  src={getImagePath(entity) ?? undefined}
                   alt={getDisplayName(entity)}
                   className={`w-full h-full object-contain ${imageRadius}`}
                   style={{ backgroundColor: "var(--bg-secondary)" }}

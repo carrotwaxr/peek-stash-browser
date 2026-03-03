@@ -288,22 +288,22 @@ export const getEntityTypes = () => Object.keys(ENTITY_DISPLAY_CONFIG);
 /**
  * Get default settings for an entity type
  */
-export const getDefaultSettings = (entityType) => {
-  return ENTITY_DISPLAY_CONFIG[entityType]?.defaultSettings || {};
+export const getDefaultSettings = (entityType: string) => {
+  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.defaultSettings || {};
 };
 
 /**
  * Get available view modes for an entity type
  */
-export const getViewModes = (entityType) => {
-  return ENTITY_DISPLAY_CONFIG[entityType]?.viewModes || [{ id: "grid", label: "Grid" }];
+export const getViewModes = (entityType: string) => {
+  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.viewModes || [{ id: "grid", label: "Grid" }];
 };
 
 /**
  * Get available settings for an entity type (for UI rendering)
  */
-export const getAvailableSettings = (entityType) => {
-  return ENTITY_DISPLAY_CONFIG[entityType]?.availableSettings || [];
+export const getAvailableSettings = (entityType: string) => {
+  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.availableSettings || [];
 };
 
 /**

@@ -30,7 +30,7 @@ const TagChips = ({ tags }: Props) => {
         return (
           <Link
             key={tag.id}
-            to={getEntityPath('tag', tag, hasMultipleInstances)}
+            to={getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances)}
             className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: `hsl(${hue}, 70%, 45%)`,

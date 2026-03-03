@@ -1,6 +1,6 @@
 // client/src/components/timeline/TimelineBar.jsx
 // Flagpole style: circle on top, bar extends downward
-import { memo, useState } from "react";
+import React, { memo, useState } from "react";
 
 const CIRCLE_SIZE = 12; // Circle diameter in pixels
 const BAR_WIDTH = 6; // Bar width (slightly smaller than circle)
@@ -17,6 +17,16 @@ function TimelineBar({
   label,
   onKeyDown,
   tabIndex = -1,
+}: {
+  period: string;
+  count: number;
+  maxCount: number;
+  isSelected: boolean;
+  isFocused: boolean;
+  onClick: (period: string) => void;
+  label: string;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  tabIndex?: number;
 }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -67,7 +77,7 @@ function TimelineBar({
           border: `1.5px solid ${isSelected ? "var(--status-success)" : "var(--accent-primary)"}`,
           "--tw-ring-color": "var(--accent-primary)",
           "--tw-ring-offset-color": "var(--bg-primary)",
-        }}
+        } as React.CSSProperties}
         data-testid="timeline-circle"
       />
 

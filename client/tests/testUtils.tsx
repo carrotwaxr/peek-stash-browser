@@ -8,6 +8,7 @@ import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi } from "vitest";
+import type { ReactNode } from "react";
 
 // ============================================================================
 // Query Client Wrapper
@@ -31,7 +32,7 @@ export const createQueryWrapper = () => {
       queries: { retry: false },
     },
   });
-  return ({ children }) => (
+  return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 };
@@ -53,7 +54,7 @@ export const createQueryWrapper = () => {
  * });
  */
 export const createRouterWrapper = (initialEntries = ["/"]) => {
-  return function RouterWrapper({ children }) {
+  return function RouterWrapper({ children }: { children: ReactNode }) {
     return (
       <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
     );
@@ -79,10 +80,10 @@ export const createRouterWrapper = (initialEntries = ["/"]) => {
  * });
  */
 export const renderWithProviders = (
-  ui,
+  ui: React.ReactElement,
   { route = "/", ...renderOptions } = {}
 ) => {
-  const Wrapper = ({ children }) => (
+  const Wrapper = ({ children }: { children: ReactNode }) => (
     <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
   );
 
@@ -134,10 +135,10 @@ export const createMockApi = () => ({
  * @param {object} options.defaults - Default preset IDs by artifact type
  */
 export const setupPresetMocks = (
-  apiGet,
+  apiGet: any,
   { presets = {}, defaults = {} } = {}
 ) => {
-  apiGet.mockImplementation((url) => {
+  apiGet.mockImplementation((url: any) => {
     if (url === "/user/filter-presets") {
       return Promise.resolve({ presets });
     }
@@ -159,7 +160,7 @@ export const setupPresetMocks = (
  * @param {string} key - Key to simulate (e.g., "ArrowRight", "Enter")
  * @param {object} options - Additional event options
  */
-export const simulateKeyDown = (element, key, options = {}) => {
+export const simulateKeyDown = (element: HTMLElement, key: string, options = {}) => {
   const event = new KeyboardEvent("keydown", {
     key,
     bubbles: true,
@@ -172,7 +173,7 @@ export const simulateKeyDown = (element, key, options = {}) => {
 /**
  * Simulates a click event
  */
-export const simulateClick = (element) => {
+export const simulateClick = (element: HTMLElement) => {
   const event = new MouseEvent("click", {
     bubbles: true,
     cancelable: true,
@@ -192,7 +193,7 @@ export const simulateClick = (element) => {
  * @param {number} timeout - Max time to wait in ms
  * @returns {Promise<void>}
  */
-export const waitForCondition = async (condition, timeout = 1000) => {
+export const waitForCondition = async (condition: () => boolean, timeout = 1000) => {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {
@@ -216,7 +217,7 @@ export const flushPromises = () =>
 /**
  * Checks if an element is visible (not hidden by CSS)
  */
-export const isVisible = (element) => {
+export const isVisible = (element: HTMLElement | null) => {
   if (!element) return false;
   const style = window.getComputedStyle(element);
   return (
@@ -229,7 +230,7 @@ export const isVisible = (element) => {
 /**
  * Gets all visible text content from an element
  */
-export const getVisibleText = (element) => {
+export const getVisibleText = (element: HTMLElement | null) => {
   if (!element) return "";
   return element.textContent?.trim() ?? "";
 };

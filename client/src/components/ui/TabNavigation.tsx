@@ -44,7 +44,7 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
   // Each tab has its own pagination state, so these shouldn't carry over
   const PAGINATION_PARAMS = ['page', 'per_page', 'sort', 'dir', 'q'];
 
-  const handleTabClick = (tabId) => {
+  const handleTabClick = (tabId: string) => {
     if (tabId === activeTab) return; // Already on this tab
 
     // Update URL query parameter and clear pagination params

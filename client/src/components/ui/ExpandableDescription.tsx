@@ -34,7 +34,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
     );
   }
 
-  const handleMoreClick = (e) => {
+  const handleMoreClick = (e: React.MouseEvent<HTMLParagraphElement>) => {
     e.stopPropagation();
     e.preventDefault();
 
@@ -51,7 +51,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
   };
 
   // Handle click outside - stop propagation to prevent card navigation
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
     handleClose();
@@ -70,7 +70,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
           3. "more" button positioned over the spacer
         */}
         <p
-          ref={ref}
+          ref={ref as React.Ref<HTMLParagraphElement>}
           className="card-description leading-relaxed m-0"
           onClick={handleMoreClick}
           style={{

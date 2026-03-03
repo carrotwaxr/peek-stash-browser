@@ -13,9 +13,32 @@ import {
   parse,
 } from "date-fns";
 
+interface DistributionItem {
+  period: string;
+  count: number;
+}
+
+interface DateRange {
+  period: string;
+  start: string;
+  end: string;
+  label: string;
+}
+
+interface TimelineFilters {
+  performerId?: string;
+  tagId?: string;
+  studioId?: string;
+  groupId?: string;
+}
+
+interface DistributionResponse {
+  distribution: DistributionItem[];
+}
+
 const ZOOM_LEVELS = ["years", "months", "weeks", "days"];
 
-export function parsePeriodToDateRange(period, zoomLevel) {
+export function parsePeriodToDateRange(period: string, zoomLevel: string): DateRange | null {
   if (!period) return null;
 
   try {
@@ -68,7 +91,14 @@ export function parsePeriodToDateRange(period, zoomLevel) {
   }
 }
 
-export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null, filters = null }) {
+interface UseTimelineStateOptions {
+  entityType: string;
+  autoSelectRecent?: boolean;
+  initialPeriod?: string | null;
+  filters?: TimelineFilters | null;
+}
+
+export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null, filters = null }: UseTimelineStateOptions) {
   // Determine initial zoom level from initialPeriod format if provided
   const getInitialZoomLevel = () => {
     if (!initialPeriod) return "months";
@@ -88,9 +118,9 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
     }
     return null;
   });
-  const [distribution, setDistribution] = useState([]);
+  const [distribution, setDistribution] = useState<DistributionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Memoize filter key to prevent unnecessary refetches
   const filterKey = useMemo(() => {
@@ -102,7 +132,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
   const hasInitiallyLoaded = useRef(!!initialPeriod); // Skip auto-select if we have initialPeriod
 
   // Clear selection when zoom level changes
-  const setZoomLevel = useCallback((newLevel) => {
+  const setZoomLevel = useCallback((newLevel: string) => {
     setZoomLevelState((prevLevel) => {
       if (prevLevel !== newLevel) {
         setSelectedPeriod(null);
@@ -127,7 +157,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
         if (filters?.studioId) params.set("studioId", filters.studioId);
         if (filters?.groupId) params.set("groupId", filters.groupId);
 
-        const response = await apiGet(
+        const response = await apiGet<DistributionResponse>(
           `/timeline/${entityType}/distribution?${params.toString()}`
         );
 
@@ -148,7 +178,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || "Failed to fetch distribution");
+          setError(err instanceof Error ? err.message : "Failed to fetch distribution");
           setDistribution([]);
         }
       } finally {
@@ -167,7 +197,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
   }, [entityType, zoomLevel, autoSelectRecent, filterKey]);
 
   const selectPeriod = useCallback(
-    (period) => {
+    (period: string) => {
       setSelectedPeriod((prev) =>
         prev?.period === period ? null : parsePeriodToDateRange(period, zoomLevel)
       );
@@ -182,7 +212,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
   // Calculate max count for bar height scaling
   const maxCount = useMemo(() => {
     if (distribution.length === 0) return 0;
-    return Math.max(...distribution.map((d) => d.count));
+    return Math.max(...distribution.map((d: DistributionItem) => d.count));
   }, [distribution]);
 
   return {

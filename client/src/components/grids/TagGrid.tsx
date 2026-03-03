@@ -24,7 +24,7 @@ const TagGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(tag, _index, { onHideSuccess }) => (
+      renderItem={(tag: any, _index: number, { onHideSuccess }: any) => (
         <TagCard
           key={tag.id}
           tag={tag}

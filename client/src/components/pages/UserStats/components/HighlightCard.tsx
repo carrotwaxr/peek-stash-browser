@@ -1,29 +1,48 @@
-// client/src/components/pages/UserStats/components/HighlightCard.jsx
+// client/src/components/pages/UserStats/components/HighlightCard.tsx
 
 import { Link } from "react-router-dom";
 import { Paper } from "../../../ui/index";
 import { getFilenameFromPath } from "../../../../utils/format";
+
+interface HighlightItem {
+  id: string;
+  name?: string;
+  title?: string;
+  filePath?: string;
+  imageUrl?: string;
+}
+
+type EntityType = "scene" | "image" | "performer";
+
+interface Props {
+  title: string;
+  item: HighlightItem | null;
+  linkPrefix: string;
+  statLabel: string;
+  statValue: number;
+  entityType?: EntityType;
+}
 
 /**
  * Get display name for highlight item
  * For scenes/images: title -> filePath basename -> "Unknown"
  * For performers: name -> "Unknown"
  */
-const getDisplayName = (item) => {
+const getDisplayName = (item: HighlightItem): string => {
   // Performers have name
   if (item.name) return item.name;
   // Scenes/images have title
   if (item.title) return item.title;
   // Fallback to file path basename for scenes/images
-  if (item.filePath) return getFilenameFromPath(item.filePath);
+  if (item.filePath) return getFilenameFromPath(item.filePath) || "Unknown";
   return "Unknown";
 };
 
 /**
  * Get fallback icon for entity type
  */
-const getFallbackIcon = (entityType) => {
-  const icons = {
+const getFallbackIcon = (entityType: EntityType): string => {
+  const icons: Record<EntityType, string> = {
     scene: "🎬",
     image: "🖼️",
     performer: "👤",
@@ -36,7 +55,7 @@ const getFallbackIcon = (entityType) => {
  * All cards use consistent 16/9 container height - portrait images are pillarboxed
  * @param {string} entityType - Type of entity for fallback icon (scene, image, performer)
  */
-const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue, entityType = "scene" }) => {
+const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue, entityType = "scene" }: Props) => {
   if (!item) {
     return null;
   }

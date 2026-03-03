@@ -3,16 +3,40 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../../api";
 import { Paper, Button } from "../ui/index";
 import { useAuth } from "../../hooks/useAuth";
 
+interface StashInstance {
+  id: string;
+  name: string;
+  description: string | null;
+  url: string;
+  enabled: boolean;
+  priority: number;
+  createdAt: string;
+}
+
+interface InstanceFormData {
+  name: string;
+  description: string;
+  url: string;
+  apiKey: string;
+  enabled: boolean;
+  priority: number;
+}
+
+interface TestResult {
+  success: boolean;
+  message: string;
+}
+
 const StashInstanceSection = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
-  const [instances, setInstances] = useState([]);
+  const [instances, setInstances] = useState<StashInstance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [editingInstance, setEditingInstance] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editingInstance, setEditingInstance] = useState<StashInstance | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<InstanceFormData>({
     name: "",
     description: "",
     url: "",
@@ -20,10 +44,10 @@ const StashInstanceSection = () => {
     enabled: true,
     priority: 0,
   });
-  const [formError, setFormError] = useState(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const loadInstances = useCallback(async () => {
     try {
@@ -32,13 +56,13 @@ const StashInstanceSection = () => {
 
       // Admin gets all instances, regular users get single instance
       const endpoint = isAdmin ? "/setup/stash-instances" : "/setup/stash-instance";
-      const data = await apiGet(endpoint);
+      const data = await apiGet<Record<string, unknown>>(endpoint);
 
       if (isAdmin) {
-        setInstances(data.instances || []);
+        setInstances((data.instances as StashInstance[]) || []);
       } else {
         // Non-admin: wrap single instance in array
-        setInstances(data.instance ? [data.instance] : []);
+        setInstances(data.instance ? [data.instance as StashInstance] : []);
       }
     } catch (err) {
       console.error("Failed to load Stash instances:", err);
@@ -82,7 +106,7 @@ const StashInstanceSection = () => {
     setShowAddForm(true);
   };
 
-  const handleEdit = (instance: Record<string, unknown>) => {
+  const handleEdit = (instance: StashInstance) => {
     setFormData({
       name: instance.name,
       description: instance.description || "",
@@ -115,7 +139,7 @@ const StashInstanceSection = () => {
       setTestResult(null);
       setFormError(null);
 
-      const data = await apiPost("/setup/test-stash-connection", {
+      const data = await apiPost<{ version?: string }>("/setup/test-stash-connection", {
         url: formData.url,
         apiKey: formData.apiKey || undefined,
       });
@@ -146,7 +170,7 @@ const StashInstanceSection = () => {
 
       if (editingInstance) {
         // Update existing instance
-        const updateData = {
+        const updateData: Record<string, unknown> = {
           name: formData.name,
           description: formData.description || null,
           url: formData.url,
@@ -180,7 +204,7 @@ const StashInstanceSection = () => {
     }
   };
 
-  const handleDelete = async (instance: { id: number; name: string }) => {
+  const handleDelete = async (instance: { id: string; name: string }) => {
     if (!confirm(`Are you sure you want to delete "${instance.name}"? This cannot be undone.`)) {
       return;
     }
@@ -193,7 +217,7 @@ const StashInstanceSection = () => {
     }
   };
 
-  const handleToggleEnabled = async (instance: { id: number; enabled: boolean }) => {
+  const handleToggleEnabled = async (instance: { id: string; enabled: boolean }) => {
     try {
       await apiPut(`/setup/stash-instance/${instance.id}`, {
         enabled: !instance.enabled,
@@ -384,7 +408,7 @@ const StashInstanceSection = () => {
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? "Saving..." : editingInstance ? "Save Changes" : "Add Instance"}
               </Button>
-              <Button onClick={handleCancel} variant="ghost">
+              <Button onClick={handleCancel} variant="tertiary">
                 Cancel
               </Button>
             </div>
@@ -437,18 +461,18 @@ const StashInstanceSection = () => {
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={() => handleToggleEnabled(instance)}
-                        variant="ghost"
+                        variant="tertiary"
                         size="sm"
                       >
                         {instance.enabled ? "Disable" : "Enable"}
                       </Button>
-                      <Button onClick={() => handleEdit(instance)} variant="ghost" size="sm">
+                      <Button onClick={() => handleEdit(instance)} variant="tertiary" size="sm">
                         Edit
                       </Button>
                       {instances.length > 1 && (
                         <Button
                           onClick={() => handleDelete(instance)}
-                          variant="ghost"
+                          variant="tertiary"
                           size="sm"
                           className="text-red-400 hover:text-red-300"
                         >

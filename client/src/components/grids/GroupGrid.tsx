@@ -24,7 +24,7 @@ const GroupGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(group, _index, { onHideSuccess }) => (
+      renderItem={(group: any, _index: number, { onHideSuccess }: any) => (
         <GroupCard
           key={group.id}
           group={group}

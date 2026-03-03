@@ -29,7 +29,7 @@ describe("PerformerCard", () => {
       performer: mockPerformer,
       fromPageTitle: "Performers",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -38,7 +38,7 @@ describe("PerformerCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
-    });
+    } as any);
 
     expect(element.props.performer).toBe(mockPerformer);
   });
@@ -46,7 +46,7 @@ describe("PerformerCard", () => {
   it("passes correct link path", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
-    });
+    } as any);
 
     expect(element.props.performer.id).toBe("1");
   });
@@ -54,7 +54,7 @@ describe("PerformerCard", () => {
   it("passes performer with all data", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
-    });
+    } as any);
 
     const performer = element.props.performer;
     expect(performer.name).toBe("Test Performer");
@@ -67,7 +67,7 @@ describe("PerformerCard", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
       fromPageTitle: "Performers",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Performers");
   });
@@ -76,7 +76,7 @@ describe("PerformerCard", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -86,7 +86,7 @@ describe("PerformerCard", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

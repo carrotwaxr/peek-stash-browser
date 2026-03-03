@@ -280,16 +280,16 @@ export const APP_ICON_COMPONENTS = {
 /**
  * Get icon name by key
  */
-export const getAppIconName = (key) => {
+export const getAppIconName = (key: string): string => {
   return (
-    FEATURE_ICONS[key] ||
-    ACTION_ICONS[key] ||
-    NAV_ICONS[key] ||
-    VIEW_MODE_ICONS[key] ||
-    UI_ICONS[key] ||
-    SERVER_ICONS[key] ||
-    GENDER_ICONS[key] ||
-    BRAND_ICONS[key] ||
+    (FEATURE_ICONS as Record<string, string>)[key] ||
+    (ACTION_ICONS as Record<string, string>)[key] ||
+    (NAV_ICONS as Record<string, string>)[key] ||
+    (VIEW_MODE_ICONS as Record<string, string>)[key] ||
+    (UI_ICONS as Record<string, string>)[key] ||
+    (SERVER_ICONS as Record<string, string>)[key] ||
+    (GENDER_ICONS as Record<string, string>)[key] ||
+    (BRAND_ICONS as Record<string, string>)[key] ||
     key
   );
 };
@@ -297,6 +297,6 @@ export const getAppIconName = (key) => {
 /**
  * Get icon component by key
  */
-export const getAppIconComponent = (key) => {
-  return APP_ICON_COMPONENTS[key] || null;
+export const getAppIconComponent = (key: string) => {
+  return (APP_ICON_COMPONENTS as Record<string, typeof APP_ICON_COMPONENTS[keyof typeof APP_ICON_COMPONENTS]>)[key] || null;
 };

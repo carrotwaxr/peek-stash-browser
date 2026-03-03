@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   Save,
@@ -26,6 +27,14 @@ import {
 let ruleIdCounter = 0;
 const generateRuleId = () => `rule-${++ruleIdCounter}`;
 
+interface CarouselRule {
+  id: string;
+  filterKey: string;
+  value: unknown;
+  modifier?: string;
+  depth?: number;
+}
+
 /**
  * CarouselBuilder Component
  * Full-page editor for creating and editing custom carousels.
@@ -39,7 +48,7 @@ const CarouselBuilder = () => {
   // Form state
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState("Film");
-  const [rules, setRules] = useState([]); // Array of rule objects
+  const [rules, setRules] = useState<CarouselRule[]>([]); // Array of rule objects
   const [sort, setSort] = useState("random");
   const [direction, setDirection] = useState("DESC");
 
@@ -47,9 +56,9 @@ const CarouselBuilder = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [previewScenes, setPreviewScenes] = useState(null);
-  const [previewError, setPreviewError] = useState(null);
-  const [error, setError] = useState(null);
+  const [previewScenes, setPreviewScenes] = useState<Record<string, unknown>[] | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [previewValid, setPreviewValid] = useState(false);
 
   // Load existing carousel if editing
@@ -59,18 +68,19 @@ const CarouselBuilder = () => {
     const loadCarousel = async () => {
       setLoading(true);
       try {
-        const { carousel } = await libraryApi.getCarousel(id);
-        setTitle(carousel.title);
-        setIcon(carousel.icon);
-        setSort(carousel.sort);
-        setDirection(carousel.direction);
+        const result = await libraryApi.getCarousel(id) as Record<string, unknown>;
+        const carousel = result.carousel as Record<string, unknown>;
+        setTitle(carousel.title as string);
+        setIcon(carousel.icon as string);
+        setSort(carousel.sort as string);
+        setDirection(carousel.direction as string);
 
         // Convert stored rules back to editable format
-        const filterState = carouselRulesToFilterState(carousel.rules);
+        const filterState = carouselRulesToFilterState(carousel.rules as Record<string, unknown>[]);
         const ruleList = convertFilterStateToRules(filterState);
         setRules(ruleList);
       } catch (err) {
-        setError(err.message || "Failed to load carousel");
+        setError((err as Error).message || "Failed to load carousel");
       } finally {
         setLoading(false);
       }
@@ -82,16 +92,16 @@ const CarouselBuilder = () => {
   /**
    * Convert filter state (flat object) to rule array for the editor
    */
-  const convertFilterStateToRules = (filterState) => {
-    const ruleList = [];
+  const convertFilterStateToRules = (filterState: Record<string, unknown>): CarouselRule[] => {
+    const ruleList: CarouselRule[] = [];
 
     // Entity selection rules
-    if (filterState.performerIds?.length > 0) {
+    if ((filterState.performerIds as unknown[] | undefined)?.length) {
       ruleList.push({
         id: generateRuleId(),
         filterKey: "performerIds",
         value: filterState.performerIds,
-        modifier: filterState.performerIdsModifier || "INCLUDES",
+        modifier: (filterState.performerIdsModifier as string) || "INCLUDES",
       });
     }
 
@@ -100,33 +110,34 @@ const CarouselBuilder = () => {
         id: generateRuleId(),
         filterKey: "studioId",
         value: filterState.studioId,
-        depth: filterState.studioIdDepth,
+        depth: filterState.studioIdDepth as number | undefined,
       });
     }
 
-    if (filterState.tagIds?.length > 0) {
+    if ((filterState.tagIds as unknown[] | undefined)?.length) {
       ruleList.push({
         id: generateRuleId(),
         filterKey: "tagIds",
         value: filterState.tagIds,
-        modifier: filterState.tagIdsModifier || "INCLUDES_ALL",
-        depth: filterState.tagIdsDepth,
+        modifier: (filterState.tagIdsModifier as string) || "INCLUDES_ALL",
+        depth: filterState.tagIdsDepth as number | undefined,
       });
     }
 
-    if (filterState.groupIds?.length > 0) {
+    if ((filterState.groupIds as unknown[] | undefined)?.length) {
       ruleList.push({
         id: generateRuleId(),
         filterKey: "groupIds",
         value: filterState.groupIds,
-        modifier: filterState.groupIdsModifier || "INCLUDES",
+        modifier: (filterState.groupIdsModifier as string) || "INCLUDES",
       });
     }
 
     // Range rules
     ["rating", "oCount", "duration", "playCount", "playDuration", "performerCount", "performerAge", "bitrate"].forEach(
       (key) => {
-        if (filterState[key]?.min !== undefined || filterState[key]?.max !== undefined) {
+        const val = filterState[key] as Record<string, unknown> | undefined;
+        if (val?.min !== undefined || val?.max !== undefined) {
           ruleList.push({
             id: generateRuleId(),
             filterKey: key,
@@ -153,7 +164,7 @@ const CarouselBuilder = () => {
         id: generateRuleId(),
         filterKey: "resolution",
         value: filterState.resolution,
-        modifier: filterState.resolutionModifier || "EQUALS",
+        modifier: (filterState.resolutionModifier as string) || "EQUALS",
       });
     }
 
@@ -170,7 +181,8 @@ const CarouselBuilder = () => {
 
     // Date range rules
     ["date", "createdAt", "lastPlayedAt"].forEach((key) => {
-      if (filterState[key]?.min || filterState[key]?.max) {
+      const val = filterState[key] as Record<string, unknown> | undefined;
+      if (val?.min || val?.max) {
         ruleList.push({
           id: generateRuleId(),
           filterKey: key,
@@ -186,7 +198,7 @@ const CarouselBuilder = () => {
    * Convert rule array back to filter state for buildSceneFilter
    */
   const convertRulesToFilterState = useCallback(() => {
-    const filterState = {};
+    const filterState: Record<string, unknown> = {};
 
     rules.forEach((rule) => {
       const def = CAROUSEL_FILTER_DEFINITIONS.find((d) => d.key === rule.filterKey);
@@ -261,7 +273,7 @@ const CarouselBuilder = () => {
   /**
    * Update a rule
    */
-  const updateRule = (ruleId, updates) => {
+  const updateRule = (ruleId: string, updates: Partial<CarouselRule>) => {
     setRules(rules.map((r) => (r.id === ruleId ? { ...r, ...updates } : r)));
     setPreviewValid(false);
     setPreviewScenes(null);
@@ -270,7 +282,7 @@ const CarouselBuilder = () => {
   /**
    * Remove a rule
    */
-  const removeRule = (ruleId) => {
+  const removeRule = (ruleId: string) => {
     setRules(rules.filter((r) => r.id !== ruleId));
     setPreviewValid(false);
     setPreviewScenes(null);
@@ -292,17 +304,17 @@ const CarouselBuilder = () => {
       const filterState = convertRulesToFilterState();
       const apiRules = buildSceneFilter(filterState);
 
-      const { scenes } = await libraryApi.previewCarousel({
+      const result = await libraryApi.previewCarousel({
         rules: apiRules,
         sort,
         direction,
-      });
+      }) as Record<string, unknown>;
 
-      setPreviewScenes(scenes);
+      setPreviewScenes(result.scenes as Record<string, unknown>[]);
       setPreviewValid(true);
       setPreviewError(null);
     } catch (err) {
-      setPreviewError(err.message || "Failed to preview carousel");
+      setPreviewError((err as Error).message || "Failed to preview carousel");
       setPreviewValid(false);
     } finally {
       setPreviewing(false);
@@ -344,20 +356,20 @@ const CarouselBuilder = () => {
       };
 
       if (isEditing) {
-        await libraryApi.updateCarousel(id, carouselData);
+        await libraryApi.updateCarousel(id!, carouselData);
       } else {
         await libraryApi.createCarousel(carouselData);
       }
 
       navigate("/settings?section=user&tab=customization");
     } catch (err) {
-      setError(err.message || "Failed to save carousel");
+      setError((err as Error).message || "Failed to save carousel");
     } finally {
       setSaving(false);
     }
   };
 
-  const IconComponent = LucideIcons[icon] || LucideIcons.Film;
+  const IconComponent = (LucideIcons as unknown as Record<string, LucideIcon>)[icon] || LucideIcons.Film;
   const canSave = title.trim() && rules.length > 0 && previewValid;
   const usedFilterKeys = new Set(rules.map((r) => r.filterKey));
   const hasMoreFilters = CAROUSEL_FILTER_DEFINITIONS.some((f) => !usedFilterKeys.has(f.key));
@@ -589,7 +601,7 @@ const CarouselBuilder = () => {
 
         {/* Preview Section */}
         <CarouselPreview
-          scenes={previewScenes}
+          scenes={previewScenes as React.ComponentProps<typeof CarouselPreview>["scenes"]}
           error={previewError}
           loading={previewing}
           onPreview={handlePreview}

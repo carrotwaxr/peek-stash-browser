@@ -29,7 +29,7 @@ const SceneTitle = ({
   maxLines = null,
 }: Props) => {
   const { hasMultipleInstances } = useConfig();
-  const title = getSceneTitle(scene);
+  const title = getSceneTitle(scene as unknown as Record<string, unknown>);
   const date = scene.date ? formatRelativeTime(scene.date) : null;
 
   // Build subtitle with studio, code, and date (like SceneCard)
@@ -71,9 +71,9 @@ const SceneTitle = ({
         // Also check if video is fullscreen
         const isFullscreen =
           document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement;
+          (document as unknown as Record<string, unknown>).webkitFullscreenElement ||
+          (document as unknown as Record<string, unknown>).mozFullScreenElement ||
+          (document as unknown as Record<string, unknown>).msFullscreenElement;
         if (isFullscreen) {
           sessionStorage.setItem("videoPlayerFullscreen", "true");
         }
@@ -81,12 +81,12 @@ const SceneTitle = ({
     }
   };
 
-  const titleStyle = maxLines
+  const titleStyle: React.CSSProperties = maxLines
     ? {
         color: "var(--text-primary)",
         display: "-webkit-box",
         WebkitLineClamp: maxLines,
-        WebkitBoxOrient: "vertical",
+        WebkitBoxOrient: "vertical" as const,
         overflow: "hidden",
         minHeight: maxLines === 2 ? "2.5rem" : undefined, // Fixed height for 2-line titles
         maxHeight: maxLines === 2 ? "2.5rem" : undefined,
@@ -98,7 +98,7 @@ const SceneTitle = ({
   return (
     <div>
       <Link
-        to={getEntityPath('scene', scene, hasMultipleInstances)}
+        to={getEntityPath('scene', scene as unknown as Record<string, unknown>, hasMultipleInstances)}
         state={linkState}
         onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}

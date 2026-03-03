@@ -1,5 +1,5 @@
-// client/src/components/timeline/TimelineView.jsx
-import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react";
+// client/src/components/timeline/TimelineView.tsx
+import { memo, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import TimelineControls from "./TimelineControls";
 import TimelineStrip from "./TimelineStrip";
 import TimelineMobileSheet from "./TimelineMobileSheet";
@@ -7,6 +7,45 @@ import { useTimelineState, parsePeriodToDateRange } from "./useTimelineState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { getGridClasses } from "../../constants/grids";
 import LoadingSpinner from "../ui/LoadingSpinner";
+
+interface DateFilterRange {
+  start: string;
+  end: string;
+}
+
+interface RenderItemOptions {
+  onItemClick?: (item: Record<string, unknown>) => void;
+  dateFilter: { date: { value: string; value2: string; modifier: string } } | null;
+}
+
+interface TimelineFilters {
+  performerId?: string;
+  tagId?: string;
+  studioId?: string;
+  groupId?: string;
+}
+
+interface VisibleRange {
+  firstPeriod: string;
+  lastPeriod: string;
+  firstLabel: string;
+  lastLabel: string;
+}
+
+interface Props {
+  entityType: string;
+  items?: Record<string, unknown>[];
+  renderItem: (item: Record<string, unknown>, index: number, options: RenderItemOptions) => ReactNode;
+  onItemClick?: (item: Record<string, unknown>) => void;
+  onDateFilterChange?: (range: DateFilterRange | null) => void;
+  onPeriodChange?: (period: string | null) => void;
+  initialPeriod?: string | null;
+  loading?: boolean;
+  emptyMessage?: string;
+  gridDensity?: string;
+  className?: string;
+  filters?: TimelineFilters | null;
+}
 
 function TimelineView({
   entityType,
@@ -21,7 +60,7 @@ function TimelineView({
   gridDensity = "medium",
   className = "",
   filters = null,
-}) {
+}: Props) {
   const {
     zoomLevel,
     setZoomLevel,
@@ -66,7 +105,7 @@ function TimelineView({
   }, [selectedPeriod, onDateFilterChange]);
 
   // Wrap selectPeriod to notify parent directly on user interaction
-  const handleSelectPeriod = useCallback((period) => {
+  const handleSelectPeriod = useCallback((period: string) => {
     selectPeriod(period);
     hasNotifiedAutoSelectRef.current = true; // Mark as handled
     // selectPeriod toggles: clicking same period deselects
@@ -97,9 +136,9 @@ function TimelineView({
   const isLoading = loading || distributionLoading;
 
   // Track visible range from timeline strip
-  const [visibleRange, setVisibleRange] = useState(null);
+  const [visibleRange, setVisibleRange] = useState<VisibleRange | null>(null);
 
-  const handleVisibleRangeChange = useCallback((range) => {
+  const handleVisibleRangeChange = useCallback((range: VisibleRange) => {
     setVisibleRange(range);
   }, []);
 
@@ -155,7 +194,7 @@ function TimelineView({
         distribution={distribution}
         maxCount={maxCount}
         zoomLevel={zoomLevel}
-        selectedPeriod={selectedPeriod}
+        selectedPeriod={selectedPeriod as { period: string; count: number } | null}
         onSelectPeriod={handleSelectPeriod}
         onVisibleRangeChange={handleVisibleRangeChange}
       />

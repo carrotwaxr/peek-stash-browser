@@ -5,7 +5,10 @@ const levelKey = "volume-level";
 const mutedKey = "volume-muted";
 
 class PersistVolumePlugin extends videojs.getPlugin("plugin") {
-  constructor(player, options) {
+  enabled: boolean;
+  declare player: any;
+
+  constructor(player: any, options: any) {
     super(player, options);
 
     this.enabled = options?.enabled ?? true;
@@ -23,13 +26,13 @@ class PersistVolumePlugin extends videojs.getPlugin("plugin") {
   }
 
   ready() {
-    localForage.getItem(levelKey).then((value) => {
+    localForage.getItem(levelKey).then((value: any) => {
       if (value !== null) {
         this.player.volume(value);
       }
     });
 
-    localForage.getItem(mutedKey).then((value) => {
+    localForage.getItem(mutedKey).then((value: any) => {
       if (value !== null) {
         this.player.muted(value);
       }

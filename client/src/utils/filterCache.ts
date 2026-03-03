@@ -3,7 +3,7 @@
  * Caches performer, studio, and tag lists to reduce API calls
  */
 
-const CACHE_KEYS = {
+const CACHE_KEYS: Record<string, string> = {
   performers: "peek-performers-cache",
   studios: "peek-studios-cache",
   tags: "peek-tags-cache",
@@ -18,7 +18,7 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
  * @param {number} timestamp - Cache timestamp
  * @returns {boolean} True if cache is still fresh
  */
-const isCacheFresh = (timestamp) => {
+const isCacheFresh = (timestamp: number) => {
   return Date.now() - timestamp < CACHE_TTL;
 };
 
@@ -27,7 +27,7 @@ const isCacheFresh = (timestamp) => {
  * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @returns {{data: Array, timestamp: number}|null} Cached data or null if stale/missing
  */
-export const getCache = (cacheKey) => {
+export const getCache = (cacheKey: string) => {
   try {
     // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
     const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;
@@ -58,7 +58,7 @@ export const getCache = (cacheKey) => {
  * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @param {Array} data - Array of {id, name} objects
  */
-export const setCache = (cacheKey, data) => {
+export const setCache = (cacheKey: string, data: unknown) => {
   try {
     // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
     const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;
@@ -71,7 +71,7 @@ export const setCache = (cacheKey, data) => {
   } catch (error) {
     console.error(`Error setting ${cacheKey} cache:`, error);
     // If quota exceeded, try to clear old caches
-    if (error.name === "QuotaExceededError") {
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
       clearAllCaches();
     }
   }

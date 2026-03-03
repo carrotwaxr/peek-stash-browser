@@ -32,9 +32,9 @@ const Tooltip = ({
     finalPosition: position,
     arrowOffset: 24,
   });
-  const triggerRef = useRef(null);
-  const tooltipRef = useRef(null);
-  const hideTimeoutRef = useRef(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Calculate and update tooltip position
   const calculatePosition = useCallback(() => {
@@ -175,12 +175,12 @@ const Tooltip = ({
   useEffect(() => {
     if (!clickable || !isVisible) return;
 
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (
         triggerRef.current &&
-        !triggerRef.current.contains(e.target) &&
+        !triggerRef.current.contains(e.target as Node) &&
         tooltipRef.current &&
-        !tooltipRef.current.contains(e.target)
+        !tooltipRef.current.contains(e.target as Node)
       ) {
         setIsVisible(false);
       }
@@ -240,7 +240,7 @@ const Tooltip = ({
     setIsVisible(false);
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (clickable) {
       e.stopPropagation();
       setIsVisible(!isVisible);

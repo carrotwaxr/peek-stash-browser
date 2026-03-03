@@ -14,9 +14,9 @@ const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
   const settings = getSettings(entityType);
 
   // Determine what to show based on settings
-  const showDescription = settings.showDescriptionOnCard;
+  const showDescription = settings.showDescriptionOnCard as boolean | undefined;
   const showRatingRow =
-    settings.showRating || settings.showFavorite || settings.showOCounter;
+    (settings.showRating as boolean) || (settings.showFavorite as boolean) || (settings.showOCounter as boolean);
 
   // Match aspect ratio logic from useEntityImageAspectRatio
   const aspectRatio = ["performer", "gallery", "group"].includes(entityType)
@@ -116,7 +116,7 @@ const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
             style={{ height: "2rem" }}
           >
             {/* Rating badge placeholder */}
-            {settings.showRating && (
+            {(settings.showRating as boolean) && (
               <div
                 className="h-6 rounded-full animate-pulse"
                 style={{
@@ -126,17 +126,17 @@ const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
               />
             )}
             {/* Empty placeholder for layout when rating is hidden */}
-            {!settings.showRating && <div />}
+            {!(settings.showRating as boolean) && <div />}
 
             {/* Right side: O Counter + Favorite + Menu */}
             <div className="flex items-center gap-2">
-              {settings.showOCounter && (
+              {(settings.showOCounter as boolean) && (
                 <div
                   className="h-6 w-6 rounded-full animate-pulse"
                   style={{ backgroundColor: "var(--bg-tertiary)" }}
                 />
               )}
-              {settings.showFavorite && (
+              {(settings.showFavorite as boolean) && (
                 <div
                   className="h-6 w-6 rounded-full animate-pulse"
                   style={{ backgroundColor: "var(--bg-tertiary)" }}

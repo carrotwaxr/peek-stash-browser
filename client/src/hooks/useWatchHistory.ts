@@ -15,11 +15,21 @@ import { useAuth } from "./useAuth";
  * @param {Object} playerRef - React ref to Video.js player instance (unused, kept for API compat)
  * @returns {Object} Watch history state and methods
  */
-export function useWatchHistory(sceneId, _playerRef = { current: null }) {  
+interface WatchHistoryData {
+  oCount?: number;
+  [key: string]: unknown;
+}
+
+interface IncrementOResponse {
+  success: boolean;
+  oCount: number;
+}
+
+export function useWatchHistory(sceneId: string, _playerRef = { current: null }) {
   const { isAuthenticated } = useAuth();
-  const [watchHistory, setWatchHistory] = useState(null);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Track current quality for logging/debugging
   const currentQualityRef = useRef("auto");
@@ -36,11 +46,11 @@ export function useWatchHistory(sceneId, _playerRef = { current: null }) {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiGet(`/watch-history/${sceneId}`);
+      const data = await apiGet<WatchHistoryData>(`/watch-history/${sceneId}`);
       setWatchHistory(data);
     } catch (err) {
       console.error("Error fetching watch history:", err);
-      setError(err.message || "Failed to fetch watch history");
+      setError(err instanceof Error ? err.message : "Failed to fetch watch history");
     } finally {
       setLoading(false);
     }
@@ -49,7 +59,7 @@ export function useWatchHistory(sceneId, _playerRef = { current: null }) {
   /**
    * Update current quality setting
    */
-  const updateQuality = useCallback((quality) => {
+  const updateQuality = useCallback((quality: string) => {
     currentQualityRef.current = quality;
   }, []);
 
@@ -62,14 +72,14 @@ export function useWatchHistory(sceneId, _playerRef = { current: null }) {
     }
 
     try {
-      const response = await apiPost("/watch-history/increment-o", { sceneId });
+      const response = await apiPost<IncrementOResponse>("/watch-history/increment-o", { sceneId });
 
       if (response.success) {
         // Update local state
-        setWatchHistory((prev) => ({
+        setWatchHistory((prev) => prev ? ({
           ...prev,
           oCount: response.oCount,
-        }));
+        }) : prev);
 
         return response;
       }
@@ -107,9 +117,9 @@ export function useWatchHistory(sceneId, _playerRef = { current: null }) {
  */
 export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
   const { isAuthenticated } = useAuth();
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<WatchHistoryData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!isAuthenticated) {
@@ -126,11 +136,11 @@ export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
         inProgress: inProgress.toString(),
       });
 
-      const response = await apiGet(`/watch-history?${queryParams}`);
+      const response = await apiGet<{ watchHistory?: WatchHistoryData[] }>(`/watch-history?${queryParams}`);
       setData(response.watchHistory || []);
     } catch (err) {
       console.error("Error fetching all watch history:", err);
-      setError(err.message || "Failed to fetch watch history");
+      setError(err instanceof Error ? err.message : "Failed to fetch watch history");
     } finally {
       setLoading(false);
     }

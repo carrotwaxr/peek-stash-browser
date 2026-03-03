@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -13,20 +13,44 @@ import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { Button, useLazyLoad } from "../ui/index";
 
+interface PlaylistScene {
+  sceneId: string;
+  instanceId?: string;
+  scene?: {
+    title?: string;
+    paths?: { screenshot?: string };
+    files?: Array<{ duration?: number; basename?: string }>;
+    studio?: { name: string };
+  };
+}
+
+interface Playlist {
+  id?: string;
+  name?: string;
+  scenes?: PlaylistScene[];
+  autoplayNext?: boolean;
+  shuffle?: boolean;
+  repeat?: string;
+}
+
+interface Props {
+  maxHeight?: number;
+}
+
 /**
  * PlaylistSidebar - Vertical playlist controls optimized for sidebar display
  * Similar to YouTube's playlist sidebar on desktop
- * @param {number} maxHeight - Maximum height in pixels to match left column
  */
-const PlaylistSidebar = ({ maxHeight }) => {
+const PlaylistSidebar = ({ maxHeight }: Props) => {
   const {
-    playlist,
+    playlist: rawPlaylist,
     currentIndex,
     gotoSceneIndex,
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
   } = useScenePlayer();
+  const playlist = rawPlaylist as Playlist | null;
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Auto-scroll to current item when it changes
@@ -47,7 +71,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
   const nextScene =
     nextSceneIndex < totalScenes ? playlist.scenes[nextSceneIndex] : null;
 
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number | undefined) => {
     if (!seconds) return "?:??";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -61,7 +85,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const navigateToScene = (index) => {
+  const navigateToScene = (index: number) => {
     if (index < 0 || index >= totalScenes) return;
 
     // Check if video is currently playing
@@ -76,11 +100,16 @@ const PlaylistSidebar = ({ maxHeight }) => {
 
     // Preserve fullscreen state
     if (isPlaying) {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element;
+        mozFullScreenElement?: Element;
+        msFullscreenElement?: Element;
+      };
       const isFullscreen =
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement;
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement;
       if (isFullscreen) {
         sessionStorage.setItem("videoPlayerFullscreen", "true");
       }
@@ -380,6 +409,18 @@ const PlaylistSidebar = ({ maxHeight }) => {
   );
 };
 
+interface PlaylistThumbnailProps {
+  src: string | null | undefined;
+  alt: string;
+  duration?: number;
+  formatDuration: (seconds: number | undefined) => string;
+  fallbackText: ReactNode;
+  width: string;
+  height: string;
+  showPlayOverlay?: boolean;
+  small?: boolean;
+}
+
 /**
  * PlaylistThumbnail - Lazy-loaded thumbnail for playlist items
  */
@@ -393,12 +434,12 @@ const PlaylistThumbnail = ({
   height,
   showPlayOverlay = false,
   small = false,
-}) => {
+}: PlaylistThumbnailProps) => {
   const [ref, shouldLoad] = useLazyLoad();
 
   return (
     <div
-      ref={ref}
+      ref={ref as React.RefObject<HTMLDivElement | null>}
       className={`relative flex-shrink-0 ${small ? "rounded" : ""} overflow-hidden`}
       style={{
         width,

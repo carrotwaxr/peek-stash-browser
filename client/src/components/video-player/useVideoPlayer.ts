@@ -32,7 +32,7 @@ chromecast(videojs);
  * @param {Object} params - Additional query parameters
  * @returns {string} Full URL with instanceId if provided
  */
-function buildStreamUrl(sceneId, path, instanceId, params = {}) {
+function buildStreamUrl(sceneId: string, path: string, instanceId: string | null | undefined, params: Record<string, string | undefined | null> = {}) {
   const url = new URL(`/api/scene/${sceneId}/${path}`, window.location.origin);
   if (instanceId) {
     url.searchParams.set('instanceId', instanceId);
@@ -52,16 +52,16 @@ function buildStreamUrl(sceneId, path, instanceId, params = {}) {
  * @param {number} baseDelay - Base delay in ms (default: 1000)
  * @returns {Promise} Result of the function or throws after all retries
  */
-async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1000) {
-  let lastError;
+async function retryWithBackoff(fn: () => Promise<any>, maxAttempts = 3, baseDelay = 1000) {
+  let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
-    } catch (error) {
+    } catch (error: unknown) {
       lastError = error;
       if (attempt < maxAttempts) {
         const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(`[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+        console.warn(`[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`, (error as Error).message);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -88,7 +88,7 @@ const QUALITY_PRESETS = [
  * @param {number} sourceHeight - Height of the source video
  * @returns {string} Quality string (e.g., "1080p", "720p")
  */
-function getBestTranscodeQuality(sourceHeight) {
+function getBestTranscodeQuality(sourceHeight: number): string {
   // Find highest preset <= source resolution
   for (const preset of QUALITY_PRESETS) {
     if (preset.height <= sourceHeight) {
@@ -108,7 +108,7 @@ function getBestTranscodeQuality(sourceHeight) {
  * @returns {Array<{quality: string, height: number}>} Available quality options
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getAvailableQualities(sourceHeight) {
+function getAvailableQualities(sourceHeight: number) {
   return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
 }
 
@@ -142,6 +142,27 @@ export function useVideoPlayer({
   loadingWatchHistory,
   enableCast = true,
   minimumPlayPercent = 20,
+}: {
+  videoRef: React.RefObject<HTMLDivElement | null>;
+  playerRef: React.MutableRefObject<any>;
+  scene: any;
+  quality: string;
+  isAutoFallback: boolean;
+  ready: boolean;
+  shouldAutoplay: boolean;
+  playlist: any;
+  currentIndex: number;
+  dispatch: (action: any) => void;
+  nextScene: () => void;
+  prevScene: () => void;
+  updateQuality: (quality: string) => void;
+  location: any;
+  hasResumedRef: React.MutableRefObject<boolean>;
+  initialResumeTimeRef: React.MutableRefObject<number | null>;
+  watchHistory: any;
+  loadingWatchHistory: boolean;
+  enableCast?: boolean;
+  minimumPlayPercent?: number;
 }) {
   // Track previous scene for detecting changes
   const prevSceneIdRef = useRef(null);
@@ -269,7 +290,7 @@ export function useVideoPlayer({
     if (!mediaSessionPlugin) return;
 
     // Build performer string from scene performers
-    const performers = scene.performers?.map((p) => p.name).join(", ") || "";
+    const performers = scene.performers?.map((p: any) => p.name).join(", ") || "";
 
     // Set metadata for OS media controls
     mediaSessionPlugin.setMetadata(
@@ -299,7 +320,7 @@ export function useVideoPlayer({
 
     // Connect plugin callbacks to API endpoints
     // saveActivity is called periodically (every 10s) during playback
-    trackActivityPlugin.saveActivity = async (resumeTime, playDuration) => {
+    trackActivityPlugin.saveActivity = async (resumeTime: number, playDuration: number) => {
       try {
         await retryWithBackoff(() =>
           apiPost("/watch-history/save-activity", {
@@ -429,7 +450,7 @@ export function useVideoPlayer({
         '480p': 'STANDARD',
         '360p': 'LOW',
       };
-      const resolution = qualityToResolution[bestQuality] || 'STANDARD_HD';
+      const resolution = (qualityToResolution as Record<string, string>)[bestQuality] || 'STANDARD_HD';
       const hlsUrl = buildStreamUrl(scene.id, 'proxy-stream/stream.m3u8', scene.instanceId, { resolution });
 
       console.log(`[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`);
@@ -457,7 +478,7 @@ export function useVideoPlayer({
       });
 
       // Call play() immediately to prevent big play button from showing
-      player.play().catch((err) => console.error("[AUTO-FALLBACK] Play failed:", err));
+      player.play().catch((err: any) => console.error("[AUTO-FALLBACK] Play failed:", err));
     };
 
     player.on("error", handleError);
@@ -515,7 +536,7 @@ export function useVideoPlayer({
       const duration = scene.files?.[0]?.duration || undefined;
 
       // Helper to check if stream is Direct (not transcoded)
-      const isDirect = (url) => {
+      const isDirect = (url: URL) => {
         return (
           url.pathname.endsWith('/stream') ||
           url.pathname.endsWith('/stream.mpd') ||
@@ -524,7 +545,7 @@ export function useVideoPlayer({
       };
 
       // Rewrite Stash URLs to use Peek's proxy
-      sources = scene.sceneStreams.map((stream) => {
+      sources = scene.sceneStreams.map((stream: any) => {
         try {
           const url = new URL(stream.url);
 
@@ -615,7 +636,7 @@ export function useVideoPlayer({
     const resumeTime = initialResumeTimeRef.current;
 
     // Handle resume playback before starting
-    if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
+    if (shouldResume && !hasResumedRef.current && resumeTime != null && resumeTime > 0) {
       hasResumedRef.current = true;
       player.currentTime(resumeTime);
     }
@@ -669,7 +690,7 @@ export function useVideoPlayer({
       // Repeat One: replay current scene
       if (playlist.repeat === "one") {
         player.currentTime(0);
-        player.play().catch((err) => console.error("Repeat play failed:", err));
+        player.play().catch((err: any) => console.error("Repeat play failed:", err));
         return;
       }
 

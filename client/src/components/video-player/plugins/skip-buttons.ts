@@ -1,7 +1,11 @@
 import videojs from "video.js";
 
 class SkipButtonPlugin extends videojs.getPlugin("plugin") {
-  constructor(player) {
+  onNext: (() => void) | undefined;
+  onPrevious: (() => void) | undefined;
+  declare player: any;
+
+  constructor(player: any) {
     super(player);
 
     this.onNext = undefined;
@@ -12,13 +16,13 @@ class SkipButtonPlugin extends videojs.getPlugin("plugin") {
     });
   }
 
-  setForwardHandler(handler) {
+  setForwardHandler(handler: (() => void) | undefined) {
     this.onNext = handler;
     if (handler !== undefined) this.player.addClass("vjs-skip-buttons-next");
     else this.player.removeClass("vjs-skip-buttons-next");
   }
 
-  setBackwardHandler(handler) {
+  setBackwardHandler(handler: (() => void) | undefined) {
     this.onPrevious = handler;
     if (handler !== undefined) this.player.addClass("vjs-skip-buttons-prev");
     else this.player.removeClass("vjs-skip-buttons-prev");
@@ -56,7 +60,10 @@ class SkipButtonPlugin extends videojs.getPlugin("plugin") {
 }
 
 class SkipButton extends videojs.getComponent("button") {
-  constructor(player, options) {
+  parentPlugin: any;
+  direction: string;
+
+  constructor(player: any, options: any) {
     super(player, options);
 
     this.parentPlugin = options.parent;

@@ -46,7 +46,7 @@ const SettingsPage = () => {
 
   // Determine active section (redirect non-admins from server section)
   const isAdmin = user?.role === "ADMIN";
-  const activeSection = validSection === "server" && !isAdmin ? "user" : validSection;
+  const activeSection: "user" | "server" = validSection === "server" && !isAdmin ? "user" : validSection as "user" | "server";
 
   // Redirect if non-admin tries to access server section
   useEffect(() => {

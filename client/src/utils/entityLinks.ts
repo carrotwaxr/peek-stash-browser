@@ -6,7 +6,7 @@
  * the same ID across different instances.
  */
 
-const ENTITY_PATHS = {
+const ENTITY_PATHS: Record<string, string> = {
   performer: '/performer',
   scene: '/scene',
   studio: '/studio',
@@ -24,17 +24,23 @@ const ENTITY_PATHS = {
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} The path to the entity detail page
  */
-export function getEntityPath(entityType, entity, hasMultipleInstances) {
+interface EntityLike {
+  id?: string | number;
+  instanceId?: string;
+  [key: string]: unknown;
+}
+
+export function getEntityPath(entityType: string, entity: EntityLike | string, hasMultipleInstances: boolean) {
   const basePath = ENTITY_PATHS[entityType];
   if (!basePath) {
     console.warn(`Unknown entity type: ${entityType}`);
     return '#';
   }
 
-  const id = entity?.id || entity;
+  const id = typeof entity === 'string' ? entity : entity?.id ?? entity;
   const base = `${basePath}/${id}`;
 
-  if (hasMultipleInstances && entity?.instanceId) {
+  if (hasMultipleInstances && typeof entity !== 'string' && entity?.instanceId) {
     return `${base}?instance=${encodeURIComponent(entity.instanceId)}`;
   }
   return base;
@@ -59,19 +65,19 @@ export function getEntityPath(entityType, entity, hasMultipleInstances) {
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} URL with instance param appended if needed
  */
-export function appendInstanceParam(url, entity, hasMultipleInstances) {
+export function appendInstanceParam(url: string, entity: EntityLike, hasMultipleInstances: boolean) {
   if (hasMultipleInstances && entity?.instanceId) {
     return `${url}&instance=${encodeURIComponent(entity.instanceId)}`;
   }
   return url;
 }
 
-export function getScenePathWithTime(scene, time, hasMultipleInstances) {
-  const id = scene?.id || scene;
+export function getScenePathWithTime(scene: EntityLike | string, time: number, hasMultipleInstances: boolean) {
+  const id = typeof scene === 'string' ? scene : scene?.id ?? scene;
   const base = `/scene/${id}`;
   const timeParam = `t=${Math.floor(time)}`;
 
-  if (hasMultipleInstances && scene?.instanceId) {
+  if (hasMultipleInstances && typeof scene !== 'string' && scene?.instanceId) {
     return `${base}?instance=${encodeURIComponent(scene.instanceId)}&${timeParam}`;
   }
   return `${base}?${timeParam}`;

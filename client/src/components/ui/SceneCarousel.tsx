@@ -29,7 +29,7 @@ const SceneCarousel = ({
 }: Props) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const scrollContainerRef = useRef(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Check scroll position and update button states
   const checkScrollButtons = () => {

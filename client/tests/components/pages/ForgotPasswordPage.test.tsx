@@ -6,8 +6,8 @@ const mockForgotPasswordInit = vi.fn();
 const mockForgotPasswordReset = vi.fn();
 
 vi.mock("../../../src/api", () => ({
-  forgotPasswordInit: (...args) => mockForgotPasswordInit(...args),
-  forgotPasswordReset: (...args) => mockForgotPasswordReset(...args),
+  forgotPasswordInit: (...args: unknown[]) => mockForgotPasswordInit(...args),
+  forgotPasswordReset: (...args: unknown[]) => mockForgotPasswordReset(...args),
 }));
 
 import ForgotPasswordPage from "../../../src/components/pages/ForgotPasswordPage";

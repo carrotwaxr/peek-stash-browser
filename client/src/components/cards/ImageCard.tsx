@@ -39,7 +39,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
     const imageSettings = getSettings("image");
     const { hasMultipleInstances } = useConfig();
     // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
+    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image as unknown as Record<string, unknown>);
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -66,7 +66,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
       effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
-          entities={effectivePerformers}
+          entities={effectivePerformers as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Performers"
           parentInstanceId={image.instanceId}
         />
@@ -76,7 +76,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
       effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
-          entities={effectiveTags}
+          entities={effectiveTags as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Tags"
           parentInstanceId={image.instanceId}
         />
@@ -87,7 +87,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
       galleriesCount > 0 && (
         <TooltipEntityGrid
           entityType="gallery"
-          entities={galleries}
+          entities={galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Galleries"
           parentInstanceId={image.instanceId}
         />
@@ -148,15 +148,15 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="image"
         imagePath={image.paths?.thumbnail || image.paths?.image}
-        title={getImageTitle(image)}
+        title={getImageTitle(image as unknown as Record<string, unknown>) as React.ReactNode}
         subtitle={subtitle}
         description={image.details}
         onClick={handleClick}
-        linkTo={onClick ? undefined : getEntityPath('image', image, hasMultipleInstances)}
+        linkTo={onClick ? undefined : getEntityPath('image', image as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={
           image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
             ? {
@@ -169,10 +169,10 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
                 onOCounterChange,
                 onRatingChange,
                 onFavoriteChange,
-                showRating: imageSettings.showRating,
-                showFavorite: imageSettings.showFavorite,
-                showOCounter: imageSettings.showOCounter,
-                showMenu: imageSettings.showMenu,
+                showRating: imageSettings.showRating as boolean | undefined,
+                showFavorite: imageSettings.showFavorite as boolean | undefined,
+                showOCounter: imageSettings.showOCounter as boolean | undefined,
+                showMenu: imageSettings.showMenu as boolean | undefined,
               }
             : undefined
         }

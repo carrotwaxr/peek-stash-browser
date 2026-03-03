@@ -7,6 +7,7 @@ interface Props {
   scenes: NormalizedScene[] | null;
   error: string | null;
   loading: boolean;
+  onPreview?: () => void;
 }
 
 /**
@@ -113,7 +114,7 @@ const PreviewCard = ({ scene }: PreviewCardProps) => {
 
   return (
     <div
-      ref={ref}
+      ref={ref as React.Ref<HTMLDivElement>}
       className="rounded-lg overflow-hidden border"
       style={{
         backgroundColor: "var(--bg-secondary)",
@@ -153,9 +154,9 @@ const PreviewCard = ({ scene }: PreviewCardProps) => {
         <p
           className="text-xs line-clamp-2"
           style={{ color: "var(--text-primary)" }}
-          title={getSceneTitle(scene)}
+          title={getSceneTitle(scene as unknown as Record<string, unknown>)}
         >
-          {getSceneTitle(scene)}
+          {getSceneTitle(scene as unknown as Record<string, unknown>)}
         </p>
       </div>
     </div>

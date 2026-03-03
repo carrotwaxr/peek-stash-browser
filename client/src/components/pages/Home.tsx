@@ -20,6 +20,18 @@ import {
   SCENE_FILTER_OPTIONS,
 } from "../../utils/filterConfig";
 import { buildSearchParams } from "../../utils/urlParams";
+import type { NormalizedScene } from "@peek/shared-types";
+
+interface CarouselDef {
+  type: string;
+  id?: string;
+  prefId: string;
+  title: string;
+  iconComponent: React.ElementType;
+  iconProps: Record<string, any>;
+  fetchKey?: string;
+  isSpecial?: boolean;
+}
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -72,8 +84,12 @@ const buildCustomCarouselUrl = (rules: Record<string, unknown> | null | undefine
     sortDirection: direction || "DESC",
     currentPage: 1,
     perPage: 24,
-    filters: filterState,
-    filterOptions: SCENE_FILTER_OPTIONS,
+    filters: filterState as Record<string, unknown>,
+    filterOptions: SCENE_FILTER_OPTIONS as any,
+    viewMode: "grid",
+    zoomLevel: "medium",
+    gridDensity: "medium",
+    timelinePeriod: null,
   });
 
   const queryString = params.toString();
@@ -86,7 +102,7 @@ const Home = () => {
   const location = useLocation();
   const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
-  const [carouselPreferences, setCarouselPreferences] = useState<Record<string, unknown>[]>([]);
+  const [carouselPreferences, setCarouselPreferences] = useState<any[]>([]);
   const [customCarousels, setCustomCarousels] = useState<Record<string, unknown>[]>([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState<Record<string, unknown>[]>([]);
@@ -98,7 +114,7 @@ const Home = () => {
     const loadData = async () => {
       try {
         // Load user preferences
-        const data = await apiGet("/user/settings");
+        const data = await apiGet("/user/settings") as Record<string, any>;
         const prefs = migrateCarouselPreferences(
           data.settings.carouselPreferences
         );
@@ -106,7 +122,7 @@ const Home = () => {
 
         // Load custom carousels
         try {
-          const { carousels } = await libraryApi.getCarousels();
+          const { carousels } = await libraryApi.getCarousels() as Record<string, any>;
           setCustomCarousels(carousels || []);
         } catch (err) {
           console.error("Failed to load custom carousels:", err);
@@ -166,7 +182,7 @@ const Home = () => {
 
   // Bulk hide action
   const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
-    selectedScenes,
+    selectedScenes: selectedScenes as { id: string | number }[],
     onComplete: handleClearSelection,
   });
 
@@ -181,24 +197,24 @@ const Home = () => {
   }, []);
 
   // Build the list of active carousels (hardcoded + custom)
-  const activeCarousels = carouselPreferences
+  const activeCarousels: CarouselDef[] = carouselPreferences
     .filter((pref) => pref.enabled !== false)
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .sort((a, b) => ((a.order as number) || 0) - ((b.order as number) || 0))
     .map((pref) => {
       // Check if it's a custom carousel
-      if (isCustomCarousel(pref.id)) {
-        const carouselId = pref.id.replace("custom-", "");
+      if (isCustomCarousel(pref.id as string)) {
+        const carouselId = (pref.id as string).replace("custom-", "");
         const customCarousel = customCarousels.find((c) => c.id === carouselId);
         if (customCarousel) {
-          const IconComponent = LucideIcons[customCarousel.icon] || LucideIcons.Film;
+          const IconComponent = (LucideIcons as Record<string, any>)[customCarousel.icon as string] || LucideIcons.Film;
           return {
             type: "custom",
             id: carouselId,
-            prefId: pref.id,
-            title: customCarousel.title,
+            prefId: pref.id as string,
+            title: customCarousel.title as string,
             iconComponent: IconComponent,
             iconProps: { className: "w-6 h-6", style: { color: "var(--accent-primary)" } },
-          };
+          } as CarouselDef;
         }
         return null; // Custom carousel not found
       }
@@ -209,12 +225,12 @@ const Home = () => {
         return {
           type: "hardcoded",
           ...def,
-          prefId: pref.id,
-        };
+          prefId: pref.id as string,
+        } as CarouselDef;
       }
       return null;
     })
-    .filter(Boolean); // Remove nulls
+    .filter((c): c is CarouselDef => c !== null); // Remove nulls
 
   return (
     <PageLayout className="max-w-none">
@@ -263,8 +279,8 @@ const Home = () => {
           return (
             <CustomCarousel
               key={carousel.prefId}
-              carouselId={id}
-              carousel={customCarousels.find((c) => c.id === id)}
+              carouselId={id!}
+              carousel={customCarousels.find((c) => c.id === id) || ({} as Record<string, unknown>)}
               title={title}
               icon={icon}
               createSceneClickHandler={createSceneClickHandler}
@@ -290,8 +306,8 @@ const Home = () => {
           return (
             <ContinueWatchingCarousel
               key={fetchKey}
-              selectedScenes={selectedScenes}
-              onToggleSelect={handleToggleSelect}
+              selectedScenes={selectedScenes as unknown as NormalizedScene[]}
+              onToggleSelect={handleToggleSelect as unknown as (scene: NormalizedScene) => void}
               onInitializing={handleInitializing}
             />
           );
@@ -303,7 +319,7 @@ const Home = () => {
             key={fetchKey}
             title={title}
             icon={icon}
-            fetchKey={fetchKey}
+            fetchKey={fetchKey!}
             createSceneClickHandler={createSceneClickHandler}
             carouselQueries={carouselQueries}
             selectedScenes={selectedScenes}
@@ -317,7 +333,7 @@ const Home = () => {
       {selectedScenes.length > 0 && (
         <>
           <BulkActionBar
-            selectedScenes={selectedScenes}
+            selectedScenes={selectedScenes as unknown as NormalizedScene[]}
             onClearSelection={handleClearSelection}
             actions={
               <>
@@ -334,14 +350,14 @@ const Home = () => {
                   </span>
                 </Button>
                 <AddToPlaylistButton
-                  sceneIds={selectedScenes.map((s) => s.id)}
+                  sceneIds={selectedScenes.map((s) => String(s.id))}
                   buttonText={
-                    <span>
+                    (<span>
                       <span className="hidden sm:inline">
                         Add {selectedScenes.length} to Playlist
                       </span>
                       <span className="sm:hidden">Add to Playlist</span>
-                    </span>
+                    </span>) as unknown as string
                   }
                   icon={<LucidePlus className="w-4 h-4" />}
                   dropdownPosition="above"
@@ -399,11 +415,12 @@ const HomeCarousel = ({
     queryKey,
     queryFn: () => fetchFunction(),
   });
+  const errorAny = error as (Error & { isInitializing?: boolean }) | null;
   const refetch = () => queryClient.invalidateQueries({ queryKey: [...queryKey] });
 
   // Handle server initialization state
   useEffect(() => {
-    if (error?.isInitializing) {
+    if (errorAny?.isInitializing) {
       if (retryCount < 60) {
         // Max 60 retries (5 minutes at 5s intervals)
         onInitializing(true);
@@ -419,32 +436,32 @@ const HomeCarousel = ({
           error
         );
       }
-    } else if (!error) {
+    } else if (!errorAny) {
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
     }
-  }, [error, refetch, retryCount, onInitializing, title]);
+  }, [errorAny, refetch, retryCount, onInitializing, title]);
 
   // Silently skip failed carousels (non-initialization errors only)
-  if (error && !error.isInitializing) {
+  if (errorAny && !errorAny.isInitializing) {
     console.error(`Failed to load carousel "${title}":`, error);
     return null;
   }
 
   // During initialization, show loading skeletons
   // Keep component mounted to allow retry useEffect to continue running
-  const isInitializing = error?.isInitializing;
+  const isInitializing = errorAny?.isInitializing;
 
   return (
     <SceneCarousel
-      loading={loading || isInitializing}
+      loading={loading || !!isInitializing}
       title={title}
       titleIcon={icon}
-      scenes={scenes || []}
-      onSceneClick={createSceneClickHandler(scenes || [], title)}
-      selectedScenes={selectedScenes}
-      onToggleSelect={onToggleSelect}
-      seeMoreUrl={getSeeMoreUrl(fetchKey)}
+      scenes={(scenes || []) as unknown as NormalizedScene[]}
+      onSceneClick={createSceneClickHandler((scenes || []) as Record<string, unknown>[], title) as unknown as (scene: NormalizedScene) => boolean | void}
+      selectedScenes={selectedScenes as unknown as NormalizedScene[]}
+      onToggleSelect={onToggleSelect as unknown as (scene: NormalizedScene) => void}
+      seeMoreUrl={getSeeMoreUrl(fetchKey) || undefined}
     />
   );
 };
@@ -482,7 +499,7 @@ const CustomCarousel = ({
   const fetchCarousel = useCallback(async () => {
     setLoading(true);
     try {
-      const { scenes: fetchedScenes } = await libraryApi.executeCarousel(carouselId);
+      const { scenes: fetchedScenes } = await libraryApi.executeCarousel(carouselId) as Record<string, any>;
       setScenes(fetchedScenes || []);
       setError(null);
       onInitializing(false);
@@ -491,7 +508,7 @@ const CustomCarousel = ({
       if (err instanceof ApiError && err.status === 503) {
         setError({ isInitializing: true, message: err.message });
       } else {
-        setError(err);
+        setError(err as Record<string, unknown>);
         console.error(`Failed to load custom carousel "${title}":`, err);
       }
     } finally {
@@ -540,17 +557,17 @@ const CustomCarousel = ({
 
   return (
     <SceneCarousel
-      loading={loading || isInitializing}
+      loading={loading || !!isInitializing}
       title={title}
       titleIcon={icon}
-      scenes={scenes}
-      onSceneClick={createSceneClickHandler(scenes, title)}
-      selectedScenes={selectedScenes}
-      onToggleSelect={onToggleSelect}
+      scenes={scenes as unknown as NormalizedScene[]}
+      onSceneClick={createSceneClickHandler(scenes, title) as unknown as (scene: NormalizedScene) => boolean | void}
+      selectedScenes={selectedScenes as unknown as NormalizedScene[]}
+      onToggleSelect={onToggleSelect as unknown as (scene: NormalizedScene) => void}
       seeMoreUrl={
         carousel
-          ? buildCustomCarouselUrl(carousel.rules, carousel.sort, carousel.direction)
-          : null
+          ? buildCustomCarouselUrl(carousel.rules as Record<string, unknown>, carousel.sort as string, carousel.direction as string)
+          : undefined
       }
     />
   );

@@ -17,7 +17,7 @@ const LazyThumbnail = ({ src, alt, fallback, className }: Props) => {
 
   return (
     <div
-      ref={ref}
+      ref={ref as React.Ref<HTMLDivElement>}
       className={className}
       style={{ backgroundColor: "var(--bg-secondary)" }}
     >

@@ -10,7 +10,7 @@
  * @param {string} hex - Hex color (e.g., "#0a0a0b")
  * @returns {[number, number, number]} [hue, saturation, lightness]
  */
-function hexToHSL(hex) {
+function hexToHSL(hex: string): [number, number, number] {
   // Remove # if present
   hex = hex.replace(/^#/, "");
 
@@ -53,7 +53,7 @@ function hexToHSL(hex) {
  * @param {number} l - Lightness (0-100)
  * @returns {string} Hex color
  */
-function hslToHex(h, s, l) {
+function hslToHex(h: number, s: number, l: number): string {
   h = h / 360;
   s = s / 100;
   l = l / 100;
@@ -63,7 +63,7 @@ function hslToHex(h, s, l) {
   if (s === 0) {
     r = g = b = l;
   } else {
-    const hue2rgb = (p, q, t) => {
+    const hue2rgb = (p: number, q: number, t: number): number => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
       if (t < 1 / 6) return p + (q - p) * 6 * t;
@@ -80,7 +80,7 @@ function hslToHex(h, s, l) {
     b = hue2rgb(p, q, h - 1 / 3);
   }
 
-  const toHex = (x) => {
+  const toHex = (x: number): string => {
     const hex = Math.round(x * 255).toString(16);
     return hex.length === 1 ? "0" + hex : hex;
   };
@@ -94,7 +94,7 @@ function hslToHex(h, s, l) {
  * @param {number} amount - Amount to adjust (-100 to +100)
  * @returns {string} Adjusted hex color
  */
-export function adjustLightness(hex, amount) {
+export function adjustLightness(hex: string, amount: number): string {
   const [h, s, l] = hexToHSL(hex);
   const newL = Math.max(0, Math.min(100, l + amount));
   return hslToHex(h, s, newL);
@@ -106,7 +106,7 @@ export function adjustLightness(hex, amount) {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Text color scale
  */
-export function generateTextScale(baseColor, mode = "dark") {
+export function generateTextScale(baseColor: string, mode = "dark"): Record<string, string> {
   if (mode === "dark") {
     // Dark mode: start white, go darker
     return {
@@ -130,7 +130,7 @@ export function generateTextScale(baseColor, mode = "dark") {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Shadow definitions
  */
-export function generateShadows(accentColor, mode = "dark") {
+export function generateShadows(accentColor: string, mode = "dark"): Record<string, string> {
   // Extract RGB from hex for rgba shadows
   const hex = accentColor.replace(/^#/, "");
   const r = parseInt(hex.substr(0, 2), 16);
@@ -151,7 +151,7 @@ export function generateShadows(accentColor, mode = "dark") {
  * @param {string} accentColor - Primary accent color (hex)
  * @returns {Object} Focus ring styles
  */
-export function generateFocusRing(accentColor) {
+export function generateFocusRing(accentColor: string): Record<string, string> {
   // Extract RGB for rgba shadow
   const hex = accentColor.replace(/^#/, "");
   const r = parseInt(hex.substr(0, 2), 16);
@@ -172,7 +172,7 @@ export function generateFocusRing(accentColor) {
  * @param {string} hex - Hex color
  * @returns {Object} RGB values { r, g, b }
  */
-function hexToRgb(hex) {
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace(/^#/, "");
   return {
     r: parseInt(h.substr(0, 2), 16),
@@ -187,11 +187,11 @@ function hexToRgb(hex) {
  * @param {Object} status - Status colors { success, error, info, warning }
  * @returns {Object} Complete status color definitions
  */
-export function generateStatusColors(status) {
-  const colors = {};
+export function generateStatusColors(status: Record<string, string>): Record<string, string> {
+  const colors: Record<string, string> = {};
 
   // Generate for each status type
-  Object.entries(status).forEach(([type, baseColor]) => {
+  Object.entries(status).forEach(([type, baseColor]: [string, string]) => {
     const rgb = hexToRgb(baseColor);
 
     colors[`--status-${type}`] = baseColor; // Base color
@@ -210,11 +210,11 @@ export function generateStatusColors(status) {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Toast color definitions
  */
-export function generateToastColors(status, mode = "dark") {
-  const colors = {};
+export function generateToastColors(status: Record<string, string>, mode = "dark"): Record<string, string> {
+  const colors: Record<string, string> = {};
 
   // Generate for each status type
-  Object.entries(status).forEach(([type, baseColor]) => {
+  Object.entries(status).forEach(([type, baseColor]: [string, string]) => {
     // Toast backgrounds are slightly darker/more saturated versions
     const toastBg = adjustLightness(baseColor, mode === "dark" ? -8 : -12);
 

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -22,7 +22,7 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for performers page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "table", label: "Table view" },
 ];
@@ -64,12 +64,12 @@ const Performers = () => {
   );
 
   const findPerformers = (data as Record<string, unknown>)?.findPerformers as Record<string, unknown> | undefined;
-  const currentPerformers = (findPerformers?.performers as unknown[]) || [];
+  const currentPerformers = (findPerformers?.performers as Record<string, unknown>[]) || [];
   const totalCount = (findPerformers?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
@@ -77,7 +77,6 @@ const Performers = () => {
   const {
     isTVMode,
     tvNavigation,
-    _gridNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -145,7 +144,8 @@ const Performers = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -158,13 +158,13 @@ const Performers = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) =>
+          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
+                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="performer"
@@ -195,9 +195,9 @@ const Performers = () => {
               )
             ) : viewMode === "table" ? (
               <TableView
-                items={currentPerformers}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentPerformers as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="performer"
@@ -214,12 +214,12 @@ const Performers = () => {
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentPerformers.map((performer, index) => {
+                {currentPerformers.map((performer: Record<string, unknown>, index: number) => {
                   const itemProps = gridItemProps(index);
                   return (
                     <PerformerCard
-                      key={performer.id}
-                      performer={performer}
+                      key={performer.id as string}
+                      performer={performer as unknown as import("@peek/shared-types").NormalizedPerformer}
                       isTVMode={isTVMode}
                       fromPageTitle="Performers"
                       {...itemProps}
@@ -228,7 +228,7 @@ const Performers = () => {
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>

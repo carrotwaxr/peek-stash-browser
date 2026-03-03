@@ -172,7 +172,7 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
     );
 
     // Handle navigation - navigate with autoplay state
-    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, hasMultipleInstances);
+    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId } as unknown as Record<string, unknown>, clip.seconds ?? 0, hasMultipleInstances);
     const handleNavigate = () => {
       if (onClick) {
         onClick(clip);
@@ -187,7 +187,7 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
       <BaseCard
         ref={ref}
         entityType="clip"
-        entity={clip}
+        entity={clip as unknown as Record<string, unknown>}
         linkTo={clipUrl}
         fromPageTitle={fromPageTitle}
         // Content (imagePath not needed - ClipCardPreview handles image/video)
@@ -202,10 +202,10 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
           entityId: clip.id,
           entityTitle: title,
           onHideSuccess,
-          showRating: clipSettings.showRating,
-          showFavorite: clipSettings.showFavorite,
-          showOCounter: clipSettings.showOCounter,
-          showMenu: clipSettings.showMenu,
+          showRating: clipSettings.showRating as boolean | undefined,
+          showFavorite: clipSettings.showFavorite as boolean | undefined,
+          showOCounter: clipSettings.showOCounter as boolean | undefined,
+          showMenu: clipSettings.showMenu as boolean | undefined,
         }}
         // Render slots
         renderImageContent={renderImageContent}

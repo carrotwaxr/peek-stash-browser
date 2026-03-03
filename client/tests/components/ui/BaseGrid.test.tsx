@@ -11,7 +11,7 @@ describe("BaseGrid", () => {
   it("renders with standard grid type", () => {
     const element = BaseGrid({
       items: mockItems,
-      renderItem: (item) => item.name,
+      renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "standard",
     });
 
@@ -23,7 +23,7 @@ describe("BaseGrid", () => {
   it("renders with scene grid type", () => {
     const element = BaseGrid({
       items: mockItems,
-      renderItem: (item) => item.name,
+      renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "scene",
     });
 
@@ -61,7 +61,7 @@ describe("BaseGrid", () => {
   it("renders fragment with grid and pagination when totalPages > 1", () => {
     const element = BaseGrid({
       items: mockItems,
-      renderItem: (item) => item.name,
+      renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "standard",
       currentPage: 1,
       totalPages: 5,

@@ -1,11 +1,21 @@
 import { getGridClasses } from "../../constants/grids";
-import ClipCard from "../cards/ClipCard";
+import ClipCard, { type Clip } from "../cards/ClipCard";
 import { SkeletonSceneCard } from "../ui/index";
 
 /**
  * ClipGrid - Grid display for clip entities
  * Follows SceneGrid patterns for consistency
  */
+interface ClipGridProps {
+  clips: Clip[] | Record<string, unknown>[];
+  density?: string;
+  loading?: boolean;
+  onClipClick?: (clip: Clip | Record<string, unknown>) => void;
+  fromPageTitle?: string;
+  emptyMessage?: string;
+  emptyDescription?: string;
+}
+
 const ClipGrid = ({
   clips,
   density = "medium",
@@ -14,7 +24,7 @@ const ClipGrid = ({
   fromPageTitle,
   emptyMessage = "No clips found",
   emptyDescription = "Try adjusting your search filters",
-}) => {
+}: ClipGridProps) => {
   // Use scene grid classes since clips have same 16:9 aspect ratio
   const gridClasses = getGridClasses("scene", density);
 
@@ -49,11 +59,11 @@ const ClipGrid = ({
 
   return (
     <div className={gridClasses}>
-      {clips.map((clip) => (
+      {clips.map((clip: Clip | Record<string, unknown>) => (
         <ClipCard
-          key={clip.id}
-          clip={clip}
-          onClick={onClipClick}
+          key={(clip as Clip).id}
+          clip={clip as Clip}
+          onClick={onClipClick as ((clip: Clip) => void) | undefined}
           fromPageTitle={fromPageTitle}
           tabIndex={0}
         />

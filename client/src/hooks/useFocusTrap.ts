@@ -9,8 +9,8 @@ import React, { useEffect, useRef } from "react";
  * @returns {Object} Ref to attach to container element
  */
 export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = null) => {
-  const containerRef = useRef(null);
-  const previousActiveElement = useRef(null);
+  const containerRef = useRef<HTMLElement | null>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!enabled || !containerRef.current) return;
@@ -18,7 +18,7 @@ export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = nul
     const container = containerRef.current;
 
     // Store the previously focused element
-    previousActiveElement.current = document.activeElement;
+    previousActiveElement.current = document.activeElement as HTMLElement | null;
 
     // Get all focusable elements within the container
     const getFocusableElements = () => {
@@ -31,7 +31,7 @@ export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = nul
         '[tabindex]:not([tabindex="-1"])',
       ].join(", ");
 
-      return Array.from(container.querySelectorAll(focusableSelectors));
+      return Array.from(container.querySelectorAll(focusableSelectors)) as HTMLElement[];
     };
 
     // Focus the first focusable element
@@ -40,7 +40,7 @@ export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = nul
       focusableElements[0].focus();
     }
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       const focusableElements = getFocusableElements();
 
       if (focusableElements.length === 0) return;
@@ -131,8 +131,8 @@ export const useInitialFocus = (
         elementToFocus = container.querySelector(focusableSelectors);
       }
 
-      if (elementToFocus && elementToFocus.focus) {
-        elementToFocus.focus();
+      if (elementToFocus && (elementToFocus as HTMLElement).focus) {
+        (elementToFocus as HTMLElement).focus();
       }
     }, 100);
 

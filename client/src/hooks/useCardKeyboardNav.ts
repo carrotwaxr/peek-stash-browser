@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -17,7 +17,7 @@ export const useCardKeyboardNav = ({ linkTo, onCustomAction }: UseCardKeyboardNa
   const navigate = useNavigate();
 
   const onKeyDown = useCallback(
-    (e) => {
+    (e: React.KeyboardEvent<HTMLElement>) => {
       // Only handle if card (or child) is focused
       if (
         e.currentTarget !== document.activeElement &&
@@ -27,7 +27,7 @@ export const useCardKeyboardNav = ({ linkTo, onCustomAction }: UseCardKeyboardNa
       }
 
       // Ignore if in input field
-      const target = e.target;
+      const target = e.target as HTMLElement;
       const isInputField =
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||

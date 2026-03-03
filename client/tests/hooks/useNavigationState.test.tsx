@@ -5,12 +5,12 @@ import { MemoryRouter } from "react-router-dom";
 import { useNavigationState } from "../../src/hooks/useNavigationState";
 
 // Wrapper to provide router context with location state
-const createWrapper = (initialEntries = ["/"], state = null) => {
+const createWrapper = (initialEntries = ["/"], state: Record<string, unknown> | null = null) => {
   const entries = state
     ? [{ pathname: initialEntries[0], state }]
     : initialEntries;
-  return ({ children }) => (
-    <MemoryRouter initialEntries={entries}>{children}</MemoryRouter>
+  return ({ children }: { children: React.ReactNode }) => (
+    <MemoryRouter initialEntries={entries as any}>{children}</MemoryRouter>
   );
 };
 

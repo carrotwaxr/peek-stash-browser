@@ -7,14 +7,14 @@ interface Props {
 }
 
 const VersionInfoSection = ({ clientVersion }: Props) => {
-  const [serverVersion, setServerVersion] = useState(null);
-  const [latestVersion, setLatestVersion] = useState(null);
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [updateError, setUpdateError] = useState(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const loadServerVersion = useCallback(async () => {
     try {
-      const data = await apiGet("/version");
+      const data = await apiGet<{ server: string }>("/version");
       setServerVersion(data.server);
     } catch (err) {
       console.error("Failed to load server version:", err);

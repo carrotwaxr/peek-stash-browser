@@ -13,6 +13,9 @@ import {
   ConfigProvider,
   useConfig,
 } from "../../src/contexts/ConfigContext";
+import type { Mock } from "vitest";
+
+const getSetupStatusMock = setupApi.getSetupStatus as unknown as Mock;
 
 /**
  * Helper component that renders config values as text for assertion.
@@ -35,7 +38,7 @@ describe("ConfigContext", () => {
   describe("ConfigProvider", () => {
     it("has isLoading=true and hasMultipleInstances=false before fetch resolves", () => {
       // Never-resolving promise to keep the provider in loading state
-      setupApi.getSetupStatus.mockReturnValue(new Promise(() => {}));
+      getSetupStatusMock.mockReturnValue(new Promise(() => {}));
 
       render(
         <ConfigProvider>
@@ -48,7 +51,7 @@ describe("ConfigContext", () => {
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is 1", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({ stashInstanceCount: 1 });
+      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 1 });
 
       render(
         <ConfigProvider>
@@ -64,7 +67,7 @@ describe("ConfigContext", () => {
     });
 
     it("sets hasMultipleInstances=true when stashInstanceCount > 1", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({ stashInstanceCount: 3 });
+      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 3 });
 
       render(
         <ConfigProvider>
@@ -80,7 +83,7 @@ describe("ConfigContext", () => {
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is 0", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({ stashInstanceCount: 0 });
+      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 0 });
 
       render(
         <ConfigProvider>
@@ -96,7 +99,7 @@ describe("ConfigContext", () => {
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is undefined", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({});
+      getSetupStatusMock.mockResolvedValue({});
 
       render(
         <ConfigProvider>
@@ -112,7 +115,7 @@ describe("ConfigContext", () => {
     });
 
     it("sets hasMultipleInstances=false when stashInstanceCount is null", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({
+      getSetupStatusMock.mockResolvedValue({
         stashInstanceCount: null,
       });
 
@@ -133,7 +136,7 @@ describe("ConfigContext", () => {
       const consoleSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
-      setupApi.getSetupStatus.mockRejectedValue(new Error("Network error"));
+      getSetupStatusMock.mockRejectedValue(new Error("Network error"));
 
       render(
         <ConfigProvider>
@@ -155,7 +158,7 @@ describe("ConfigContext", () => {
     });
 
     it("renders children correctly", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({ stashInstanceCount: 1 });
+      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 1 });
 
       render(
         <ConfigProvider>
@@ -181,9 +184,9 @@ describe("ConfigContext", () => {
     });
 
     it("returns fetched config values when used inside a provider", async () => {
-      setupApi.getSetupStatus.mockResolvedValue({ stashInstanceCount: 2 });
+      getSetupStatusMock.mockResolvedValue({ stashInstanceCount: 2 });
 
-      const wrapper = ({ children }) => (
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
         <ConfigProvider>{children}</ConfigProvider>
       );
 

@@ -17,6 +17,16 @@ interface UserItem {
   groups?: Array<{ id: number; name: string }>;
 }
 
+interface GroupItem {
+  id: number;
+  name: string;
+  description?: string;
+  memberCount?: number;
+  canShare?: boolean;
+  canDownloadFiles?: boolean;
+  canDownloadPlaylists?: boolean;
+}
+
 interface Props {
   users: UserItem[];
   currentUser: UserItem | null;
@@ -34,19 +44,19 @@ const UserManagementSection = ({
 }: Props) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [syncTargetUser, setSyncTargetUser] = useState(null);
-  const [groups, setGroups] = useState([]);
+  const [syncTargetUser, setSyncTargetUser] = useState<UserItem | null>(null);
+  const [groups, setGroups] = useState<GroupItem[]>([]);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingGroup, setEditingGroup] = useState<GroupItem | null>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
 
   // Load groups on mount
   const loadGroups = async () => {
     try {
       const response = await getGroups();
-      setGroups(response.groups || []);
+      setGroups((response.groups as GroupItem[]) || []);
     } catch (err) {
-      onError(err.message || "Failed to load groups");
+      onError((err as Error).message || "Failed to load groups");
     }
   };
 
@@ -61,7 +71,7 @@ const UserManagementSection = ({
     setShowGroupModal(true);
   };
 
-  const handleEditGroup = (group: Record<string, unknown>) => {
+  const handleEditGroup = (group: GroupItem) => {
     setEditingGroup(group);
     setShowGroupModal(true);
   };
@@ -72,12 +82,12 @@ const UserManagementSection = ({
     }
 
     try {
-      await deleteGroup(group.id);
+      await deleteGroup(String(group.id));
       onMessage(`Group "${group.name}" deleted successfully`);
       loadGroups();
       onUsersChanged(); // Refresh users to update their group badges
     } catch (err) {
-      onError(err.message || "Failed to delete group");
+      onError((err as Error).message || "Failed to delete group");
     }
   };
 
@@ -94,7 +104,7 @@ const UserManagementSection = ({
     onUsersChanged(); // Refresh users to update their group badges
   };
 
-  const renderPermissionBadges = (group: Record<string, unknown>) => {
+  const renderPermissionBadges = (group: GroupItem) => {
     const badges = [];
 
     if (group?.canShare) {
@@ -175,8 +185,8 @@ const UserManagementSection = ({
     }
   };
 
-  const openSyncModal = (user: UserItem) => {
-    setSyncTargetUser(user);
+  const openSyncModal = (targetUser: UserItem) => {
+    setSyncTargetUser(targetUser);
     setShowSyncModal(true);
   };
 

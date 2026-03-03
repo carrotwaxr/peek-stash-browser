@@ -31,17 +31,17 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         );
 
       const groupsTooltip = getIndicatorBehavior('performer', 'groups') === 'rich' &&
-        performer.groups?.length > 0 && (
+        (performer.groups?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="group" entities={performer.groups} title="Collections" parentInstanceId={performer.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('performer', 'galleries') === 'rich' &&
-        performer.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={performer.galleries} title="Galleries" parentInstanceId={performer.instanceId} />
+        (performer.galleries?.length ?? 0) > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={performer.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={performer.instanceId} />
         );
 
       const studiosTooltip = getIndicatorBehavior('performer', 'studios') === 'rich' &&
-        performer.studios?.length > 0 && (
+        (performer.studios?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="studio" entities={performer.studios} title="Studios" parentInstanceId={performer.instanceId} />
         );
 
@@ -50,7 +50,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         {
           type: "SCENES",
           count: performer.scene_count,
-          onClick: performer.scene_count > 0 ? () => navigate(appendInstanceParam(`/scenes?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
+          onClick: performer.scene_count > 0 ? () => navigate(appendInstanceParam(`/scenes?performerId=${performer.id}`, performer as unknown as Record<string, unknown>, hasMultipleInstances)) : undefined,
         },
         {
           type: "GROUPS",
@@ -60,7 +60,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         {
           type: "IMAGES",
           count: performer.image_count,
-          onClick: performer.image_count > 0 ? () => navigate(appendInstanceParam(`/images?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
+          onClick: performer.image_count > 0 ? () => navigate(appendInstanceParam(`/images?performerId=${performer.id}`, performer as unknown as Record<string, unknown>, hasMultipleInstances)) : undefined,
         },
         {
           type: "GALLERIES",
@@ -94,13 +94,13 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
             <GenderIcon gender={performer.gender} size={16} />
           </div>
         }
-        linkTo={getEntityPath('performer', performer, hasMultipleInstances)}
+        linkTo={getEntityPath('performer', performer as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
         description={performer.details}
         hideSubtitle
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: performerSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: performerSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={{
           entityId: performer.id,
           instanceId: performer.instanceId,
@@ -108,10 +108,10 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,
           onHideSuccess,
-          showRating: performerSettings.showRating,
-          showFavorite: performerSettings.showFavorite,
-          showOCounter: performerSettings.showOCounter,
-          showMenu: performerSettings.showMenu,
+          showRating: performerSettings.showRating as boolean | undefined,
+          showFavorite: performerSettings.showFavorite as boolean | undefined,
+          showOCounter: performerSettings.showOCounter as boolean | undefined,
+          showMenu: performerSettings.showMenu as boolean | undefined,
         }}
         {...rest}
       />

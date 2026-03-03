@@ -11,20 +11,20 @@ const CustomizationTab = () => {
   const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
   const [wallPlayback, setWallPlayback] = useState("autoplay");
   const [lightboxDoubleTapAction, setLightboxDoubleTapAction] = useState("favorite");
-  const [tableColumnDefaults, setTableColumnDefaults] = useState({});
+  const [tableColumnDefaults, setTableColumnDefaults] = useState<Record<string, { visible: string[]; order: string[] }>>({});
 
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const data = await apiGet("/user/settings");
+        const data = await apiGet<{ settings: Record<string, unknown> }>("/user/settings");
         const { settings } = data;
 
-        setPreferredPreviewQuality(settings.preferredPreviewQuality || "sprite");
-        setWallPlayback(settings.wallPlayback || "autoplay");
-        setLightboxDoubleTapAction(settings.lightboxDoubleTapAction || "favorite");
-        setTableColumnDefaults(settings.tableColumnDefaults || {});
+        setPreferredPreviewQuality((settings.preferredPreviewQuality as string) || "sprite");
+        setWallPlayback((settings.wallPlayback as string) || "autoplay");
+        setLightboxDoubleTapAction((settings.lightboxDoubleTapAction as string) || "favorite");
+        setTableColumnDefaults((settings.tableColumnDefaults as Record<string, { visible: string[]; order: string[] }>) || {});
       } catch {
         showError("Failed to load customization settings");
       } finally {
@@ -35,7 +35,7 @@ const CustomizationTab = () => {
     loadSettings();
   }, []);
 
-  const saveViewPreference = async (key, value) => {
+  const saveViewPreference = async (key: string, value: string) => {
     try {
       await apiPut("/user/settings", {
         [key]: value,
@@ -54,7 +54,7 @@ const CustomizationTab = () => {
     }
   };
 
-  const saveTableColumnDefaults = async (newDefaults) => {
+  const saveTableColumnDefaults = async (newDefaults: Record<string, { visible: string[]; order: string[] }>) => {
     try {
       await apiPut("/user/settings", {
         tableColumnDefaults: newDefaults,
@@ -169,7 +169,7 @@ const CustomizationTab = () => {
             <select
               id="unitPreference"
               value={unitPreference}
-              onChange={(e) => setUnitPreference(e.target.value)}
+              onChange={(e) => (setUnitPreference as (v: string) => void)(e.target.value)}
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",

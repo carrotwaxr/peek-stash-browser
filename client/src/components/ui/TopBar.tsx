@@ -21,7 +21,7 @@ import UserMenu from "./UserMenu";
  */
 interface NavPreference {
   id: string;
-  visible: boolean;
+  enabled: boolean;
   order: number;
 }
 
@@ -47,7 +47,9 @@ const TopBar = ({ navPreferences = [] }: Props) => {
   );
 
   // Get ordered and filtered nav items based on user preferences
-  const navItems = getOrderedNavItems(navPreferences);
+  const navItems = getOrderedNavItems(navPreferences).filter(
+    (item): item is NonNullable<typeof item> => item != null
+  );
 
   // Get current page from React Router location
   const getCurrentPage = () => {

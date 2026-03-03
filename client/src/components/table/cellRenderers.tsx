@@ -11,7 +11,13 @@ import {
   formatDate,
   calculateAge,
 } from "./formatters";
-import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
+import { getEntityPath as _getEntityPath, getScenePathWithTime as _getScenePathWithTime } from "../../utils/entityLinks";
+
+// Wrappers that default `hasMultipleInstances` to false
+const getEntityPath = (type: string, entity: Parameters<typeof _getEntityPath>[1], hasMultipleInstances?: boolean) =>
+  _getEntityPath(type, entity, hasMultipleInstances ?? false);
+const getScenePathWithTime = (entity: Parameters<typeof _getScenePathWithTime>[0], time: Parameters<typeof _getScenePathWithTime>[1], hasMultipleInstances?: boolean) =>
+  _getScenePathWithTime(entity, time, hasMultipleInstances ?? false);
 
 // ============================================================================
 // Cell Components
@@ -59,11 +65,11 @@ export const FavoriteCell = ({ favorite }: FavoriteCellProps) => {
 const getThumbnailDimensions = (entityType: string | undefined): { width: string; height: string } => {
   const normalizedType = entityType?.toLowerCase();
   // Portrait entities (2/3 aspect ratio)
-  if (["performer", "performers", "gallery", "galleries", "group", "groups"].includes(normalizedType)) {
+  if (normalizedType && ["performer", "performers", "gallery", "galleries", "group", "groups"].includes(normalizedType)) {
     return { width: "w-10", height: "h-14" };
   }
   // Square for images (variable aspect ratio)
-  if (["image", "images"].includes(normalizedType)) {
+  if (normalizedType && ["image", "images"].includes(normalizedType)) {
     return { width: "w-10", height: "h-10" };
   }
   // Landscape (16/9) for scenes, studios, tags (default)
@@ -102,7 +108,7 @@ export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }: ThumbnailCe
       className={`${sizeClasses} object-cover rounded`}
       loading="lazy"
       onError={(e) => {
-        e.target.style.display = "none";
+        (e.target as HTMLImageElement).style.display = "none";
       }}
     />
   );
@@ -191,11 +197,15 @@ const SimpleValueCell = ({ value }: SimpleValueCellProps) => {
 // Entity-Specific Cell Renderers
 // ============================================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Entity = Record<string, any>;
+type RendererFn = (entity: Entity, options?: CellRendererOptions) => React.ReactNode;
+type RendererMap = Record<string, RendererFn>;
+
 /**
  * Scene cell renderers
- * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const sceneRenderers = {
+const sceneRenderers: RendererMap = {
   title: (scene, options = {}) => (
     <LinkCell text={scene.title || `Scene ${scene.id}`} linkTo={getEntityPath('scene', scene, options.hasMultipleInstances)} />
   ),
@@ -217,7 +227,7 @@ const sceneRenderers = {
     return <LinkCell text={scene.studio.name} linkTo={getEntityPath('studio', scene.studio, options.hasMultipleInstances)} />;
   },
   performers: (scene, options = {}) => {
-    const items = (scene.performers || []).map((p) => ({
+    const items = (scene.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
       linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
@@ -225,7 +235,7 @@ const sceneRenderers = {
     return <MultiValueCell items={items} />;
   },
   tags: (scene, options = {}) => {
-    const items = (scene.tags || []).map((t) => ({
+    const items = (scene.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
       linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
@@ -248,9 +258,8 @@ const sceneRenderers = {
 
 /**
  * Performer cell renderers
- * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const performerRenderers = {
+const performerRenderers: RendererMap = {
   name: (performer, options = {}) => (
     <LinkCell text={performer.name} linkTo={getEntityPath('performer', performer, options.hasMultipleInstances)} />
   ),
@@ -308,7 +317,7 @@ const StudioLogoCell = ({ src, alt = "", linkTo }: StudioLogoCellProps) => {
         className="max-w-full max-h-full object-contain"
         loading="lazy"
         onError={(e) => {
-          e.target.style.display = "none";
+          (e.target as HTMLImageElement).style.display = "none";
         }}
       />
     </div>
@@ -329,7 +338,7 @@ const StudioLogoCell = ({ src, alt = "", linkTo }: StudioLogoCellProps) => {
  * Studio cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const studioRenderers = {
+const studioRenderers: RendererMap = {
   name: (studio, options = {}) => (
     <LinkCell text={studio.name} linkTo={getEntityPath('studio', studio, options.hasMultipleInstances)} />
   ),
@@ -360,7 +369,7 @@ const studioRenderers = {
  * Tag cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const tagRenderers = {
+const tagRenderers: RendererMap = {
   name: (tag, options = {}) => <LinkCell text={tag.name} linkTo={getEntityPath('tag', tag, options.hasMultipleInstances)} />,
   image: (tag, options = {}) => (
     <ThumbnailCell
@@ -381,7 +390,7 @@ const tagRenderers = {
  * Gallery cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const galleryRenderers = {
+const galleryRenderers: RendererMap = {
   title: (gallery, options = {}) => (
     <LinkCell
       text={gallery.title || `Gallery ${gallery.id}`}
@@ -405,7 +414,7 @@ const galleryRenderers = {
     return <LinkCell text={gallery.studio.name} linkTo={getEntityPath('studio', gallery.studio, options.hasMultipleInstances)} />;
   },
   performers: (gallery, options = {}) => {
-    const items = (gallery.performers || []).map((p) => ({
+    const items = (gallery.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
       linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
@@ -413,7 +422,7 @@ const galleryRenderers = {
     return <MultiValueCell items={items} />;
   },
   tags: (gallery, options = {}) => {
-    const items = (gallery.tags || []).map((t) => ({
+    const items = (gallery.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
       linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
@@ -431,7 +440,7 @@ const galleryRenderers = {
  * Image cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const imageRenderers = {
+const imageRenderers: RendererMap = {
   title: (image, options = {}) => (
     <LinkCell
       text={image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`}
@@ -454,7 +463,7 @@ const imageRenderers = {
     return <LinkCell text={image.studio.name} linkTo={getEntityPath('studio', image.studio, options.hasMultipleInstances)} />;
   },
   performers: (image, options = {}) => {
-    const items = (image.performers || []).map((p) => ({
+    const items = (image.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
       linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
@@ -462,7 +471,7 @@ const imageRenderers = {
     return <MultiValueCell items={items} />;
   },
   tags: (image, options = {}) => {
-    const items = (image.tags || []).map((t) => ({
+    const items = (image.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
       linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
@@ -488,7 +497,7 @@ const imageRenderers = {
  * Group cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const groupRenderers = {
+const groupRenderers: RendererMap = {
   name: (group, options = {}) => (
     <LinkCell text={group.name} linkTo={getEntityPath('group', group, options.hasMultipleInstances)} />
   ),
@@ -513,7 +522,7 @@ const groupRenderers = {
   performers: (group, options = {}) => {
     // Groups don't have performers directly, but scenes in group do
     // This would need API support to aggregate performers across scenes
-    const items = (group.performers || []).map((p) => ({
+    const items = (group.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
       linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
@@ -521,7 +530,7 @@ const groupRenderers = {
     return <MultiValueCell items={items} />;
   },
   tags: (group, options = {}) => {
-    const items = (group.tags || []).map((t) => ({
+    const items = (group.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
       linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
@@ -558,7 +567,7 @@ const TagLinkCell = ({ tag, hasMultipleInstances }: TagLinkCellProps) => {
  * Clip cell renderers
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
-const clipRenderers = {
+const clipRenderers: RendererMap = {
   title: (clip, options = {}) => (
     <LinkCell
       text={clip.title || "Untitled"}
@@ -590,7 +599,7 @@ const clipRenderers = {
       />
     );
   },
-  primary_tag: (clip, options = {}) => <TagLinkCell tag={clip.primaryTag} hasMultipleInstances={options.hasMultipleInstances} />,
+  primary_tag: (clip, options = {}) => <TagLinkCell tag={clip.primaryTag} hasMultipleInstances={options.hasMultipleInstances || false} />,
   start_time: (clip) => formatDuration(clip.seconds),
   duration: (clip) => {
     if (clip.endSeconds && clip.seconds) {
@@ -599,7 +608,7 @@ const clipRenderers = {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   },
   tags: (clip, options = {}) => {
-    const items = (clip.tags || []).map((t) => ({
+    const items = (clip.tags || []).map((t: Entity) => ({
       id: t.tag?.id || t.id,
       name: t.tag?.name || t.name,
       linkTo: getEntityPath('tag', { id: t.tag?.id || t.id, instanceId: t.tag?.instanceId || t.instanceId }, options.hasMultipleInstances),
@@ -615,7 +624,7 @@ const clipRenderers = {
 /**
  * Map of entity types to their renderers
  */
-const entityRenderers = {
+const entityRenderers: Record<string, RendererMap> = {
   scene: sceneRenderers,
   scenes: sceneRenderers,
   performer: performerRenderers,
@@ -644,21 +653,20 @@ interface CellRendererOptions {
 export const getCellRenderer = (columnId: string, entityType: string, options: CellRendererOptions = {}) => {
   const normalizedType = entityType?.toLowerCase();
   const renderers = entityRenderers[normalizedType];
-
   if (!renderers) {
     // Unknown entity type - return a simple fallback renderer
-    return (entity) => <SimpleValueCell value={entity[columnId]} />;
+    return (entity: Entity) => <SimpleValueCell value={entity[columnId]} />;
   }
 
   const renderer = renderers[columnId];
 
   if (!renderer) {
     // Unknown column - return a simple fallback renderer
-    return (entity) => <SimpleValueCell value={entity[columnId]} />;
+    return (entity: Entity) => <SimpleValueCell value={entity[columnId]} />;
   }
 
   // Return a wrapper function that passes options to the renderer
-  return (entity) => renderer(entity, options);
+  return (entity: Entity) => renderer(entity, options);
 };
 
 export default getCellRenderer;

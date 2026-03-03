@@ -36,7 +36,7 @@ vi.mock("react-swipeable", () => ({
 }));
 
 // Helper to create mock images
-const createMockImages = (page, perPage = 10) => {
+const createMockImages = (page: number, perPage = 10) => {
   return Array.from({ length: perPage }, (_, i) => ({
     id: `page${page}-image${i}`,
     paths: {
@@ -44,7 +44,7 @@ const createMockImages = (page, perPage = 10) => {
       thumbnail: `http://example.com/page${page}/thumb${i}.jpg`,
     },
     title: `Page ${page} Image ${i}`,
-  }));
+  })) as any[];
 };
 
 describe("Lightbox", () => {
@@ -102,8 +102,8 @@ describe("Lightbox", () => {
       const page2Images = createMockImages(2, 10);
 
       // Track all render states
-      const renderLog = [];
-      const RenderTracker = ({ images, initialIndex, isPageTransitioning, ...props }) => {
+      const renderLog: any[] = [];
+      const RenderTracker = ({ images, initialIndex, isPageTransitioning, ...props }: any) => {
         // Log every render's key values
         renderLog.push({
           timestamp: Date.now(),
@@ -231,7 +231,7 @@ describe("Lightbox", () => {
       );
 
       // Find the image container div (has visibility style)
-      const imageContainer = container.querySelector(".w-\\[90vw\\]");
+      const imageContainer = container.querySelector(".w-\\[90vw\\]") as HTMLElement;
       expect(imageContainer.style.visibility).toBe("visible");
 
       // Now transition
@@ -303,7 +303,7 @@ describe("Lightbox", () => {
       expect(getImgSrc()).toBe("http://example.com/page1/image0.jpg");
 
       // Verify container is hidden
-      const imageContainer = container.querySelector(".w-\\[90vw\\]");
+      const imageContainer = container.querySelector(".w-\\[90vw\\]") as HTMLElement;
       expect(imageContainer.style.visibility).toBe("hidden");
     });
 
@@ -334,7 +334,7 @@ describe("Lightbox", () => {
 
       const getImgSrc = () => container.querySelector("img")?.getAttribute("src");
       const getVisibility = () =>
-        container.querySelector(".w-\\[90vw\\]")?.style.visibility;
+        (container.querySelector(".w-\\[90vw\\]") as HTMLElement | null)?.style.visibility;
 
       expect(getImgSrc()).toBe("http://example.com/page1/image9.jpg");
 
@@ -381,7 +381,7 @@ describe("Lightbox", () => {
       expect(getImgSrc()).toBe("http://example.com/page2/image0.jpg");
 
       // Simulate image load — now the container becomes visible
-      const img = container.querySelector("img");
+      const img = container.querySelector("img")!;
       fireEvent.load(img);
 
       await act(async () => {
@@ -406,7 +406,7 @@ describe("Lightbox", () => {
         />
       );
 
-      const img = container.querySelector("img");
+      const img = container.querySelector("img")!;
 
       // Simulate image load
       fireEvent.load(img);
@@ -459,7 +459,7 @@ describe("Lightbox", () => {
         />
       );
 
-      const img = container.querySelector("img");
+      const img = container.querySelector("img")!;
       fireEvent.load(img);
       expect(img.style.opacity).toBe("1");
 
@@ -527,10 +527,10 @@ describe("Lightbox", () => {
       const onClose = vi.fn();
       render(
         <Lightbox
-          images={[{ id: "1", paths: { image: "/test.jpg" } }]}
+          images={[{ id: "1", paths: { image: "/test.jpg" } }] as any}
           isOpen={true}
           onClose={onClose}
-          supportsFullscreen={true}
+          {...{ supportsFullscreen: true } as any}
         />
       );
 

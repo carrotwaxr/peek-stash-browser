@@ -5,8 +5,8 @@ import { MemoryRouter, useSearchParams } from "react-router-dom";
 import FolderView from "../../../src/components/folder/FolderView";
 
 // Helper to capture URL search params
-let capturedSearchParams = null;
-const SearchParamsCapture = ({ children }) => {
+let capturedSearchParams: URLSearchParams | null = null;
+const SearchParamsCapture = ({ children }: { children: React.ReactNode }) => {
   const [searchParams] = useSearchParams();
   capturedSearchParams = searchParams;
   return children;
@@ -14,7 +14,7 @@ const SearchParamsCapture = ({ children }) => {
 
 // Wrapper to provide router context with initial URL
 const createWrapper = (initialEntries = ["/"]) => {
-  return ({ children }) => (
+  return ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>
       <SearchParamsCapture>{children}</SearchParamsCapture>
     </MemoryRouter>
@@ -43,14 +43,14 @@ describe("FolderView", () => {
         <FolderView
           items={sampleItems}
           tags={sampleTags}
-          renderItem={(item) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
       );
 
       // Verify we start on page 5
-      expect(capturedSearchParams.get("page")).toBe("5");
+      expect(capturedSearchParams!.get("page")).toBe("5");
 
       // Find and click the "Photo" folder card (has h3 with folder name)
       // The folder card has an h3 inside it, so we find that and click its parent button
@@ -61,7 +61,7 @@ describe("FolderView", () => {
       fireEvent.click(folderCards[0]);
 
       // After navigating into a folder, page should be reset (deleted = page 1)
-      expect(capturedSearchParams.get("page")).toBeNull();
+      expect(capturedSearchParams!.get("page")).toBeNull();
     });
 
     it("resets page to 1 when navigating out of a folder via breadcrumb", async () => {
@@ -73,15 +73,15 @@ describe("FolderView", () => {
         <FolderView
           items={sampleItems}
           tags={sampleTags}
-          renderItem={(item) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
       );
 
       // Verify we start on page 3 inside tag1
-      expect(capturedSearchParams.get("page")).toBe("3");
-      expect(capturedSearchParams.get("folderPath")).toBe("tag1");
+      expect(capturedSearchParams!.get("page")).toBe("3");
+      expect(capturedSearchParams!.get("folderPath")).toBe("tag1");
 
       // Find the breadcrumb nav and click "All" (root) within it
       const breadcrumbNav = screen.getByRole("navigation", { name: /folder navigation/i });
@@ -89,7 +89,7 @@ describe("FolderView", () => {
       fireEvent.click(allContentBreadcrumb);
 
       // After navigating, page should be reset
-      expect(capturedSearchParams.get("page")).toBeNull();
+      expect(capturedSearchParams!.get("page")).toBeNull();
     });
 
     it("resets page when clicking deeper into nested folders", async () => {
@@ -106,14 +106,14 @@ describe("FolderView", () => {
         <FolderView
           items={itemsWithSubfolder}
           tags={sampleTags}
-          renderItem={(item) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
       );
 
       // Verify we start on page 2
-      expect(capturedSearchParams.get("page")).toBe("2");
+      expect(capturedSearchParams!.get("page")).toBe("2");
 
       // Find and click the "Color" folder card (has h3 with folder name)
       const folderCards = screen.getAllByRole("button").filter(
@@ -123,9 +123,9 @@ describe("FolderView", () => {
       fireEvent.click(folderCards[0]);
 
       // After navigating deeper, page should be reset
-      expect(capturedSearchParams.get("page")).toBeNull();
+      expect(capturedSearchParams!.get("page")).toBeNull();
       // And folderPath should be updated
-      expect(capturedSearchParams.get("folderPath")).toBe("tag1,tag2");
+      expect(capturedSearchParams!.get("folderPath")).toBe("tag1,tag2");
     });
   });
 });

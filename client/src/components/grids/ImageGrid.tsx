@@ -24,7 +24,7 @@ const ImageGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="date"
       density={density}
-      renderItem={(image, _index, { onHideSuccess }) => (
+      renderItem={(image: any, _index: number, { onHideSuccess }: any) => (
         <ImageCard
           key={image.id}
           image={image}

@@ -13,7 +13,7 @@ import {
  * Site information for URL display
  * Returns name, icon component, and brand color for known sites
  */
-export const getSiteInfo = (url) => {
+export const getSiteInfo = (url: string) => {
   const urlLower = url.toLowerCase();
 
   // === Social Media ===
@@ -122,7 +122,7 @@ export const getSiteInfo = (url) => {
 /**
  * Extract domain from URL for favicon fetching
  */
-export const getDomainFromUrl = (url) => {
+export const getDomainFromUrl = (url: string) => {
   try {
     const urlObj = new URL(url);
     return urlObj.origin;

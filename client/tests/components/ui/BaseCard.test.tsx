@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { BaseCard } from "../../../src/components/ui/BaseCard";
+import { BaseCard, type BaseCardProps } from "../../../src/components/ui/BaseCard";
+
+// Cast for createElement usage since BaseCard is a forwardRef component
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BaseCardComponent = BaseCard as any;
 
 describe("BaseCard", () => {
   const defaultProps = {
@@ -23,7 +27,7 @@ describe("BaseCard", () => {
   });
 
   it("renders subtitle when provided", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       subtitle: "Test Subtitle",
     });
@@ -31,7 +35,7 @@ describe("BaseCard", () => {
   });
 
   it("hides subtitle when hideSubtitle is true", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       subtitle: "Test Subtitle",
       hideSubtitle: true,
@@ -41,7 +45,7 @@ describe("BaseCard", () => {
   });
 
   it("renders description when provided", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       description: "Test Description",
     });
@@ -49,7 +53,7 @@ describe("BaseCard", () => {
   });
 
   it("hides description when hideDescription is true", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       description: "Test Description",
       hideDescription: true,
@@ -59,7 +63,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts linkTo prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       linkTo: "/test-path",
     });
@@ -71,7 +75,7 @@ describe("BaseCard", () => {
       { label: "Scenes", count: 5, icon: "scene" },
       { label: "Images", count: 10, icon: "image" },
     ];
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       indicators,
     });
@@ -80,7 +84,7 @@ describe("BaseCard", () => {
 
   it("calls renderOverlay slot when provided", () => {
     const renderOverlay = vi.fn(() => createElement("div", {}, "Custom Overlay"));
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       renderOverlay,
     });
@@ -91,7 +95,7 @@ describe("BaseCard", () => {
     const renderAfterTitle = vi.fn(() =>
       createElement("div", {}, "After Title Content")
     );
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       renderAfterTitle,
     });
@@ -99,7 +103,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts className prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       className: "custom-class",
     });
@@ -108,7 +112,7 @@ describe("BaseCard", () => {
 
   it("accepts onClick prop", () => {
     const onClick = vi.fn();
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       onClick,
     });
@@ -123,7 +127,7 @@ describe("BaseCard", () => {
       initialOCounter: 5,
       entityTitle: "Test Scene",
     };
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       ratingControlsProps,
     });
@@ -131,7 +135,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts maxTitleLines prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       maxTitleLines: 3,
     });
@@ -139,7 +143,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts maxDescriptionLines prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       maxDescriptionLines: 5,
     });
@@ -147,7 +151,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts fromPageTitle prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       fromPageTitle: "Galleries",
     });
@@ -155,7 +159,7 @@ describe("BaseCard", () => {
   });
 
   it("accepts tabIndex prop", () => {
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       tabIndex: 0,
     });
@@ -164,7 +168,7 @@ describe("BaseCard", () => {
 
   it("accepts style prop", () => {
     const style = { backgroundColor: "red" };
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       style,
     });
@@ -175,7 +179,7 @@ describe("BaseCard", () => {
     const renderImageContent = vi.fn(() =>
       createElement("div", {}, "Image Content")
     );
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       ...defaultProps,
       renderImageContent,
     });
@@ -193,6 +197,7 @@ describe("BaseCard selection mode", () => {
         <BaseCard
           entityType="scene"
           entity={entity}
+          title="Scene"
           linkTo="/scene/1"
           selectionMode={true}
           onToggleSelect={onToggleSelect}
@@ -212,6 +217,7 @@ describe("BaseCard selection mode", () => {
         <BaseCard
           entityType="scene"
           entity={{ id: "1" }}
+          title="Scene"
           linkTo="/scene/1"
           isSelected={true}
         />
@@ -234,13 +240,13 @@ describe("BaseCard menu placement logic", () => {
       showOCounter: false,
       showMenu: true,
     };
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       entityType: "scene",
       imagePath: "/test.jpg",
       title: "Test",
       ratingControlsProps,
     });
-    expect(element.props.ratingControlsProps.showMenu).toBe(true);
+    expect(element.props.ratingControlsProps!.showMenu).toBe(true);
   });
 
   it("accepts showMenu=false to hide menu", () => {
@@ -251,13 +257,13 @@ describe("BaseCard menu placement logic", () => {
       showOCounter: false,
       showMenu: false,
     };
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       entityType: "scene",
       imagePath: "/test.jpg",
       title: "Test",
       ratingControlsProps,
     });
-    expect(element.props.ratingControlsProps.showMenu).toBe(false);
+    expect(element.props.ratingControlsProps!.showMenu).toBe(false);
   });
 
   it("defaults showMenu to true when not specified", () => {
@@ -268,13 +274,13 @@ describe("BaseCard menu placement logic", () => {
       showOCounter: false,
       // showMenu not specified - should default to true
     };
-    const element = createElement(BaseCard, {
+    const element = createElement(BaseCardComponent, {
       entityType: "scene",
       imagePath: "/test.jpg",
       title: "Test",
       ratingControlsProps,
     });
     // showMenu should be undefined in props, but BaseCard logic defaults it to true
-    expect(element.props.ratingControlsProps.showMenu).toBeUndefined();
+    expect((element.props.ratingControlsProps as any)?.showMenu).toBeUndefined();
   });
 });

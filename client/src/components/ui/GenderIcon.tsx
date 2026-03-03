@@ -82,14 +82,16 @@ const GenderIcon = ({ gender, size = 24, className = "" }: Props) => {
   const config = getGenderConfig();
   const Icon = config.icon;
 
+  // Custom icons (IntersexIcon, NonBinaryIcon) don't accept aria-label/title
+  // Wrap all icons uniformly to avoid type narrowing issues
   return (
-    <Icon
-      size={size}
-      color={config.color}
-      className={className}
-      aria-label={config.label}
-      title={config.label}
-    />
+    <span aria-label={config.label} title={config.label} className="inline-flex">
+      <Icon
+        size={size}
+        color={config.color}
+        className={className}
+      />
+    </span>
   );
 };
 

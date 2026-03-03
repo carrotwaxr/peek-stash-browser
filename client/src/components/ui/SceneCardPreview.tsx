@@ -26,18 +26,20 @@ const SceneCardPreview = ({
   objectFit = "contain",
 }: Props) => {
   const { user } = useAuth();
-  const [sprites, setSprites] = useState([]);
+  type SpriteData = ReturnType<typeof getEvenlySpacedSprites>[number];
+
+  const [sprites, setSprites] = useState<SpriteData[]>([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const [containerElement, setContainerElement] = useState(null);
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
   const [previewDataLoaded, setPreviewDataLoaded] = useState(false);
-  const [activePreviewType, setActivePreviewType] = useState(null); // Track which type is actually being used (after fallback)
+  const [activePreviewType, setActivePreviewType] = useState<string | null>(null); // Track which type is actually being used (after fallback)
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false); // True lazy loading for screenshots
-  const intervalRef = useRef(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Determine preview type based on user preference
   // Note: We don't check if paths exist yet - that happens in the lazy-load effect
@@ -58,7 +60,7 @@ const SceneCardPreview = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => {
+    const handleChange = (e: MediaQueryListEvent) => {
       setHasHoverCapability(e.matches);
     };
     mediaQuery.addEventListener("change", handleChange);
@@ -136,7 +138,7 @@ const SceneCardPreview = ({
       try {
         // Handle sprite preference (low quality, always use sprite)
         if (preferredPreviewType === "sprite") {
-          const parsedCues = await fetchAndParseVTT(scene.paths.vtt);
+          const parsedCues = await fetchAndParseVTT(scene.paths.vtt!);
           if (parsedCues.length > 0) {
             const evenlySpaced = getEvenlySpacedSprites(
               parsedCues,
@@ -330,7 +332,7 @@ const SceneCardPreview = ({
       {/* Screenshot base layer - true lazy loading via IntersectionObserver */}
       {/* Only set src when card enters viewport to prevent browser from queuing all images */}
       <img
-        src={shouldLoadScreenshot ? scene?.paths?.screenshot : undefined}
+        src={shouldLoadScreenshot ? (scene?.paths?.screenshot ?? undefined) : undefined}
         alt={scene?.title || "Scene"}
         className={`w-full h-full pointer-events-none ${objectFitClass}`}
         style={{ backgroundColor: "var(--bg-secondary)" }}
@@ -341,7 +343,7 @@ const SceneCardPreview = ({
         shouldShowAnimation &&
         previewDataLoaded && (
           <video
-            src={getPreviewUrl()}
+            src={getPreviewUrl() ?? undefined}
             className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}
             autoPlay
@@ -356,7 +358,7 @@ const SceneCardPreview = ({
         shouldShowAnimation &&
         previewDataLoaded && (
           <img
-            src={getPreviewUrl()}
+            src={getPreviewUrl() ?? undefined}
             alt={scene?.title || "Scene preview"}
             className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}
@@ -371,7 +373,7 @@ const SceneCardPreview = ({
         currentSprite && (
           <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
             <img
-              src={scene.paths.sprite}
+              src={scene.paths.sprite ?? undefined}
               alt={scene?.title || "Scene preview"}
               className="pointer-events-none"
               style={{

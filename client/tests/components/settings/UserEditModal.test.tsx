@@ -52,8 +52,8 @@ describe("UserEditModal", () => {
   };
 
   const mockGroups = [
-    { id: 1, name: "Family", description: "Family members", canShare: true },
-    { id: 2, name: "Friends", description: null, canDownloadFiles: true },
+    { id: 1, name: "Family", description: "Family members" },
+    { id: 2, name: "Friends", description: null },
   ];
 
   const mockPermissions = {
@@ -65,11 +65,6 @@ describe("UserEditModal", () => {
       canDownloadFiles: "default",
       canDownloadPlaylists: "default",
     },
-  };
-
-  const mockApi = {
-    put: vi.fn(),
-    delete: vi.fn(),
   };
 
   beforeEach(() => {
@@ -87,7 +82,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -104,7 +99,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -121,7 +116,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -139,7 +134,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -156,7 +151,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -177,7 +172,7 @@ describe("UserEditModal", () => {
           onClose={vi.fn()}
           onSave={vi.fn()}
           onMessage={onMessage}
-          api={mockApi}
+
         />
       );
 
@@ -191,7 +186,7 @@ describe("UserEditModal", () => {
       fireEvent.click(checkboxes[1]);
 
       await waitFor(() => {
-        expect(mockAddGroupMember).toHaveBeenCalledWith(2, 1);
+        expect(mockAddGroupMember).toHaveBeenCalledWith("2", 1);
       });
 
       await waitFor(() => {
@@ -211,7 +206,7 @@ describe("UserEditModal", () => {
           onClose={vi.fn()}
           onSave={vi.fn()}
           onMessage={onMessage}
-          api={mockApi}
+
         />
       );
 
@@ -225,7 +220,7 @@ describe("UserEditModal", () => {
       fireEvent.click(checkboxes[0]);
 
       await waitFor(() => {
-        expect(mockRemoveGroupMember).toHaveBeenCalledWith(1, 1);
+        expect(mockRemoveGroupMember).toHaveBeenCalledWith("1", "1");
       });
 
       await waitFor(() => {
@@ -243,7 +238,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -260,7 +255,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -292,7 +287,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -312,7 +307,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -329,7 +324,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -346,7 +341,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -364,7 +359,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={onClose}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -381,7 +376,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={onClose}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -398,7 +393,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -416,7 +411,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 
@@ -433,7 +428,7 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-          api={mockApi}
+
         />
       );
 

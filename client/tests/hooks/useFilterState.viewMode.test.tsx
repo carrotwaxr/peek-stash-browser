@@ -18,8 +18,8 @@ vi.mock("../../src/api", () => ({
 }));
 
 // Helper to capture URL search params
-let capturedSearchParams = null;
-const SearchParamsCapture = ({ children }) => {
+let capturedSearchParams: URLSearchParams | null = null;
+const SearchParamsCapture = ({ children }: { children: React.ReactNode }) => {
   const [searchParams] = useSearchParams();
   capturedSearchParams = searchParams;
   return children;
@@ -27,7 +27,7 @@ const SearchParamsCapture = ({ children }) => {
 
 // Wrapper to provide router context with initial URL
 const createWrapper = (initialEntries = ["/"]) => {
-  return ({ children }) => (
+  return ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>
       <SearchParamsCapture>{children}</SearchParamsCapture>
     </MemoryRouter>
@@ -93,7 +93,7 @@ describe("useFilterState - view mode persistence", () => {
     });
 
     // URL should still have view=folder
-    expect(capturedSearchParams.get("view")).toBe("folder");
+    expect(capturedSearchParams!.get("view")).toBe("folder");
   });
 
   it("restores view mode from URL after remount (simulating browser back)", async () => {

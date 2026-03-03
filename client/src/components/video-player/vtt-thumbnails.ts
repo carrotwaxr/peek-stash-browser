@@ -8,8 +8,25 @@ import { WebVTT } from "videojs-vtt.js";
  * Parses VTT files with sprite coordinates and displays thumbnails using CSS background positioning.
  */
 
+interface VttDataItem {
+  start: number;
+  end: number;
+  style: Record<string, string> | null;
+}
+
 class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
-  constructor(player, options) {
+  source: string | null;
+  spriteUrl: string | null;
+  showTimestamp: boolean;
+  progressBar: HTMLElement | null;
+  thumbnailHolder: HTMLElement | null;
+  showing: boolean;
+  vttData: VttDataItem[] | null;
+  lastStyle: Record<string, string> | null;
+  isTouching: boolean;
+  declare player: any;
+
+  constructor(player: any, options: any) {
     super(player, options);
     this.source = options.src || null;
     this.spriteUrl = options.spriteUrl || null;
@@ -21,6 +38,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     this.showing = false;
     this.vttData = null;
     this.lastStyle = null;
+    this.isTouching = false;
 
     player.ready(() => {
       player.addClass("vjs-vtt-thumbnails");
@@ -28,7 +46,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     });
   }
 
-  src(source, spriteUrl) {
+  src(source: string, spriteUrl?: string) {
     this.resetPlugin();
     this.source = source;
     if (spriteUrl !== undefined) {
@@ -85,7 +103,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
         this.vttData = this.processVtt(data);
         this.setupThumbnailElement();
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error("[VTT Thumbnails] Failed to load VTT file:", err);
       });
   }
@@ -102,7 +120,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
       .split(/([^/]*)$/gi)[0];
   }
 
-  getVttFile(url) {
+  getVttFile(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const req = new XMLHttpRequest();
       req.addEventListener("load", () => {
@@ -149,7 +167,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     }
   };
 
-  onBarPointerMove = (e) => {
+  onBarPointerMove = (e: any) => {
     const { progressBar } = this;
     if (!progressBar) return;
 
@@ -170,13 +188,13 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     }
   };
 
-  onTouchStart = (e) => {
+  onTouchStart = (e: TouchEvent) => {
     this.isTouching = true;
     this.showThumbnailHolder();
     this.onTouchMove(e);
   };
 
-  onTouchMove = (e) => {
+  onTouchMove = (e: TouchEvent) => {
     const { progressBar } = this;
     if (!progressBar || !this.isTouching) return;
 
@@ -199,7 +217,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     }, 500);
   };
 
-  getStyleForTime(time) {
+  getStyleForTime(time: number) {
     if (!this.vttData) return null;
 
     for (const item of this.vttData) {
@@ -225,7 +243,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     }
   }
 
-  updateThumbnailStyle(percent, width) {
+  updateThumbnailStyle(percent: number, width: number) {
     if (!this.thumbnailHolder) return;
 
     const duration = this.player.duration();
@@ -262,11 +280,11 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     Object.assign(this.thumbnailHolder.style, currentStyle);
   }
 
-  processVtt(data) {
-    const processedVtts = [];
+  processVtt(data: string): VttDataItem[] {
+    const processedVtts: VttDataItem[] = [];
 
     const parser = new WebVTT.Parser(window, WebVTT.StringDecoder());
-    parser.oncue = (cue) => {
+    parser.oncue = (cue: any) => {
       processedVtts.push({
         start: cue.startTime,
         end: cue.endTime,
@@ -279,7 +297,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     return processedVtts;
   }
 
-  getFullyQualifiedUrl(path, base) {
+  getFullyQualifiedUrl(path: string, base: string) {
     // If path contains "//" it's a full URL, or if it starts with "/" it's an absolute path
     if (path.indexOf("//") >= 0 || path.charAt(0) === "/") {
       return path;
@@ -296,7 +314,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     return path;
   }
 
-  getPropsFromDef(def) {
+  getPropsFromDef(def: string) {
     const match = def.match(/^([^#]*)#xywh=(\d+),(\d+),(\d+),(\d+)$/i);
     if (!match) return null;
 
@@ -309,7 +327,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     };
   }
 
-  getVttStyle(vttImageDef) {
+  getVttStyle(vttImageDef: string) {
     // Parse the coordinates from the VTT definition
     const imageProps = this.getPropsFromDef(vttImageDef);
     if (!imageProps) return null;
@@ -332,7 +350,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     };
   }
 
-  trim(str, charlist) {
+  trim(str: string, charlist?: string) {
     let whitespace = [
       " ",
       "\n",

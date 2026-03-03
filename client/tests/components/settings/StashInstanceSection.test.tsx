@@ -13,10 +13,10 @@ const mockApiPost = vi.fn();
 const mockApiPut = vi.fn();
 const mockApiDelete = vi.fn();
 vi.mock("../../../src/api", () => ({
-  apiGet: (...args) => mockApiGet(...args),
-  apiPost: (...args) => mockApiPost(...args),
-  apiPut: (...args) => mockApiPut(...args),
-  apiDelete: (...args) => mockApiDelete(...args),
+  apiGet: (...args: unknown[]) => mockApiGet(...args),
+  apiPost: (...args: unknown[]) => mockApiPost(...args),
+  apiPut: (...args: unknown[]) => mockApiPut(...args),
+  apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
 
 import { useAuth } from "../../../src/hooks/useAuth";
@@ -38,7 +38,7 @@ describe("StashInstanceSection", () => {
 
   describe("Admin user", () => {
     beforeEach(() => {
-      useAuth.mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
     });
 
     it("loads all instances for admin users", async () => {
@@ -183,7 +183,7 @@ describe("StashInstanceSection", () => {
 
   describe("Non-admin user", () => {
     beforeEach(() => {
-      useAuth.mockReturnValue({ user: { role: "USER" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "USER" } });
     });
 
     it("loads single instance for non-admin users", async () => {
@@ -213,7 +213,7 @@ describe("StashInstanceSection", () => {
 
   describe("Error handling", () => {
     beforeEach(() => {
-      useAuth.mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
     });
 
     it("displays error message on API failure", async () => {
@@ -239,7 +239,7 @@ describe("StashInstanceSection", () => {
 
   describe("Test connection", () => {
     beforeEach(() => {
-      useAuth.mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
     });
 
     it("tests connection and shows success", async () => {

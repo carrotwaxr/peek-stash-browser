@@ -20,7 +20,7 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }: Props) => {
     iconName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSelect = (iconName) => {
+  const handleSelect = (iconName: string) => {
     onSelect(iconName);
     onClose();
   };
@@ -75,7 +75,7 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }: Props) => {
         style={{ scrollbarWidth: "thin" }}
       >
         {filteredIcons.map((iconName) => {
-          const IconComponent = LucideIcons[iconName];
+          const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[iconName];
           if (!IconComponent) return null;
 
           const isSelected = selectedIcon === iconName;
@@ -96,9 +96,9 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }: Props) => {
                 color: isSelected
                   ? "var(--text-on-accent)"
                   : "var(--text-primary)",
-                ringColor: "var(--accent-primary)",
-                ringOffsetColor: "var(--bg-card)",
-              }}
+                "--tw-ring-color": "var(--accent-primary)",
+                "--tw-ring-offset-color": "var(--bg-card)",
+              } as React.CSSProperties}
               title={iconName}
             >
               <IconComponent className="w-5 h-5" />

@@ -20,10 +20,15 @@ export const useGridPageTVNavigation = ({
   columns = 6,
   totalPages = 1,
   onItemSelect,
+}: {
+  items?: any[];
+  columns?: number;
+  totalPages?: number;
+  onItemSelect?: (item: any) => void;
 }) => {
   const { isTVMode } = useTVMode();
   const [searchParams] = useSearchParams();
-  const paginationHandlerRef = useRef(null);
+  const paginationHandlerRef = useRef<((page: number) => void) | null>(null);
 
   // Get current page from URL
   const urlPage = parseInt(searchParams.get("page") || "1", 10);
@@ -33,7 +38,7 @@ export const useGridPageTVNavigation = ({
     zones: ["search", "topPagination", "grid", "bottomPagination", "mainNav"],
     initialZone: "grid",
     enabled: isTVMode,
-  });
+  } as any);
 
   // Spatial navigation for grid
   const gridNavigation = useSpatialNavigation({
@@ -44,21 +49,21 @@ export const useGridPageTVNavigation = ({
     onEscapeUp: useCallback(() => {
       // Blur the currently focused element before switching zones
       if (document.activeElement) {
-        document.activeElement.blur();
+        (document.activeElement as HTMLElement).blur();
       }
       tvNavigation.goToPreviousZone();
     }, [tvNavigation]),
     onEscapeDown: useCallback(() => {
       // Blur the currently focused element before switching zones
       if (document.activeElement) {
-        document.activeElement.blur();
+        (document.activeElement as HTMLElement).blur();
       }
       tvNavigation.goToNextZone();
     }, [tvNavigation]),
     onEscapeLeft: useCallback(() => {
       // Blur the currently focused element before switching zones
       if (document.activeElement) {
-        document.activeElement.blur();
+        (document.activeElement as HTMLElement).blur();
       }
       tvNavigation.goToZone("mainNav");
     }, [tvNavigation]),
@@ -92,7 +97,7 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode) return;
 
-    const handleSearchZoneEscape = (e) => {
+    const handleSearchZoneEscape = (e: any) => {
       const { direction } = e.detail;
       if (direction === "up") {
         const moved = tvNavigation.goToPreviousZone();
@@ -115,7 +120,7 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode) return;
 
-    const handlePaginationEscape = (e) => {
+    const handlePaginationEscape = (e: any) => {
       const { zone, direction } = e.detail;
 
       if (zone === "top") {
@@ -144,7 +149,7 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode || !tvNavigation.isZoneActive("mainNav")) return;
 
-    const handleGlobalKeyDown = (e) => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Sidebar (mainNav) navigation
       if (e.key === "ArrowRight") {
         e.preventDefault();
@@ -162,7 +167,7 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode || tvNavigation.isZoneActive("grid") || tvNavigation.isZoneActive("mainNav")) return;
 
-    const handleGlobalKeyDown = (e) => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Content zones (search, topPagination, bottomPagination)
       // Navigation within these zones is now handled by useHorizontalNavigation in each component
       // Only handle Left arrow to move to sidebar
@@ -181,7 +186,7 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode) return;
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "PageUp") {
         e.preventDefault();
         handlePageUpKey();
@@ -208,8 +213,8 @@ export const useGridPageTVNavigation = ({
       paginationHandlerRef,
     },
     // Props to pass to grid items
-    gridItemProps: (index) => ({
-      ref: (el) => gridNavigation.setItemRef(index, el),
+    gridItemProps: (index: number) => ({
+      ref: (el: HTMLElement | null) => gridNavigation.setItemRef(index, el),
       className: gridNavigation.isFocused(index) ? "keyboard-focus" : "",
       tabIndex: gridNavigation.isFocused(index) ? 0 : -1,
     }),

@@ -54,7 +54,7 @@ const ContextSettings = ({
 }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Card display settings
   const { getSettings, updateSettings } = useCardDisplaySettings();
@@ -66,8 +66,8 @@ const ContextSettings = ({
   // Use mouseup instead of mousedown to avoid closing when interacting with
   // native select dropdowns (their options render outside our container)
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -80,7 +80,7 @@ const ContextSettings = ({
 
   // Close on Escape key
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
       }
@@ -93,7 +93,7 @@ const ContextSettings = ({
   }, [isOpen]);
 
   const handleSettingChange = useCallback(
-    async (key, value) => {
+    async (key: string, value: string | boolean) => {
       setSaving(true);
       try {
         await apiPut("/user/settings", { [key]: value });
@@ -101,8 +101,8 @@ const ContextSettings = ({
           onSettingChange(key, value);
         }
         showSuccess("Setting saved");
-      } catch (err) {
-        showError(err.response?.data?.error || "Failed to save setting");
+      } catch (err: unknown) {
+        showError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to save setting");
       } finally {
         setSaving(false);
       }
@@ -111,9 +111,9 @@ const ContextSettings = ({
   );
 
   const handleCardSettingChange = useCallback(
-    async (key, value) => {
+    async (key: string, value: string | boolean) => {
       try {
-        await updateSettings(entityType, key, value);
+        await updateSettings(entityType!, key, value);
         showSuccess("Setting saved");
       } catch {
         showError("Failed to save setting");
@@ -190,7 +190,7 @@ const ContextSettings = ({
                     </label>
                     <select
                       id={`context-${setting.key}`}
-                      value={currentValues[setting.key] || ""}
+                      value={String(currentValues[setting.key] || "")}
                       onChange={(e) => handleSettingChange(setting.key, e.target.value)}
                       disabled={saving}
                       className="w-full px-2 py-1.5 rounded text-sm"
@@ -200,7 +200,7 @@ const ContextSettings = ({
                         color: "var(--text-primary)",
                       }}
                     >
-                      {setting.options.map((option) => (
+                      {setting.options!.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -217,7 +217,7 @@ const ContextSettings = ({
                     <input
                       id={`context-${setting.key}`}
                       type="checkbox"
-                      checked={currentValues[setting.key] || false}
+                      checked={!!currentValues[setting.key]}
                       onChange={(e) => handleSettingChange(setting.key, e.target.checked)}
                       disabled={saving}
                       className="w-4 h-4"
@@ -253,7 +253,7 @@ const ContextSettings = ({
                 </h4>
                 <div className="space-y-2">
                   {/* Default View Mode dropdown */}
-                  {getAvailableSettings(entityType).includes("defaultViewMode") && (
+                  {(getAvailableSettings(entityType) as string[]).includes("defaultViewMode") && (
                     <div>
                       <label
                         htmlFor="context-defaultViewMode"
@@ -264,7 +264,7 @@ const ContextSettings = ({
                       </label>
                       <select
                         id="context-defaultViewMode"
-                        value={cardSettings?.defaultViewMode || "grid"}
+                        value={String(cardSettings?.defaultViewMode || "grid")}
                         onChange={(e) => handleCardSettingChange("defaultViewMode", e.target.value)}
                         className="w-full px-2 py-1.5 rounded text-sm"
                         style={{
@@ -273,7 +273,7 @@ const ContextSettings = ({
                           color: "var(--text-primary)",
                         }}
                       >
-                        {getViewModes(entityType).map((mode) => (
+                        {(getViewModes(entityType!) as Array<{ id: string; label: string }>).map((mode) => (
                           <option key={mode.id} value={mode.id}>
                             {mode.label}
                           </option>
@@ -293,8 +293,8 @@ const ContextSettings = ({
                       <ZoomSlider
                         value={
                           cardSettings?.defaultViewMode === "grid"
-                            ? (cardSettings?.defaultGridDensity || "medium")
-                            : (cardSettings?.defaultWallZoom || "medium")
+                            ? String(cardSettings?.defaultGridDensity || "medium")
+                            : String(cardSettings?.defaultWallZoom || "medium")
                         }
                         onChange={(density) =>
                           handleCardSettingChange(
@@ -306,19 +306,19 @@ const ContextSettings = ({
                     </div>
                   )}
                   {/* Toggle settings */}
-                  {getAvailableSettings(entityType)
+                  {(getAvailableSettings(entityType!) as string[])
                     .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom", "showDescriptionOnDetail"].includes(key))
                     .map((settingKey) => (
                       <label key={settingKey} className="flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={cardSettings?.[settingKey] ?? true}
+                          checked={Boolean((cardSettings as Record<string, unknown> | null)?.[settingKey] ?? true)}
                           onChange={(e) => handleCardSettingChange(settingKey, e.target.checked)}
                           className="w-4 h-4"
                           style={{ accentColor: "var(--accent-primary)" }}
                         />
                         <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                          {SETTING_LABELS[settingKey] || settingKey}
+                          {SETTING_LABELS[settingKey as keyof typeof SETTING_LABELS] || settingKey}
                         </span>
                       </label>
                     ))}

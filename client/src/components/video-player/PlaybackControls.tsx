@@ -14,18 +14,19 @@ import {
 } from "../ui/index";
 
 const PlaybackControls = () => {
-  const { scene, sceneLoading, videoLoading, oCounter, dispatch } =
+  const { scene: rawScene, sceneLoading, videoLoading, oCounter, dispatch } =
     useScenePlayer();
+  const scene = rawScene as any;
   const { getSettings } = useCardDisplaySettings();
-  const sceneSettings = getSettings("scene");
+  const sceneSettings = getSettings("scene") as any;
 
   // Rating and favorite state
-  const [rating, setRating] = useState(null);
+  const [rating, setRating] = useState<any>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Download state
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState(null);
+  const [permissions, setPermissions] = useState<any>(null);
 
   // Sync state when scene changes
   const sceneId = scene?.id;
@@ -43,7 +44,7 @@ const PlaybackControls = () => {
     const fetchPermissions = async () => {
       try {
         const result = await getMyPermissions();
-        setPermissions(result.permissions);
+        setPermissions((result as any).permissions);
       } catch (error) {
         // Silently fail - permissions will remain null and download button won't show
         console.error("Failed to fetch permissions:", error);
@@ -53,14 +54,14 @@ const PlaybackControls = () => {
   }, []);
 
   // Handle rating change
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: any) => {
     if (!scene?.id) return;
 
     const previousRating = rating;
     setRating(newRating);
 
     try {
-      await libraryApi.updateRating("scene", scene.id, newRating, scene.instanceId);
+      await libraryApi.updateRating("scene", scene.id as string, newRating, scene.instanceId as string);
     } catch (error) {
       console.error("Failed to update scene rating:", error);
       setRating(previousRating);
@@ -68,14 +69,14 @@ const PlaybackControls = () => {
   };
 
   // Handle favorite change
-  const handleFavoriteChange = async (newFavorite) => {
+  const handleFavoriteChange = async (newFavorite: any) => {
     if (!scene?.id) return;
 
     const previousFavorite = isFavorite;
     setIsFavorite(newFavorite);
 
     try {
-      await libraryApi.updateFavorite("scene", scene.id, newFavorite, scene.instanceId);
+      await libraryApi.updateFavorite("scene", scene.id as string, newFavorite, scene.instanceId as string);
     } catch (error) {
       console.error("Failed to update scene favorite:", error);
       setIsFavorite(previousFavorite);
@@ -93,7 +94,7 @@ const PlaybackControls = () => {
   const handleDownload = async () => {
     try {
       setDownloading(true);
-      const response = await apiPost(`/downloads/scene/${scene.id}`);
+      const response: any = await apiPost(`/downloads/scene/${scene.id}`);
       const download = response.download;
 
       // For scenes, download is immediate - redirect to file endpoint
@@ -102,7 +103,7 @@ const PlaybackControls = () => {
         window.location.href = `/api/downloads/${download.id}/file`;
       }
       showSuccess("Download started");
-    } catch (error) {
+    } catch (error: any) {
       const message = error.data?.error || error.message || "Download failed";
       showError(message);
     } finally {
@@ -153,9 +154,9 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id}
+                sceneId={scene?.id as string}
                 initialCount={oCounter}
-                onChange={(newCount) =>
+                onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
                 }
                 disabled={isLoading}
@@ -168,7 +169,7 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
             {permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
@@ -206,9 +207,9 @@ const PlaybackControls = () => {
             >
               {sceneSettings.showOCounter && (
                 <OCounterButton
-                  sceneId={scene?.id}
+                  sceneId={scene?.id as string}
                   initialCount={oCounter}
-                  onChange={(newCount) =>
+                  onChange={(newCount: number) =>
                     dispatch({ type: "SET_O_COUNTER", payload: newCount })
                   }
                   disabled={isLoading}
@@ -226,7 +227,7 @@ const PlaybackControls = () => {
 
           {/* Row 2: Add to Playlist + Download */}
           <div className="flex items-center justify-end gap-4">
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
             {permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
@@ -249,9 +250,9 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id}
+                sceneId={scene?.id as string}
                 initialCount={oCounter}
-                onChange={(newCount) =>
+                onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
                 }
                 disabled={isLoading}
@@ -264,7 +265,7 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
             {permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"

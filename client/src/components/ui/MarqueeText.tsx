@@ -34,8 +34,8 @@ const MarqueeText = ({
   style = {},
   autoplayOnScroll = true,
 }: Props) => {
-  const containerRef = useRef(null);
-  const textRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [overflowAmount, setOverflowAmount] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -48,7 +48,7 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => setHasHoverCapability(e.matches);
+    const handleChange = (e: MediaQueryListEvent) => setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -58,7 +58,7 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
 
-    const handleChange = (e) => setPrefersReducedMotion(e.matches);
+    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);

@@ -38,7 +38,8 @@ const SceneContent = () => {
   const { goBack, backButtonText } = useNavigationState();
 
   // Set page title to scene title (with fallback to filename)
-  const displayTitle = scene?.title || scene?.files?.[0]?.basename || "Scene";
+  const sceneFiles = scene?.files as Array<Record<string, unknown>> | undefined;
+  const displayTitle = (scene?.title as string) || (sceneFiles?.[0]?.basename as string) || "Scene";
   usePageTitle(displayTitle);
 
   // Set initial focus to video player when page loads (excluding back button)
@@ -130,7 +131,7 @@ const SceneContent = () => {
               className="text-xl mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              {sceneError?.message || "Scene not found"}
+              {(sceneError as { message?: string })?.message || "Scene not found"}
             </h2>
             <Button onClick={() => navigate("/scenes")} variant="primary">
               Browse Scenes
@@ -160,11 +161,11 @@ const SceneContent = () => {
               <span className="whitespace-nowrap">{backButtonText}</span>
             </Button>
             <ExternalPlayerButton
-              sceneId={scene?.id}
-              instanceId={scene?.instanceId}
+              sceneId={scene?.id as string}
+              instanceId={scene?.instanceId as string}
               title={displayTitle}
             />
-            <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
+            <ViewInStashButton stashUrl={(scene?.stashUrl as string) || ""} size={20} />
           </div>
           <h1
             className="text-2xl font-bold line-clamp-2"
@@ -197,12 +198,12 @@ const SceneContent = () => {
             <div className="sticky top-4 space-y-4">
               {/* Show playlist sidebar if we have a playlist, otherwise show recommendations */}
               {playlist ? (
-                <PlaylistSidebar maxHeight={sidebarHeight} />
+                <PlaylistSidebar maxHeight={sidebarHeight ?? undefined} />
               ) : (
                 scene && (
                   <RecommendedSidebar
-                    sceneId={scene.id}
-                    maxHeight={sidebarHeight}
+                    sceneId={scene.id as string}
+                    maxHeight={sidebarHeight ?? undefined}
                   />
                 )
               )}
@@ -224,11 +225,11 @@ const SceneContent = () => {
             <TabNavigation
               tabs={[
                 { id: 'similar', label: 'Similar Scenes', count: similarScenesCount },
-                ...(scene.groups && scene.groups.length > 0
-                  ? [{ id: 'collections', label: 'Collections', count: scene.groups.length }]
+                ...((scene.groups as unknown[])?.length > 0
+                  ? [{ id: 'collections', label: 'Collections', count: (scene.groups as unknown[]).length }]
                   : []),
-                ...(scene.galleries && scene.galleries.length > 0
-                  ? [{ id: 'galleries', label: 'Galleries', count: scene.galleries.length }]
+                ...((scene.galleries as unknown[])?.length > 0
+                  ? [{ id: 'galleries', label: 'Galleries', count: (scene.galleries as unknown[]).length }]
                   : []),
               ]}
               defaultTab="similar"
@@ -238,7 +239,7 @@ const SceneContent = () => {
             {/* Tab Content */}
             {activeTab === 'similar' && (
               <div className="mt-6">
-                <ScenesLikeThis sceneId={scene.id} onCountChange={setSimilarScenesCount} />
+                <ScenesLikeThis sceneId={scene.id as string} onCountChange={setSimilarScenesCount} />
               </div>
             )}
 
@@ -248,7 +249,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     group_filter: {
                       scenes: {
-                        value: [makeCompositeKey(scene.id, scene.instanceId)],
+                        value: [makeCompositeKey(scene.id as string, scene.instanceId as string)],
                         modifier: "INCLUDES"
                       }
                     }
@@ -265,7 +266,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     gallery_filter: {
                       scenes: {
-                        value: [makeCompositeKey(scene.id, scene.instanceId)],
+                        value: [makeCompositeKey(scene.id as string, scene.instanceId as string)],
                         modifier: "INCLUDES"
                       }
                     }
@@ -322,14 +323,14 @@ const Scene = () => {
       try {
         const parsed = JSON.parse(storedPlaylist);
         // Verify the current scene is actually in this playlist
-        const sceneInPlaylist = parsed.scenes?.some(
-          (s) => s.sceneId === sceneId
+        const sceneInPlaylist = (parsed.scenes as Array<{ sceneId: string }>)?.some(
+          (s: { sceneId: string }) => s.sceneId === sceneId
         );
         if (sceneInPlaylist) {
           playlist = parsed;
           // Update currentIndex to match the current scene
-          const currentIndex = parsed.scenes.findIndex(
-            (s) => s.sceneId === sceneId
+          const currentIndex = (parsed.scenes as Array<{ sceneId: string }>).findIndex(
+            (s: { sceneId: string }) => s.sceneId === sceneId
           );
           if (currentIndex >= 0) {
             playlist.currentIndex = currentIndex;
@@ -368,11 +369,11 @@ const Scene = () => {
 
   return (
     <ScenePlayerProvider
-      sceneId={sceneId}
-      instanceId={instanceId}
-      playlist={playlist}
-      shouldResume={shouldResume}
-      compatibility={compatibility}
+      sceneId={sceneId ?? ""}
+      instanceId={instanceId ?? undefined}
+      playlist={playlist ?? undefined}
+      shouldResume={shouldResume ?? undefined}
+      compatibility={compatibility ?? undefined}
       initialQuality={initialQuality}
       initialShouldAutoplay={shouldAutoplayFromState}
     >

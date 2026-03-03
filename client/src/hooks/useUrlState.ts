@@ -36,7 +36,7 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] }: UseUrlStateOptio
     return parsed;
   };
 
-  const [values, setValuesState] = useState(() => {
+  const [values, setValuesState] = useState<Record<string, string | null | undefined>>(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
       return getInitialValues();

@@ -23,7 +23,7 @@ const SyncSettingsSection = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const data = await apiGet("/sync/status");
+        const data = await apiGet<{ settings?: { syncIntervalMinutes?: number } }>("/sync/status");
         const minutes = data?.settings?.syncIntervalMinutes;
         if (minutes) setSyncInterval(minutes);
       } catch (err) {

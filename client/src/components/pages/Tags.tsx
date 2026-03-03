@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -25,7 +25,7 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes for Tags page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "table", label: "Table view" },
   { id: "hierarchy", label: "Hierarchy view" },
@@ -83,21 +83,20 @@ const Tags = () => {
   );
 
   const findTags = (data as Record<string, unknown>)?.findTags as Record<string, unknown> | undefined;
-  const currentTags = (findTags?.tags as unknown[]) || [];
+  const currentTags = (findTags?.tags as Record<string, unknown>[]) || [];
   const totalCount = (findTags?.count as number) || 0;
   const hierarchyFindTags = (hierarchyRaw as Record<string, unknown>)?.findTags as Record<string, unknown> | undefined;
   const hierarchyTags = (hierarchyFindTags?.tags as unknown[]) || [];
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -143,7 +142,8 @@ const Tags = () => {
           onViewModeChange={setActiveViewMode}
           totalPages={activeViewMode === "hierarchy" ? 0 : totalPages}
           totalCount={activeViewMode === "hierarchy" ? 0 : totalCount}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -156,14 +156,15 @@ const Tags = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) => {
+          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) => {
             // Hierarchy view
             if (viewMode === "hierarchy") {
               // Show loading if we don't have hierarchy data yet
               const showLoading = hierarchyLoading || !hierarchyRaw;
               return (
                 <TagHierarchyView
-                  tags={hierarchyTags}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TagItem is not exported from TagHierarchyView
+                  tags={hierarchyTags as any}
                   isLoading={showLoading}
                   searchQuery={searchParams.get("q") || ""}
                   sortField={sortField}
@@ -176,9 +177,9 @@ const Tags = () => {
             if (viewMode === "table") {
               return (
                 <TableView
-                  items={currentTags}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
+                  items={currentTags as Record<string, unknown>[]}
+                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="tag"
@@ -216,21 +217,21 @@ const Tags = () => {
 
             return (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentTags.map((tag, index) => {
-                  const itemProps = gridItemProps(index);
+                {currentTags.map((tag: Record<string, unknown>, index: number) => {
+                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
                   return (
                     <TagCard
-                      key={tag.id}
-                      tag={tag}
+                      key={tag.id as string}
+                      tag={tag as unknown as import("@peek/shared-types").NormalizedTag & { child_count?: number }}
                       fromPageTitle="Tags"
-                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
-                      {...itemProps}
+                      tabIndex={isTVMode ? _tabIndex : -1}
+                      {...restItemProps}
                     />
                   );
                 })}
               </div>
             );
-          }}
+          }) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>

@@ -9,7 +9,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Creates a minimal playlist with N scenes for navigation tests. */
-function makePlaylist(count, overrides = {}) {
+function makePlaylist(count: number, overrides: Record<string, unknown> = {}) {
   return {
     scenes: Array.from({ length: count }, (_, i) => ({ id: `scene-${i}` })),
     autoplayNext: true,
@@ -21,7 +21,7 @@ function makePlaylist(count, overrides = {}) {
 }
 
 /** Deep-clone a plain object so we can later assert the original was not mutated. */
-function snapshot(obj) {
+function snapshot(obj: unknown) {
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -459,7 +459,7 @@ describe("scenePlayerReducer", () => {
     });
 
     it("full cycle: START -> SUCCESS increments correctly", () => {
-      let state = { ...initialState, oCounter: 0 };
+      let state: any = { ...initialState, oCounter: 0 };
 
       state = scenePlayerReducer(state, { type: "INCREMENT_O_COUNTER_START" });
       expect(state.oCounterLoading).toBe(true);
@@ -494,7 +494,7 @@ describe("scenePlayerReducer", () => {
         });
 
         expect(result.autoplayNext).toBe(false);
-        expect(result.playlist.autoplayNext).toBe(false);
+        expect(result.playlist!.autoplayNext).toBe(false);
       });
 
       it("toggles autoplayNext from false to true", () => {
@@ -508,7 +508,7 @@ describe("scenePlayerReducer", () => {
         });
 
         expect(result.autoplayNext).toBe(true);
-        expect(result.playlist.autoplayNext).toBe(true);
+        expect(result.playlist!.autoplayNext).toBe(true);
       });
 
       it("sets playlist to null when playlist is null", () => {
@@ -534,8 +534,8 @@ describe("scenePlayerReducer", () => {
 
         expect(result.shuffle).toBe(true);
         expect(result.shuffleHistory).toEqual([]);
-        expect(result.playlist.shuffle).toBe(true);
-        expect(result.playlist.shuffleHistory).toEqual([]);
+        expect(result.playlist!.shuffle).toBe(true);
+        expect(result.playlist!.shuffleHistory).toEqual([]);
       });
 
       it("disables shuffle and preserves shuffleHistory", () => {
@@ -550,7 +550,7 @@ describe("scenePlayerReducer", () => {
         expect(result.shuffle).toBe(false);
         // When disabling, shuffleHistory is kept from state (not reset)
         expect(result.shuffleHistory).toEqual([1, 2]);
-        expect(result.playlist.shuffle).toBe(false);
+        expect(result.playlist!.shuffle).toBe(false);
       });
 
       it("handles null playlist gracefully", () => {
@@ -572,7 +572,7 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "TOGGLE_REPEAT" });
 
         expect(result.repeat).toBe("all");
-        expect(result.playlist.repeat).toBe("all");
+        expect(result.playlist!.repeat).toBe("all");
       });
 
       it("cycles all -> one", () => {
@@ -584,7 +584,7 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "TOGGLE_REPEAT" });
 
         expect(result.repeat).toBe("one");
-        expect(result.playlist.repeat).toBe("one");
+        expect(result.playlist!.repeat).toBe("one");
       });
 
       it("cycles one -> none", () => {
@@ -596,11 +596,11 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "TOGGLE_REPEAT" });
 
         expect(result.repeat).toBe("none");
-        expect(result.playlist.repeat).toBe("none");
+        expect(result.playlist!.repeat).toBe("none");
       });
 
       it("full cycle: none -> all -> one -> none", () => {
-        let state = {
+        let state: any = {
           ...initialState,
           repeat: "none",
           playlist: makePlaylist(3),
@@ -638,7 +638,7 @@ describe("scenePlayerReducer", () => {
         });
 
         expect(result.shuffleHistory).toEqual([0, 2, 4]);
-        expect(result.playlist.shuffleHistory).toEqual([0, 2, 4]);
+        expect(result.playlist!.shuffleHistory).toEqual([0, 2, 4]);
       });
 
       it("handles null playlist", () => {
@@ -761,7 +761,7 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
         // shuffleHistory should end with the previous currentIndex (2)
-        expect(result.shuffleHistory[result.shuffleHistory.length - 1]).toBe(2);
+        expect((result.shuffleHistory as number[])[(result.shuffleHistory as number[]).length - 1]).toBe(2);
       });
 
       it("updates playlist.shuffleHistory as well", () => {
@@ -774,7 +774,7 @@ describe("scenePlayerReducer", () => {
         };
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
-        expect(result.playlist.shuffleHistory).toEqual(result.shuffleHistory);
+        expect(result.playlist!.shuffleHistory).toEqual(result.shuffleHistory);
       });
 
       it("stays when no unplayed scenes remain and repeat is not 'all'", () => {
@@ -805,7 +805,7 @@ describe("scenePlayerReducer", () => {
 
         // Should reset history to [currentIndex] (the previous scene)
         expect(result.shuffleHistory).toEqual([0]);
-        expect(result.playlist.shuffleHistory).toEqual([0]);
+        expect(result.playlist!.shuffleHistory).toEqual([0]);
         // New index should not be current
         expect(result.currentIndex).not.toBe(0);
         // State resets
@@ -926,7 +926,7 @@ describe("scenePlayerReducer", () => {
         expect(result.currentIndex).toBe(1);
         // History should have last item removed
         expect(result.shuffleHistory).toEqual([0, 2]);
-        expect(result.playlist.shuffleHistory).toEqual([0, 2]);
+        expect(result.playlist!.shuffleHistory).toEqual([0, 2]);
         // State resets
         expect(result.video).toBeNull();
         expect(result.quality).toBe("direct");
@@ -1277,7 +1277,7 @@ describe("scenePlayerReducer", () => {
 
     it("returns state unchanged for an action with no type", () => {
       const state = { ...initialState };
-      const result = scenePlayerReducer(state, {});
+      const result = scenePlayerReducer(state, {} as any);
       expect(result).toBe(state);
     });
   });
@@ -1534,7 +1534,7 @@ describe("scenePlayerReducer", () => {
     });
 
     it("multiple rapid scene loads maintain correct state", () => {
-      let state = { ...initialState };
+      let state: any = { ...initialState };
 
       // Start loading scene 1
       state = scenePlayerReducer(state, { type: "LOAD_SCENE_START" });
@@ -1548,7 +1548,7 @@ describe("scenePlayerReducer", () => {
           oCounter: 2,
         },
       });
-      expect(state.scene.id).toBe("1");
+      expect(state.scene!.id).toBe("1");
       expect(state.oCounter).toBe(2);
       expect(state.sceneLoading).toBe(false);
 
@@ -1556,7 +1556,7 @@ describe("scenePlayerReducer", () => {
       state = scenePlayerReducer(state, { type: "LOAD_SCENE_START" });
       expect(state.sceneLoading).toBe(true);
       // Old scene is still there during loading
-      expect(state.scene.id).toBe("1");
+      expect(state.scene!.id).toBe("1");
 
       // Scene 2 succeeds
       state = scenePlayerReducer(state, {
@@ -1566,7 +1566,7 @@ describe("scenePlayerReducer", () => {
           oCounter: 0,
         },
       });
-      expect(state.scene.id).toBe("2");
+      expect(state.scene!.id).toBe("2");
       expect(state.oCounter).toBe(0);
       // Quality was reset to "direct" by default, so auto-selection kicks in
       expect(state.quality).toBe("480p");

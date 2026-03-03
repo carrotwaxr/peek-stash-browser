@@ -10,7 +10,7 @@ interface Props {
  * Circular medal shape with realistic metallic sheen and depth
  */
 const RatingBadge = ({ rating, onClick, size = "small" }: Props) => {
-  const getRatingGradient = (rating) => {
+  const getRatingGradient = (rating: number | null | undefined) => {
     if (rating === null || rating === undefined) {
       // No rating - transparent badge with low opacity
       return {

@@ -10,7 +10,7 @@ videojs.log.level("warn");
  * Show or hide the playback rate control
  * Only visible for direct play (transcoded HLS doesn't support playback rate)
  */
-export const togglePlaybackRateControl = (player, show) => {
+export const togglePlaybackRateControl = (player: any, show: boolean) => {
   if (!player || player.isDisposed()) return;
 
   const controlBar = player.controlBar;
@@ -31,7 +31,7 @@ export const togglePlaybackRateControl = (player, show) => {
  * Adds text tracks via sourceSelector for proper lifecycle management
  * Video.js automatically shows/hides the caption button based on available tracks
  */
-export const setupSubtitles = (player, sceneId, captions, instanceId) => {
+export const setupSubtitles = (player: any, sceneId: string, captions: any[], instanceId?: string) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
 
@@ -72,7 +72,7 @@ export const setupSubtitles = (player, sceneId, captions, instanceId) => {
   let hasDefault = false;
 
   // Add tracks via sourceSelector (auto-cleanup on source change)
-  captions.forEach((caption) => {
+  captions.forEach((caption: any) => {
     const lang = caption.language_code;
     let label = lang;
 

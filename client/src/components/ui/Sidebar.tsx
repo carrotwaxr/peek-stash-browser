@@ -23,8 +23,20 @@ import Tooltip from "./Tooltip";
  */
 interface NavPreference {
   id: string;
-  visible: boolean;
+  enabled: boolean;
   order: number;
+}
+
+interface NavItem {
+  name: string;
+  path: string | null;
+  icon: string;
+  key?: string;
+  description?: string;
+  isButton?: boolean;
+  isUserMenu?: boolean;
+  isSubItem?: boolean;
+  isToggle?: boolean;
 }
 
 interface Props {
@@ -40,7 +52,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
   const [isMainNavActive, setIsMainNavActive] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
-  const itemRefs = useRef([]);
+  const itemRefs = useRef<Array<HTMLElement | null>>([]);
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
@@ -56,8 +68,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
   // Build complete list of all navigable items (nav items + bottom items)
   // When user menu is expanded, include sub-items in the navigation list
-  const allNavItems = useMemo(() => {
-    const bottomItems = [
+  const allNavItems = useMemo((): NavItem[] => {
+    const bottomItems: NavItem[] = [
       { name: "Help", path: null, isButton: true, icon: "questionCircle" },
       { name: "Settings", path: "/settings", icon: "settings" },
     ];
@@ -75,7 +87,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
       bottomItems.push(...userMenuSubItems);
     }
 
-    return [...navItems, ...bottomItems];
+    return [...(navItems as NavItem[]), ...bottomItems];
   }, [navItems, isUserMenuExpanded, userMenuSubItems]);
 
   // Get current page from React Router location
@@ -103,8 +115,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
   // Listen for zone change events from page components
   useEffect(() => {
-    const handleZoneChange = (e) => {
-      const zone = e.detail.zone;
+    const handleZoneChange = (e: Event) => {
+      const zone = (e as CustomEvent).detail.zone;
       // zone === null means page doesn't support TV navigation (e.g., Scene player page)
       // In this case, deactivate mainNav so keyboard events don't get intercepted
       setIsMainNavActive(zone === "mainNav");
@@ -120,7 +132,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
       return;
     }
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case "ArrowUp": {
           e.preventDefault();
@@ -206,7 +218,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
           {/* Navigation items */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="flex flex-col gap-1 px-2">
-              {navItems.map((item, index) => {
+              {navItems.filter((i): i is NonNullable<typeof i> => Boolean(i)).map((item, index) => {
                 const isActive = currentPage === item.name;
                 const isFocused = isTVMode && isMainNavActive && focusedIndex === index;
 
@@ -216,7 +228,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                     <div className="xl:hidden">
                       <Tooltip content={item.name} position="right">
                         <Link
-                          ref={(el) => (itemRefs.current[index] = el)}
+                          ref={(el: HTMLElement | null) => { itemRefs.current[index] = el; }}
                           to={item.path}
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
                             isActive ? "nav-link-active" : isFocused ? "keyboard-focus" : "nav-link"
@@ -231,7 +243,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                     {/* Expanded view (xl+): Icon + text */}
                     <Link
-                      ref={(el) => (itemRefs.current[index] = el)}
+                      ref={(el: HTMLElement | null) => { itemRefs.current[index] = el; }}
                       to={item.path}
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
                         isActive ? "nav-link-active" : isFocused ? "keyboard-focus" : "nav-link"
@@ -262,7 +274,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                     <div className="xl:hidden">
                       <Tooltip content="Help" position="right">
                         <button
-                          ref={(el) => (itemRefs.current[itemIndex] = el)}
+                          ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
                           onClick={() => setIsHelpModalOpen(true)}
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="Help"
@@ -273,7 +285,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       </Tooltip>
                     </div>
                     <button
-                      ref={(el) => (itemRefs.current[itemIndex] = el)}
+                      ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
                       onClick={() => setIsHelpModalOpen(true)}
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isFocused ? 0 : -1}
@@ -294,7 +306,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                     <div className="xl:hidden">
                       <Tooltip content="Settings" position="right">
                         <Link
-                          ref={(el) => (itemRefs.current[itemIndex] = el)}
+                          ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
                           to="/settings"
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="Settings"
@@ -305,7 +317,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       </Tooltip>
                     </div>
                     <Link
-                      ref={(el) => (itemRefs.current[itemIndex] = el)}
+                      ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
                       to="/settings"
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isFocused ? 0 : -1}
@@ -369,7 +381,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                         }
                       >
                         <button
-                          ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
+                          ref={(el: HTMLElement | null) => { itemRefs.current[userMenuItemIndex] = el; }}
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="User menu"
                           tabIndex={isUserMenuFocused ? 0 : -1}
@@ -381,7 +393,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                     {/* User menu toggle - expanded view */}
                     <button
-                      ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
+                      ref={(el: HTMLElement | null) => { itemRefs.current[userMenuItemIndex] = el; }}
                       onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
                       className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isUserMenuFocused ? 0 : -1}
@@ -407,7 +419,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
+                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
                                 onClick={() => {
                                   toggleTVMode();
                                 }}
@@ -425,7 +437,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
+                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
                                 onClick={logout}
                                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}
@@ -438,8 +450,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <Link
                                 key={subItem.name}
-                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
-                                to={subItem.path}
+                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
+                                to={subItem.path!}
                                 className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}
                               >

@@ -20,9 +20,16 @@ export const useHorizontalNavigation = ({
   onEscapeUp,
   onEscapeDown,
   initialFocusIndex = 0,
+}: {
+  items?: Array<{ id: string; name: string }>;
+  enabled?: boolean;
+  onSelect?: (item: { id: string; name: string }, index?: number) => void;
+  onEscapeUp?: () => void;
+  onEscapeDown?: () => void;
+  initialFocusIndex?: number;
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
-  const itemRefs = useRef([]);
+  const itemRefs = useRef<HTMLElement[]>([]);
 
   // Update refs array when items change
   useEffect(() => {
@@ -51,7 +58,7 @@ export const useHorizontalNavigation = ({
   }, [focusedIndex, enabled]);
 
   const handleKeyDown = useCallback(
-    (e) => {
+    (e: KeyboardEvent) => {
       if (!enabled || !items.length) return;
 
       const totalItems = items.length;
@@ -122,7 +129,7 @@ export const useHorizontalNavigation = ({
   }, [enabled, handleKeyDown]);
 
   // Helper to set ref for an item
-  const setItemRef = useCallback((index, element) => {
+  const setItemRef = useCallback((index: number, element: HTMLElement | null) => {
     if (element) {
       itemRefs.current[index] = element;
     }
@@ -130,7 +137,7 @@ export const useHorizontalNavigation = ({
 
   // Helper to check if an index is focused
   const isFocused = useCallback(
-    (index) => {
+    (index: number) => {
       return enabled && focusedIndex === index;
     },
     [enabled, focusedIndex]

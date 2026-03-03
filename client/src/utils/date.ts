@@ -7,7 +7,7 @@
  * For date-only strings (YYYY-MM-DD), formats directly without timezone conversion
  * since these are publication dates, not moments in time.
  */
-export function formatDate(dateString, options = {}) {
+export function formatDate(dateString: string, options: Intl.DateTimeFormatOptions = {}) {
   if (!dateString) return "Unknown";
 
   try {
@@ -21,7 +21,7 @@ export function formatDate(dateString, options = {}) {
     }
 
     // For timestamps with time/timezone, use standard Date parsing
-    const defaultOptions = {
+    const defaultOptions: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -37,7 +37,7 @@ export function formatDate(dateString, options = {}) {
  * Format a timestamp as relative time (e.g., "2 hours ago")
  * For publication dates (YYYY-MM-DD), calculates days difference without timezone issues.
  */
-export function formatRelativeTime(dateString) {
+export function formatRelativeTime(dateString: string) {
   if (!dateString) return "Unknown";
 
   try {
@@ -69,7 +69,7 @@ export function formatRelativeTime(dateString) {
     // For timestamps with time/timezone, use standard relative time
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now - date;
+    const diffMs = now.getTime() - date.getTime();
     const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffSecs / 60);
     const diffHours = Math.floor(diffMins / 60);

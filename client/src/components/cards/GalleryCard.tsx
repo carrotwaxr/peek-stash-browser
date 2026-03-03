@@ -64,7 +64,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
       gallery.scenes?.length > 0 && (
         <TooltipEntityGrid
           entityType="scene"
-          entities={gallery.scenes}
+          entities={gallery.scenes as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Scenes"
           parentInstanceId={gallery.instanceId}
         />
@@ -76,7 +76,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.image_count,
         // Config says 'nav' for gallery->images
         onClick: getIndicatorBehavior('gallery', 'images') === 'nav' && gallery.image_count > 0
-          ? () => navigate(appendInstanceParam(`/images?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/images?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
           : undefined,
       },
       {
@@ -85,7 +85,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         tooltipContent: scenesTooltip,
         // Config says 'nav' for gallery->scenes
         onClick: getIndicatorBehavior('gallery', 'scenes') === 'nav' && gallery.scenes?.length > 0
-          ? () => navigate(appendInstanceParam(`/scenes?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/scenes?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
           : undefined,
       },
       {
@@ -93,7 +93,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.performers?.length || 0,
         tooltipContent: performersTooltip,
         onClick: getIndicatorBehavior('gallery', 'performers') === 'nav' && gallery.performers?.length > 0
-          ? () => navigate(appendInstanceParam(`/performers?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/performers?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
           : undefined,
       },
       {
@@ -101,7 +101,7 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         count: gallery.tags?.length || 0,
         tooltipContent: tagsTooltip,
         onClick: getIndicatorBehavior('gallery', 'tags') === 'nav' && gallery.tags?.length > 0
-          ? () => navigate(appendInstanceParam(`/tags?galleryId=${gallery.id}`, gallery, hasMultipleInstances))
+          ? () => navigate(appendInstanceParam(`/tags?galleryId=${gallery.id}`, gallery as unknown as Record<string, unknown>, hasMultipleInstances))
           : undefined,
       },
     ];
@@ -114,24 +114,24 @@ const GalleryCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="gallery"
         imagePath={gallery.cover}
-        title={galleryTitle(gallery)}
+        title={galleryTitle(gallery as unknown as Record<string, unknown>) as React.ReactNode}
         subtitle={subtitle}
-        description={gallery.description}
-        linkTo={getEntityPath('gallery', gallery, hasMultipleInstances)}
+        description={gallery.details}
+        linkTo={getEntityPath('gallery', gallery as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={{
           entityId: gallery.id,
           instanceId: gallery.instanceId,
           initialRating: gallery.rating100,
           initialFavorite: gallery.favorite || false,
           onHideSuccess,
-          showRating: gallerySettings.showRating,
-          showFavorite: gallerySettings.showFavorite,
-          showOCounter: gallerySettings.showOCounter,
-          showMenu: gallerySettings.showMenu,
+          showRating: gallerySettings.showRating as boolean | undefined,
+          showFavorite: gallerySettings.showFavorite as boolean | undefined,
+          showOCounter: gallerySettings.showOCounter as boolean | undefined,
+          showMenu: gallerySettings.showMenu as boolean | undefined,
         }}
         {...rest}
       />

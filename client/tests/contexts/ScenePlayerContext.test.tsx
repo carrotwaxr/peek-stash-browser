@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPost = vi.fn();
 vi.mock("@/api", () => ({
-  apiPost: (...args) => mockPost(...args),
+  apiPost: (...args: unknown[]) => mockPost(...args),
 }));
 
 vi.mock("@/contexts/ConfigContext", () => ({
@@ -28,6 +28,10 @@ import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "@/contexts/ScenePlayerContext";
+import type { Mock } from "vitest";
+
+const getEntityPathMock = getEntityPath as unknown as Mock;
+const useConfigMock = useConfig as unknown as Mock;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,7 +44,7 @@ const mockScene = {
   instanceId: "inst-1",
 };
 
-const mockApiResponse = (scene = mockScene) => ({
+const mockApiResponse = (scene: Record<string, unknown> = mockScene) => ({
   findScenes: { scenes: [scene] },
 });
 
@@ -48,7 +52,7 @@ const mockApiResponse = (scene = mockScene) => ({
  * Wrapper factory that provides ScenePlayerProvider with configurable props.
  */
 function createWrapper(props = {}) {
-  const defaults = {
+  const defaults: Record<string, unknown> = {
     sceneId: "scene-42",
     instanceId: "inst-1",
     playlist: null,
@@ -59,8 +63,8 @@ function createWrapper(props = {}) {
   };
   const merged = { ...defaults, ...props };
 
-  return function Wrapper({ children }) {
-    return <ScenePlayerProvider {...merged}>{children}</ScenePlayerProvider>;
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return <ScenePlayerProvider {...(merged as any)}>{children}</ScenePlayerProvider>;
   };
 }
 
@@ -249,7 +253,7 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.scene).toBeNull();
       expect(result.current.sceneError).toBeTruthy();
-      expect(result.current.sceneError.message).toBe("Scene not found");
+      expect((result.current.sceneError as Error).message).toBe("Scene not found");
     });
 
     it("dispatches LOAD_SCENE_ERROR on API network failure", async () => {
@@ -639,7 +643,7 @@ describe("ScenePlayerContext", () => {
         currentIndex: 0,
       };
 
-      getEntityPath.mockReturnValue("/scene/scene-42");
+      getEntityPathMock.mockReturnValue("/scene/scene-42");
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper({ playlist }),
@@ -666,7 +670,7 @@ describe("ScenePlayerContext", () => {
     });
 
     it("does not update URL when there is no playlist", async () => {
-      window.history.replaceState.mockClear();
+      (window.history.replaceState as Mock).mockClear();
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper({ playlist: null }),
@@ -681,14 +685,14 @@ describe("ScenePlayerContext", () => {
     });
 
     it("passes hasMultipleInstances to getEntityPath", async () => {
-      useConfig.mockReturnValue({ hasMultipleInstances: true });
+      useConfigMock.mockReturnValue({ hasMultipleInstances: true });
 
       const playlist = {
         scenes: [{ sceneId: "s-1", instanceId: "i-1" }],
         currentIndex: 0,
       };
 
-      getEntityPath.mockReturnValue("/scene/scene-42?instance=inst-1");
+      getEntityPathMock.mockReturnValue("/scene/scene-42?instance=inst-1");
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper({ playlist }),
@@ -715,7 +719,7 @@ describe("ScenePlayerContext", () => {
 
       // Make getEntityPath return the current location
       const currentPath = window.location.pathname + window.location.search;
-      getEntityPath.mockReturnValue(currentPath);
+      getEntityPathMock.mockReturnValue(currentPath);
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper({ playlist }),

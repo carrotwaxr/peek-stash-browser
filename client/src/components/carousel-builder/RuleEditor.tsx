@@ -47,7 +47,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
-  const handleFilterChange = (newFilterKey) => {
+  const handleFilterChange = (newFilterKey: string) => {
     const newDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === newFilterKey);
     if (!newDef) return;
 
@@ -178,8 +178,8 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
     case "searchable-select":
       return (
         <SearchableSelect
-          entityType={filterDef.entityType}
-          value={rule.value}
+          entityType={filterDef.entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
+          value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}
           multi={filterDef.multi}
           placeholder={`Select ${filterDef.label.toLowerCase()}...`}
@@ -187,7 +187,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       );
 
     case "range":
-      return <RangeInput filterDef={filterDef} value={rule.value} onChange={(val) => onChange({ value: val })} />;
+      return <RangeInput filterDef={filterDef} value={rule.value as { min?: number; max?: number } | undefined} onChange={(val) => onChange({ value: val })} />;
 
     case "checkbox":
       return (
@@ -201,7 +201,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
     case "select":
       return (
         <select
-          value={rule.value || ""}
+          value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           className="w-full px-3 py-2 rounded-lg border text-sm"
           style={{
@@ -223,7 +223,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       return (
         <input
           type="text"
-          value={rule.value || ""}
+          value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder={filterDef.placeholder || "Enter value..."}
           className="w-full px-3 py-2 rounded-lg border text-sm"
@@ -236,7 +236,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       );
 
     case "date-range":
-      return <DateRangeInput value={rule.value} onChange={(val) => onChange({ value: val })} />;
+      return <DateRangeInput value={rule.value as { min?: string; max?: string } | undefined} onChange={(val) => onChange({ value: val })} />;
 
     default:
       return <span style={{ color: "var(--text-secondary)" }}>Unsupported type: {filterDef.type}</span>;
@@ -254,12 +254,12 @@ interface RangeInputProps {
  * Min/max input for numeric range filters.
  */
 const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
-  const handleMinChange = (e) => {
+  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const min = e.target.value === "" ? undefined : parseInt(e.target.value);
     onChange({ ...value, min });
   };
 
-  const handleMaxChange = (e) => {
+  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const max = e.target.value === "" ? undefined : parseInt(e.target.value);
     onChange({ ...value, max });
   };
@@ -314,12 +314,12 @@ interface DateRangeInputProps {
  * Date pickers for date range filters.
  */
 const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
-  const handleFromChange = (e) => {
+  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const min = e.target.value || undefined;
     onChange({ ...value, min });
   };
 
-  const handleToChange = (e) => {
+  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const max = e.target.value || undefined;
     onChange({ ...value, max });
   };

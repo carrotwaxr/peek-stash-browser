@@ -1,42 +1,50 @@
-// client/src/components/timeline/TimelineMobileSheet.jsx
-import { memo, useState, useRef, useCallback } from "react";
+// client/src/components/timeline/TimelineMobileSheet.tsx
+import { memo, useState, useRef, useCallback, type ReactNode } from "react";
 import { ChevronUp } from "lucide-react";
 
 const MINIMIZED_HEIGHT = 48; // Just handle + selection info
 const SWIPE_THRESHOLD = 50; // Minimum swipe distance to trigger state change
 
+interface SelectedPeriod {
+  period: string;
+  label: string;
+  start?: string;
+  end?: string;
+}
+
+interface Props {
+  isOpen: boolean;
+  selectedPeriod: SelectedPeriod | null;
+  itemCount?: number;
+  children: ReactNode;
+}
+
 /**
  * Mobile-friendly bottom sheet for the timeline.
  * Tap or swipe the drag handle to toggle between minimized and expanded states.
  * When expanded, shows full timeline controls matching desktop layout.
- *
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether the sheet is visible
- * @param {Object} props.selectedPeriod - Currently selected period { period, label }
- * @param {number} props.itemCount - Number of items in selected period
- * @param {React.ReactNode} props.children - Timeline controls and strip content
  */
 function TimelineMobileSheet({
   isOpen,
   selectedPeriod,
   itemCount = 0,
   children,
-}) {
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const touchStartY = useRef(null);
-  const touchStartTime = useRef(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number | null>(null);
 
   const toggleExpanded = useCallback(() => setIsExpanded((prev) => !prev), []);
   const itemText = itemCount === 1 ? "item" : "items";
 
   // Touch handlers for swipe gestures
-  const handleTouchStart = useCallback((e) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchStartTime.current = Date.now();
   }, []);
 
-  const handleTouchEnd = useCallback((e) => {
-    if (touchStartY.current === null) return;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null || touchStartTime.current === null) return;
 
     const touchEndY = e.changedTouches[0].clientY;
     const deltaY = touchEndY - touchStartY.current;

@@ -1,14 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Share2 } from "lucide-react";
 import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../api";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
-const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
+interface UserGroup {
+  id: number;
+  name: string;
+}
+
+interface Share {
+  groupId: number;
+}
+
+interface Props {
+  playlistId: number;
+  playlistName: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [userGroups, setUserGroups] = useState([]);
-  const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
+  const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set());
 
   const loadData = useCallback(async () => {
     try {
@@ -18,8 +34,8 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
         getPlaylistShares(playlistId),
       ]);
 
-      setUserGroups(groupsResult.groups || []);
-      setSelectedGroupIds(new Set(sharesResult.shares.map((s) => s.groupId)));
+      setUserGroups((groupsResult.groups || []) as UserGroup[]);
+      setSelectedGroupIds(new Set((sharesResult.shares as Share[]).map((s) => s.groupId)));
     } catch (error) {
       console.error("Error loading share data:", error);
       showError("Failed to load sharing options");
@@ -34,7 +50,7 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
     }
   }, [isOpen, playlistId, loadData]);
 
-  const handleToggleGroup = (groupId) => {
+  const handleToggleGroup = (groupId: number) => {
     setSelectedGroupIds((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -49,7 +65,7 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await updatePlaylistShares(playlistId, Array.from(selectedGroupIds));
+      await updatePlaylistShares(playlistId, [...selectedGroupIds]);
       showSuccess(
         selectedGroupIds.size > 0
           ? "Playlist sharing updated"
@@ -58,7 +74,7 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
       onClose();
     } catch (error) {
       console.error("Error updating shares:", error);
-      const message = error.data?.error || "Failed to update sharing";
+      const message = (error as { data?: { error?: string } })?.data?.error || "Failed to update sharing";
       showError(message);
     } finally {
       setSaving(false);
@@ -76,14 +92,12 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }) => {
         className="max-w-md w-full m-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <Paper.Header
-          title={
-            <div className="flex items-center gap-2">
-              <Share2 size={20} />
-              <span>Share Playlist</span>
-            </div>
-          }
-        />
+        <Paper.Header>
+          <div className="flex items-center gap-2">
+            <Share2 size={20} />
+            <span className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>Share Playlist</span>
+          </div>
+        </Paper.Header>
         <Paper.Body>
           {loading ? (
             <div className="flex justify-center py-8">

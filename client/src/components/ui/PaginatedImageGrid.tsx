@@ -87,7 +87,7 @@ const PaginatedImageGrid = ({
             <LazyImage
               key={image.id}
               src={image.paths?.thumbnail}
-              alt={getImageTitle(image) || `Image ${index + 1}`}
+              alt={getImageTitle(image as Parameters<typeof getImageTitle>[0]) || `Image ${index + 1}`}
               className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
               style={{
                 backgroundColor: "var(--bg-secondary)",

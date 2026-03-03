@@ -39,10 +39,10 @@ export const SearchableGrid = ({
 }: SearchableGridProps) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const [lastQuery, setLastQuery] = useState(null);
+  const [lastQuery, setLastQuery] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [data, setData] = useState<Array<Record<string, unknown>>>([]);
   const [totalCount, setTotalCount] = useState(0);
 
   // API method and key mappings (memoized to avoid recreating on each render)
@@ -85,7 +85,7 @@ export const SearchableGrid = ({
   }, [entityType]);
 
   const handleQueryChange = useCallback(
-    async (newQuery) => {
+    async (newQuery: Record<string, unknown>) => {
       if (isAuthLoading || !isAuthenticated) {
         return;
       }
@@ -106,15 +106,15 @@ export const SearchableGrid = ({
         setLastQuery(mergedQuery);
         setError(null);
 
-        const result = await libraryApi[apiMethod](mergedQuery);
-        const items = result[responseKey]?.[dataKey] || [];
-        const count = result[responseKey]?.count || 0;
+        const result = await (libraryApi as unknown as Record<string, (params: unknown) => Promise<Record<string, Record<string, unknown>>>>)[apiMethod](mergedQuery);
+        const items = (result[responseKey]?.[dataKey] || []) as Array<Record<string, unknown>>;
+        const count = (result[responseKey]?.count || 0) as number;
 
         setData(items);
         setTotalCount(count);
         onResultsChange?.({ items, count });
       } catch (err) {
-        setError(err);
+        setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
         setIsLoading(false);
       }
@@ -123,13 +123,13 @@ export const SearchableGrid = ({
   );
 
   // Handle successful hide - remove item from local state
-  const handleHideSuccess = useCallback((entityId) => {
+  const handleHideSuccess = useCallback((entityId: string) => {
     setData((prevData) => prevData.filter((item) => item.id !== entityId));
     setTotalCount((prevCount) => Math.max(0, prevCount - 1));
   }, []);
 
   // Calculate pagination
-  const currentPerPage = lastQuery?.filter?.per_page || 24;
+  const currentPerPage = ((lastQuery?.filter as Record<string, unknown> | undefined)?.per_page as number) || 24;
   const totalPages = Math.ceil(totalCount / currentPerPage);
 
   // Build filter key for locked filters if we need to hide them
@@ -158,7 +158,7 @@ export const SearchableGrid = ({
         emptyMessage={emptyMessage || `No ${entityType}s found`}
         emptyDescription={emptyDescription}
         skeletonCount={skeletonCount}
-        currentPage={lastQuery?.filter?.page || 1}
+        currentPage={((lastQuery?.filter as Record<string, unknown> | undefined)?.page as number) || 1}
         totalPages={totalPages}
         onPageChange={() => {
           // SearchControls manages pagination state, but we pass it through for SearchResults to render

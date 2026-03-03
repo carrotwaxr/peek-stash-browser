@@ -10,9 +10,44 @@
  * @param {Array} inherited - Inherited entities (from galleries)
  * @returns {Array} Merged array with unique entities by ID
  */
-function mergeEntitiesById(primary = [], inherited = []) {
-  const seen = new Set();
-  const result = [];
+interface Entity {
+  id: string;
+  name?: string | null;
+  [key: string]: any;
+}
+
+interface Gallery {
+  id?: string;
+  performers?: Entity[];
+  tags?: Entity[];
+  studio?: any;
+  studioId?: string;
+  studioName?: string;
+  date?: string;
+  details?: string;
+  photographer?: string;
+  urls?: string[];
+  [key: string]: any;
+}
+
+interface ImageObject {
+  id?: string;
+  title?: string;
+  filePath?: string;
+  galleries?: Gallery[];
+  performers?: Entity[];
+  tags?: Entity[];
+  studio?: any;
+  date?: string;
+  details?: string;
+  photographer?: string;
+  urls?: string[];
+  [key: string]: any;
+}
+
+function mergeEntitiesById(primary: Entity[] = [], inherited: Entity[] = []): Entity[] {
+  const seen = new Set<string>();
+  const result: Entity[] = [];
 
   // Add primary entities first
   for (const entity of primary) {
@@ -38,8 +73,8 @@ function mergeEntitiesById(primary = [], inherited = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Array} All performers from galleries (deduplicated)
  */
-function getInheritedPerformers(galleries = []) {
-  const allPerformers = [];
+function getInheritedPerformers(galleries: Gallery[] = []): Entity[] {
+  const allPerformers: Entity[] = [];
   for (const gallery of galleries) {
     if (gallery?.performers) {
       allPerformers.push(...gallery.performers);
@@ -53,8 +88,8 @@ function getInheritedPerformers(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Array} All tags from galleries (deduplicated)
  */
-function getInheritedTags(galleries = []) {
-  const allTags = [];
+function getInheritedTags(galleries: Gallery[] = []): Entity[] {
+  const allTags: Entity[] = [];
   for (const gallery of galleries) {
     if (gallery?.tags) {
       allTags.push(...gallery.tags);
@@ -68,7 +103,7 @@ function getInheritedTags(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Object|null} Studio object or null
  */
-function getInheritedStudio(galleries = []) {
+function getInheritedStudio(galleries: Gallery[] = []): any {
   for (const gallery of galleries) {
     if (gallery?.studio) {
       return gallery.studio;
@@ -86,7 +121,7 @@ function getInheritedStudio(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {string|null} Date string or null
  */
-function getInheritedDate(galleries = []) {
+function getInheritedDate(galleries: Gallery[] = []): string | null {
   for (const gallery of galleries) {
     if (gallery?.date) {
       return gallery.date;
@@ -100,7 +135,7 @@ function getInheritedDate(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {string|null} Details string or null
  */
-function getInheritedDetails(galleries = []) {
+function getInheritedDetails(galleries: Gallery[] = []): string | null {
   for (const gallery of galleries) {
     if (gallery?.details) {
       return gallery.details;
@@ -114,7 +149,7 @@ function getInheritedDetails(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {string|null} Photographer string or null
  */
-function getInheritedPhotographer(galleries = []) {
+function getInheritedPhotographer(galleries: Gallery[] = []): string | null {
   for (const gallery of galleries) {
     if (gallery?.photographer) {
       return gallery.photographer;
@@ -129,9 +164,9 @@ function getInheritedPhotographer(galleries = []) {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Array} Merged array of unique URLs
  */
-function mergeUrls(imageUrls = [], galleries = []) {
-  const seen = new Set();
-  const result = [];
+function mergeUrls(imageUrls: string[] = [], galleries: Gallery[] = []): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
 
   // Add image URLs first
   for (const url of imageUrls) {
@@ -169,7 +204,7 @@ function mergeUrls(imageUrls = [], galleries = []) {
  * @param {Object} image - Image object with optional galleries array
  * @returns {Object} Object containing effective metadata fields
  */
-export function getEffectiveImageMetadata(image) {
+export function getEffectiveImageMetadata(image: ImageObject | null | undefined) {
   if (!image) {
     return {
       effectivePerformers: [],
@@ -229,7 +264,7 @@ export function getEffectiveImageMetadata(image) {
  * @param {Object} image - Image object
  * @returns {Object} Image with added effective* fields
  */
-export function enrichImageWithInheritedMetadata(image) {
+export function enrichImageWithInheritedMetadata(image: ImageObject | null | undefined) {
   if (!image) return image;
 
   const {
@@ -259,7 +294,7 @@ export function enrichImageWithInheritedMetadata(image) {
  * @param {Object} image - Image object
  * @returns {string|null} Title string or null
  */
-export function getImageTitle(image) {
+export function getImageTitle(image: ImageObject | null | undefined) {
   if (image?.title) return image.title;
   if (image?.filePath) {
     // Extract filename from path (handles both / and \ separators)

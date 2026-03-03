@@ -35,7 +35,7 @@ export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess }:
 
     const entities = selectedScenes.map((scene) => ({
       entityType: "scene",
-      entityId: scene.id,
+      entityId: String(scene.id),
     }));
 
     const result = await hideEntities({

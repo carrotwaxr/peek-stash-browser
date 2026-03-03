@@ -13,14 +13,14 @@ import videojs from 'video.js';
 // Delay before loading new source after setting currentTime (matches Stash)
 const LOAD_DELAY = 200;
 
-function offsetMiddleware(player) {
-  let tech;
-  let source = null;
-  let offsetStart;
+function offsetMiddleware(player: any) {
+  let tech: any;
+  let source: any = null;
+  let offsetStart: number | undefined;
   let seeking = 0;
-  let loadSourceTimeout = null;
+  let loadSourceTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  function updateOffsetStart(offset) {
+  function updateOffsetStart(offset: number | undefined) {
     offsetStart = offset;
 
     if (!tech) return;
@@ -32,7 +32,7 @@ function offsetMiddleware(player) {
       const { cues } = tracks[i];
       if (cues) {
         for (let j = 0; j < cues.length; j++) {
-          const cue = cues[j];
+          const cue = cues[j] as any;
           if (cue._startTime === undefined || cue._endTime === undefined) {
             continue;
           }
@@ -43,7 +43,7 @@ function offsetMiddleware(player) {
     }
   }
 
-  function loadSource(seconds) {
+  function loadSource(seconds: number) {
     // Add ?start=X parameter to source URL
     const srcUrl = new URL(source.src, window.location.origin);
     srcUrl.searchParams.set('start', seconds.toString());
@@ -72,11 +72,11 @@ function offsetMiddleware(player) {
   }
 
   return {
-    setTech(newTech) {
+    setTech(newTech: any) {
       tech = newTech;
     },
 
-    setSource(srcObj, next) {
+    setSource(srcObj: any, next: any) {
       // Reset offset handling based on source properties
       if (srcObj.offset && srcObj.duration) {
         updateOffsetStart(0);
@@ -91,7 +91,7 @@ function offsetMiddleware(player) {
       next(null, srcObj);
     },
 
-    duration(seconds) {
+    duration(seconds: number) {
       // If source has explicit duration property, use it
       // This overrides the duration reported by HLS manifests
       if (source && source.duration !== undefined) {
@@ -102,12 +102,12 @@ function offsetMiddleware(player) {
       return seconds;
     },
 
-    buffered(buffers) {
+    buffered(buffers: any) {
       if (offsetStart === undefined) {
         return buffers;
       }
 
-      const timeRanges = [];
+      const timeRanges: Array<[number, number]> = [];
       for (let i = 0; i < buffers.length; i++) {
         const start = buffers.start(i) + offsetStart;
         const end = buffers.end(i) + offsetStart;
@@ -117,11 +117,11 @@ function offsetMiddleware(player) {
       return videojs.createTimeRanges(timeRanges);
     },
 
-    currentTime(seconds) {
+    currentTime(seconds: number) {
       return (offsetStart ?? 0) + seconds;
     },
 
-    setCurrentTime(seconds) {
+    setCurrentTime(seconds: number) {
       if (offsetStart === undefined) {
         return seconds;
       }

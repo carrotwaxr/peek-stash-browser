@@ -44,13 +44,13 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         );
 
       const performersTooltip = getIndicatorBehavior('group', 'performers') === 'rich' &&
-        group.performers?.length > 0 && (
+        (group.performers?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" parentInstanceId={group.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
-        group.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" parentInstanceId={group.instanceId} />
+        (group.galleries?.length ?? 0) > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={group.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={group.instanceId} />
         );
 
       return [
@@ -59,15 +59,15 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           count: group.scene_count,
           onClick:
             group.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
           type: "GROUPS",
           count: group.sub_group_count,
           onClick:
-            group.sub_group_count > 0
-              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group, hasMultipleInstances))
+            (group.sub_group_count ?? 0) > 0
+              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
@@ -99,21 +99,21 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         title={group.name}
         subtitle={subtitle}
         description={group.description}
-        linkTo={getEntityPath('group', group, hasMultipleInstances)}
+        linkTo={getEntityPath('group', group as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={{
           entityId: group.id,
           instanceId: group.instanceId,
           initialRating: group.rating100,
           initialFavorite: group.favorite || false,
           onHideSuccess,
-          showRating: groupSettings.showRating,
-          showFavorite: groupSettings.showFavorite,
-          showOCounter: groupSettings.showOCounter,
-          showMenu: groupSettings.showMenu,
+          showRating: groupSettings.showRating as boolean | undefined,
+          showFavorite: groupSettings.showFavorite as boolean | undefined,
+          showOCounter: groupSettings.showOCounter as boolean | undefined,
+          showMenu: groupSettings.showMenu as boolean | undefined,
         }}
         {...rest}
       />

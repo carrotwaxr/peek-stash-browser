@@ -15,9 +15,12 @@ vi.mock("../../src/api", () => ({
 
 import { apiGet } from "../../src/api";
 import { useFilterState } from "../../src/hooks/useFilterState";
+import type { Mock } from "vitest";
+
+const apiGetMock = apiGet as unknown as Mock;
 
 const createWrapper = (initialEntries = ["/"]) => {
-  return ({ children }) => (
+  return ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
   );
 };
@@ -28,7 +31,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("sets viewMode from default preset (e.g., 'hierarchy')", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
           presets: {
@@ -69,7 +72,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("uses defaultViewMode when no preset exists", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({ presets: {} });
       }
@@ -98,7 +101,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("applies perPage from default preset on init when no URL per_page param", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
           presets: {
@@ -140,7 +143,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("uses URL per_page over preset perPage when URL param is explicit", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
           presets: {
@@ -183,7 +186,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("defaults perPage to 24 when no preset and no URL param", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({ presets: {} });
       }
@@ -212,7 +215,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("applies preset perPage when URL has filter params but no per_page", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
           presets: {
@@ -256,7 +259,7 @@ describe("useFilterState - preset initialization", () => {
   });
 
   it("uses preset viewMode even when URL has no view param", async () => {
-    apiGet.mockImplementation((url) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === "/user/filter-presets") {
         return Promise.resolve({
           presets: {

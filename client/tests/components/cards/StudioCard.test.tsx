@@ -24,7 +24,7 @@ describe("StudioCard", () => {
       studio: mockStudio,
       fromPageTitle: "Studios",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -33,7 +33,7 @@ describe("StudioCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
-    });
+    } as any);
 
     expect(element.props.studio).toBe(mockStudio);
   });
@@ -41,7 +41,7 @@ describe("StudioCard", () => {
   it("passes correct link path", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
-    });
+    } as any);
 
     expect(element.props.studio.id).toBe("1");
   });
@@ -49,7 +49,7 @@ describe("StudioCard", () => {
   it("passes studio with all data", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
-    });
+    } as any);
 
     const studio = element.props.studio;
     expect(studio.name).toBe("Test Studio");
@@ -61,7 +61,7 @@ describe("StudioCard", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
       fromPageTitle: "Studios",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Studios");
   });
@@ -70,7 +70,7 @@ describe("StudioCard", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -80,7 +80,7 @@ describe("StudioCard", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

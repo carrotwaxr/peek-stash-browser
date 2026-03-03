@@ -23,6 +23,7 @@ interface Props {
   size?: "small" | "medium" | "large";
   variant?: "card" | "page" | "lightbox";
   interactive?: boolean;
+  disabled?: boolean;
 }
 
 const OCounterButton = ({
@@ -56,7 +57,7 @@ const OCounterButton = ({
   const entityId = sceneId || imageId;
   const entityType = sceneId ? "scene" : imageId ? "image" : null;
 
-  const handleClick = async (e) => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     // Stop propagation to prevent triggering parent click handlers
     e.preventDefault();
     e.stopPropagation();
@@ -72,16 +73,16 @@ const OCounterButton = ({
     setIsUpdating(true);
 
     try {
-      let response;
+      let response: { success?: boolean; oCount?: number } | undefined;
       if (sceneId) {
-        response = await apiPost("/watch-history/increment-o", { sceneId });
+        response = await apiPost("/watch-history/increment-o", { sceneId }) as { success?: boolean; oCount?: number };
       } else if (imageId) {
-        response = await apiPost("/image-view-history/increment-o", { imageId });
+        response = await apiPost("/image-view-history/increment-o", { imageId }) as { success?: boolean; oCount?: number };
       }
 
       if (response?.success) {
-        setCount(response.oCount); // Update with server value
-        onChange?.(response.oCount);
+        setCount(response.oCount ?? count); // Update with server value
+        onChange?.(response.oCount ?? count);
       }
     } catch (err) {
       console.error(`Error incrementing O counter for ${entityType}:`, err);

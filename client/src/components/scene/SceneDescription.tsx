@@ -18,7 +18,7 @@ const SceneDescription = ({
   lineClamp = 2,
   className = "",
 }: Props) => {
-  const description = getSceneDescription(scene);
+  const description = getSceneDescription(scene as unknown as Record<string, unknown>);
 
   if (!description) return null;
 

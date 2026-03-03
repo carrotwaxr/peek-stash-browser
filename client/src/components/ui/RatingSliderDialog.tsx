@@ -92,7 +92,8 @@ const RatingSliderDialog = ({
     }
   }, [isOpen, anchorEl]);
 
-  const debouncedOnSave = useDebouncedCallback((newValue) => {
+  const debouncedOnSave = useDebouncedCallback((...args: unknown[]) => {
+    const newValue = args[0] as number;
     const ratingValue = Math.round(newValue * 10);
     onSave(ratingValue === 0 ? null : ratingValue);
   }, 300);
@@ -101,11 +102,11 @@ const RatingSliderDialog = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent) => {
       if (
         popoverRef.current &&
-        !popoverRef.current.contains(e.target) &&
-        !anchorEl?.contains(e.target)
+        !(popoverRef.current as HTMLElement).contains(e.target as Node) &&
+        !anchorEl?.contains(e.target as Node)
       ) {
         onClose();
       }
@@ -131,7 +132,7 @@ const RatingSliderDialog = ({
 
   if (!isOpen) return null;
 
-  const getRatingGradient = (val) => {
+  const getRatingGradient = (val: number | null) => {
     // Unrated: neutral gray
     if (val === null || val === undefined) {
       return "linear-gradient(90deg, #6B7280 0%, #4B5563 100%)"; // Neutral gray
@@ -146,13 +147,13 @@ const RatingSliderDialog = ({
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setValue(newValue);
     debouncedOnSave(newValue);
   };
 
-  const handleClear = (e) => {
+  const handleClear = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     onSave(null); // Clear rating

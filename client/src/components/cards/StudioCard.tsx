@@ -29,18 +29,18 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
         );
 
       const performersTooltip = getIndicatorBehavior('studio', 'performers') === 'rich' &&
-        studio.performers?.length > 0 && (
+        (studio.performers?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="performer" entities={studio.performers} title="Performers" parentInstanceId={studio.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('studio', 'groups') === 'rich' &&
-        studio.groups?.length > 0 && (
+        (studio.groups?.length ?? 0) > 0 && (
           <TooltipEntityGrid entityType="group" entities={studio.groups} title="Collections" parentInstanceId={studio.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('studio', 'galleries') === 'rich' &&
-        studio.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={studio.galleries} title="Galleries" parentInstanceId={studio.instanceId} />
+        (studio.galleries?.length ?? 0) > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={studio.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={studio.instanceId} />
         );
 
       return [
@@ -50,7 +50,7 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.scene_count,
           onClick:
             studio.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
@@ -58,7 +58,7 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.image_count,
           onClick:
             studio.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio as unknown as Record<string, unknown>, hasMultipleInstances))
               : undefined,
         },
         {
@@ -94,11 +94,11 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
         imagePath={studio.image_path}
         title={studio.name}
         description={studio.details}
-        linkTo={getEntityPath('studio', studio, hasMultipleInstances)}
+        linkTo={getEntityPath('studio', studio as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={{
           entityId: studio.id,
           instanceId: studio.instanceId,
@@ -106,10 +106,10 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           initialFavorite: studio.favorite || false,
           initialOCounter: studio.o_counter,
           onHideSuccess,
-          showRating: studioSettings.showRating,
-          showFavorite: studioSettings.showFavorite,
-          showOCounter: studioSettings.showOCounter,
-          showMenu: studioSettings.showMenu,
+          showRating: studioSettings.showRating as boolean | undefined,
+          showFavorite: studioSettings.showFavorite as boolean | undefined,
+          showOCounter: studioSettings.showOCounter as boolean | undefined,
+          showMenu: studioSettings.showMenu as boolean | undefined,
         }}
         {...rest}
       />

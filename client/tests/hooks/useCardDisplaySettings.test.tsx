@@ -12,8 +12,8 @@ const { mockGet, mockPut } = vi.hoisted(() => {
 
 // Mock the typed API client
 vi.mock("../../src/api", () => ({
-  apiGet: (...args) => mockGet(...args),
-  apiPut: (...args) => mockPut(...args),
+  apiGet: (...args: unknown[]) => mockGet(...args),
+  apiPut: (...args: unknown[]) => mockPut(...args),
 }));
 
 // Import after mock setup
@@ -41,7 +41,7 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("with provider", () => {
-    const wrapper = ({ children }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
       <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
     );
 
@@ -79,7 +79,7 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("getSettings", () => {
-    const wrapper = ({ children }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
       <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
     );
 
@@ -162,7 +162,7 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("updateSettings", () => {
-    const wrapper = ({ children }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
       <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
     );
 
@@ -243,7 +243,7 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("error handling", () => {
-    const wrapper = ({ children }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
       <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
     );
 

@@ -4,18 +4,24 @@ import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../../hooks/useHiddenEntities";
 import { apiGet, apiPut } from "../../../api";
 
+interface StashInstance {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 const ContentTab = () => {
   const { hideConfirmationDisabled, updateHideConfirmation } = useHiddenEntities();
 
-  const [instances, setInstances] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [instances, setInstances] = useState<StashInstance[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showInstanceSection, setShowInstanceSection] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchInstances = async () => {
       try {
-        const data = await apiGet("/user/stash-instances");
+        const data = await apiGet<{ selectedInstanceIds: string[]; availableInstances: StashInstance[] }>("/user/stash-instances");
         const { selectedInstanceIds, availableInstances } = data;
 
         setInstances(availableInstances || []);
@@ -23,7 +29,7 @@ const ContentTab = () => {
         // This matches the backend behavior where empty = "show all enabled instances"
         const effectiveSelection = selectedInstanceIds?.length > 0
           ? selectedInstanceIds
-          : (availableInstances || []).map((i) => i.id);
+          : (availableInstances || []).map((i: StashInstance) => i.id);
         setSelectedIds(effectiveSelection);
         setShowInstanceSection((availableInstances?.length || 0) >= 2);
       } catch (err) {
@@ -34,9 +40,9 @@ const ContentTab = () => {
     fetchInstances();
   }, []);
 
-  const handleInstanceToggle = async (instanceId) => {
+  const handleInstanceToggle = async (instanceId: string) => {
     const newSelectedIds = selectedIds.includes(instanceId)
-      ? selectedIds.filter((id) => id !== instanceId)
+      ? selectedIds.filter((id: string) => id !== instanceId)
       : [...selectedIds, instanceId];
 
     // Don't allow unchecking all

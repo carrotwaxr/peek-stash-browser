@@ -6,7 +6,7 @@ import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySe
 
 // Mock the api module
 vi.mock("../../../src/api", () => ({
-  getClipPreviewUrl: (id) => `/api/proxy/clip/${id}/preview`,
+  getClipPreviewUrl: (id: string) => `/api/proxy/clip/${id}/preview`,
 }));
 
 const mockClips = [
@@ -34,7 +34,7 @@ const mockClips = [
   },
 ];
 
-const renderWithProviders = (ui) => {
+const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <MemoryRouter>
       <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>

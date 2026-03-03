@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -22,7 +22,7 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for groups page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "table", label: "Table view" },
 ];
@@ -64,19 +64,18 @@ const Groups = () => {
   );
 
   const findGroups = (data as Record<string, unknown>)?.findGroups as Record<string, unknown> | undefined;
-  const currentGroups = (findGroups?.groups as unknown[]) || [];
+  const currentGroups = (findGroups?.groups as Record<string, unknown>[]) || [];
   const totalCount = (findGroups?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -124,7 +123,8 @@ const Groups = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -137,13 +137,13 @@ const Groups = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) =>
+          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
+                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="group"
@@ -174,9 +174,9 @@ const Groups = () => {
               )
             ) : viewMode === "table" ? (
               <TableView
-                items={currentGroups}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentGroups as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="group"
@@ -193,21 +193,21 @@ const Groups = () => {
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentGroups.map((group, index) => {
-                  const itemProps = gridItemProps(index);
+                {currentGroups.map((group: Record<string, unknown>, index: number) => {
+                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
                   return (
                     <GroupCard
-                      key={group.id}
-                      group={group}
+                      key={group.id as string}
+                      group={group as unknown as import("@peek/shared-types").NormalizedGroup & { sub_group_count?: number; description?: string | null }}
                       fromPageTitle="Collections"
-                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
-                      {...itemProps}
+                      tabIndex={isTVMode ? _tabIndex : -1}
+                      {...restItemProps}
                     />
                   );
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>

@@ -57,7 +57,7 @@ describe("TimelineControls", () => {
         />
       );
 
-      const daysButton = screen.getByText("Days").closest("button");
+      const daysButton = screen.getByText("Days").closest("button")!;
       await user.click(daysButton);
 
       expect(onZoomLevelChange).toHaveBeenCalledWith("days");
@@ -74,10 +74,10 @@ describe("TimelineControls", () => {
         />
       );
 
-      await user.click(screen.getByText("Years").closest("button"));
+      await user.click(screen.getByText("Years").closest("button")!);
       expect(onZoomLevelChange).toHaveBeenCalledWith("years");
 
-      await user.click(screen.getByText("Weeks").closest("button"));
+      await user.click(screen.getByText("Weeks").closest("button")!);
       expect(onZoomLevelChange).toHaveBeenCalledWith("weeks");
     });
   });

@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useMediaQuery } from "../../src/hooks/useMediaQuery";
 
 describe("useMediaQuery", () => {
-  let matchMediaMock;
-  let listeners;
+  let matchMediaMock: any;
+  let listeners: any[];
 
   beforeEach(() => {
     listeners = [];

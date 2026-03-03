@@ -26,25 +26,27 @@ Object.defineProperty(window, "matchMedia", {
 
 // Mock IntersectionObserver (used by lazy loading)
 class MockIntersectionObserver {
-  constructor(callback) {
+  callback: IntersectionObserverCallback;
+  constructor(callback: IntersectionObserverCallback) {
     this.callback = callback;
   }
   observe() {}
   unobserve() {}
   disconnect() {}
 }
-globalThis.IntersectionObserver = MockIntersectionObserver;
+globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver (used by some UI components)
 class MockResizeObserver {
-  constructor(callback) {
+  callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
     this.callback = callback;
   }
   observe() {}
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver = MockResizeObserver;
+globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
 // Mock scrollIntoView (not implemented in happy-dom)
 Element.prototype.scrollIntoView = vi.fn();

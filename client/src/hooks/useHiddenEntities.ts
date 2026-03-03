@@ -19,7 +19,7 @@ export const useHiddenEntities = () => {
    * @param {boolean} params.skipConfirmation - Skip confirmation dialog
    */
   const hideEntity = useCallback(
-    async ({ entityType, entityId, entityName, skipConfirmation = false }) => {
+    async ({ entityType, entityId, entityName, skipConfirmation = false }: { entityType: string; entityId: string; entityName: string; skipConfirmation?: boolean }) => {
       setIsHiding(true);
       try {
         await apiPost("/user/hidden-entities", {
@@ -39,7 +39,7 @@ export const useHiddenEntities = () => {
         }
 
         return true;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to hide entity:", error);
         showError(
           error.data?.error || "Failed to hide entity. Please try again."
@@ -60,7 +60,7 @@ export const useHiddenEntities = () => {
    * @returns {Object} Result with successCount and failCount
    */
   const hideEntities = useCallback(
-    async ({ entities, skipConfirmation = false }) => {
+    async ({ entities, skipConfirmation = false }: { entities: Array<{ entityType: string; entityId: string }>; skipConfirmation?: boolean }) => {
       setIsHiding(true);
       try {
         const response = await apiPost("/user/hidden-entities/bulk", {
@@ -77,8 +77,8 @@ export const useHiddenEntities = () => {
 
         return {
           success: true,
-          successCount: response.successCount,
-          failCount: response.failCount,
+          successCount: (response as any).successCount,
+          failCount: (response as any).failCount,
         };
       } catch (error) {
         console.error("Failed to hide entities:", error);
@@ -98,12 +98,12 @@ export const useHiddenEntities = () => {
    * Unhide (restore) an entity
    */
   const unhideEntity = useCallback(
-    async ({ entityType, entityId, entityName }) => {
+    async ({ entityType, entityId, entityName }: { entityType: string; entityId: string; entityName: string }) => {
       try {
         await apiDelete(`/user/hidden-entities/${entityType}/${entityId}`);
         showSuccess(`${entityName} has been restored`);
         return true;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to unhide entity:", error);
         showError(
           error.data?.error || "Failed to restore entity. Please try again."
@@ -117,12 +117,12 @@ export const useHiddenEntities = () => {
   /**
    * Get all hidden entities (optionally filtered by type)
    */
-  const getHiddenEntities = useCallback(async (entityType) => {
+  const getHiddenEntities = useCallback(async (entityType?: string) => {
     try {
       const endpoint = entityType
         ? `/user/hidden-entities?entityType=${entityType}`
         : "/user/hidden-entities";
-      const response = await apiGet(endpoint);
+      const response = await apiGet(endpoint) as any;
       return response.hiddenEntities;
     } catch (error) {
       console.error("Failed to get hidden entities:", error);
@@ -134,7 +134,7 @@ export const useHiddenEntities = () => {
   /**
    * Unhide all entities (optionally filtered by type)
    */
-  const unhideAll = useCallback(async (entityType) => {
+  const unhideAll = useCallback(async (entityType?: string) => {
     try {
       const endpoint = entityType
         ? `/user/hidden-entities/all?entityType=${entityType}`
@@ -143,7 +143,7 @@ export const useHiddenEntities = () => {
       const typeLabel = entityType ? `${entityType}s` : "items";
       showSuccess(`All hidden ${typeLabel} have been restored`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unhide all entities:", error);
       showError(
         error.data?.error || "Failed to restore all items. Please try again."
@@ -156,7 +156,7 @@ export const useHiddenEntities = () => {
    * Update hide confirmation preference
    */
   const updateHideConfirmation = useCallback(
-    async (disabled) => {
+    async (disabled: boolean) => {
       try {
         await apiPut("/user/hide-confirmation", {
           hideConfirmationDisabled: disabled,

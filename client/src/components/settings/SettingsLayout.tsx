@@ -18,7 +18,7 @@ interface Props {
  */
 const SettingsLayout = ({ tabs, activeTab, onTabChange, children }: Props) => {
   const SCROLL_THRESHOLD = 1;
-  const tabContainerRef = useRef(null);
+  const tabContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
 

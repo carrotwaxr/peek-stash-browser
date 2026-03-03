@@ -27,9 +27,9 @@ const FavoriteButton = ({
     large: 28,
   };
 
-  const iconSize = sizeMap[size] || size;
+  const iconSize = typeof size === 'number' ? size : sizeMap[size];
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 

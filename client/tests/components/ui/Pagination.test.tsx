@@ -98,7 +98,7 @@ describe("Pagination", () => {
 
     it("does not render when totalPages is undefined", () => {
       const { container } = render(
-        <Pagination {...defaultProps} totalPages={undefined} />
+        <Pagination {...defaultProps} totalPages={undefined as unknown as number} />
       );
 
       expect(container.firstChild).toBeNull();
@@ -205,7 +205,7 @@ describe("Pagination", () => {
       render(<Pagination {...defaultProps} totalPages={5} />);
 
       const comboboxes = screen.getAllByRole("combobox");
-      const pageSelect = comboboxes[0];
+      const pageSelect = comboboxes[0] as HTMLSelectElement;
       const options = Array.from(pageSelect.options);
 
       expect(options).toHaveLength(5);
@@ -312,8 +312,8 @@ describe("Pagination", () => {
     it("has preset options 12, 24, 48, 96, 120", () => {
       render(<Pagination {...defaultProps} perPage={24} />);
 
-      const perPageSelect = screen.getByLabelText("Per Page:");
-      const options = Array.from(perPageSelect.options).map(o => o.value);
+      const perPageSelect = screen.getByLabelText("Per Page:") as HTMLSelectElement;
+      const options = Array.from(perPageSelect.options).map((o: HTMLOptionElement) => o.value);
 
       expect(options).toContain("12");
       expect(options).toContain("24");

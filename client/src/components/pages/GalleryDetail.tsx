@@ -25,6 +25,17 @@ import {
   TagChips,
 } from "../ui/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
+import type { TagRef, NormalizedImage } from "@peek/shared-types";
+import type React from "react";
+
+interface EntityRef {
+  id: string;
+  name?: string;
+  instanceId?: string;
+  image_path?: string;
+  gender?: string;
+  [key: string]: unknown;
+}
 
 const PER_PAGE = 100;
 
@@ -33,7 +44,7 @@ const GalleryDetail = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState<Record<string, unknown> | null>(null);
-  const [images, setImages] = useState<Record<string, unknown>[]>([]);
+  const [images, setImages] = useState<NormalizedImage[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [imagesLoading, setImagesLoading] = useState(true);
   const [rating, setRating] = useState<number | null>(null);
@@ -54,8 +65,8 @@ const GalleryDetail = () => {
 
   // Compute tabs with counts for smart default selection
   // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
-  const galleryImageCount = totalCount || gallery?.image_count || 0;
-  const galleryScenesCount = gallery?.scenes?.length || 0;
+  const galleryImageCount = totalCount || (gallery?.image_count as number) || 0;
+  const galleryScenesCount = (gallery?.scenes as unknown[] | undefined)?.length || 0;
   const contentTabs = [
     { id: 'images', label: 'Images', count: galleryImageCount },
     { id: 'scenes', label: 'Scenes', count: galleryScenesCount },
@@ -66,7 +77,7 @@ const GalleryDetail = () => {
   const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
 
   const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -81,12 +92,12 @@ const GalleryDetail = () => {
 
   // Fetch function for prefetching adjacent pages
   const fetchPage = useCallback(async (page: number) => {
-    const data = await libraryApi.getGalleryImages(galleryId, {
+    const data = await libraryApi.getGalleryImages(galleryId!, {
       page,
       per_page: PER_PAGE,
       instanceId,
-    });
-    return { images: data.images || [] };
+    }) as Record<string, unknown>;
+    return { images: (data.images || []) as NormalizedImage[] };
   }, [galleryId, instanceId]);
 
   // Paginated lightbox state and handlers
@@ -99,16 +110,16 @@ const GalleryDetail = () => {
   });
 
   // Set page title to gallery name
-  usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
+  usePageTitle(gallery ? (galleryTitle(gallery) as string) : "Gallery");
 
   useEffect(() => {
     const fetchGallery = async () => {
       try {
         setIsLoading(true);
-        const galleryData = await libraryApi.findGalleryById(galleryId, instanceId);
+        const galleryData = await libraryApi.findGalleryById(galleryId!, instanceId) as Record<string, unknown> | null;
         setGallery(galleryData);
-        setRating(galleryData.rating);
-        setIsFavorite(galleryData.favorite || false);
+        setRating((galleryData as Record<string, unknown> | null)?.rating as number | null);
+        setIsFavorite(((galleryData as Record<string, unknown> | null)?.favorite as boolean) || false);
       } catch (error) {
         console.error("Error loading gallery:", error);
       } finally {
@@ -123,13 +134,13 @@ const GalleryDetail = () => {
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
-        const data = await libraryApi.getGalleryImages(galleryId, {
+        const data = await libraryApi.getGalleryImages(galleryId!, {
           page: lightbox.currentPage,
           per_page: PER_PAGE,
           instanceId,
-        });
-        setImages(data.images || []);
-        setTotalCount(data.pagination?.total || data.images?.length || 0);
+        }) as Record<string, unknown>;
+        setImages((data.images || []) as NormalizedImage[]);
+        setTotalCount(((data.pagination as Record<string, unknown> | undefined)?.total as number) || (data.images as unknown[] | undefined)?.length || 0);
 
         // Handle pending lightbox navigation after page loads
         lightbox.consumePendingLightboxIndex();
@@ -147,20 +158,20 @@ const GalleryDetail = () => {
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("gallery", galleryId, newRating, instanceId);
+      await libraryApi.updateRating("gallery", galleryId!, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(gallery.rating);
+      setRating((gallery?.rating as number | null) ?? null);
     }
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("gallery", galleryId, newValue, instanceId);
+      await libraryApi.updateFavorite("gallery", galleryId!, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
-      setIsFavorite(gallery.favorite || false);
+      setIsFavorite((gallery?.favorite as boolean) || false);
     }
   };
 
@@ -195,6 +206,10 @@ const GalleryDetail = () => {
     );
   }
 
+  const performers = gallery.performers as EntityRef[] | undefined;
+  const tags = gallery.tags as TagRef[] | undefined;
+  const studioRef = gallery.studio as EntityRef | undefined;
+
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8 py-6">
       <div className="max-w-none">
@@ -224,55 +239,59 @@ const GalleryDetail = () => {
         <div className="mb-6">
           <PageHeader
             title={
-              <div className="flex flex-wrap gap-3 items-center">
-                <span>{galleryTitle(gallery)}</span>
-                {settings.showFavorite && (
-                  <FavoriteButton
-                    isFavorite={isFavorite}
-                    onChange={handleFavoriteChange}
-                    size="large"
-                  />
-                )}
-                <ViewInStashButton stashUrl={gallery?.stashUrl} size={24} />
-              </div>
+              (
+                <div className="flex flex-wrap gap-3 items-center">
+                  <span>{galleryTitle(gallery) as React.ReactNode}</span>
+                  {!!settings.showFavorite && (
+                    <FavoriteButton
+                      isFavorite={isFavorite}
+                      onChange={handleFavoriteChange}
+                      size="large"
+                    />
+                  )}
+                  <ViewInStashButton stashUrl={gallery?.stashUrl as string} size={24} />
+                </div>
+              ) as unknown as string
             }
             subtitle={
-              <div className="flex flex-wrap gap-3 items-center text-base mt-2">
-                {gallery.studio && (
-                  <>
-                    <Link
-                      to={getEntityPath('studio', gallery.studio, hasMultipleInstances)}
-                      className="hover:underline"
-                      style={{ color: "var(--accent-primary)" }}
-                    >
-                      {gallery.studio.name}
-                    </Link>
-                    <span>•</span>
-                  </>
-                )}
-                {totalCount > 0 && (
-                  <span>
-                    {totalCount} image{totalCount !== 1 ? "s" : ""}
-                  </span>
-                )}
-                {gallery.date && (
-                  <>
-                    <span>•</span>
-                    <span>{new Date(gallery.date).toLocaleDateString()}</span>
-                  </>
-                )}
-                {gallery.photographer && (
-                  <>
-                    <span>•</span>
-                    <span>by {gallery.photographer}</span>
-                  </>
-                )}
-              </div>
+              (
+                <div className="flex flex-wrap gap-3 items-center text-base mt-2">
+                  {studioRef && (
+                    <>
+                      <Link
+                        to={getEntityPath('studio', studioRef, hasMultipleInstances)}
+                        className="hover:underline"
+                        style={{ color: "var(--accent-primary)" }}
+                      >
+                        {studioRef.name}
+                      </Link>
+                      <span>•</span>
+                    </>
+                  )}
+                  {totalCount > 0 && (
+                    <span>
+                      {totalCount} image{totalCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {!!gallery.date && (
+                    <>
+                      <span>•</span>
+                      <span>{new Date(gallery.date as string).toLocaleDateString()}</span>
+                    </>
+                  )}
+                  {!!gallery.photographer && (
+                    <>
+                      <span>•</span>
+                      <span>by {gallery.photographer as React.ReactNode}</span>
+                    </>
+                  )}
+                </div>
+              ) as React.ReactNode
             }
           />
 
           {/* Rating Slider */}
-          {settings.showRating && (
+          {!!settings.showRating && (
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
@@ -283,7 +302,7 @@ const GalleryDetail = () => {
           )}
 
           {/* Details */}
-          {settings.showDescriptionOnDetail && gallery.details && (
+          {!!settings.showDescriptionOnDetail && !!gallery.details && (
             <div className="mt-6">
               <h3
                 className="text-sm font-medium mb-3"
@@ -295,13 +314,13 @@ const GalleryDetail = () => {
                 className="text-sm whitespace-pre-wrap"
                 style={{ color: "var(--text-primary)" }}
               >
-                {gallery.details}
+                {gallery.details as React.ReactNode}
               </p>
             </div>
           )}
 
           {/* Performers Row (kept for at-a-glance importance) */}
-          {gallery.performers && gallery.performers.length > 0 && (
+          {performers && performers.length > 0 && (
             <div className="mt-6">
               <h3
                 className="text-sm font-medium mb-3"
@@ -313,7 +332,7 @@ const GalleryDetail = () => {
                 className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
                 style={{ scrollbarWidth: "thin" }}
               >
-                {gallery.performers.map((performer) => (
+                {performers.map((performer: EntityRef) => (
                   <Link
                     key={performer.id}
                     to={getEntityPath('performer', performer, hasMultipleInstances)}
@@ -355,7 +374,7 @@ const GalleryDetail = () => {
           )}
 
           {/* Tags Row */}
-          {gallery.tags && gallery.tags.length > 0 && (
+          {tags && tags.length > 0 && (
             <div className="mt-6">
               <h3
                 className="text-sm font-medium mb-3"
@@ -363,7 +382,7 @@ const GalleryDetail = () => {
               >
                 Tags
               </h3>
-              <TagChips tags={gallery.tags} />
+              <TagChips tags={tags} />
             </div>
           )}
         </div>
@@ -396,10 +415,10 @@ const GalleryDetail = () => {
                   )}
 
                   <WallView
-                    items={images}
+                    items={images as unknown as Record<string, unknown>[]}
                     entityType="image"
                     zoomLevel="medium"
-                    onItemClick={(image) => {
+                    onItemClick={(image: Record<string, unknown>) => {
                       const index = images.findIndex((img) => img.id === image.id);
                       lightbox.openLightbox(index >= 0 ? index : 0);
                     }}
@@ -426,15 +445,15 @@ const GalleryDetail = () => {
                   context="gallery_scenes"
                   permanentFilters={{
                     galleries: {
-                      value: [makeCompositeKey(galleryId, instanceId)],
+                      value: [makeCompositeKey(galleryId!, instanceId)],
                       modifier: "INCLUDES"
                     }
                   }}
                   permanentFiltersMetadata={{
-                    galleries: [{ id: makeCompositeKey(galleryId, instanceId), title: galleryTitle(gallery) }]
+                    galleries: [{ id: makeCompositeKey(galleryId!, instanceId), title: galleryTitle(gallery) as string }]
                   }}
-                  title={`Scenes in ${galleryTitle(gallery)}`}
-                  fromPageTitle={galleryTitle(gallery) || "Gallery"}
+                  title={`Scenes in ${galleryTitle(gallery) as string}`}
+                  fromPageTitle={(galleryTitle(gallery) as string) || "Gallery"}
                 />
               )}
             </>
@@ -449,7 +468,7 @@ const GalleryDetail = () => {
         isOpen={lightbox.lightboxOpen}
         autoPlay={lightbox.lightboxAutoPlay}
         onClose={lightbox.closeLightbox}
-        onImagesUpdate={setImages}
+        onImagesUpdate={setImages as (images: NormalizedImage[]) => void}
         onPageBoundary={lightbox.onPageBoundary}
         totalCount={totalCount}
         pageOffset={lightbox.pageOffset}

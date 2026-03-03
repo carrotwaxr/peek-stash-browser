@@ -24,7 +24,7 @@ function renderWithAuth() {
 /**
  * Creates a resolved Response-like object for mocking fetch.
  */
-function okResponse(body) {
+function okResponse(body: unknown) {
   return Promise.resolve({
     ok: true,
     json: () => Promise.resolve(body),
@@ -106,7 +106,7 @@ describe("AuthProvider", () => {
   // 4. Loading state
   it("starts with isLoading=true and transitions to false after auth check", async () => {
     // Use a deferred promise so we can observe the loading state
-    let resolveAuth;
+    let resolveAuth: (value: unknown) => void;
     globalThis.fetch = vi.fn().mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -122,7 +122,7 @@ describe("AuthProvider", () => {
 
     // Resolve the auth check
     await act(async () => {
-      resolveAuth({
+      resolveAuth!({
         ok: true,
         json: () => Promise.resolve({ user: mockUser }),
       });
@@ -305,7 +305,7 @@ describe("updateUser()", () => {
     expect(result.current.user).toEqual(mockUser);
 
     act(() => {
-      result.current.updateUser({ displayName: "New Name" });
+      result.current.updateUser({ displayName: "New Name" } as any);
     });
 
     expect(result.current.user).toEqual({
@@ -327,7 +327,7 @@ describe("updateUser()", () => {
     expect(result.current.user).toBeNull();
 
     act(() => {
-      result.current.updateUser({ displayName: "New Name" });
+      result.current.updateUser({ displayName: "New Name" } as any);
     });
 
     expect(result.current.user).toBeNull();

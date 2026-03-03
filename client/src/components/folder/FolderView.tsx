@@ -49,7 +49,7 @@ const FolderView = ({
   }, [searchParams]);
 
   // Track last notified tag to avoid duplicate notifications
-  const lastNotifiedTagRef = useRef(undefined);
+  const lastNotifiedTagRef = useRef<string | null | undefined>(undefined);
 
   // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
   useEffect(() => {
@@ -62,7 +62,7 @@ const FolderView = ({
 
   // Update URL when path changes - also reset page to 1
   const setCurrentPath = useCallback(
-    (newPath) => {
+    (newPath: string[]) => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         if (newPath.length > 0) {
@@ -90,7 +90,7 @@ const FolderView = ({
 
   // Handle folder click - navigate into folder
   const handleFolderClick = useCallback(
-    (folder) => {
+    (folder: { id: string }) => {
       if (folder.id === "__untagged__") {
         // Can't navigate into untagged
         return;
@@ -102,7 +102,7 @@ const FolderView = ({
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback(
-    (path) => {
+    (path: string[]) => {
       setCurrentPath(path);
     },
     [setCurrentPath]

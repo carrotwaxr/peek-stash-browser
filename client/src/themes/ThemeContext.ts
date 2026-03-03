@@ -1,3 +1,31 @@
 import { createContext } from "react";
 
-export const ThemeContext = createContext();
+export interface ThemeDefinition {
+  name: string;
+  properties: Record<string, string>;
+  isCustom?: boolean;
+  id?: number;
+}
+
+export interface CustomTheme {
+  id: number;
+  name: string;
+  config: Record<string, unknown>;
+}
+
+export interface AvailableTheme {
+  key: string;
+  name: string;
+  isCustom: boolean;
+}
+
+export interface ThemeContextValue {
+  currentTheme: string;
+  changeTheme: (themeKey: string) => void;
+  theme: ThemeDefinition | undefined;
+  availableThemes: AvailableTheme[];
+  customThemes: CustomTheme[];
+  refreshCustomThemes: () => Promise<void>;
+}
+
+export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);

@@ -7,6 +7,30 @@ interface UserData {
   username: string;
 }
 
+interface SyncEntityStats {
+  checked?: number;
+  created?: number;
+  updated?: number;
+}
+
+interface SyncStats {
+  scenes: SyncEntityStats | null;
+  performers: SyncEntityStats | null;
+  studios: SyncEntityStats | null;
+  tags: SyncEntityStats | null;
+  galleries: SyncEntityStats | null;
+  groups: SyncEntityStats | null;
+}
+
+interface SyncOptions {
+  scenes: { rating: boolean; favorite?: boolean; oCounter: boolean };
+  performers: { rating: boolean; favorite: boolean };
+  studios: { rating: boolean; favorite: boolean };
+  tags: { rating: boolean; favorite: boolean };
+  galleries: { rating: boolean };
+  groups: { rating: boolean };
+}
+
 interface Props {
   user: UserData;
   onClose: () => void;
@@ -15,9 +39,9 @@ interface Props {
 
 const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState(null);
-  const [syncError, setSyncError] = useState(null);
-  const [syncOptions, setSyncOptions] = useState({
+  const [syncResult, setSyncResult] = useState<SyncStats | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncOptions, setSyncOptions] = useState<SyncOptions>({
     scenes: { rating: true, favorite: false, oCounter: false },
     performers: { rating: true, favorite: true },
     studios: { rating: true, favorite: true },
@@ -26,12 +50,12 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
     groups: { rating: true },
   });
 
-  const toggleSyncOption = (entityType: string, field: string) => {
+  const toggleSyncOption = (entityType: keyof SyncOptions, field: string) => {
     setSyncOptions((prev) => ({
       ...prev,
       [entityType]: {
         ...prev[entityType],
-        [field]: !prev[entityType][field],
+        [field]: !(prev[entityType] as Record<string, boolean>)[field],
       },
     }));
   };
@@ -42,7 +66,7 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
     setSyncResult(null);
 
     try {
-      const data = await apiPost(`/user/${user.id}/sync-from-stash`, {
+      const data = await apiPost<{ stats: SyncStats }>(`/user/${user.id}/sync-from-stash`, {
         options: syncOptions,
       });
       setSyncResult(data.stats);

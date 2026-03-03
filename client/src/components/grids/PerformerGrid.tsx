@@ -24,7 +24,7 @@ const PerformerGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="o_counter"
       density={density}
-      renderItem={(performer, _index, { onHideSuccess }) => (
+      renderItem={(performer: any, _index: number, { onHideSuccess }: any) => (
         <PerformerCard
           key={performer.id}
           performer={performer}

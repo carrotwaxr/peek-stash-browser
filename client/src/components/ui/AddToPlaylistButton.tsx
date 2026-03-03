@@ -18,6 +18,7 @@ interface Props {
   onSuccess?: () => void;
   excludePlaylistIds?: string[];
   variant?: "primary" | "secondary" | "tertiary" | "destructive";
+  disabled?: boolean;
 }
 
 const AddToPlaylistButton = ({
@@ -32,14 +33,23 @@ const AddToPlaylistButton = ({
   variant = "primary",
 }: Props) => {
   const [showMenu, setShowMenu] = useState(false);
-  const [playlists, setPlaylists] = useState([]);
+  interface PlaylistItem {
+    id: string;
+    name: string;
+    isShared: boolean;
+    _count?: { items?: number };
+    sceneCount?: number;
+    [key: string]: unknown;
+  }
+
+  const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [computedPosition, setComputedPosition] = useState("below");
-  const menuRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Support both single sceneId and multiple sceneIds
   const scenesToAdd = sceneIds || (sceneId ? [sceneId] : []);
@@ -67,8 +77,8 @@ const AddToPlaylistButton = ({
 
   // Click outside to close
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
       }
     };
@@ -87,10 +97,10 @@ const AddToPlaylistButton = ({
         apiGet("/playlists"),
         apiGet("/playlists/shared"),
       ]);
-      const own = (ownResult.status === "fulfilled" ? ownResult.value.playlists || [] : [])
-        .map((p) => ({ ...p, isShared: false }));
-      const shared = (sharedResult.status === "fulfilled" ? sharedResult.value.playlists || [] : [])
-        .map((p) => ({ ...p, isShared: true }));
+      const ownData = ownResult.status === "fulfilled" ? (ownResult.value as { playlists?: Record<string, unknown>[] }).playlists || [] : [];
+      const own = ownData.map((p: Record<string, unknown>) => ({ ...p, isShared: false })) as PlaylistItem[];
+      const sharedData = sharedResult.status === "fulfilled" ? (sharedResult.value as { playlists?: Record<string, unknown>[] }).playlists || [] : [];
+      const shared = sharedData.map((p: Record<string, unknown>) => ({ ...p, isShared: true })) as PlaylistItem[];
       setPlaylists([...own, ...shared]);
     } catch {
       // Error loading playlists - will show in UI
@@ -99,7 +109,7 @@ const AddToPlaylistButton = ({
     }
   };
 
-  const addToPlaylist = async (playlistId, skipToast = false) => {
+  const addToPlaylist = async (playlistId: string, skipToast = false) => {
     try {
       // Add scenes one by one (could be optimized with a batch endpoint later)
       let addedCount = 0;
@@ -153,7 +163,7 @@ const AddToPlaylistButton = ({
     }
   };
 
-  const createPlaylistAndAdd = async (e) => {
+  const createPlaylistAndAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
@@ -164,7 +174,7 @@ const AddToPlaylistButton = ({
         description: newPlaylistDescription.trim() || undefined,
       });
 
-      const newPlaylistId = data.playlist.id;
+      const newPlaylistId = (data as { playlist: { id: string } }).playlist.id;
 
       // Add scenes to the newly created playlist (skip the toast, we'll show our own)
       const { addedCount } = await addToPlaylist(newPlaylistId, true);
@@ -250,10 +260,10 @@ const AddToPlaylistButton = ({
                     borderColor: "var(--border-color)",
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = "var(--bg-secondary)";
+                    (e.target as HTMLElement).style.backgroundColor = "var(--bg-secondary)";
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = "transparent";
+                    (e.target as HTMLElement).style.backgroundColor = "transparent";
                   }}
                 >
                   + Create New Playlist
@@ -286,10 +296,10 @@ const AddToPlaylistButton = ({
                           color: "var(--text-primary)",
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = "var(--bg-secondary)";
+                          (e.target as HTMLElement).style.backgroundColor = "var(--bg-secondary)";
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = "transparent";
+                          (e.target as HTMLElement).style.backgroundColor = "transparent";
                         }}
                       >
                         <div className="flex items-center gap-1.5">

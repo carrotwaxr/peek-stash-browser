@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { setupApi } from "../api";
 
 /**
@@ -12,7 +12,7 @@ const ConfigContext = createContext({
   isLoading: true,
 });
 
-export function ConfigProvider({ children }) {
+export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState({
     hasMultipleInstances: false,
     isLoading: true,

@@ -27,6 +27,20 @@ import {
 } from "../ui/index";
 import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
+import type { TagRef, NormalizedImage } from "@peek/shared-types";
+
+interface EntityRef {
+  id: string;
+  name?: string;
+  instanceId?: string;
+  image_path?: string;
+  [key: string]: unknown;
+}
+
+interface StashId {
+  endpoint: string;
+  stash_id: string;
+}
 
 const StudioDetail = () => {
   const { studioId } = useParams<{ studioId: string }>();
@@ -54,11 +68,11 @@ const StudioDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: "scenes", label: "Scenes", count: studio?.scene_count || 0 },
-    { id: "galleries", label: "Galleries", count: studio?.gallery_count || 0 },
-    { id: "images", label: "Images", count: studio?.image_count || 0 },
-    { id: "performers", label: "Performers", count: studio?.performer_count || 0 },
-    { id: "groups", label: "Collections", count: studio?.group_count || 0 },
+    { id: "scenes", label: "Scenes", count: (studio?.scene_count as number) || 0 },
+    { id: "galleries", label: "Galleries", count: (studio?.gallery_count as number) || 0 },
+    { id: "images", label: "Images", count: (studio?.image_count as number) || 0 },
+    { id: "performers", label: "Performers", count: (studio?.performer_count as number) || 0 },
+    { id: "groups", label: "Collections", count: (studio?.group_count as number) || 0 },
   ];
   const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || "scenes";
 
@@ -77,19 +91,20 @@ const StudioDetail = () => {
   };
 
   // Check if studio has children (for showing toggle)
-  const hasChildren = studio?.child_studios && studio.child_studios.length > 0;
+  const childStudios = studio?.child_studios as Record<string, unknown>[] | undefined;
+  const hasChildren = childStudios && childStudios.length > 0;
 
   // Set page title to studio name
-  usePageTitle(studio?.name || "Studio");
+  usePageTitle((studio?.name as string) || "Studio");
 
   useEffect(() => {
     const fetchStudio = async () => {
       try {
         setIsLoading(true);
-        const studioData = await libraryApi.findStudioById(studioId, instanceId);
+        const studioData = await libraryApi.findStudioById(studioId!, instanceId) as Record<string, unknown> | null;
         setStudio(studioData);
-        setRating(studioData.rating);
-        setIsFavorite(studioData.favorite || false);
+        setRating(studioData?.rating as number | null);
+        setIsFavorite((studioData?.favorite as boolean) || false);
       } catch {
         // Error loading studio - will show loading spinner
       } finally {
@@ -103,7 +118,7 @@ const StudioDetail = () => {
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("studio", studioId, newRating, instanceId);
+      await libraryApi.updateRating("studio", studioId!, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((studio as Record<string, unknown>)?.rating as number | null);
@@ -113,10 +128,10 @@ const StudioDetail = () => {
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("studio", studioId, newValue, instanceId);
+      await libraryApi.updateFavorite("studio", studioId!, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
-      setIsFavorite(studio.favorite || false);
+      setIsFavorite((studio?.favorite as boolean) || false);
     }
   };
 
@@ -125,7 +140,8 @@ const StudioDetail = () => {
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
-  useRatingHotkeys({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (useRatingHotkeys as any)({
     enabled: !isLoading && !!studio,
     setRating: handleRatingChange,
     toggleFavorite });
@@ -157,27 +173,29 @@ const StudioDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              <div className="flex gap-4 items-center">
-                <span>{studio?.name || `Studio ${studioId}`}</span>
-                {settings.showFavorite && (
-                  <FavoriteButton
-                    isFavorite={isFavorite}
-                    onChange={handleFavoriteChange}
-                    size="large"
-                  />
-                )}
-                <ViewInStashButton stashUrl={studio?.stashUrl} size={24} />
-              </div>
+              (
+                <div className="flex gap-4 items-center">
+                  <span>{(studio?.name as string) || `Studio ${studioId}`}</span>
+                  {!!settings.showFavorite && (
+                    <FavoriteButton
+                      isFavorite={isFavorite}
+                      onChange={handleFavoriteChange}
+                      size="large"
+                    />
+                  )}
+                  <ViewInStashButton stashUrl={studio?.stashUrl as string} size={24} />
+                </div>
+              ) as unknown as string
             }
             subtitle={
-              studio?.aliases?.length
-                ? `Also known as: ${studio.aliases.join(", ")}`
+              (studio?.aliases as string[] | undefined)?.length
+                ? `Also known as: ${(studio!.aliases as string[]).join(", ")}`
                 : null
             }
           />
 
           {/* Rating Slider */}
-          {settings.showRating && (
+          {!!settings.showRating && (
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
@@ -196,14 +214,14 @@ const StudioDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          {settings.showDescriptionOnDetail && studio?.details && (
+          {!!settings.showDescriptionOnDetail && !!studio?.details && (
             <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <Card title="Details">
                 <p
                   className="text-sm whitespace-pre-wrap"
                   style={{ color: "var(--text-primary)" }}
                 >
-                  {studio.details}
+                  {studio.details as React.ReactNode}
                 </p>
               </Card>
             </div>
@@ -237,7 +255,7 @@ const StudioDetail = () => {
                   className="text-sm font-medium"
                   style={{ color: "var(--text-primary)" }}
                 >
-                  Include sub-studios ({studio.child_studios.length})
+                  Include sub-studios ({(studio!.child_studios as EntityRef[]).length})
                 </span>
               </label>
             </div>
@@ -261,15 +279,15 @@ const StudioDetail = () => {
                   context="scene_studio"
                   permanentFilters={{
                     studios: {
-                      value: [makeCompositeKey(studioId, instanceId)],
+                      value: [makeCompositeKey(studioId!, instanceId)],
                       modifier: "INCLUDES",
                       ...(includeSubStudios && { depth: -1 }) } }}
                   permanentFiltersMetadata={{
                     studios: [
-                      { id: makeCompositeKey(studioId, instanceId), name: studio?.name || "Unknown Studio" },
+                      { id: makeCompositeKey(studioId!, instanceId), name: studio?.name || "Unknown Studio" },
                     ] }}
                   title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
-                  fromPageTitle={studio?.name || "Studio"}
+                  fromPageTitle={(studio?.name as string) || "Studio"}
                 />
               )}
 
@@ -279,7 +297,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId, instanceId)],
+                        value: [makeCompositeKey(studioId!, instanceId)],
                         modifier: "INCLUDES",
                         ...(includeSubStudios && { depth: -1 }) } } }}
                   hideLockedFilters
@@ -291,7 +309,7 @@ const StudioDetail = () => {
                 <ImagesTab
                   studioId={studioId}
                   instanceId={instanceId}
-                  studioName={studio?.name}
+                  studioName={studio?.name as string | undefined}
                   includeSubStudios={includeSubStudios}
                 />
               )}
@@ -301,7 +319,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     performer_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId, instanceId)],
+                        value: [makeCompositeKey(studioId!, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No performers found for ${studio?.name}`}
@@ -313,7 +331,7 @@ const StudioDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       studios: {
-                        value: [makeCompositeKey(studioId, instanceId)],
+                        value: [makeCompositeKey(studioId!, instanceId)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${studio?.name}`}
@@ -371,8 +389,8 @@ const StudioImage = ({ studio }: StudioImageProps) => {
     >
       {studio?.image_path ? (
         <img
-          src={studio.image_path}
-          alt={studio.name}
+          src={studio.image_path as string}
+          alt={studio.name as string | undefined}
           style={{
             width: "100%",
             height: "100%",
@@ -421,7 +439,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
     isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
     if (!value && value !== 0) return null;
 
-    const clickable = onClick && value > 0;
+    const clickable = onClick && Number(value) > 0;
 
     return (
       <div className="flex justify-between">
@@ -450,7 +468,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
   return (
     <Card title="Statistics">
       {/* Visual Rating Display */}
-      {studio?.rating100 > 0 && (
+      {studio && (studio.rating100 as number) > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
@@ -463,7 +481,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
               className="text-2xl font-bold"
               style={{ color: "var(--accent-primary)" }}
             >
-              {studio.rating100}/100
+              {studio!.rating100 as React.ReactNode}/100
             </span>
           </div>
           <div
@@ -473,7 +491,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
-                width: `${studio.rating100}%`,
+                width: `${studio!.rating100}%`,
                 backgroundColor: "var(--accent-primary)" }}
             />
           </div>
@@ -484,35 +502,35 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatField
           label="Scenes:"
-          value={studio?.scene_count}
+          value={studio?.scene_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("scenes")}
           isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
-          value={studio?.performer_count}
+          value={studio?.performer_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("performers")}
           isActive={activeTab === "performers"}
         />
         <StatField
           label="Images:"
-          value={studio?.image_count}
+          value={studio?.image_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("images")}
           isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
-          value={studio?.gallery_count}
+          value={studio?.gallery_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("galleries")}
           isActive={activeTab === "galleries"}
         />
         <StatField
           label="Collections:"
-          value={studio?.group_count}
+          value={studio?.group_count as number | undefined}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch("groups")}
           isActive={activeTab === "groups"}
@@ -537,13 +555,13 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
       {studio?.url && (
         <Card title="Website">
           <a
-            href={studio.url}
+            href={studio.url as string}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center hover:underline transition-colors"
             style={{ color: "var(--accent-primary)" }}
           >
-            {studio.url}
+            {studio.url as React.ReactNode}
             <svg
               className="w-4 h-4 ml-1"
               fill="none"
@@ -567,29 +585,29 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
             className="text-sm whitespace-pre-wrap"
             style={{ color: "var(--text-primary)" }}
           >
-            {studio.details}
+            {studio.details as React.ReactNode}
           </p>
         </Card>
       )}
 
-      {studio?.parent_studio?.id && (
+      {(studio?.parent_studio as EntityRef | undefined)?.id && (
         <Card title="Parent Studio">
           <Link
-            to={getEntityPath('studio', studio.parent_studio, hasMultipleInstances)}
+            to={getEntityPath('studio', studio!.parent_studio as EntityRef, hasMultipleInstances)}
             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: "var(--accent-primary)",
               color: "white" }}
           >
-            {studio.parent_studio.name || `Studio ${studio.parent_studio.id}`}
+            {(studio!.parent_studio as EntityRef).name || `Studio ${(studio!.parent_studio as EntityRef).id}`}
           </Link>
         </Card>
       )}
 
-      {studio?.child_studios && studio.child_studios.length > 0 && (
+      {studio?.child_studios && (studio.child_studios as EntityRef[]).length > 0 && (
         <Card title="Child Studios">
           <div className="flex flex-wrap gap-2">
-            {studio.child_studios.map((child) => (
+            {(studio.child_studios as EntityRef[]).map((child: EntityRef) => (
               <Link
                 key={child.id}
                 to={getEntityPath('studio', child, hasMultipleInstances)}
@@ -604,16 +622,16 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
         </Card>
       )}
 
-      {studio?.tags && studio.tags.length > 0 && (
+      {studio?.tags && (studio.tags as TagRef[]).length > 0 && (
         <Card title="Tags">
-          <TagChips tags={studio.tags} />
+          <TagChips tags={studio.tags as TagRef[]} />
         </Card>
       )}
 
-      {studio?.movies && studio.movies.length > 0 && (
+      {studio?.movies && (studio.movies as EntityRef[]).length > 0 && (
         <Card title="Movies">
           <div className="space-y-1">
-            {studio.movies.map((movie) => (
+            {(studio.movies as EntityRef[]).map((movie: EntityRef) => (
               <div
                 key={movie.id}
                 className="text-sm"
@@ -626,10 +644,10 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
         </Card>
       )}
 
-      {studio?.stash_ids && studio.stash_ids.length > 0 && (
+      {studio?.stash_ids && (studio.stash_ids as StashId[]).length > 0 && (
         <Card title="StashDB Links">
           <div className="space-y-2">
-            {studio.stash_ids.map((stashId, index) => (
+            {(studio.stash_ids as StashId[]).map((stashId: StashId, index: number) => (
               <a
                 key={index}
                 href={`${stashId.endpoint.replace("/graphql", "")}/studios/${
@@ -678,7 +696,7 @@ const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
 
   const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -697,34 +715,34 @@ const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false
         filter: { page, per_page: perPage },
         image_filter: {
           studios: {
-            value: [makeCompositeKey(studioId, instanceId)],
+            value: [makeCompositeKey(studioId!, instanceId)],
             modifier: "INCLUDES",
             ...(includeSubStudios && { depth: -1 }),
           },
         },
-      });
+      }) as Record<string, Record<string, unknown>>;
       return {
-        images: data.findImages?.images || [],
-        count: data.findImages?.count || 0,
+        images: (data.findImages?.images || []) as NormalizedImage[],
+        count: (data.findImages?.count || 0) as number,
       };
     },
     [studioId, instanceId, includeSubStudios]
   );
 
-  const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
-    fetchImages,
-    dependencies: [studioId, instanceId, includeSubStudios],
+  const paginationResult = useImagesPagination({
+    fetchImages: fetchImages as unknown as Parameters<typeof useImagesPagination>[0]['fetchImages'],
+    dependencies: [studioId, instanceId, includeSubStudios] as never[],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });
 
   return (
     <PaginatedImageGrid
-      images={images}
-      totalCount={totalCount}
-      isLoading={isLoading}
-      lightbox={lightbox}
-      setImages={setImages}
+      images={paginationResult.images as unknown as NormalizedImage[]}
+      totalCount={paginationResult.totalCount as number}
+      isLoading={paginationResult.isLoading as boolean}
+      lightbox={paginationResult.lightbox as Parameters<typeof PaginatedImageGrid>[0]['lightbox']}
+      setImages={paginationResult.setImages as unknown as (images: NormalizedImage[]) => void}
       emptyMessage={`No images found for ${studioName}`}
       className="mt-6"
     />

@@ -5,18 +5,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock the useTimelineState hook
 const mockUseTimelineState = vi.fn();
 vi.mock("../../../src/components/timeline/useTimelineState", () => ({
-  useTimelineState: (...args) => mockUseTimelineState(...args),
+  useTimelineState: (...args: any[]) => mockUseTimelineState(...args),
 }));
 
 // Mock useMediaQuery - default to desktop (false = not mobile)
-const mockUseMediaQuery = vi.fn(() => false);
+const mockUseMediaQuery = vi.fn((..._args: any[]) => false);
 vi.mock("../../../src/hooks/useMediaQuery", () => ({
-  useMediaQuery: (...args) => mockUseMediaQuery(...args),
+  useMediaQuery: (...args: any[]) => mockUseMediaQuery(...args),
 }));
 
 // Mock TimelineMobileSheet with expand/collapse support
 vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
-  default: ({ isOpen, selectedPeriod, itemCount, children }) => (
+  default: ({ isOpen, selectedPeriod, itemCount, children }: any) => (
     isOpen ? (
       <div data-testid="timeline-mobile-sheet">
         {selectedPeriod && (
@@ -31,7 +31,7 @@ vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
 
 // Mock TimelineControls to simplify testing
 vi.mock("../../../src/components/timeline/TimelineControls", () => ({
-  default: ({ zoomLevel, onZoomLevelChange }) => (
+  default: ({ zoomLevel, onZoomLevelChange }: any) => (
     <div data-testid="timeline-controls">
       <span data-testid="current-zoom">{zoomLevel}</span>
       <button onClick={() => onZoomLevelChange("years")} data-testid="zoom-button">
@@ -43,7 +43,7 @@ vi.mock("../../../src/components/timeline/TimelineControls", () => ({
 
 // Mock TimelineStrip to simplify testing
 vi.mock("../../../src/components/timeline/TimelineStrip", () => ({
-  default: ({ distribution, maxCount, selectedPeriod }) => (
+  default: ({ distribution, maxCount, selectedPeriod }: any) => (
     <div data-testid="timeline-strip">
       <span data-testid="distribution-count">{distribution?.length ?? 0}</span>
       <span data-testid="max-count">{maxCount}</span>
@@ -74,9 +74,11 @@ describe("TimelineView", () => {
   const defaultProps = {
     entityType: "scene",
     items: [],
-    renderItem: vi.fn((item) => <div key={item.id}>{item.title}</div>),
+    renderItem: vi.fn((item: any) => <div key={item.id}>{item.title}</div>),
     onItemClick: vi.fn(),
-  };
+    onDateFilterChange: vi.fn(),
+    onPeriodChange: vi.fn(),
+  } as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -133,7 +135,7 @@ describe("TimelineView", () => {
 
     it("passes initialPeriod to useTimelineState when provided", () => {
       render(
-        <TimelineView {...defaultProps} entityType="scene" initialPeriod="2024-03" />
+        <TimelineView {...defaultProps} entityType="scene" initialPeriod={"2024-03" as any} />
       );
 
       expect(mockUseTimelineState).toHaveBeenCalledWith({
@@ -146,7 +148,7 @@ describe("TimelineView", () => {
 
     it("sets autoSelectRecent to false when initialPeriod is provided", () => {
       render(
-        <TimelineView {...defaultProps} entityType="image" initialPeriod="2024-W15" />
+        <TimelineView {...defaultProps} entityType="image" initialPeriod={"2024-W15" as any} />
       );
 
       expect(mockUseTimelineState).toHaveBeenCalledWith(
@@ -681,7 +683,7 @@ describe("TimelineView", () => {
       render(
         <TimelineView
           {...defaultProps}
-          initialPeriod="2024-01"
+          initialPeriod={"2024-01" as any}
           onPeriodChange={onPeriodChange}
         />
       );

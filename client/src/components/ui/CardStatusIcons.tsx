@@ -7,7 +7,7 @@ interface Props {
   oCount: number;
   playCount: number;
   sceneId: string;
-  size?: string;
+  size?: "small" | "medium" | "large";
 }
 
 export default function CardStatusIcons({
@@ -16,7 +16,7 @@ export default function CardStatusIcons({
   oCount,
   playCount,
   sceneId,
-  size = "base",
+  size = "small",
 }: Props) {
   return (
     <div
@@ -25,7 +25,7 @@ export default function CardStatusIcons({
     >
       <OCounterButton
         initialCount={oCount}
-        isReadOnly={isReadOnly}
+        interactive={!isReadOnly}
         sceneId={sceneId}
         size={size}
       />

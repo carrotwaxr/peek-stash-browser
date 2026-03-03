@@ -24,7 +24,7 @@ describe("TagCard", () => {
       tag: mockTag,
       fromPageTitle: "Tags",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -33,7 +33,7 @@ describe("TagCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
-    });
+    } as any);
 
     expect(element.props.tag).toBe(mockTag);
   });
@@ -41,7 +41,7 @@ describe("TagCard", () => {
   it("passes correct link path", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
-    });
+    } as any);
 
     expect(element.props.tag.id).toBe("1");
   });
@@ -49,7 +49,7 @@ describe("TagCard", () => {
   it("passes tag with all data", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
-    });
+    } as any);
 
     const tag = element.props.tag;
     expect(tag.name).toBe("Test Tag");
@@ -61,7 +61,7 @@ describe("TagCard", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
       fromPageTitle: "Tags",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Tags");
   });
@@ -70,7 +70,7 @@ describe("TagCard", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -80,7 +80,7 @@ describe("TagCard", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

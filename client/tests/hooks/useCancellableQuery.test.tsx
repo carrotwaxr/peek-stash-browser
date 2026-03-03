@@ -9,8 +9,9 @@ vi.mock("../../src/hooks/useAuth", () => ({
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
+import type { Mock } from "vitest";
 
-const useAuthMock = vi.mocked(useAuth);
+const useAuthMock = useAuth as unknown as Mock;
 
 describe("useCancellableQuery", () => {
   beforeEach(() => {

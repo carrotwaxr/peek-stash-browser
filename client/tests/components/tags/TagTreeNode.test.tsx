@@ -11,10 +11,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import TagTreeNode from "../../../src/components/tags/TagTreeNode";
+import TagTreeNodeComponent from "../../../src/components/tags/TagTreeNode";
+
+// Cast to FC<any> since TagTreeNode is an untyped forwardRef
+const TagTreeNode = TagTreeNodeComponent as unknown as React.FC<any>;
 
 // Wrapper to provide router context
-const renderWithRouter = (ui) => {
+const renderWithRouter = (ui: React.ReactElement) => {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
 };
 
@@ -187,18 +190,20 @@ describe("TagTreeNode", () => {
 
       rerender(
         <MemoryRouter>
-          <TagTreeNode
-            tag={mockTagWithChildren}
-            isExpanded={true}
-            expandedIds={new Set(["1"])}
-            onToggle={() => {}}
-          />
+          {(
+            <TagTreeNode
+              tag={mockTagWithChildren}
+              isExpanded={true}
+              expandedIds={new Set(["1"])}
+              onToggle={() => {}}
+            />
+          )}
         </MemoryRouter>
       );
       // When expanded, multiple treeitems exist - get the parent by its name
       const allTreeItems = screen.getAllByRole("treeitem");
       const parentItem = allTreeItems.find(item =>
-        item.textContent.includes("Parent Tag")
+        item.textContent!.includes("Parent Tag")
       );
       expect(parentItem).toHaveAttribute("aria-expanded", "true");
     });
@@ -230,12 +235,14 @@ describe("TagTreeNode", () => {
 
       rerender(
         <MemoryRouter>
-          <TagTreeNode
-            tag={mockTagLeaf}
-            focusedId="other"
-            onToggle={() => {}}
-            onFocus={() => {}}
-          />
+          {(
+            <TagTreeNode
+              tag={mockTagLeaf}
+              focusedId="other"
+              onToggle={() => {}}
+              onFocus={() => {}}
+            />
+          )}
         </MemoryRouter>
       );
       expect(screen.getByRole("treeitem")).toHaveAttribute("tabIndex", "-1");

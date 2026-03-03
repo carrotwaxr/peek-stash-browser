@@ -1,8 +1,11 @@
 import videojs from "video.js";
 
 class SourceMenuItem extends videojs.getComponent("MenuItem") {
-  constructor(parent, source) {
-    const options = {};
+  source: any;
+  isSelected: boolean;
+
+  constructor(parent: any, source: any) {
+    const options: any = {};
     options.selectable = true;
     options.multiSelectable = false;
     options.label = source.label || source.type;
@@ -15,7 +18,7 @@ class SourceMenuItem extends videojs.getComponent("MenuItem") {
     this.addClass("vjs-source-menu-item");
   }
 
-  selected(selected) {
+  selected(selected: any) {
     super.selected(selected);
     this.isSelected = selected;
   }
@@ -28,7 +31,10 @@ class SourceMenuItem extends videojs.getComponent("MenuItem") {
 }
 
 class SourceMenuButton extends videojs.getComponent("MenuButton") {
-  constructor(player) {
+  items: SourceMenuItem[];
+  selectedSource: any;
+
+  constructor(player: any) {
     super(player);
 
     this.items = [];
@@ -39,10 +45,10 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
     });
   }
 
-  setSources(sources) {
+  setSources(sources: any[]) {
     this.selectedSource = null;
 
-    this.items = sources.map((source, i) => {
+    this.items = sources.map((source: any, i: number) => {
       if (i === 0) {
         this.selectedSource = source;
       }
@@ -76,7 +82,7 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
     return this.items;
   }
 
-  setSelectedSource(source) {
+  setSelectedSource(source: any) {
     this.selectedSource = source;
     if (this.items === undefined) return;
 
@@ -85,8 +91,8 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
     }
   }
 
-  markSourceErrored(source) {
-    const item = this.items.find((i) => i.source.src === source.src);
+  markSourceErrored(source: any) {
+    const item = this.items.find((i: SourceMenuItem) => i.source.src === source.src);
     if (item === undefined) return;
 
     item.addClass("vjs-source-menu-item-error");
@@ -94,7 +100,15 @@ class SourceMenuButton extends videojs.getComponent("MenuButton") {
 }
 
 class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
-  constructor(player) {
+  menu: any;
+  sources: any[];
+  selectedIndex: number;
+  cleanupTextTracks: any[];
+  manualTextTracks: any[];
+  manuallySelected: boolean;
+  declare player: any;
+
+  constructor(player: any) {
     super(player);
 
     this.menu = new SourceMenuButton(player);
@@ -106,8 +120,8 @@ class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
     // don't auto play next source if user manually selected a source
     this.manuallySelected = false;
 
-    this.menu.on("sourceselected", (_, source) => {
-      this.selectedIndex = this.sources.findIndex((src) => src === source);
+    this.menu.on("sourceselected", (_: any, source: any) => {
+      this.selectedIndex = this.sources.findIndex((src: any) => src === source);
       if (this.selectedIndex === -1) return;
 
       this.manuallySelected = true;
@@ -200,7 +214,7 @@ class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
     });
   }
 
-  setSources(sources) {
+  setSources(sources: any[]) {
     const cleanupTracks = this.cleanupTextTracks.splice(0);
     for (const track of cleanupTracks) {
       this.player.removeRemoteTextTrack(track);
@@ -221,7 +235,7 @@ class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
     return [...this.cleanupTextTracks, ...this.manualTextTracks];
   }
 
-  addTextTrack(options, manualCleanup) {
+  addTextTrack(options: any, manualCleanup: any) {
     const track = this.player.addRemoteTextTrack(options, true);
     if (manualCleanup) {
       this.manualTextTracks.push(track);
@@ -231,7 +245,7 @@ class SourceSelectorPlugin extends videojs.getPlugin("plugin") {
     return track;
   }
 
-  removeTextTrack(track) {
+  removeTextTrack(track: any) {
     this.player.removeRemoteTextTrack(track);
     let index = this.manualTextTracks.indexOf(track);
     if (index != -1) {

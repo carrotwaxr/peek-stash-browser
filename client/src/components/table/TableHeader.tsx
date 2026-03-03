@@ -40,11 +40,11 @@ const TableHeader = ({
    * - If clicking the same column that's sorted: toggle direction
    * - If clicking a different column: default to DESC
    */
-  const handleHeaderClick = (column) => {
+  const handleHeaderClick = (column: ColumnDef) => {
     if (!column.sortable || !onSort) return;
 
     const sortField = getColumnSortField(column.id, entityType);
-    let newDirection;
+    let newDirection: "ASC" | "DESC";
 
     if (sort?.field === sortField) {
       // Toggle direction: DESC -> ASC, ASC -> DESC
@@ -61,7 +61,7 @@ const TableHeader = ({
    * Handle right-click on a column header
    * Only triggers for non-mandatory columns
    */
-  const handleContextMenu = (column, event) => {
+  const handleContextMenu = (column: ColumnDef, event: React.MouseEvent) => {
     if (column.mandatory || !onColumnContextMenu) return;
 
     event.preventDefault();
@@ -71,7 +71,7 @@ const TableHeader = ({
   /**
    * Check if a column is the current sort column
    */
-  const isCurrentSortColumn = (column) => {
+  const isCurrentSortColumn = (column: ColumnDef) => {
     if (!sort?.field) return false;
     const sortField = getColumnSortField(column.id, entityType);
     return sort.field === sortField;
@@ -80,10 +80,10 @@ const TableHeader = ({
   /**
    * Render sort indicator icon
    */
-  const renderSortIcon = (column) => {
+  const renderSortIcon = (column: ColumnDef) => {
     if (!column.sortable || !isCurrentSortColumn(column)) return null;
 
-    const Icon = sort.direction === "ASC" ? ArrowUp : ArrowDown;
+    const Icon = sort?.direction === "ASC" ? ArrowUp : ArrowDown;
     return <Icon size={14} className="ml-1.5 inline-block flex-shrink-0" />;
   };
 

@@ -7,19 +7,20 @@ import Button from "./Button";
 
 const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef(null);
-  const buttonRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
 
   const { logout, user } = useAuth();
   const { isTVMode, toggleTVMode } = useTVMode();
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         menuRef.current &&
-        !menuRef.current.contains(event.target) &&
-        !buttonRef.current.contains(event.target)
+        !menuRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -41,20 +42,21 @@ const UserMenu = () => {
 
   return (
     <div className="relative">
-      {/* User Menu Button */}
-      <Button
-        ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
-        variant="tertiary"
-        style={{
-          backgroundColor: isOpen ? "var(--bg-card)" : "transparent",
-          border: isOpen
-            ? "1px solid var(--border-color)"
-            : "1px solid transparent",
-        }}
-        icon={<ThemedIcon name="circle-user-round" size={20} />}
-        aria-label="User menu"
-      />
+      {/* User Menu Button - wrapper div for click-outside ref detection */}
+      <div ref={buttonRef} className="inline-flex">
+        <Button
+          onClick={() => setIsOpen(!isOpen)}
+          variant="tertiary"
+          style={{
+            backgroundColor: isOpen ? "var(--bg-card)" : "transparent",
+            border: isOpen
+              ? "1px solid var(--border-color)"
+              : "1px solid transparent",
+          }}
+          icon={<ThemedIcon name="circle-user-round" size={20} />}
+          aria-label="User menu"
+        />
+      </div>
 
       {/* Popover Menu */}
       {isOpen && (

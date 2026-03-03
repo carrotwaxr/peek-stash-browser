@@ -23,7 +23,7 @@ interface Props {
  * Allows users to toggle visibility and reorder navigation menu items
  */
 const NavigationSettings = ({ navPreferences, onSave }: Props) => {
-  const [preferences, setPreferences] = useState([]);
+  const [preferences, setPreferences] = useState<NavPreference[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -87,7 +87,7 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
   };
 
   const handleReset = () => {
-    const sorted = [...navPreferences].sort((a, b) => a.order - b.order);
+    const sorted = [...(navPreferences || [])].sort((a, b) => a.order - b.order);
     setPreferences(sorted);
     setHasChanges(false);
   };

@@ -91,6 +91,6 @@ export const INDICATOR_BEHAVIORS = {
  * @param {string} relationshipType - The relationship (performers, tags, etc.)
  * @returns {'rich'|'nav'|'count'} The behavior for this indicator
  */
-export function getIndicatorBehavior(cardType, relationshipType) {
-  return INDICATOR_BEHAVIORS[cardType]?.[relationshipType] ?? 'count';
+export function getIndicatorBehavior(cardType: string, relationshipType: string) {
+  return (INDICATOR_BEHAVIORS as Record<string, Record<string, string>>)[cardType]?.[relationshipType] ?? 'count';
 }

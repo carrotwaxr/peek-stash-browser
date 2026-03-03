@@ -20,6 +20,9 @@ vi.mock("../../../src/hooks/useAuth", () => ({
 
 import { userSetupApi } from "../../../src/api";
 
+const mockGetSetupStatus = userSetupApi.getSetupStatus as ReturnType<typeof vi.fn>;
+const mockCompleteSetup = userSetupApi.completeSetup as ReturnType<typeof vi.fn>;
+
 describe("UserSetupModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +30,7 @@ describe("UserSetupModal", () => {
 
   it("displays recovery key from API", async () => {
     // Mock returns data directly (not wrapped in .data like axios)
-    userSetupApi.getSetupStatus.mockResolvedValue({
+    mockGetSetupStatus.mockResolvedValue({
       setupCompleted: false,
       recoveryKey: "ABCD-1234-EFGH-5678",
       instances: [],
@@ -42,7 +45,7 @@ describe("UserSetupModal", () => {
   });
 
   it("shows instance selection when multiple instances exist", async () => {
-    userSetupApi.getSetupStatus.mockResolvedValue({
+    mockGetSetupStatus.mockResolvedValue({
       setupCompleted: false,
       recoveryKey: "ABCD-1234-EFGH-5678",
       instances: [
@@ -62,7 +65,7 @@ describe("UserSetupModal", () => {
   });
 
   it("hides instance selection when only one instance exists", async () => {
-    userSetupApi.getSetupStatus.mockResolvedValue({
+    mockGetSetupStatus.mockResolvedValue({
       setupCompleted: false,
       recoveryKey: "ABCD-1234-EFGH-5678",
       instances: [{ id: "inst-1", name: "Main", description: "" }],
@@ -80,13 +83,13 @@ describe("UserSetupModal", () => {
 
   it("calls completeSetup and onComplete when clicking Get Started", async () => {
     const onComplete = vi.fn();
-    userSetupApi.getSetupStatus.mockResolvedValue({
+    mockGetSetupStatus.mockResolvedValue({
       setupCompleted: false,
       recoveryKey: "ABCD-1234-EFGH-5678",
       instances: [],
       instanceCount: 1,
     });
-    userSetupApi.completeSetup.mockResolvedValue({ success: true });
+    mockCompleteSetup.mockResolvedValue({ success: true });
 
     render(<UserSetupModal onComplete={onComplete} />);
 

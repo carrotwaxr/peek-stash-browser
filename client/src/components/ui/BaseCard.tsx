@@ -127,7 +127,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
 
     // Selection hook
     const { selectionHandlers, handleNavigationClick } = useCardSelection({
-      entity,
+      entity: entity ?? {},
       selectionMode,
       onToggleSelect,
     });
@@ -198,7 +198,7 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
         {/* Title Section - navigable when linkTo provided */}
         <CardTitle
           title={title}
-          subtitle={hideSubtitle ? null : subtitle}
+          subtitle={hideSubtitle ? null : (typeof subtitle === 'string' ? subtitle : null)}
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
           linkState={linkState}
@@ -238,8 +238,8 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
             <EntityMenu
               entityType={ratingControlsProps.entityType || entityType}
               entityId={ratingControlsProps.entityId}
-              entityName={ratingControlsProps.entityTitle}
-              onHide={ratingControlsProps.onHideClick}
+              entityName={ratingControlsProps.entityTitle ?? ""}
+              onHide={ratingControlsProps.onHideClick as ((payload: { entityType: string; entityId: string; entityName: string }) => void) | undefined}
             />
           ) : null;
 
@@ -255,7 +255,23 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
 
               {/* Rating Controls - only render if has visible controls */}
               {ratingControlsProps && hasRatingControls && (
-                <CardRatingRow entityType={entityType} {...ratingControlsProps} />
+                <CardRatingRow
+                  entityType={ratingControlsProps.entityType || entityType}
+                  entityId={ratingControlsProps.entityId}
+                  instanceId={ratingControlsProps.instanceId}
+                  entityTitle={ratingControlsProps.entityTitle}
+                  initialRating={ratingControlsProps.initialRating ?? null}
+                  initialFavorite={ratingControlsProps.initialFavorite ?? false}
+                  initialOCounter={ratingControlsProps.initialOCounter ?? 0}
+                  onHideSuccess={ratingControlsProps.onHideSuccess}
+                  onOCounterChange={ratingControlsProps.onOCounterChange}
+                  onRatingChange={ratingControlsProps.onRatingChange as ((entityId: string, rating: number | null) => void) | undefined}
+                  onFavoriteChange={ratingControlsProps.onFavoriteChange}
+                  showRating={ratingControlsProps.showRating}
+                  showFavorite={ratingControlsProps.showFavorite}
+                  showOCounter={ratingControlsProps.showOCounter}
+                  showMenu={ratingControlsProps.showMenu}
+                />
               )}
 
               {/* Standalone menu row - only if no indicators and no rating controls but menu enabled */}

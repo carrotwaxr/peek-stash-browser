@@ -7,10 +7,17 @@ import { apiPost } from "../api";
  * Hook to fetch all tags with hierarchy for folder view.
  * Only fetches when folder view is active.
  */
-export function useFolderViewTags(isActive, filters = null) {
-  const [tags, setTags] = useState([]);
+interface FolderViewFilters {
+  performerId?: string;
+  tagId?: string;
+  studioId?: string;
+  groupId?: string;
+}
+
+export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters | null = null) {
+  const [tags, setTags] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<any>(null);
   const fetchedRef = useRef(false);
 
   // Memoize filter key to prevent unnecessary refetches
@@ -20,7 +27,7 @@ export function useFolderViewTags(isActive, filters = null) {
   }, [filters]);
 
   // Track last filter key
-  const lastFilterKeyRef = useRef(null);
+  const lastFilterKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Reset fetched flag if filters change
@@ -45,7 +52,7 @@ export function useFolderViewTags(isActive, filters = null) {
             tagId: filters.tagId,
             studioId: filters.studioId,
             groupId: filters.groupId,
-          });
+          }) as any;
           fetchedTags = result?.tags || [];
         } else {
           // Fetch all tags (existing behavior)
@@ -55,7 +62,7 @@ export function useFolderViewTags(isActive, filters = null) {
               sort: "name",
               direction: "ASC",
             },
-          });
+          }) as any;
           fetchedTags = result?.findTags?.tags || [];
         }
 

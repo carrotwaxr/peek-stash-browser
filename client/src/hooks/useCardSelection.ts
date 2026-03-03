@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Hook for card selection behavior: long-press to select, selection mode click handling
@@ -8,12 +8,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {Function} options.onToggleSelect - Callback when entity should be toggled
  * @returns {Object} - { isLongPressing, selectionHandlers, handleNavigationClick }
  */
+interface UseCardSelectionOptions {
+  entity: Record<string, unknown>;
+  selectionMode?: boolean;
+  onToggleSelect?: (entity: Record<string, unknown>) => void;
+}
+
 export const useCardSelection = ({
   entity,
   selectionMode = false,
   onToggleSelect,
-}) => {
-  const longPressTimerRef = useRef(null);
+}: UseCardSelectionOptions) => {
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const hasMovedRef = useRef(false);
@@ -27,7 +33,7 @@ export const useCardSelection = ({
     };
   }, []);
 
-  const isInteractiveElement = useCallback((target, currentTarget) => {
+  const isInteractiveElement = useCallback((target: HTMLElement, currentTarget: HTMLElement) => {
     const closestButton = target.closest("button");
     const isButton = closestButton && closestButton !== currentTarget;
     const closestLink = target.closest("a");
@@ -38,8 +44,8 @@ export const useCardSelection = ({
   }, []);
 
   const handleMouseDown = useCallback(
-    (e) => {
-      if (isInteractiveElement(e.target, e.currentTarget)) return;
+    (e: React.MouseEvent) => {
+      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) return;
 
       longPressTimerRef.current = setTimeout(() => {
         setIsLongPressing(true);
@@ -57,8 +63,8 @@ export const useCardSelection = ({
   }, []);
 
   const handleTouchStart = useCallback(
-    (e) => {
-      if (isInteractiveElement(e.target, e.currentTarget)) return;
+    (e: React.TouchEvent) => {
+      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) return;
 
       const touch = e.touches[0];
       startPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -74,7 +80,7 @@ export const useCardSelection = ({
     [entity, onToggleSelect, isInteractiveElement]
   );
 
-  const handleTouchMove = useCallback((e) => {
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (longPressTimerRef.current && e.touches.length > 0) {
       const touch = e.touches[0];
       const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
@@ -100,7 +106,7 @@ export const useCardSelection = ({
   // Click handler for navigation elements (CardImage, CardTitle)
   // Always attached to intercept clicks from interactive elements (like checkboxes)
   const handleNavigationClick = useCallback(
-    (e) => {
+    (e: React.MouseEvent) => {
       // If long-press just fired, block the click
       if (isLongPressing) {
         e.preventDefault();
@@ -117,7 +123,7 @@ export const useCardSelection = ({
 
       // If click originated from an interactive element (button, nested link, input),
       // prevent navigation - the interactive element handles its own action
-      if (isInteractiveElement(e.target, e.currentTarget)) {
+      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) {
         e.preventDefault();
         return;
       }

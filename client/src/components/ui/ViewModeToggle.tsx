@@ -43,7 +43,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
   // Local state for immediate visual feedback (optimistic update)
   const [localValue, setLocalValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync local state when parent value changes (authoritative)
   useEffect(() => {
@@ -52,8 +52,8 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -66,7 +66,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
 
   // Close on Escape
   useEffect(() => {
-    const handleEscape = (event) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
       }
@@ -78,7 +78,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
     }
   }, [isOpen]);
 
-  const handleSelect = (modeId) => {
+  const handleSelect = (modeId: string) => {
     setLocalValue(modeId); // Immediate visual feedback
     onChange(modeId);       // Trigger parent update
     setIsOpen(false);
@@ -88,7 +88,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
   const effectiveModes = modes
     ? modes.map((mode) => ({
         ...mode,
-        icon: mode.icon || MODE_ICONS[mode.id] || LucideGrid2X2,
+        icon: mode.icon || MODE_ICONS[mode.id as keyof typeof MODE_ICONS] || LucideGrid2X2,
       }))
     : DEFAULT_MODES;
 

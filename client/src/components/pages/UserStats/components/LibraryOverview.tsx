@@ -1,12 +1,26 @@
-// client/src/components/pages/UserStats/components/LibraryOverview.jsx
+// client/src/components/pages/UserStats/components/LibraryOverview.tsx
 
 import { ENTITY_ICONS } from "../../../../constants/entityIcons";
 import StatCard from "./StatCard";
 
+interface LibraryCounts {
+  sceneCount: number;
+  performerCount: number;
+  studioCount: number;
+  tagCount: number;
+  galleryCount: number;
+  imageCount: number;
+  clipCount: number;
+}
+
+interface Props {
+  library: LibraryCounts;
+}
+
 /**
  * Compact row of library count stats
  */
-const LibraryOverview = ({ library }) => {
+const LibraryOverview = ({ library }: Props) => {
   const SceneIcon = ENTITY_ICONS.scene;
   const PerformerIcon = ENTITY_ICONS.performer;
   const StudioIcon = ENTITY_ICONS.studio;

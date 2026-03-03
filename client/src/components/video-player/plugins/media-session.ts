@@ -9,7 +9,9 @@ import videojs from "video.js";
  * Ported from Stash's media-session.ts plugin.
  */
 class MediaSessionPlugin extends videojs.getPlugin("plugin") {
-  constructor(player, options) {
+  declare player: any;
+
+  constructor(player: any, options: any) {
     super(player, options);
 
     player.ready(() => {
@@ -36,7 +38,7 @@ class MediaSessionPlugin extends videojs.getPlugin("plugin") {
    * @param {string} artist - Performer name(s)
    * @param {string} poster - Poster/screenshot URL
    */
-  setMetadata(title, artist, poster) {
+  setMetadata(title: string, artist: string, poster: string) {
     if ("mediaSession" in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: title || "Unknown",

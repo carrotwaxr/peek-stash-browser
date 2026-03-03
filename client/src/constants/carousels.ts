@@ -61,14 +61,20 @@ export const CAROUSEL_DEFINITIONS = [
 /**
  * Check if an ID is a custom carousel (prefixed with "custom-")
  */
-const isCustomCarousel = (id) => id && id.startsWith("custom-");
+const isCustomCarousel = (id: string) => id && id.startsWith("custom-");
 
 /**
  * Migrate carousel preferences to include any new carousels
  * @param {Array} savedPreferences - Preferences from backend
  * @returns {Array} - Migrated preferences with all carousels
  */
-export const migrateCarouselPreferences = (savedPreferences) => {
+interface CarouselPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+export const migrateCarouselPreferences = (savedPreferences: CarouselPreference[]) => {
   let prefs = savedPreferences;
 
   // If no preferences exist, create defaults
@@ -81,15 +87,15 @@ export const migrateCarouselPreferences = (savedPreferences) => {
   }
 
   // Keep custom carousels (prefixed with "custom-") separate
-  const customPrefs = prefs.filter((pref) => isCustomCarousel(pref.id));
-  const hardcodedPrefs = prefs.filter((pref) => !isCustomCarousel(pref.id));
+  const customPrefs = prefs.filter((pref: CarouselPreference) => isCustomCarousel(pref.id));
+  const hardcodedPrefs = prefs.filter((pref: CarouselPreference) => !isCustomCarousel(pref.id));
 
   // Filter out removed hardcoded carousels (barelyLegalScenes, longScenes, highBitrateScenes)
   const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
-  let validHardcoded = hardcodedPrefs.filter((pref) => validIds.has(pref.id));
+  let validHardcoded = hardcodedPrefs.filter((pref: CarouselPreference) => validIds.has(pref.id));
 
   // Migrate: Add any new hardcoded carousels that don't exist in saved preferences
-  const existingIds = new Set(validHardcoded.map((p) => p.id));
+  const existingIds = new Set(validHardcoded.map((p: CarouselPreference) => p.id));
   const missingCarousels = CAROUSEL_DEFINITIONS.filter(
     (def) => !existingIds.has(def.fetchKey)
   );
@@ -108,8 +114,8 @@ export const migrateCarouselPreferences = (savedPreferences) => {
   prefs = [...validHardcoded, ...customPrefs];
 
   // Re-normalize order values
-  prefs.sort((a, b) => a.order - b.order);
-  prefs = prefs.map((pref, idx) => ({ ...pref, order: idx }));
+  prefs.sort((a: CarouselPreference, b: CarouselPreference) => a.order - b.order);
+  prefs = prefs.map((pref: CarouselPreference, idx: number) => ({ ...pref, order: idx }));
 
   return prefs;
 };

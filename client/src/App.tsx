@@ -62,7 +62,7 @@ const PageLoader = () => (
 
 // Main app component with authentication and routing
 const AppContent = () => {
-  const [setupStatus, setSetupStatus] = useState(null);
+  const [setupStatus, setSetupStatus] = useState<any>(null);
   const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ const AppContent = () => {
       } catch (error) {
         console.error("Failed to check setup status:", error);
         // If check fails, assume setup is not complete
-        setSetupStatus({ setupComplete: false, hasUsers: false, hasStashInstance: false });
+        setSetupStatus({ setupComplete: false, hasUsers: false, hasStashInstance: false, userCount: 0, stashInstanceCount: 0 });
       } finally {
         setCheckingSetup(false);
       }
@@ -84,13 +84,13 @@ const AppContent = () => {
 
   // Handler for when setup completes - triggers re-check and navigation
   const handleSetupComplete = () => {
-    setSetupStatus({ ...setupStatus, setupComplete: true });
+    setSetupStatus({ ...(setupStatus as any), setupComplete: true });
     // Navigate to home after setup (user is already logged in via auto-login)
     window.location.href = "/";
   };
 
   // Ensure setupStatus has defaults to prevent null access in guards
-  const safeSetupStatus = setupStatus || { setupComplete: false, hasUsers: false, hasStashInstance: false };
+  const safeSetupStatus = setupStatus || { setupComplete: false, hasUsers: false, hasStashInstance: false, userCount: 0, stashInstanceCount: 0 };
 
   return (
     <Router>

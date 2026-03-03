@@ -17,10 +17,10 @@ const mockIntersectionObserver = vi.fn(() => ({
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
-globalThis.IntersectionObserver = mockIntersectionObserver;
+globalThis.IntersectionObserver = mockIntersectionObserver as any;
 
 describe("MarqueeText", () => {
-  let matchMediaMock;
+  let matchMediaMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,14 +71,14 @@ describe("MarqueeText", () => {
 
   describe("hover capability detection", () => {
     it("detects hover capability on desktop devices", () => {
-      matchMediaMock.mockImplementation((query) => ({
+      matchMediaMock.mockImplementation((query: string) => ({
         matches: query === "(hover: hover)",
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       }));
 
       const { container } = render(<MarqueeText>Test</MarqueeText>);
-      const containerDiv = container.firstChild;
+      const containerDiv = container.firstChild!;
 
       // On desktop, hover events should be handled
       fireEvent.mouseEnter(containerDiv);
@@ -88,7 +88,7 @@ describe("MarqueeText", () => {
     });
 
     it("detects no hover capability on touch devices", () => {
-      matchMediaMock.mockImplementation((query) => ({
+      matchMediaMock.mockImplementation((query: string) => ({
         matches: query === "(hover: none)",
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
@@ -102,7 +102,7 @@ describe("MarqueeText", () => {
 
   describe("reduced motion preference", () => {
     it("respects prefers-reduced-motion media query", () => {
-      matchMediaMock.mockImplementation((query) => ({
+      matchMediaMock.mockImplementation((query: string) => ({
         matches:
           query === "(prefers-reduced-motion: reduce)" ||
           query === "(hover: hover)",
@@ -115,7 +115,7 @@ describe("MarqueeText", () => {
 
       // When reduced motion is preferred, animation should not be applied
       // even on hover
-      fireEvent.mouseEnter(textElement.parentElement);
+      fireEvent.mouseEnter(textElement.parentElement!);
       expect(textElement.style.animation).toBe("");
     });
   });
@@ -126,7 +126,7 @@ describe("MarqueeText", () => {
       const container = screen.getByText("Test").parentElement;
 
       // Should not throw
-      fireEvent.mouseEnter(container);
+      fireEvent.mouseEnter(container!);
       expect(container).toBeInTheDocument();
     });
 
@@ -134,8 +134,8 @@ describe("MarqueeText", () => {
       render(<MarqueeText>Test</MarqueeText>);
       const container = screen.getByText("Test").parentElement;
 
-      fireEvent.mouseEnter(container);
-      fireEvent.mouseLeave(container);
+      fireEvent.mouseEnter(container!);
+      fireEvent.mouseLeave(container!);
       expect(container).toBeInTheDocument();
     });
   });

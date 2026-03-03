@@ -11,6 +11,7 @@ interface Props {
   confirmText?: string;
   cancelText?: string;
   confirmStyle?: "danger" | "primary";
+  variant?: string;
 }
 
 /**
@@ -32,7 +33,7 @@ const ConfirmDialog = ({
 
   if (!isOpen) return null;
 
-  const handleConfirm = (e) => {
+  const handleConfirm = (e: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
     onConfirm();
@@ -47,7 +48,7 @@ const ConfirmDialog = ({
       onClick={onClose}
     >
       <div
-        ref={dialogRef}
+        ref={dialogRef as React.Ref<HTMLDivElement>}
         className="rounded-lg shadow-lg max-w-md w-full m-4"
         style={{
           backgroundColor: "var(--bg-card)",

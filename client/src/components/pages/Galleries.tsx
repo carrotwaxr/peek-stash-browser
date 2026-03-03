@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
@@ -27,7 +27,7 @@ import { FolderView } from "../folder/index";
 import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for galleries page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
@@ -120,19 +120,18 @@ const Galleries = () => {
   );
 
   const findGalleries = (data as Record<string, unknown>)?.findGalleries as Record<string, unknown> | undefined;
-  const currentGalleries = (findGalleries?.galleries as unknown[]) || [];
+  const currentGalleries = (findGalleries?.galleries as Record<string, unknown>[]) || [];
   const totalCount = (findGalleries?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -178,7 +177,8 @@ const Galleries = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
-          viewModes={VIEW_MODES}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          viewModes={VIEW_MODES as any}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -192,12 +192,12 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
+          {(({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }: { viewMode: string; gridDensity: string; zoomLevel: number; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void; timelinePeriod: string; setTimelinePeriod: (period: string) => void }) =>
             viewMode === "table" ? (
               <TableView
-                items={currentGalleries}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentGalleries as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="gallery"
@@ -214,11 +214,11 @@ const Galleries = () => {
               />
             ) : viewMode === "wall" ? (
               <WallView
-                items={currentGalleries}
+                items={currentGalleries as Record<string, unknown>[]}
                 entityType="gallery"
-                zoomLevel={zoomLevel}
-                playbackMode={wallPlayback}
-                onItemClick={handleGalleryClick}
+                zoomLevel={zoomLevel as unknown as "small" | "medium" | "large"}
+                playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
+                onItemClick={handleGalleryClick as (item: Record<string, unknown>) => void}
                 loading={isLoading}
                 emptyMessage="No galleries found"
               />
@@ -226,16 +226,16 @@ const Galleries = () => {
               <TimelineView
                 entityType="gallery"
                 items={currentGalleries}
-                renderItem={(gallery) => (
+                renderItem={(gallery: Record<string, unknown>) => (
                   <GalleryCard
-                    key={gallery.id}
-                    gallery={gallery}
+                    key={gallery.id as string}
+                    gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
                     fromPageTitle="Galleries"
                     tabIndex={0}
                   />
                 )}
                 onDateFilterChange={setTimelineDateFilter}
-                onPeriodChange={setTimelinePeriod}
+                onPeriodChange={setTimelinePeriod as (period: string | null) => void}
                 initialPeriod={timelinePeriod}
                 loading={isLoading}
                 emptyMessage="No galleries found for this time period"
@@ -249,10 +249,10 @@ const Galleries = () => {
                 loading={isLoading || tagsLoading}
                 emptyMessage="No galleries found"
                 onFolderPathChange={setFolderTagFilter}
-                renderItem={(gallery) => (
+                renderItem={(gallery: Record<string, unknown>) => (
                   <GalleryCard
-                    key={gallery.id}
-                    gallery={gallery}
+                    key={gallery.id as string}
+                    gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
                     fromPageTitle="Galleries"
                     tabIndex={0}
                   />
@@ -273,21 +273,21 @@ const Galleries = () => {
               </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentGalleries.map((gallery, index) => {
-                  const itemProps = gridItemProps(index);
+                {currentGalleries.map((gallery: Record<string, unknown>, index: number) => {
+                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
                   return (
                     <GalleryCard
-                      key={gallery.id}
-                      gallery={gallery}
+                      key={gallery.id as string}
+                      gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
                       fromPageTitle="Galleries"
-                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
-                      {...itemProps}
+                      tabIndex={isTVMode ? _tabIndex : -1}
+                      {...restItemProps}
                     />
                   );
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>

@@ -34,17 +34,17 @@ const formatDuration = (seconds: number | undefined | null): string => {
  * Merge and deduplicate tags from scene direct tags and inherited tags
  * (inherited tags are pre-computed on server from performers, studio, groups)
  */
-const mergeAllTags = (scene: Record<string, unknown>) => {
+const mergeAllTags = (scene: Record<string, any>) => {
   const tagMap = new Map();
 
   // Add direct scene tags
   if (scene.tags) {
-    scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
+    (scene.tags as any[]).forEach((tag: any) => tagMap.set(tag.id, tag));
   }
 
   // Add inherited tags (pre-computed from performers, studio, groups)
   if (scene.inheritedTags) {
-    scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
+    (scene.inheritedTags as any[]).forEach((tag: any) => tagMap.set(tag.id, tag));
   }
 
   return Array.from(tagMap.values());
@@ -56,7 +56,8 @@ const SceneDetails = ({
   showTechnicalDetails,
   setShowTechnicalDetails,
 }: SceneDetailsProps) => {
-  const { scene, sceneLoading, compatibility } = useScenePlayer();
+  const { scene: rawScene, sceneLoading, compatibility } = useScenePlayer();
+  const scene = rawScene as Record<string, any> | null;
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene");
   const { hasMultipleInstances } = useConfig();
@@ -72,8 +73,8 @@ const SceneDetails = ({
       if (!scene?.id) return;
       setClipsLoading(true);
       try {
-        const response = await getClipsForScene(scene.id, scene.instanceId, true);
-        setClips(response.clips || []);
+        const response = await getClipsForScene(scene.id as string, scene.instanceId as string, true);
+        setClips((response as any).clips || []);
       } catch (err) {
         console.error("Failed to fetch clips", err);
         setClips([]);
@@ -247,7 +248,7 @@ const SceneDetails = ({
                       className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
                       style={{ scrollbarWidth: "thin" }}
                     >
-                      {scene.performers.map((performer) => (
+                      {scene.performers.map((performer: any) => (
                         <Link
                           key={performer.id}
                           to={getEntityPath('performer', performer, hasMultipleInstances)}
@@ -322,8 +323,8 @@ const SceneDetails = ({
               {showClips && (
                 <Paper.Body>
                   <ClipList
-                    clips={clips}
-                    onClipClick={handleClipClick}
+                    clips={clips as unknown as import("../cards/ClipCard").Clip[]}
+                    onClipClick={handleClipClick as (clip: import("../cards/ClipCard").Clip) => void}
                     loading={clipsLoading}
                   />
                 </Paper.Body>
@@ -341,7 +342,7 @@ const SceneDetails = ({
               </Paper.Header>
               <Paper.Body>
                 <div className="flex flex-wrap gap-2">
-                  {scene.urls.map((url, index) => (
+                  {scene.urls.map((url: string, index: number) => (
                     <SectionLink key={index} url={url} />
                   ))}
                 </div>
@@ -511,7 +512,7 @@ const SceneDetails = ({
                       className="text-sm"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      {compatibility.reason}
+                      {compatibility.reason as string}
                     </p>
                   </div>
                 )}

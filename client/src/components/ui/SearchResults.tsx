@@ -89,7 +89,7 @@ export const SearchResults = ({
       />
 
       {/* Pagination - common across all layouts */}
-      {totalPages > 1 && onPageChange && (
+      {totalPages != null && totalPages > 1 && onPageChange && (
         <nav role="navigation" aria-label="Pagination" className="mt-6">
           <Pagination
             currentPage={currentPage}

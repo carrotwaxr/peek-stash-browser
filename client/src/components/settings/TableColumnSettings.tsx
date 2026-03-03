@@ -48,7 +48,7 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   };
 
   const handleToggleColumn = (columnId: string) => {
-    const column = allColumns.find((c) => c.id === columnId);
+    const column = allColumns.find((c: { id: string; mandatory?: boolean }) => c.id === columnId);
     if (column?.mandatory) return;
 
     const newVisible = currentConfig.visible.includes(columnId)
@@ -119,16 +119,24 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
     setHasChanges(true);
   };
 
+  interface TableColumn {
+    id: string;
+    label: string;
+    mandatory?: boolean;
+    defaultVisible?: boolean;
+  }
+
   // Get columns in current order
+  const typedAllColumns = allColumns as TableColumn[];
   const orderedColumns = currentConfig.order
-    .map((id) => allColumns.find((col) => col.id === id))
-    .filter(Boolean);
+    .map((id: string) => typedAllColumns.find((col) => col.id === id))
+    .filter((col): col is TableColumn => col != null);
 
   // Add any missing columns
-  const missingColumns = allColumns.filter(
+  const missingColumns = typedAllColumns.filter(
     (col) => !currentConfig.order.includes(col.id)
   );
-  const allOrderedColumns = [...orderedColumns, ...missingColumns];
+  const allOrderedColumns: TableColumn[] = [...orderedColumns, ...missingColumns];
 
   return (
     <div>

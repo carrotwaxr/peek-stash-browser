@@ -1,7 +1,7 @@
 import { type CSSProperties } from "react";
 import { useState, useCallback, useEffect } from "react";
 
-interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "onLoad" | "onError"> {
+interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "onLoad" | "onError" | "src"> {
   src: string | null | undefined;
   alt?: string;
   className?: string;
@@ -82,7 +82,7 @@ const MediaImage = ({
   if (isVideo) {
     return (
       <video
-        src={src}
+        src={src ?? undefined}
         autoPlay
         loop
         muted
@@ -91,14 +91,13 @@ const MediaImage = ({
         className={className}
         style={style}
         onError={handleVideoError}
-        {...props}
       />
     );
   }
 
   return (
     <img
-      src={src}
+      src={src ?? undefined}
       alt={alt}
       className={className}
       style={style}

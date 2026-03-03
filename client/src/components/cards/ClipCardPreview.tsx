@@ -11,7 +11,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false);
-  const [containerElement, setContainerElement] = useState(null);
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
 
   // Get preview URLs
   const previewUrl = clip.isGenerated ? getClipPreviewUrl(clip.id) : null;
@@ -23,7 +23,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => {
+    const handleChange = (e: MediaQueryListEvent) => {
       setHasHoverCapability(e.matches);
     };
     mediaQuery.addEventListener("change", handleChange);

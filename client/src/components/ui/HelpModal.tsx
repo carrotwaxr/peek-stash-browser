@@ -8,7 +8,7 @@ interface Props {
 }
 
 // Determine current page from URL
-const getCurrentPage = (location) => {
+const getCurrentPage = (location: { pathname: string }) => {
   const path = location.pathname;
   if (path.startsWith("/scene/")) return "scene";
   if (path.startsWith("/scenes")) return "scenes";
@@ -202,9 +202,9 @@ const HelpModal = ({ onClose }: Props) => {
   };
 
   // Get shortcuts for current page (fall back to global if page has no specific shortcuts)
-  const pageShortcuts = shortcuts[currentPage] || shortcuts.global;
+  const pageShortcuts = shortcuts[currentPage as keyof typeof shortcuts] || shortcuts.global;
 
-  const renderShortcutKey = (key) => {
+  const renderShortcutKey = (key: string) => {
     return (
       <kbd
         className="px-2 py-1 text-xs font-semibold rounded"
@@ -220,7 +220,7 @@ const HelpModal = ({ onClose }: Props) => {
     );
   };
 
-  const renderShortcutRow = ({ keys, description }) => {
+  const renderShortcutRow = ({ keys, description }: { keys: string[]; description: string }) => {
     return (
       <div
         key={keys.join("+")}
@@ -233,7 +233,7 @@ const HelpModal = ({ onClose }: Props) => {
           {description}
         </span>
         <div className="flex items-center gap-1">
-          {keys.map((keyCombo, index) => {
+          {keys.map((keyCombo: string, index: number) => {
             // Check if this is a key combination (e.g., "Shift+>")
             const isCombo = keyCombo.includes("+");
             const parts = isCombo ? keyCombo.split("+") : [keyCombo];
@@ -249,7 +249,7 @@ const HelpModal = ({ onClose }: Props) => {
                   </span>
                 )}
                 {/* Render each part of the combination */}
-                {parts.map((part, partIndex) => (
+                {parts.map((part: string, partIndex: number) => (
                   <span key={partIndex} className="flex items-center gap-1">
                     {partIndex > 0 && (
                       <span
@@ -270,7 +270,7 @@ const HelpModal = ({ onClose }: Props) => {
     );
   };
 
-  const renderShortcutCategory = ({ category, items }) => {
+  const renderShortcutCategory = ({ category, items }: { category: string; items: { keys: string[]; description: string }[] }) => {
     return (
       <div key={category} className="mb-6">
         <h4
@@ -280,7 +280,7 @@ const HelpModal = ({ onClose }: Props) => {
           {category}
         </h4>
         <div className="space-y-1">
-          {items.map((item) => renderShortcutRow(item))}
+          {items.map((item: { keys: string[]; description: string }) => renderShortcutRow(item))}
         </div>
       </div>
     );
@@ -303,7 +303,7 @@ const HelpModal = ({ onClose }: Props) => {
       playlists: "Playlists Page Shortcuts",
       global: "Keyboard Shortcuts",
     };
-    return titles[currentPage] || "Keyboard Shortcuts";
+    return titles[currentPage as keyof typeof titles] || "Keyboard Shortcuts";
   };
 
   const modalContent = (
@@ -490,7 +490,7 @@ const HelpModal = ({ onClose }: Props) => {
                 </div>
 
                 <div>
-                  {pageShortcuts.map((category) =>
+                  {pageShortcuts.map((category: { category: string; items: { keys: string[]; description: string }[] }) =>
                     renderShortcutCategory(category)
                   )}
                 </div>

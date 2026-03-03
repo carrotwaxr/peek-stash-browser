@@ -48,7 +48,7 @@ import {
   ZoomSlider,
 } from "./index";
 
-const buildFilter = (artifactType, filters, unitPreference) => {
+const buildFilter = (artifactType: string, filters: Record<string, any>, unitPreference: string) => {
   switch (artifactType) {
     case "performer":
       return { performer_filter: buildPerformerFilter(filters, unitPreference) };
@@ -70,7 +70,7 @@ const buildFilter = (artifactType, filters, unitPreference) => {
   }
 };
 
-const getSortOptions = (artifactType) => {
+const getSortOptions = (artifactType: string) => {
   switch (artifactType) {
     case "performer":
       return PERFORMER_SORT_OPTIONS;
@@ -161,10 +161,10 @@ const SearchControls = ({
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [highlightedFilterKey, setHighlightedFilterKey] = useState(null);
+  const [highlightedFilterKey, setHighlightedFilterKey] = useState<string | null>(null);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
-  const topPaginationRef = useRef(null); // Ref for top pagination element
-  const filterRefs = useRef({}); // Refs for filter controls (for scroll-to-highlight)
+  const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
+  const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
   const randomSeedRef = useRef(-1); // Random seed for stable pagination (-1 = uninitialized)
 
   // TV Mode
@@ -181,7 +181,7 @@ const SearchControls = ({
   const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
 
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
-  const searchZoneItems = useMemo(() => [
+  const searchZoneItems = useMemo<{ id: string; name: string }[]>(() => [
     { id: "search-input", name: "Search" },
     { id: "sort-control", name: "Sort" },
     { id: "sort-direction", name: "Direction" },
@@ -196,11 +196,11 @@ const SearchControls = ({
   const searchZoneNav = useHorizontalNavigation({
     items: searchZoneItems,
     enabled: isTVMode && tvSearchZoneActive,
-    onSelect: (item) => {
+    onSelect: (item: { id: string; name: string }) => {
       // Trigger click on the focused element
       const element = document.querySelector(`[data-tv-search-item="${item.id}"]`);
       if (element) {
-        element.click();
+        (element as HTMLElement).click();
         // For search input, focus it
         if (item.id === "search-input") {
           const input = element.querySelector("input");
@@ -220,9 +220,9 @@ const SearchControls = ({
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {
     // Transform filter options based on unit preference
-    const transformForUnits = (options) => {
+    const transformForUnits = (options: Record<string, any>[]) => {
       if (unitPreference !== "imperial") return options;
-      return options.map((opt) => {
+      return options.map((opt: Record<string, any>) => {
         // Transform height filter for imperial
         if (opt.key === "height") {
           return {
@@ -276,9 +276,9 @@ const SearchControls = ({
   }, [artifactType, unitPreference]);
 
   // Track collapsed state for each filter section
-  const [collapsedSections, setCollapsedSections] = useState(() => {
-    const initial = {};
-    filterOptions.forEach((opt) => {
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    filterOptions.forEach((opt: Record<string, any>) => {
       if (opt.type === "section-header" && opt.collapsible) {
         initial[opt.key] = !opt.defaultOpen;
       }
@@ -317,9 +317,9 @@ const SearchControls = ({
     permanentFilters,
     filterOptions,
     syncToUrl,
-    defaultViewMode,
-    defaultGridDensity,
-    defaultZoomLevel,
+    defaultViewMode: defaultViewMode as string,
+    defaultGridDensity: defaultGridDensity as string,
+    defaultZoomLevel: defaultZoomLevel as string,
   });
 
   // Extract values for compatibility with existing code
@@ -338,7 +338,7 @@ const SearchControls = ({
 
   // Get sort value with embedded random seed when needed
   // Uses ref so seed persists across renders without causing re-renders
-  const getSortWithSeed = useCallback((sort) => {
+  const getSortWithSeed = useCallback((sort: string) => {
     // Normalize: treat both "random" and "random_*" as random sort
     // (latter can happen if saved in preset, though we try to avoid it)
     const isRandomSort = sort === 'random' || sort.startsWith('random_');
@@ -451,7 +451,7 @@ const SearchControls = ({
   }, [clearFiltersAction, permanentFilters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
   // Handle filter change in panel (editing before submit)
-  const handleFilterChange = useCallback((filterKey, value) => {
+  const handleFilterChange = useCallback((filterKey: string, value: any) => {
     setLocalFilters((prev) => ({
       ...prev,
       [filterKey]: value === "" ? undefined : value,
@@ -480,7 +480,7 @@ const SearchControls = ({
 
   // Handle removing a single filter chip
   const handleRemoveFilter = useCallback(
-    (filterKey) => {
+    (filterKey: string) => {
       removeFilterAction(filterKey); // Hook handles URL sync and resets to page 1
 
       // Calculate updated filters for query
@@ -519,7 +519,7 @@ const SearchControls = ({
 
   // Handle clicking on a filter chip to highlight that filter
   const handleFilterChipClick = useCallback(
-    (filterKey) => {
+    (filterKey: string) => {
       // Open filter panel if not already open
       setIsFilterPanelOpen(true);
 
@@ -559,7 +559,7 @@ const SearchControls = ({
 
   // Handle loading a saved preset
   const handleLoadPreset = useCallback(
-    (preset) => {
+    (preset: Record<string, any>) => {
       loadPreset(preset); // Hook handles URL sync and state updates
       onPerPageStateChange?.(preset.perPage || perPage);
       if (preset.viewMode) onViewModeChange?.(preset.viewMode);
@@ -591,7 +591,7 @@ const SearchControls = ({
     [loadPreset, onPerPageStateChange, onViewModeChange, permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference, getSortWithSeed, resetRandomSeed]
   );
 
-  const handlePageChange = useCallback((page) => {
+  const handlePageChange = useCallback((page: number) => {
     setPage(page); // Hook handles URL sync
 
     // Merge user filters with permanent filters (e.g., folder tag filter)
@@ -635,7 +635,7 @@ const SearchControls = ({
     }
   }, [paginationHandlerRef, handlePageChange]);
 
-  const handleChangeSearchText = useCallback((searchStr) => {
+  const handleChangeSearchText = useCallback((searchStr: string) => {
     if (searchStr === searchText) return; // No change
     setSearchTextAction(searchStr); // Hook handles URL sync and resets to page 1
 
@@ -655,7 +655,7 @@ const SearchControls = ({
   }, [searchText, setSearchTextAction, sortDirection, perPage, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
   // Handle sort change
-  const handleSortChange = useCallback((field) => {
+  const handleSortChange = useCallback((field: string) => {
     let newSortDirection = "DESC";
     let newSortField = sortField;
 
@@ -693,7 +693,7 @@ const SearchControls = ({
     setIsFilterPanelOpen((prev) => !prev);
   }, []);
 
-  const handlePerPageChange = useCallback((newPerPage) => {
+  const handlePerPageChange = useCallback((newPerPage: number) => {
     setPerPageAction(newPerPage); // Hook handles URL sync and resets to page 1
     onPerPageStateChange?.(newPerPage);
 
@@ -713,7 +713,7 @@ const SearchControls = ({
   }, [setPerPageAction, onPerPageStateChange, sortDirection, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
   // Handle view mode change - notify parent directly instead of via effect
-  const handleViewModeChange = useCallback((newMode) => {
+  const handleViewModeChange = useCallback((newMode: string) => {
     setViewMode(newMode);
     onViewModeChange?.(newMode);
   }, [setViewMode, onViewModeChange]);
@@ -734,7 +734,7 @@ const SearchControls = ({
     
     // For scenes, conditionally include scene_index based on group filter
     if (artifactType === "scene") {
-      const hasGroupFilter = filters?.groups?.length > 0;
+      const hasGroupFilter = (filters as Record<string, any>)?.groups?.length > 0;
       if (hasGroupFilter) {
         return SCENE_SORT_OPTIONS; // Full list with scene_index
       }
@@ -742,7 +742,7 @@ const SearchControls = ({
     }
     
     return baseOptions;
-  }, [artifactType, filters?.groups]);
+  }, [artifactType, (filters as Record<string, any>)?.groups]);
 
   // Show loading state while fetching default presets
   if (isLoadingPresets) {
@@ -883,11 +883,11 @@ const SearchControls = ({
                   {
                     Object.keys(filters).filter(
                       (key) =>
-                        filters[key] !== undefined &&
-                        filters[key] !== "" &&
-                        (typeof filters[key] !== "object" ||
-                          Object.values(filters[key]).some(
-                            (v) => v !== "" && v !== undefined
+                        (filters as Record<string, any>)[key] !== undefined &&
+                        (filters as Record<string, any>)[key] !== "" &&
+                        (typeof (filters as Record<string, any>)[key] !== "object" ||
+                          Object.values((filters as Record<string, any>)[key]).some(
+                            (v: any) => v !== "" && v !== undefined
                           ))
                     ).length
                   }
@@ -930,7 +930,7 @@ const SearchControls = ({
             className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
           >
             <ViewModeToggle
-              modes={viewModes}
+              modes={viewModes as any}
               value={viewMode}
               onChange={handleViewModeChange}
             />
@@ -974,9 +974,9 @@ const SearchControls = ({
             entityType={artifactType}
             settings={contextSettings}
             currentValues={{ wallPlayback }}
-            onSettingChange={(key, value) => {
+            onSettingChange={(key: string, value: string | boolean) => {
               if (key === "wallPlayback" && onWallPlaybackChange) {
-                onWallPlaybackChange(value);
+                onWallPlaybackChange(key, value as string);
               }
             }}
           />
@@ -986,7 +986,7 @@ const SearchControls = ({
             {/* Active Filter Chips */}
             <ActiveFilterChips
               filters={filters}
-              filterOptions={filterOptions}
+              filterOptions={filterOptions as any}
               onRemoveFilter={handleRemoveFilter}
               onChipClick={handleFilterChipClick}
               permanentFilters={permanentFilters}
@@ -1032,12 +1032,12 @@ const SearchControls = ({
         highlightedFilterKey={highlightedFilterKey}
         filterRefs={filterRefs}
       >
-        {filterOptions.map((opt, index) => {
+        {filterOptions.map((opt: Record<string, any>, index: number) => {
           const { defaultValue, key, type, ...rest } = opt;
 
           // Render section header
           if (type === "section-header") {
-            const isCollapsed = collapsedSections[key] || false;
+            const isCollapsed = (collapsedSections as Record<string, boolean>)[key] || false;
             const toggleSection = () => {
               setCollapsedSections((prev) => ({
                 ...prev,
@@ -1100,7 +1100,7 @@ const SearchControls = ({
           }
 
           const isInCollapsedSection =
-            currentSectionKey && collapsedSections[currentSectionKey];
+            currentSectionKey && (collapsedSections as Record<string, boolean>)[currentSectionKey];
 
           if (isInCollapsedSection) {
             return null;
@@ -1120,24 +1120,25 @@ const SearchControls = ({
           return (
             <FilterControl
               key={`FilterControl-${key}`}
-              ref={(el) => {
+              ref={(el: HTMLDivElement | null) => {
                 if (el) filterRefs.current[key] = el;
               }}
               isHighlighted={highlightedFilterKey === key}
-              onChange={(value) => handleFilterChange(key, value)}
-              value={localFilters[key] || defaultValue}
+              onChange={(value: unknown) => handleFilterChange(key, value)}
+              value={(localFilters as Record<string, any>)[key] || defaultValue}
               type={type}
+              label={filterProps.label}
               modifierOptions={modifierOptions}
-              modifierValue={localFilters[modifierKey] || defaultModifier}
-              onModifierChange={(value) =>
+              modifierValue={(localFilters as Record<string, any>)[modifierKey] || defaultModifier}
+              onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)
               }
               supportsHierarchy={supportsHierarchy}
               hierarchyLabel={hierarchyLabel}
-              hierarchyValue={hierarchyKey ? localFilters[hierarchyKey] : undefined}
+              hierarchyValue={hierarchyKey ? (localFilters as Record<string, any>)[hierarchyKey] : undefined}
               onHierarchyChange={
                 hierarchyKey
-                  ? (value) => handleFilterChange(hierarchyKey, value)
+                  ? (value: unknown) => handleFilterChange(hierarchyKey, value)
                   : undefined
               }
               {...filterProps}
@@ -1147,7 +1148,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange, timelinePeriod, setTimelinePeriod })
+        ? (children as Function)({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange, timelinePeriod, setTimelinePeriod })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

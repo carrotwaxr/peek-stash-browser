@@ -24,7 +24,7 @@ const StudioGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(studio, _index, { onHideSuccess }) => (
+      renderItem={(studio: any, _index: number, { onHideSuccess }: any) => (
         <StudioCard
           key={studio.id}
           studio={studio}

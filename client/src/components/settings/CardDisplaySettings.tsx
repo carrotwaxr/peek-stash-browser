@@ -90,9 +90,9 @@ interface EntitySettingsSectionProps {
 
 const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
   const { getSettings, updateSettings } = useCardDisplaySettings();
-  const settings = getSettings(entityType);
-  const availableSettings = getAvailableSettings(entityType);
-  const viewModes = getViewModes(entityType);
+  const settings = getSettings(entityType) as Record<string, string | boolean>;
+  const availableSettings = getAvailableSettings(entityType) as string[];
+  const viewModes = getViewModes(entityType) as Array<{ id: string; label: string }>;
 
   const handleChange = async (key: string, value: string | boolean) => {
     try {
@@ -109,8 +109,8 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
         {/* Default View Mode - always first if available */}
         {availableSettings.includes("defaultViewMode") && (
           <Dropdown
-            label={SETTING_LABELS.defaultViewMode}
-            value={settings.defaultViewMode}
+            label={(SETTING_LABELS as Record<string, string>).defaultViewMode}
+            value={settings.defaultViewMode as string}
             options={viewModes}
             onChange={(v) => handleChange("defaultViewMode", v)}
           />
@@ -126,8 +126,8 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
               <ZoomSlider
                 value={
                   settings.defaultViewMode === "grid"
-                    ? (settings.defaultGridDensity || "medium")
-                    : (settings.defaultWallZoom || "medium")
+                    ? ((settings.defaultGridDensity as string) || "medium")
+                    : ((settings.defaultWallZoom as string) || "medium")
                 }
                 onChange={(density) =>
                   handleChange(
@@ -142,14 +142,14 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
 
         {/* Toggle settings */}
         {availableSettings
-          .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
-          .map((settingKey) => (
+          .filter((key: string) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
+          .map((settingKey: string) => (
             <Toggle
               key={settingKey}
-              label={SETTING_LABELS[settingKey]}
-              checked={settings[settingKey]}
+              label={(SETTING_LABELS as Record<string, string>)[settingKey]}
+              checked={settings[settingKey] as boolean}
               onChange={(v) => handleChange(settingKey, v)}
-              description={SETTING_DESCRIPTIONS[settingKey]}
+              description={(SETTING_DESCRIPTIONS as Record<string, string>)[settingKey]}
             />
           ))}
       </div>
@@ -158,7 +158,7 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
 };
 
 const CardDisplaySettings = () => {
-  const [expandedEntity, setExpandedEntity] = useState("scene");
+  const [expandedEntity, setExpandedEntity] = useState<string | null>("scene");
   const entityTypes = getEntityTypes();
 
   return (
@@ -176,7 +176,7 @@ const CardDisplaySettings = () => {
       {/* Accordion-style entity sections */}
       <div className="space-y-2">
         {entityTypes.map((entityType) => {
-          const config = ENTITY_DISPLAY_CONFIG[entityType];
+          const config = (ENTITY_DISPLAY_CONFIG as Record<string, { label: string }>)[entityType];
           return (
             <div
               key={entityType}

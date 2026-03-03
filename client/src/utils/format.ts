@@ -5,7 +5,7 @@
 /**
  * Format file size in bytes to human readable format
  */
-export function formatFileSize(bytes) {
+export function formatFileSize(bytes: number) {
   if (!bytes || bytes === 0) return "0 B";
 
   const k = 1024;
@@ -18,7 +18,7 @@ export function formatFileSize(bytes) {
 /**
  * Format bit rate in bits per second to human readable format
  */
-export function formatBitRate(bitsPerSecond) {
+export function formatBitRate(bitsPerSecond: number) {
   if (!bitsPerSecond) return "0 bps";
 
   const mbps = bitsPerSecond / (1000 * 1000);
@@ -31,17 +31,19 @@ export function formatBitRate(bitsPerSecond) {
 /**
  * Get scene display title - uses title if available, otherwise falls back to first file basename
  */
-export function getSceneTitle(scene) {
+export function getSceneTitle(scene: Record<string, unknown> | null) {
   if (!scene) return "Unknown Scene";
 
   // Use title if it exists and is not empty
-  if (scene.title && scene.title.trim()) {
-    return scene.title.trim();
+  const title = scene.title as string | undefined;
+  if (title && title.trim()) {
+    return title.trim();
   }
 
   // Fallback to first file basename
-  if (scene.files && scene.files.length > 0 && scene.files[0].basename) {
-    return scene.files[0].basename.replace(/\.[^/.]+$/, ""); // Remove file extension
+  const files = scene.files as Array<Record<string, unknown>> | undefined;
+  if (files && files.length > 0 && files[0].basename) {
+    return (files[0].basename as string).replace(/\.[^/.]+$/, ""); // Remove file extension
   }
 
   return "Unknown Scene";
@@ -50,15 +52,15 @@ export function getSceneTitle(scene) {
 /**
  * Get scene description, handling empty cases
  */
-export function getSceneDescription(scene) {
+export function getSceneDescription(scene: Record<string, unknown> | null) {
   if (!scene || !scene.details) return "";
-  return scene.details.trim();
+  return (scene.details as string).trim();
 }
 
 /**
  * Format duration in seconds to human readable format (HH:MM:SS or MM:SS)
  */
-export function formatDuration(seconds) {
+export function formatDuration(seconds: number) {
   if (!seconds) return "0:00";
 
   const hours = Math.floor(seconds / 3600);
@@ -76,7 +78,7 @@ export function formatDuration(seconds) {
  * Format duration in seconds to compact format for overlays (max 6 characters)
  * Examples: "32s", "1m15s", "45m12s", "2h03m"
  */
-export function formatDurationCompact(seconds) {
+export function formatDurationCompact(seconds: number) {
   if (!seconds) return "0s";
 
   const hours = Math.floor(seconds / 3600);
@@ -105,7 +107,7 @@ export function formatDurationCompact(seconds) {
  * @param {boolean} options.includeDays - Include days in output (default true)
  * @returns {string} Formatted duration string (e.g., "2d 5h 30m", "3h 45m", "12m")
  */
-export function formatDurationHumanReadable(seconds, options = {}) {
+export function formatDurationHumanReadable(seconds: number, options: { includeDays?: boolean } = {}) {
   const { includeDays = true } = options;
 
   if (!seconds || seconds === 0) return "0m";
@@ -137,7 +139,7 @@ export function formatDurationHumanReadable(seconds, options = {}) {
  * @param {string} filePath - Full file path
  * @returns {string|null} Filename without extension, or null if no path
  */
-export function getFilenameFromPath(filePath) {
+export function getFilenameFromPath(filePath: string) {
   if (!filePath) return null;
   const basename = filePath.split(/[\\/]/).pop() || filePath;
   return basename.replace(/\.[^/.]+$/, ""); // Remove extension
@@ -149,7 +151,7 @@ export function getFilenameFromPath(filePath) {
  * @param {number} height - Video height in pixels
  * @returns {string} Formatted resolution string
  */
-export function formatResolution(width, height) {
+export function formatResolution(width: number, height: number) {
   if (!width || !height) return "";
 
   // Common 4K resolutions

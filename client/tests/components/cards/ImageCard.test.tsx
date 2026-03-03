@@ -19,7 +19,7 @@ describe("ImageCard", () => {
       image: mockImage,
       fromPageTitle: "Images",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -28,7 +28,7 @@ describe("ImageCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
-    });
+    } as any);
 
     expect(element.props.image).toBe(mockImage);
   });
@@ -36,7 +36,7 @@ describe("ImageCard", () => {
   it("passes correct link path", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
-    });
+    } as any);
 
     expect(element.props.image.id).toBe("1");
   });
@@ -44,7 +44,7 @@ describe("ImageCard", () => {
   it("passes image with all data", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
-    });
+    } as any);
 
     const image = element.props.image;
     expect(image.title).toBe("Test Image");
@@ -55,7 +55,7 @@ describe("ImageCard", () => {
     const imageNoTitle = { ...mockImage, title: null };
     const element = createElement(ImageCard, {
       image: imageNoTitle,
-    });
+    } as any);
 
     expect(element.props.image.id).toBe("1");
   });
@@ -64,7 +64,7 @@ describe("ImageCard", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
       fromPageTitle: "Images",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Images");
   });
@@ -73,7 +73,7 @@ describe("ImageCard", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -83,7 +83,7 @@ describe("ImageCard", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

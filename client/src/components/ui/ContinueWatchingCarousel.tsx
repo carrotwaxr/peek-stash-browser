@@ -5,8 +5,18 @@ import { useAllWatchHistory } from "../../hooks/useWatchHistory";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import { libraryApi } from "../../api";
+import { ApiError } from "../../api/client";
 import SceneCarousel from "./SceneCarousel";
 import type { NormalizedScene } from "@peek/shared-types";
+
+interface WatchHistoryEntry {
+  sceneId: string;
+  resumeTime?: number;
+  playCount?: number;
+  lastPlayedAt?: string | null;
+  playDuration?: number;
+  [key: string]: unknown;
+}
 
 /**
  * Continue Watching carousel component
@@ -35,11 +45,18 @@ const ContinueWatchingCarousel = ({
     limit: 12,
   });
 
-  const [scenes, setScenes] = useState([]);
+  interface SceneWithProgress extends NormalizedScene {
+    watchHistory: WatchHistoryEntry | null;
+    resumeTime: number;
+    playCount: number;
+    lastPlayedAt: string | null;
+  }
+
+  const [scenes, setScenes] = useState<SceneWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [retryTrigger, setRetryTrigger] = useState(0);
-  const [scenesFetchError, setScenesFetchError] = useState(null);
+  const [scenesFetchError, setScenesFetchError] = useState<ApiError | null>(null);
 
   // Fetch full scene data for each watch history entry
   useEffect(() => {
@@ -58,15 +75,16 @@ const ContinueWatchingCarousel = ({
         setLoading(true);
 
         // Extract scene IDs from watch history
-        const sceneIds = watchHistoryList.map((wh) => wh.sceneId);
+        const whList = watchHistoryList as WatchHistoryEntry[];
+        const sceneIds = whList.map((wh) => wh.sceneId);
 
         // Fetch scenes in bulk
         const response = await libraryApi.findScenes({ ids: sceneIds });
-        const fetchedScenes = response?.findScenes?.scenes || [];
+        const fetchedScenes = (response as { findScenes?: { scenes?: NormalizedScene[] } })?.findScenes?.scenes || [];
 
         // Match scenes with watch history data and add progress info
-        const scenesWithProgress = fetchedScenes.map((scene) => {
-          const watchHistory = watchHistoryList.find(
+        const scenesWithProgress = fetchedScenes.map((scene: NormalizedScene) => {
+          const watchHistory = whList.find(
             (wh) => wh.sceneId === scene.id
           );
           return {
@@ -74,7 +92,7 @@ const ContinueWatchingCarousel = ({
             watchHistory: watchHistory || null,
             resumeTime: watchHistory?.resumeTime || 0,
             playCount: watchHistory?.playCount || 0,
-            lastPlayedAt: watchHistory?.lastPlayedAt || null,
+            lastPlayedAt: (watchHistory?.lastPlayedAt as string | null) || null,
           };
         });
 
@@ -83,7 +101,7 @@ const ContinueWatchingCarousel = ({
         const MIN_WATCH_PERCENT = 2;
         const filteredScenes = scenesWithProgress.filter((scene) => {
           const duration = scene.files?.[0]?.duration;
-          const playDuration = scene.watchHistory?.playDuration;
+          const playDuration = scene.watchHistory?.playDuration as number | undefined;
 
           if (!duration || !playDuration) {
             return false; // No duration data, exclude
@@ -97,14 +115,14 @@ const ContinueWatchingCarousel = ({
         filteredScenes.sort((a, b) => {
           const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
           const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
-          return dateB - dateA;
+          return dateB.getTime() - dateA.getTime();
         });
 
         setScenes(filteredScenes);
         setScenesFetchError(null);
       } catch (err) {
         console.error("Error fetching continue watching scenes:", err);
-        setScenesFetchError(err);
+        setScenesFetchError(err instanceof ApiError ? err : null);
         setScenes([]);
       } finally {
         setLoading(false);
@@ -116,7 +134,7 @@ const ContinueWatchingCarousel = ({
 
   // Handle server initialization state
   useEffect(() => {
-    const isWatchHistoryInitializing = error?.isInitializing;
+    const isWatchHistoryInitializing = false; // error from useAllWatchHistory is string | null, never has isInitializing
     const isScenesInitializing = scenesFetchError?.isInitializing;
     const isInitializing = isWatchHistoryInitializing || isScenesInitializing;
 
@@ -139,10 +157,10 @@ const ContinueWatchingCarousel = ({
     }
   }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
 
-  const handleSceneClick = (scene) => {
+  const handleSceneClick = (scene: NormalizedScene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
+    navigate(getEntityPath('scene', scene as unknown as Parameters<typeof getEntityPath>[1], hasMultipleInstances), {
       state: {
         scene,
         fromPageTitle: "Home",
@@ -166,10 +184,9 @@ const ContinueWatchingCarousel = ({
   };
 
   // Don't show carousel if error (non-initialization) or no scenes
-  const isInitializing =
-    error?.isInitializing || scenesFetchError?.isInitializing;
+  const isInitializing = scenesFetchError?.isInitializing;
   if (
-    (error && !error.isInitializing) ||
+    (error) ||
     (scenesFetchError && !scenesFetchError.isInitializing)
   ) {
     console.error(

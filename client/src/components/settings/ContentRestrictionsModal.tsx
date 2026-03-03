@@ -31,10 +31,10 @@ interface RestrictionConfig {
 const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Restriction state for each entity type
-  const [restrictions, setRestrictions] = useState({
+  const [restrictions, setRestrictions] = useState<Record<EntityType, RestrictionConfig>>({
     groups: { mode: "NONE", entityIds: [], restrictEmpty: false },
     tags: { mode: "NONE", entityIds: [], restrictEmpty: false },
     studios: { mode: "NONE", entityIds: [], restrictEmpty: false },
@@ -52,12 +52,12 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
       setLoading(true);
       setError(null);
 
-      const data = await apiGet(`/user/${user.id}/restrictions`);
+      const data = await apiGet<{ restrictions: Array<{ entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }> }>(`/user/${user.id}/restrictions`);
       const existingRestrictions = data.restrictions || [];
 
       // Convert API format to component state
       const newRestrictions = { ...restrictions };
-      existingRestrictions.forEach((restriction) => {
+      existingRestrictions.forEach((restriction: { entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }) => {
         newRestrictions[restriction.entityType] = {
           mode: restriction.mode,
           entityIds: JSON.parse(restriction.entityIds),
@@ -127,14 +127,14 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
       onSave?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to save restrictions");
+      setError((err as Error).message || "Failed to save restrictions");
     } finally {
       setSaving(false);
     }
   };
 
   const getEntityLabel = (entityType: string) => {
-    const labels = {
+    const labels: Record<string, string> = {
       groups: "Collections",
       tags: "Tags",
       studios: "Studios",
@@ -144,7 +144,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   };
 
   const getEntityDescription = (entityType: string) => {
-    const descriptions = {
+    const descriptions: Record<string, string> = {
       groups:
         "Most reliable for content organization as groups are typically static and manually curated.",
       tags: "May change frequently if using Stash plugins. Use with caution for dynamic tagging systems.",
@@ -156,7 +156,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   };
 
   const getModeDescription = (mode: string) => {
-    const descriptions = {
+    const descriptions: Record<string, string> = {
       NONE: "No restrictions - user can see all content",
       EXCLUDE: "Hide selected items and any content associated with them",
       INCLUDE: "Show ONLY selected items and content associated with them",
@@ -214,7 +214,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
                   name={`${entityType}-mode`}
                   value={mode}
                   checked={config.mode === mode}
-                  onChange={() => handleModeChange(entityType, mode)}
+                  onChange={() => handleModeChange(entityType, mode as RestrictionMode)}
                   className="mt-0.5"
                   style={{ accentColor: "var(--primary-color)" }}
                 />
@@ -250,7 +250,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
               <SearchableSelect
                 entityType={entityType}
                 value={config.entityIds}
-                onChange={(ids) => handleEntityIdsChange(entityType, ids)}
+                onChange={(ids) => handleEntityIdsChange(entityType, Array.isArray(ids) ? ids : [ids])}
                 multi={true}
                 placeholder={`Select ${getEntityLabel(
                   entityType

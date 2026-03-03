@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 /**
  * Reusable keyboard shortcut hook for the entire application
@@ -26,9 +26,16 @@ import { useEffect, useRef } from "react";
  *   shouldHandle: (event) => !event.target.closest('.no-shortcuts')
  * });
  */
+interface KeyboardShortcutOptions {
+  enabled?: boolean;
+  context?: string;
+  priority?: number;
+  shouldHandle?: ((event: KeyboardEvent) => boolean) | null;
+}
+
 export const useKeyboardShortcuts = (
-  shortcuts = {},
-  { enabled = true, context = "global", priority = 0, shouldHandle = null } = {}
+  shortcuts: Record<string, (event: KeyboardEvent) => any> = {},
+  { enabled = true, context = "global", priority = 0, shouldHandle = null }: KeyboardShortcutOptions = {}
 ) => {
   // Use ref to avoid recreating handler on every render
   const shortcutsRef = useRef(shortcuts);
@@ -43,7 +50,7 @@ export const useKeyboardShortcuts = (
   useEffect(() => {
     if (!enabled) return;
 
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       // Skip if user is typing in an input field
       if (isTypingInInput(event.target)) {
         return;
@@ -101,12 +108,13 @@ export const useKeyboardShortcuts = (
  * @param {HTMLElement} target - Event target element
  * @returns {boolean} True if typing in input
  */
-function isTypingInInput(target) {
+function isTypingInInput(target: EventTarget | null) {
   if (!target) return false;
 
-  const tagName = target.tagName;
+  const el = target as HTMLElement;
+  const tagName = el.tagName;
   const isInput = tagName === "INPUT" || tagName === "TEXTAREA";
-  const isContentEditable = target.isContentEditable;
+  const isContentEditable = el.isContentEditable;
   const isButton = tagName === "BUTTON";
 
   // Allow Space on buttons (for activation)
@@ -121,7 +129,7 @@ function isTypingInInput(target) {
  * @param {KeyboardEvent} event - Keyboard event
  * @returns {string} Key combination string (e.g., "ctrl+shift+a", "space", "shift+>")
  */
-function buildKeyCombo(event) {
+function buildKeyCombo(event: KeyboardEvent) {
   const parts = [];
 
   // Normalize key name first
@@ -152,9 +160,9 @@ function buildKeyCombo(event) {
  * @param {string} key - Raw key from event.key
  * @returns {string} Normalized key name
  */
-function normalizeKey(key) {
+function normalizeKey(key: string) {
   // Map of special keys to normalized names
-  const keyMap = {
+  const keyMap: Record<string, string> = {
     " ": "space",
     ArrowUp: "up",
     ArrowDown: "down",
@@ -184,14 +192,14 @@ function normalizeKey(key) {
  * @param {Object} options - Configuration options
  */
 export const useVideoPlayerShortcuts = (
-  playerRef,
-  shortcuts = {},
-  options = {}
+  playerRef: React.RefObject<unknown>,
+  shortcuts: Record<string, (event: KeyboardEvent) => unknown> = {},
+  options: KeyboardShortcutOptions = {}
 ) => {
   useKeyboardShortcuts(shortcuts, {
     ...options,
     context: "video-player",
-    shouldHandle: (event) => {
+    shouldHandle: (event: KeyboardEvent) => {
       // Only handle if player exists and is ready
       if (!playerRef.current) return false;
 

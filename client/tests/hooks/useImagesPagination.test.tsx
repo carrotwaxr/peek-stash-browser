@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { useImagesPagination } from "../../src/hooks/useImagesPagination";
 
 describe("useImagesPagination", () => {
-  const createMockFetchImages = (images = [], count = 0) => {
+  const createMockFetchImages = (images: unknown[] = [], count = 0) => {
     return vi.fn().mockResolvedValue({ images, count });
   };
 
@@ -17,7 +17,7 @@ describe("useImagesPagination", () => {
         useImagesPagination({
           fetchImages,
           perPage: 10,
-        })
+        } as any)
       );
 
       await waitFor(() => {
@@ -38,7 +38,7 @@ describe("useImagesPagination", () => {
             fetchImages,
             perPage: 10,
             dependencies: [dep],
-          }),
+          } as any),
         { initialProps: { dep: "value1" } }
       );
 
@@ -61,7 +61,7 @@ describe("useImagesPagination", () => {
         useImagesPagination({
           fetchImages,
           perPage: 10,
-        })
+        } as any)
       );
 
       await waitFor(() => {
@@ -153,7 +153,7 @@ describe("useImagesPagination", () => {
         useImagesPagination({
           fetchImages,
           perPage: 10,
-        })
+        } as any)
       );
 
       await waitFor(() => {
@@ -179,7 +179,7 @@ describe("useImagesPagination", () => {
         useImagesPagination({
           fetchImages,
           perPage: 10,
-        })
+        } as any)
       );
 
       await waitFor(() => {

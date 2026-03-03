@@ -4,17 +4,45 @@ import {
   useContext,
   useEffect,
   useReducer,
+  type Dispatch,
 } from "react";
 import { apiPost } from "../api";
-import { initialState, scenePlayerReducer } from "./scenePlayerReducer";
+import { initialState, scenePlayerReducer, type ScenePlayerReducerState } from "./scenePlayerReducer";
 import { useConfig } from "./ConfigContext";
 import { getEntityPath } from "../utils/entityLinks";
 
-const ScenePlayerContext = createContext(null);
+// Use the reducer's state type directly
+type ScenePlayerState = ScenePlayerReducerState;
+
+interface ScenePlayerContextValue extends ScenePlayerState {
+  shouldResume: boolean;
+  dispatch: Dispatch<{ type: string; payload?: unknown }>;
+  loadScene: (sceneId: string, instanceId?: string | null) => Promise<void>;
+  incrementOCounter: () => Promise<void>;
+  nextScene: () => void;
+  prevScene: () => void;
+  gotoSceneIndex: (index: number, shouldAutoplay?: boolean) => void;
+  toggleAutoplayNext: () => void;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+}
+
+const ScenePlayerContext = createContext<ScenePlayerContextValue | null>(null);
 
 // ============================================================================
 // PROVIDER
 // ============================================================================
+
+interface ScenePlayerProviderProps {
+  children: React.ReactNode;
+  sceneId: string;
+  instanceId?: string | null;
+  playlist?: Record<string, unknown> | null;
+  shouldResume?: boolean;
+  compatibility?: Record<string, unknown> | null;
+  initialQuality?: string;
+  initialShouldAutoplay?: boolean;
+}
 
 export function ScenePlayerProvider({
   children,
@@ -25,8 +53,8 @@ export function ScenePlayerProvider({
   compatibility = null,
   initialQuality = "direct",
   initialShouldAutoplay = false,
-}) {
-  const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
+}: ScenePlayerProviderProps) {
+  const [state, dispatch] = useReducer(scenePlayerReducer as React.Reducer<ScenePlayerState, any>, initialState);
   const { hasMultipleInstances } = useConfig();
 
   // Initialize context from props
@@ -35,7 +63,7 @@ export function ScenePlayerProvider({
       type: "INITIALIZE",
       payload: {
         playlist,
-        currentIndex: playlist?.currentIndex || 0,
+        currentIndex: (playlist as Record<string, unknown> | null)?.currentIndex || 0,
         compatibility,
         initialQuality,
         initialShouldAutoplay,
@@ -47,18 +75,20 @@ export function ScenePlayerProvider({
   // ACTION CREATORS (with side effects)
   // ============================================================================
 
-  const loadScene = useCallback(async (sceneIdToLoad, sceneInstanceId) => {
+  const loadScene = useCallback(async (sceneIdToLoad: string, sceneInstanceId?: string | null) => {
     dispatch({ type: "LOAD_SCENE_START" });
     try {
-      const requestBody = {
+      const requestBody: Record<string, unknown> = {
         ids: [sceneIdToLoad],
       };
       // Include instance_id for disambiguation when multiple instances exist
       if (sceneInstanceId) {
         requestBody.scene_filter = { instance_id: sceneInstanceId };
       }
-      const data = await apiPost("/library/scenes", requestBody);
-      const scene = data?.findScenes?.scenes?.[0];
+      const data = await apiPost<Record<string, unknown>>("/library/scenes", requestBody);
+      const findScenes = data?.findScenes as Record<string, unknown> | undefined;
+      const scenes = findScenes?.scenes as Array<Record<string, unknown>> | undefined;
+      const scene = scenes?.[0];
 
       if (!scene) {
         throw new Error("Scene not found");
@@ -103,7 +133,7 @@ export function ScenePlayerProvider({
     dispatch({ type: "PREV_SCENE" });
   }, []);
 
-  const gotoSceneIndex = useCallback((index, shouldAutoplay = false) => {
+  const gotoSceneIndex = useCallback((index: number, shouldAutoplay = false) => {
     dispatch({
       type: "GOTO_SCENE_INDEX",
       payload: { index, shouldAutoplay },
@@ -130,9 +160,9 @@ export function ScenePlayerProvider({
   // Load scene when sceneId or currentIndex changes
   useEffect(() => {
     const playlistScene = state.playlist?.scenes?.[state.currentIndex];
-    const effectiveSceneId = playlistScene?.sceneId || sceneId;
+    const effectiveSceneId = (playlistScene?.sceneId as string | undefined) || sceneId;
     // For playlists, get instanceId from playlist entry; otherwise use prop
-    const effectiveInstanceId = playlistScene?.instanceId || instanceId;
+    const effectiveInstanceId = (playlistScene?.instanceId as string | undefined) || instanceId;
 
     if (effectiveSceneId) {
       loadScene(effectiveSceneId, effectiveInstanceId);

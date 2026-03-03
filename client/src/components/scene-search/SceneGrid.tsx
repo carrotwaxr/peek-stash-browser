@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare, LucideEyeOff, LucidePlus } from "lucide-react";
+import type { NormalizedScene } from "@peek/shared-types";
 import { getGridClasses } from "../../constants/grids";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
@@ -15,6 +16,26 @@ import {
   SceneCard,
   SkeletonSceneCard,
 } from "../ui/index";
+
+interface Props {
+  scenes: NormalizedScene[];
+  density?: string;
+  loading?: boolean;
+  error?: string | Error | null;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
+  onSceneClick?: (scene: NormalizedScene) => void;
+  onHideSuccess?: (sceneId: string, entityType: string) => void;
+  fromPageTitle?: string;
+  emptyMessage?: string;
+  emptyDescription?: string;
+  enableKeyboard?: boolean;
+  isTVMode?: boolean;
+  tvGridZoneActive?: boolean;
+  gridNavigation?: unknown;
+  gridItemProps?: ((index: number) => Record<string, unknown>) | null;
+}
 
 const SceneGrid = ({
   scenes,
@@ -34,16 +55,16 @@ const SceneGrid = ({
   tvGridZoneActive = false,
   gridNavigation = null, // eslint-disable-line @typescript-eslint/no-unused-vars
   gridItemProps = null,
-}) => {
-  const gridRef = useRef();
+}: Props) => {
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("scenes");
   const gridClasses = getGridClasses("scene", density);
 
   // Selection state (always enabled, no mode toggle)
-  const [selectedScenes, setSelectedScenes] = useState([]);
+  const [selectedScenes, setSelectedScenes] = useState<NormalizedScene[]>([]);
 
   // Selection handlers
-  const handleToggleSelect = (scene) => {
+  const handleToggleSelect = (scene: NormalizedScene) => {
     setSelectedScenes((prev) => {
       const isSelected = prev.some((s) => s.id === scene.id);
       if (isSelected) {
@@ -70,14 +91,14 @@ const SceneGrid = ({
   const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
     selectedScenes,
     onComplete: handleClearSelection,
-    onHideSuccess,
+    onHideSuccess: onHideSuccess as ((id: string | number, entityType: string) => void) | undefined,
   });
 
   // Set initial focus when grid loads and zone is active (only in TV mode)
   useEffect(() => {
     if (tvGridZoneActive && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
-      const firstFocusable = gridRef.current.querySelector('[tabindex="0"]');
+      const firstFocusable = gridRef.current.querySelector('[tabindex="0"]') as HTMLElement | null;
       if (firstFocusable) {
         firstFocusable.focus();
       }
@@ -85,7 +106,7 @@ const SceneGrid = ({
   }, [tvGridZoneActive, scenes]);
 
   // Clear selections when page changes - wrapped in handler instead of effect
-  const handlePageChange = (page) => {
+  const handlePageChange = (page: number) => {
     setSelectedScenes([]);
     onPageChange?.(page);
   };
@@ -101,7 +122,7 @@ const SceneGrid = ({
   }
 
   if (error) {
-    return <ErrorMessage message={error} />;
+    return <ErrorMessage error={error} />;
   }
 
   if (!scenes || scenes.length === 0) {
@@ -149,7 +170,7 @@ const SceneGrid = ({
 
       {/* Grid */}
       <div ref={gridRef} className={gridClasses}>
-        {scenes.map((scene, index) => {
+        {scenes.map((scene: NormalizedScene, index: number) => {
           // Use gridItemProps if provided (TV mode with zone navigation), otherwise use defaults
           const itemProps = gridItemProps ? gridItemProps(index) : {};
           return (
@@ -200,14 +221,7 @@ const SceneGrid = ({
                 </Button>
                 <AddToPlaylistButton
                   sceneIds={selectedScenes.map((s) => s.id)}
-                  buttonText={
-                    <span>
-                      <span className="hidden sm:inline">
-                        Add {selectedScenes.length} to Playlist
-                      </span>
-                      <span className="sm:hidden">Add to Playlist</span>
-                    </span>
-                  }
+                  buttonText={`Add ${selectedScenes.length} to Playlist`}
                   icon={<LucidePlus className="w-4 h-4" />}
                   dropdownPosition="above"
                   onSuccess={handleClearSelection}
