@@ -316,10 +316,10 @@ Both client and server enforce coverage thresholds in CI. If coverage drops belo
 
 | Metric | Client | Server |
 |--------|--------|--------|
-| Statements | 33% | 53% |
-| Branches | 75% | 71% |
-| Functions | 37% | 62% |
-| Lines | 33% | 53% |
+| Statements | 35% | 63% |
+| Branches | 76% | 72% |
+| Functions | 42% | 68% |
+| Lines | 35% | 63% |
 
 ## Running Tests
 

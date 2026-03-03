@@ -34,6 +34,8 @@ services:
       # Hot reloading - mount source code
       - ./client:/app
       - /app/node_modules
+      # Shared types package (referenced by tsconfig.json)
+      - ./shared:/shared:ro
     depends_on:
       - peek-server
     networks:
