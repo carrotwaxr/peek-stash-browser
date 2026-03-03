@@ -3,7 +3,7 @@
  * @param {number} seconds - Duration in seconds
  * @returns {string} Formatted duration string
  */
-export const formatDuration = (seconds) => {
+export const formatDuration = (seconds: number | null | undefined) => {
   if (seconds === null || seconds === undefined || isNaN(seconds)) {
     return "-";
   }
@@ -24,7 +24,7 @@ export const formatDuration = (seconds) => {
  * @param {number} bytes - File size in bytes
  * @returns {string} Formatted file size (KB/MB/GB)
  */
-export const formatFileSize = (bytes) => {
+export const formatFileSize = (bytes: number | null | undefined) => {
   if (bytes === null || bytes === undefined || isNaN(bytes)) {
     return "-";
   }
@@ -46,7 +46,7 @@ export const formatFileSize = (bytes) => {
  * @param {string} dateStr - ISO date string or YYYY-MM-DD
  * @returns {string} Formatted date string
  */
-export const formatDate = (dateStr) => {
+export const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) {
     return "-";
   }
@@ -67,7 +67,7 @@ export const formatDate = (dateStr) => {
  * @param {string} birthdate - ISO date string or YYYY-MM-DD
  * @returns {number|string} Age in years or "-" if invalid
  */
-export const calculateAge = (birthdate) => {
+export const calculateAge = (birthdate: string | null | undefined) => {
   if (!birthdate) {
     return "-";
   }

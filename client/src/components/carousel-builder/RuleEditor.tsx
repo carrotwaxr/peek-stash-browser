@@ -3,17 +3,43 @@ import { Button } from "../ui/index";
 import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig";
 import SearchableSelect from "../ui/SearchableSelect";
 
+interface CarouselRule {
+  id: string;
+  filterKey: string;
+  value: unknown;
+  modifier?: string;
+  depth?: number;
+}
+
+interface FilterDefinition {
+  key: string;
+  label: string;
+  type: string;
+  multi?: boolean;
+  entityType?: string;
+  modifierOptions?: Array<{ value: string; label: string }>;
+  defaultModifier?: string;
+  supportsHierarchy?: boolean;
+  options?: Array<{ value: string; label: string }>;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  valueUnit?: string;
+}
+
+interface Props {
+  rule: CarouselRule;
+  usedFilterKeys: Set<string>;
+  onChange: (updates: Partial<CarouselRule>) => void;
+  onRemove: () => void;
+}
+
 /**
  * RuleEditor Component
  * Edits a single filter rule for the carousel builder.
  * Renders appropriate input based on filter type.
- *
- * @param {Object} rule - The rule being edited
- * @param {Set} usedFilterKeys - Keys already used by other rules
- * @param {function} onChange - Callback when rule changes
- * @param {function} onRemove - Callback to remove this rule
  */
-const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }) => {
+const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
   const filterDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === rule.filterKey);
 
   // Get available filters (current + unused)
@@ -21,7 +47,7 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }) => {
     (f) => f.key === rule.filterKey || !usedFilterKeys.has(f.key)
   );
 
-  const handleFilterChange = (newFilterKey) => {
+  const handleFilterChange = (newFilterKey: string) => {
     const newDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === newFilterKey);
     if (!newDef) return;
 
@@ -133,11 +159,17 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }) => {
   );
 };
 
+interface RuleValueInputProps {
+  filterDef: FilterDefinition | undefined;
+  rule: CarouselRule;
+  onChange: (updates: Partial<CarouselRule>) => void;
+}
+
 /**
  * RuleValueInput Component
  * Renders the appropriate input for the filter type.
  */
-const RuleValueInput = ({ filterDef, rule, onChange }) => {
+const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
   if (!filterDef) {
     return <span style={{ color: "var(--text-secondary)" }}>Unknown filter</span>;
   }
@@ -146,8 +178,8 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
     case "searchable-select":
       return (
         <SearchableSelect
-          entityType={filterDef.entityType}
-          value={rule.value}
+          entityType={filterDef.entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
+          value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}
           multi={filterDef.multi}
           placeholder={`Select ${filterDef.label.toLowerCase()}...`}
@@ -155,7 +187,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
       );
 
     case "range":
-      return <RangeInput filterDef={filterDef} value={rule.value} onChange={(val) => onChange({ value: val })} />;
+      return <RangeInput filterDef={filterDef} value={rule.value as { min?: number; max?: number } | undefined} onChange={(val) => onChange({ value: val })} />;
 
     case "checkbox":
       return (
@@ -169,7 +201,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
     case "select":
       return (
         <select
-          value={rule.value || ""}
+          value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           className="w-full px-3 py-2 rounded-lg border text-sm"
           style={{
@@ -191,7 +223,7 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
       return (
         <input
           type="text"
-          value={rule.value || ""}
+          value={(rule.value as string) || ""}
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder={filterDef.placeholder || "Enter value..."}
           className="w-full px-3 py-2 rounded-lg border text-sm"
@@ -204,24 +236,30 @@ const RuleValueInput = ({ filterDef, rule, onChange }) => {
       );
 
     case "date-range":
-      return <DateRangeInput value={rule.value} onChange={(val) => onChange({ value: val })} />;
+      return <DateRangeInput value={rule.value as { min?: string; max?: string } | undefined} onChange={(val) => onChange({ value: val })} />;
 
     default:
       return <span style={{ color: "var(--text-secondary)" }}>Unsupported type: {filterDef.type}</span>;
   }
 };
 
+interface RangeInputProps {
+  filterDef: FilterDefinition;
+  value: { min?: number; max?: number } | undefined;
+  onChange: (value: { min?: number; max?: number }) => void;
+}
+
 /**
  * RangeInput Component
  * Min/max input for numeric range filters.
  */
-const RangeInput = ({ filterDef, value, onChange }) => {
-  const handleMinChange = (e) => {
+const RangeInput = ({ filterDef, value, onChange }: RangeInputProps) => {
+  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const min = e.target.value === "" ? undefined : parseInt(e.target.value);
     onChange({ ...value, min });
   };
 
-  const handleMaxChange = (e) => {
+  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const max = e.target.value === "" ? undefined : parseInt(e.target.value);
     onChange({ ...value, max });
   };
@@ -266,17 +304,22 @@ const RangeInput = ({ filterDef, value, onChange }) => {
   );
 };
 
+interface DateRangeInputProps {
+  value: { min?: string; max?: string } | undefined;
+  onChange: (value: { min?: string; max?: string }) => void;
+}
+
 /**
  * DateRangeInput Component
  * Date pickers for date range filters.
  */
-const DateRangeInput = ({ value, onChange }) => {
-  const handleFromChange = (e) => {
+const DateRangeInput = ({ value, onChange }: DateRangeInputProps) => {
+  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const min = e.target.value || undefined;
     onChange({ ...value, min });
   };
 
-  const handleToChange = (e) => {
+  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const max = e.target.value || undefined;
     onChange({ ...value, max });
   };

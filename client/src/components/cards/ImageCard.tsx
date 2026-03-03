@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import type { NormalizedImage } from "@peek/shared-types";
 import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -7,10 +8,18 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 
-/**
- * Format resolution string from width/height
- */
-const formatResolution = (width, height) => {
+interface Props {
+  image: NormalizedImage;
+  onClick?: (image: NormalizedImage) => void;
+  fromPageTitle?: string;
+  tabIndex?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onOCounterChange?: (entityId: string, count: number) => void;
+  onRatingChange?: (entityId: string, rating: number) => void;
+  onFavoriteChange?: (entityId: string, value: boolean) => void;
+}
+
+const formatResolution = (width: number | null, height: number | null) => {
   if (!width || !height) return null;
   if (height >= 2160) return "4K";
   if (height >= 1440) return "1440p";
@@ -24,13 +33,13 @@ const formatResolution = (width, height) => {
  * ImageCard - Card for displaying image entities
  * Supports onClick for lightbox integration
  */
-const ImageCard = forwardRef(
+const ImageCard = forwardRef<HTMLDivElement, Props>(
   ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
     const { getSettings } = useCardDisplaySettings();
     const imageSettings = getSettings("image");
     const { hasMultipleInstances } = useConfig();
     // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
+    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image as unknown as Record<string, unknown>);
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -57,7 +66,7 @@ const ImageCard = forwardRef(
       effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
-          entities={effectivePerformers}
+          entities={effectivePerformers as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Performers"
           parentInstanceId={image.instanceId}
         />
@@ -67,7 +76,7 @@ const ImageCard = forwardRef(
       effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
-          entities={effectiveTags}
+          entities={effectiveTags as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Tags"
           parentInstanceId={image.instanceId}
         />
@@ -78,7 +87,7 @@ const ImageCard = forwardRef(
       galleriesCount > 0 && (
         <TooltipEntityGrid
           entityType="gallery"
-          entities={galleries}
+          entities={galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
           title="Galleries"
           parentInstanceId={image.instanceId}
         />
@@ -128,7 +137,7 @@ const ImageCard = forwardRef(
 
     // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
     const handleClick = onClick
-      ? (e) => {
+      ? (e: React.MouseEvent<HTMLDivElement>) => {
           e.preventDefault();
           onClick(image);
         }
@@ -139,15 +148,15 @@ const ImageCard = forwardRef(
         ref={ref}
         entityType="image"
         imagePath={image.paths?.thumbnail || image.paths?.image}
-        title={getImageTitle(image)}
+        title={getImageTitle(image as unknown as Record<string, unknown>) as React.ReactNode}
         subtitle={subtitle}
         description={image.details}
         onClick={handleClick}
-        linkTo={onClick ? undefined : getEntityPath('image', image, hasMultipleInstances)}
+        linkTo={onClick ? undefined : getEntityPath('image', image as unknown as Record<string, unknown>, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard }}
+        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard as boolean | undefined }}
         ratingControlsProps={
           image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
             ? {
@@ -160,10 +169,10 @@ const ImageCard = forwardRef(
                 onOCounterChange,
                 onRatingChange,
                 onFavoriteChange,
-                showRating: imageSettings.showRating,
-                showFavorite: imageSettings.showFavorite,
-                showOCounter: imageSettings.showOCounter,
-                showMenu: imageSettings.showMenu,
+                showRating: imageSettings.showRating as boolean | undefined,
+                showFavorite: imageSettings.showFavorite as boolean | undefined,
+                showOCounter: imageSettings.showOCounter as boolean | undefined,
+                showMenu: imageSettings.showMenu as boolean | undefined,
               }
             : undefined
         }

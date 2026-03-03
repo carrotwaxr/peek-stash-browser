@@ -35,20 +35,20 @@ import { useVideoPlayer } from "./useVideoPlayer";
 const VideoPlayer = () => {
   const location = useLocation();
 
-  const videoRef = useRef(null); // Container div (Video.js element appended here)
-  const playerRef = useRef(null); // Video.js player instance
+  const videoRef = useRef<HTMLDivElement | null>(null); // Container div (Video.js element appended here)
+  const playerRef = useRef<any>(null); // Video.js player instance
   const hasResumedRef = useRef(false); // Prevent double-resume
-  const initialResumeTimeRef = useRef(null); // Capture resume time once
+  const initialResumeTimeRef = useRef<number | null>(null); // Capture resume time once
 
   const [enableCast, setEnableCast] = useState(true); // Default to true
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20); // Default to 20%
-  const [clips, setClips] = useState([]);
+  const [clips, setClips] = useState<any[]>([]);
 
   // Fetch user settings for cast preference and playback thresholds
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const data = await apiGet("/user/settings");
+        const data: any = await apiGet("/user/settings");
         setEnableCast(data.settings.enableCast !== false);
         setMinimumPlayPercent(data.settings.minimumPlayPercent ?? 20);
       } catch (error) {
@@ -63,10 +63,10 @@ const VideoPlayer = () => {
   // CONTEXT
   // ============================================================================
   const {
-    scene,
-    video,
+    scene: rawScene,
+    video: _video,
     videoLoading,
-    sessionId,
+    sessionId: _sessionId,
     quality,
     isInitializing,
     isAutoFallback,
@@ -74,15 +74,17 @@ const VideoPlayer = () => {
     shouldAutoplay,
     playlist,
     currentIndex,
-    _shuffle,
-    _repeat,
-    _shuffleHistory,
+    shuffle: _shuffle,
+    repeat: _repeat,
+    shuffleHistory: _shuffleHistory,
     dispatch,
     nextScene,
     prevScene,
   } = useScenePlayer();
 
-  const firstFile = scene?.files?.[0];
+  const scene = rawScene as any;
+
+  const firstFile = (scene?.files as any[])?.[0];
 
   // Calculate aspect ratio from actual video dimensions
   const videoWidth = firstFile?.width || 1920;
@@ -97,7 +99,7 @@ const VideoPlayer = () => {
         return;
       }
       try {
-        const response = await getClipsForScene(scene.id, scene.instanceId, true);
+        const response: any = await getClipsForScene(scene.id as string, scene.instanceId as string, true);
         setClips(response.clips || []);
       } catch (err) {
         console.error("Failed to fetch clips for timeline", err);
@@ -119,7 +121,7 @@ const VideoPlayer = () => {
     markersPlugin.clearMarkers();
 
     // Filter to only generated clips and add to timeline
-    const generatedClips = clips.filter((c) => c.isGenerated);
+    const generatedClips = clips.filter((c: any) => c.isGenerated);
     if (generatedClips.length > 0) {
       markersPlugin.addClipMarkers(generatedClips);
     }
@@ -143,8 +145,6 @@ const VideoPlayer = () => {
     videoRef,
     playerRef,
     scene,
-    video,
-    sessionId,
     quality,
     isAutoFallback,
     ready,
@@ -179,7 +179,7 @@ const VideoPlayer = () => {
 
   // Listen for seekToTime events (e.g., from ClipList clicks)
   useEffect(() => {
-    const handleSeekToTime = (event) => {
+    const handleSeekToTime = (event: any) => {
       const { seconds } = event.detail;
       if (playerRef.current && typeof seconds === "number") {
         playerRef.current.currentTime(seconds);

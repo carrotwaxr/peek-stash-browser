@@ -1,20 +1,28 @@
-// client/src/components/timeline/TimelineControls.jsx
+// client/src/components/timeline/TimelineControls.tsx
 import { memo } from "react";
 
-const ZOOM_LABELS = {
+const ZOOM_LABELS: Record<string, string> = {
   years: "Years",
   months: "Months",
   weeks: "Weeks",
   days: "Days",
 };
 
+interface Props {
+  zoomLevel: string;
+  onZoomLevelChange: (level: string) => void;
+  zoomLevels?: string[];
+  variant?: "buttons" | "dropdown";
+  className?: string;
+}
+
 function TimelineControls({
   zoomLevel,
   onZoomLevelChange,
   zoomLevels = ["years", "months", "weeks", "days"],
-  variant = "buttons", // "buttons" (desktop) or "dropdown" (mobile)
+  variant = "buttons",
   className = "",
-}) {
+}: Props) {
   // Dropdown variant for mobile - saves horizontal space
   if (variant === "dropdown") {
     return (
@@ -27,7 +35,7 @@ function TimelineControls({
           color: "var(--text-primary)",
           border: "1px solid var(--border-color)",
           "--tw-ring-color": "var(--accent-primary)",
-        }}
+        } as React.CSSProperties}
         aria-label="Timeline zoom level"
       >
         {zoomLevels.map((level) => (
@@ -59,7 +67,7 @@ function TimelineControls({
             color:
               zoomLevel === level ? "white" : "var(--text-secondary)",
             "--tw-ring-color": "var(--accent-primary)",
-          }}
+          } as React.CSSProperties}
           aria-pressed={zoomLevel === level}
         >
           {ZOOM_LABELS[level] || level}

@@ -18,9 +18,10 @@ vi.mock("../../src/api", () => ({
 
 import { useAuth } from "../../src/hooks/useAuth";
 import { apiGet } from "../../src/api";
+import type { Mock } from "vitest";
 
-const useAuthMock = vi.mocked(useAuth);
-const apiGetMock = vi.mocked(apiGet);
+const useAuthMock = useAuth as unknown as Mock;
+const apiGetMock = apiGet as unknown as Mock;
 
 describe("useUserStats", () => {
   const mockStats = {
@@ -150,9 +151,9 @@ describe("useUserStats", () => {
       apiGetMock.mockResolvedValue(mockStats);
 
       const { rerender } = renderHook(
-        ({ sortBy }) => useUserStats({ sortBy }),
+        ({ sortBy }: { sortBy: string }) => useUserStats({ sortBy } as any),
         {
-          initialProps: { sortBy: "engagement" as const },
+          initialProps: { sortBy: "engagement" },
           wrapper: createQueryWrapper(),
         },
       );
@@ -161,7 +162,7 @@ describe("useUserStats", () => {
         expect(apiGetMock).toHaveBeenCalledWith("/user-stats");
       });
 
-      rerender({ sortBy: "oCount" as const });
+      rerender({ sortBy: "oCount" });
 
       await waitFor(() => {
         expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=oCount");

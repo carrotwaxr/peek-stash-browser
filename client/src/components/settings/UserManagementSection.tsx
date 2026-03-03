@@ -8,28 +8,55 @@ import SyncFromStashModal from "./SyncFromStashModal";
 import UserEditModal from "./UserEditModal";
 import { Button, Paper } from "../ui/index";
 
+interface UserItem {
+  id: number;
+  username: string;
+  role: string;
+  syncToStash?: boolean;
+  createdAt: string;
+  groups?: Array<{ id: number; name: string }>;
+}
+
+interface GroupItem {
+  id: number;
+  name: string;
+  description?: string;
+  memberCount?: number;
+  canShare?: boolean;
+  canDownloadFiles?: boolean;
+  canDownloadPlaylists?: boolean;
+}
+
+interface Props {
+  users: UserItem[];
+  currentUser: UserItem | null;
+  onUsersChanged: () => void;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
+}
+
 const UserManagementSection = ({
   users,
   currentUser,
   onUsersChanged,
   onMessage,
   onError,
-}) => {
+}: Props) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [syncTargetUser, setSyncTargetUser] = useState(null);
-  const [groups, setGroups] = useState([]);
+  const [syncTargetUser, setSyncTargetUser] = useState<UserItem | null>(null);
+  const [groups, setGroups] = useState<GroupItem[]>([]);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingGroup, setEditingGroup] = useState<GroupItem | null>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
 
   // Load groups on mount
   const loadGroups = async () => {
     try {
       const response = await getGroups();
-      setGroups(response.groups || []);
+      setGroups((response.groups as GroupItem[]) || []);
     } catch (err) {
-      onError(err.message || "Failed to load groups");
+      onError((err as Error).message || "Failed to load groups");
     }
   };
 
@@ -44,23 +71,23 @@ const UserManagementSection = ({
     setShowGroupModal(true);
   };
 
-  const handleEditGroup = (group) => {
+  const handleEditGroup = (group: GroupItem) => {
     setEditingGroup(group);
     setShowGroupModal(true);
   };
 
-  const handleDeleteGroup = async (group) => {
+  const handleDeleteGroup = async (group: { id: number; name: string }) => {
     if (!confirm(`Are you sure you want to delete the group "${group.name}"?\n\nThis will remove the group from all members but will not delete any users.`)) {
       return;
     }
 
     try {
-      await deleteGroup(group.id);
+      await deleteGroup(String(group.id));
       onMessage(`Group "${group.name}" deleted successfully`);
       loadGroups();
       onUsersChanged(); // Refresh users to update their group badges
     } catch (err) {
-      onError(err.message || "Failed to delete group");
+      onError((err as Error).message || "Failed to delete group");
     }
   };
 
@@ -77,7 +104,7 @@ const UserManagementSection = ({
     onUsersChanged(); // Refresh users to update their group badges
   };
 
-  const renderPermissionBadges = (group) => {
+  const renderPermissionBadges = (group: GroupItem) => {
     const badges = [];
 
     if (group?.canShare) {
@@ -142,7 +169,7 @@ const UserManagementSection = ({
     return <div className="flex flex-wrap gap-1">{badges}</div>;
   };
 
-  const toggleSyncToStash = async (userId, username, currentSyncToStash) => {
+  const toggleSyncToStash = async (userId: number, username: string, currentSyncToStash: boolean | undefined) => {
     const newSyncToStash = !currentSyncToStash;
 
     try {
@@ -158,8 +185,8 @@ const UserManagementSection = ({
     }
   };
 
-  const openSyncModal = (user) => {
-    setSyncTargetUser(user);
+  const openSyncModal = (targetUser: UserItem) => {
+    setSyncTargetUser(targetUser);
     setShowSyncModal(true);
   };
 

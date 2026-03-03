@@ -1,16 +1,31 @@
+import type { ReactNode } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { getColumnSortField } from "../../config/tableColumns";
 
+interface ColumnDef {
+  id: string;
+  label: string;
+  sortable: boolean;
+  width: string;
+  mandatory: boolean;
+}
+
+interface SortState {
+  field: string;
+  direction: "ASC" | "DESC";
+}
+
+interface Props {
+  columns: ColumnDef[];
+  sort?: SortState | null;
+  onSort?: (field: string, direction: "ASC" | "DESC") => void;
+  onColumnContextMenu?: (columnId: string, event: React.MouseEvent) => void;
+  entityType: string;
+  columnsPopover?: ReactNode;
+}
+
 /**
  * TableHeader - Renders a table header row with sortable columns
- *
- * @param {Object} props
- * @param {Array<{id: string, label: string, sortable: boolean, width: string, mandatory: boolean}>} props.columns - Column definitions
- * @param {Object} props.sort - Current sort state { field, direction }
- * @param {Function} props.onSort - Called when sortable header clicked (field, direction)
- * @param {Function} props.onColumnContextMenu - Called on right-click for non-mandatory columns (columnId, event)
- * @param {string} props.entityType - Entity type for sort field mapping
- * @param {React.ReactNode} props.columnsPopover - Optional columns config popover to render in first header cell
  */
 const TableHeader = ({
   columns,
@@ -19,17 +34,17 @@ const TableHeader = ({
   onColumnContextMenu,
   entityType,
   columnsPopover,
-}) => {
+}: Props) => {
   /**
    * Handle click on a sortable column header
    * - If clicking the same column that's sorted: toggle direction
    * - If clicking a different column: default to DESC
    */
-  const handleHeaderClick = (column) => {
+  const handleHeaderClick = (column: ColumnDef) => {
     if (!column.sortable || !onSort) return;
 
     const sortField = getColumnSortField(column.id, entityType);
-    let newDirection;
+    let newDirection: "ASC" | "DESC";
 
     if (sort?.field === sortField) {
       // Toggle direction: DESC -> ASC, ASC -> DESC
@@ -46,7 +61,7 @@ const TableHeader = ({
    * Handle right-click on a column header
    * Only triggers for non-mandatory columns
    */
-  const handleContextMenu = (column, event) => {
+  const handleContextMenu = (column: ColumnDef, event: React.MouseEvent) => {
     if (column.mandatory || !onColumnContextMenu) return;
 
     event.preventDefault();
@@ -56,7 +71,7 @@ const TableHeader = ({
   /**
    * Check if a column is the current sort column
    */
-  const isCurrentSortColumn = (column) => {
+  const isCurrentSortColumn = (column: ColumnDef) => {
     if (!sort?.field) return false;
     const sortField = getColumnSortField(column.id, entityType);
     return sort.field === sortField;
@@ -65,10 +80,10 @@ const TableHeader = ({
   /**
    * Render sort indicator icon
    */
-  const renderSortIcon = (column) => {
+  const renderSortIcon = (column: ColumnDef) => {
     if (!column.sortable || !isCurrentSortColumn(column)) return null;
 
-    const Icon = sort.direction === "ASC" ? ArrowUp : ArrowDown;
+    const Icon = sort?.direction === "ASC" ? ArrowUp : ArrowDown;
     return <Icon size={14} className="ml-1.5 inline-block flex-shrink-0" />;
   };
 

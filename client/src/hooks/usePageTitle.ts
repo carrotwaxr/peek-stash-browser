@@ -17,7 +17,11 @@ import { useEffect } from "react";
  * // Detail pages
  * usePageTitle(sceneName);  // Sets "Scene Name - Peek"
  */
-export const usePageTitle = (title = "", options = {}) => {
+interface PageTitleOptions {
+  suffix?: string;
+}
+
+export const usePageTitle = (title = "", options: PageTitleOptions = {}) => {
   const suffix = options.suffix || "Peek";
 
   useEffect(() => {

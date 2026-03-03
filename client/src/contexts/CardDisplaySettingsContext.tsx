@@ -1,19 +1,25 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { apiGet, apiPut } from "../api";
 import { getDefaultSettings } from "../config/entityDisplayConfig";
 
-const CardDisplaySettingsContext = createContext(null);
+interface CardDisplaySettingsContextValue {
+  getSettings: (entityType: string) => Record<string, unknown>;
+  updateSettings: (entityType: string, key: string, value: unknown) => Promise<void>;
+  isLoading: boolean;
+}
 
-export const CardDisplaySettingsProvider = ({ children }) => {
-  const [settings, setSettings] = useState({});
+const CardDisplaySettingsContext = createContext<CardDisplaySettingsContextValue | null>(null);
+
+export const CardDisplaySettingsProvider = ({ children }: { children: React.ReactNode }) => {
+  const [settings, setSettings] = useState<Record<string, Record<string, unknown>>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const data = await apiGet("/user/settings");
+        const data = await apiGet<{ settings: { cardDisplaySettings?: Record<string, Record<string, unknown>> } }>("/user/settings");
         setSettings(data.settings.cardDisplaySettings || {});
       } catch (error) {
         console.error("Failed to load card display settings:", error);
@@ -25,14 +31,14 @@ export const CardDisplaySettingsProvider = ({ children }) => {
   }, []);
 
   // Get settings for a specific entity type (with defaults from shared config)
-  const getSettings = useCallback((entityType) => {
+  const getSettings = useCallback((entityType: string) => {
     const defaults = getDefaultSettings(entityType);
     const entitySettings = settings[entityType] || {};
     return { ...defaults, ...entitySettings };
   }, [settings]);
 
   // Update a specific setting
-  const updateSettings = useCallback(async (entityType, key, value) => {
+  const updateSettings = useCallback(async (entityType: string, key: string, value: unknown) => {
     const newEntitySettings = {
       ...(settings[entityType] || {}),
       [key]: value,

@@ -3,23 +3,43 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { LucideChevronRight, LucideChevronDown, LucideFolder, LucideFolderOpen } from "lucide-react";
 import { buildTagTree } from "../../utils/buildTagTree";
 
+interface TagItem {
+  id: string;
+  name: string;
+  parents?: Array<{ id: string }>;
+  image_path?: string | null;
+}
+
+interface TreeNodeData {
+  id: string;
+  name: string;
+  children?: TreeNodeData[];
+}
+
+interface Props {
+  tags: TagItem[];
+  currentPath: string[];
+  onNavigate: (path: string[]) => void;
+  className?: string;
+}
+
 /**
  * Collapsible tree sidebar for folder view on desktop.
  * Shows tag hierarchy with expand/collapse controls.
  * Features sticky parent breadcrumb for scroll context.
  */
-const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) => {
+const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }: Props) => {
   // Build tree from tags
-  const tree = useMemo(() => buildTagTree(tags, { sortField: "name", sortDirection: "ASC" }), [tags]);
+  const tree = useMemo(() => buildTagTree(tags, { sortField: "name", sortDirection: "ASC" }) as TreeNodeData[], [tags]);
 
   // Create a map of tag IDs to names for breadcrumb display
   const tagNameMap = useMemo(() => {
     const map = new Map();
-    const addToMap = (nodes) => {
+    const addToMap = (nodes: Array<{ id: string; name: string; children?: unknown[] }>) => {
       for (const node of nodes) {
         map.set(node.id, node.name);
-        if (node.children?.length > 0) {
-          addToMap(node.children);
+        if ((node.children?.length ?? 0) > 0) {
+          addToMap(node.children as Array<{ id: string; name: string; children?: unknown[] }>);
         }
       }
     };
@@ -28,8 +48,8 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) =>
   }, [tree]);
 
   // Ref for the sidebar container (for scrolling)
-  const sidebarRef = useRef(null);
-  const scrollContentRef = useRef(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
 
   // Track expanded nodes
   const [expanded, setExpanded] = useState(() => {
@@ -79,7 +99,7 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) =>
     return () => scrollContainer.removeEventListener("scroll", handleScroll);
   }, [currentPath]);
 
-  const toggleExpanded = (tagId) => {
+  const toggleExpanded = (tagId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(tagId)) {
@@ -157,7 +177,17 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) =>
   );
 };
 
-const TreeNode = ({ node, nodePath, depth, expanded, toggleExpanded, currentPath, onNavigate }) => {
+interface TreeNodeProps {
+  node: TreeNodeData;
+  nodePath: string[];
+  depth: number;
+  expanded: Set<string>;
+  toggleExpanded: (tagId: string) => void;
+  currentPath: string[];
+  onNavigate: (path: string[]) => void;
+}
+
+const TreeNode = ({ node, nodePath, depth, expanded, toggleExpanded, currentPath, onNavigate }: TreeNodeProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expanded.has(node.id);
   const isInPath = currentPath.includes(node.id);
@@ -214,7 +244,7 @@ const TreeNode = ({ node, nodePath, depth, expanded, toggleExpanded, currentPath
       {/* Children */}
       {hasChildren && isExpanded && (
         <div>
-          {node.children.map((child) => (
+          {node.children!.map((child) => (
             <TreeNode
               key={child.id}
               node={child}

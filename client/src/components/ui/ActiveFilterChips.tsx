@@ -1,17 +1,29 @@
 import { LucideX } from "lucide-react";
 import Button from "./Button";
 
-/**
- * Display active filters as removable chips/badges
- *
- * @param {Object} props
- * @param {Object} props.filters - Current filter values
- * @param {Array} props.filterOptions - Filter configuration from filterConfig.js
- * @param {Function} props.onRemoveFilter - Callback when a filter is removed
- * @param {Function} props.onChipClick - Callback when a chip body is clicked (receives filter key)
- * @param {Object} props.permanentFilters - Filters that can't be removed
- * @param {Object} props.permanentFiltersMetadata - Display names for permanent filters
- */
+interface FilterOption {
+  key: string;
+  label: string;
+  type: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface PermanentFiltersMetadata {
+  performers?: Array<{ id: string; name: string }>;
+  studios?: Array<{ id: string; name: string }>;
+  tags?: Array<{ id: string; name: string }>;
+  [key: string]: unknown;
+}
+
+interface Props {
+  filters: Record<string, unknown>;
+  filterOptions: FilterOption[];
+  onRemoveFilter: (key: string) => void;
+  onChipClick?: (key: string) => void;
+  permanentFilters?: Record<string, unknown>;
+  permanentFiltersMetadata?: PermanentFiltersMetadata;
+}
+
 const ActiveFilterChips = ({
   filters,
   filterOptions,
@@ -19,8 +31,8 @@ const ActiveFilterChips = ({
   onChipClick,
   permanentFilters = {},
   permanentFiltersMetadata = {},
-}) => {
-  const getFilterLabel = (filterKey, filterValue, filterConfig) => {
+}: Props) => {
+  const getFilterLabel = (_filterKey: string, filterValue: unknown, filterConfig: FilterOption) => {
     const { label, type, options } = filterConfig;
 
     // Skip undefined or empty values
@@ -38,7 +50,7 @@ const ActiveFilterChips = ({
 
       case "select": {
         const selectedOption = options?.find(
-          (opt) => opt.value === filterValue
+          (opt: { value: string; label: string }) => opt.value === filterValue
         );
         return selectedOption
           ? `${label}: ${selectedOption.label}`
@@ -60,25 +72,29 @@ const ActiveFilterChips = ({
         return filterValue ? `${label}: selected` : null;
       }
 
-      case "range":
-        if (!filterValue.min && !filterValue.max) return null;
-        if (filterValue.min && filterValue.max) {
-          return `${label}: ${filterValue.min} - ${filterValue.max}`;
+      case "range": {
+        const range = filterValue as { min?: string | number; max?: string | number } | null;
+        if (!range?.min && !range?.max) return null;
+        if (range.min && range.max) {
+          return `${label}: ${range.min} - ${range.max}`;
         }
-        if (filterValue.min) {
-          return `${label}: ≥ ${filterValue.min}`;
+        if (range.min) {
+          return `${label}: ≥ ${range.min}`;
         }
-        return `${label}: ≤ ${filterValue.max}`;
+        return `${label}: ≤ ${range.max}`;
+      }
 
-      case "date-range":
-        if (!filterValue.start && !filterValue.end) return null;
-        if (filterValue.start && filterValue.end) {
-          return `${label}: ${filterValue.start} to ${filterValue.end}`;
+      case "date-range": {
+        const dateRange = filterValue as { start?: string; end?: string } | null;
+        if (!dateRange?.start && !dateRange?.end) return null;
+        if (dateRange.start && dateRange.end) {
+          return `${label}: ${dateRange.start} to ${dateRange.end}`;
         }
-        if (filterValue.start) {
-          return `${label}: After ${filterValue.start}`;
+        if (dateRange.start) {
+          return `${label}: After ${dateRange.start}`;
         }
-        return `${label}: Before ${filterValue.end}`;
+        return `${label}: Before ${dateRange.end}`;
+      }
 
       default:
         return null;
@@ -86,11 +102,11 @@ const ActiveFilterChips = ({
   };
 
   // Build array of permanent filter chips
-  const permanentChips = [];
+  const permanentChips: Array<{ key: string; label: string; isPermanent: boolean }> = [];
 
   // Check for performer permanent filters
-  if (permanentFiltersMetadata.performers?.length > 0) {
-    permanentFiltersMetadata.performers.forEach((performer) => {
+  if ((permanentFiltersMetadata.performers?.length ?? 0) > 0) {
+    permanentFiltersMetadata.performers!.forEach((performer) => {
       permanentChips.push({
         key: `permanent-performer-${performer.id}`,
         label: `Performer: ${performer.name}`,
@@ -100,8 +116,8 @@ const ActiveFilterChips = ({
   }
 
   // Check for studio permanent filters
-  if (permanentFiltersMetadata.studios?.length > 0) {
-    permanentFiltersMetadata.studios.forEach((studio) => {
+  if ((permanentFiltersMetadata.studios?.length ?? 0) > 0) {
+    permanentFiltersMetadata.studios!.forEach((studio) => {
       permanentChips.push({
         key: `permanent-studio-${studio.id}`,
         label: `Studio: ${studio.name}`,
@@ -111,8 +127,8 @@ const ActiveFilterChips = ({
   }
 
   // Check for tag permanent filters
-  if (permanentFiltersMetadata.tags?.length > 0) {
-    permanentFiltersMetadata.tags.forEach((tag) => {
+  if ((permanentFiltersMetadata.tags?.length ?? 0) > 0) {
+    permanentFiltersMetadata.tags!.forEach((tag) => {
       permanentChips.push({
         key: `permanent-tag-${tag.id}`,
         label: `Tag: ${tag.name}`,
@@ -122,7 +138,7 @@ const ActiveFilterChips = ({
   }
 
   // Build array of regular active filter chips (exclude permanent filters)
-  const activeChips = [];
+  const activeChips: Array<{ key: string; label: string; isPermanent: boolean }> = [];
 
   filterOptions.forEach((filterConfig) => {
     // Skip if this is a permanent filter

@@ -26,7 +26,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 export const useGlobalNavigation = () => {
   const navigate = useNavigate();
   const inNavModeRef = useRef(false);
-  const navTimeoutRef = useRef(null);
+  const navTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear any pending timeout when component unmounts
   useEffect(() => {
@@ -38,7 +38,7 @@ export const useGlobalNavigation = () => {
   }, []);
 
   // Navigation mappings (both g c and g v go to collections)
-  const navMap = {
+  const navMap: Record<string, string> = {
     s: "/scenes",
     r: "/recommended",
     p: "/performers",
@@ -52,7 +52,7 @@ export const useGlobalNavigation = () => {
   };
 
   // Build shortcuts object
-  const shortcuts = {};
+  const shortcuts: Record<string, () => void> = {};
 
   // Register 'g' key to enter navigation mode
   shortcuts["g"] = () => {

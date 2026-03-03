@@ -3,22 +3,24 @@ import * as LucideIcons from "lucide-react";
 import { Search, X } from "lucide-react";
 import { CAROUSEL_ICONS } from "./carouselIcons";
 
+interface Props {
+  selectedIcon: string;
+  onSelect: (icon: string) => void;
+  onClose: () => void;
+}
+
 /**
  * IconPicker Component
  * Grid-based icon selector with search functionality for choosing carousel icons.
- *
- * @param {string} selectedIcon - Currently selected icon name
- * @param {function} onSelect - Callback when an icon is selected
- * @param {function} onClose - Callback when picker is closed
  */
-const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
+const IconPicker = ({ selectedIcon, onSelect, onClose }: Props) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredIcons = CAROUSEL_ICONS.filter((iconName) =>
     iconName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSelect = (iconName) => {
+  const handleSelect = (iconName: string) => {
     onSelect(iconName);
     onClose();
   };
@@ -73,7 +75,7 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
         style={{ scrollbarWidth: "thin" }}
       >
         {filteredIcons.map((iconName) => {
-          const IconComponent = LucideIcons[iconName];
+          const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[iconName];
           if (!IconComponent) return null;
 
           const isSelected = selectedIcon === iconName;
@@ -94,9 +96,9 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
                 color: isSelected
                   ? "var(--text-on-accent)"
                   : "var(--text-primary)",
-                ringColor: "var(--accent-primary)",
-                ringOffsetColor: "var(--bg-card)",
-              }}
+                "--tw-ring-color": "var(--accent-primary)",
+                "--tw-ring-offset-color": "var(--bg-card)",
+              } as React.CSSProperties}
               title={iconName}
             >
               <IconComponent className="w-5 h-5" />

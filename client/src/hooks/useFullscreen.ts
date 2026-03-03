@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Vendor-prefixed fullscreen API types
+interface VendorDocument extends Document {
+  webkitFullscreenEnabled?: boolean;
+  mozFullScreenEnabled?: boolean;
+  msFullscreenEnabled?: boolean;
+  webkitExitFullscreen?: () => Promise<void>;
+  mozCancelFullScreen?: () => Promise<void>;
+  msExitFullscreen?: () => Promise<void>;
+}
+
+interface VendorHTMLElement extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void>;
+  mozRequestFullScreen?: () => Promise<void>;
+  msRequestFullscreen?: () => Promise<void>;
+}
+
 /**
  * Hook to manage browser fullscreen state with optional auto-fullscreen on landscape rotation
  * @param {Object} options
@@ -11,16 +27,17 @@ export function useFullscreen({ autoOnLandscape = false, enabled = true } = {}) 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const userDeclinedRef = useRef(false);
 
+  const doc = document as VendorDocument;
   const supportsFullscreen = Boolean(
-    document.fullscreenEnabled ||
-      document.webkitFullscreenEnabled ||
-      document.mozFullScreenEnabled ||
-      document.msFullscreenEnabled
+    doc.fullscreenEnabled ||
+      doc.webkitFullscreenEnabled ||
+      doc.mozFullScreenEnabled ||
+      doc.msFullscreenEnabled
   );
 
   const enterFullscreen = useCallback(async () => {
     try {
-      const elem = document.documentElement;
+      const elem = document.documentElement as VendorHTMLElement;
       if (elem.requestFullscreen) {
         await elem.requestFullscreen();
       } else if (elem.webkitRequestFullscreen) {
@@ -37,14 +54,14 @@ export function useFullscreen({ autoOnLandscape = false, enabled = true } = {}) 
 
   const exitFullscreen = useCallback(async () => {
     try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        await document.webkitExitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        await document.mozCancelFullScreen();
-      } else if (document.msExitFullscreen) {
-        await document.msExitFullscreen();
+      if (doc.exitFullscreen) {
+        await doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        await doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        await doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        await doc.msExitFullscreen();
       }
     } catch (err) {
       console.warn("Fullscreen exit failed:", err);

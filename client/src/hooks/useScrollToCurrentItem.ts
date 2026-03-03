@@ -13,13 +13,18 @@ import { useRef, useCallback } from "react";
  *   - containerElRef: Regular ref object to read container element (for event handling)
  *   - setCurrentItemRef: Callback ref to pass to current item's ref prop
  */
-export const useScrollToCurrentItem = (currentIndex, options = {}) => {
+interface UseScrollToCurrentItemOptions {
+  direction?: "horizontal" | "vertical";
+  delay?: number;
+}
+
+export const useScrollToCurrentItem = (currentIndex: number, options: UseScrollToCurrentItemOptions = {}) => {
   const { direction = "horizontal", delay = 100 } = options;
 
-  const containerElRef = useRef(null);
-  const currentItemRef = useRef(null);
-  const lastScrolledIndex = useRef(null);
-  const pendingScrollIndexRef = useRef(null);
+  const containerElRef = useRef<HTMLElement | null>(null);
+  const currentItemRef = useRef<HTMLElement | null>(null);
+  const lastScrolledIndex = useRef<number | null>(null);
+  const pendingScrollIndexRef = useRef<number | null>(null);
 
   const scrollToCenter = useCallback(() => {
     const container = containerElRef.current;
@@ -42,7 +47,7 @@ export const useScrollToCurrentItem = (currentIndex, options = {}) => {
       while (sibling) {
         // Get gap from container's computed style
         const gap = parseInt(getComputedStyle(container).gap) || 8;
-        itemLeftInContainer += sibling.offsetWidth + gap;
+        itemLeftInContainer += (sibling as HTMLElement).offsetWidth + gap;
         sibling = sibling.previousElementSibling;
       }
 
@@ -76,7 +81,7 @@ export const useScrollToCurrentItem = (currentIndex, options = {}) => {
 
   // Helper to attempt scrolling with retries
   const attemptScroll = useCallback(
-    (indexToScrollTo) => {
+    (indexToScrollTo: number) => {
       const tryScroll = (attempt = 0) => {
         const success = scrollToCenter();
         if (success) {
@@ -95,7 +100,7 @@ export const useScrollToCurrentItem = (currentIndex, options = {}) => {
 
   // Callback ref for the container - checks for pending scroll when attached
   const containerRef = useCallback(
-    (el) => {
+    (el: HTMLElement | null) => {
       containerElRef.current = el;
 
       // If we have a pending scroll and now have the container, trigger it
@@ -108,7 +113,7 @@ export const useScrollToCurrentItem = (currentIndex, options = {}) => {
 
   // Callback ref for the current item - triggers scroll when attached
   const setCurrentItemRef = useCallback(
-    (el) => {
+    (el: HTMLElement | null) => {
       currentItemRef.current = el;
 
       // Only scroll if this is a new index we haven't scrolled to yet

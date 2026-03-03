@@ -7,11 +7,24 @@ import { createPortal } from "react-dom";
  * Provides "Hide [Entity Type]" option
  * Uses portal to render dropdown outside card stacking context
  */
-const EntityMenu = ({ entityType, entityId, entityName, onHide }) => {
+interface HidePayload {
+  entityType: string;
+  entityId: string;
+  entityName: string;
+}
+
+interface Props {
+  entityType: string;
+  entityId: string;
+  entityName: string;
+  onHide?: (payload: HidePayload) => void;
+}
+
+const EntityMenu = ({ entityType, entityId, entityName, onHide }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
-  const menuRef = useRef(null);
-  const buttonRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Update menu position when opening (useLayoutEffect prevents position flicker)
   useLayoutEffect(() => {
@@ -26,12 +39,12 @@ const EntityMenu = ({ entityType, entityId, entityName, onHide }) => {
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         menuRef.current &&
-        !menuRef.current.contains(event.target) &&
+        !menuRef.current.contains(event.target as Node) &&
         buttonRef.current &&
-        !buttonRef.current.contains(event.target)
+        !buttonRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -57,13 +70,13 @@ const EntityMenu = ({ entityType, entityId, entityName, onHide }) => {
     }
   }, [isOpen]);
 
-  const handleButtonClick = (e) => {
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsOpen(!isOpen);
   };
 
-  const handleHideClick = (e) => {
+  const handleHideClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsOpen(false);

@@ -9,15 +9,22 @@ import {
 } from "lucide-react";
 import Button from "../ui/Button";
 
+interface ColumnDefinition {
+  id: string;
+  label: string;
+  mandatory?: boolean;
+}
+
+interface Props {
+  allColumns: ColumnDefinition[];
+  visibleColumnIds: string[];
+  columnOrder: string[];
+  onToggleColumn?: (columnId: string) => void;
+  onMoveColumn?: (columnId: string, direction: "up" | "down" | "top" | "bottom") => void;
+}
+
 /**
  * ColumnConfigPopover - Popover component for configuring table column visibility and order
- *
- * @param {Object} props
- * @param {Array<{id: string, label: string, mandatory?: boolean}>} props.allColumns - All column definitions
- * @param {Array<string>} props.visibleColumnIds - Array of currently visible column IDs
- * @param {Array<string>} props.columnOrder - Array of column IDs in current order
- * @param {Function} props.onToggleColumn - Called when column visibility toggled (columnId)
- * @param {Function} props.onMoveColumn - Called when column moved (columnId, direction: "up"|"down"|"top"|"bottom")
  */
 const ColumnConfigPopover = ({
   allColumns,
@@ -25,21 +32,21 @@ const ColumnConfigPopover = ({
   columnOrder,
   onToggleColumn,
   onMoveColumn,
-}) => {
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef(null);
-  const buttonRef = useRef(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
 
   // Close popover when clicking outside
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         popoverRef.current &&
-        !popoverRef.current.contains(event.target) &&
+        !popoverRef.current.contains(event.target as Node) &&
         buttonRef.current &&
-        !buttonRef.current.contains(event.target)
+        !buttonRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -59,42 +66,43 @@ const ColumnConfigPopover = ({
     const columnMap = new Map(allColumns.map((col) => [col.id, col]));
     return columnOrder
       .map((id) => columnMap.get(id))
-      .filter(Boolean);
+      .filter((col): col is ColumnDefinition => Boolean(col));
   };
 
   const orderedColumns = getOrderedColumns();
 
   // Check if column is visible
-  const isColumnVisible = (columnId) => visibleColumnIds.includes(columnId);
+  const isColumnVisible = (columnId: string) => visibleColumnIds.includes(columnId);
 
   // Check if column can move in a direction
-  const canMoveUp = (index) => index > 0;
-  const canMoveDown = (index) => index < orderedColumns.length - 1;
+  const canMoveUp = (index: number) => index > 0;
+  const canMoveDown = (index: number) => index < orderedColumns.length - 1;
 
   // Handle move button clicks
-  const handleMoveTop = (columnId) => onMoveColumn?.(columnId, "top");
-  const handleMoveUp = (columnId) => onMoveColumn?.(columnId, "up");
-  const handleMoveDown = (columnId) => onMoveColumn?.(columnId, "down");
-  const handleMoveBottom = (columnId) => onMoveColumn?.(columnId, "bottom");
+  const handleMoveTop = (columnId: string) => onMoveColumn?.(columnId, "top");
+  const handleMoveUp = (columnId: string) => onMoveColumn?.(columnId, "up");
+  const handleMoveDown = (columnId: string) => onMoveColumn?.(columnId, "down");
+  const handleMoveBottom = (columnId: string) => onMoveColumn?.(columnId, "bottom");
 
   // Handle visibility toggle
-  const handleToggle = (columnId) => onToggleColumn?.(columnId);
+  const handleToggle = (columnId: string) => onToggleColumn?.(columnId);
 
   return (
     <div className="relative">
       {/* Trigger Button */}
-      <Button
-        ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
-        variant="secondary"
-        size="sm"
-        icon={<LucideColumns3 size={16} />}
-        aria-label="Columns"
-        style={{
-          backgroundColor: isOpen ? "var(--bg-card)" : "var(--bg-secondary)",
-          borderColor: isOpen ? "var(--accent-primary)" : "var(--border-color)",
-        }}
-      />
+      <div ref={buttonRef}>
+        <Button
+          onClick={() => setIsOpen(!isOpen)}
+          variant="secondary"
+          size="sm"
+          icon={<LucideColumns3 size={16} />}
+          aria-label="Columns"
+          style={{
+            backgroundColor: isOpen ? "var(--bg-card)" : "var(--bg-secondary)",
+            borderColor: isOpen ? "var(--accent-primary)" : "var(--border-color)",
+          }}
+        />
+      </div>
 
       {/* Popover */}
       {isOpen && (

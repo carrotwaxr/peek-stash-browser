@@ -48,14 +48,14 @@ describe("compositeKey utilities", () => {
     });
 
     it("returns { id: null, instanceId: undefined } for null input", () => {
-      expect(parseCompositeKey(null)).toEqual({
+      expect(parseCompositeKey(null as any)).toEqual({
         id: null,
         instanceId: undefined,
       });
     });
 
     it("returns { id: undefined, instanceId: undefined } for undefined input", () => {
-      expect(parseCompositeKey(undefined)).toEqual({
+      expect(parseCompositeKey(undefined as any)).toEqual({
         id: undefined,
         instanceId: undefined,
       });
@@ -90,7 +90,7 @@ describe("compositeKey utilities", () => {
     });
 
     it("coerces numeric input to string before parsing", () => {
-      expect(parseCompositeKey(42)).toEqual({
+      expect(parseCompositeKey(42 as any)).toEqual({
         id: "42",
         instanceId: undefined,
       });

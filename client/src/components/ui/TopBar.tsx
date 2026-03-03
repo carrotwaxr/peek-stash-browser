@@ -19,7 +19,17 @@ import UserMenu from "./UserMenu";
  * - Desktop: Navigation is in sidebar
  * - Auto-hides on scroll down
  */
-const TopBar = ({ navPreferences = [] }) => {
+interface NavPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences?: NavPreference[];
+}
+
+const TopBar = ({ navPreferences = [] }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();
@@ -37,7 +47,9 @@ const TopBar = ({ navPreferences = [] }) => {
   );
 
   // Get ordered and filtered nav items based on user preferences
-  const navItems = getOrderedNavItems(navPreferences);
+  const navItems = getOrderedNavItems(navPreferences).filter(
+    (item): item is NonNullable<typeof item> => item != null
+  );
 
   // Get current page from React Router location
   const getCurrentPage = () => {

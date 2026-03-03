@@ -4,8 +4,34 @@ import TimelineBar from "./TimelineBar";
 import TimelineEdgeNav from "./TimelineEdgeNav";
 import { format, parse } from "date-fns";
 
+type ZoomLevel = "years" | "months" | "weeks" | "days";
+
+interface DistributionItem {
+  period: string;
+  count: number;
+}
+
+interface ContextMarker {
+  index: number;
+  type: string;
+  label: string;
+  context: string;
+  endIndex?: number;
+}
+
+interface TimelineStripProps {
+  distribution: DistributionItem[];
+  maxCount: number;
+  zoomLevel: string;
+  selectedPeriod: DistributionItem | null;
+  onSelectPeriod: (period: string) => void;
+  onKeyboardNavigate?: (e: React.KeyboardEvent) => void;
+  onVisibleRangeChange?: (range: { firstPeriod: string; lastPeriod: string; firstLabel: string; lastLabel: string }) => void;
+  className?: string;
+}
+
 // Extract context (year, month) from period for marker detection
-function getContext(period, zoomLevel) {
+function getContext(period: string, zoomLevel: string) {
   if (!period) return { year: null, month: null };
   try {
     switch (zoomLevel) {
@@ -32,9 +58,9 @@ function getContext(period, zoomLevel) {
 }
 
 // Short labels without redundant context (year shown on markers)
-const SHORT_LABELS = {
-  years: (period) => period,
-  months: (period) => {
+const SHORT_LABELS: Record<ZoomLevel, (period: string) => string> = {
+  years: (period: string) => period,
+  months: (period: string) => {
     try {
       const date = parse(period, "yyyy-MM", new Date());
       if (isNaN(date.getTime())) return period;
@@ -43,12 +69,12 @@ const SHORT_LABELS = {
       return period;
     }
   },
-  weeks: (period) => {
+  weeks: (period: string) => {
     if (!period || !period.includes("-W")) return period;
     const [, week] = period.split("-W");
     return `W${week}`;
   },
-  days: (period) => {
+  days: (period: string) => {
     try {
       const date = parse(period, "yyyy-MM-dd", new Date());
       if (isNaN(date.getTime())) return period;
@@ -60,7 +86,7 @@ const SHORT_LABELS = {
 };
 
 // Point spacing per zoom level
-const POINT_SPACING = {
+const POINT_SPACING: Record<ZoomLevel, number> = {
   years: 48,
   months: 44,
   weeks: 40,
@@ -68,9 +94,9 @@ const POINT_SPACING = {
 };
 
 // Full labels for accessibility (aria-label)
-const FULL_LABELS = {
-  years: (period) => period,
-  months: (period) => {
+const FULL_LABELS: Record<ZoomLevel, (period: string) => string> = {
+  years: (period: string) => period,
+  months: (period: string) => {
     try {
       const date = parse(period, "yyyy-MM", new Date());
       if (isNaN(date.getTime())) return period;
@@ -79,12 +105,12 @@ const FULL_LABELS = {
       return period;
     }
   },
-  weeks: (period) => {
+  weeks: (period: string) => {
     if (!period || !period.includes("-W")) return period;
     const [year, week] = period.split("-W");
     return `Week ${week}, ${year}`;
   },
-  days: (period) => {
+  days: (period: string) => {
     try {
       const date = parse(period, "yyyy-MM-dd", new Date());
       if (isNaN(date.getTime())) return period;
@@ -104,40 +130,40 @@ function TimelineStrip({
   onKeyboardNavigate,
   onVisibleRangeChange,
   className = "",
-}) {
-  const containerRef = useRef(null);
+}: TimelineStripProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [scrollState, setScrollState] = useState({ atStart: true, atEnd: true });
   const isMouseDownRef = useRef(false); // Track if focus came from mouse click
 
   const getShortLabel = useCallback(
-    (period) => {
-      const labelFn = SHORT_LABELS[zoomLevel] || SHORT_LABELS.months;
+    (period: string) => {
+      const labelFn = SHORT_LABELS[zoomLevel as ZoomLevel] || SHORT_LABELS.months;
       return labelFn(period);
     },
     [zoomLevel]
   );
 
   const getFullLabel = useCallback(
-    (period) => {
-      const labelFn = FULL_LABELS[zoomLevel] || FULL_LABELS.months;
+    (period: string) => {
+      const labelFn = FULL_LABELS[zoomLevel as ZoomLevel] || FULL_LABELS.months;
       return labelFn(period);
     },
     [zoomLevel]
   );
 
   // Get point spacing for current zoom level
-  const pointSpacing = POINT_SPACING[zoomLevel] || POINT_SPACING.months;
+  const pointSpacing = POINT_SPACING[zoomLevel as ZoomLevel] || POINT_SPACING.months;
 
   // Determine which labels to show (every other, unless selected or years zoom)
   const shouldShowLabel = useCallback(
-    (index) => {
+    (index: number) => {
       // Years zoom: show all labels
       if (zoomLevel === "years") return true;
 
       // Find selected index
       const selectedIndex = selectedPeriod
-        ? distribution.findIndex((d) => d.period === selectedPeriod.period)
+        ? distribution.findIndex((d: DistributionItem) => d.period === selectedPeriod.period)
         : -1;
 
       // Always show selected
@@ -157,11 +183,11 @@ function TimelineStrip({
   const contextMarkers = useMemo(() => {
     if (zoomLevel === "years") return []; // Years don't need markers
 
-    const markers = [];
-    let lastYear = null;
-    let lastMonth = null;
+    const markers: ContextMarker[] = [];
+    let lastYear: string | null = null;
+    let lastMonth: string | null = null;
 
-    distribution.forEach((item, index) => {
+    distribution.forEach((item: DistributionItem, index: number) => {
       const ctx = getContext(item.period, zoomLevel);
 
       if (zoomLevel === "months" || zoomLevel === "weeks") {
@@ -201,7 +227,7 @@ function TimelineStrip({
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
-    (e) => {
+    (e: React.KeyboardEvent) => {
       if (distribution.length === 0) return;
 
       switch (e.key) {
@@ -326,7 +352,7 @@ function TimelineStrip({
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheel = (e) => {
+    const handleWheel = (e: WheelEvent) => {
       // Only intercept if there's vertical scroll (deltaY) and container can scroll horizontally
       if (e.deltaY !== 0 && container.scrollWidth > container.clientWidth) {
         e.preventDefault();
@@ -380,7 +406,7 @@ function TimelineStrip({
           if (focusedIndex === -1 && distribution.length > 0) {
             // Focus on selected period or last (most recent)
             const selectedIndex = distribution.findIndex(
-              (d) => d.period === selectedPeriod?.period
+              (d: DistributionItem) => d.period === selectedPeriod?.period
             );
             setFocusedIndex(
               selectedIndex >= 0 ? selectedIndex : distribution.length - 1
@@ -416,7 +442,7 @@ function TimelineStrip({
 
           {/* Period labels row (above the line) */}
           <div className="absolute left-0 right-0 h-4" style={{ top: "22px" }}>
-            {distribution.map((item, index) => {
+            {distribution.map((item: DistributionItem, index: number) => {
               const isSelected = selectedPeriod?.period === item.period;
               const showLabel = shouldShowLabel(index);
 
@@ -454,7 +480,7 @@ function TimelineStrip({
 
           {/* Timeline points and bars */}
           <div className="absolute top-10 left-0 right-0">
-            {distribution.map((item, index) => {
+            {distribution.map((item: DistributionItem, index: number) => {
               const isSelected = selectedPeriod?.period === item.period;
 
               return (
@@ -472,7 +498,7 @@ function TimelineStrip({
                     maxCount={maxCount}
                     isSelected={isSelected}
                     isFocused={focusedIndex === index}
-                    onClick={(period) => {
+                    onClick={(period: string) => {
                       setFocusedIndex(index);
                       onSelectPeriod(period);
                     }}

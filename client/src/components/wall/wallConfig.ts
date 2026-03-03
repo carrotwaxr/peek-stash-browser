@@ -6,7 +6,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { getClipPreviewUrl } from "../../api";
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: any) => {
   if (!dateStr) return null;
   try {
     return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
@@ -15,25 +15,25 @@ const formatDate = (dateStr) => {
   }
 };
 
-const formatResolution = (width, height) => {
+const formatResolution = (width: any, height: any) => {
   if (!width || !height) return null;
   return `${width}×${height}`;
 };
 
 export const wallConfig = {
   scene: {
-    getImageUrl: (item) => item.paths?.screenshot,
-    getPreviewUrl: (item) => item.paths?.preview,
-    getAspectRatio: (item) => {
+    getImageUrl: (item: any) => item.paths?.screenshot,
+    getPreviewUrl: (item: any) => item.paths?.preview,
+    getAspectRatio: (item: any) => {
       const file = item.files?.[0];
       if (file?.width && file?.height) {
         return file.width / file.height;
       }
       return 16 / 9; // Default for scenes
     },
-    getTitle: (item) => item.title || "Untitled",
-    getSubtitle: (item) => {
-      const parts = [];
+    getTitle: (item: any) => item.title || "Untitled",
+    getSubtitle: (item: any) => {
+      const parts: string[] = [];
       if (item.studio?.name) parts.push(item.studio.name);
       if (item.date) parts.push(formatDate(item.date));
       return parts.join(" • ");
@@ -43,44 +43,44 @@ export const wallConfig = {
 
   gallery: {
     // gallery.cover is a direct URL string (proxy URL)
-    getImageUrl: (item) => item.cover || null,
+    getImageUrl: (item: any) => item.cover || null,
     getPreviewUrl: () => null,
-    getAspectRatio: (item) => {
+    getAspectRatio: (item: any) => {
       // Use cover image dimensions if available (from coverImageId -> StashImage)
       if (item.coverWidth && item.coverHeight) {
         return item.coverWidth / item.coverHeight;
       }
       return 1; // Default square if no dimensions
     },
-    getTitle: (item) => item.title || "Untitled Gallery",
-    getSubtitle: (item) => `${item.image_count || 0} images`,
+    getTitle: (item: any) => item.title || "Untitled Gallery",
+    getSubtitle: (item: any) => `${item.image_count || 0} images`,
     hasPreview: false,
   },
 
   image: {
-    getImageUrl: (item) => item.paths?.thumbnail,
+    getImageUrl: (item: any) => item.paths?.thumbnail,
     getPreviewUrl: () => null,
-    getAspectRatio: (item) => {
+    getAspectRatio: (item: any) => {
       if (item.width && item.height) {
         return item.width / item.height;
       }
       return 1; // Default square for images
     },
-    getTitle: (item) => item.title || item.files?.[0]?.basename || "Untitled",
-    getSubtitle: (item) => formatResolution(item.width, item.height),
+    getTitle: (item: any) => item.title || item.files?.[0]?.basename || "Untitled",
+    getSubtitle: (item: any) => formatResolution(item.width, item.height),
     hasPreview: false,
   },
 
   clip: {
-    getImageUrl: (item) => {
+    getImageUrl: (item: any) => {
       // Use dedicated clip preview proxy endpoint - it handles the URL properly
       if (item.id) {
         return getClipPreviewUrl(item.id);
       }
       return null;
     },
-    getPreviewUrl: (item) => (item.isGenerated ? getClipPreviewUrl(item.id) : null),
-    getAspectRatio: (item) => {
+    getPreviewUrl: (item: any) => (item.isGenerated ? getClipPreviewUrl(item.id) : null),
+    getAspectRatio: (item: any) => {
       // Use parent scene's video dimensions
       const file = item.scene?.files?.[0];
       if (file?.width && file?.height) {
@@ -88,9 +88,9 @@ export const wallConfig = {
       }
       return 16 / 9; // Default for video clips
     },
-    getTitle: (item) => item.title || "Untitled",
-    getSubtitle: (item) => {
-      const parts = [];
+    getTitle: (item: any) => item.title || "Untitled",
+    getSubtitle: (item: any) => {
+      const parts: string[] = [];
       if (item.scene?.title) parts.push(item.scene.title);
       if (item.primaryTag?.name) parts.push(item.primaryTag.name);
       return parts.join(" • ");

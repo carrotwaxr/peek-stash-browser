@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
 import { getClipPreviewUrl } from "../../api";
+import type { Clip } from "./ClipCard";
 
-/**
- * Animated preview for clip cards
- * Plays the generated MP4 preview on hover
- *
- * @param {Object} clip - Clip object with id, isGenerated, scene.pathScreenshot
- * @param {string} objectFit - CSS object-fit value: "contain" (default) or "cover"
- */
-const ClipCardPreview = ({ clip, objectFit = "cover" }) => {
+interface Props {
+  clip: Clip;
+  objectFit?: "contain" | "cover";
+}
+
+const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false);
-  const [containerElement, setContainerElement] = useState(null);
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
 
   // Get preview URLs
   const previewUrl = clip.isGenerated ? getClipPreviewUrl(clip.id) : null;
@@ -24,7 +23,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }) => {
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => {
+    const handleChange = (e: MediaQueryListEvent) => {
       setHasHoverCapability(e.matches);
     };
     mediaQuery.addEventListener("change", handleChange);

@@ -12,7 +12,7 @@ export const PeekLogo = ({
 
   // Navigate to user's preferred landing page
   // Passes current path so random mode excludes the current page
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     const destination = getLandingPage(user?.landingPagePreference, location.pathname);
     navigate(destination);
@@ -37,7 +37,7 @@ export const PeekLogo = ({
     },
   };
 
-  const config = sizeConfig[size];
+  const config = (sizeConfig as Record<string, any>)[size];
 
   // Get logo image paths
   const getLogoPath = () => {

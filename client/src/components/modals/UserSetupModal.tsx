@@ -4,30 +4,40 @@ import { userSetupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { Button } from "../ui/index";
 
-const UserSetupModal = ({ onComplete }) => {
+interface StashInstance {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface Props {
+  onComplete?: () => void;
+}
+
+const UserSetupModal = ({ onComplete }: Props) => {
   const { updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [recoveryKey, setRecoveryKey] = useState("");
-  const [instances, setInstances] = useState([]);
-  const [selectedInstanceIds, setSelectedInstanceIds] = useState([]);
+  const [instances, setInstances] = useState<StashInstance[]>([]);
+  const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
   const [showInstanceSelection, setShowInstanceSelection] = useState(false);
 
   useEffect(() => {
     const fetchSetupStatus = async () => {
       try {
-        const data = await userSetupApi.getSetupStatus();
-        const { recoveryKey, instances, instanceCount } = data;
+        const data = await userSetupApi.getSetupStatus() as { needsSetup: boolean; instances: StashInstance[]; recoveryKey?: string; instanceCount?: number };
+        const { recoveryKey: key, instances: inst, instanceCount } = data;
 
-        setRecoveryKey(recoveryKey || "");
-        setInstances(instances || []);
-        setShowInstanceSelection(instanceCount >= 2);
+        setRecoveryKey(key || "");
+        setInstances(inst || []);
+        setShowInstanceSelection((instanceCount ?? 0) >= 2);
 
         // Pre-select all instances
-        setSelectedInstanceIds((instances || []).map((i) => i.id));
+        setSelectedInstanceIds((inst || []).map((i: StashInstance) => i.id));
       } catch (err) {
         setError("Failed to load setup data");
         console.error("Setup status error:", err);
@@ -49,7 +59,7 @@ const UserSetupModal = ({ onComplete }) => {
     }
   };
 
-  const handleInstanceToggle = (instanceId) => {
+  const handleInstanceToggle = (instanceId: string) => {
     setSelectedInstanceIds((prev) => {
       if (prev.includes(instanceId)) {
         // Don't allow unchecking if it's the last one
@@ -74,7 +84,7 @@ const UserSetupModal = ({ onComplete }) => {
 
       onComplete?.();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to complete setup");
+      setError((err as Error).message || "Failed to complete setup");
       console.error("Complete setup error:", err);
     } finally {
       setSubmitting(false);

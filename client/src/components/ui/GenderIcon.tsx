@@ -23,7 +23,13 @@ import NonBinaryIcon from "./icons/NonBinaryIcon";
  * @param {number} size - Icon size in pixels (default: 24)
  * @param {string} className - Optional additional CSS classes
  */
-const GenderIcon = ({ gender, size = 24, className = "" }) => {
+interface Props {
+  gender: string | null | undefined;
+  size?: number;
+  className?: string;
+}
+
+const GenderIcon = ({ gender, size = 24, className = "" }: Props) => {
   // Gender-specific colors based on traditional and pride flag colors
   const getGenderConfig = () => {
     switch (gender) {
@@ -76,14 +82,16 @@ const GenderIcon = ({ gender, size = 24, className = "" }) => {
   const config = getGenderConfig();
   const Icon = config.icon;
 
+  // Custom icons (IntersexIcon, NonBinaryIcon) don't accept aria-label/title
+  // Wrap all icons uniformly to avoid type narrowing issues
   return (
-    <Icon
-      size={size}
-      color={config.color}
-      className={className}
-      aria-label={config.label}
-      title={config.label}
-    />
+    <span aria-label={config.label} title={config.label} className="inline-flex">
+      <Icon
+        size={size}
+        color={config.color}
+        className={className}
+      />
+    </span>
   );
 };
 

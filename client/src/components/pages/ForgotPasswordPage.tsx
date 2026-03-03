@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { forgotPasswordInit, forgotPasswordReset } from "../../api";
 import { Button } from "../ui/index";
@@ -11,10 +11,10 @@ const ForgotPasswordPage = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const handleUsernameSubmit = async (e) => {
+  const handleUsernameSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -33,7 +33,7 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  const handleResetSubmit = async (e) => {
+  const handleResetSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
@@ -60,8 +60,9 @@ const ForgotPasswordPage = () => {
     try {
       await forgotPasswordReset(username, recoveryKey, newPassword);
       setSuccess(true);
-    } catch (err) {
-      setError(err.response?.data?.error || "Invalid recovery key or username");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setError(axiosErr.response?.data?.error || "Invalid recovery key or username");
     } finally {
       setLoading(false);
     }

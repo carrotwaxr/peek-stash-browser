@@ -8,15 +8,25 @@ import { wallConfig, ZOOM_LEVELS, DEFAULT_ZOOM } from "./wallConfig";
  * Justified gallery view using react-photo-album.
  * Renders items in rows with preserved aspect ratios.
  */
+interface Props {
+  items?: Record<string, unknown>[];
+  entityType?: keyof typeof wallConfig;
+  zoomLevel?: keyof typeof ZOOM_LEVELS;
+  playbackMode?: "autoplay" | "hover" | "static";
+  onItemClick?: (item: Record<string, unknown>) => void;
+  loading?: boolean;
+  emptyMessage?: string;
+}
+
 const WallView = ({
   items = [],
   entityType = "scene",
-  zoomLevel = DEFAULT_ZOOM,
+  zoomLevel = DEFAULT_ZOOM as keyof typeof ZOOM_LEVELS,
   playbackMode = "autoplay",
   onItemClick,
   loading = false,
   emptyMessage = "No items found",
-}) => {
+}: Props) => {
   const config = wallConfig[entityType];
   const { targetRowHeight } = ZOOM_LEVELS[zoomLevel] || ZOOM_LEVELS[DEFAULT_ZOOM];
 
@@ -25,16 +35,16 @@ const WallView = ({
     if (!items || !config) return [];
 
     return items.map((item) => {
-      const aspectRatio = config.getAspectRatio(item);
+      const aspectRatio = config.getAspectRatio(item as Record<string, unknown>);
       // react-photo-album needs width/height, we use aspect ratio to derive them
       const baseHeight = targetRowHeight;
       const baseWidth = baseHeight * aspectRatio;
 
       return {
-        src: config.getImageUrl(item) || "",
+        src: config.getImageUrl(item as Record<string, unknown>) || "",
         width: baseWidth,
         height: baseHeight,
-        key: item.id,
+        key: item.id as string,
         // Pass original item for rendering
         _item: item,
       };

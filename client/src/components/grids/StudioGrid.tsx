@@ -1,21 +1,21 @@
 import { SearchableGrid } from "../ui/SearchableGrid";
 import { StudioCard } from "../cards/index";
 
-/**
- * StudioGrid - Grid for displaying studios with search and filtering
- *
- * @param {Object} [props.lockedFilters] - Filters locked for nested grid use
- * @param {boolean} [props.hideLockedFilters] - Hide locked filters from UI
- * @param {string} [props.emptyMessage] - Custom empty state message
- * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
- */
+interface Props {
+  lockedFilters?: Record<string, unknown>;
+  hideLockedFilters?: boolean;
+  emptyMessage?: string;
+  density?: "small" | "medium" | "large";
+  [key: string]: unknown;
+}
+
 const StudioGrid = ({
   lockedFilters,
   hideLockedFilters,
   emptyMessage = "No studios found",
   density = "medium",
   ...rest
-}) => {
+}: Props) => {
   return (
     <SearchableGrid
       entityType="studio"
@@ -24,7 +24,7 @@ const StudioGrid = ({
       emptyMessage={emptyMessage}
       defaultSort="name"
       density={density}
-      renderItem={(studio, _index, { onHideSuccess }) => (
+      renderItem={(studio: any, _index: number, { onHideSuccess }: any) => (
         <StudioCard
           key={studio.id}
           studio={studio}

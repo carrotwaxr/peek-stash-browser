@@ -21,7 +21,15 @@ import videojs from "video.js";
  * This matches behavior in YouTube, Netflix, and other major players.
  */
 class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
-  constructor(player, options = {}) {
+  resumeDelay: number;
+  wasPlayingBeforeScrub: boolean;
+  pendingSeekTime: number | null;
+  resumeTimeout: ReturnType<typeof setTimeout> | null;
+  originalCurrentTime: ((time?: number) => any) | null;
+  wasScrubbing: boolean;
+  declare player: any;
+
+  constructor(player: any, options: any = {}) {
     super(player, options);
 
     // Configuration
@@ -54,10 +62,10 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     this.originalCurrentTime = this.player.currentTime.bind(this.player);
     const self = this;
 
-    this.player.currentTime = function (time) {
+    this.player.currentTime = function (time?: number) {
       // If getting current time (no argument), always use original
       if (time === undefined) {
-        return self.originalCurrentTime();
+        return self.originalCurrentTime!();
       }
 
       // Check if we're scrubbing using Video.js's state
@@ -76,7 +84,7 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
       }
 
       // Not scrubbing - pass through to original
-      return self.originalCurrentTime(time);
+      return self.originalCurrentTime!(time);
     };
   }
 
@@ -100,7 +108,7 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     if (this.pendingSeekTime !== null) {
       const finalTime = this.pendingSeekTime;
       this.pendingSeekTime = null;
-      this.originalCurrentTime(finalTime);
+      this.originalCurrentTime!(finalTime);
     }
 
     // Resume playback after debounce if we paused

@@ -14,7 +14,7 @@ describe("SkeletonSceneCard", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useCardDisplaySettings.mockReturnValue({
+    (useCardDisplaySettings as ReturnType<typeof vi.fn>).mockReturnValue({
       getSettings: mockGetSettings,
       updateSettings: vi.fn(),
       isLoading: false,
@@ -49,7 +49,7 @@ describe("SkeletonSceneCard", () => {
       expect(ratingRow).toBeTruthy();
 
       // Should have rating badge placeholder
-      const ratingBadge = ratingRow.querySelector('[style*="width: 3.5rem"]');
+      const ratingBadge = ratingRow!.querySelector('[style*="width: 3.5rem"]');
       expect(ratingBadge).toBeTruthy();
     });
 
@@ -126,7 +126,7 @@ describe("SkeletonSceneCard", () => {
       expect(ratingRow).toBeTruthy();
 
       // Should have rating badge placeholder
-      const ratingBadge = ratingRow.querySelector('[style*="width: 3.5rem"]');
+      const ratingBadge = ratingRow!.querySelector('[style*="width: 3.5rem"]');
       expect(ratingBadge).toBeTruthy();
     });
 
@@ -160,7 +160,7 @@ describe("SkeletonSceneCard", () => {
 
     // Helper to find element by computed aspect ratio
     // JSDOM normalizes "16/9" to "16 / 9" format
-    const findByAspectRatio = (container, ratio) => {
+    const findByAspectRatio = (container: HTMLElement, ratio: string) => {
       const allDivs = container.querySelectorAll("div");
       for (const div of allDivs) {
         if (div.style.aspectRatio && div.style.aspectRatio.replace(/\s/g, "") === ratio) {

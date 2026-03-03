@@ -1,15 +1,16 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useCancellableQuery } from "../../hooks/useCancellableQuery";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { libraryApi } from "../../api";
+import { type LibrarySearchParams } from "../../api";
+import { usePerformerList } from "../../api/hooks";
+import { ApiError } from "../../api/client";
 import {
   SyncProgressBanner,
   ErrorMessage,
@@ -21,7 +22,7 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for performers page
-const VIEW_MODES = [
+const VIEW_MODES: { id: string; label: string }[] = [
   { id: "grid", label: "Grid view" },
   { id: "table", label: "Table view" },
 ];
@@ -31,8 +32,8 @@ const Performers = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasMultipleInstances } = useConfig();
-  const pageRef = useRef(null);
-  const gridRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const columns = useGridColumns("performers");
 
   // Table columns hook for table view
@@ -47,21 +48,28 @@ const Performers = () => {
     getColumnConfig,
   } = useTableColumns("performer");
 
-  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const { data, isLoading: queryLoading, error } = usePerformerList(queryParams);
+  const initMessage =
+    error instanceof ApiError && error.isInitializing
+      ? "Server is syncing library, please wait..."
+      : null;
+  const isLoading = queryParams === null || queryLoading;
 
   const handleQueryChange = useCallback(
-    (newQuery) => {
-      execute((signal) => getPerformers(newQuery, signal));
+    (newQuery: LibrarySearchParams) => {
+      setQueryParams(newQuery);
     },
-    [execute]
+    []
   );
 
-  const currentPerformers = data?.performers || [];
-  const totalCount = data?.count || 0;
+  const findPerformers = (data as Record<string, unknown>)?.findPerformers as Record<string, unknown> | undefined;
+  const currentPerformers = (findPerformers?.performers as Record<string, unknown>[]) || [];
+  const totalCount = (findPerformers?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
-    parseInt(searchParams.get("per_page")) || 24
+    parseInt(searchParams.get("per_page") ?? "24") || 24
   );
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
@@ -69,7 +77,6 @@ const Performers = () => {
   const {
     isTVMode,
     tvNavigation,
-    _gridNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -137,7 +144,8 @@ const Performers = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          viewModes={VIEW_MODES}
+           
+          viewModes={VIEW_MODES as any}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -150,13 +158,13 @@ const Performers = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) =>
+          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
+                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="performer"
@@ -187,9 +195,9 @@ const Performers = () => {
               )
             ) : viewMode === "table" ? (
               <TableView
-                items={currentPerformers}
-                columns={visibleColumns}
-                sort={{ field: sortField, direction: sortDirection }}
+                items={currentPerformers as Record<string, unknown>[]}
+                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
+                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="performer"
@@ -206,12 +214,12 @@ const Performers = () => {
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentPerformers.map((performer, index) => {
+                {currentPerformers.map((performer: Record<string, unknown>, index: number) => {
                   const itemProps = gridItemProps(index);
                   return (
                     <PerformerCard
-                      key={performer.id}
-                      performer={performer}
+                      key={performer.id as string}
+                      performer={performer as unknown as import("@peek/shared-types").NormalizedPerformer}
                       isTVMode={isTVMode}
                       fromPageTitle="Performers"
                       {...itemProps}
@@ -220,24 +228,11 @@ const Performers = () => {
                 })}
               </div>
             )
-          }
+          ) as unknown as React.ReactNode}
         </SearchControls>
       </div>
     </PageLayout>
   );
-};
-
-const getPerformers = async (query, signal) => {
-  const response = await libraryApi.findPerformers(query, signal);
-
-  // Extract performers and count from server response structure
-  const findPerformers = response?.findPerformers;
-  const result = {
-    performers: findPerformers?.performers || [],
-    count: findPerformers?.count || 0,
-  };
-
-  return result;
 };
 
 export default Performers;

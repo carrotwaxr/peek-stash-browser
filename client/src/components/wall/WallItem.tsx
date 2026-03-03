@@ -3,6 +3,24 @@ import { Link } from "react-router-dom";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks";
 
+interface WallItemConfig {
+  getImageUrl: (item: Record<string, unknown>) => string | null;
+  getPreviewUrl: (item: Record<string, unknown>) => string | null;
+  getTitle: (item: Record<string, unknown>) => string;
+  getSubtitle: (item: Record<string, unknown>) => string | null;
+  hasPreview: boolean;
+}
+
+interface Props {
+  item: Record<string, unknown>;
+  config: WallItemConfig;
+  entityType: string;
+  width: number;
+  height: number;
+  playbackMode?: "autoplay" | "hover" | "static";
+  onClick?: (item: Record<string, unknown>) => void;
+}
+
 /**
  * Individual item in the WallView with hover overlay and optional video preview.
  */
@@ -12,17 +30,17 @@ const WallItem = ({
   entityType,
   width,
   height,
-  playbackMode = "autoplay", // "autoplay" | "hover" | "static"
+  playbackMode = "autoplay",
   onClick,
-}) => {
+}: Props) => {
   const { hasMultipleInstances } = useConfig();
-  const containerRef = useRef(null);
-  const videoRef = useRef(null);
+  const containerRef = useRef<HTMLAnchorElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const overlayTimeoutRef = useRef(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const imageUrl = config.getImageUrl(item);
   const previewUrl = config.getPreviewUrl(item);
@@ -33,7 +51,7 @@ const WallItem = ({
   // Compute link path with multi-instance support
   // Clips are special: they link to scene with timestamp
   const linkPath = entityType === "clip"
-    ? getScenePathWithTime({ id: item.sceneId, instanceId: item.instanceId }, item.seconds, hasMultipleInstances)
+    ? getScenePathWithTime({ id: item.sceneId as string, instanceId: item.instanceId as string | undefined } as Record<string, unknown>, (item.seconds as number | undefined) ?? 0, hasMultipleInstances)
     : getEntityPath(entityType, item, hasMultipleInstances);
 
   // Intersection Observer for autoplay mode
@@ -92,7 +110,7 @@ const WallItem = ({
     };
   }, [isHovering]);
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent) => {
     if (onClick) {
       e.preventDefault();
       onClick(item);

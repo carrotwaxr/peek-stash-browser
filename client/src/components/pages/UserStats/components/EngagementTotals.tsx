@@ -1,14 +1,27 @@
-// client/src/components/pages/UserStats/components/EngagementTotals.jsx
+// client/src/components/pages/UserStats/components/EngagementTotals.tsx
 
 import { Clock, Play, Heart } from "lucide-react";
 import { ENTITY_ICONS } from "../../../../constants/entityIcons";
 import StatCard from "./StatCard";
 import { formatDurationHumanReadable } from "../../../../utils/format";
 
+interface EngagementData {
+  totalWatchTime: number;
+  totalPlayCount: number;
+  totalOCount: number;
+  uniqueScenesWatched: number;
+  totalImagesViewed: number;
+}
+
+interface Props {
+  engagement: EngagementData;
+  librarySceneCount: number;
+}
+
 /**
  * Hero section with engagement totals
  */
-const EngagementTotals = ({ engagement, librarySceneCount }) => {
+const EngagementTotals = ({ engagement, librarySceneCount }: Props) => {
   const coveragePercent =
     librarySceneCount > 0
       ? Math.round((engagement.uniqueScenesWatched / librarySceneCount) * 100)

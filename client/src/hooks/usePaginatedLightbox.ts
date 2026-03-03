@@ -17,6 +17,15 @@ export const PREFETCH_COUNT = 3;
  * @param {Function} options.fetchPage - (page: number) => Promise<{ images: Image[] }> - fetches a page of images for prefetching
  * @returns {Object} Lightbox and pagination state/handlers
  */
+interface PaginatedLightboxOptions {
+  perPage?: number;
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
+  externalPage?: number;
+  onExternalPageChange?: (page: number) => void;
+  fetchPage?: (page: number) => Promise<{ images: any[] }>;
+}
+
 export function usePaginatedLightbox({
   perPage = 100,
   totalCount = 0,
@@ -24,7 +33,7 @@ export function usePaginatedLightbox({
   externalPage,
   onExternalPageChange,
   fetchPage,
-}) {
+}: PaginatedLightboxOptions) {
   // Internal page state - only used when externalPage is not provided
   const [internalPage, setInternalPage] = useState(1);
 
@@ -41,12 +50,12 @@ export function usePaginatedLightbox({
   const [transitionKey, setTransitionKey] = useState(0);
 
   // Prefetch state for adjacent pages
-  const [prevPageImages, setPrevPageImages] = useState([]);
-  const [nextPageImages, setNextPageImages] = useState([]);
-  const prefetchingRef = useRef({ prev: null, next: null }); // Track which pages are being fetched
+  const [prevPageImages, setPrevPageImages] = useState<any[]>([]);
+  const [nextPageImages, setNextPageImages] = useState<any[]>([]);
+  const prefetchingRef = useRef<{ prev: number | null; next: number | null }>({ prev: null, next: null }); // Track which pages are being fetched
 
   // Track pending page load for lightbox cross-page navigation
-  const pendingLightboxNav = useRef(null);
+  const pendingLightboxNav = useRef<number | null>(null);
 
   // Track current lightbox index reported by Lightbox component (for prefetch triggering)
   // This is separate from lightboxIndex which is used as initialIndex prop
@@ -56,7 +65,7 @@ export function usePaginatedLightbox({
 
   // Handle page change - use external callback if provided, otherwise internal
   const handlePageChange = useCallback(
-    (newPage) => {
+    (newPage: number) => {
       if (externalPage !== undefined && onExternalPageChange) {
         // External pagination mode - call the external handler
         onExternalPageChange(newPage);
@@ -75,7 +84,7 @@ export function usePaginatedLightbox({
   // Handle lightbox reaching page boundary
   // Returns true if navigation was handled (crossing page boundary), false otherwise
   const handlePageBoundary = useCallback(
-    (direction) => {
+    (direction: "next" | "prev") => {
       if (direction === "next" && currentPage < totalPages) {
         // User navigated past last image on current page - load next page
         const targetIndex = 0; // First image of next page
@@ -102,7 +111,7 @@ export function usePaginatedLightbox({
   );
 
   // Handle lightbox index change (for tracking current position for prefetching)
-  const handleLightboxIndexChange = useCallback((index) => {
+  const handleLightboxIndexChange = useCallback((index: number) => {
     setTrackedIndex(index);
   }, []);
 
@@ -113,7 +122,7 @@ export function usePaginatedLightbox({
   }, []);
 
   // Open lightbox at a specific image
-  const openLightbox = useCallback((index, autoPlay = false) => {
+  const openLightbox = useCallback((index: number, autoPlay = false) => {
     setLightboxIndex(index);
     setLightboxAutoPlay(autoPlay);
     setLightboxOpen(true);
@@ -151,7 +160,7 @@ export function usePaginatedLightbox({
     ) {
       prefetchingRef.current.next = currentPage + 1;
       fetchPage(currentPage + 1)
-        .then(({ images }) => {
+        .then(({ images }: { images: any[] }) => {
           // Only update if we're still on the same page
           if (prefetchingRef.current.next === currentPage + 1) {
             setNextPageImages(images.slice(0, PREFETCH_COUNT));
@@ -172,7 +181,7 @@ export function usePaginatedLightbox({
     ) {
       prefetchingRef.current.prev = currentPage - 1;
       fetchPage(currentPage - 1)
-        .then(({ images }) => {
+        .then(({ images }: { images: any[] }) => {
           // Only update if we're still on the same page
           if (prefetchingRef.current.prev === currentPage - 1) {
             setPrevPageImages(images.slice(-PREFETCH_COUNT));

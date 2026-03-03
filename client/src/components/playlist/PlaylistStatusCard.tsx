@@ -13,13 +13,31 @@ import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem";
 import { getSceneTitle } from "../../utils/format";
 import { Button } from "../ui/index";
 
+interface PlaylistScene {
+  sceneId: string;
+  instanceId?: string;
+  scene?: {
+    title?: string;
+    paths?: { screenshot?: string };
+  };
+}
+
+interface Playlist {
+  id?: string;
+  name?: string;
+  scenes?: PlaylistScene[];
+  autoplayNext?: boolean;
+  shuffle?: boolean;
+  repeat?: string;
+}
+
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist
  * Displays current position, navigation controls, and quick scene access
  */
 const PlaylistStatusCard = () => {
   const {
-    playlist,
+    playlist: rawPlaylist,
     currentIndex,
     gotoSceneIndex,
     nextScene,
@@ -29,6 +47,7 @@ const PlaylistStatusCard = () => {
     toggleShuffle,
     toggleRepeat,
   } = useScenePlayer();
+  const playlist = rawPlaylist as Playlist | null;
 
   // Auto-scroll to current thumbnail for both md (tablet) and mobile layouts
   // This component is visible from sm to lg breakpoints (lg:hidden wrapper in Scene.jsx)
@@ -49,17 +68,17 @@ const PlaylistStatusCard = () => {
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeftPos = useRef(0);
-  const scrollContainer = useRef(null);
+  const scrollContainer = useRef<HTMLElement | null>(null);
   const hasDragged = useRef(false);
 
   // Add/remove document-level listeners for mouse events (drag-to-scroll)
   useEffect(() => {
-    const handleMouseDown = (e) => {
+    const handleMouseDown = (e: MouseEvent) => {
       // Check if mouse is in either scroll container (use ElRef for reading .current)
-      let activeContainer = null;
-      if (mdScrollElRef.current?.contains(e.target)) {
+      let activeContainer: HTMLElement | null = null;
+      if (mdScrollElRef.current?.contains(e.target as Node)) {
         activeContainer = mdScrollElRef.current;
-      } else if (smScrollElRef.current?.contains(e.target)) {
+      } else if (smScrollElRef.current?.contains(e.target as Node)) {
         activeContainer = smScrollElRef.current;
       }
 
@@ -80,7 +99,7 @@ const PlaylistStatusCard = () => {
       activeContainer.style.userSelect = "none";
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current || !scrollContainer.current) return;
 
       e.preventDefault();
@@ -129,7 +148,7 @@ const PlaylistStatusCard = () => {
   const hasNext = currentIndex < totalScenes - 1;
   const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
 
-  const navigateToScene = (index) => {
+  const navigateToScene = (index: number) => {
     // Prevent navigation if we just dragged
     if (hasDragged.current) {
       hasDragged.current = false;
@@ -150,11 +169,16 @@ const PlaylistStatusCard = () => {
 
     // Preserve fullscreen state
     if (isPlaying) {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element;
+        mozFullScreenElement?: Element;
+        msFullscreenElement?: Element;
+      };
       const isFullscreen =
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement;
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement;
       if (isFullscreen) {
         sessionStorage.setItem("videoPlayerFullscreen", "true");
       }
@@ -522,39 +546,43 @@ const PlaylistStatusCard = () => {
                 const isCurrent = index === currentIndex;
 
                 return (
-                  <Button
+                  <div
                     key={item.sceneId}
                     ref={isCurrent ? setMdCurrentRef : null}
-                    onClick={() => navigateToScene(index)}
-                    variant="tertiary"
-                    className="flex-shrink-0 overflow-hidden !p-0"
-                    style={{
-                      width: isCurrent ? "120px" : "80px",
-                      height: isCurrent ? "68px" : "45px",
-                      border: isCurrent
-                        ? "2px solid var(--accent-color)"
-                        : "1px solid var(--border-color)",
-                      opacity: isCurrent ? 1 : 0.6,
-                    }}
-                    title={getSceneTitle(scene)}
+                    className="flex-shrink-0"
                   >
-                    {scene?.paths?.screenshot ? (
-                      <img
-                        src={scene.paths.screenshot}
-                        alt={scene.title || `Scene ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center"
-                        style={{ backgroundColor: "var(--bg-secondary)" }}
-                      >
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {index + 1}
-                        </span>
-                      </div>
-                    )}
-                  </Button>
+                    <Button
+                      onClick={() => navigateToScene(index)}
+                      variant="tertiary"
+                      className="flex-shrink-0 overflow-hidden !p-0"
+                      style={{
+                        width: isCurrent ? "120px" : "80px",
+                        height: isCurrent ? "68px" : "45px",
+                        border: isCurrent
+                          ? "2px solid var(--accent-color)"
+                          : "1px solid var(--border-color)",
+                        opacity: isCurrent ? 1 : 0.6,
+                      }}
+                      title={getSceneTitle((scene as Record<string, unknown>) ?? null)}
+                    >
+                      {scene?.paths?.screenshot ? (
+                        <img
+                          src={scene.paths.screenshot}
+                          alt={scene.title || `Scene ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{ backgroundColor: "var(--bg-secondary)" }}
+                        >
+                          <span style={{ color: "var(--text-muted)" }}>
+                            {index + 1}
+                          </span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 );
               })}
             </div>
@@ -581,39 +609,43 @@ const PlaylistStatusCard = () => {
                 const isCurrent = index === currentIndex;
 
                 return (
-                  <Button
+                  <div
                     key={item.sceneId}
                     ref={isCurrent ? setSmCurrentRef : null}
-                    onClick={() => navigateToScene(index)}
-                    variant="tertiary"
-                    className="flex-shrink-0 overflow-hidden !p-0"
-                    style={{
-                      width: isCurrent ? "120px" : "80px",
-                      height: isCurrent ? "68px" : "45px",
-                      border: isCurrent
-                        ? "2px solid var(--accent-color)"
-                        : "1px solid var(--border-color)",
-                      opacity: isCurrent ? 1 : 0.6,
-                    }}
-                    title={getSceneTitle(scene)}
+                    className="flex-shrink-0"
                   >
-                    {scene?.paths?.screenshot ? (
-                      <img
-                        src={scene.paths.screenshot}
-                        alt={scene.title || `Scene ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center"
-                        style={{ backgroundColor: "var(--bg-secondary)" }}
-                      >
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {index + 1}
-                        </span>
-                      </div>
-                    )}
-                  </Button>
+                    <Button
+                      onClick={() => navigateToScene(index)}
+                      variant="tertiary"
+                      className="flex-shrink-0 overflow-hidden !p-0"
+                      style={{
+                        width: isCurrent ? "120px" : "80px",
+                        height: isCurrent ? "68px" : "45px",
+                        border: isCurrent
+                          ? "2px solid var(--accent-color)"
+                          : "1px solid var(--border-color)",
+                        opacity: isCurrent ? 1 : 0.6,
+                      }}
+                      title={getSceneTitle((scene as Record<string, unknown>) ?? null)}
+                    >
+                      {scene?.paths?.screenshot ? (
+                        <img
+                          src={scene.paths.screenshot}
+                          alt={scene.title || `Scene ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{ backgroundColor: "var(--bg-secondary)" }}
+                        >
+                          <span style={{ color: "var(--text-muted)" }}>
+                            {index + 1}
+                          </span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 );
               })}
             </div>

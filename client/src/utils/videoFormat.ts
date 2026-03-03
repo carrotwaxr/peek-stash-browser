@@ -4,7 +4,7 @@
  */
 
 // Codec to MIME type mapping for browser testing
-const CODEC_MIME_TYPES = {
+const CODEC_MIME_TYPES: Record<string, string> = {
   // Video codecs
   h264: "avc1.42E01E", // H.264 baseline profile
   h265: "hev1.1.6.L93.B0", // H.265/HEVC main profile
@@ -25,7 +25,7 @@ const CODEC_MIME_TYPES = {
 };
 
 // Container to MIME type mapping
-const CONTAINER_MIME_TYPES = {
+const CONTAINER_MIME_TYPES: Record<string, string> = {
   mp4: "video/mp4",
   mov: "video/mp4", // MOV uses MP4 structure
   webm: "video/webm",
@@ -43,7 +43,7 @@ const codecSupportCache = new Map();
  * @param {string} audioCodec - Audio codec name
  * @returns {boolean}
  */
-function testCodecSupport(container, videoCodec, audioCodec) {
+function testCodecSupport(container: string, videoCodec: string, audioCodec: string) {
   const cacheKey = `${container}/${videoCodec}/${audioCodec}`;
 
   if (codecSupportCache.has(cacheKey)) {
@@ -86,7 +86,14 @@ function testCodecSupport(container, videoCodec, audioCodec) {
  * @param {Object} file - The file object from the scene
  * @returns {Object} - { canDirectPlay: boolean, reason: string, fallbackRequired: boolean }
  */
-export function canDirectPlayVideo(file) {
+interface VideoFile {
+  format?: string;
+  video_codec?: string;
+  audio_codec?: string;
+  [key: string]: unknown;
+}
+
+export function canDirectPlayVideo(file: VideoFile | null) {
   if (!file) {
     return {
       canDirectPlay: false,
@@ -95,13 +102,13 @@ export function canDirectPlayVideo(file) {
     };
   }
 
-  const { format, video_codec, audio_codec } = file;
+  const { format, video_codec, audio_codec } = file as { format?: string; video_codec?: string; audio_codec?: string };
 
   // Always allow common web formats - let the browser decide
   const commonFormats = ["mp4", "webm", "mov"];
-  if (commonFormats.includes(format?.toLowerCase())) {
+  if (format && commonFormats.includes(format.toLowerCase())) {
     // Test actual codec support
-    const supported = testCodecSupport(format, video_codec, audio_codec);
+    const supported = testCodecSupport(format, video_codec || "", audio_codec || "");
 
     if (supported) {
       return {

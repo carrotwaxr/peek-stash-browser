@@ -5,7 +5,7 @@ import SceneSearch from "../scene-search/SceneSearch";
 
 const Scenes = () => {
   usePageTitle("Scenes");
-  const pageRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // Set initial focus to first scene card when page loads
   useInitialFocus(pageRef, '[tabindex="0"]', true);

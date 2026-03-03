@@ -11,6 +11,7 @@ import {
   PageHeader,
   PageLayout,
   TabNavigation,
+  TAB_COUNT_LOADING,
 } from "../ui/index";
 
 /**
@@ -19,7 +20,7 @@ import {
 const HiddenItemsPage = () => {
   const { getHiddenEntities, unhideEntity, unhideAll } = useHiddenEntities();
   const [activeTab, setActiveTab] = useState("all");
-  const [hiddenItems, setHiddenItems] = useState([]);
+  const [hiddenItems, setHiddenItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoringAll, setRestoringAll] = useState(false);
 
@@ -27,14 +28,14 @@ const HiddenItemsPage = () => {
   const { goBack, backButtonText } = useNavigationState();
 
   const tabs = [
-    { id: "all", label: "All" },
-    { id: "scene", label: "Scenes" },
-    { id: "performer", label: "Performers" },
-    { id: "studio", label: "Studios" },
-    { id: "tag", label: "Tags" },
-    { id: "group", label: "Collections" },
-    { id: "gallery", label: "Galleries" },
-    { id: "image", label: "Images" },
+    { id: "all", label: "All", count: TAB_COUNT_LOADING as number },
+    { id: "scene", label: "Scenes", count: TAB_COUNT_LOADING as number },
+    { id: "performer", label: "Performers", count: TAB_COUNT_LOADING as number },
+    { id: "studio", label: "Studios", count: TAB_COUNT_LOADING as number },
+    { id: "tag", label: "Tags", count: TAB_COUNT_LOADING as number },
+    { id: "group", label: "Collections", count: TAB_COUNT_LOADING as number },
+    { id: "gallery", label: "Galleries", count: TAB_COUNT_LOADING as number },
+    { id: "image", label: "Images", count: TAB_COUNT_LOADING as number },
   ];
 
   const loadHiddenItems = useCallback(async () => {
@@ -49,11 +50,11 @@ const HiddenItemsPage = () => {
     loadHiddenItems();
   }, [loadHiddenItems]);
 
-  const handleRestore = async (item) => {
+  const handleRestore = async (item: Record<string, unknown>) => {
     const entityName = getEntityName(item);
     const success = await unhideEntity({
-      entityType: item.entityType,
-      entityId: item.entityId,
+      entityType: item.entityType as string,
+      entityId: item.entityId as string,
       entityName,
     });
 
@@ -77,18 +78,19 @@ const HiddenItemsPage = () => {
   };
 
   // Group items by type for "All" tab
-  const groupedItems =
+  const groupedItems: Record<string, Record<string, unknown>[]> =
     activeTab === "all"
-      ? hiddenItems.reduce((acc, item) => {
-          if (!acc[item.entityType]) {
-            acc[item.entityType] = [];
+      ? hiddenItems.reduce((acc: Record<string, Record<string, unknown>[]>, item) => {
+          const type = item.entityType as string;
+          if (!acc[type]) {
+            acc[type] = [];
           }
-          acc[item.entityType].push(item);
+          acc[type].push(item);
           return acc;
         }, {})
       : { [activeTab]: hiddenItems };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
       year: "numeric",
@@ -97,23 +99,24 @@ const HiddenItemsPage = () => {
     });
   };
 
-  const capitalizeType = (type) => {
+  const capitalizeType = (type: string): string => {
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
   /**
    * Get display name for an entity based on its type
    */
-  const getEntityName = (item) => {
+  const getEntityName = (item: Record<string, unknown>): string => {
     if (!item.entity) return "Unknown";
 
     // Scenes use getSceneTitle which handles basename fallback
     if (item.entityType === "scene") {
-      return getSceneTitle(item.entity);
+      return getSceneTitle(item.entity as Record<string, unknown>);
     }
 
     // Other entities use name or title
-    return item.entity.name || item.entity.title || "Unknown";
+    const entity = item.entity as Record<string, unknown>;
+    return (entity.name as string) || (entity.title as string) || "Unknown";
   };
 
   return (
@@ -145,7 +148,7 @@ const HiddenItemsPage = () => {
         )}
       </div>
 
-      <TabNavigation tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      <TabNavigation tabs={tabs} defaultTab="all" onTabChange={setActiveTab} />
 
       <div className="p-4">
         {loading ? (
@@ -154,7 +157,7 @@ const HiddenItemsPage = () => {
           </div>
         ) : hiddenItems.length === 0 ? (
           <EmptyState
-            message={
+            title={
               activeTab === "all"
                 ? "No hidden items"
                 : `No hidden ${activeTab}s`
@@ -177,11 +180,12 @@ const HiddenItemsPage = () => {
                 <div className="space-y-2">
                   {items.map((item) => {
                     const entityName = getEntityName(item);
-                    const hasImage = item.entity?.image_path;
+                    const entity = item.entity as Record<string, unknown> | undefined;
+                    const hasImage = entity?.image_path;
 
                     return (
                       <div
-                        key={item.id}
+                        key={item.id as string}
                         className="flex items-center gap-4 p-3 rounded border"
                         style={{
                           backgroundColor: "var(--bg-card)",
@@ -189,15 +193,15 @@ const HiddenItemsPage = () => {
                         }}
                       >
                         {/* Thumbnail */}
-                        {hasImage && (
+                        {hasImage ? (
                           <LazyImage
                             src={`/api/proxy/stash?path=${encodeURIComponent(
-                              item.entity.image_path
+                              entity?.image_path as string
                             )}`}
                             alt={entityName}
                             className="w-16 h-16 object-cover rounded"
                           />
-                        )}
+                        ) : null}
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -211,7 +215,7 @@ const HiddenItemsPage = () => {
                             className="text-sm opacity-70"
                             style={{ color: "var(--text-secondary)" }}
                           >
-                            Hidden on {formatDate(item.hiddenAt)}
+                            Hidden on {formatDate(item.hiddenAt as string)}
                           </div>
                         </div>
 

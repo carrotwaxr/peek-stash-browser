@@ -1,20 +1,34 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import TableHeader from "./TableHeader";
 import { getCellRenderer } from "./cellRenderers";
 import { useConfig } from "../../contexts/ConfigContext";
 
+interface ColumnDef {
+  id: string;
+  label: string;
+  sortable: boolean;
+  width: string;
+  mandatory: boolean;
+}
+
+interface SortState {
+  field: string;
+  direction: "ASC" | "DESC";
+}
+
+interface Props {
+  items: Array<Record<string, unknown>>;
+  columns: ColumnDef[];
+  sort?: SortState | null;
+  onSort?: (field: string, direction: "ASC" | "DESC") => void;
+  onHideColumn?: (columnId: string) => void;
+  entityType: string;
+  isLoading?: boolean;
+  columnsPopover?: ReactNode;
+}
+
 /**
  * TableView - Main table view component for displaying entity lists
- *
- * @param {Object} props
- * @param {Array} props.items - Array of entities to display
- * @param {Array<{id: string, label: string, sortable: boolean, width: string, mandatory: boolean}>} props.columns - Array of visible column objects with metadata
- * @param {Object} props.sort - Current sort state { field, direction }
- * @param {Function} props.onSort - Called when sortable header clicked (field, direction)
- * @param {Function} props.onHideColumn - Called from context menu to hide a column (columnId)
- * @param {string} props.entityType - Entity type for cell rendering
- * @param {boolean} props.isLoading - Whether data is loading (default: false)
- * @param {React.ReactNode} props.columnsPopover - Optional columns config popover to render in table header
  */
 const TableView = ({
   items,
@@ -25,14 +39,14 @@ const TableView = ({
   entityType,
   isLoading = false,
   columnsPopover,
-}) => {
+}: Props) => {
   const { hasMultipleInstances } = useConfig();
 
   // Context menu state: { columnId, x, y } or null
-  const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenu, setContextMenu] = useState<{ columnId: string; x: number; y: number } | null>(null);
 
   // Scroll state for showing/hiding the scroll hint
-  const scrollContainerRef = useRef(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const checkScrollState = useCallback(() => {
@@ -61,7 +75,7 @@ const TableView = ({
    * Handle right-click on column header
    * Opens context menu for non-mandatory columns
    */
-  const handleColumnContextMenu = (columnId, event) => {
+  const handleColumnContextMenu = (columnId: string, event: React.MouseEvent) => {
     event.preventDefault();
     setContextMenu({
       columnId,
@@ -136,7 +150,7 @@ const TableView = ({
 
     return items.map((item, index) => (
       <tr
-        key={item.id || index}
+        key={(item.id as React.Key) || index}
         className="transition-colors hover:bg-[var(--bg-card)]"
         style={{
           backgroundColor: index % 2 === 1 ? "var(--bg-secondary)" : "transparent",

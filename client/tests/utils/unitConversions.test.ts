@@ -34,8 +34,8 @@ describe("unitConversions", () => {
     });
 
     it("returns zeros for null/undefined input", () => {
-      expect(cmToFeetInches(null)).toEqual({ feet: 0, inches: 0 });
-      expect(cmToFeetInches(undefined)).toEqual({ feet: 0, inches: 0 });
+      expect(cmToFeetInches(null as any)).toEqual({ feet: 0, inches: 0 });
+      expect(cmToFeetInches(undefined as any)).toEqual({ feet: 0, inches: 0 });
     });
 
     it("converts 5 feet 10 inches to 178 cm", () => {
@@ -59,8 +59,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatHeight(null, UNITS.METRIC)).toBeNull();
-      expect(formatHeight(undefined, UNITS.IMPERIAL)).toBeNull();
+      expect(formatHeight(null as any, UNITS.METRIC)).toBeNull();
+      expect(formatHeight(undefined as any, UNITS.IMPERIAL)).toBeNull();
     });
   });
 
@@ -90,8 +90,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatWeight(null, UNITS.METRIC)).toBeNull();
-      expect(formatWeight(undefined, UNITS.IMPERIAL)).toBeNull();
+      expect(formatWeight(null as any, UNITS.METRIC)).toBeNull();
+      expect(formatWeight(undefined as any, UNITS.IMPERIAL)).toBeNull();
     });
   });
 
@@ -122,8 +122,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatLength(null, UNITS.METRIC)).toBeNull();
-      expect(formatLength(undefined, UNITS.IMPERIAL)).toBeNull();
+      expect(formatLength(null as any, UNITS.METRIC)).toBeNull();
+      expect(formatLength(undefined as any, UNITS.IMPERIAL)).toBeNull();
     });
   });
 });

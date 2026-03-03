@@ -126,8 +126,10 @@ describe("SearchControls - initialization notifications", () => {
             { id: "grid", label: "Grid" },
             { id: "table", label: "Table" },
             { id: "hierarchy", label: "Hierarchy" },
-          ]}
-        />
+          ] as any}
+        >
+          {null}
+        </SearchControls>
       </MemoryRouter>
     );
 
@@ -157,7 +159,9 @@ describe("SearchControls - initialization notifications", () => {
           onPerPageStateChange={onPerPageStateChange}
           totalPages={5}
           totalCount={240}
-        />
+        >
+          {null}
+        </SearchControls>
       </MemoryRouter>
     );
 
@@ -190,8 +194,10 @@ describe("SearchControls - initialization notifications", () => {
           viewModes={[
             { id: "grid", label: "Grid" },
             { id: "table", label: "Table" },
-          ]}
-        />
+          ] as any}
+        >
+          {null}
+        </SearchControls>
       </MemoryRouter>
     );
 

@@ -11,20 +11,21 @@ import Button from "./Button";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index";
 
 // Helper to get context label for UI
-const getContextLabel = (ctx) => {
-  const labels = {
-    scene: "All Scenes page",
-    scene_performer: "Performer pages",
-    scene_tag: "Tag pages",
-    scene_studio: "Studio pages",
-    scene_group: "Group pages",
-    performer: "Performers page",
-    studio: "Studios page",
-    tag: "Tags page",
-    group: "Groups page",
-    gallery: "Galleries page",
-  };
-  return labels[ctx] || ctx;
+const contextLabels: Record<string, string> = {
+  scene: "All Scenes page",
+  scene_performer: "Performer pages",
+  scene_tag: "Tag pages",
+  scene_studio: "Studio pages",
+  scene_group: "Group pages",
+  performer: "Performers page",
+  studio: "Studios page",
+  tag: "Tags page",
+  group: "Groups page",
+  gallery: "Galleries page",
+};
+
+const getContextLabel = (ctx: string): string => {
+  return contextLabels[ctx] || ctx;
 };
 
 /**
@@ -44,6 +45,32 @@ const getContextLabel = (ctx) => {
  * @param {Object} props.currentTableColumns - Current table columns config { visible: [], order: [] }
  * @param {Function} props.onLoadPreset - Callback when a preset is loaded
  */
+interface PresetData {
+  filters: Record<string, unknown>;
+  sort: string;
+  direction: string;
+  viewMode?: string;
+  zoomLevel?: string;
+  gridDensity?: string;
+  tableColumns?: Record<string, unknown> | null;
+  perPage?: number | null;
+}
+
+interface Props {
+  artifactType: string;
+  context?: string;
+  currentFilters: Record<string, unknown>;
+  permanentFilters?: Record<string, unknown>;
+  currentSort: string;
+  currentDirection: string;
+  currentViewMode?: string;
+  currentZoomLevel?: string;
+  currentGridDensity?: string;
+  currentTableColumns?: Record<string, unknown> | null;
+  currentPerPage?: number;
+  onLoadPreset: (preset: PresetData) => void;
+}
+
 const FilterPresets = ({
   artifactType,
   context,
@@ -57,17 +84,30 @@ const FilterPresets = ({
   currentTableColumns = null,
   currentPerPage = 24,
   onLoadPreset,
-}) => {
+}: Props) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
-  const [presets, setPresets] = useState([]);
-  const [defaultPresetId, setDefaultPresetId] = useState(null);
+  interface Preset {
+    id: string;
+    name: string;
+    filters: Record<string, unknown>;
+    sort: string;
+    direction: string;
+    viewMode?: string;
+    zoomLevel?: string;
+    gridDensity?: string;
+    tableColumns?: Record<string, unknown> | null;
+    perPage?: number | null;
+  }
+
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [defaultPresetId, setDefaultPresetId] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [setAsDefault, setSetAsDefault] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch presets on mount
@@ -84,14 +124,14 @@ const FilterPresets = ({
         apiGet("/user/default-presets"),
       ]);
 
-      const allPresets = presetsResponse?.presets || {};
+      const allPresets = (presetsResponse as Record<string, unknown>)?.presets as Record<string, Preset[]> || {};
       // Get presets for the artifact type (scene grid contexts use "scene" presets)
       const presetArtifactType = effectiveContext.startsWith("scene_")
         ? "scene"
         : effectiveContext;
       setPresets(allPresets[presetArtifactType] || []);
 
-      const defaults = defaultsResponse?.defaults || {};
+      const defaults = (defaultsResponse as Record<string, unknown>)?.defaults as Record<string, string> || {};
       // Get default for this specific context
       setDefaultPresetId(defaults[effectiveContext] || null);
     } catch (err) {
@@ -141,13 +181,13 @@ const FilterPresets = ({
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || "Failed to save preset");
+      setError((err as Error).message || "Failed to save preset");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLoadPreset = (preset) => {
+  const handleLoadPreset = (preset: Preset) => {
     // Merge permanent filters back in when loading
     const mergedFilters = {
       ...preset.filters,
@@ -169,7 +209,7 @@ const FilterPresets = ({
     setTimeout(() => setSuccess(null), 3000);
   };
 
-  const handleToggleDefault = async (presetId, presetName, event) => {
+  const handleToggleDefault = async (presetId: string, presetName: string, event: React.MouseEvent) => {
     // Prevent the load preset action from triggering
     event.stopPropagation();
 
@@ -195,13 +235,13 @@ const FilterPresets = ({
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || "Failed to update default preset");
+      setError((err as Error).message || "Failed to update default preset");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeletePreset = async (presetId, presetName) => {
+  const handleDeletePreset = async (presetId: string, presetName: string) => {
     if (!confirm(`Delete preset "${presetName}"?`)) {
       return;
     }
@@ -219,7 +259,7 @@ const FilterPresets = ({
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || "Failed to delete preset");
+      setError((err as Error).message || "Failed to delete preset");
     } finally {
       setIsLoading(false);
     }
@@ -235,7 +275,7 @@ const FilterPresets = ({
       )}
       {error && (
         <div className="fixed top-4 right-4 z-50">
-          <ErrorMessage message={error} />
+          <ErrorMessage error={error} />
         </div>
       )}
 

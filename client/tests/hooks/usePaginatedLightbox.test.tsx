@@ -10,7 +10,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       expect(result.current.currentPage).toBe(1);
@@ -22,7 +22,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       act(() => {
@@ -41,7 +41,7 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 3,
           onExternalPageChange: vi.fn(),
-        })
+        } as any)
       );
 
       expect(result.current.currentPage).toBe(3);
@@ -55,7 +55,7 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       act(() => {
@@ -74,7 +74,7 @@ describe("usePaginatedLightbox", () => {
             totalCount: 100,
             externalPage,
             onExternalPageChange,
-          }),
+          } as any),
         { initialProps: { externalPage: 1 } }
       );
 
@@ -95,7 +95,7 @@ describe("usePaginatedLightbox", () => {
           externalPage: 1,
           onExternalPageChange,
           onPageChange,
-        })
+        } as any)
       );
 
       act(() => {
@@ -116,12 +116,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary("next");
+        handled = result.current.onPageBoundary!("next");
       });
 
       expect(handled).toBe(true);
@@ -137,12 +137,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 5,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary("prev");
+        handled = result.current.onPageBoundary!("prev");
       });
 
       expect(handled).toBe(true);
@@ -158,12 +158,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary("prev");
+        handled = result.current.onPageBoundary!("prev");
       });
 
       expect(handled).toBe(false);
@@ -178,12 +178,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 10, // last page
           onExternalPageChange,
-        })
+        } as any)
       );
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary("next");
+        handled = result.current.onPageBoundary!("next");
       });
 
       expect(handled).toBe(false);
@@ -195,7 +195,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 5, // only 1 page
-        })
+        } as any)
       );
 
       expect(result.current.onPageBoundary).toBeUndefined();
@@ -208,7 +208,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       expect(result.current.lightboxOpen).toBe(false);
@@ -227,7 +227,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       act(() => {
@@ -242,7 +242,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       act(() => {
@@ -263,7 +263,7 @@ describe("usePaginatedLightbox", () => {
         usePaginatedLightbox({
           perPage: 10,
           totalCount: 100,
-        })
+        } as any)
       );
 
       let pendingIndex;
@@ -282,12 +282,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       // Trigger page boundary navigation (forward)
       act(() => {
-        result.current.onPageBoundary("next");
+        result.current.onPageBoundary!("next");
       });
 
       expect(result.current.isPageTransitioning).toBe(true);
@@ -310,12 +310,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 5,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       // Trigger page boundary navigation (backward)
       act(() => {
-        result.current.onPageBoundary("prev");
+        result.current.onPageBoundary!("prev");
       });
 
       // Consume the pending navigation
@@ -335,12 +335,12 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange,
-        })
+        } as any)
       );
 
       // Trigger page boundary navigation
       act(() => {
-        result.current.onPageBoundary("next");
+        result.current.onPageBoundary!("next");
       });
 
       // Consume once
@@ -366,7 +366,7 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 3,
           onExternalPageChange: vi.fn(),
-        })
+        } as any)
       );
 
       // Page 3, perPage 10 -> offset should be (3-1) * 10 = 20
@@ -380,7 +380,7 @@ describe("usePaginatedLightbox", () => {
           totalCount: 100,
           externalPage: 1,
           onExternalPageChange: vi.fn(),
-        })
+        } as any)
       );
 
       expect(result.current.pageOffset).toBe(0);

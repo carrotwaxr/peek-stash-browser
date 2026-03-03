@@ -5,6 +5,42 @@ import { Button, Paper } from "../ui/index";
 import { apiPut, apiDelete, getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../api";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
+interface UserData {
+  id: number;
+  username: string;
+  role: string;
+  setupCompleted?: boolean;
+}
+
+interface GroupData {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
+interface PermissionSources {
+  canShare: string;
+  canDownloadFiles: string;
+  canDownloadPlaylists: string;
+}
+
+interface UserPermissions {
+  canShare: boolean;
+  canDownloadFiles: boolean;
+  canDownloadPlaylists: boolean;
+  sources: PermissionSources;
+}
+
+interface UserEditModalContentProps {
+  user: UserData;
+  groups?: GroupData[];
+  currentUser: UserData | null;
+  onClose: () => void;
+  onSave?: () => void;
+  onMessage?: (message: string) => void;
+  onError?: (message: string) => void;
+}
+
 /**
  * UserEditModalContent - Inner component that handles the modal content
  * This is separated to ensure hooks are always called (user is guaranteed to exist)
@@ -18,23 +54,23 @@ const UserEditModalContent = ({
   onSave,
   onMessage,
   onError,
-}) => {
+}: UserEditModalContentProps) => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Check if editing current user
   const isCurrentUser = user?.id === currentUser?.id;
 
   // Form state
   const [role, setRole] = useState(user.role || "USER");
-  const [userGroups, setUserGroups] = useState([]);
-  const [permissions, setPermissions] = useState(null);
+  const [userGroups, setUserGroups] = useState<number[]>([]);
+  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
    
 
   // Password reset state
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
-  const [generatedKey, setGeneratedKey] = useState(null);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
 
   // Content restrictions modal state
   const [showContentRestrictionsModal, setShowContentRestrictionsModal] = useState(false);
@@ -47,7 +83,8 @@ const UserEditModalContent = ({
     const loadUserGroups = async () => {
       try {
         const response = await getUserGroupMemberships(user.id);
-        const memberGroupIds = (response.groups || []).map((g) => g.id);
+        const groups = response.groups || [];
+        const memberGroupIds = groups.map((g) => (g as Record<string, unknown>).id as number);
         setUserGroups(memberGroupIds);
       } catch (err) {
         console.error("Failed to load user groups:", err);
@@ -63,7 +100,7 @@ const UserEditModalContent = ({
   useEffect(() => {
     const loadPermissions = async () => {
       try {
-        const response = await getUserPermissions(user.id);
+        const response = await getUserPermissions(user.id) as unknown as { permissions: UserPermissions };
         setPermissions(response.permissions);
       } catch (err) {
         console.error("Failed to load user permissions:", err);
@@ -75,34 +112,34 @@ const UserEditModalContent = ({
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
 
-  const handleGroupToggle = async (groupId, isCurrentlyMember) => {
+  const handleGroupToggle = async (groupId: number, isCurrentlyMember: boolean) => {
     try {
       if (isCurrentlyMember) {
-        await removeGroupMember(groupId, user.id);
+        await removeGroupMember(String(groupId), String(user.id));
         setUserGroups((prev) => prev.filter((id) => id !== groupId));
         onMessage?.(`Removed ${user.username} from group`);
       } else {
-        await addGroupMember(groupId, user.id);
+        await addGroupMember(String(groupId), user.id);
         setUserGroups((prev) => [...prev, groupId]);
         onMessage?.(`Added ${user.username} to group`);
       }
       setHasChanges(true);
-    } catch (err) {
-      setError(err.message || "Failed to update group membership");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to update group membership");
     }
   };
 
-  const handlePermissionOverride = async (permissionKey, newValue) => {
+  const handlePermissionOverride = async (permissionKey: string, newValue: boolean | null) => {
     try {
       const overrideKey = `${permissionKey}Override`;
       const response = await updateUserPermissionOverrides(user.id, {
         [overrideKey]: newValue,
-      });
+      }) as unknown as { permissions: UserPermissions };
       setPermissions(response.permissions);
       onMessage?.(`Permission updated for ${user.username}`);
       setHasChanges(true);
-    } catch (err) {
-      setError(err.message || "Failed to update permission");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to update permission");
     }
   };
 
@@ -149,8 +186,8 @@ const UserEditModalContent = ({
       onMessage?.(`Password reset for ${user.username}`);
       setShowPasswordReset(false);
       setNewPassword("");
-    } catch (err) {
-      setError(err.response?.data?.error || "Failed to reset password");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to reset password");
     } finally {
       setLoading(false);
     }
@@ -166,14 +203,14 @@ const UserEditModalContent = ({
       const response = await adminRegenerateRecoveryKey(user.id);
       setGeneratedKey(response.recoveryKey);
       onMessage?.(`Recovery key regenerated for ${user.username}`);
-    } catch (err) {
-      setError(err.response?.data?.error || "Failed to regenerate recovery key");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to regenerate recovery key");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderInheritanceLabel = (source) => {
+  const renderInheritanceLabel = (source: string) => {
     if (source === "override") {
       return (
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -713,11 +750,11 @@ const UserEditModalContent = ({
  * @param {Function} props.onError - Callback for error messages
  * @param {Object} props.api - API instance for requests
  */
-const UserEditModal = (props) => {
+const UserEditModal = (props: Omit<UserEditModalContentProps, 'user'> & { user: UserData | null }) => {
   // Early return before any hooks - this wrapper has no hooks
   if (!props.user) return null;
 
-  return <UserEditModalContent {...props} />;
+  return <UserEditModalContent {...props} user={props.user} />;
 };
 
 export default UserEditModal;

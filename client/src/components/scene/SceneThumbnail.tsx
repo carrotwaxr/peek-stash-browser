@@ -1,19 +1,22 @@
+import type { NormalizedScene, WatchHistoryData } from "@peek/shared-types";
 import {
   formatDurationCompact,
   formatResolution,
 } from "../../utils/format";
 import { SceneCardPreview } from "../ui/index";
 
+interface Props {
+  scene: NormalizedScene;
+  watchHistory?: WatchHistoryData | null;
+  className?: string;
+  autoplayOnScroll?: boolean;
+  objectFit?: "contain" | "cover";
+}
+
 /**
  * Scene thumbnail with animated preview and progress bar overlay
  * Uses SceneCardPreview for animation (hover on desktop, scroll on mobile)
  * Adds watch progress bar on top of the preview
- *
- * @param {Object} scene - Scene object with paths, files, etc.
- * @param {Object} watchHistory - Optional watch history with resumeTime
- * @param {string} className - Additional CSS classes
- * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (for mobile layouts)
- * @param {string} objectFit - CSS object-fit: "contain" (default) or "cover" for cropping
  */
 const SceneThumbnail = ({
   scene,
@@ -21,8 +24,8 @@ const SceneThumbnail = ({
   className = "",
   autoplayOnScroll = false,
   objectFit = "cover",
-}) => {
-  const formatResumeTime = (seconds) => {
+}: Props) => {
+  const formatResumeTime = (seconds: number) => {
     if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);

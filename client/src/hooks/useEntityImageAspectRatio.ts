@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-export const useEntityImageAspectRatio = (entityType) => {
+export const useEntityImageAspectRatio = (entityType: string) => {
   return useMemo(() => {
     if (["performer", "gallery", "group"].includes(entityType)) {
       return "2/3"; // Portrait

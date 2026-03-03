@@ -9,6 +9,21 @@ import Button from "./Button";
 import { useTVMode } from "../../hooks/useTVMode";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
 
+interface Props {
+  currentPage?: number;
+  totalPages: number;
+  onPageChange?: (page: number) => void;
+  perPage?: number;
+  onPerPageChange?: (perPage: number) => void;
+  totalCount?: number;
+  showInfo?: boolean;
+  showPerPageSelector?: boolean;
+  className?: string;
+  tvActive?: boolean;
+  onEscapeUp?: () => void;
+  onEscapeDown?: () => void;
+}
+
 /**
  * Reusable pagination component
  */
@@ -25,11 +40,10 @@ const Pagination = ({
   showInfo = true,
   showPerPageSelector = true,
   className = "",
-  // TV Mode props
   tvActive = false,
   onEscapeUp,
   onEscapeDown,
-}) => {
+}: Props) => {
   const { isTVMode } = useTVMode();
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -51,7 +65,7 @@ const Pagination = ({
     }
   }, [perPage, isPreset]);
 
-  const handlePresetChange = (value) => {
+  const handlePresetChange = (value: string) => {
     if (value === "custom") {
       setShowCustomInput(true);
       setCustomInput(String(perPage));
@@ -62,7 +76,7 @@ const Pagination = ({
     } else {
       const num = parseInt(value, 10);
       if (!isNaN(num) && num !== perPage) {
-        onPerPageChange(num);
+        onPerPageChange?.(num);
       }
       setShowCustomInput(false);
       setCustomInput("");
@@ -70,7 +84,7 @@ const Pagination = ({
     }
   };
 
-  const handleCustomInputChange = (value) => {
+  const handleCustomInputChange = (value: string) => {
     setCustomInput(value);
     const num = parseInt(value, 10);
     setCustomError(isNaN(num) || num < 1 || num > 500);
@@ -79,7 +93,7 @@ const Pagination = ({
   const handleCustomSubmit = () => {
     const num = parseInt(customInput, 10);
     if (!isNaN(num) && num >= 1 && num <= 500 && num !== perPage) {
-      onPerPageChange(num);
+      onPerPageChange?.(num);
     } else if (isNaN(num) || num < 1 || num > 500) {
       // Reset to current value if invalid
       setCustomInput(String(perPage));
@@ -87,9 +101,9 @@ const Pagination = ({
     }
   };
 
-  const handleCustomKeyDown = (e) => {
+  const handleCustomKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      e.target.blur();
+      (e.target as HTMLInputElement).blur();
     } else if (e.key === "Escape") {
       // Cancel custom input, revert to preset if possible
       if (isPreset) {
@@ -120,7 +134,7 @@ const Pagination = ({
     items: paginationItems,
     enabled: isTVMode && tvActive,
     onSelect: (item) => {
-      const element = document.querySelector(`[data-tv-pagination-item="${item.id}"]`);
+      const element = document.querySelector(`[data-tv-pagination-item="${item.id}"]`) as HTMLElement | null;
       if (element) {
         element.click();
         // For inputs/dropdowns, focus them so user can interact

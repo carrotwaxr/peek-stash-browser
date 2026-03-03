@@ -613,7 +613,16 @@ export const CLIP_COLUMNS = [
 /**
  * Entity type to columns mapping
  */
-const ENTITY_COLUMNS_MAP = {
+interface ColumnDefinition {
+  id: string;
+  label: string;
+  mandatory: boolean;
+  defaultVisible: boolean;
+  sortable: boolean;
+  width: string;
+}
+
+const ENTITY_COLUMNS_MAP: Record<string, ColumnDefinition[]> = {
   scene: SCENE_COLUMNS,
   scenes: SCENE_COLUMNS,
   performer: PERFORMER_COLUMNS,
@@ -636,7 +645,7 @@ const ENTITY_COLUMNS_MAP = {
  * Mapping of column IDs to sort fields where they differ
  * Key: "entityType:columnId", Value: sort field
  */
-const COLUMN_SORT_FIELD_OVERRIDES = {
+const COLUMN_SORT_FIELD_OVERRIDES: Record<string, string> = {
   "performer:age": "birthdate",
   "performers:age": "birthdate",
 };
@@ -646,7 +655,7 @@ const COLUMN_SORT_FIELD_OVERRIDES = {
  * @param {string} entityType - The entity type (scene, performer, studio, tag, gallery, image, group)
  * @returns {Array} Array of column definitions
  */
-export function getColumnsForEntity(entityType) {
+export function getColumnsForEntity(entityType: string) {
   const normalizedType = entityType?.toLowerCase();
   return ENTITY_COLUMNS_MAP[normalizedType] ?? [];
 }
@@ -656,7 +665,7 @@ export function getColumnsForEntity(entityType) {
  * @param {string} entityType - The entity type
  * @returns {Array<string>} Array of column IDs
  */
-export function getDefaultVisibleColumns(entityType) {
+export function getDefaultVisibleColumns(entityType: string) {
   const columns = getColumnsForEntity(entityType);
   return columns.filter((col) => col.defaultVisible).map((col) => col.id);
 }
@@ -666,7 +675,7 @@ export function getDefaultVisibleColumns(entityType) {
  * @param {string} entityType - The entity type
  * @returns {Array<string>} Array of column IDs
  */
-export function getDefaultColumnOrder(entityType) {
+export function getDefaultColumnOrder(entityType: string) {
   const columns = getColumnsForEntity(entityType);
   return columns.map((col) => col.id);
 }
@@ -677,7 +686,7 @@ export function getDefaultColumnOrder(entityType) {
  * @param {string} entityType - The entity type
  * @returns {string} The sort field to use
  */
-export function getColumnSortField(columnId, entityType) {
+export function getColumnSortField(columnId: string, entityType: string) {
   const normalizedType = entityType?.toLowerCase();
   const overrideKey = `${normalizedType}:${columnId}`;
 

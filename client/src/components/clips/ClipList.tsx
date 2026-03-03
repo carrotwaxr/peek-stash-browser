@@ -1,17 +1,23 @@
 import { useState } from "react";
-import ClipCard from "../cards/ClipCard";
+import ClipCard, { type Clip } from "../cards/ClipCard";
+
+interface Props {
+  clips: Clip[];
+  onClipClick?: (clip: Clip) => void;
+  loading?: boolean;
+}
 
 /**
  * ClipList - Displays clips for a scene with toggle for ungenerated
  */
-export default function ClipList({ clips, onClipClick, loading = false }) {
+export default function ClipList({ clips, onClipClick, loading = false }: Props) {
   const [showUngenerated, setShowUngenerated] = useState(false);
 
   const filteredClips = showUngenerated
     ? clips
-    : clips.filter((c) => c.isGenerated);
+    : clips.filter((c: Clip) => c.isGenerated);
 
-  const ungeneratedCount = clips.filter((c) => !c.isGenerated).length;
+  const ungeneratedCount = clips.filter((c: Clip) => !c.isGenerated).length;
 
   if (loading) {
     return (
@@ -58,12 +64,11 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
 
       {/* Clip grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {filteredClips.map((clip) => (
+        {filteredClips.map((clip: Clip) => (
           <ClipCard
             key={clip.id}
             clip={clip}
             onClick={onClipClick}
-            showSceneTitle={false}
           />
         ))}
       </div>

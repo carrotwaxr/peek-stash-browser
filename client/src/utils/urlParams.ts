@@ -10,11 +10,34 @@ import { makeCompositeKey } from "./compositeKey";
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
  * @returns {URLSearchParams} URL search params object
  */
-const filtersToUrlParams = (filters, filterOptions) => {
+interface FilterOption {
+  key: string;
+  type: string;
+  multi?: boolean;
+  modifierKey?: string;
+  hierarchyKey?: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface SearchState {
+  searchText: string;
+  sortField: string;
+  sortDirection: string;
+  currentPage: number;
+  perPage: number;
+  filters: Record<string, unknown>;
+  filterOptions: FilterOption[];
+  viewMode: string;
+  zoomLevel: string;
+  gridDensity: string;
+  timelinePeriod: string | null;
+}
+
+const filtersToUrlParams = (filters: Record<string, unknown>, filterOptions: FilterOption[]) => {
   const params = new URLSearchParams();
 
   filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
-    const value = filters[key];
+    const value = filters[key] as unknown;
 
     if (value === undefined || value === "" || value === false) {
       return; // Skip empty values
@@ -30,7 +53,7 @@ const filtersToUrlParams = (filters, filterOptions) => {
       case "select":
       case "text":
         if (value) {
-          params.set(key, value);
+          params.set(key, String(value));
         }
         break;
 
@@ -43,28 +66,32 @@ const filtersToUrlParams = (filters, filterOptions) => {
         } else {
           // Single select: just set the value
           if (value) {
-            params.set(key, value);
+            params.set(key, String(value));
           }
         }
         // Serialize modifier if present
         if (modifierKey && filters[modifierKey]) {
-          params.set(modifierKey, filters[modifierKey]);
+          params.set(modifierKey, String(filters[modifierKey]));
         }
         // Serialize hierarchy depth if present
         if (hierarchyKey && filters[hierarchyKey] !== undefined) {
-          params.set(hierarchyKey, filters[hierarchyKey].toString());
+          params.set(hierarchyKey, String(filters[hierarchyKey]));
         }
         break;
 
-      case "range":
-        if (value?.min) params.set(`${key}_min`, value.min);
-        if (value?.max) params.set(`${key}_max`, value.max);
+      case "range": {
+        const rangeVal = value as Record<string, string> | null;
+        if (rangeVal?.min) params.set(`${key}_min`, rangeVal.min);
+        if (rangeVal?.max) params.set(`${key}_max`, rangeVal.max);
         break;
+      }
 
-      case "date-range":
-        if (value?.start) params.set(`${key}_start`, value.start);
-        if (value?.end) params.set(`${key}_end`, value.end);
+      case "date-range": {
+        const dateVal = value as Record<string, string> | null;
+        if (dateVal?.start) params.set(`${key}_start`, dateVal.start);
+        if (dateVal?.end) params.set(`${key}_end`, dateVal.end);
         break;
+      }
     }
   });
 
@@ -78,13 +105,13 @@ const filtersToUrlParams = (filters, filterOptions) => {
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
  * @returns {Object} Filter state object
  */
-const urlParamsToFilters = (searchParams, filterOptions) => {
-  const filters = {};
+const urlParamsToFilters = (searchParams: URLSearchParams, filterOptions: FilterOption[]) => {
+  const filters: Record<string, unknown> = {};
 
   // Handle singular entity ID params from card indicator clicks
   // (e.g., /scenes?performerId=82&instance=abc-123 → performerIds: ["82:abc-123"])
   const instanceParam = searchParams.get("instance");
-  const singularToPlural = {
+  const singularToPlural: Record<string, string> = {
     performerId: "performerIds",
     studioId: "studioId", // studioId is already the correct key (single-select)
     tagId: "tagIds",
@@ -92,14 +119,14 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
     galleryId: "galleryIds",
   };
 
-  const singularProcessedKeys = new Set();
+  const singularProcessedKeys = new Set<string>();
   for (const [singular, pluralKey] of Object.entries(singularToPlural)) {
     if (searchParams.has(singular)) {
-      const rawId = searchParams.get(singular);
+      const rawId = searchParams.get(singular)!;
       const compositeId = makeCompositeKey(rawId, instanceParam);
 
       // Check if the plural key is multi-select or single-select
-      const filterOption = filterOptions.find((opt) => opt.key === pluralKey);
+      const filterOption = filterOptions.find((opt: FilterOption) => opt.key === pluralKey);
       if (filterOption?.multi) {
         filters[pluralKey] = [compositeId];
       } else {
@@ -133,7 +160,7 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
           if (multi) {
             // Multi-select: deserialize comma-separated string to array
             // Keep as strings (Stash uses string IDs)
-            filters[key] = value.split(",").filter(Boolean);
+            filters[key] = value!.split(",").filter(Boolean);
           } else {
             // Single select: just set the value
             filters[key] = value;
@@ -145,7 +172,7 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
         }
         // Deserialize hierarchy depth if present
         if (hierarchyKey && searchParams.has(hierarchyKey)) {
-          filters[hierarchyKey] = parseInt(searchParams.get(hierarchyKey), 10);
+          filters[hierarchyKey] = parseInt(searchParams.get(hierarchyKey)!, 10);
         }
         break;
 
@@ -153,9 +180,10 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
         const min = searchParams.get(`${key}_min`);
         const max = searchParams.get(`${key}_max`);
         if (min || max) {
-          filters[key] = {};
-          if (min) filters[key].min = min;
-          if (max) filters[key].max = max;
+          const rangeObj: Record<string, string> = {};
+          if (min) rangeObj.min = min;
+          if (max) rangeObj.max = max;
+          filters[key] = rangeObj;
         }
         break;
       }
@@ -164,9 +192,10 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
         const start = searchParams.get(`${key}_start`);
         const end = searchParams.get(`${key}_end`);
         if (start || end) {
-          filters[key] = {};
-          if (start) filters[key].start = start;
-          if (end) filters[key].end = end;
+          const dateObj: Record<string, string> = {};
+          if (start) dateObj.start = start;
+          if (end) dateObj.end = end;
+          filters[key] = dateObj;
         }
         break;
       }
@@ -203,7 +232,7 @@ export const buildSearchParams = ({
   zoomLevel,
   gridDensity,
   timelinePeriod,
-}) => {
+}: SearchState) => {
   const params = filtersToUrlParams(filters, filterOptions);
 
   if (searchText) params.set("q", searchText);
@@ -228,9 +257,9 @@ export const buildSearchParams = ({
  * @returns {Object} Complete search state
  */
 export const parseSearchParams = (
-  searchParams,
-  filterOptions,
-  defaults = {}
+  searchParams: URLSearchParams,
+  filterOptions: FilterOption[],
+  defaults: Partial<SearchState> = {}
 ) => {
   return {
     searchText: searchParams.get("q") || defaults.searchText || "",

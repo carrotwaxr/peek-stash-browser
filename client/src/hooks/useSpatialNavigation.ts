@@ -17,6 +17,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {number} options.initialFocusIndex Initial focus index (default: 0)
  * @returns {Object} Navigation state and helpers
  */
+interface SpatialNavigationOptions {
+  items?: any[];
+  columns?: number;
+  enabled?: boolean;
+  onSelect?: (item: any, index: number) => void;
+  onPageUp?: () => void;
+  onPageDown?: () => void;
+  onEscapeUp?: () => void;
+  onEscapeDown?: () => void;
+  onEscapeLeft?: () => void;
+  initialFocusIndex?: number;
+}
+
 export const useSpatialNavigation = ({
   items = [],
   columns = 4,
@@ -28,9 +41,9 @@ export const useSpatialNavigation = ({
   onEscapeDown,
   onEscapeLeft,
   initialFocusIndex = 0,
-}) => {
+}: SpatialNavigationOptions) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
-  const itemRefs = useRef([]);
+  const itemRefs = useRef<HTMLElement[]>([]);
 
   // Update refs array when items change
   useEffect(() => {
@@ -59,7 +72,7 @@ export const useSpatialNavigation = ({
   }, [focusedIndex, enabled]);
 
   const handleKeyDown = useCallback(
-    (e) => {
+    (e: KeyboardEvent) => {
       if (!enabled || !items.length) return;
 
       const totalItems = items.length;
@@ -170,7 +183,7 @@ export const useSpatialNavigation = ({
   }, [enabled, handleKeyDown]);
 
   // Helper to set ref for an item
-  const setItemRef = useCallback((index, element) => {
+  const setItemRef = useCallback((index: number, element: HTMLElement | null) => {
     if (element) {
       itemRefs.current[index] = element;
     }
@@ -178,7 +191,7 @@ export const useSpatialNavigation = ({
 
   // Helper to check if an index is focused
   const isFocused = useCallback(
-    (index) => {
+    (index: number) => {
       return enabled && focusedIndex === index;
     },
     [enabled, focusedIndex]

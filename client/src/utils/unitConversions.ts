@@ -21,7 +21,7 @@ export const UNITS = {
  * @param {number} cm - Height in centimeters
  * @returns {{ feet: number, inches: number }}
  */
-export const cmToFeetInches = (cm) => {
+export const cmToFeetInches = (cm: number) => {
   if (!cm) return { feet: 0, inches: 0 };
   const totalInches = cm / 2.54;
   const feet = Math.floor(totalInches / 12);
@@ -39,7 +39,7 @@ export const cmToFeetInches = (cm) => {
  * @param {number} inches
  * @returns {number} Height in centimeters
  */
-export const feetInchesToCm = (feet, inches) => {
+export const feetInchesToCm = (feet: number, inches: number) => {
   const totalInches = feet * 12 + inches;
   return Math.round(totalInches * 2.54);
 };
@@ -50,7 +50,7 @@ export const feetInchesToCm = (feet, inches) => {
  * @param {string} unit - UNITS.METRIC or UNITS.IMPERIAL
  * @returns {string|null}
  */
-export const formatHeight = (cm, unit) => {
+export const formatHeight = (cm: number, unit: string) => {
   if (!cm) return null;
   if (unit === UNITS.IMPERIAL) {
     const { feet, inches } = cmToFeetInches(cm);
@@ -64,14 +64,14 @@ export const formatHeight = (cm, unit) => {
  * @param {number} kg - Weight in kilograms
  * @returns {number} Weight in pounds (rounded)
  */
-export const kgToLbs = (kg) => Math.round(kg * 2.205);
+export const kgToLbs = (kg: number) => Math.round(kg * 2.205);
 
 /**
  * Convert pounds to kilograms
  * @param {number} lbs - Weight in pounds
  * @returns {number} Weight in kilograms (rounded)
  */
-export const lbsToKg = (lbs) => Math.round(lbs / 2.205);
+export const lbsToKg = (lbs: number) => Math.round(lbs / 2.205);
 
 /**
  * Format weight for display based on unit preference
@@ -79,7 +79,7 @@ export const lbsToKg = (lbs) => Math.round(lbs / 2.205);
  * @param {string} unit - UNITS.METRIC or UNITS.IMPERIAL
  * @returns {string|null}
  */
-export const formatWeight = (kg, unit) => {
+export const formatWeight = (kg: number, unit: string) => {
   if (!kg) return null;
   if (unit === UNITS.IMPERIAL) {
     return `${kgToLbs(kg)} lbs`;
@@ -92,14 +92,14 @@ export const formatWeight = (kg, unit) => {
  * @param {number} cm - Length in centimeters
  * @returns {number} Length in inches
  */
-export const cmToInches = (cm) => Math.round((cm / 2.54) * 10) / 10;
+export const cmToInches = (cm: number) => Math.round((cm / 2.54) * 10) / 10;
 
 /**
  * Convert inches to centimeters (1 decimal place)
  * @param {number} inches - Length in inches
  * @returns {number} Length in centimeters
  */
-export const inchesToCm = (inches) => Math.round(inches * 2.54 * 10) / 10;
+export const inchesToCm = (inches: number) => Math.round(inches * 2.54 * 10) / 10;
 
 /**
  * Format length for display based on unit preference
@@ -107,7 +107,7 @@ export const inchesToCm = (inches) => Math.round(inches * 2.54 * 10) / 10;
  * @param {string} unit - UNITS.METRIC or UNITS.IMPERIAL
  * @returns {string|null}
  */
-export const formatLength = (cm, unit) => {
+export const formatLength = (cm: number, unit: string) => {
   if (cm === null || cm === undefined) return null;
   if (unit === UNITS.IMPERIAL) {
     return `${cmToInches(cm)} in`;

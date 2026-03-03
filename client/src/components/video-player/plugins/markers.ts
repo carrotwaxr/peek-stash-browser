@@ -1,8 +1,28 @@
 import videojs from "video.js";
 import CryptoJS from "crypto-js";
 
+interface MarkerSet {
+  dot?: HTMLElement;
+  range?: HTMLElement;
+}
+
+interface Marker {
+  seconds: number;
+  end_seconds?: number;
+  title: string;
+  primaryTag?: { name: string } | null;
+}
+
 class MarkersPlugin extends videojs.getPlugin("plugin") {
-  constructor(player) {
+  markers: Marker[];
+  markerDivs: MarkerSet[];
+  markerTooltip: HTMLElement | null;
+  defaultTooltip: HTMLElement | null;
+  layerHeight: number;
+  tagColors: Record<string, string>;
+  declare player: any;
+
+  constructor(player: any) {
     super(player);
 
     this.markers = [];
@@ -29,7 +49,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     });
   }
 
-  showMarkerTooltip(title, layer = 0) {
+  showMarkerTooltip(title: string, layer = 0) {
     if (!this.markerTooltip) return;
     this.markerTooltip.innerText = title;
     this.markerTooltip.style.right = `${-this.markerTooltip.clientWidth / 2}px`;
@@ -43,26 +63,25 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     if (this.defaultTooltip) this.defaultTooltip.style.visibility = "visible";
   }
 
-  addDotMarker(marker) {
+  addDotMarker(marker: Marker) {
     const duration = this.player.duration();
-    const markerSet = {};
     const seekBar = this.player.el().querySelector(".vjs-progress-holder");
 
-    markerSet.dot = videojs.dom.createEl("div");
-    markerSet.dot.className = "vjs-marker";
+    const dot: HTMLElement = videojs.dom.createEl("div");
+    dot.className = "vjs-marker";
     if (duration) {
       // marker is 6px wide - adjust by 3px to align to center not left side
-      markerSet.dot.style.left = `calc(${
+      dot.style.left = `calc(${
         (marker.seconds / duration) * 100
       }% - 3px)`;
-      markerSet.dot.style.visibility = "visible";
+      dot.style.visibility = "visible";
     }
 
     // Add event listeners to dot
-    markerSet.dot.addEventListener("click", () =>
+    dot.addEventListener("click", () =>
       this.player.currentTime(marker.seconds)
     );
-    markerSet.dot.toggleAttribute("marker-tooltip-shown", true);
+    dot.toggleAttribute("marker-tooltip-shown", true);
 
     // Set background color based on tag (if available)
     if (
@@ -70,27 +89,28 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
       marker.primaryTag.name &&
       this.tagColors[marker.primaryTag.name]
     ) {
-      markerSet.dot.style.backgroundColor =
+      dot.style.backgroundColor =
         this.tagColors[marker.primaryTag.name];
     }
-    markerSet.dot.addEventListener("mouseenter", () => {
+    dot.addEventListener("mouseenter", () => {
       this.showMarkerTooltip(marker.title);
-      if (markerSet.dot) markerSet.dot.toggleAttribute("marker-tooltip-shown", true);
+      dot.toggleAttribute("marker-tooltip-shown", true);
     });
 
-    markerSet.dot.addEventListener("mouseout", () => {
+    dot.addEventListener("mouseout", () => {
       this.hideMarkerTooltip();
-      if (markerSet.dot) markerSet.dot.toggleAttribute("marker-tooltip-shown", false);
+      dot.toggleAttribute("marker-tooltip-shown", false);
     });
 
+    const markerSet: MarkerSet = { dot };
     if (seekBar) {
-      seekBar.appendChild(markerSet.dot);
+      seekBar.appendChild(dot);
     }
     this.markers.push(marker);
     this.markerDivs.push(markerSet);
   }
 
-  addDotMarkers(markers) {
+  addDotMarkers(markers: Marker[]) {
     markers.forEach(this.addDotMarker, this);
   }
 
@@ -99,22 +119,22 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
    * Clips are converted to marker format with generated colors based on tag names
    * @param {Array} clips - Array of clip objects with seconds, title, and primaryTag
    */
-  addClipMarkers(clips) {
+  addClipMarkers(clips: any[]) {
     if (!clips || clips.length === 0) return;
 
     // Extract unique tag names and generate colors
     const tagNames = [...new Set(
       clips
-        .filter(clip => clip.primaryTag?.name)
-        .map(clip => clip.primaryTag.name)
-    )];
+        .filter((clip: any) => clip.primaryTag?.name)
+        .map((clip: any) => clip.primaryTag.name)
+    )] as string[];
 
     if (tagNames.length > 0) {
       this.findColors(tagNames);
     }
 
     // Convert clips to marker format and add them
-    const markers = clips.map(clip => ({
+    const markers = clips.map((clip: any) => ({
       seconds: clip.seconds,
       title: clip.title || "Untitled",
       primaryTag: clip.primaryTag,
@@ -123,21 +143,20 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     this.addDotMarkers(markers);
   }
 
-  renderRangeMarkers(markers, layer) {
+  renderRangeMarkers(markers: Marker[], layer: number) {
     const duration = this.player.duration();
     const parent = this.player.el().querySelector(".vjs-progress-control");
     const seekBar = this.player.el().querySelector(".vjs-progress-holder");
     if (!seekBar || !parent || !duration) return;
 
-    markers.forEach((marker) => {
+    markers.forEach((marker: Marker) => {
       this.renderRangeMarker(marker, layer, duration, seekBar, parent);
     });
   }
 
-  renderRangeMarker(marker, layer, duration, seekBar, parent) {
+  renderRangeMarker(marker: Marker, layer: number, duration: number, seekBar: HTMLElement, parent: HTMLElement) {
     if (!marker.end_seconds) return;
 
-    const markerSet = {};
     const rangeDiv = videojs.dom.createEl("div");
     rangeDiv.className = "vjs-marker-range";
 
@@ -165,32 +184,33 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
       rangeDiv.style.backgroundColor = this.tagColors[marker.primaryTag.name];
     }
 
-    markerSet.range = rangeDiv;
-    markerSet.range.style.display = "block";
-    markerSet.range.addEventListener("pointermove", (e) => {
+    const range: HTMLElement = rangeDiv;
+    range.style.display = "block";
+    range.addEventListener("pointermove", (e: Event) => {
       e.stopPropagation();
     });
-    markerSet.range.addEventListener("pointerover", (e) => {
+    range.addEventListener("pointerover", (e: Event) => {
       e.stopPropagation();
     });
-    markerSet.range.addEventListener("pointerout", (e) => {
+    range.addEventListener("pointerout", (e: Event) => {
       e.stopPropagation();
     });
-    markerSet.range.addEventListener("mouseenter", () => {
+    range.addEventListener("mouseenter", () => {
       this.showMarkerTooltip(marker.title, layer);
-      if (markerSet.range) markerSet.range.toggleAttribute("marker-tooltip-shown", true);
+      range.toggleAttribute("marker-tooltip-shown", true);
     });
 
-    markerSet.range.addEventListener("mouseout", () => {
+    range.addEventListener("mouseout", () => {
       this.hideMarkerTooltip();
-      if (markerSet.range) markerSet.range.toggleAttribute("marker-tooltip-shown", false);
+      range.toggleAttribute("marker-tooltip-shown", false);
     });
     parent.appendChild(rangeDiv);
+    const markerSet: MarkerSet = { range };
     this.markers.push(marker);
     this.markerDivs.push(markerSet);
   }
 
-  addRangeMarkers(markers) {
+  addRangeMarkers(markers: Marker[]) {
     let remainingMarkers = [...markers];
     let layerNum = 0;
 
@@ -209,13 +229,13 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Use dynamic programming to find maximum weight independent set (ie the set of markers that have the highest total duration that don't overlap)
-  findMWIS(markers) {
+  findMWIS(markers: Marker[]): Marker[] {
     if (!markers.length) return [];
 
     // Sort markers by end time
     markers = markers
       .slice()
-      .sort((a, b) => (a.end_seconds || 0) - (b.end_seconds || 0));
+      .sort((a: Marker, b: Marker) => (a.end_seconds || 0) - (b.end_seconds || 0));
     const n = markers.length;
 
     // Compute p(j) for each marker. This is the index of the marker that has the highest end time that doesn't overlap with marker j
@@ -240,7 +260,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     }
 
     // Reconstruct optimal solution
-    const findSolution = (j) => {
+    const findSolution = (j: number): Marker[] => {
       if (j < 0) return [];
       const include =
         (markers[j].end_seconds || 0) - markers[j].seconds + (M[p[j]] || 0);
@@ -255,7 +275,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     return findSolution(n - 1);
   }
 
-  removeMarker(marker) {
+  removeMarker(marker: Marker) {
     const i = this.markers.indexOf(marker);
     if (i === -1) return;
 
@@ -270,7 +290,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     if (markerSet.range) markerSet.range.remove();
   }
 
-  removeMarkers(markers) {
+  removeMarkers(markers: Marker[]) {
     markers.forEach(this.removeMarker, this);
   }
 
@@ -288,9 +308,9 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Implementing the findColors method
-  findColors(tagNames) {
+  findColors(tagNames: string[]) {
     // Compute base hues for each tag
-    const baseHues = {};
+    const baseHues: Record<string, number> = {};
     for (const tag of tagNames) {
       baseHues[tag] = this.computeBaseHue(tag);
     }
@@ -307,7 +327,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   // Helper methods translated from Python
 
   // Compute base hue from tag name
-  computeBaseHue(tag) {
+  computeBaseHue(tag: string) {
     const hash = CryptoJS.SHA256(tag);
     const hashHex = hash.toString(CryptoJS.enc.Hex);
     const hashInt = BigInt(`0x${hashHex}`);
@@ -316,7 +336,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Calculate minimum acceptable hue difference based on number of tags
-  calculateDeltaMin(N) {
+  calculateDeltaMin(N: number) {
     const maxDeltaNeeded = 35;
     let scalingFactor;
 
@@ -333,8 +353,8 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Adjust hues to ensure minimum difference
-  adjustHues(baseHues) {
-    const adjustedHues = {};
+  adjustHues(baseHues: Record<string, number>) {
+    const adjustedHues: Record<string, number> = {};
     const tags = Object.keys(baseHues);
     const N = tags.length;
     const deltaMin = this.calculateDeltaMin(N);
@@ -386,7 +406,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Convert hue to RGB color in hex format
-  hueToColor(hue) {
+  hueToColor(hue: number) {
     // Convert hue from degrees to [0, 1)
     const hueNormalized = hue / 360.0;
     const saturation = 0.65;
@@ -400,7 +420,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Convert HSV to RGB
-  hsvToRgb(h, s, v) {
+  hsvToRgb(h: number, s: number, v: number) {
     const i = Math.floor(h * 6);
     const f = h * 6 - i;
     const p = v * (1 - s);
@@ -450,7 +470,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Convert a number to two-digit hex string
-  toHex(value) {
+  toHex(value: number) {
     return value.toString(16).padStart(2, "0");
   }
 }

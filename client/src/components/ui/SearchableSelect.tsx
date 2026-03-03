@@ -19,6 +19,20 @@ import Button from "./Button";
  * @param {"scenes"|"galleries"|"images"|"performers"|"groups"|null} props.countFilterContext - Filter entities to only those with content in this context
  */
 
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
+interface Props {
+  entityType: "performers" | "studios" | "tags" | "groups" | "galleries";
+  value: string | string[];
+  onChange: (value: string | string[]) => void;
+  multi?: boolean;
+  placeholder?: string;
+  countFilterContext?: "scenes" | "galleries" | "images" | "performers" | "groups" | null;
+}
+
 const SearchableSelect = ({
   entityType,
   value,
@@ -26,14 +40,14 @@ const SearchableSelect = ({
   multi = false,
   placeholder = "Select...",
   countFilterContext = null,
-}) => {
+}: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [options, setOptions] = useState([]);
+  const [options, setOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   // Initialize selectedItems as empty - will be populated by useEffect when value has items
-  const [selectedItems, setSelectedItems] = useState(() => {
+  const [selectedItems, setSelectedItems] = useState<SelectOption[]>(() => {
     // Ensure we start with empty array if value is empty/undefined
     if (!value || (Array.isArray(value) && value.length === 0)) {
       return [];
@@ -43,8 +57,8 @@ const SearchableSelect = ({
     return [];
   });
 
-  const dropdownRef = useRef(null);
-  const searchInputRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const prevEntityTypeRef = useRef(entityType);
   const prevCountFilterContextRef = useRef(countFilterContext);
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
@@ -54,7 +68,7 @@ const SearchableSelect = ({
   // API calls to avoid ambiguous lookups when the same entity ID exists across
   // multiple Stash instances.
   const fetchItemsByIds = useCallback(
-    async (compositeKeys) => {
+    async (compositeKeys: string[]) => {
       // Guard: don't fetch if no IDs provided
       if (!compositeKeys || compositeKeys.length === 0) {
         return [];
@@ -81,12 +95,12 @@ const SearchableSelect = ({
       };
 
       // Response extractor per entity type
-      const extractResults = {
-        performers: (r) => r?.findPerformers?.performers || [],
-        studios: (r) => r?.findStudios?.studios || [],
-        tags: (r) => r?.findTags?.tags || [],
-        groups: (r) => r?.findGroups?.groups || [],
-        galleries: (r) => r?.findGalleries?.galleries || [],
+      const extractResults: Record<string, (r: any) => any[]> = {
+        performers: (r: any) => r?.findPerformers?.performers || [],
+        studios: (r: any) => r?.findStudios?.studios || [],
+        tags: (r: any) => r?.findTags?.tags || [],
+        groups: (r: any) => r?.findGroups?.groups || [],
+        galleries: (r: any) => r?.findGalleries?.galleries || [],
       };
 
       // API method per entity type
@@ -115,10 +129,10 @@ const SearchableSelect = ({
 
           // Add instance filter for non-bare groups
           if (groupKey !== "__bare__" && filterKey) {
-            params[filterKey] = { instance_id: groupKey };
+            (params as Record<string, unknown>)[filterKey] = { instance_id: groupKey };
           }
 
-          const response = await apiMethod(params);
+          const response = await apiMethod(params as Record<string, unknown>);
           return extract(response);
         }
       );
@@ -151,11 +165,11 @@ const SearchableSelect = ({
     }
 
     const loadSelectedNames = async () => {
-      const valueArray = multi ? value : [value];
+      const valueArray: string[] = multi ? (value as string[]) : [value as string];
 
       // First, try to find in already-loaded options
       if (options.length > 0) {
-        const selected = options.filter((opt) => valueArray.includes(opt.id));
+        const selected = options.filter((opt: SelectOption) => valueArray.includes(opt.id));
         if (selected.length === valueArray.length) {
           setSelectedItems(selected);
           return;
@@ -166,7 +180,7 @@ const SearchableSelect = ({
       try {
         const cached = getCache(entityType);
         if (cached?.data) {
-          const selected = cached.data.filter((opt) =>
+          const selected = cached.data.filter((opt: { id: string }) =>
             valueArray.includes(opt.id)
           );
 
@@ -255,10 +269,10 @@ const SearchableSelect = ({
         };
 
         const count_filter = getCountFilter();
-        const rawResults = await apiMethod({ filter, count_filter });
+        const rawResults = await apiMethod({ filter, count_filter } as Record<string, unknown>);
 
         // Transform results to use composite id:instanceId keys
-        const results = rawResults.map((item) => ({
+        const results = (rawResults as Array<{ id: string; instanceId?: string; name?: string; title?: string }>).map((item) => ({
           id: makeCompositeKey(item.id, item.instanceId),
           name: item.name || item.title || "Unknown",
         }));
@@ -310,8 +324,8 @@ const SearchableSelect = ({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm("");
       }
@@ -333,13 +347,13 @@ const SearchableSelect = ({
     }
   }, [isOpen]);
 
-  const handleSelect = (option) => {
+  const handleSelect = (option: SelectOption) => {
     if (multi) {
-      const currentValue = value || [];
-      const isSelected = currentValue.includes(option.id);
+      const currentValue = (value || []) as string[];
+      const isAlreadySelected = currentValue.includes(option.id);
 
-      if (isSelected) {
-        onChange(currentValue.filter((id) => id !== option.id));
+      if (isAlreadySelected) {
+        onChange(currentValue.filter((id: string) => id !== option.id));
       } else {
         onChange([...currentValue, option.id]);
       }
@@ -350,23 +364,23 @@ const SearchableSelect = ({
     }
   };
 
-  const handleRemove = (optionId, e) => {
+  const handleRemove = (optionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (multi) {
-      onChange((value || []).filter((id) => id !== optionId));
+      onChange(((value || []) as string[]).filter((id: string) => id !== optionId));
     } else {
       onChange("");
     }
   };
 
-  const handleClearAll = (e) => {
+  const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't toggle dropdown
     onChange(multi ? [] : "");
   };
 
-  const isSelected = (optionId) => {
+  const isSelected = (optionId: string) => {
     if (multi) {
-      return (value || []).includes(optionId);
+      return ((value || []) as string[]).includes(optionId);
     }
     return value === optionId;
   };

@@ -1,15 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Heart, Info, Maximize, Minimize, Pause, Play, Plus, X } from "lucide-react";
 import { useSwipeable } from "react-swipeable";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, type ReactZoomPanPinchContentRef } from "react-zoom-pan-pinch";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import MetadataDrawer from "./MetadataDrawer";
+import type { NormalizedImage } from "@peek/shared-types";
 
 // Percentage of screen width on each side that triggers navigation on click
 const EDGE_ZONE_PERCENT = 0.15;
+
+interface Props {
+  images: NormalizedImage[];
+  initialIndex?: number;
+  isOpen: boolean;
+  onClose: () => void;
+  autoPlay?: boolean;
+  onImagesUpdate?: (images: NormalizedImage[]) => void;
+  onPageBoundary?: (direction: "next" | "prev") => boolean;
+  totalCount?: number;
+  pageOffset?: number;
+  onIndexChange?: (index: number) => void;
+  isPageTransitioning?: boolean;
+  transitionKey?: number;
+  prefetchImages?: NormalizedImage[];
+}
 
 const Lightbox = ({
   images,
@@ -18,24 +35,23 @@ const Lightbox = ({
   onClose,
   autoPlay = false,
   onImagesUpdate,
-  // Cross-page navigation support
-  onPageBoundary, // (direction: 'next' | 'prev') => boolean - returns true if page change handled
-  totalCount, // Total images across all pages (for counter display)
-  pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
-  onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
-  isPageTransitioning = false, // Whether we're loading a new page (show loading state, hide current image)
-  transitionKey = 0, // Increments on each page boundary crossing to force index reset
-  prefetchImages = [], // Images from adjacent pages to prefetch into browser cache
-}) => {
+  onPageBoundary,
+  totalCount,
+  pageOffset = 0,
+  onIndexChange,
+  isPageTransitioning = false,
+  transitionKey = 0,
+  prefetchImages = [],
+}: Props) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [intervalDuration, setIntervalDuration] = useState(5000); // Default 5 seconds
-  const intervalRef = useRef(null);
-  const viewTimerRef = useRef(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const viewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Rating, favorite, and O counter state for current image
-  const [rating, setRating] = useState(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [oCounter, setOCounter] = useState(0);
 
@@ -47,17 +63,17 @@ const Lightbox = ({
     autoOnLandscape: true,
     enabled: isOpen,
   });
-  const controlsTimeoutRef = useRef(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Zoom/pan state
   const [zoomScale, setZoomScale] = useState(1);
-  const transformRef = useRef(null);
+  const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null);
 
   // Double-tap/double-click preference and feedback
   const [doubleTapAction, setDoubleTapAction] = useState("favorite");
-  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState<string | null>(null); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
   const lastTapTimeRef = useRef(0);
-  const doubleTapFeedbackTimerRef = useRef(null);
+  const doubleTapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doubleTapGuardRef = useRef(0);
 
   // Fetch user's lightbox double-tap preference
@@ -65,7 +81,7 @@ const Lightbox = ({
     if (!isOpen) return;
     apiGet("/user/settings")
       .then((data) => {
-        const action = data?.settings?.lightboxDoubleTapAction;
+        const action = (data as { settings?: { lightboxDoubleTapAction?: string } })?.settings?.lightboxDoubleTapAction;
         if (action) setDoubleTapAction(action);
       })
       .catch(() => {
@@ -113,7 +129,7 @@ const Lightbox = ({
   // When we navigate across a page boundary, we store the current image ID as stale.
   // We refuse to show any image with this ID, preventing the flash of the wrong image
   // while waiting for the new page's data to arrive.
-  const staleImageIdRef = useRef(null);
+  const staleImageIdRef = useRef<string | null>(null);
 
   // Check if current image is stale (should not be displayed)
   const isShowingStaleImage = staleImageIdRef.current !== null && currentImageId === staleImageIdRef.current;
@@ -163,7 +179,7 @@ const Lightbox = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => setHasHoverCapability(e.matches);
+    const handleChange = (e: MediaQueryListEvent) => setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -262,7 +278,7 @@ const Lightbox = ({
 
   // Handle rating change
   const handleRatingChange = useCallback(
-    async (newRating) => {
+    async (newRating: number | null) => {
       const currentImage = images[currentIndex];
       if (!currentImage?.id) return;
 
@@ -298,7 +314,7 @@ const Lightbox = ({
 
   // Handle favorite change
   const handleFavoriteChange = useCallback(
-    async (newFavorite) => {
+    async (newFavorite: boolean) => {
       const currentImage = images[currentIndex];
       if (!currentImage?.id) return;
 
@@ -333,7 +349,7 @@ const Lightbox = ({
 
   // Handle O counter change
   const handleOCounterChange = useCallback(
-    (newCount) => {
+    (newCount: number) => {
       const currentImage = images[currentIndex];
       if (!currentImage?.id) return;
 
@@ -392,7 +408,7 @@ const Lightbox = ({
   }, [images, currentIndex, doubleTapAction, oCounter, isFavorite, handleOCounterChange, handleFavoriteChange, toggleFullscreen]);
 
   // Desktop double-click handler on image container
-  const handleDoubleClick = useCallback((e) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     // Only trigger in center zone (not edge navigation zones)
     const clickX = e.clientX;
     const screenWidth = window.innerWidth;
@@ -432,14 +448,14 @@ const Lightbox = ({
   }, [showControls]);
 
   // Toggle controls on tap (mobile), with double-tap detection
-  const handleTap = useCallback((e) => {
+  const handleTap = useCallback(({ event }: { event: React.MouseEvent | TouchEvent | MouseEvent }) => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapTimeRef.current;
     lastTapTimeRef.current = now;
 
     if (timeSinceLastTap < 300) {
       // Double-tap detected — check if in center zone
-      const tapX = e?.event?.clientX ?? window.innerWidth / 2;
+      const tapX = "clientX" in event ? event.clientX : window.innerWidth / 2;
       const screenWidth = window.innerWidth;
       const tapPercent = tapX / screenWidth;
       if (tapPercent >= EDGE_ZONE_PERCENT && tapPercent <= 1 - EDGE_ZONE_PERCENT) {
@@ -546,9 +562,9 @@ const Lightbox = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
 
       switch (e.key) {
         case "Escape":
@@ -615,11 +631,11 @@ const Lightbox = ({
 
   const currentImage = images[currentIndex];
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
-  const imageTitle = getImageTitle(currentImage);
+  const imageTitle = getImageTitle(currentImage as Parameters<typeof getImageTitle>[0]);
 
   // Handle backdrop click - edge zones navigate, center does nothing
   // Left 15% = previous, right 15% = next, center = no action
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: React.MouseEvent) => {
     // Close drawer if open
     if (drawerOpen) {
       setDrawerOpen(false);
@@ -852,8 +868,8 @@ const Lightbox = ({
             contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             <img
-              src={imageSrc}
-              alt={imageTitle}
+              src={imageSrc ?? undefined}
+              alt={imageTitle ?? undefined}
               className="max-w-full max-h-full object-contain"
               style={{
                 opacity: imageLoaded ? 1 : 0,

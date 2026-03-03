@@ -1,3 +1,8 @@
 import { createContext } from "react";
 
-export const TVModeContext = createContext(null);
+export interface TVModeContextValue {
+  isTVMode: boolean;
+  toggleTVMode: () => void;
+}
+
+export const TVModeContext = createContext<TVModeContextValue | null>(null);

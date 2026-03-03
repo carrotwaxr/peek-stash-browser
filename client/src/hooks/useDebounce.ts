@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * const debouncedSearch = useDebouncedValue(searchTerm, 300);
  * useEffect(() => { loadOptions(debouncedSearch); }, [debouncedSearch]);
  */
-export const useDebouncedValue = (value, delay = 300) => {
+export const useDebouncedValue = <T>(value: T, delay = 300): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
@@ -37,8 +37,8 @@ export const useDebouncedValue = (value, delay = 300) => {
  * const debouncedSave = useDebouncedCallback((value) => saveRating(value), 300);
  * const handleChange = (e) => { setValue(e.target.value); debouncedSave(e.target.value); };
  */
-export const useDebouncedCallback = (callback, delay = 300) => {
-  const timeoutRef = useRef(null);
+export const useDebouncedCallback = (callback: (...args: unknown[]) => void, delay = 300) => {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
 
   // Keep callback ref fresh to avoid stale closures
@@ -56,7 +56,7 @@ export const useDebouncedCallback = (callback, delay = 300) => {
   }, []);
 
   return useCallback(
-    (...args) => {
+    (...args: unknown[]) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }

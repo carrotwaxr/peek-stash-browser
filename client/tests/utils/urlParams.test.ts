@@ -9,12 +9,12 @@ import { buildSearchParams as _buildSearchParams, parseSearchParams } from "@/ut
 // Wrapper with defaults for optional params to avoid repeating them in every test
 const buildSearchParams = (params: Record<string, any>) =>
   _buildSearchParams({
-    viewMode: undefined,
-    zoomLevel: undefined,
-    gridDensity: undefined,
-    timelinePeriod: undefined,
+    viewMode: "",
+    zoomLevel: "",
+    gridDensity: "",
+    timelinePeriod: null,
     ...params,
-  });
+  } as Parameters<typeof _buildSearchParams>[0]);
 
 // Minimal filterOptions for testing - matches the shape from filterConfig.js
 const mockFilterOptions = [

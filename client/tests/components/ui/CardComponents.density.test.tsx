@@ -50,7 +50,7 @@ describe("CardComponents density", () => {
     });
 
     it("does not render wrapper when indicators is null", () => {
-      const { container } = render(<CardIndicators indicators={null} />);
+      const { container } = render(<CardIndicators indicators={undefined} />);
       expect(container.firstChild).toBeNull();
     });
   });
@@ -61,6 +61,9 @@ describe("CardComponents density", () => {
         <CardRatingRow
           entityType="scene"
           entityId="123"
+          initialRating={null}
+          initialFavorite={false}
+          initialOCounter={null}
           showRating={false}
           showFavorite={false}
           showOCounter={false}
@@ -71,7 +74,7 @@ describe("CardComponents density", () => {
       const row = menuButton.closest("div.flex.justify-between");
       // Row should exist and be more compact (1.5rem instead of 2rem)
       expect(row).toBeInTheDocument();
-      expect(row.style.height).toBe("1.5rem");
+      expect((row as HTMLElement).style.height).toBe("1.5rem");
     });
   });
 });

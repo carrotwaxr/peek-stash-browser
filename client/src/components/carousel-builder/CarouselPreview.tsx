@@ -1,16 +1,20 @@
 import { AlertCircle, Eye, Loader2, ImageOff } from "lucide-react";
+import type { NormalizedScene } from "@peek/shared-types";
 import { getSceneTitle } from "../../utils/format";
 import { useLazyLoad } from "../ui/CardComponents";
+
+interface Props {
+  scenes: NormalizedScene[] | null;
+  error: string | null;
+  loading: boolean;
+  onPreview?: () => void;
+}
 
 /**
  * CarouselPreview Component
  * Shows a preview of the carousel results after running the query.
- *
- * @param {Array} scenes - Preview scenes to display
- * @param {string} error - Error message if preview failed
- * @param {boolean} loading - Whether preview is loading
  */
-const CarouselPreview = ({ scenes, error, loading }) => {
+const CarouselPreview = ({ scenes, error, loading }: Props) => {
   return (
     <div
       className="rounded-lg border p-4 space-y-4"
@@ -96,17 +100,21 @@ const CarouselPreview = ({ scenes, error, loading }) => {
   );
 };
 
+interface PreviewCardProps {
+  scene: NormalizedScene;
+}
+
 /**
  * PreviewCard Component
  * Simple scene card for the preview grid.
  */
-const PreviewCard = ({ scene }) => {
+const PreviewCard = ({ scene }: PreviewCardProps) => {
   const thumbnailUrl = scene.paths?.screenshot;
   const [ref, shouldLoad] = useLazyLoad();
 
   return (
     <div
-      ref={ref}
+      ref={ref as React.Ref<HTMLDivElement>}
       className="rounded-lg overflow-hidden border"
       style={{
         backgroundColor: "var(--bg-secondary)",
@@ -146,9 +154,9 @@ const PreviewCard = ({ scene }) => {
         <p
           className="text-xs line-clamp-2"
           style={{ color: "var(--text-primary)" }}
-          title={getSceneTitle(scene)}
+          title={getSceneTitle(scene as unknown as Record<string, unknown>)}
         >
-          {getSceneTitle(scene)}
+          {getSceneTitle(scene as unknown as Record<string, unknown>)}
         </p>
       </div>
     </div>
@@ -158,7 +166,7 @@ const PreviewCard = ({ scene }) => {
 /**
  * Format duration from seconds to HH:MM:SS or MM:SS
  */
-const formatDuration = (seconds) => {
+const formatDuration = (seconds: number): string => {
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);

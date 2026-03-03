@@ -12,7 +12,7 @@ export const useWallPlayback = () => {
   useEffect(() => {
     const loadSetting = async () => {
       try {
-        const response = await apiGet("/user/settings");
+        const response = await apiGet<{ settings?: { wallPlayback?: string } }>("/user/settings");
         setWallPlayback(response.settings?.wallPlayback || "autoplay");
       } catch {
         // Default to autoplay on error
@@ -26,7 +26,7 @@ export const useWallPlayback = () => {
   }, []);
 
   // Update local state (called after API save succeeds in ContextSettings)
-  const updateWallPlayback = useCallback((value) => {
+  const updateWallPlayback = useCallback((value: string) => {
     setWallPlayback(value);
   }, []);
 

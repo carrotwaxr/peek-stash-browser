@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
  * const isMobile = useMediaQuery("(max-width: 768px)");
  * return isMobile ? <MobileView /> : <DesktopView />;
  */
-export function useMediaQuery(query) {
+export function useMediaQuery(query: string) {
   // Initialize with the current match state (SSR-safe fallback to false)
   const [matches, setMatches] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -27,7 +27,7 @@ export function useMediaQuery(query) {
     setMatches(mediaQueryList.matches);
 
     // Handler for media query changes
-    const handleChange = (event) => {
+    const handleChange = (event: MediaQueryListEvent) => {
       setMatches(event.matches);
     };
 

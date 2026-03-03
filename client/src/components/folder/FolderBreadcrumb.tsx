@@ -1,11 +1,22 @@
 // client/src/components/folder/FolderBreadcrumb.jsx
 import { LucideChevronRight, LucideHome } from "lucide-react";
 
+interface BreadcrumbItem {
+  id: string;
+  name: string;
+}
+
+interface Props {
+  breadcrumbs: BreadcrumbItem[];
+  onNavigate: (path: string[]) => void;
+  className?: string;
+}
+
 /**
  * Breadcrumb navigation for folder view.
  * Shows current path and allows jumping to any level.
  */
-const FolderBreadcrumb = ({ breadcrumbs, onNavigate, className = "" }) => {
+const FolderBreadcrumb = ({ breadcrumbs, onNavigate, className = "" }: Props) => {
   return (
     <nav
       className={`flex items-center gap-1 text-sm flex-wrap ${className}`}

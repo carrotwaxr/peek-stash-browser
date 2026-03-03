@@ -102,7 +102,7 @@ export const LANDING_PAGE_OPTIONS = [
  * @param {string} key - Landing page key
  * @returns {string} Path for the landing page, defaults to "/"
  */
-export const getLandingPagePath = (key) => {
+export const getLandingPagePath = (key: string) => {
   const option = LANDING_PAGE_OPTIONS.find((opt) => opt.key === key);
   return option?.path || "/";
 };
@@ -113,7 +113,7 @@ export const getLandingPagePath = (key) => {
  * @param {string} [currentPath] - Current path to exclude from random selection
  * @returns {string} Path to navigate to
  */
-export const getLandingPage = (preference, currentPath) => {
+export const getLandingPage = (preference: any, currentPath?: string) => {
   // Default fallback
   if (!preference || !preference.pages?.length) {
     return "/";
@@ -127,7 +127,7 @@ export const getLandingPage = (preference, currentPath) => {
         (opt) => opt.path === currentPath
       )?.key;
       if (currentKey) {
-        availablePages = preference.pages.filter((key) => key !== currentKey);
+        availablePages = preference.pages.filter((key: string) => key !== currentKey);
       }
     }
 
@@ -148,7 +148,13 @@ export const getLandingPage = (preference, currentPath) => {
  * @param {Array} savedPreferences - User's saved nav preferences
  * @returns {Array} Migrated preferences with all current nav items
  */
-export const migrateNavPreferences = (savedPreferences) => {
+interface NavPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+export const migrateNavPreferences = (savedPreferences: NavPreference[]) => {
   let prefs = savedPreferences;
 
   // If no preferences exist, create defaults (all enabled, in order)
@@ -161,7 +167,7 @@ export const migrateNavPreferences = (savedPreferences) => {
   }
 
   // Find any new nav items that don't exist in saved preferences
-  const existingIds = new Set(prefs.map((p) => p.id));
+  const existingIds = new Set(prefs.map((p: NavPreference) => p.id));
   const missingNavItems = NAV_DEFINITIONS.filter(
     (def) => !existingIds.has(def.key)
   );
@@ -169,13 +175,13 @@ export const migrateNavPreferences = (savedPreferences) => {
   // Insert new nav items at their proper position from NAV_DEFINITIONS
   if (missingNavItems.length > 0) {
     // Create a map of existing prefs for quick lookup
-    const prefsMap = new Map(prefs.map((p) => [p.id, p]));
+    const prefsMap = new Map(prefs.map((p: NavPreference) => [p.id, p]));
 
     // Rebuild prefs array in NAV_DEFINITIONS order
     prefs = NAV_DEFINITIONS.map((def, definitionIndex) => {
       if (prefsMap.has(def.key)) {
         // Keep existing preference
-        return prefsMap.get(def.key);
+        return prefsMap.get(def.key)!;
       } else {
         // Add new item at its proper position, enabled by default
         return {
@@ -188,8 +194,8 @@ export const migrateNavPreferences = (savedPreferences) => {
   }
 
   // Re-normalize order values (ensure sequential 0, 1, 2, ...)
-  prefs.sort((a, b) => a.order - b.order);
-  prefs = prefs.map((pref, idx) => ({ ...pref, order: idx }));
+  prefs.sort((a: NavPreference, b: NavPreference) => a.order - b.order);
+  prefs = prefs.map((pref: NavPreference, idx: number) => ({ ...pref, order: idx }));
 
   return prefs;
 };
@@ -199,7 +205,7 @@ export const migrateNavPreferences = (savedPreferences) => {
  * @param {string} key - Navigation item key
  * @returns {Object|undefined} Navigation definition
  */
-export const getNavDefinition = (key) => {
+export const getNavDefinition = (key: string) => {
   return NAV_DEFINITIONS.find((def) => def.key === key);
 };
 
@@ -208,7 +214,7 @@ export const getNavDefinition = (key) => {
  * @param {Array} preferences - User's nav preferences
  * @returns {Array} Ordered array of enabled nav items
  */
-export const getOrderedNavItems = (preferences) => {
+export const getOrderedNavItems = (preferences: NavPreference[]) => {
   if (!preferences || preferences.length === 0) {
     return NAV_DEFINITIONS;
   }

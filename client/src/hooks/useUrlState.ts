@@ -10,7 +10,12 @@ import { useSearchParams } from "react-router-dom";
  * @param {string[]} options.ignoreKeys - Keys to ignore when computing hasUrlParams
  * @returns {Object} { values, setValue, setValues, hasUrlParams }
  */
-export const useUrlState = ({ defaults = {}, ignoreKeys = [] } = {}) => {
+interface UseUrlStateOptions {
+  defaults?: Record<string, string>;
+  ignoreKeys?: string[];
+}
+
+export const useUrlState = ({ defaults = {}, ignoreKeys = [] }: UseUrlStateOptions = {}) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
   const hadUrlParamsRef = useRef(false);
@@ -31,7 +36,7 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] } = {}) => {
     return parsed;
   };
 
-  const [values, setValuesState] = useState(() => {
+  const [values, setValuesState] = useState<Record<string, string | null | undefined>>(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
       return getInitialValues();
@@ -39,7 +44,7 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] } = {}) => {
     return {};
   });
 
-  const setValue = useCallback((key, value, options = {}) => {
+  const setValue = useCallback((key: string, value: string | null | undefined, options: { replace?: boolean } = {}) => {
     const { replace = false } = options;
 
     // Update internal state
@@ -60,7 +65,7 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] } = {}) => {
     }, { replace });
   }, [setSearchParams]);
 
-  const setValues = useCallback((updates, options = {}) => {
+  const setValues = useCallback((updates: Record<string, string | null | undefined>, options: { replace?: boolean } = {}) => {
     const { replace = false } = options;
 
     setValuesState((prev) => ({

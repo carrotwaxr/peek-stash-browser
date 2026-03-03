@@ -12,7 +12,7 @@ import {
 describe("format utilities", () => {
   describe("formatDurationHumanReadable", () => {
     it("returns '0m' for null input", () => {
-      expect(formatDurationHumanReadable(null)).toBe("0m");
+      expect(formatDurationHumanReadable(null as any)).toBe("0m");
     });
 
     it("returns '0m' for 0 seconds", () => {
@@ -61,11 +61,11 @@ describe("format utilities", () => {
 
   describe("getFilenameFromPath", () => {
     it("returns null for null input", () => {
-      expect(getFilenameFromPath(null)).toBeNull();
+      expect(getFilenameFromPath(null as any)).toBeNull();
     });
 
     it("returns null for undefined input", () => {
-      expect(getFilenameFromPath(undefined)).toBeNull();
+      expect(getFilenameFromPath(undefined as any)).toBeNull();
     });
 
     it("returns null for empty string", () => {
@@ -106,8 +106,8 @@ describe("format utilities", () => {
 
   describe("formatDuration (MM:SS format)", () => {
     it("returns '0:00' for null/undefined", () => {
-      expect(formatDuration(null)).toBe("0:00");
-      expect(formatDuration(undefined)).toBe("0:00");
+      expect(formatDuration(null as any)).toBe("0:00");
+      expect(formatDuration(undefined as any)).toBe("0:00");
     });
 
     it("formats seconds less than a minute", () => {
@@ -130,8 +130,8 @@ describe("format utilities", () => {
 
   describe("formatDurationCompact", () => {
     it("returns '0s' for null/undefined", () => {
-      expect(formatDurationCompact(null)).toBe("0s");
-      expect(formatDurationCompact(undefined)).toBe("0s");
+      expect(formatDurationCompact(null as any)).toBe("0s");
+      expect(formatDurationCompact(undefined as any)).toBe("0s");
     });
 
     it("formats seconds only", () => {
@@ -154,8 +154,8 @@ describe("format utilities", () => {
 
   describe("formatFileSize", () => {
     it("returns '0 B' for null/undefined/zero", () => {
-      expect(formatFileSize(null)).toBe("0 B");
-      expect(formatFileSize(undefined)).toBe("0 B");
+      expect(formatFileSize(null as any)).toBe("0 B");
+      expect(formatFileSize(undefined as any)).toBe("0 B");
       expect(formatFileSize(0)).toBe("0 B");
     });
 
@@ -181,8 +181,8 @@ describe("format utilities", () => {
 
   describe("formatBitRate", () => {
     it("returns '0 bps' for null/undefined/zero", () => {
-      expect(formatBitRate(null)).toBe("0 bps");
-      expect(formatBitRate(undefined)).toBe("0 bps");
+      expect(formatBitRate(null as any)).toBe("0 bps");
+      expect(formatBitRate(undefined as any)).toBe("0 bps");
       expect(formatBitRate(0)).toBe("0 bps");
     });
 
@@ -198,8 +198,8 @@ describe("format utilities", () => {
 
   describe("getSceneTitle", () => {
     it("returns 'Unknown Scene' for null/undefined", () => {
-      expect(getSceneTitle(null)).toBe("Unknown Scene");
-      expect(getSceneTitle(undefined)).toBe("Unknown Scene");
+      expect(getSceneTitle(null as any)).toBe("Unknown Scene");
+      expect(getSceneTitle(undefined as any)).toBe("Unknown Scene");
     });
 
     it("returns title if present", () => {

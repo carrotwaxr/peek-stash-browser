@@ -3,6 +3,20 @@ import { useSearchParams } from "react-router-dom";
 /** Use this value for tab count when data is still loading (shows tab without count badge) */
 export const TAB_COUNT_LOADING = -1;
 
+interface Tab {
+  id: string;
+  label: string;
+  count: number;
+}
+
+interface Props {
+  tabs: Tab[];
+  defaultTab: string;
+  onTabChange?: (tabId: string) => void;
+  showSingleTab?: boolean;
+  showEmpty?: boolean;
+}
+
 /**
  * TabNavigation - A reusable tab navigation component with URL query parameter support
  *
@@ -16,7 +30,7 @@ export const TAB_COUNT_LOADING = -1;
  * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
  * @param {boolean} [props.showEmpty] - If true, show tabs even when count is 0 (still shows count badge)
  */
-const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, showEmpty = false }) => {
+const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, showEmpty = false }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get active tab from URL or use default
@@ -30,7 +44,7 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
   // Each tab has its own pagination state, so these shouldn't carry over
   const PAGINATION_PARAMS = ['page', 'per_page', 'sort', 'dir', 'q'];
 
-  const handleTabClick = (tabId) => {
+  const handleTabClick = (tabId: string) => {
     if (tabId === activeTab) return; // Already on this tab
 
     // Update URL query parameter and clear pagination params

@@ -1,14 +1,19 @@
-// client/src/components/timeline/TimelineEdgeNav.jsx
+// client/src/components/timeline/TimelineEdgeNav.tsx
 import { memo } from "react";
+
+interface Props {
+  side: "left" | "right";
+  visible: boolean;
+}
 
 /**
  * Edge fade overlays for the timeline strip.
  * Simple gradient fade to indicate scrollable content (no buttons or labels).
  */
 function TimelineEdgeNav({
-  side, // "left" or "right"
+  side,
   visible,
-}) {
+}: Props) {
   if (!visible) return null;
 
   const isLeft = side === "left";

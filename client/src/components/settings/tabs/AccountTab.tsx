@@ -12,7 +12,7 @@ const AccountTab = () => {
   const [passwordChanging, setPasswordChanging] = useState(false);
 
   // Recovery key state
-  const [recoveryKey, setRecoveryKey] = useState(null);
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
   const [showRecoveryKey, setShowRecoveryKey] = useState(false);
   const [keyLoading, setKeyLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -51,11 +51,11 @@ const AccountTab = () => {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(recoveryKey);
+    navigator.clipboard.writeText(recoveryKey!);
     showSuccess("Recovery key copied to clipboard");
   };
 
-  const changePassword = async (e) => {
+  const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {

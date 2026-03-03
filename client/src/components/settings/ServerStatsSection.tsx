@@ -1,21 +1,62 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api";
 import { Clock, Cpu, Database, HardDrive, RefreshCw, Film } from "lucide-react";
 import { Button, Paper } from "../ui/index";
 import { useAuth } from "../../hooks/useAuth";
 
+interface CacheCounts {
+  scenes: number;
+  performers: number;
+  studios: number;
+  tags: number;
+  galleries: number;
+  groups: number;
+  images: number;
+  clips: number;
+  ungeneratedClips: number;
+}
+
+interface ServerStats {
+  system?: {
+    uptime: string;
+    cpuCount: number;
+    usedMemory: string;
+    memoryUsagePercent: string;
+  };
+  process?: {
+    heapUsed: string;
+    heapUsedPercent: string;
+  };
+  cache?: {
+    isRefreshing: boolean;
+    isInitialized: boolean;
+    lastRefreshed: string | null;
+    counts: CacheCounts;
+  };
+  database?: {
+    size: string;
+  };
+}
+
+interface ReprobeResult {
+  success: boolean;
+  checked?: number;
+  updated?: number;
+  message?: string;
+}
+
 const ServerStatsSection = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<ServerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingCache, setRefreshingCache] = useState(false);
   const [reprobingClips, setReprobingClips] = useState(false);
-  const [reprobeResult, setReprobeResult] = useState(null);
+  const [reprobeResult, setReprobeResult] = useState<ReprobeResult | null>(null);
 
   const loadStats = async () => {
     try {
-      const data = await apiGet("/stats");
+      const data = await apiGet<ServerStats>("/stats");
       setStats(data);
     } catch (err) {
       console.error("Failed to load server stats:", err);
@@ -43,7 +84,7 @@ const ServerStatsSection = () => {
     try {
       setReprobingClips(true);
       setReprobeResult(null);
-      const data = await apiPost("/sync/reprobe-clips", {});
+      const data = await apiPost<{ checked: number; updated: number }>("/sync/reprobe-clips", {});
       setReprobeResult({
         success: true,
         checked: data.checked,
@@ -55,7 +96,7 @@ const ServerStatsSection = () => {
       console.error("Failed to re-probe clips:", err);
       setReprobeResult({
         success: false,
-        message: err.response?.data?.message || "Failed to re-probe clips",
+        message: (err as Error).message || "Failed to re-probe clips",
       });
     } finally {
       setReprobingClips(false);
@@ -112,7 +153,7 @@ const ServerStatsSection = () => {
                   : null
               }
               icon={<HardDrive className="w-4 h-4" />}
-              progress={parseFloat(stats.system?.memoryUsagePercent || 0)}
+              progress={parseFloat(stats.system?.memoryUsagePercent || "0")}
             />
             <StatCard
               label="Process Memory"
@@ -123,7 +164,7 @@ const ServerStatsSection = () => {
                   : null
               }
               icon={<HardDrive className="w-4 h-4" />}
-              progress={parseFloat(stats.process?.heapUsedPercent || 0)}
+              progress={parseFloat(stats.process?.heapUsedPercent || "0")}
             />
           </div>
         </div>
@@ -228,7 +269,7 @@ const ServerStatsSection = () => {
         </div>
 
         {/* Clips Maintenance Section - show if there are ungenerated clips */}
-        {isAdmin && stats.cache?.counts?.ungeneratedClips > 0 && (
+        {isAdmin && (stats.cache?.counts?.ungeneratedClips ?? 0) > 0 && (
           <>
             <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
             <div>
@@ -241,7 +282,7 @@ const ServerStatsSection = () => {
                     Clips Maintenance
                   </h3>
                   <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    {stats.cache.counts.ungeneratedClips.toLocaleString()} clip{stats.cache.counts.ungeneratedClips !== 1 ? "s" : ""} pending preview generation
+                    {stats.cache!.counts.ungeneratedClips.toLocaleString()} clip{stats.cache!.counts.ungeneratedClips !== 1 ? "s" : ""} pending preview generation
                   </p>
                 </div>
                 <Button
@@ -283,7 +324,7 @@ const ServerStatsSection = () => {
                   }}
                 >
                   {reprobeResult.success
-                    ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
+                    ? `Checked ${reprobeResult.checked!.toLocaleString()} clips, ${reprobeResult.updated!.toLocaleString()} now have previews`
                     : reprobeResult.message}
                 </div>
               )}
@@ -312,7 +353,17 @@ const ServerStatsSection = () => {
   );
 };
 
-// Reusable stat card component
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  subtitle?: string | null;
+  icon?: React.ReactNode;
+  valueColor?: string;
+  progress?: number;
+  compact?: boolean;
+}
+
+/** Reusable stat card component */
 const StatCard = ({
   label,
   value,
@@ -321,7 +372,7 @@ const StatCard = ({
   valueColor,
   progress,
   compact,
-}) => {
+}: StatCardProps) => {
   return (
     <div
       className={`rounded-lg ${compact ? "p-3" : "p-4"}`}

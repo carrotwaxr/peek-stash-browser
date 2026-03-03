@@ -9,7 +9,7 @@ import { Button, PageHeader, PageLayout } from "../ui/index";
  * @param {number} bytes - Size in bytes
  * @returns {string} Formatted size string
  */
-const formatSize = (bytes) => {
+const formatSize = (bytes: number | null | undefined): string => {
   if (bytes === null || bytes === undefined) return "-";
   if (bytes === 0) return "0 B";
 
@@ -26,7 +26,7 @@ const formatSize = (bytes) => {
  * @param {string} dateStr - ISO date string
  * @returns {string} Formatted date string
  */
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return "-";
   const date = new Date(dateStr);
   return date.toLocaleString();
@@ -37,7 +37,7 @@ const formatDate = (dateStr) => {
  * @param {string} fileName - File name with extension
  * @returns {string} Display name without extension
  */
-const getDisplayName = (fileName) => {
+const getDisplayName = (fileName: string | null | undefined): string => {
   if (!fileName) return "Untitled";
   // Remove extension for display
   return fileName.replace(/\.[^/.]+$/, "") || "Untitled";
@@ -48,7 +48,7 @@ const getDisplayName = (fileName) => {
  * @param {string} status - Download status
  * @returns {JSX.Element} Status badge
  */
-const getStatusBadge = (status) => {
+const getStatusBadge = (status: string) => {
   const statusStyles = {
     PENDING: {
       backgroundColor: "rgba(59, 130, 246, 0.2)",
@@ -72,7 +72,7 @@ const getStatusBadge = (status) => {
     },
   };
 
-  const style = statusStyles[status] || statusStyles.PENDING;
+  const style = statusStyles[status as keyof typeof statusStyles] || statusStyles.PENDING;
 
   return (
     <span
@@ -92,7 +92,7 @@ const getStatusBadge = (status) => {
  * @param {Object} download - Download object
  * @returns {JSX.Element} Thumbnail or type icon
  */
-const getDownloadThumbnail = (download) => {
+const getDownloadThumbnail = (download: Record<string, unknown>) => {
   // For scenes and images, show actual thumbnail
   if (download.type === "SCENE" && download.entityId) {
     return (
@@ -102,9 +102,10 @@ const getDownloadThumbnail = (download) => {
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
-            e.target.style.display = "none";
-            e.target.parentElement.classList.add("flex", "items-center", "justify-center");
-            e.target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
+            const target = e.target as HTMLImageElement;
+            target.style.display = "none";
+            target.parentElement?.classList.add("flex", "items-center", "justify-center");
+            if (target.parentElement) target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
           }}
         />
       </div>
@@ -119,9 +120,10 @@ const getDownloadThumbnail = (download) => {
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
-            e.target.style.display = "none";
-            e.target.parentElement.classList.add("flex", "items-center", "justify-center");
-            e.target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`;
+            const target = e.target as HTMLImageElement;
+            target.style.display = "none";
+            target.parentElement?.classList.add("flex", "items-center", "justify-center");
+            if (target.parentElement) target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`;
           }}
         />
       </div>
@@ -167,20 +169,20 @@ const getDownloadThumbnail = (download) => {
       className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
       style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
     >
-      {icons[download.type] || icons.SCENE}
+      {icons[download.type as keyof typeof icons] || icons.SCENE}
     </div>
   );
 };
 
 const Downloads = () => {
   usePageTitle("Downloads");
-  const [downloads, setDownloads] = useState([]);
+  const [downloads, setDownloads] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const pollIntervalRef = useRef(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadDownloads = useCallback(async () => {
     try {
-      const response = await apiGet("/downloads");
+      const response = await apiGet<{ downloads: Record<string, unknown>[] }>("/downloads");
       setDownloads(response.downloads || []);
     } catch {
       showError("Failed to load downloads");
@@ -214,7 +216,7 @@ const Downloads = () => {
     };
   }, [hasActiveDownloads, loadDownloads]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     try {
       await apiDelete(`/downloads/${id}`);
       showSuccess("Download removed");
@@ -224,7 +226,7 @@ const Downloads = () => {
     }
   };
 
-  const handleRetry = async (id) => {
+  const handleRetry = async (id: string) => {
     try {
       await apiPost(`/downloads/${id}/retry`);
       showSuccess("Download queued for retry");
@@ -288,9 +290,12 @@ const Downloads = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {downloads.map((download) => (
+          {downloads.map((download) => {
+            const isActive = (download.status === "PENDING" || download.status === "PROCESSING") && download.progress !== undefined;
+            const hasFailed = download.status === "FAILED" && download.error;
+            return (
             <div
-              key={download.id}
+              key={download.id as string}
               className="p-4 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",
@@ -308,25 +313,23 @@ const Downloads = () => {
                       className="font-medium truncate"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {getDisplayName(download.fileName)}
+                      {getDisplayName(download.fileName as string | null | undefined)}
                     </span>
-                    {getStatusBadge(download.status)}
+                    {getStatusBadge(download.status as string)}
                   </div>
 
                   <div
                     className="text-sm flex items-center gap-3 flex-wrap"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {download.fileSize && (
-                      <span>{formatSize(download.fileSize)}</span>
-                    )}
-                    <span>{formatDate(download.createdAt)}</span>
+                    {download.fileSize ? (
+                      <span>{formatSize(download.fileSize as number)}</span>
+                    ) : null}
+                    <span>{formatDate(download.createdAt as string | null | undefined)}</span>
                   </div>
 
                   {/* Progress bar for active downloads */}
-                  {(download.status === "PENDING" ||
-                    download.status === "PROCESSING") &&
-                    download.progress !== undefined && (
+                  {isActive ? (
                       <div className="mt-2">
                         <div
                           className="h-2 rounded-full overflow-hidden"
@@ -335,7 +338,7 @@ const Downloads = () => {
                           <div
                             className="h-full rounded-full transition-all duration-300"
                             style={{
-                              width: `${download.progress || 0}%`,
+                              width: `${(download.progress as number) || 0}%`,
                               backgroundColor: "var(--accent-primary)",
                             }}
                           />
@@ -344,13 +347,13 @@ const Downloads = () => {
                           className="text-xs mt-1"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          {download.progress || 0}%
+                          {(download.progress as number) || 0}%
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                   {/* Error message for failed downloads */}
-                  {download.status === "FAILED" && download.error && (
+                  {hasFailed ? (
                     <div
                       className="mt-2 text-sm p-2 rounded"
                       style={{
@@ -358,9 +361,9 @@ const Downloads = () => {
                         color: "rgb(239, 68, 68)",
                       }}
                     >
-                      {download.error}
+                      {download.error as string}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Actions */}
@@ -368,8 +371,8 @@ const Downloads = () => {
                   {/* Download button for completed */}
                   {download.status === "COMPLETED" && (
                     <a
-                      href={`/api/downloads/${download.id}/file`}
-                      download={download.fileName}
+                      href={`/api/downloads/${download.id as string}/file`}
+                      download={download.fileName as string}
                       className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg font-medium transition-all"
                       style={{
                         backgroundColor: "var(--accent-primary)",
@@ -383,7 +386,7 @@ const Downloads = () => {
                   {/* Retry button for failed */}
                   {download.status === "FAILED" && (
                     <Button
-                      onClick={() => handleRetry(download.id)}
+                      onClick={() => handleRetry(download.id as string)}
                       variant="secondary"
                       size="sm"
                     >
@@ -393,7 +396,7 @@ const Downloads = () => {
 
                   {/* Delete button for all */}
                   <Button
-                    onClick={() => handleDelete(download.id)}
+                    onClick={() => handleDelete(download.id as string)}
                     variant="destructive"
                     size="sm"
                   >
@@ -402,7 +405,7 @@ const Downloads = () => {
                 </div>
               </div>
             </div>
-          ))}
+          ); })}
         </div>
       )}
     </PageLayout>

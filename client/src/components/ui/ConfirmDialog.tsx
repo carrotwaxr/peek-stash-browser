@@ -1,5 +1,18 @@
+import { type ReactNode } from "react";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import Button from "./Button";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  message: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  confirmStyle?: "danger" | "primary";
+  variant?: string;
+}
 
 /**
  * Reusable confirmation dialog component
@@ -13,14 +26,14 @@ const ConfirmDialog = ({
   message,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  confirmStyle = "danger", // "danger" or "primary"
-}) => {
+  confirmStyle = "danger",
+}: Props) => {
   // Focus trap to keep keyboard navigation within modal
   const dialogRef = useFocusTrap(isOpen, onClose);
 
   if (!isOpen) return null;
 
-  const handleConfirm = (e) => {
+  const handleConfirm = (e: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
     onConfirm();
@@ -35,7 +48,7 @@ const ConfirmDialog = ({
       onClick={onClose}
     >
       <div
-        ref={dialogRef}
+        ref={dialogRef as React.Ref<HTMLDivElement>}
         className="rounded-lg shadow-lg max-w-md w-full m-4"
         style={{
           backgroundColor: "var(--bg-card)",

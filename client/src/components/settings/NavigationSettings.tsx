@@ -7,12 +7,23 @@ import {
 import { ThemedIcon } from "../icons/index";
 import { Button } from "../ui/index";
 
+interface NavPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences: NavPreference[] | null;
+  onSave: (preferences: NavPreference[]) => void;
+}
+
 /**
  * NavigationSettings component
  * Allows users to toggle visibility and reorder navigation menu items
  */
-const NavigationSettings = ({ navPreferences, onSave }) => {
-  const [preferences, setPreferences] = useState([]);
+const NavigationSettings = ({ navPreferences, onSave }: Props) => {
+  const [preferences, setPreferences] = useState<NavPreference[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -24,7 +35,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
     setHasChanges(false);
   }, [navPreferences]);
 
-  const moveUp = (index) => {
+  const moveUp = (index: number) => {
     if (index === 0) return;
 
     const newPreferences = [...preferences];
@@ -43,7 +54,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
     setHasChanges(true);
   };
 
-  const moveDown = (index) => {
+  const moveDown = (index: number) => {
     if (index === preferences.length - 1) return;
 
     const newPreferences = [...preferences];
@@ -62,7 +73,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
     setHasChanges(true);
   };
 
-  const toggleEnabled = (id) => {
+  const toggleEnabled = (id: string) => {
     const updated = preferences.map((pref) =>
       pref.id === id ? { ...pref, enabled: !pref.enabled } : pref
     );
@@ -76,7 +87,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
   };
 
   const handleReset = () => {
-    const sorted = [...navPreferences].sort((a, b) => a.order - b.order);
+    const sorted = [...(navPreferences || [])].sort((a, b) => a.order - b.order);
     setPreferences(sorted);
     setHasChanges(false);
   };

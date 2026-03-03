@@ -8,6 +8,9 @@ vi.mock("../../src/api", () => ({
 }));
 
 import { apiGet } from "../../src/api";
+import type { Mock } from "vitest";
+
+const apiGetMock = apiGet as unknown as Mock;
 
 describe("useTimelineState", () => {
   beforeEach(() => {
@@ -16,7 +19,7 @@ describe("useTimelineState", () => {
 
   describe("initialization", () => {
     it("initializes with default zoom level of months", () => {
-      apiGet.mockResolvedValue({ distribution: [] });
+      apiGetMock.mockResolvedValue({ distribution: [] });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -26,7 +29,7 @@ describe("useTimelineState", () => {
     });
 
     it("initializes with no selected period", () => {
-      apiGet.mockResolvedValue({ distribution: [] });
+      apiGetMock.mockResolvedValue({ distribution: [] });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -40,7 +43,7 @@ describe("useTimelineState", () => {
         { period: "2024-01", count: 47 },
         { period: "2024-02", count: 12 },
       ];
-      apiGet.mockResolvedValue({ distribution: mockDistribution });
+      apiGetMock.mockResolvedValue({ distribution: mockDistribution });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -56,7 +59,7 @@ describe("useTimelineState", () => {
 
   describe("zoom level changes", () => {
     it("updates zoom level and refetches distribution", async () => {
-      apiGet.mockResolvedValue({ distribution: [] });
+      apiGetMock.mockResolvedValue({ distribution: [] });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -80,7 +83,7 @@ describe("useTimelineState", () => {
 
   describe("period selection", () => {
     it("selects a period and calculates date range", async () => {
-      apiGet.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
+      apiGetMock.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -103,7 +106,7 @@ describe("useTimelineState", () => {
     });
 
     it("clears selection when selecting same period", async () => {
-      apiGet.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
+      apiGetMock.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -131,7 +134,7 @@ describe("useTimelineState", () => {
         { period: "2024-01", count: 10 },
         { period: "2024-03", count: 47 },
       ];
-      apiGet.mockResolvedValue({ distribution: mockDistribution });
+      apiGetMock.mockResolvedValue({ distribution: mockDistribution });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene", autoSelectRecent: true })
@@ -147,7 +150,7 @@ describe("useTimelineState", () => {
 
   describe("error handling", () => {
     it("sets error state when API call fails", async () => {
-      apiGet.mockRejectedValue(new Error("Network error"));
+      apiGetMock.mockRejectedValue(new Error("Network error"));
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })

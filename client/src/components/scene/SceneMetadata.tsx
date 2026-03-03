@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import type { NormalizedScene, TagRef } from "@peek/shared-types";
 import { CardCountIndicators, MediaImage } from "../ui/index";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -7,7 +8,7 @@ import { getEntityPath } from "../../utils/entityLinks";
 /**
  * Combine direct tags with inherited tags from server
  */
-const getAllTags = (scene) => {
+const getAllTags = (scene: NormalizedScene): TagRef[] => {
   const tagMap = new Map();
   // Direct scene tags
   if (scene.tags) {
@@ -20,15 +21,20 @@ const getAllTags = (scene) => {
   return Array.from(tagMap.values());
 };
 
+interface TagThumbnailLinkProps {
+  tag: TagRef;
+  hasMultipleInstances: boolean;
+}
+
 /**
  * Tag thumbnail link component that handles video tag images
  */
-const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
+const TagThumbnailLink = ({ tag, hasMultipleInstances }: TagThumbnailLinkProps) => {
   const [showPlaceholder, setShowPlaceholder] = useState(false);
 
   return (
     <Link
-      to={getEntityPath('tag', tag, hasMultipleInstances)}
+      to={getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances)}
       className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
       onClick={(e) => e.stopPropagation()}
     >
@@ -52,10 +58,14 @@ const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
   );
 };
 
+interface Props {
+  scene: NormalizedScene;
+}
+
 /**
  * Scene metadata: performers and tags with image-rich tooltips
  */
-const SceneMetadata = ({ scene }) => {
+const SceneMetadata = ({ scene }: Props) => {
   const { hasMultipleInstances } = useConfig();
 
   // Get merged and deduped tags
@@ -68,7 +78,7 @@ const SceneMetadata = ({ scene }) => {
         {scene.performers.map((performer) => (
           <Link
             key={performer.id}
-            to={getEntityPath('performer', performer, hasMultipleInstances)}
+            to={getEntityPath('performer', performer as unknown as Record<string, unknown>, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
@@ -113,13 +123,13 @@ const SceneMetadata = ({ scene }) => {
         {scene.groups.map((group) => (
           <Link
             key={group.id}
-            to={getEntityPath('group', group, hasMultipleInstances)}
+            to={getEntityPath('group', group as unknown as Record<string, unknown>, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {group.front_image_path || group.back_image_path ? (
               <img
-                src={group.front_image_path || group.back_image_path}
+                src={(group.front_image_path || group.back_image_path) ?? undefined}
                 alt={group.name}
                 className="w-16 h-16 rounded object-cover flex-shrink-0"
               />

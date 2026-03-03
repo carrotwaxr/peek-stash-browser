@@ -6,14 +6,14 @@ import BulkActionBar from "../../../src/components/ui/BulkActionBar";
 const mockScenes = [
   { id: "scene-1", title: "Scene 1" },
   { id: "scene-2", title: "Scene 2" },
-];
+] as any[];
 
 describe("BulkActionBar", () => {
   const defaultProps = {
     selectedScenes: mockScenes,
     onClearSelection: vi.fn(),
     actions: <button data-testid="test-action">Test Action</button>,
-  };
+  } as React.ComponentProps<typeof BulkActionBar>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,7 +35,7 @@ describe("BulkActionBar", () => {
       <MemoryRouter>
         <BulkActionBar
           {...defaultProps}
-          selectedScenes={[{ id: "scene-1", title: "Scene 1" }]}
+          selectedScenes={[{ id: "scene-1", title: "Scene 1" }] as any}
         />
       </MemoryRouter>
     );

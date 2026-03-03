@@ -47,20 +47,20 @@ const RecommendationInfoContent = () => (
 const Recommended = () => {
   usePageTitle("Recommended");
   const [searchParams, setSearchParams] = useSearchParams();
-  const pageRef = useRef(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const { isTVMode } = useTVMode();
 
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<{ message: string; errorType: string | null } | null>(null);
   const [totalCount, setTotalCount] = useState(0);
-  const [message, setMessage] = useState(null);
-  const [initMessage, setInitMessage] = useState(null);
-  const [criteria, setCriteria] = useState(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [initMessage, setInitMessage] = useState<string | null>(null);
+  const [criteria, setCriteria] = useState<Record<string, number> | null>(null);
 
   // Get pagination params from URL
-  const page = parseInt(searchParams.get("page")) || 1;
-  const perPage = parseInt(searchParams.get("per_page")) || 24;
+  const page = parseInt(searchParams.get("page") ?? "1") || 1;
+  const perPage = parseInt(searchParams.get("per_page") ?? "24") || 24;
 
   // Calculate total pages
   const totalPages = Math.ceil(totalCount / perPage);
@@ -77,7 +77,12 @@ const Recommended = () => {
         setMessage(null);
         setInitMessage(null);
 
-        const data = await apiGet(
+        const data = await apiGet<{
+          scenes: Record<string, unknown>[];
+          count: number;
+          message?: string;
+          criteria?: Record<string, number>;
+        }>(
           `/library/scenes/recommended?page=${page}&per_page=${perPage}`
         );
 
@@ -113,7 +118,7 @@ const Recommended = () => {
 
         setError({
           message: (err instanceof ApiError ? err.message : null) || "Failed to load recommendations",
-          errorType: (err instanceof ApiError ? err.data?.errorType : null) || null,
+          errorType: (err instanceof ApiError ? (err.data as Record<string, unknown>)?.errorType as string : null) || null,
         });
         setLoading(false);
       }
@@ -123,7 +128,7 @@ const Recommended = () => {
   }, [page, perPage]);
 
   // Handle page change
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", newPage.toString());
     setSearchParams(newParams);
@@ -140,7 +145,7 @@ const Recommended = () => {
   };
 
   // Handle per page change
-  const handlePerPageChange = (newPerPage) => {
+  const handlePerPageChange = (newPerPage: number) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("per_page", newPerPage.toString());
     newParams.set("page", "1"); // Reset to page 1 when changing per page
@@ -158,7 +163,7 @@ const Recommended = () => {
   };
 
   // Handle successful hide - remove scene from state
-  const handleHideSuccess = (sceneId) => {
+  const handleHideSuccess = (sceneId: string) => {
     setScenes((prev) => prev.filter((s) => s.id !== sceneId));
     setTotalCount((prev) => Math.max(0, prev - 1));
   };
@@ -271,22 +276,19 @@ const Recommended = () => {
 
         {/* Scene Grid (includes bottom pagination) */}
         <SceneGrid
-          scenes={scenes}
+          scenes={scenes as unknown as import("@peek/shared-types").NormalizedScene[]}
           loading={loading}
-          error={!initMessage && error ? error.message : null}
+          error={!initMessage && error ? error.message : undefined}
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
-          onHideSuccess={handleHideSuccess}
-          perPage={perPage}
-          onPerPageChange={handlePerPageChange}
-          totalCount={totalCount}
-          emptyMessage={message || "No Recommendations Yet"}
-          emptyDescription={
+          onHideSuccess={handleHideSuccess as (sceneId: string, entityType: string) => void}
+          emptyMessage={message ?? "No Recommendations Yet"}
+          emptyDescription={(
             criteria
               ? renderCriteriaFeedback()
               : "Rate or Favorite more items to get personalized recommendations."
-          }
+          ) as string | undefined}
         />
       </div>
     </PageLayout>

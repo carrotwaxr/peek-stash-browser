@@ -14,6 +14,24 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 import BaseCard from "./BaseCard";
 import { SceneCardPreview, TooltipEntityGrid } from "./index";
+import type { NormalizedScene } from "@peek/shared-types";
+
+interface Props {
+  scene: NormalizedScene;
+  onClick?: (scene: NormalizedScene) => boolean | void;
+  onFocus?: (event: React.FocusEvent<HTMLElement>) => void;
+  tabIndex?: number;
+  className?: string;
+  isSelected?: boolean;
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  selectionMode?: boolean;
+  autoplayOnScroll?: boolean;
+  hideRatingControls?: boolean;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  fromPageTitle?: string;
+  enableKeyboard?: boolean;
+  showProgress?: boolean;
+}
 
 /**
  * Build scene subtitle with studio, code, and date
@@ -23,7 +41,7 @@ import { SceneCardPreview, TooltipEntityGrid } from "./index";
  * @param {boolean} options.showStudio - Whether to show studio name in subtitle
  * @param {boolean} options.showDate - Whether to show date in subtitle
  */
-const buildSceneSubtitle = (scene, { showCodeOnCard = true, showStudio = true, showDate = true } = {}) => {
+const buildSceneSubtitle = (scene: NormalizedScene, { showCodeOnCard = true, showStudio = true, showDate = true } = {}) => {
   const parts = [];
 
   if (showStudio && scene.studio) {
@@ -47,15 +65,15 @@ const buildSceneSubtitle = (scene, { showCodeOnCard = true, showStudio = true, s
 /**
  * Compute all tags for a scene (direct + inherited)
  */
-const computeAllTags = (scene) => {
-  const tagMap = new Map();
+const computeAllTags = (scene: NormalizedScene) => {
+  const tagMap = new Map<string, { id: string; name: string }>();
 
   if (scene.tags) {
-    scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
+    scene.tags.forEach((tag: { id: string; name: string }) => tagMap.set(tag.id, tag));
   }
 
   if (scene.inheritedTags) {
-    scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
+    scene.inheritedTags.forEach((tag: { id: string; name: string }) => tagMap.set(tag.id, tag));
   }
 
   return Array.from(tagMap.values());
@@ -65,7 +83,7 @@ const computeAllTags = (scene) => {
  * Enhanced scene card component with keyboard navigation support
  * Now uses BaseCard for consistency with other entity cards
  */
-const SceneCard = forwardRef(
+const SceneCard = forwardRef<HTMLDivElement, Props>(
   (
     {
       scene,
@@ -89,12 +107,13 @@ const SceneCard = forwardRef(
     const sceneSettings = getSettings("scene");
     const { hasMultipleInstances } = useConfig();
 
-    const title = getSceneTitle(scene);
-    const description = getSceneDescription(scene);
+    const sceneRecord = scene as unknown as Record<string, unknown>;
+    const title = getSceneTitle(sceneRecord);
+    const description = getSceneDescription(sceneRecord);
     const subtitle = buildSceneSubtitle(scene, {
-      showCodeOnCard: sceneSettings.showCodeOnCard,
-      showStudio: sceneSettings.showStudio,
-      showDate: sceneSettings.showDate,
+      showCodeOnCard: sceneSettings.showCodeOnCard as boolean,
+      showStudio: sceneSettings.showStudio as boolean,
+      showDate: sceneSettings.showDate as boolean,
     });
     const duration = scene.files?.[0]?.duration
       ? formatDurationCompact(scene.files[0].duration)
@@ -143,7 +162,7 @@ const SceneCard = forwardRef(
         scene.galleries?.length > 0 && (
           <TooltipEntityGrid
             entityType="gallery"
-            entities={scene.galleries}
+            entities={scene.galleries as unknown as Array<{ id: string; name?: string; title?: string }>}
             title="Galleries"
             parentInstanceId={scene.instanceId}
           />
@@ -161,7 +180,7 @@ const SceneCard = forwardRef(
           tooltipContent: performersTooltip,
           // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
           onClick: getIndicatorBehavior('scene', 'performers') === 'nav' && scene.performers?.length > 0
-            ? () => navigate(appendInstanceParam(`/performers?sceneId=${scene.id}`, scene, hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/performers?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
             : undefined,
         },
         {
@@ -169,7 +188,7 @@ const SceneCard = forwardRef(
           count: scene.groups?.length,
           tooltipContent: groupsTooltip,
           onClick: getIndicatorBehavior('scene', 'groups') === 'nav' && scene.groups?.length > 0
-            ? () => navigate(appendInstanceParam(`/collections?sceneId=${scene.id}`, scene, hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/collections?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
             : undefined,
         },
         {
@@ -177,7 +196,7 @@ const SceneCard = forwardRef(
           count: scene.galleries?.length,
           tooltipContent: galleriesTooltip,
           onClick: getIndicatorBehavior('scene', 'galleries') === 'nav' && scene.galleries?.length > 0
-            ? () => navigate(appendInstanceParam(`/galleries?sceneId=${scene.id}`, scene, hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/galleries?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
             : undefined,
         },
         {
@@ -185,7 +204,7 @@ const SceneCard = forwardRef(
           count: allTags?.length,
           tooltipContent: tagsTooltip,
           onClick: getIndicatorBehavior('scene', 'tags') === 'nav' && allTags?.length > 0
-            ? () => navigate(appendInstanceParam(`/tags?sceneId=${scene.id}`, scene, hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/tags?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
             : undefined,
         },
       ];
@@ -194,7 +213,7 @@ const SceneCard = forwardRef(
     // Only show indicators if setting is enabled
     const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];
 
-    const handleCheckboxClick = (e) => {
+    const handleCheckboxClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       onToggleSelect?.(scene);
@@ -264,14 +283,14 @@ const SceneCard = forwardRef(
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
 
         {/* Watch progress bar */}
-        {scene.resumeTime && scene.files?.[0]?.duration && (
+        {scene.resume_time && scene.files?.[0]?.duration && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
             <div
               className="h-full transition-all pointer-events-none"
               style={{
                 width: `${Math.min(
                   100,
-                  (scene.resumeTime / scene.files[0].duration) * 100
+                  (scene.resume_time / scene.files[0].duration) * 100
                 )}%`,
                 backgroundColor: "var(--status-success)",
               }}
@@ -285,21 +304,21 @@ const SceneCard = forwardRef(
       <BaseCard
         ref={ref}
         entityType="scene"
-        entity={scene}
-        linkTo={getEntityPath('scene', scene, hasMultipleInstances)}
+        entity={scene as unknown as Record<string, unknown>}
+        linkTo={getEntityPath('scene', sceneRecord as Parameters<typeof getEntityPath>[1], hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}
         isSelected={isSelected}
-        onToggleSelect={onToggleSelect}
+        onToggleSelect={onToggleSelect as ((entity: Record<string, unknown> | undefined) => void) | undefined}
         // Content
         imagePath={scene.paths?.screenshot}
         title={title}
         subtitle={subtitle}
         description={description}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard }}
-        ratingControlsProps={!hideRatingControls && {
+        displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard as boolean }}
+        ratingControlsProps={!hideRatingControls ? {
           entityType: "scene",
           entityId: scene.id,
           instanceId: scene.instanceId,
@@ -308,17 +327,17 @@ const SceneCard = forwardRef(
           initialOCounter: scene.o_counter,
           entityTitle: title,
           onHideSuccess,
-          showRating: sceneSettings.showRating,
-          showFavorite: sceneSettings.showFavorite,
-          showOCounter: sceneSettings.showOCounter,
-          showMenu: sceneSettings.showMenu,
-        }}
+          showRating: sceneSettings.showRating as boolean,
+          showFavorite: sceneSettings.showFavorite as boolean,
+          showOCounter: sceneSettings.showOCounter as boolean,
+          showMenu: sceneSettings.showMenu as boolean,
+        } : undefined}
         // Render slots
         renderOverlay={renderOverlay}
         renderImageContent={renderImageContent}
         // Standard props
         className={className}
-        onClick={onClick}
+        onClick={onClick as ((e: React.MouseEvent<HTMLDivElement>) => void) | undefined}
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
       />

@@ -18,7 +18,7 @@ const QUALITY_PRESETS = [
  * Get the best transcode quality for a given source resolution
  * Returns the highest quality preset that is <= source height
  */
-function getBestTranscodeQuality(sourceHeight) {
+function getBestTranscodeQuality(sourceHeight: number) {
   for (const preset of QUALITY_PRESETS) {
     if (preset.height <= sourceHeight) {
       return preset.quality;
@@ -28,10 +28,49 @@ function getBestTranscodeQuality(sourceHeight) {
 }
 
 // ============================================================================
+// TYPES
+// ============================================================================
+
+interface PlaylistData {
+  scenes?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+export interface ScenePlayerReducerState {
+  scene: Record<string, unknown> | null;
+  sceneLoading: boolean;
+  sceneError: unknown;
+  video: Record<string, unknown> | null;
+  videoLoading: boolean;
+  videoError: unknown;
+  sessionId: string | null;
+  quality: string;
+  isInitializing: boolean;
+  isAutoFallback: boolean;
+  isSwitchingMode: boolean;
+  ready: boolean;
+  shouldAutoplay: boolean;
+  playlist: PlaylistData | null;
+  currentIndex: number;
+  autoplayNext: boolean;
+  shuffle: boolean;
+  repeat: string;
+  shuffleHistory: number[];
+  compatibility: Record<string, unknown> | null;
+  oCounter: number;
+  oCounterLoading: boolean;
+}
+
+interface ScenePlayerAction {
+  type: string;
+  payload?: unknown;
+}
+
+// ============================================================================
 // INITIAL STATE
 // ============================================================================
 
-export const initialState = {
+export const initialState: ScenePlayerReducerState = {
   // Scene data (from Stash API)
   scene: null,
   sceneLoading: false,
@@ -73,7 +112,7 @@ export const initialState = {
 // REDUCER
 // ============================================================================
 
-export function scenePlayerReducer(state, action) {
+export function scenePlayerReducer(state: ScenePlayerReducerState, action: ScenePlayerAction) {
   switch (action.type) {
     // Scene loading
     case "LOAD_SCENE_START":
@@ -84,7 +123,8 @@ export function scenePlayerReducer(state, action) {
       };
 
     case "LOAD_SCENE_SUCCESS": {
-      const scene = action.payload.scene;
+      const payload = action.payload as { scene: Record<string, unknown>; oCounter?: number };
+      const scene = payload.scene;
 
       // Smart default quality selection based on codec detection (Phase 3)
       // If scene has streamability info and quality is still at default "direct",
@@ -97,7 +137,7 @@ export function scenePlayerReducer(state, action) {
           autoSelectedQuality = "direct";
         } else {
           // Scene needs transcoding - choose highest quality <= source resolution
-          const sourceHeight = scene.files?.[0]?.height || 1080;
+          const sourceHeight = (scene.files as Array<Record<string, unknown>> | undefined)?.[0]?.height as number || 1080;
           autoSelectedQuality = getBestTranscodeQuality(sourceHeight);
         }
       }
@@ -105,7 +145,7 @@ export function scenePlayerReducer(state, action) {
       return {
         ...state,
         scene: scene,
-        oCounter: action.payload.oCounter || 0,
+        oCounter: payload.oCounter || 0,
         quality: autoSelectedQuality,
         sceneLoading: false,
         sceneError: null,
@@ -127,15 +167,17 @@ export function scenePlayerReducer(state, action) {
         videoError: null,
       };
 
-    case "LOAD_VIDEO_SUCCESS":
+    case "LOAD_VIDEO_SUCCESS": {
+      const payload = action.payload as { video: Record<string, unknown>; sessionId: string | null };
       return {
         ...state,
-        video: action.payload.video,
-        sessionId: action.payload.sessionId,
+        video: payload.video,
+        sessionId: payload.sessionId,
         videoLoading: false,
         videoError: null,
         isInitializing: false,
       };
+    }
 
     case "LOAD_VIDEO_ERROR":
       return {
@@ -149,19 +191,19 @@ export function scenePlayerReducer(state, action) {
     case "SET_QUALITY":
       return {
         ...state,
-        quality: action.payload,
+        quality: action.payload as string,
       };
 
     case "SET_VIDEO":
       return {
         ...state,
-        video: action.payload,
+        video: action.payload as Record<string, unknown> | null,
       };
 
     case "SET_SESSION_ID":
       return {
         ...state,
-        sessionId: action.payload,
+        sessionId: action.payload as string | null,
       };
 
     case "CLEAR_VIDEO":
@@ -329,11 +371,13 @@ export function scenePlayerReducer(state, action) {
     }
 
     case "GOTO_SCENE_INDEX": {
-      const index = action.payload?.index ?? action.payload;
-      const shouldAutoplay = action.payload?.shouldAutoplay ?? false;
+      const gotoPayload = action.payload as { index?: number; shouldAutoplay?: boolean } | number;
+      const index = typeof gotoPayload === 'object' && gotoPayload !== null ? (gotoPayload.index ?? 0) : (gotoPayload as number);
+      const shouldAutoplay = typeof gotoPayload === 'object' && gotoPayload !== null ? (gotoPayload.shouldAutoplay ?? false) : false;
 
       if (
         !state.playlist ||
+        !state.playlist.scenes ||
         index < 0 ||
         index >= state.playlist.scenes.length
       ) {
@@ -360,7 +404,7 @@ export function scenePlayerReducer(state, action) {
     case "SET_CURRENT_INDEX": {
       return {
         ...state,
-        currentIndex: action.payload,
+        currentIndex: action.payload as number,
       };
     }
 
@@ -368,31 +412,31 @@ export function scenePlayerReducer(state, action) {
     case "SET_INITIALIZING":
       return {
         ...state,
-        isInitializing: action.payload,
+        isInitializing: action.payload as boolean,
       };
 
     case "SET_AUTO_FALLBACK":
       return {
         ...state,
-        isAutoFallback: action.payload,
+        isAutoFallback: action.payload as boolean,
       };
 
     case "SET_SWITCHING_MODE":
       return {
         ...state,
-        isSwitchingMode: action.payload,
+        isSwitchingMode: action.payload as boolean,
       };
 
     case "SET_READY":
       return {
         ...state,
-        ready: action.payload,
+        ready: action.payload as boolean,
       };
 
     case "SET_SHOULD_AUTOPLAY":
       return {
         ...state,
-        shouldAutoplay: action.payload,
+        shouldAutoplay: action.payload as boolean,
       };
 
     // O Counter
@@ -418,7 +462,7 @@ export function scenePlayerReducer(state, action) {
     case "SET_O_COUNTER":
       return {
         ...state,
-        oCounter: action.payload,
+        oCounter: action.payload as number,
       };
 
     // Playlist controls
@@ -465,30 +509,39 @@ export function scenePlayerReducer(state, action) {
       };
     }
 
-    case "SET_SHUFFLE_HISTORY":
+    case "SET_SHUFFLE_HISTORY": {
+      const newShuffleHistory = action.payload as number[];
       return {
         ...state,
-        shuffleHistory: action.payload,
+        shuffleHistory: newShuffleHistory,
         // Update playlist object as well
         playlist: state.playlist
-          ? { ...state.playlist, shuffleHistory: action.payload }
+          ? { ...state.playlist, shuffleHistory: newShuffleHistory }
           : null,
       };
+    }
 
     // Initialize from props
     case "INITIALIZE": {
-      const playlist = action.payload.playlist;
+      const initPayload = action.payload as {
+        playlist?: PlaylistData | null;
+        currentIndex?: number;
+        compatibility?: Record<string, unknown> | null;
+        initialQuality?: string;
+        initialShouldAutoplay?: boolean;
+      };
+      const playlist = initPayload.playlist;
 
       // Get shouldAutoplay from props (passed via location.state)
       // Preserve existing value if already set (for re-initialization)
-      const shouldAutoplay = action.payload.initialShouldAutoplay || state.shouldAutoplay || false;
+      const shouldAutoplay = initPayload.initialShouldAutoplay || state.shouldAutoplay || false;
 
       return {
         ...state,
         playlist: playlist || null,
-        currentIndex: action.payload.currentIndex || 0,
-        compatibility: action.payload.compatibility || null,
-        quality: action.payload.initialQuality || "direct",
+        currentIndex: initPayload.currentIndex || 0,
+        compatibility: initPayload.compatibility || null,
+        quality: initPayload.initialQuality || "direct",
         // Initialize playlist controls from playlist object
         autoplayNext: playlist?.autoplayNext ?? true,
         shuffle: playlist?.shuffle ?? false,

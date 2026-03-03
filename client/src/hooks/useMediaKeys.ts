@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts";
 import { isInRatingMode } from "./useRatingHotkeys";
 
@@ -16,13 +16,35 @@ import { isInRatingMode } from "./useRatingHotkeys";
  * @param {Function} options.playPrevious Callback to play previous in playlist
  * @param {boolean} options.enabled Whether controls are enabled
  */
+interface VideoPlayer {
+  paused: () => boolean;
+  play: () => void;
+  pause: () => void;
+  currentTime: (time?: number) => number;
+  duration: () => number;
+  volume: (vol?: number) => number;
+  muted: (muted?: boolean) => boolean;
+  playbackRate: (rate?: number) => number;
+  isFullscreen: () => boolean;
+  exitFullscreen: () => void;
+  requestFullscreen: () => void;
+}
+
+interface UsePlaylistMediaKeysOptions {
+  playerRef: React.MutableRefObject<VideoPlayer | null>;
+  playlist: { scenes?: unknown[] } | null;
+  playNext: (() => void) | null;
+  playPrevious: (() => void) | null;
+  enabled?: boolean;
+}
+
 export const usePlaylistMediaKeys = ({
   playerRef,
   playlist,
   playNext,
   playPrevious,
   enabled = true,
-}) => {
+}: UsePlaylistMediaKeysOptions) => {
   const hasPlaylist = playlist && playlist.scenes && playlist.scenes.length > 1;
 
   // Define all keyboard shortcuts for the video player
@@ -253,16 +275,17 @@ export const usePlaylistMediaKeys = ({
   useEffect(() => {
     if (!hasPlaylist || !playNext || !playPrevious || !enabled) return;
 
-    const handleShiftNav = (event) => {
+    const handleShiftNav = (event: KeyboardEvent) => {
       // Only handle if shift is pressed
       if (!event.shiftKey) return;
 
       // Don't handle if user is typing in an input field
-      const target = event.target;
+      const target = event.target as HTMLElement | null;
       if (
-        target.tagName === "INPUT" ||
+        target &&
+        (target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
-        target.isContentEditable
+        target.isContentEditable)
       ) {
         return;
       }
@@ -287,7 +310,7 @@ export const usePlaylistMediaKeys = ({
  * @param {Object} playerRef - Ref to Video.js player
  * @param {number} percentage - Percentage (0-100)
  */
-function jumpToPercentage(playerRef, percentage) {
+function jumpToPercentage(playerRef: React.MutableRefObject<VideoPlayer | null>, percentage: number) {
   const player = playerRef.current;
   if (player && player.duration()) {
     const targetTime = (player.duration() * percentage) / 100;

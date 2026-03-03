@@ -1,14 +1,14 @@
 import videojs from "video.js";
 import "videojs-vr";
 
-const VRType = {
+const VRType: Record<string, string> = {
   LR180: "180 LR",
   TB360: "360 TB",
   Mono360: "360 Mono",
   Off: "Off",
 };
 
-const vrTypeProjection = {
+const vrTypeProjection: Record<string, string> = {
   [VRType.LR180]: "180_LR",
   [VRType.TB360]: "360_TB",
   [VRType.Mono360]: "360",
@@ -20,8 +20,11 @@ function isVrDevice() {
 }
 
 class VRMenuItem extends videojs.getComponent("MenuItem") {
-  constructor(parent, type) {
-    const options = {};
+  type: string;
+  isSelected: boolean;
+
+  constructor(parent: any, type: string) {
+    const options: any = {};
     options.selectable = true;
     options.multiSelectable = false;
     options.label = type;
@@ -34,7 +37,7 @@ class VRMenuItem extends videojs.getComponent("MenuItem") {
     this.addClass("vjs-source-menu-item");
   }
 
-  selected(selected) {
+  selected(selected: any) {
     super.selected(selected);
     this.isSelected = selected;
   }
@@ -47,7 +50,10 @@ class VRMenuItem extends videojs.getComponent("MenuItem") {
 }
 
 class VRMenuButton extends videojs.getComponent("MenuButton") {
-  constructor(player) {
+  items: VRMenuItem[];
+  selectedType: string;
+
+  constructor(player: any) {
     super(player);
 
     this.items = [];
@@ -56,10 +62,10 @@ class VRMenuButton extends videojs.getComponent("MenuButton") {
     this.setTypes();
   }
 
-  onSelected(item) {
+  onSelected(item: VRMenuItem) {
     this.selectedType = item.type;
 
-    this.items.forEach((i) => {
+    this.items.forEach((i: VRMenuItem) => {
       i.selected(i.type === this.selectedType);
     });
 
@@ -67,7 +73,7 @@ class VRMenuButton extends videojs.getComponent("MenuButton") {
   }
 
   setTypes() {
-    this.items = Object.values(VRType).map((type) => {
+    this.items = Object.values(VRType).map((type: string) => {
       const item = new VRMenuItem(this, type);
 
       item.on("selected", () => {
@@ -98,7 +104,12 @@ class VRMenuButton extends videojs.getComponent("MenuButton") {
 }
 
 class VRMenuPlugin extends videojs.getPlugin("plugin") {
-  constructor(player, options) {
+  menu: any;
+  showButton: boolean;
+  vr: any;
+  declare player: any;
+
+  constructor(player: any, options: any) {
     super(player);
 
     this.menu = new VRMenuButton(player);
@@ -109,7 +120,7 @@ class VRMenuPlugin extends videojs.getPlugin("plugin") {
 
     this.vr = this.player.vr();
 
-    this.menu.on("typeselected", (_, type) => {
+    this.menu.on("typeselected", (_: any, type: string) => {
       this.loadVR(type);
     });
 
@@ -120,7 +131,7 @@ class VRMenuPlugin extends videojs.getPlugin("plugin") {
     });
   }
 
-  loadVR(type) {
+  loadVR(type: string) {
     const projection = vrTypeProjection[type];
     if (this.vr) {
       this.vr.setProjection(projection);
@@ -140,7 +151,7 @@ class VRMenuPlugin extends videojs.getPlugin("plugin") {
     controlBar.removeChild(this.menu);
   }
 
-  setShowButton(showButton) {
+  setShowButton(showButton: boolean) {
     if (isVrDevice()) return;
 
     if (showButton === this.showButton) return;

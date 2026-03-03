@@ -3,11 +3,23 @@ import { Folder } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree";
 
+interface FolderData {
+  id: string;
+  name: string;
+  thumbnail?: string | null;
+}
+
+interface Props {
+  folder: FolderData;
+  onClick: (folder: FolderData) => void;
+  className?: string;
+}
+
 /**
  * Card component for displaying a folder (tag) in folder view.
  * Shows thumbnail and folder name.
  */
-const FolderCard = ({ folder, onClick, className = "" }) => {
+const FolderCard = ({ folder, onClick, className = "" }: Props) => {
   const { name, thumbnail, id } = folder;
   const isUntagged = id === UNTAGGED_FOLDER_ID;
 

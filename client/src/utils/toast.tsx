@@ -11,7 +11,22 @@ import {
  * Uses react-hot-toast with custom components
  */
 
-export const showSuccess = (message, options = {}) => {
+type ToastPosition = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right";
+
+interface ToastOptions {
+  duration?: number;
+  position?: ToastPosition;
+  onRetry?: () => void;
+  [key: string]: unknown;
+}
+
+interface PromiseMessages {
+  loading?: string;
+  success?: string;
+  error?: string;
+}
+
+export const showSuccess = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
       <SuccessMessage
@@ -28,7 +43,7 @@ export const showSuccess = (message, options = {}) => {
   );
 };
 
-export const showError = (error, options = {}) => {
+export const showError = (error: any, options: ToastOptions = {}) => {
   return toast.custom(
     () => (
       <ErrorMessage
@@ -46,7 +61,7 @@ export const showError = (error, options = {}) => {
   );
 };
 
-export const showWarning = (message, options = {}) => {
+export const showWarning = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
       <WarningMessage
@@ -63,7 +78,7 @@ export const showWarning = (message, options = {}) => {
   );
 };
 
-const showInfo = (message, options = {}) => {
+const showInfo = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
       <InfoMessage
@@ -84,7 +99,7 @@ const showInfo = (message, options = {}) => {
  * Promise-based toast for async operations
  * Example: showPromise(fetchData(), { loading: 'Saving...', success: 'Saved!', error: 'Failed' })
  */
-const showPromise = (promise, messages, options = {}) => {
+const showPromise = (promise: Promise<any>, messages: PromiseMessages, options: ToastOptions = {}) => {
   return toast.promise(
     promise,
     {

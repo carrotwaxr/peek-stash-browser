@@ -1,7 +1,15 @@
+import { type ReactNode } from "react";
+
+interface Props {
+  title: string;
+  subtitle?: ReactNode;
+  className?: string;
+}
+
 /**
  * Reusable page header component
  */
-const PageHeader = ({ title, subtitle, className = "" }) => {
+const PageHeader = ({ title, subtitle, className = "" }: Props) => {
   if (!title) return null;
 
   return (

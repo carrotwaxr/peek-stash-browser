@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { getSiteInfo, getDomainFromUrl } from "../../utils/siteInfo";
 
+interface Props {
+  url: string;
+}
+
 /**
  * External link component with site icon/favicon
  * Shows site-specific icons for known sites, attempts favicon for unknown sites
  */
-const SectionLink = ({ url }) => {
+const SectionLink = ({ url }: Props) => {
   const [faviconError, setFaviconError] = useState(false);
 
   if (!url) return null;

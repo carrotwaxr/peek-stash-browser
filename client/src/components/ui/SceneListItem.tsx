@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -12,19 +12,31 @@ import {
 } from "../scene/index";
 import { ExpandableDescription } from "./ExpandableDescription";
 import { getSceneDescription } from "../../utils/format";
+import type { NormalizedScene } from "@peek/shared-types";
 
-/**
- * Shared row-based scene list item component
- * Used by both Playlists and Watch History
- *
- * @param {Object} scene - Scene object
- * @param {Object} watchHistory - Optional watch history data {resumeTime, playCount, playDuration, lastPlayedAt, oCount}
- * @param {React.ReactNode} actionButtons - Optional action buttons (e.g., Remove button)
- * @param {React.ReactNode} dragHandle - Optional content to show before the thumbnail (e.g., position controls)
- * @param {Object} linkState - Optional state to pass to Link component
- * @param {boolean} exists - Whether the scene exists (for deleted scenes)
- * @param {string} sceneId - Scene ID (for when scene is deleted)
- */
+interface WatchHistoryData {
+  resumeTime?: number;
+  playCount?: number;
+  playDuration?: number;
+  lastPlayedAt?: string | null;
+  oCount?: number;
+  oHistory?: string[] | string;
+}
+
+interface Props {
+  scene: NormalizedScene | null;
+  watchHistory?: WatchHistoryData | null;
+  actionButtons?: ReactNode;
+  dragHandle?: ReactNode;
+  linkState?: Record<string, unknown>;
+  exists?: boolean;
+  sceneId?: string;
+  showSessionOIndicator?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (scene: NormalizedScene) => void;
+  selectionMode?: boolean;
+}
+
 const SceneListItem = ({
   scene,
   watchHistory,
@@ -33,18 +45,18 @@ const SceneListItem = ({
   linkState,
   exists = true,
   sceneId,
-  showSessionOIndicator = false, // Show if O was clicked in the last session
+  showSessionOIndicator = false,
   isSelected = false,
   onToggleSelect,
   selectionMode = false,
-}) => {
+}: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
 
   const { selectionHandlers, isLongPressing, handleNavigationClick } = useCardSelection({
-    entity: scene,
+    entity: scene as unknown as Record<string, unknown>,
     selectionMode,
-    onToggleSelect,
+    onToggleSelect: onToggleSelect as ((entity: Record<string, unknown>) => void) | undefined,
   });
 
   // Track if viewport is mobile-width for scroll-based preview autoplay
@@ -77,7 +89,7 @@ const SceneListItem = ({
       const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
 
       // Check if the last O was within 5 minutes of the last play session
-      const timeDiff = Math.abs(lastOTimestamp - lastPlayedAt);
+      const timeDiff = Math.abs(lastOTimestamp.getTime() - lastPlayedAt.getTime());
       const fiveMinutes = 5 * 60 * 1000;
 
       return timeDiff < fiveMinutes;
@@ -87,7 +99,7 @@ const SceneListItem = ({
     }
   };
 
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number) => {
     if (!seconds || seconds < 1) return "0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -97,14 +109,14 @@ const SceneListItem = ({
     return `${minutes}m`;
   };
 
-  const formatResumeTime = (seconds) => {
+  const formatResumeTime = (seconds: number) => {
     if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent) => {
     // Delegate to hook's click handler first — it handles long-press guard
     // (resets isLongPressing flag and blocks the click) and selection mode toggling
     if (isLongPressing || selectionMode) {
@@ -113,7 +125,7 @@ const SceneListItem = ({
     }
 
     // Don't navigate if clicking on interactive elements
-    const target = e.target;
+    const target = e.target as HTMLElement;
     const isInteractive =
       target.closest("button") ||
       target.closest("a") ||
@@ -140,15 +152,15 @@ const SceneListItem = ({
       // Also check if video is fullscreen
       const isFullscreen =
         document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement;
+        (document as unknown as Record<string, unknown>).webkitFullscreenElement ||
+        (document as unknown as Record<string, unknown>).mozFullScreenElement ||
+        (document as unknown as Record<string, unknown>).msFullscreenElement;
       if (isFullscreen) {
         sessionStorage.setItem("videoPlayerFullscreen", "true");
       }
     }
 
-    navigate(getEntityPath('scene', scene, hasMultipleInstances), { state: linkState });
+    navigate(getEntityPath('scene', scene as unknown as Parameters<typeof getEntityPath>[1], hasMultipleInstances), { state: linkState });
   };
 
   return (
@@ -176,7 +188,7 @@ const SceneListItem = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onToggleSelect?.(scene);
+                  if (scene) onToggleSelect?.(scene);
                 }}
                 className="absolute top-2 left-2 z-20 w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
                 style={{
@@ -197,8 +209,8 @@ const SceneListItem = ({
             )}
             {exists ? (
               <SceneThumbnail
-                scene={scene}
-                watchHistory={watchHistory}
+                scene={scene!}
+                watchHistory={watchHistory as Parameters<typeof SceneThumbnail>[0]['watchHistory']}
                 className="w-full aspect-video"
                 autoplayOnScroll={isMobileWidth}
               />
@@ -254,23 +266,23 @@ const SceneListItem = ({
                               {formatRelativeTime(watchHistory.lastPlayedAt)}
                             </span>
                           )}
-                          {watchHistory.resumeTime > 0 &&
+                          {(watchHistory.resumeTime ?? 0) > 0 &&
                             scene.files?.[0]?.duration && (
                               <span>
                                 ⏸️ Resume at:{" "}
-                                {formatResumeTime(watchHistory.resumeTime)} (
+                                {formatResumeTime(watchHistory.resumeTime!)} (
                                 {Math.round(
-                                  (watchHistory.resumeTime /
+                                  (watchHistory.resumeTime! /
                                     scene.files[0].duration) *
                                     100
                                 )}
                                 %)
                               </span>
                             )}
-                          {watchHistory.playDuration > 0 && (
+                          {(watchHistory.playDuration ?? 0) > 0 && (
                             <span>
                               ⏱️ Watched:{" "}
-                              {formatDuration(watchHistory.playDuration)}
+                              {formatDuration(watchHistory.playDuration!)}
                             </span>
                           )}
                         </div>
@@ -278,7 +290,7 @@ const SceneListItem = ({
 
                       {/* Stats Row */}
                       <div className="flex items-center gap-2 mb-2">
-                        <SceneStats scene={scene} watchHistory={watchHistory} />
+                        <SceneStats scene={scene} watchHistory={watchHistory as Parameters<typeof SceneStats>[0]['watchHistory']} />
                         {showSessionOIndicator && hadOInLastSession() && (
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
@@ -295,10 +307,10 @@ const SceneListItem = ({
                       </div>
 
                       {/* Description */}
-                      {getSceneDescription(scene) && (
+                      {getSceneDescription(scene as unknown as Record<string, unknown>) && (
                         <div className="mb-2">
                           <ExpandableDescription
-                            description={getSceneDescription(scene)}
+                            description={getSceneDescription(scene as unknown as Record<string, unknown>)}
                             maxLines={2}
                           />
                         </div>

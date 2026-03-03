@@ -31,7 +31,7 @@ vi.mock("../../../src/hooks/useAuth", () => ({
 
 // Mock SceneCardPreview to avoid its dependencies
 vi.mock("../../../src/components/ui/SceneCardPreview", () => ({
-  default: ({ duration, resolution }) => (
+  default: ({ duration, resolution }: { duration?: number; resolution?: string }) => (
     <div data-testid="scene-preview">
       {duration && <span>{duration}</span>}
       {resolution && <span>{resolution}</span>}
@@ -58,9 +58,9 @@ describe("SceneCard respects card display settings", () => {
     tags: [{ id: "t1", name: "Tag1" }],
     studio: { id: "s1", name: "Test Studio" },
     details: "This is a test scene description that should be visible.",
-  };
+  } as any;
 
-  const wrapper = ({ children }) => (
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter>{children}</MemoryRouter>
   );
 

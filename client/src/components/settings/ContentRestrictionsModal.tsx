@@ -2,19 +2,39 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPut } from "../../api";
 import { Button, Paper, SearchableSelect } from "../ui/index";
 
+interface UserData {
+  id: number;
+  username: string;
+}
+
+interface Props {
+  user: UserData;
+  onClose: () => void;
+  onSave?: () => void;
+}
+
+type RestrictionMode = "NONE" | "EXCLUDE" | "INCLUDE";
+type EntityType = "groups" | "tags" | "studios" | "galleries";
+
+interface RestrictionConfig {
+  mode: RestrictionMode;
+  entityIds: string[];
+  restrictEmpty: boolean;
+}
+
 /**
  * Content Restrictions Modal
  *
  * Allows admins to configure per-user content restrictions for Collections, Tags, Studios, and Galleries.
  * Supports INCLUDE (show only) and EXCLUDE (hide) modes with "restrict empty" option.
  */
-const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
+const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Restriction state for each entity type
-  const [restrictions, setRestrictions] = useState({
+  const [restrictions, setRestrictions] = useState<Record<EntityType, RestrictionConfig>>({
     groups: { mode: "NONE", entityIds: [], restrictEmpty: false },
     tags: { mode: "NONE", entityIds: [], restrictEmpty: false },
     studios: { mode: "NONE", entityIds: [], restrictEmpty: false },
@@ -32,12 +52,12 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
       setLoading(true);
       setError(null);
 
-      const data = await apiGet(`/user/${user.id}/restrictions`);
+      const data = await apiGet<{ restrictions: Array<{ entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }> }>(`/user/${user.id}/restrictions`);
       const existingRestrictions = data.restrictions || [];
 
       // Convert API format to component state
       const newRestrictions = { ...restrictions };
-      existingRestrictions.forEach((restriction) => {
+      existingRestrictions.forEach((restriction: { entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }) => {
         newRestrictions[restriction.entityType] = {
           mode: restriction.mode,
           entityIds: JSON.parse(restriction.entityIds),
@@ -53,7 +73,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }
   };
 
-  const handleModeChange = (entityType, mode) => {
+  const handleModeChange = (entityType: EntityType, mode: RestrictionMode) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -65,7 +85,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }));
   };
 
-  const handleEntityIdsChange = (entityType, entityIds) => {
+  const handleEntityIdsChange = (entityType: EntityType, entityIds: string[]) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -75,7 +95,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     }));
   };
 
-  const handleRestrictEmptyChange = (entityType, checked) => {
+  const handleRestrictEmptyChange = (entityType: EntityType, checked: boolean) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -107,14 +127,14 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
       onSave?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to save restrictions");
+      setError((err as Error).message || "Failed to save restrictions");
     } finally {
       setSaving(false);
     }
   };
 
-  const getEntityLabel = (entityType) => {
-    const labels = {
+  const getEntityLabel = (entityType: string) => {
+    const labels: Record<string, string> = {
       groups: "Collections",
       tags: "Tags",
       studios: "Studios",
@@ -123,8 +143,8 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return labels[entityType] || entityType;
   };
 
-  const getEntityDescription = (entityType) => {
-    const descriptions = {
+  const getEntityDescription = (entityType: string) => {
+    const descriptions: Record<string, string> = {
       groups:
         "Most reliable for content organization as groups are typically static and manually curated.",
       tags: "May change frequently if using Stash plugins. Use with caution for dynamic tagging systems.",
@@ -135,8 +155,8 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return descriptions[entityType] || "";
   };
 
-  const getModeDescription = (mode) => {
-    const descriptions = {
+  const getModeDescription = (mode: string) => {
+    const descriptions: Record<string, string> = {
       NONE: "No restrictions - user can see all content",
       EXCLUDE: "Hide selected items and any content associated with them",
       INCLUDE: "Show ONLY selected items and content associated with them",
@@ -144,7 +164,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
     return descriptions[mode] || "";
   };
 
-  const renderEntitySection = (entityType) => {
+  const renderEntitySection = (entityType: EntityType) => {
     const config = restrictions[entityType];
 
     return (
@@ -194,7 +214,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                   name={`${entityType}-mode`}
                   value={mode}
                   checked={config.mode === mode}
-                  onChange={() => handleModeChange(entityType, mode)}
+                  onChange={() => handleModeChange(entityType, mode as RestrictionMode)}
                   className="mt-0.5"
                   style={{ accentColor: "var(--primary-color)" }}
                 />
@@ -230,7 +250,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
               <SearchableSelect
                 entityType={entityType}
                 value={config.entityIds}
-                onChange={(ids) => handleEntityIdsChange(entityType, ids)}
+                onChange={(ids) => handleEntityIdsChange(entityType, Array.isArray(ids) ? ids : [ids])}
                 multi={true}
                 placeholder={`Select ${getEntityLabel(
                   entityType

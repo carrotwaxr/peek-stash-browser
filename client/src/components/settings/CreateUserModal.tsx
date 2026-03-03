@@ -2,14 +2,19 @@ import { useState } from "react";
 import { apiPost } from "../../api";
 import { Button, Paper } from "../ui/index";
 
-const CreateUserModal = ({ onClose, onUserCreated }) => {
+interface Props {
+  onClose: () => void;
+  onUserCreated: (username: string) => void;
+}
+
+const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("USER");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!username.trim() || !password.trim()) {

@@ -10,7 +10,13 @@ import { showSuccess, showError } from "../utils/toast";
  * @param {Function} [options.onHideSuccess] - Called per scene after successful hide
  * @returns {Object} - { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog }
  */
-export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess }) => {
+interface UseHideBulkActionOptions {
+  selectedScenes: Array<{ id: string | number }>;
+  onComplete: () => void;
+  onHideSuccess?: (id: string | number, entityType: string) => void;
+}
+
+export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess }: UseHideBulkActionOptions) => {
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
   const { hideEntities, hideConfirmationDisabled } = useHiddenEntities();
@@ -23,13 +29,13 @@ export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess })
     }
   };
 
-  const handleHideConfirm = async (dontAskAgain) => {
+  const handleHideConfirm = async (dontAskAgain: boolean) => {
     setIsHiding(true);
     setHideDialogOpen(false);
 
     const entities = selectedScenes.map((scene) => ({
       entityType: "scene",
-      entityId: scene.id,
+      entityId: String(scene.id),
     }));
 
     const result = await hideEntities({

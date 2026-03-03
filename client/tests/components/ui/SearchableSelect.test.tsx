@@ -43,7 +43,7 @@ vi.mock("../../../src/utils/filterCache", () => ({
 
 // Mock useDebounce to return value immediately (no delay)
 vi.mock("../../../src/hooks/useDebounce", () => ({
-  useDebouncedValue: (value) => value,
+  useDebouncedValue: (value: unknown) => value,
 }));
 
 vi.mock("../../../src/api", () => ({
@@ -71,23 +71,23 @@ const emptyTagsResponse = { findTags: { tags: [] } };
 const emptyPerformersResponse = { findPerformers: { performers: [] } };
 
 /** Creates a findTags response with given tags */
-const makeTagsResponse = (tags) => ({
+const makeTagsResponse = (tags: unknown[]) => ({
   findTags: { tags },
 });
 
-const makePerformersResponse = (performers) => ({
+const makePerformersResponse = (performers: unknown[]) => ({
   findPerformers: { performers },
 });
 
-const makeStudiosResponse = (studios) => ({
+const makeStudiosResponse = (studios: unknown[]) => ({
   findStudios: { studios },
 });
 
-const makeGroupsResponse = (groups) => ({
+const makeGroupsResponse = (groups: unknown[]) => ({
   findGroups: { groups },
 });
 
-const makeGalleriesResponse = (galleries) => ({
+const makeGalleriesResponse = (galleries: unknown[]) => ({
   findGalleries: { galleries },
 });
 
@@ -433,7 +433,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
   it("returns empty array for unsupported entity type in fetchItemsByIds", async () => {
     render(
       <SearchableSelect
-        entityType="unsupported"
+        entityType={"unsupported" as any}
         value={["1:inst-1"]}
         onChange={vi.fn()}
         multi
@@ -477,7 +477,7 @@ describe("SearchableSelect loadOptions guard", () => {
 
     const { container } = render(
       <SearchableSelect
-        entityType="unsupported"
+        entityType={"unsupported" as any}
         value={[]}
         onChange={vi.fn()}
         multi
@@ -485,7 +485,7 @@ describe("SearchableSelect loadOptions guard", () => {
     );
 
     // Open the dropdown to trigger loadOptions
-    const trigger = container.querySelector("[class*='cursor-pointer']");
+    const trigger = container.querySelector("[class*='cursor-pointer']")!;
     fireEvent.click(trigger);
 
     // Wait for component to settle - loadOptions should bail out gracefully

@@ -3,12 +3,21 @@ import { apiGet } from "../../../api";
 import { useAuth } from "../../../hooks/useAuth";
 import UserManagementSection from "../UserManagementSection";
 
+interface UserItem {
+  id: number;
+  username: string;
+  role: string;
+  syncToStash?: boolean;
+  createdAt: string;
+  groups?: Array<{ id: number; name: string }>;
+}
+
 const UserManagementTab = () => {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [message, setMessage] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -18,7 +27,7 @@ const UserManagementTab = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiGet("/user/all");
+      const data = await apiGet<{ users: UserItem[] }>("/user/all");
       setUsers(data.users || []);
     } catch (err) {
       setError((err as Error).message || "Failed to load users");
@@ -27,12 +36,12 @@ const UserManagementTab = () => {
     }
   };
 
-  const showMessage = (msg) => {
+  const showMessage = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const showError = (err) => {
+  const showError = (err: string) => {
     setError(err);
     setTimeout(() => setError(null), 5000);
   };
@@ -80,7 +89,7 @@ const UserManagementTab = () => {
       {/* User Management Section */}
       <UserManagementSection
         users={users}
-        currentUser={currentUser}
+        currentUser={currentUser as UserItem | null}
         onUsersChanged={loadUsers}
         onMessage={showMessage}
         onError={showError}

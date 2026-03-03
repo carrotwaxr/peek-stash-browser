@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "../../hooks/useDebounce";
 
+interface Props {
+  rating: number | null | undefined;
+  onChange: (rating: number | null) => void;
+  label?: string;
+  showClearButton?: boolean;
+}
+
 /**
  * Inline slider for rating on detail pages
  * Replaces star rating with gradient slider
@@ -11,7 +18,7 @@ const RatingSlider = ({
   onChange,
   label = "Rating",
   showClearButton = true,
-}) => {
+}: Props) => {
   // Track whether item is rated (null = unrated, number = rated)
   const [value, setValue] = useState(
     rating === null || rating === undefined ? null : rating / 10
@@ -21,12 +28,13 @@ const RatingSlider = ({
     setValue(rating === null || rating === undefined ? null : rating / 10);
   }, [rating]);
 
-  const debouncedOnChange = useDebouncedCallback((newValue) => {
+  const debouncedOnChange = useDebouncedCallback((...args: unknown[]) => {
+    const newValue = args[0] as number;
     const ratingValue = Math.round(newValue * 10);
     onChange(ratingValue === 0 ? null : ratingValue);
   }, 300);
 
-  const getRatingGradient = (val) => {
+  const getRatingGradient = (val: number | null) => {
     // Unrated: neutral gray
     if (val === null || val === undefined) {
       return "linear-gradient(90deg, #6B7280 0%, #4B5563 100%)"; // Neutral gray
@@ -41,7 +49,7 @@ const RatingSlider = ({
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setValue(newValue);
     debouncedOnChange(newValue);

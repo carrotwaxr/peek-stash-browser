@@ -12,7 +12,7 @@ vi.mock("../../src/api", () => ({
 import { apiGet } from "../../src/api";
 
 const createWrapper = (initialEntries = ["/"]) => {
-  return ({ children }) => (
+  return ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
   );
 };
@@ -21,7 +21,7 @@ describe("useFilterState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no presets
-    apiGet.mockResolvedValue({ presets: {}, defaults: {} });
+    (apiGet as any).mockResolvedValue({ presets: {}, defaults: {} });
   });
 
   describe("initialization", () => {
@@ -69,7 +69,7 @@ describe("useFilterState", () => {
 
   describe("preset handling", () => {
     it("applies full preset (sort + filters) when URL has no filter params", async () => {
-      apiGet.mockImplementation((url) => {
+      (apiGet as any).mockImplementation((url: string) => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {
@@ -102,7 +102,7 @@ describe("useFilterState", () => {
     });
 
     it("applies preset sort ONLY when URL has filter params", async () => {
-      apiGet.mockImplementation((url) => {
+      (apiGet as any).mockImplementation((url: string) => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {
@@ -140,7 +140,7 @@ describe("useFilterState", () => {
     });
 
     it("URL sort takes precedence over preset sort", async () => {
-      apiGet.mockImplementation((url) => {
+      (apiGet as any).mockImplementation((url: string) => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {

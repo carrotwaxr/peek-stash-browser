@@ -2,9 +2,14 @@ import { useState } from "react";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import { apiPost, apiPut, apiDelete } from "../../api";
 import { useTheme } from "../../themes/useTheme";
+import type { CustomTheme } from "../../themes/ThemeContext";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper } from "../ui/index";
 import CustomThemeEditor from "./CustomThemeEditor";
+
+interface CustomThemeWithDates extends CustomTheme {
+  createdAt?: string;
+}
 
 /**
  * Custom theme management component
@@ -12,9 +17,9 @@ import CustomThemeEditor from "./CustomThemeEditor";
 const CustomThemeManager = () => {
   const { customThemes, refreshCustomThemes, currentTheme, changeTheme } =
     useTheme();
-  const [editingTheme, setEditingTheme] = useState(null);
+  const [editingTheme, setEditingTheme] = useState<CustomThemeWithDates | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<CustomThemeWithDates | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = () => {
@@ -22,15 +27,15 @@ const CustomThemeManager = () => {
     setEditingTheme(null);
   };
 
-  const handleEdit = (theme) => {
+  const handleEdit = (theme: CustomThemeWithDates) => {
     setEditingTheme(theme);
     setIsCreating(false);
   };
 
-  const handleSaveNew = async (themeData) => {
+  const handleSaveNew = async (themeData: { name: string; config: Record<string, any> }) => {
     try {
       setLoading(true);
-      const data = await apiPost("/themes/custom", themeData);
+      const data = await apiPost("/themes/custom", themeData) as Record<string, any>;
       await refreshCustomThemes();
       showSuccess(`Theme "${themeData.name}" created successfully!`);
       setIsCreating(false);
@@ -44,10 +49,10 @@ const CustomThemeManager = () => {
     }
   };
 
-  const handleSaveEdit = async (themeData) => {
+  const handleSaveEdit = async (themeData: { name: string; config: Record<string, any> }) => {
     try {
       setLoading(true);
-      await apiPut(`/themes/custom/${editingTheme.id}`, themeData);
+      await apiPut(`/themes/custom/${editingTheme!.id}`, themeData);
       await refreshCustomThemes();
       showSuccess(`Theme "${themeData.name}" updated successfully!`);
       setEditingTheme(null);
@@ -58,7 +63,7 @@ const CustomThemeManager = () => {
     }
   };
 
-  const handleDelete = async (theme) => {
+  const handleDelete = async (theme: CustomThemeWithDates) => {
     try {
       setLoading(true);
       await apiDelete(`/themes/custom/${theme.id}`);
@@ -77,10 +82,10 @@ const CustomThemeManager = () => {
     }
   };
 
-  const handleDuplicate = async (theme) => {
+  const handleDuplicate = async (theme: CustomThemeWithDates) => {
     try {
       setLoading(true);
-      const data = await apiPost(`/themes/custom/${theme.id}/duplicate`);
+      const data = await apiPost(`/themes/custom/${theme.id}/duplicate`) as Record<string, any>;
       await refreshCustomThemes();
       showSuccess(`Theme duplicated as "${data.theme.name}"!`);
     } catch (error) {
@@ -104,7 +109,7 @@ const CustomThemeManager = () => {
             className="text-xl font-semibold"
             style={{ color: "var(--text-primary)" }}
           >
-            {isCreating ? "Create Custom Theme" : `Edit "${editingTheme.name}"`}
+            {isCreating ? "Create Custom Theme" : `Edit "${editingTheme!.name}"`}
           </h3>
           <Button variant="secondary" onClick={handleCancel} disabled={loading}>
             <X size={16} className="mr-2" />
@@ -112,7 +117,7 @@ const CustomThemeManager = () => {
           </Button>
         </div>
         <CustomThemeEditor
-          theme={editingTheme}
+          theme={editingTheme as unknown as React.ComponentProps<typeof CustomThemeEditor>["theme"]}
           onSave={isCreating ? handleSaveNew : handleSaveEdit}
           onCancel={handleCancel}
           isNew={isCreating}
@@ -173,6 +178,7 @@ const CustomThemeManager = () => {
       ) : (
         <div className="space-y-3">
           {customThemes.map((theme) => {
+            const themeWithDates = theme as CustomThemeWithDates;
             const isActive = currentTheme === `custom-${theme.id}`;
             return (
               <Paper key={theme.id}>
@@ -184,14 +190,14 @@ const CustomThemeManager = () => {
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: theme.config.accents.primary,
+                            backgroundColor: (themeWithDates.config.accents as Record<string, any>)?.primary,
                           }}
                           title="Primary Accent"
                         />
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: theme.config.accents.secondary,
+                            backgroundColor: (themeWithDates.config.accents as Record<string, any>)?.secondary,
                           }}
                           title="Secondary Accent"
                         />
@@ -227,7 +233,7 @@ const CustomThemeManager = () => {
                           {theme.config.mode === "dark" ? "Dark" : "Light"} mode
                           {" • "}
                           Created{" "}
-                          {new Date(theme.createdAt).toLocaleDateString()}
+                          {new Date((theme as CustomThemeWithDates).createdAt || "").toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -282,13 +288,14 @@ const CustomThemeManager = () => {
       {/* Delete Confirmation Dialog */}
       {deleteConfirm && (
         <ConfirmDialog
+          isOpen={true}
           title="Delete Custom Theme"
           message={`Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
           onConfirm={() => handleDelete(deleteConfirm)}
-          onCancel={() => setDeleteConfirm(null)}
-          variant="danger"
+          onClose={() => setDeleteConfirm(null)}
+          confirmStyle="danger"
         />
       )}
     </div>

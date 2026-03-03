@@ -15,6 +15,20 @@ import TagChips from "./TagChips";
  * - Landscape (wider): opens from the right as a side panel
  * - Portrait (taller): opens from the bottom as a sheet
  */
+import type { NormalizedImage } from "@peek/shared-types";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  image: NormalizedImage | null;
+  rating: number | null;
+  isFavorite: boolean;
+  oCounter: number;
+  onRatingChange: (rating: number | null) => void;
+  onFavoriteChange: (isFavorite: boolean) => void;
+  onOCounterChange: (count: number) => void;
+}
+
 const MetadataDrawer = ({
   open,
   onClose,
@@ -25,7 +39,7 @@ const MetadataDrawer = ({
   onRatingChange,
   onFavoriteChange,
   onOCounterChange,
-}) => {
+}: Props) => {
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(
     () => window.innerWidth > window.innerHeight
@@ -38,7 +52,7 @@ const MetadataDrawer = ({
   useEffect(() => {
     const mq = window.matchMedia("(orientation: landscape)");
     setIsLandscape(mq.matches);
-    const handler = (e) => setIsLandscape(e.matches);
+    const handler = (e: MediaQueryListEvent) => setIsLandscape(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
@@ -54,7 +68,7 @@ const MetadataDrawer = ({
     effectiveDetails,
     effectivePhotographer,
     effectiveUrls,
-  } = getEffectiveImageMetadata(image);
+  } = getEffectiveImageMetadata(image as Parameters<typeof getEffectiveImageMetadata>[0]);
 
   const date = effectiveDate
     ? new Date(effectiveDate).toLocaleDateString()
@@ -120,7 +134,7 @@ const MetadataDrawer = ({
               className="text-lg font-semibold line-clamp-2 flex-1"
               style={{ color: "var(--text-primary)" }}
             >
-              {getImageTitle(image)}
+              {getImageTitle(image as Parameters<typeof getImageTitle>[0])}
             </h2>
             <div className="flex items-center gap-2 flex-shrink-0">
               <div ref={ratingBadgeRef}>
@@ -199,7 +213,7 @@ const MetadataDrawer = ({
                       {performer.image_path ? (
                         <img
                           src={performer.image_path}
-                          alt={performer.name}
+                          alt={performer.name ?? undefined}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -237,7 +251,7 @@ const MetadataDrawer = ({
               >
                 Tags
               </h3>
-              <TagChips tags={effectiveTags} />
+              <TagChips tags={effectiveTags as Parameters<typeof TagChips>[0]['tags']} />
             </div>
           )}
 
@@ -291,7 +305,7 @@ const MetadataDrawer = ({
         initialRating={rating}
         onSave={onRatingChange}
         entityType="image"
-        entityTitle={getImageTitle(image)}
+        entityTitle={getImageTitle(image as Parameters<typeof getImageTitle>[0]) ?? undefined}
         anchorEl={ratingBadgeRef.current}
       />
     </>

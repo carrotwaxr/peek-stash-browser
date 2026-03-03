@@ -3,7 +3,7 @@ import videojs from "video.js";
 const BigPlayButton = videojs.getComponent("BigPlayButton");
 
 class BigPlayPauseButton extends BigPlayButton {
-  handleClick(event) {
+  handleClick(event: any) {
     if (this.player().paused()) {
       super.handleClick(event);
     } else {
@@ -17,7 +17,7 @@ class BigPlayPauseButton extends BigPlayButton {
 }
 
 class BigButtonGroup extends videojs.getComponent("Component") {
-  constructor(player) {
+  constructor(player: any) {
     super(player);
 
     this.addChild("seekButton", {
@@ -41,7 +41,7 @@ class BigButtonGroup extends videojs.getComponent("Component") {
 }
 
 class BigButtonsPlugin extends videojs.getPlugin("plugin") {
-  constructor(player) {
+  constructor(player: any) {
     super(player);
 
     player.ready(() => {

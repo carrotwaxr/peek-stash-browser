@@ -1,11 +1,29 @@
 // client/src/components/folder/FolderView.jsx
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { buildFolderTree } from "../../utils/buildFolderTree";
 import FolderCard from "./FolderCard";
 import FolderBreadcrumb from "./FolderBreadcrumb";
 import FolderTreeSidebar from "./FolderTreeSidebar";
+
+interface TagItem {
+  id: string;
+  name: string;
+  parents?: Array<{ id: string }>;
+  image_path?: string | null;
+}
+
+interface Props {
+  items: Array<Record<string, unknown>>;
+  tags: TagItem[];
+  renderItem: (item: Record<string, unknown>) => ReactNode;
+  gridDensity?: string;
+  loading?: boolean;
+  emptyMessage?: string;
+  onFolderPathChange?: (tagId: string | null) => void;
+  filters?: Record<string, unknown> | null;
+}
 
 /**
  * Folder view for browsing content by tag hierarchy.
@@ -19,9 +37,9 @@ const FolderView = ({
   gridDensity = "medium",
   loading = false,
   emptyMessage = "No items found",
-  onFolderPathChange, // Callback when folder path changes (for API filtering)
-  filters = null, // eslint-disable-line @typescript-eslint/no-unused-vars -- Not used directly but for API consistency
-}) => {
+  onFolderPathChange,
+  filters: _filters = null,  
+}: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Parse path from URL
@@ -31,7 +49,7 @@ const FolderView = ({
   }, [searchParams]);
 
   // Track last notified tag to avoid duplicate notifications
-  const lastNotifiedTagRef = useRef(undefined);
+  const lastNotifiedTagRef = useRef<string | null | undefined>(undefined);
 
   // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
   useEffect(() => {
@@ -44,7 +62,7 @@ const FolderView = ({
 
   // Update URL when path changes - also reset page to 1
   const setCurrentPath = useCallback(
-    (newPath) => {
+    (newPath: string[]) => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         if (newPath.length > 0) {
@@ -72,7 +90,7 @@ const FolderView = ({
 
   // Handle folder click - navigate into folder
   const handleFolderClick = useCallback(
-    (folder) => {
+    (folder: { id: string }) => {
       if (folder.id === "__untagged__") {
         // Can't navigate into untagged
         return;
@@ -84,7 +102,7 @@ const FolderView = ({
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback(
-    (path) => {
+    (path: string[]) => {
       setCurrentPath(path);
     },
     [setCurrentPath]

@@ -14,8 +14,8 @@ import { useEffect, useRef } from "react";
  * and intercept popstate to prevent this.
  */
 export const useOrientationFullscreen = (
-  playerRef,
-  sceneId,
+  playerRef: any,
+  sceneId: any,
   enabled = true
 ) => {
   const userDeclinedRef = useRef(false);

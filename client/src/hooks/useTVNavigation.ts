@@ -12,12 +12,18 @@ import { useCallback, useState } from "react";
  * @param {boolean} options.enabled Whether TV navigation is enabled
  * @returns {Object} Navigation state and control functions
  */
+interface UseTVNavigationOptions {
+  zones?: string[];
+  initialZone?: string | null;
+  enabled?: boolean;
+}
+
 export const useTVNavigation = ({
   zones = [],
   initialZone = null,
   enabled = true,
-}) => {
-  const [currentZone, setCurrentZone] = useState(initialZone || zones[0]);
+}: UseTVNavigationOptions) => {
+  const [currentZone, setCurrentZone] = useState<string>(initialZone || zones[0]);
   const [focusIndex, setFocusIndex] = useState(0); // Focus index within current zone
 
   /**
@@ -52,7 +58,7 @@ export const useTVNavigation = ({
    * Jump directly to a specific zone
    */
   const goToZone = useCallback(
-    (zoneName) => {
+    (zoneName: string) => {
       if (zones.includes(zoneName)) {
         setCurrentZone(zoneName);
         setFocusIndex(0);
@@ -67,7 +73,7 @@ export const useTVNavigation = ({
    * Check if a given zone is currently active
    */
   const isZoneActive = useCallback(
-    (zoneName) => {
+    (zoneName: string) => {
       return enabled && currentZone === zoneName;
     },
     [enabled, currentZone]
@@ -76,7 +82,7 @@ export const useTVNavigation = ({
   /**
    * Update focus index within current zone
    */
-  const updateFocusIndex = useCallback((index) => {
+  const updateFocusIndex = useCallback((index: number) => {
     setFocusIndex(index);
   }, []);
 

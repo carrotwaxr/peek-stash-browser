@@ -1,4 +1,12 @@
+import { type CSSProperties, type ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+
+interface Props {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  autoplayOnScroll?: boolean;
+}
 
 /**
  * MarqueeText - Auto-scrolling text for overflowing content
@@ -25,9 +33,9 @@ const MarqueeText = ({
   className = "",
   style = {},
   autoplayOnScroll = true,
-}) => {
-  const containerRef = useRef(null);
-  const textRef = useRef(null);
+}: Props) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [overflowAmount, setOverflowAmount] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -40,7 +48,7 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => setHasHoverCapability(e.matches);
+    const handleChange = (e: MediaQueryListEvent) => setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -50,7 +58,7 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
 
-    const handleChange = (e) => setPrefersReducedMotion(e.matches);
+    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);

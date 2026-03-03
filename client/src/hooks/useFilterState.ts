@@ -6,6 +6,29 @@ import { parseSearchParams, buildSearchParams } from "../utils/urlParams";
 /**
  * High-level hook for filter state management with URL sync and presets.
  */
+interface UseFilterStateOptions {
+  artifactType?: string;
+  context?: string;
+  initialSort?: string;
+  permanentFilters?: Record<string, any>;
+  filterOptions?: any[];
+  syncToUrl?: boolean;
+  defaultViewMode?: string;
+  defaultGridDensity?: string;
+  defaultZoomLevel?: string;
+}
+
+interface FilterState {
+  filters: Record<string, any>;
+  sort: { field: string; direction: string };
+  pagination: { page: number; perPage: number };
+  searchText: string;
+  viewMode: string;
+  zoomLevel: string;
+  gridDensity: string;
+  timelinePeriod: string | null;
+}
+
 export const useFilterState = ({
   artifactType = "scene",
   context,
@@ -16,25 +39,25 @@ export const useFilterState = ({
   defaultViewMode = "grid",
   defaultGridDensity = "medium",
   defaultZoomLevel = "medium",
-} = {}) => {
+}: UseFilterStateOptions = {}) => {
   const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
-  const searchDebounceRef = useRef(null);
-  const stateRef = useRef(null); // For capturing current state in debounced callbacks
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef<FilterState | null>(null); // For capturing current state in debounced callbacks
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
   // State
-  const [filters, setFiltersState] = useState({});
+  const [filters, setFiltersState] = useState<Record<string, any>>({});
   const [sort, setSortState] = useState({ field: initialSort, direction: "DESC" });
   const [pagination, setPaginationState] = useState({ page: 1, perPage: 24 });
   const [searchText, setSearchTextState] = useState("");
   const [viewMode, setViewModeState] = useState(defaultViewMode);
   const [zoomLevel, setZoomLevelState] = useState(defaultZoomLevel);
   const [gridDensity, setGridDensityState] = useState(defaultGridDensity);
-  const [tableColumns, setTableColumnsState] = useState(null);
-  const [timelinePeriod, setTimelinePeriodState] = useState(null);
+  const [tableColumns, setTableColumnsState] = useState<any>(null);
+  const [timelinePeriod, setTimelinePeriodState] = useState<string | null>(null);
 
   // Initialize on mount
   useEffect(() => {
@@ -58,15 +81,15 @@ export const useFilterState = ({
           apiGet("/user/default-presets"),
         ]);
 
-        const allPresets = presetsRes?.presets || {};
-        const defaults = defaultsRes?.defaults || {};
+        const allPresets = (presetsRes as any)?.presets || {};
+        const defaults = (defaultsRes as any)?.defaults || {};
         const defaultPresetId = defaults[effectiveContext];
 
         const presetArtifactType = effectiveContext.startsWith("scene_")
           ? "scene"
           : effectiveContext;
         const presets = allPresets[presetArtifactType] || [];
-        const defaultPreset = presets.find((p) => p.id === defaultPresetId);
+        const defaultPreset = presets.find((p: any) => p.id === defaultPresetId);
 
         // Parse URL params
         const urlState = parseSearchParams(searchParams, filterOptions, {
@@ -131,10 +154,10 @@ export const useFilterState = ({
         setSortState({ field: finalState.sortField, direction: finalState.sortDirection });
         setPaginationState({ page: finalState.currentPage, perPage: finalState.perPage });
         setSearchTextState(finalState.searchText);
-        setViewModeState(finalState.viewMode);
-        setZoomLevelState(finalState.zoomLevel);
-        setGridDensityState(finalState.gridDensity);
-        setTimelinePeriodState(finalState.timelinePeriod);
+        setViewModeState(finalState.viewMode as string);
+        setZoomLevelState(finalState.zoomLevel as string);
+        setGridDensityState(finalState.gridDensity as string);
+        setTimelinePeriodState(finalState.timelinePeriod as string | null);
 
       } catch (err) {
         console.error("Error loading presets:", err);
@@ -148,10 +171,10 @@ export const useFilterState = ({
         setSortState({ field: urlState.sortField, direction: urlState.sortDirection });
         setPaginationState({ page: urlState.currentPage, perPage: urlState.perPage });
         setSearchTextState(urlState.searchText);
-        setViewModeState(urlState.viewMode);
-        setZoomLevelState(urlState.zoomLevel);
-        setGridDensityState(urlState.gridDensity);
-        setTimelinePeriodState(urlState.timelinePeriod);
+        setViewModeState(urlState.viewMode as string);
+        setZoomLevelState(urlState.zoomLevel as string);
+        setGridDensityState(urlState.gridDensity as string);
+        setTimelinePeriodState(urlState.timelinePeriod as string | null);
       } finally {
         setIsLoadingPresets(false);
         setIsInitialized(true);
@@ -177,7 +200,7 @@ export const useFilterState = ({
 
   // URL sync helper - writes to URL without reading back
   // Preserves unknown params (like folderPath) that other components may use
-  const syncToUrlParams = useCallback((state, options = {}) => {
+  const syncToUrlParams = useCallback((state: FilterState, options: { replace?: boolean } = {}) => {
     if (!syncToUrl || !isInitialized) return;
 
     const { replace = false } = options;
@@ -204,7 +227,7 @@ export const useFilterState = ({
       // Copy over preserved params from previous URL
       for (const key of preserveParams) {
         if (prev.has(key) && !merged.has(key)) {
-          merged.set(key, prev.get(key));
+          merged.set(key, prev.get(key) as string);
         }
       }
       return merged;
@@ -212,7 +235,7 @@ export const useFilterState = ({
   }, [syncToUrl, isInitialized, filterOptions, setSearchParams]);
 
   // Actions
-  const setPage = useCallback((page) => {
+  const setPage = useCallback((page: number) => {
     setPaginationState((prev) => ({ ...prev, page }));
     syncToUrlParams({
       filters,
@@ -226,7 +249,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setPerPage = useCallback((perPage) => {
+  const setPerPage = useCallback((perPage: number) => {
     setPaginationState({ page: 1, perPage });
     syncToUrlParams({
       filters,
@@ -240,7 +263,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setSort = useCallback((field, direction) => {
+  const setSort = useCallback((field: string, direction?: string) => {
     const newDirection = direction || (sort.field === field && sort.direction === "DESC" ? "ASC" : "DESC");
     setSortState({ field, direction: newDirection });
     syncToUrlParams({
@@ -255,8 +278,8 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setFilter = useCallback((key, value) => {
-    const newFilters = { ...filters, [key]: value };
+  const setFilter = useCallback((key: string, value: any) => {
+    const newFilters: Record<string, any> = { ...filters, [key]: value };
     setFiltersState(newFilters);
     setPaginationState((prev) => ({ ...prev, page: 1 }));
     syncToUrlParams({
@@ -271,7 +294,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setFilters = useCallback((newFilters) => {
+  const setFilters = useCallback((newFilters: Record<string, any>) => {
     setFiltersState(newFilters);
     setPaginationState((prev) => ({ ...prev, page: 1 }));
     syncToUrlParams({
@@ -286,8 +309,8 @@ export const useFilterState = ({
     });
   }, [sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const removeFilter = useCallback((key) => {
-    const newFilters = { ...filters };
+  const removeFilter = useCallback((key: string) => {
+    const newFilters: Record<string, any> = { ...filters };
     delete newFilters[key];
     // Re-apply permanent filters
     Object.assign(newFilters, permanentFilters);
@@ -306,7 +329,7 @@ export const useFilterState = ({
   }, [filters, permanentFilters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
   const clearFilters = useCallback(() => {
-    const newFilters = { ...permanentFilters };
+    const newFilters: Record<string, any> = { ...permanentFilters };
     setFiltersState(newFilters);
     setPaginationState((prev) => ({ ...prev, page: 1 }));
     syncToUrlParams({
@@ -321,7 +344,7 @@ export const useFilterState = ({
     });
   }, [permanentFilters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setSearchText = useCallback((text) => {
+  const setSearchText = useCallback((text: string) => {
     setSearchTextState(text);
     setPaginationState((prev) => ({ ...prev, page: 1 }));
 
@@ -333,7 +356,7 @@ export const useFilterState = ({
     // Debounce URL update (500ms) to avoid history pollution while typing
     // Uses stateRef to get current values at timeout execution time, avoiding stale closures
     searchDebounceRef.current = setTimeout(() => {
-      const current = stateRef.current;
+      const current = stateRef.current!;
       syncToUrlParams({
         filters: current.filters,
         sort: current.sort,
@@ -347,7 +370,7 @@ export const useFilterState = ({
     }, 500);
   }, [syncToUrlParams]);
 
-  const loadPreset = useCallback((preset) => {
+  const loadPreset = useCallback((preset: any) => {
     const newFilters = { ...permanentFilters, ...preset.filters };
     const newViewMode = preset.viewMode || defaultViewMode;
     const newZoomLevel = preset.zoomLevel || defaultZoomLevel;
@@ -376,11 +399,11 @@ export const useFilterState = ({
     });
   }, [permanentFilters, pagination, searchText, syncToUrlParams, defaultViewMode, defaultZoomLevel, defaultGridDensity]);
 
-  const setTableColumns = useCallback((columns) => {
+  const setTableColumns = useCallback((columns: any) => {
     setTableColumnsState(columns);
   }, []);
 
-  const setViewMode = useCallback((mode) => {
+  const setViewMode = useCallback((mode: string) => {
     setViewModeState(mode);
     // Clear timeline period when switching away from timeline view
     const newTimelinePeriod = mode === "timeline" ? timelinePeriod : null;
@@ -399,7 +422,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, zoomLevel, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setZoomLevel = useCallback((level) => {
+  const setZoomLevel = useCallback((level: string) => {
     setZoomLevelState(level);
     syncToUrlParams({
       filters,
@@ -413,7 +436,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, viewMode, gridDensity, timelinePeriod, syncToUrlParams]);
 
-  const setGridDensity = useCallback((density) => {
+  const setGridDensity = useCallback((density: string) => {
     setGridDensityState(density);
     syncToUrlParams({
       filters,
@@ -427,7 +450,7 @@ export const useFilterState = ({
     });
   }, [filters, sort, pagination, searchText, viewMode, zoomLevel, timelinePeriod, syncToUrlParams]);
 
-  const setTimelinePeriod = useCallback((period) => {
+  const setTimelinePeriod = useCallback((period: string | null) => {
     setTimelinePeriodState(period);
     // Reset to page 1 when timeline period changes
     setPaginationState((prev) => ({ ...prev, page: 1 }));

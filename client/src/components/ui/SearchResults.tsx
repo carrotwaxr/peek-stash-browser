@@ -1,34 +1,25 @@
+import { type ReactNode } from 'react';
 import { LayoutRenderer } from './LayoutRenderer';
 import EmptyState from './EmptyState';
 import Pagination from './Pagination';
 
-/**
- * SearchResults - Layout-agnostic results renderer
- *
- * Responsibilities:
- * - Handle loading/empty/error states
- * - Delegate actual rendering to LayoutRenderer
- * - Manage pagination UI
- *
- * Future: Will read user's layout preference via useEntityDisplayPreferences hook.
- * For now, defaults to 'grid' layout.
- *
- * @param {Object} props
- * @param {string} props.entityType - Entity type for layout selection
- * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
- * @param {Array} props.items - Items to render
- * @param {Function} props.renderItem - Function to render each item
- * @param {boolean} [props.loading] - Loading state
- * @param {Error} [props.error] - Error object
- * @param {string} [props.emptyMessage] - Empty state message
- * @param {string} [props.emptyDescription] - Empty state description
- * @param {number} [props.currentPage] - Current page
- * @param {number} [props.totalPages] - Total pages
- * @param {Function} [props.onPageChange] - Page change handler
- * @param {Function} [props.renderSkeleton] - Custom skeleton renderer
- * @param {number} [props.skeletonCount] - Skeleton count while loading
- * @param {string} [props.className] - Additional CSS classes
- */
+interface Props {
+  entityType: string;
+  density?: "small" | "medium" | "large";
+  items: unknown[];
+  renderItem: (item: unknown, index: number) => ReactNode;
+  loading?: boolean;
+  error?: Error | null;
+  emptyMessage?: string;
+  emptyDescription?: string;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: ((page: number) => void) | null;
+  renderSkeleton?: () => ReactNode;
+  skeletonCount?: number;
+  className?: string;
+}
+
 export const SearchResults = ({
   entityType,
   density = "medium",
@@ -44,7 +35,7 @@ export const SearchResults = ({
   renderSkeleton,
   skeletonCount = 12,
   className = "",
-}) => {
+}: Props) => {
   // TODO: Get user's layout preference for this entity type
   // const { preferences } = useEntityDisplayPreferences(entityType);
   // const layoutType = preferences.layoutType || 'grid';
@@ -98,7 +89,7 @@ export const SearchResults = ({
       />
 
       {/* Pagination - common across all layouts */}
-      {totalPages > 1 && onPageChange && (
+      {totalPages != null && totalPages > 1 && onPageChange && (
         <nav role="navigation" aria-label="Pagination" className="mt-6">
           <Pagination
             currentPage={currentPage}

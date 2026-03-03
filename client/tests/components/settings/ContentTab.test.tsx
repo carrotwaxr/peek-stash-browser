@@ -18,6 +18,8 @@ vi.mock("../../../src/api", () => ({
 
 import { apiGet } from "../../../src/api";
 
+const mockApiGet = apiGet as ReturnType<typeof vi.fn>;
+
 describe("ContentTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -25,7 +27,7 @@ describe("ContentTab", () => {
 
   it("shows Content Sources section when multiple instances exist", async () => {
     // API returns data directly (not wrapped in .data)
-    apiGet.mockResolvedValue({
+    mockApiGet.mockResolvedValue({
       selectedInstanceIds: ["inst-1", "inst-2"],
       availableInstances: [
         { id: "inst-1", name: "Main", description: "Primary" },
@@ -47,7 +49,7 @@ describe("ContentTab", () => {
   });
 
   it("hides Content Sources section when only one instance exists", async () => {
-    apiGet.mockResolvedValue({
+    mockApiGet.mockResolvedValue({
       selectedInstanceIds: ["inst-1"],
       availableInstances: [
         { id: "inst-1", name: "Main", description: "Primary" },

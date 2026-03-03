@@ -9,7 +9,17 @@ import Button from "./Button";
 import HelpModal from "./HelpModal";
 import UserMenu from "./UserMenu";
 
-const Navigation = ({ navPreferences = [] }) => {
+interface NavPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+interface Props {
+  navPreferences?: NavPreference[];
+}
+
+const Navigation = ({ navPreferences = [] }: Props) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();
@@ -17,7 +27,9 @@ const Navigation = ({ navPreferences = [] }) => {
   const scrollDirection = useScrollDirection(100);
 
   // Get ordered and filtered nav items based on user preferences
-  const navItems = getOrderedNavItems(navPreferences);
+  const navItems = getOrderedNavItems(navPreferences).filter(
+    (item): item is NonNullable<typeof item> => item != null
+  );
 
   // Get current page from React Router location
   const getCurrentPage = () => {

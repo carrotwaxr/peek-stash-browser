@@ -325,8 +325,8 @@ describe("CardDisplaySettings", () => {
 
       // Scene toggle settings exclude dropdown settings (defaultViewMode, defaultGridDensity, defaultWallZoom)
       const dropdownSettings = ["defaultViewMode", "defaultGridDensity", "defaultWallZoom"];
-      const sceneToggleSettings = getAvailableSettings("scene").filter(
-        (s) => !dropdownSettings.includes(s)
+      const sceneToggleSettings = (getAvailableSettings("scene") as string[]).filter(
+        (s: string) => !dropdownSettings.includes(s)
       );
       const checkboxes = screen.getAllByRole("checkbox");
       expect(checkboxes.length).toBe(sceneToggleSettings.length);

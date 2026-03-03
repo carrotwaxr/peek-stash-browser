@@ -10,15 +10,41 @@ import { ENTITY_ICONS } from "../../constants/entityIcons";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 
+interface TagNodeData {
+  id: string;
+  name: string;
+  children?: TagNodeData[];
+  image_path?: string | null;
+  scene_count?: number;
+  image_count?: number;
+  performer_count?: number;
+  rating100?: number | null;
+  o_counter?: number;
+  favorite?: boolean;
+  isAncestorOnly?: boolean;
+  instanceId?: string;
+}
+
+interface TagTreeNodeProps {
+  tag: TagNodeData;
+  depth?: number;
+  isExpanded?: boolean;
+  expandedIds?: Set<string>;
+  onToggle: (id: string) => void;
+  isAncestorOnly?: boolean;
+  focusedId?: string | null;
+  onFocus?: (id: string) => void;
+}
+
 // Color utilities matching CardCountIndicators
-const hueify = (color, direction = "lighter", amount = 12) => {
+const hueify = (color: string, direction = "lighter", amount = 12) => {
   return `lch(from ${color} calc(l ${
     direction === "lighter" ? "+" : "-"
   } ${Math.abs(amount)}) c h)`;
 };
 
 // Rating badge gradient matching RatingBadge component
-const getRatingStyle = (rating100) => {
+const getRatingStyle = (rating100: number | null | undefined) => {
   if (rating100 === null || rating100 === undefined) return null;
   const value = rating100 / 10; // 0-10 scale
 
@@ -50,7 +76,7 @@ const getRatingStyle = (rating100) => {
  * Individual tree node for tag hierarchy view.
  * Displays a compact "mini-card" with expand/collapse, thumbnail, and counts.
  */
-const TagTreeNode = forwardRef(
+const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
   (
     {
       tag,
@@ -70,7 +96,7 @@ const TagTreeNode = forwardRef(
     const isFocused = focusedId === tag.id;
 
     const handleClick = useCallback(
-      (e) => {
+      (e: React.MouseEvent) => {
         e.stopPropagation();
         if (hasChildren) {
           onToggle(tag.id);
@@ -81,26 +107,26 @@ const TagTreeNode = forwardRef(
     );
 
     const handleDoubleClick = useCallback(
-      (e) => {
+      (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
       },
       [navigate, tag, hasMultipleInstances]
     );
 
     const handleNavigateClick = useCallback(
-      (e) => {
+      (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
       },
       [navigate, tag, hasMultipleInstances]
     );
 
     const handleKeyDown = useCallback(
-      (e) => {
+      (e: React.KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+          navigate(getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
         }
       },
       [navigate, tag, hasMultipleInstances]
@@ -108,8 +134,8 @@ const TagTreeNode = forwardRef(
 
     // Subtitle: child count or nothing
     const subtitle =
-      tag.children?.length > 0
-        ? `${tag.children.length} subtag${tag.children.length !== 1 ? "s" : ""}`
+      (tag.children?.length ?? 0) > 0
+        ? `${tag.children!.length} subtag${tag.children!.length !== 1 ? "s" : ""}`
         : null;
 
     // Generate placeholder color from tag id
@@ -190,7 +216,7 @@ const TagTreeNode = forwardRef(
           {/* Right side: counts, rating, o-counter, favorite, navigate */}
           <div className="flex items-center gap-3 flex-shrink-0">
             {/* Scene count - clapperboard icon */}
-            {tag.scene_count > 0 && (
+            {(tag.scene_count ?? 0) > 0 && (
               <div
                 className="flex items-center gap-1"
                 title={`${tag.scene_count} scene${tag.scene_count !== 1 ? "s" : ""}`}
@@ -206,7 +232,7 @@ const TagTreeNode = forwardRef(
             )}
 
             {/* Image count - images icon */}
-            {tag.image_count > 0 && (
+            {(tag.image_count ?? 0) > 0 && (
               <div
                 className="flex items-center gap-1"
                 title={`${tag.image_count} image${tag.image_count !== 1 ? "s" : ""}`}
@@ -222,7 +248,7 @@ const TagTreeNode = forwardRef(
             )}
 
             {/* Performer count - user icon */}
-            {tag.performer_count > 0 && (
+            {(tag.performer_count ?? 0) > 0 && (
               <div
                 className="flex items-center gap-1"
                 title={`${tag.performer_count} performer${tag.performer_count !== 1 ? "s" : ""}`}
@@ -238,8 +264,9 @@ const TagTreeNode = forwardRef(
             )}
 
             {/* Rating badge - metallic medal style */}
-            {tag.rating100 > 0 && (() => {
+            {(tag.rating100 ?? 0) > 0 && (() => {
               const ratingStyle = getRatingStyle(tag.rating100);
+              if (!ratingStyle) return null;
               return (
                 <span
                   className="text-xs px-2 py-0.5 rounded font-bold"
@@ -247,15 +274,15 @@ const TagTreeNode = forwardRef(
                     background: ratingStyle.background,
                     color: ratingStyle.color,
                   }}
-                  title={`Rating: ${(tag.rating100 / 10).toFixed(1)}`}
+                  title={`Rating: ${(tag.rating100! / 10).toFixed(1)}`}
                 >
-                  {(tag.rating100 / 10).toFixed(1)}
+                  {(tag.rating100! / 10).toFixed(1)}
                 </span>
               );
             })()}
 
             {/* O-Counter - droplets icon with info color */}
-            {tag.o_counter > 0 && (
+            {(tag.o_counter ?? 0) > 0 && (
               <div
                 className="flex items-center gap-1"
                 title={`O-Counter: ${tag.o_counter}`}
@@ -272,12 +299,13 @@ const TagTreeNode = forwardRef(
 
             {/* Favorite heart */}
             {tag.favorite && (
-              <Heart
-                size={16}
-                fill="var(--accent-primary)"
-                style={{ color: "var(--accent-primary)" }}
-                title="Favorite"
-              />
+              <span title="Favorite">
+                <Heart
+                  size={16}
+                  fill="var(--accent-primary)"
+                  style={{ color: "var(--accent-primary)" }}
+                />
+              </span>
             )}
 
             {/* Navigate button - visible on hover */}
@@ -300,7 +328,7 @@ const TagTreeNode = forwardRef(
         {/* Children (recursive) */}
         {hasChildren && isExpanded && (
           <div role="group">
-            {tag.children.map((child) => (
+            {tag.children!.map((child) => (
               <TagTreeNode
                 key={`${tag.id}-${child.id}`}
                 tag={child}

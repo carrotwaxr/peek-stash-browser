@@ -35,7 +35,7 @@ export const STANDARD_GRID_CONTAINER_CLASSNAMES = STANDARD_GRID_DENSITIES.medium
 export const SCENE_GRID_CONTAINER_CLASSNAMES = SCENE_GRID_DENSITIES.medium;
 
 /** Helper to get grid classes for a density level */
-export const getGridClasses = (gridType, density = "medium") => {
-  const densities = gridType === "scene" ? SCENE_GRID_DENSITIES : STANDARD_GRID_DENSITIES;
+export const getGridClasses = (gridType: string, density = "medium") => {
+  const densities: Record<string, string> = gridType === "scene" ? SCENE_GRID_DENSITIES : STANDARD_GRID_DENSITIES;
   return densities[density] || densities.medium;
 };

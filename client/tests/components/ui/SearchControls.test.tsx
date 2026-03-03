@@ -99,6 +99,7 @@ const renderSearchControls = (props = {}, filterStateOverrides = {}) => {
     onQueryChange: vi.fn(),
     totalPages: 10,
     totalCount: 240,
+    children: null as React.ReactNode,
   };
 
   const mergedProps = { ...defaultProps, ...props };
@@ -171,7 +172,7 @@ describe("SearchControls", () => {
       renderSearchControls();
 
       // Find Filters button by its text and click
-      const filtersButton = screen.getByText("Filters").closest("button");
+      const filtersButton = screen.getByText("Filters").closest("button")!;
       await user.click(filtersButton);
 
       // Filter panel should be visible - look for Apply Filters button
@@ -185,7 +186,7 @@ describe("SearchControls", () => {
       renderSearchControls();
 
       // Open panel
-      const filtersButton = screen.getByText("Filters").closest("button");
+      const filtersButton = screen.getByText("Filters").closest("button")!;
       await user.click(filtersButton);
 
       await waitFor(() => {
@@ -193,7 +194,7 @@ describe("SearchControls", () => {
       });
 
       // Click Apply
-      const applyButton = screen.getByText("Apply Filters").closest("button");
+      const applyButton = screen.getByText("Apply Filters").closest("button")!;
       await user.click(applyButton);
 
       // Panel should close (Apply Filters button should disappear)
@@ -217,7 +218,7 @@ describe("SearchControls", () => {
       onQueryChange.mockClear();
 
       // Open filter panel
-      const filtersButton = screen.getByText("Filters").closest("button");
+      const filtersButton = screen.getByText("Filters").closest("button")!;
       await user.click(filtersButton);
 
       await waitFor(() => {
@@ -225,7 +226,7 @@ describe("SearchControls", () => {
       });
 
       // Apply filters (even without changes, should still trigger onQueryChange)
-      const applyButton = screen.getByText("Apply Filters").closest("button");
+      const applyButton = screen.getByText("Apply Filters").closest("button")!;
       await user.click(applyButton);
 
       await waitFor(() => {
@@ -365,8 +366,8 @@ describe("SearchControls", () => {
       const comboboxes = screen.getAllByRole("combobox");
       // Per page selector should be one with "24" as current value
       const perPageSelect = comboboxes.find((cb) =>
-        Array.from(cb.options).some((opt) => opt.value === "48")
-      );
+        Array.from((cb as HTMLSelectElement).options).some((opt: HTMLOptionElement) => opt.value === "48")
+      ) as HTMLSelectElement | undefined;
 
       if (perPageSelect) {
         await user.selectOptions(perPageSelect, "48");
@@ -387,10 +388,10 @@ describe("SearchControls", () => {
       renderSearchControls({ artifactType: "performer" });
 
       // Find the sort dropdown
-      const sortSelect = screen.getAllByRole("combobox")[0];
+      const sortSelect = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
 
       // Should have performer-specific sort options like "Height"
-      const options = Array.from(sortSelect.options).map((opt) => opt.textContent);
+      const options = Array.from(sortSelect.options).map((opt: HTMLOptionElement) => opt.textContent);
       expect(options).toContain("Height");
     });
 
@@ -415,7 +416,9 @@ describe("SearchControls", () => {
               onQueryChange={onQueryChange}
               totalPages={1}
               totalCount={10}
-            />
+            >
+              {null}
+            </SearchControls>
           </MemoryRouter>
         );
 
@@ -442,7 +445,9 @@ describe("SearchControls", () => {
             onQueryChange={vi.fn()}
             totalPages={10}
             totalCount={240}
-          />
+          >
+            {null}
+          </SearchControls>
         </MemoryRouter>
       );
 
@@ -458,7 +463,7 @@ describe("SearchControls", () => {
       renderSearchControls({}, { filters: { favorite: true } });
 
       // Open filter panel to see Clear All
-      const filtersButton = screen.getByText("Filters").closest("button");
+      const filtersButton = screen.getByText("Filters").closest("button")!;
       await user.click(filtersButton);
 
       await waitFor(() => {
@@ -479,7 +484,7 @@ describe("SearchControls", () => {
       onQueryChange.mockClear();
 
       // Open filter panel
-      const filtersButton = screen.getByText("Filters").closest("button");
+      const filtersButton = screen.getByText("Filters").closest("button")!;
       await user.click(filtersButton);
 
       await waitFor(() => {
@@ -487,7 +492,7 @@ describe("SearchControls", () => {
       });
 
       // Click Clear All
-      const clearButton = screen.getByText("Clear All").closest("button");
+      const clearButton = screen.getByText("Clear All").closest("button")!;
       await user.click(clearButton);
 
       await waitFor(() => {
@@ -510,7 +515,9 @@ describe("SearchControls", () => {
             totalCount={0}
             deferInitialQueryUntilFiltersReady={true}
             permanentFilters={{}}
-          />
+          >
+            {null}
+          </SearchControls>
         </MemoryRouter>
       );
 
@@ -534,7 +541,9 @@ describe("SearchControls", () => {
             totalCount={10}
             deferInitialQueryUntilFiltersReady={true}
             permanentFilters={{ date: { start: "2024-01-01", end: "2024-01-31" } }}
-          />
+          >
+            {null}
+          </SearchControls>
         </MemoryRouter>
       );
 
@@ -562,7 +571,9 @@ describe("SearchControls", () => {
             totalCount={10}
             deferInitialQueryUntilFiltersReady={false}
             permanentFilters={{}}
-          />
+          >
+            {null}
+          </SearchControls>
         </MemoryRouter>
       );
 

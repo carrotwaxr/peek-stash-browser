@@ -16,13 +16,13 @@ const PlaybackTab = () => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const data = await apiGet("/user/settings");
+        const data = await apiGet<{ settings: Record<string, unknown> }>("/user/settings");
         const { settings } = data;
 
-        setPreferredQuality(settings.preferredQuality || "auto");
-        setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
+        setPreferredQuality((settings.preferredQuality as string) || "auto");
+        setPreferredPlaybackMode((settings.preferredPlaybackMode as string) || "auto");
         setEnableCast(settings.enableCast !== false);
-        setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
+        setMinimumPlayPercent((settings.minimumPlayPercent as number) ?? 20);
       } catch {
         showError("Failed to load playback settings");
       } finally {
@@ -33,7 +33,7 @@ const PlaybackTab = () => {
     loadSettings();
   }, []);
 
-  const saveSettings = async (e) => {
+  const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSaving(true);

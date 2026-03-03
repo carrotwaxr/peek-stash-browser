@@ -7,7 +7,13 @@
  * @param {string} color - Icon color
  * @param {string} className - Optional CSS classes
  */
-const NonBinaryIcon = ({ size, color, className = "" }) => (
+interface Props {
+  size: number;
+  color: string;
+  className?: string;
+}
+
+const NonBinaryIcon = ({ size, color, className = "" }: Props) => (
   <svg
     width={size}
     height={size}

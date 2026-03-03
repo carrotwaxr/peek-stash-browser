@@ -1,6 +1,18 @@
-import { forwardRef, useEffect } from "react";
+import { forwardRef, useEffect, type ReactNode, type MutableRefObject } from "react";
 import Button from "./Button";
 import SearchableSelect from "./SearchableSelect";
+
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface SortControlProps {
+  options: SortOption[];
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+}
 
 /**
  * Reusable Sort Control Component
@@ -10,7 +22,7 @@ export const SortControl = ({
   value,
   onChange,
   label,
-}) => {
+}: SortControlProps) => {
   // Standardized styles (same as FilterControl)
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -48,7 +60,40 @@ export const SortControl = ({
 /**
  * Reusable Filter Control Component
  */
-export const FilterControl = forwardRef(({
+interface RangeValue {
+  min?: string;
+  max?: string;
+  feetMin?: string;
+  inchesMin?: string;
+  feetMax?: string;
+  inchesMax?: string;
+  start?: string;
+  end?: string;
+}
+
+interface FilterControlProps {
+  type?: "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range";
+  label: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  options?: SortOption[];
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  entityType?: string;
+  multi?: boolean;
+  countFilterContext?: string | null;
+  modifierOptions?: SortOption[];
+  modifierValue?: string;
+  onModifierChange?: (value: string) => void;
+  supportsHierarchy?: boolean;
+  hierarchyLabel?: string;
+  hierarchyValue?: number | undefined;
+  onHierarchyChange?: (value: number | undefined) => void;
+  isHighlighted?: boolean;
+}
+
+export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
   type = "select",
   label,
   value,
@@ -57,18 +102,17 @@ export const FilterControl = forwardRef(({
   placeholder = "",
   min,
   max,
-  entityType, // for searchable-select
-  multi, // for searchable-select
-  countFilterContext, // for searchable-select - filter to entities with content in this context
-  modifierOptions, // for multi-criterion modifiers
-  modifierValue, // current modifier value
-  onModifierChange, // modifier change handler
-  // Hierarchy support for tags/studios
+  entityType,
+  multi,
+  countFilterContext,
+  modifierOptions,
+  modifierValue,
+  onModifierChange,
   supportsHierarchy = false,
   hierarchyLabel = "Include children",
-  hierarchyValue, // current depth value (undefined/0 = off, -1 = all)
-  onHierarchyChange, // hierarchy change handler
-  isHighlighted = false, // for highlight animation when chip is clicked
+  hierarchyValue,
+  onHierarchyChange,
+  isHighlighted = false,
 }, ref) => {
   // Standardized styles for all inputs in the filter panel
   const baseInputStyle = {
@@ -109,7 +153,7 @@ export const FilterControl = forwardRef(({
             {modifierOptions && modifierOptions.length > 0 && (
               <select
                 value={modifierValue}
-                onChange={(e) => onModifierChange(e.target.value)}
+                onChange={(e) => onModifierChange?.(e.target.value)}
                 className={inputClasses}
                 style={baseInputStyle}
               >
@@ -122,7 +166,7 @@ export const FilterControl = forwardRef(({
             )}
             {/* Main select */}
             <select
-              value={value}
+              value={value as string}
               onChange={(e) => onChange(e.target.value)}
               className={inputClasses}
               style={baseInputStyle}
@@ -147,7 +191,7 @@ export const FilterControl = forwardRef(({
             {modifierOptions && modifierOptions.length > 0 && (
               <select
                 value={effectiveModifierValue}
-                onChange={(e) => onModifierChange(e.target.value)}
+                onChange={(e) => onModifierChange?.(e.target.value)}
                 className={inputClasses}
                 style={{
                   ...baseInputStyle,
@@ -165,12 +209,12 @@ export const FilterControl = forwardRef(({
             )}
             {/* Main select */}
             <SearchableSelect
-              entityType={entityType}
-              value={value}
-              onChange={onChange}
+              entityType={entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
+              value={value as string | string[]}
+              onChange={onChange as (value: string | string[]) => void}
               multi={multi}
               placeholder={placeholder || `Select ${label}...`}
-              countFilterContext={countFilterContext}
+              countFilterContext={countFilterContext as "performers" | "scenes" | "galleries" | "groups" | "images" | null | undefined}
             />
             {/* Hierarchy checkbox (for tags/studios) */}
             {supportsHierarchy && onHierarchyChange && (
@@ -206,7 +250,7 @@ export const FilterControl = forwardRef(({
         return (
           <input
             type="number"
-            value={value}
+            value={value as string | number | undefined}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
             min={min}
@@ -219,7 +263,7 @@ export const FilterControl = forwardRef(({
         return (
           <input
             type="text"
-            value={value}
+            value={value as string | undefined}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
             className={inputClasses}
@@ -230,19 +274,20 @@ export const FilterControl = forwardRef(({
         return (
           <input
             type="date"
-            value={value}
+            value={value as string | undefined}
             onChange={(e) => onChange(e.target.value)}
             className={inputClasses}
             style={baseInputStyle}
           />
         );
-      case "range":
+      case "range": {
+        const rangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex space-x-2">
             <input
               type="number"
-              value={value?.min || ""}
-              onChange={(e) => onChange({ ...value, min: e.target.value })}
+              value={rangeVal.min || ""}
+              onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
               placeholder="Min"
               min={min}
               max={max}
@@ -251,8 +296,8 @@ export const FilterControl = forwardRef(({
             />
             <input
               type="number"
-              value={value?.max || ""}
-              onChange={(e) => onChange({ ...value, max: e.target.value })}
+              value={rangeVal.max || ""}
+              onChange={(e) => onChange({ ...rangeVal, max: e.target.value })}
               placeholder="Max"
               min={min}
               max={max}
@@ -261,8 +306,10 @@ export const FilterControl = forwardRef(({
             />
           </div>
         );
-      case "imperial-height-range":
+      }
+      case "imperial-height-range": {
         // Imperial height input with feet and inches fields
+        const heightVal = (value || {}) as RangeValue;
         return (
           <div className="space-y-2">
             <fieldset>
@@ -280,8 +327,8 @@ export const FilterControl = forwardRef(({
                   <input
                     id="height-feet-min"
                     type="number"
-                    value={value?.feetMin || ""}
-                    onChange={(e) => onChange({ ...value, feetMin: e.target.value })}
+                    value={heightVal.feetMin || ""}
+                    onChange={(e) => onChange({ ...heightVal, feetMin: e.target.value })}
                     placeholder="Feet"
                     min={0}
                     max={8}
@@ -297,8 +344,8 @@ export const FilterControl = forwardRef(({
                   <input
                     id="height-inches-min"
                     type="number"
-                    value={value?.inchesMin || ""}
-                    onChange={(e) => onChange({ ...value, inchesMin: e.target.value })}
+                    value={heightVal.inchesMin || ""}
+                    onChange={(e) => onChange({ ...heightVal, inchesMin: e.target.value })}
                     placeholder="Inches"
                     min={0}
                     max={11}
@@ -324,8 +371,8 @@ export const FilterControl = forwardRef(({
                   <input
                     id="height-feet-max"
                     type="number"
-                    value={value?.feetMax || ""}
-                    onChange={(e) => onChange({ ...value, feetMax: e.target.value })}
+                    value={heightVal.feetMax || ""}
+                    onChange={(e) => onChange({ ...heightVal, feetMax: e.target.value })}
                     placeholder="Feet"
                     min={0}
                     max={8}
@@ -341,8 +388,8 @@ export const FilterControl = forwardRef(({
                   <input
                     id="height-inches-max"
                     type="number"
-                    value={value?.inchesMax || ""}
-                    onChange={(e) => onChange({ ...value, inchesMax: e.target.value })}
+                    value={heightVal.inchesMax || ""}
+                    onChange={(e) => onChange({ ...heightVal, inchesMax: e.target.value })}
                     placeholder="Inches"
                     min={0}
                     max={11}
@@ -355,7 +402,9 @@ export const FilterControl = forwardRef(({
             </fieldset>
           </div>
         );
-      case "date-range":
+      }
+      case "date-range": {
+        const dateRangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex flex-col space-y-2">
             <div>
@@ -367,8 +416,8 @@ export const FilterControl = forwardRef(({
               </div>
               <input
                 type="date"
-                value={value?.start || ""}
-                onChange={(e) => onChange({ ...value, start: e.target.value })}
+                value={dateRangeVal.start || ""}
+                onChange={(e) => onChange({ ...dateRangeVal, start: e.target.value })}
                 className={inputClasses}
                 style={baseInputStyle}
               />
@@ -382,35 +431,38 @@ export const FilterControl = forwardRef(({
               </div>
               <input
                 type="date"
-                value={value?.end || ""}
-                onChange={(e) => onChange({ ...value, end: e.target.value })}
+                value={dateRangeVal.end || ""}
+                onChange={(e) => onChange({ ...dateRangeVal, end: e.target.value })}
                 className={inputClasses}
                 style={baseInputStyle}
               />
             </div>
           </div>
         );
-      case "time-range":
+      }
+      case "time-range": {
+        const timeRangeVal = (value || {}) as RangeValue;
         return (
           <div className="flex space-x-2">
             <input
               type="time"
-              value={value?.start || ""}
-              onChange={(e) => onChange({ ...value, start: e.target.value })}
+              value={timeRangeVal.start || ""}
+              onChange={(e) => onChange({ ...timeRangeVal, start: e.target.value })}
               placeholder="Start"
               className="px-3 py-2 border rounded-md text-sm w-full"
               style={baseInputStyle}
             />
             <input
               type="time"
-              value={value?.end || ""}
-              onChange={(e) => onChange({ ...value, end: e.target.value })}
+              value={timeRangeVal.end || ""}
+              onChange={(e) => onChange({ ...timeRangeVal, end: e.target.value })}
               placeholder="End"
               className="px-3 py-2 border rounded-md text-sm w-full"
               style={baseInputStyle}
             />
           </div>
         );
+      }
       default:
         return null;
     }
@@ -437,6 +489,17 @@ FilterControl.displayName = "FilterControl";
 /**
  * Collapsible Filter Panel Component with manual submit
  */
+interface FilterPanelProps {
+  children: ReactNode;
+  onClear: () => void;
+  hasActiveFilters: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onSubmit: () => void;
+  highlightedFilterKey?: string | null;
+  filterRefs?: MutableRefObject<Record<string, HTMLElement | null>>;
+}
+
 export const FilterPanel = ({
   children,
   onClear,
@@ -446,7 +509,7 @@ export const FilterPanel = ({
   onSubmit,
   highlightedFilterKey,
   filterRefs,
-}) => {
+}: FilterPanelProps) => {
   // Scroll to highlighted filter when it changes
   useEffect(() => {
     if (highlightedFilterKey && filterRefs?.current?.[highlightedFilterKey]) {

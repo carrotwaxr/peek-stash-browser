@@ -1,5 +1,18 @@
+import { type ReactNode } from "react";
 import { cva } from "class-variance-authority";
 import { clsx } from "clsx";
+
+interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "tertiary" | "destructive";
+  size?: "sm" | "md" | "lg";
+  icon?: ReactNode;
+  iconPosition?: "left" | "right";
+  loading?: boolean;
+  disabled?: boolean;
+  fullWidth?: boolean;
+  className?: string;
+  children?: ReactNode;
+}
 
 const buttonVariants = cva(
   // Base styles for all buttons
@@ -53,7 +66,7 @@ export default function Button({
   className,
   children,
   ...props
-}) {
+}: Props) {
   const isDisabled = disabled || loading;
 
   // Determine background color based on variant

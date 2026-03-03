@@ -1393,8 +1393,8 @@ export const CLIP_FILTER_OPTIONS = [
  * Helper functions to convert UI filter values to GraphQL filter format
  */
 
-export const buildSceneFilter = (filters) => {
-  const sceneFilter = {};
+export const buildSceneFilter = (filters: Record<string, any>): Record<string, any> => {
+  const sceneFilter: Record<string, any> = {};
 
   // ID-based filters - merge permanent filters with UI filters
   // Performers: Merge permanent + UI filters
@@ -1889,7 +1889,7 @@ export const buildSceneFilter = (filters) => {
  * Converts filter values from imperial to metric if needed.
  * Height uses feet/inches fields, weight uses lbs, penisLength uses inches.
  */
-const convertFilterUnits = (filters, unitPreference) => {
+const convertFilterUnits = (filters: Record<string, any>, unitPreference: string): Record<string, any> => {
   if (unitPreference !== UNITS.IMPERIAL) return filters;
 
   const converted = { ...filters };
@@ -1948,10 +1948,10 @@ const convertFilterUnits = (filters, unitPreference) => {
   return converted;
 };
 
-export const buildPerformerFilter = (filters, unitPreference = UNITS.METRIC) => {
+export const buildPerformerFilter = (filters: Record<string, any>, unitPreference: string = UNITS.METRIC): Record<string, any> => {
   // Convert imperial values to metric before building filter
   const convertedFilters = convertFilterUnits(filters, unitPreference);
-  const performerFilter = {};
+  const performerFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -2395,8 +2395,8 @@ export const buildPerformerFilter = (filters, unitPreference = UNITS.METRIC) => 
   return performerFilter;
 };
 
-export const buildStudioFilter = (filters) => {
-  const studioFilter = {};
+export const buildStudioFilter = (filters: Record<string, any>): Record<string, any> => {
+  const studioFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -2567,8 +2567,8 @@ export const buildStudioFilter = (filters) => {
   return studioFilter;
 };
 
-export const buildTagFilter = (filters) => {
-  const tagFilter = {};
+export const buildTagFilter = (filters: Record<string, any>): Record<string, any> => {
+  const tagFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -2759,8 +2759,8 @@ export const buildTagFilter = (filters) => {
   return tagFilter;
 };
 
-export const buildGroupFilter = (filters) => {
-  const groupFilter = {};
+export const buildGroupFilter = (filters: Record<string, any>): Record<string, any> => {
+  const groupFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -2939,8 +2939,8 @@ export const buildGroupFilter = (filters) => {
   return groupFilter;
 };
 
-export const buildGalleryFilter = (filters) => {
-  const galleryFilter = {};
+export const buildGalleryFilter = (filters: Record<string, any>): Record<string, any> => {
+  const galleryFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -3060,8 +3060,8 @@ export const buildGalleryFilter = (filters) => {
   return galleryFilter;
 };
 
-export const buildImageFilter = (filters) => {
-  const imageFilter = {};
+export const buildImageFilter = (filters: Record<string, any>): Record<string, any> => {
+  const imageFilter: Record<string, any> = {};
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -3178,8 +3178,8 @@ export const buildImageFilter = (filters) => {
  * Unlike other build*Filter functions that return GraphQL filter objects,
  * this returns params for the Peek REST API's getClips endpoint.
  */
-export const buildClipFilter = (filters) => {
-  const clipParams = {};
+export const buildClipFilter = (filters: Record<string, any>): Record<string, any> => {
+  const clipParams: Record<string, any> = {};
 
   // Tag filters
   if (filters.tagIds && filters.tagIds.length > 0) {
@@ -3420,7 +3420,7 @@ export const CAROUSEL_FILTER_DEFINITIONS = [
 /**
  * Get a carousel filter definition by key
  */
-export const getCarouselFilterDefinition = (key) => {
+export const getCarouselFilterDefinition = (key: string) => {
   return CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === key);
 };
 
@@ -3435,8 +3435,8 @@ export const getCarouselFilterDefinition = (key) => {
  * Output (UI state):
  *   { performerIds: ['1', '2'], performerIdsModifier: 'INCLUDES' }
  */
-export const carouselRulesToFilterState = (rules) => {
-  const filterState = {};
+export const carouselRulesToFilterState = (rules: Record<string, any> | null | undefined): Record<string, any> => {
+  const filterState: Record<string, any> = {};
 
   if (!rules || typeof rules !== "object") {
     return filterState;
@@ -3610,7 +3610,7 @@ export const carouselRulesToFilterState = (rules) => {
 /**
  * Helper to convert API date filter to UI date range format
  */
-const dateRangeFromApi = (dateFilter) => {
+const dateRangeFromApi = (dateFilter: Record<string, any> | null | undefined): Record<string, any> => {
   if (!dateFilter) return {};
 
   if (dateFilter.modifier === "BETWEEN") {
@@ -3626,7 +3626,7 @@ const dateRangeFromApi = (dateFilter) => {
 /**
  * Count active filters in a carousel's rules
  */
-export const countCarouselRules = (rules) => {
+export const countCarouselRules = (rules: Record<string, any> | null | undefined): number => {
   if (!rules || typeof rules !== "object") return 0;
   return Object.keys(rules).length;
 };

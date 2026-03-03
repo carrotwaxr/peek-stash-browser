@@ -11,7 +11,14 @@ import {
 } from "../../config/entityDisplayConfig";
 import { showSuccess, showError } from "../../utils/toast";
 
-const Toggle = ({ label, checked, onChange, description }) => (
+interface ToggleProps {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  description?: string;
+}
+
+const Toggle = ({ label, checked, onChange, description }: ToggleProps) => (
   <label className="flex items-start gap-3 cursor-pointer">
     <input
       type="checkbox"
@@ -33,7 +40,20 @@ const Toggle = ({ label, checked, onChange, description }) => (
   </label>
 );
 
-const Dropdown = ({ label, value, options, onChange, description }) => (
+interface DropdownOption {
+  id: string;
+  label: string;
+}
+
+interface DropdownProps {
+  label: string;
+  value: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+  description?: string;
+}
+
+const Dropdown = ({ label, value, options, onChange, description }: DropdownProps) => (
   <div className="flex flex-col gap-1">
     <label className="flex items-center justify-between gap-3">
       <div>
@@ -64,13 +84,17 @@ const Dropdown = ({ label, value, options, onChange, description }) => (
   </div>
 );
 
-const EntitySettingsSection = ({ entityType }) => {
-  const { getSettings, updateSettings } = useCardDisplaySettings();
-  const settings = getSettings(entityType);
-  const availableSettings = getAvailableSettings(entityType);
-  const viewModes = getViewModes(entityType);
+interface EntitySettingsSectionProps {
+  entityType: string;
+}
 
-  const handleChange = async (key, value) => {
+const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
+  const { getSettings, updateSettings } = useCardDisplaySettings();
+  const settings = getSettings(entityType) as Record<string, string | boolean>;
+  const availableSettings = getAvailableSettings(entityType) as string[];
+  const viewModes = getViewModes(entityType) as Array<{ id: string; label: string }>;
+
+  const handleChange = async (key: string, value: string | boolean) => {
     try {
       await updateSettings(entityType, key, value);
       showSuccess("Setting saved");
@@ -85,8 +109,8 @@ const EntitySettingsSection = ({ entityType }) => {
         {/* Default View Mode - always first if available */}
         {availableSettings.includes("defaultViewMode") && (
           <Dropdown
-            label={SETTING_LABELS.defaultViewMode}
-            value={settings.defaultViewMode}
+            label={(SETTING_LABELS as Record<string, string>).defaultViewMode}
+            value={settings.defaultViewMode as string}
             options={viewModes}
             onChange={(v) => handleChange("defaultViewMode", v)}
           />
@@ -102,8 +126,8 @@ const EntitySettingsSection = ({ entityType }) => {
               <ZoomSlider
                 value={
                   settings.defaultViewMode === "grid"
-                    ? (settings.defaultGridDensity || "medium")
-                    : (settings.defaultWallZoom || "medium")
+                    ? ((settings.defaultGridDensity as string) || "medium")
+                    : ((settings.defaultWallZoom as string) || "medium")
                 }
                 onChange={(density) =>
                   handleChange(
@@ -118,14 +142,14 @@ const EntitySettingsSection = ({ entityType }) => {
 
         {/* Toggle settings */}
         {availableSettings
-          .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
-          .map((settingKey) => (
+          .filter((key: string) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
+          .map((settingKey: string) => (
             <Toggle
               key={settingKey}
-              label={SETTING_LABELS[settingKey]}
-              checked={settings[settingKey]}
+              label={(SETTING_LABELS as Record<string, string>)[settingKey]}
+              checked={settings[settingKey] as boolean}
               onChange={(v) => handleChange(settingKey, v)}
-              description={SETTING_DESCRIPTIONS[settingKey]}
+              description={(SETTING_DESCRIPTIONS as Record<string, string>)[settingKey]}
             />
           ))}
       </div>
@@ -134,7 +158,7 @@ const EntitySettingsSection = ({ entityType }) => {
 };
 
 const CardDisplaySettings = () => {
-  const [expandedEntity, setExpandedEntity] = useState("scene");
+  const [expandedEntity, setExpandedEntity] = useState<string | null>("scene");
   const entityTypes = getEntityTypes();
 
   return (
@@ -152,7 +176,7 @@ const CardDisplaySettings = () => {
       {/* Accordion-style entity sections */}
       <div className="space-y-2">
         {entityTypes.map((entityType) => {
-          const config = ENTITY_DISPLAY_CONFIG[entityType];
+          const config = (ENTITY_DISPLAY_CONFIG as Record<string, { label: string }>)[entityType];
           return (
             <div
               key={entityType}

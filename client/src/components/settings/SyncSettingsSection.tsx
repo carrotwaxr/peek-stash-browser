@@ -23,7 +23,7 @@ const SyncSettingsSection = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const data = await apiGet("/sync/status");
+        const data = await apiGet<{ settings?: { syncIntervalMinutes?: number } }>("/sync/status");
         const minutes = data?.settings?.syncIntervalMinutes;
         if (minutes) setSyncInterval(minutes);
       } catch (err) {
@@ -35,7 +35,7 @@ const SyncSettingsSection = () => {
     loadSettings();
   }, []);
 
-  const handleChange = async (e) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = Number(e.target.value);
     const previous = syncInterval;
     setSyncInterval(value);

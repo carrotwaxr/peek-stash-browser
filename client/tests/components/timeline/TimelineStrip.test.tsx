@@ -18,7 +18,8 @@ describe("TimelineStrip", () => {
     selectedPeriod: null,
     onSelectPeriod: vi.fn(),
     onKeyboardNavigate: vi.fn(),
-  };
+    onVisibleRangeChange: vi.fn(),
+  } as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -279,7 +280,7 @@ describe("TimelineStrip", () => {
       // Find the label div elements and check for selected styling via font-weight
       const labels = container.querySelectorAll("div.text-xs");
       const selectedLabel = Array.from(labels).find(
-        (div) => div.style.fontWeight === "600"
+        (div) => (div as HTMLElement).style.fontWeight === "600"
       );
       expect(selectedLabel).toBeInTheDocument();
       // Short label is just "Feb" (no year)
@@ -294,7 +295,7 @@ describe("TimelineStrip", () => {
       // All labels should have normal font weight when nothing is selected
       const labels = container.querySelectorAll("div.text-xs");
       const boldLabel = Array.from(labels).find(
-        (div) => div.style.fontWeight === "600"
+        (div) => (div as HTMLElement).style.fontWeight === "600"
       );
       expect(boldLabel).toBeUndefined();
     });

@@ -7,7 +7,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
  * keys like 'f' (fullscreen) and '0-9' (seek) that conflict with rating hotkeys.
  */
 let globalRatingMode = false;
-let globalRatingModeTimeout = null;
+let globalRatingModeTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Check if currently in rating mode (for use by other hooks like useMediaKeys)
@@ -38,12 +38,16 @@ export const useRatingHotkeys = ({
   enabled = true,
   setRating,
   toggleFavorite = null,
+}: {
+  enabled?: boolean;
+  setRating: (rating: any) => void;
+  toggleFavorite?: (() => void) | null;
 }) => {
-  const ratingModeTimeoutRef = useRef(null);
+  const ratingModeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inRatingModeRef = useRef(false);
 
   // Map of number keys to rating values (1-5 = 20/40/60/80/100, 0 = null)
-  const ratingMap = {
+  const ratingMap: Record<string, number | null> = {
     "0": null, // Clear rating
     "1": 20,
     "2": 40,
@@ -62,7 +66,7 @@ export const useRatingHotkeys = ({
   }, []);
 
   // Build shortcuts object dynamically based on rating mode state
-  const shortcuts = {};
+  const shortcuts: Record<string, () => void> = {};
 
   // Helper to enter rating mode (updates both local and global state)
   const enterRatingMode = () => {

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
  * @param {number} threshold - Minimum scroll distance before hiding (default: 100px)
  * @returns {string} 'up' | 'down' | 'top'
  */
-export const useScrollDirection = (threshold = 100) => {
+export const useScrollDirection = (threshold: number = 100) => {
   const [scrollDirection, setScrollDirection] = useState("top");
   const lastScrollYRef = useRef(window.scrollY);
 

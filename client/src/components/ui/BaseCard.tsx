@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode, type CSSProperties, type MouseEvent, type FocusEvent } from "react";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import { useCardSelection } from "../../hooks/useCardSelection";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
@@ -13,23 +13,81 @@ import {
 } from "./CardComponents";
 import EntityMenu from "./EntityMenu";
 
+export interface CardIndicator {
+  type: string;
+  count?: number;
+  label?: string;
+  tooltipContent?: ReactNode;
+  onClick?: () => void;
+}
+
+export interface RatingControlsProps {
+  entityType?: string;
+  entityId: string;
+  instanceId?: string | null;
+  entityTitle?: string;
+  initialRating?: number | null;
+  initialFavorite?: boolean;
+  initialOCounter?: number;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onHideClick?: (hideInfo: Record<string, unknown>) => void;
+  onOCounterChange?: (entityId: string, count: number) => void;
+  onRatingChange?: (entityId: string, rating: number) => void;
+  onFavoriteChange?: (entityId: string, value: boolean) => void;
+  showRating?: boolean;
+  showFavorite?: boolean;
+  showOCounter?: boolean;
+  showMenu?: boolean;
+}
+
+export interface BaseCardProps {
+  entityType: string;
+  entity?: Record<string, unknown>;
+  imagePath?: string | null;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  description?: string | null;
+  linkTo?: string;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (entity: Record<string, unknown> | undefined) => void;
+  indicators?: CardIndicator[];
+  ratingControlsProps?: RatingControlsProps;
+  displayPreferences?: { showDescription?: boolean };
+  hideDescription?: boolean;
+  hideSubtitle?: boolean;
+  maxDescriptionLines?: number;
+  objectFit?: "contain" | "cover";
+  renderOverlay?: () => ReactNode;
+  renderImageContent?: () => ReactNode;
+  renderAfterTitle?: () => ReactNode;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
+  onNavigate?: (e: MouseEvent<HTMLElement>) => void;
+  className?: string;
+  fromPageTitle?: string;
+  linkState?: Record<string, unknown>;
+  tabIndex?: number;
+  style?: CSSProperties;
+  onFocus?: (e: FocusEvent<HTMLDivElement>) => void;
+}
+
 /**
  * BaseCard - Composable card component that assembles primitives
  * Provides render slots for entity-specific customization
  */
-export const BaseCard = forwardRef(
+export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
   (
     {
       // Data
       entityType,
-      entity, // NEW: for selection callbacks
+      entity,
       imagePath,
       title,
       subtitle,
       description,
       linkTo,
 
-      // Selection mode (NEW)
+      // Selection mode
       selectionMode = false,
       isSelected = false,
       onToggleSelect,
@@ -38,7 +96,7 @@ export const BaseCard = forwardRef(
       indicators = [],
       ratingControlsProps,
 
-      // Display preferences (future: from useEntityDisplayPreferences hook)
+      // Display preferences
       displayPreferences = {},
 
       // Display options
@@ -54,7 +112,7 @@ export const BaseCard = forwardRef(
 
       // Events & behavior
       onClick,
-      onNavigate, // Custom navigation handler - if provided, prevents Link default and calls this instead
+      onNavigate,
       className = "",
       fromPageTitle,
       linkState = {},
@@ -69,13 +127,13 @@ export const BaseCard = forwardRef(
 
     // Selection hook
     const { selectionHandlers, handleNavigationClick } = useCardSelection({
-      entity,
+      entity: entity ?? {},
       selectionMode,
       onToggleSelect,
     });
 
     // Wrap navigation click handler to support custom navigation
-    const wrappedNavigationClick = (e) => {
+    const wrappedNavigationClick = (e: MouseEvent<HTMLElement>) => {
       // First let selection hook handle its logic
       handleNavigationClick(e);
       // If selection hook didn't prevent default and we have a custom navigate handler
@@ -140,7 +198,7 @@ export const BaseCard = forwardRef(
         {/* Title Section - navigable when linkTo provided */}
         <CardTitle
           title={title}
-          subtitle={hideSubtitle ? null : subtitle}
+          subtitle={hideSubtitle ? null : (typeof subtitle === 'string' ? subtitle : null)}
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
           linkState={linkState}
@@ -180,8 +238,8 @@ export const BaseCard = forwardRef(
             <EntityMenu
               entityType={ratingControlsProps.entityType || entityType}
               entityId={ratingControlsProps.entityId}
-              entityName={ratingControlsProps.entityTitle}
-              onHide={ratingControlsProps.onHideClick}
+              entityName={ratingControlsProps.entityTitle ?? ""}
+              onHide={ratingControlsProps.onHideClick as ((payload: { entityType: string; entityId: string; entityName: string }) => void) | undefined}
             />
           ) : null;
 
@@ -197,7 +255,23 @@ export const BaseCard = forwardRef(
 
               {/* Rating Controls - only render if has visible controls */}
               {ratingControlsProps && hasRatingControls && (
-                <CardRatingRow entityType={entityType} {...ratingControlsProps} />
+                <CardRatingRow
+                  entityType={ratingControlsProps.entityType || entityType}
+                  entityId={ratingControlsProps.entityId}
+                  instanceId={ratingControlsProps.instanceId}
+                  entityTitle={ratingControlsProps.entityTitle}
+                  initialRating={ratingControlsProps.initialRating ?? null}
+                  initialFavorite={ratingControlsProps.initialFavorite ?? false}
+                  initialOCounter={ratingControlsProps.initialOCounter ?? 0}
+                  onHideSuccess={ratingControlsProps.onHideSuccess}
+                  onOCounterChange={ratingControlsProps.onOCounterChange}
+                  onRatingChange={ratingControlsProps.onRatingChange as ((entityId: string, rating: number | null) => void) | undefined}
+                  onFavoriteChange={ratingControlsProps.onFavoriteChange}
+                  showRating={ratingControlsProps.showRating}
+                  showFavorite={ratingControlsProps.showFavorite}
+                  showOCounter={ratingControlsProps.showOCounter}
+                  showMenu={ratingControlsProps.showMenu}
+                />
               )}
 
               {/* Standalone menu row - only if no indicators and no rating controls but menu enabled */}

@@ -26,7 +26,7 @@ describe("GalleryCard", () => {
       gallery: mockGallery,
       fromPageTitle: "Galleries",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -35,7 +35,7 @@ describe("GalleryCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
-    });
+    } as any);
 
     expect(element.props.gallery).toBe(mockGallery);
   });
@@ -43,7 +43,7 @@ describe("GalleryCard", () => {
   it("passes correct link path", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
-    });
+    } as any);
 
     expect(element.props.gallery.id).toBe("1");
   });
@@ -51,19 +51,19 @@ describe("GalleryCard", () => {
   it("passes gallery with all data", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
-    });
+    } as any);
 
     const gallery = element.props.gallery;
     expect(gallery.title).toBe("Test Gallery");
     expect(gallery.image_count).toBe(25);
-    expect(gallery.studio.name).toBe("Test Studio");
+    expect(gallery.studio!.name).toBe("Test Studio");
   });
 
   it("accepts fromPageTitle prop", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
       fromPageTitle: "Galleries",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Galleries");
   });
@@ -72,7 +72,7 @@ describe("GalleryCard", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -82,7 +82,7 @@ describe("GalleryCard", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

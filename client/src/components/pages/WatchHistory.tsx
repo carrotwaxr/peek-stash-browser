@@ -10,13 +10,39 @@ import {
   PageLayout,
   SceneListItem,
 } from "../ui/index";
+import type { NormalizedScene } from "@peek/shared-types";
+import type React from "react";
+
+interface WatchHistoryEntry {
+  sceneId: string;
+  resumeTime?: number;
+  playCount?: number;
+  playDuration?: number;
+  lastPlayedAt?: string | null;
+  oCount?: number;
+  oHistory?: string[];
+}
+
+interface SceneWithHistory extends Record<string, unknown> {
+  id: string;
+  instanceId: string;
+  watchHistory: WatchHistoryEntry | null;
+  resumeTime: number;
+  playCount: number;
+  playDuration: number;
+  lastPlayedAt: string | null;
+  oCount: number;
+  oHistory: string[];
+  isCompleted: boolean;
+  files?: Array<{ duration?: number }>;
+}
 
 const WatchHistory = () => {
   usePageTitle("Watch History");
 
   const [sortBy, setSortBy] = useState("recent"); // recent, most_watched, longest_duration
   const [filterBy, setFilterBy] = useState("all"); // all, in_progress, completed
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<SceneWithHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -35,7 +61,8 @@ const WatchHistory = () => {
   // Fetch full scene data for watch history
   useEffect(() => {
     const fetchScenes = async () => {
-      if (!watchHistoryList || watchHistoryList.length === 0) {
+      const historyList = watchHistoryList as unknown as WatchHistoryEntry[] | null;
+      if (!historyList || historyList.length === 0) {
         setScenes([]);
         setLoading(false);
         return;
@@ -45,28 +72,31 @@ const WatchHistory = () => {
         setLoading(true);
 
         // Extract scene IDs from watch history
-        const sceneIds = watchHistoryList.map((wh) => wh.sceneId);
+        const sceneIds: string[] = historyList.map((wh) => wh.sceneId);
 
         // Fetch scenes in bulk - must set per_page to match number of IDs
         const response = await libraryApi.findScenes({
           ids: sceneIds,
           filter: { per_page: sceneIds.length },
-        });
-        const fetchedScenes = response?.findScenes?.scenes || [];
+        }) as Record<string, Record<string, unknown>>;
+        const fetchedScenes = (response?.findScenes?.scenes || []) as Record<string, unknown>[];
 
         // Match scenes with watch history data
-        const scenesWithHistory = fetchedScenes.map((scene) => {
-          const watchHistory = watchHistoryList.find(
+        const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map((scene: Record<string, unknown>) => {
+          const watchHistory = historyList.find(
             (wh) => wh.sceneId === scene.id
-          );
-          const duration = scene.files?.[0]?.duration || 0;
+          ) || null;
+          const files = scene.files as Array<{ duration?: number }> | undefined;
+          const duration = files?.[0]?.duration || 0;
           const resumeTime = watchHistory?.resumeTime || 0;
           const isCompleted =
             duration > 0 && resumeTime > 0 && resumeTime / duration > 0.9;
 
           return {
             ...scene,
-            watchHistory: watchHistory || null,
+            id: scene.id as string,
+            instanceId: scene.instanceId as string,
+            watchHistory: watchHistory,
             resumeTime: resumeTime,
             playCount: watchHistory?.playCount || 0,
             playDuration: watchHistory?.playDuration || 0,
@@ -81,10 +111,10 @@ const WatchHistory = () => {
         let filtered = scenesWithHistory;
         if (filterBy === "in_progress") {
           filtered = scenesWithHistory.filter(
-            (s) => !s.isCompleted && s.resumeTime > 0
+            (s: SceneWithHistory) => !s.isCompleted && s.resumeTime > 0
           );
         } else if (filterBy === "completed") {
-          filtered = scenesWithHistory.filter((s) => s.isCompleted);
+          filtered = scenesWithHistory.filter((s: SceneWithHistory) => s.isCompleted);
         }
 
         // Apply sorting
@@ -92,11 +122,11 @@ const WatchHistory = () => {
         if (sortBy === "recent") {
           sorted.sort((a, b) => {
             const dateA = a.lastPlayedAt
-              ? new Date(a.lastPlayedAt)
-              : new Date(0);
+              ? new Date(a.lastPlayedAt).getTime()
+              : 0;
             const dateB = b.lastPlayedAt
-              ? new Date(b.lastPlayedAt)
-              : new Date(0);
+              ? new Date(b.lastPlayedAt).getTime()
+              : 0;
             return dateB - dateA;
           });
         } else if (sortBy === "most_watched") {
@@ -119,7 +149,7 @@ const WatchHistory = () => {
     }
   }, [watchHistoryList, loadingHistory, sortBy, filterBy]);
 
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number | null | undefined): string => {
     if (!seconds) return "0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -148,11 +178,10 @@ const WatchHistory = () => {
   };
 
   return (
-    <PageLayout fullHeight style={{ backgroundColor: "var(--bg-primary)" }}>
+    <PageLayout fullHeight>
       <PageHeader
-        title="Watch History"
-        subtitle="View your viewing history and continue watching"
-        icon={<History className="w-8 h-8" />}
+        title={"Watch History" as string}
+        subtitle={"View your viewing history and continue watching" as string}
       />
 
       {/* Controls */}
@@ -220,7 +249,7 @@ const WatchHistory = () => {
                 <span>
                   Total watch time:{" "}
                   {formatDuration(
-                    scenes.reduce((sum, s) => sum + s.playDuration, 0)
+                    scenes.reduce((sum, s) => sum + (s.playDuration as number), 0)
                   )}
                 </span>
               )}
@@ -258,7 +287,7 @@ const WatchHistory = () => {
             }}
           >
             <p style={{ color: "var(--status-error)" }}>
-              Error loading watch history: {error}
+              Error loading watch history: {error as React.ReactNode}
             </p>
           </div>
         ) : scenes.length === 0 ? (
@@ -287,15 +316,15 @@ const WatchHistory = () => {
           <div className="space-y-3">
             {scenes.map((scene, index) => (
               <SceneListItem
-                key={scene.id}
-                scene={scene}
+                key={scene.id as string}
+                scene={scene as unknown as NormalizedScene}
                 watchHistory={{
-                  resumeTime: scene.resumeTime,
-                  playCount: scene.playCount,
-                  playDuration: scene.playDuration,
-                  lastPlayedAt: scene.lastPlayedAt,
-                  oCount: scene.oCount,
-                  oHistory: scene.oHistory,
+                  resumeTime: scene.resumeTime as number | undefined,
+                  playCount: scene.playCount as number | undefined,
+                  playDuration: scene.playDuration as number | undefined,
+                  lastPlayedAt: scene.lastPlayedAt as string | null | undefined,
+                  oCount: scene.oCount as number | undefined,
+                  oHistory: scene.oHistory as string | string[] | undefined,
                 }}
                 showSessionOIndicator={true}
                 linkState={{
@@ -316,7 +345,7 @@ const WatchHistory = () => {
                   },
                 }}
                 exists={true}
-                sceneId={scene.id}
+                sceneId={scene.id as string | undefined}
               />
             ))}
           </div>

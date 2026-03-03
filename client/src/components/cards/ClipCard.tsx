@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useMemo, type FocusEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
@@ -9,11 +9,34 @@ import { getScenePathWithTime } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
 import ClipCardPreview from "./ClipCardPreview";
 
-/**
- * ClipCard - Card for displaying clip entities
- * Uses BaseCard for consistency with other entity cards
- */
-const ClipCard = forwardRef(
+export interface Clip {
+  id: string;
+  title?: string | null;
+  sceneId: string;
+  instanceId?: string;
+  seconds?: number | null;
+  endSeconds?: number | null;
+  isGenerated?: boolean;
+  primaryTag?: { id: string; name: string } | null;
+  tags?: Array<{ id: string; name: string }>;
+  scene?: {
+    title?: string | null;
+    instanceId?: string;
+    pathScreenshot?: string | null;
+  } | null;
+}
+
+interface Props {
+  clip: Clip;
+  onClick?: (clip: Clip) => void;
+  onFocus?: (e: FocusEvent<HTMLDivElement>) => void;
+  tabIndex?: number;
+  className?: string;
+  fromPageTitle?: string;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+const ClipCard = forwardRef<HTMLDivElement, Props>(
   (
     {
       clip,
@@ -149,7 +172,7 @@ const ClipCard = forwardRef(
     );
 
     // Handle navigation - navigate with autoplay state
-    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, hasMultipleInstances);
+    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId } as unknown as Record<string, unknown>, clip.seconds ?? 0, hasMultipleInstances);
     const handleNavigate = () => {
       if (onClick) {
         onClick(clip);
@@ -164,7 +187,7 @@ const ClipCard = forwardRef(
       <BaseCard
         ref={ref}
         entityType="clip"
-        entity={clip}
+        entity={clip as unknown as Record<string, unknown>}
         linkTo={clipUrl}
         fromPageTitle={fromPageTitle}
         // Content (imagePath not needed - ClipCardPreview handles image/video)
@@ -179,10 +202,10 @@ const ClipCard = forwardRef(
           entityId: clip.id,
           entityTitle: title,
           onHideSuccess,
-          showRating: clipSettings.showRating,
-          showFavorite: clipSettings.showFavorite,
-          showOCounter: clipSettings.showOCounter,
-          showMenu: clipSettings.showMenu,
+          showRating: clipSettings.showRating as boolean | undefined,
+          showFavorite: clipSettings.showFavorite as boolean | undefined,
+          showOCounter: clipSettings.showOCounter as boolean | undefined,
+          showMenu: clipSettings.showMenu as boolean | undefined,
         }}
         // Render slots
         renderImageContent={renderImageContent}

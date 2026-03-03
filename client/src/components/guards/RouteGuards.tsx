@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import type { GetSetupStatusResponse } from '@peek/shared-types';
 import { useAuth } from '../../hooks/useAuth';
 import { REDIRECT_STORAGE_KEY } from '../../api';
 import UserSetupModal from '../modals/UserSetupModal';
@@ -10,13 +11,19 @@ const LoadingSpinner = () => (
   </div>
 );
 
+interface GuardProps {
+  children: ReactNode;
+  setupStatus: GetSetupStatusResponse;
+  checkingSetup: boolean;
+}
+
 /**
  * SetupGuard - Wraps the setup wizard route
  * - If setup is complete AND user is authenticated → redirect to "/"
  * - If setup is complete AND user is NOT authenticated → redirect to "/login"
  * - Otherwise → render children (show setup wizard)
  */
-export const SetupGuard = ({ children, setupStatus, checkingSetup }) => {
+export const SetupGuard = ({ children, setupStatus, checkingSetup }: GuardProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading || checkingSetup) {
@@ -39,7 +46,7 @@ export const SetupGuard = ({ children, setupStatus, checkingSetup }) => {
  * - If user is authenticated → redirect to "/"
  * - Otherwise → render children (show login)
  */
-export const LoginGuard = ({ children, setupStatus, checkingSetup }) => {
+export const LoginGuard = ({ children, setupStatus, checkingSetup }: GuardProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading || checkingSetup) {
@@ -64,7 +71,7 @@ export const LoginGuard = ({ children, setupStatus, checkingSetup }) => {
  * - If user hasn't completed first-login setup → show UserSetupModal
  * - Otherwise → render children
  */
-export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
+export const ProtectedRoute = ({ children, setupStatus, checkingSetup }: GuardProps) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
   const [setupComplete, setSetupComplete] = useState(false);

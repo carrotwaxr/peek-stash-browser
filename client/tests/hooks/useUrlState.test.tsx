@@ -6,7 +6,7 @@ import { useUrlState } from "../../src/hooks/useUrlState";
 
 // Wrapper to provide router context
 const createWrapper = (initialEntries = ["/"]) => {
-  return ({ children }) => (
+  return ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
   );
 };
@@ -15,7 +15,7 @@ describe("useUrlState", () => {
   describe("initialization", () => {
     it("parses initial URL params on mount", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1, sort: "date" } }),
+        () => useUrlState({ defaults: { page: 1, sort: "date" } as any }),
         { wrapper: createWrapper(["/?page=3&sort=rating"]) }
       );
 
@@ -25,7 +25,7 @@ describe("useUrlState", () => {
 
     it("uses defaults when URL params are missing", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1, sort: "date" } }),
+        () => useUrlState({ defaults: { page: 1, sort: "date" } as any }),
         { wrapper: createWrapper(["/"]) }
       );
 
@@ -37,12 +37,12 @@ describe("useUrlState", () => {
   describe("setValue", () => {
     it("updates URL with history push by default", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1 } }),
+        () => useUrlState({ defaults: { page: 1 } as any }),
         { wrapper: createWrapper(["/?page=1"]) }
       );
 
       act(() => {
-        result.current.setValue("page", 2);
+        result.current.setValue("page", 2 as any);
       });
 
       // Check internal state updated
@@ -92,15 +92,15 @@ describe("useUrlState", () => {
   describe("setValues", () => {
     it("updates multiple values at once", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1, sort: "date", filter: "" } }),
+        () => useUrlState({ defaults: { page: "1", sort: "date", filter: "" } }),
         { wrapper: createWrapper(["/"]) }
       );
 
       act(() => {
-        result.current.setValues({ page: 5, sort: "rating" });
+        result.current.setValues({ page: "5", sort: "rating" });
       });
 
-      expect(result.current.values.page).toBe(5);
+      expect(result.current.values.page).toBe("5");
       expect(result.current.values.sort).toBe("rating");
     });
 
@@ -123,7 +123,7 @@ describe("useUrlState", () => {
     it("returns true when URL has params beyond defaults", () => {
       const { result } = renderHook(
         () => useUrlState({
-          defaults: { page: 1 },
+          defaults: { page: "1" },
           ignoreKeys: ["page", "per_page"]
         }),
         { wrapper: createWrapper(["/?page=1&tagIds=123"]) }
@@ -135,7 +135,7 @@ describe("useUrlState", () => {
     it("returns false when URL only has ignored params", () => {
       const { result } = renderHook(
         () => useUrlState({
-          defaults: { page: 1 },
+          defaults: { page: "1" },
           ignoreKeys: ["page", "per_page"]
         }),
         { wrapper: createWrapper(["/?page=2"]) }
@@ -146,7 +146,7 @@ describe("useUrlState", () => {
 
     it("returns false when URL is empty", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1 } }),
+        () => useUrlState({ defaults: { page: "1" } }),
         { wrapper: createWrapper(["/"]) }
       );
 

@@ -27,7 +27,7 @@ describe("GroupCard", () => {
       group: mockGroup,
       fromPageTitle: "Collections",
       tabIndex: 0,
-    });
+    } as any);
 
     expect(element).toBeDefined();
     expect(element.props).toBeDefined();
@@ -36,7 +36,7 @@ describe("GroupCard", () => {
   it("passes correct entity type to BaseCard", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
-    });
+    } as any);
 
     expect(element.props.group).toBe(mockGroup);
   });
@@ -44,7 +44,7 @@ describe("GroupCard", () => {
   it("passes correct link path", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
-    });
+    } as any);
 
     expect(element.props.group.id).toBe("1");
   });
@@ -52,7 +52,7 @@ describe("GroupCard", () => {
   it("passes group with all data", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
-    });
+    } as any);
 
     const group = element.props.group;
     expect(group.name).toBe("Test Collection");
@@ -64,7 +64,7 @@ describe("GroupCard", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
       fromPageTitle: "Collections",
-    });
+    } as any);
 
     expect(element.props.fromPageTitle).toBe("Collections");
   });
@@ -73,7 +73,7 @@ describe("GroupCard", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
       tabIndex: 5,
-    });
+    } as any);
 
     expect(element.props.tabIndex).toBe(5);
   });
@@ -83,7 +83,7 @@ describe("GroupCard", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
       onHideSuccess,
-    });
+    } as any);
 
     expect(element.props.onHideSuccess).toBe(onHideSuccess);
   });

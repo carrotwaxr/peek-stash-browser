@@ -4,20 +4,25 @@ import { apiGet } from "../../api";
 import SceneGrid from "../scene-search/SceneGrid";
 import Pagination from "./Pagination";
 
-const ScenesLikeThis = ({ sceneId, onCountChange }) => {
+interface Props {
+  sceneId: string;
+  onCountChange?: (count: number) => void;
+}
+
+const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<Array<{ id: string; [key: string]: unknown }>>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const perPage = 12;
   const prevSceneIdRef = useRef(sceneId);
 
   // Get page from URL, default to 1
-  const page = parseInt(searchParams.get("page")) || 1;
+  const page = parseInt(searchParams.get("page") ?? "1") || 1;
 
   // Memoized fetch function
-  const fetchSimilarScenes = useCallback(async (pageNum, currentSceneId) => {
+  const fetchSimilarScenes = useCallback(async (pageNum: number, currentSceneId: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -26,7 +31,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
         `/library/scenes/${currentSceneId}/similar?page=${pageNum}`,
       );
 
-      const { scenes: newScenes, count } = data;
+      const { scenes: newScenes, count } = data as { scenes: Array<{ id: string; [key: string]: unknown }>; count: number };
       setScenes(newScenes);
       setTotalCount(count);
       // Notify parent of count change for tab badge
@@ -60,7 +65,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
     fetchSimilarScenes(page, sceneId);
   }, [sceneId, page, searchParams, setSearchParams, fetchSimilarScenes]);
 
-  const handlePageChange = useCallback((newPage) => {
+  const handlePageChange = useCallback((newPage: number) => {
     const newParams = new URLSearchParams(searchParams);
     if (newPage === 1) {
       newParams.delete("page");
@@ -71,7 +76,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
   }, [searchParams, setSearchParams]);
 
   // Handle successful hide - remove scene from state
-  const handleHideSuccess = (hiddenSceneId) => {
+  const handleHideSuccess = (hiddenSceneId: string) => {
     setScenes((prev) => prev.filter((s) => s.id !== hiddenSceneId));
   };
 
@@ -113,12 +118,14 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
 
       {/* Scene Grid - reuse existing component */}
       <SceneGrid
-        scenes={scenes}
+        scenes={scenes as any}
         loading={loading}
         error={null}
         currentPage={page}
         totalPages={totalPages}
-        onPageChange={null}
+        onPageChange={undefined}
+        onSceneClick={undefined}
+        fromPageTitle="Similar Scenes"
         onHideSuccess={handleHideSuccess}
         enableKeyboard={false}
         emptyMessage="No similar scenes found"

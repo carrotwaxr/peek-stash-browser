@@ -1,8 +1,14 @@
+interface Props {
+  activeSection: "user" | "server";
+  onSectionChange: (section: "user" | "server") => void;
+  isAdmin: boolean;
+}
+
 /**
  * SectionSelector - Segmented control for switching between User/Server settings
  * Two-button toggle with accent styling for active section
  */
-const SectionSelector = ({ activeSection, onSectionChange, isAdmin }) => {
+const SectionSelector = ({ activeSection, onSectionChange, isAdmin }: Props) => {
   return (
     <div className="flex justify-center mb-6">
       <div

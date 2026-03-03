@@ -84,11 +84,11 @@ const iconSets = {
   },
 };
 
-const getIconSet = (themeName) => {
-  return iconSets[themeName] || iconSets.peek;
+const getIconSet = (themeName: string) => {
+  return (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] || iconSets.peek;
 };
 
-export const getIconName = (iconKey, themeName = "peek") => {
+export const getIconName = (iconKey: string, themeName = "peek") => {
   const iconSet = getIconSet(themeName);
-  return iconSet.icons[iconKey] || iconKey;
+  return (iconSet.icons as Record<string, string>)[iconKey] || iconKey;
 };

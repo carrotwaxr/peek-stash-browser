@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { libraryApi } from "../../api";
@@ -17,10 +17,18 @@ import MarqueeText from "./MarqueeText";
  * Shared card components for visual consistency across GridCard and SceneCard
  */
 
+interface CardContainerProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
+  className?: string;
+  entityType?: string;
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  style?: CSSProperties;
+}
+
 /**
  * Card container - base wrapper for all cards
  */
-export const CardContainer = forwardRef(
+export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
   (
     {
       children,
@@ -72,6 +80,22 @@ CardContainer.displayName = "CardContainer";
   * @param {string} [props.fromPageTitle] - Page title for back navigation context
  * @param {Function} [props.onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
+interface CardImageProps {
+  src?: string | null;
+  alt?: string;
+  aspectRatio?: string;
+  entityType?: string;
+  objectFit?: "cover" | "contain";
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  onClick?: (event: React.MouseEvent) => void;
+  linkTo?: string;
+  fromPageTitle?: string;
+  linkState?: Record<string, unknown>;
+  onClickOverride?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+}
+
 export const CardImage = ({
   src,
   alt = "",
@@ -86,8 +110,9 @@ export const CardImage = ({
   fromPageTitle,
   linkState = {},
   onClickOverride,
-}) => {
-  const [ref, isVisible] = useLazyLoad();
+}: CardImageProps) => {
+  const [lazyRef, isVisible] = useLazyLoad();
+  const ref = lazyRef as React.RefObject<HTMLAnchorElement & HTMLDivElement | null>;
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
@@ -148,7 +173,7 @@ export const CardImage = ({
         </svg>
       ),
     };
-    return icons[entityType] || icons.default;
+    return icons[entityType as keyof typeof icons] || icons.default;
   };
 
   const imageContent = (
@@ -248,8 +273,8 @@ export const CardImage = ({
  * Hook for true lazy loading via IntersectionObserver
  * Returns [ref, shouldLoad] - attach ref to container, use shouldLoad to conditionally set src
  */
-export const useLazyLoad = (rootMargin = "200px") => {
-  const ref = useRef(null);
+export const useLazyLoad = (rootMargin = "200px"): [React.RefObject<HTMLElement | null>, boolean] => {
+  const ref = useRef<HTMLElement | null>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
 
   useEffect(() => {
@@ -261,7 +286,7 @@ export const useLazyLoad = (rootMargin = "200px") => {
       return;
     }
 
-    let observer;
+    let observer: IntersectionObserver;
     try {
       observer = new IntersectionObserver(
         ([entry]) => {
@@ -290,8 +315,16 @@ export const useLazyLoad = (rootMargin = "200px") => {
  * Uses IntersectionObserver to only load images when they enter the viewport
  * This prevents overwhelming the proxy with 24+ simultaneous requests
  */
-export const LazyImage = ({ src, alt, className, style, onClick }) => {
-  const [ref, shouldLoad] = useLazyLoad();
+interface LazyImageProps {
+  src?: string | null;
+  alt?: string;
+  className?: string;
+  style?: CSSProperties;
+  onClick?: (event: React.MouseEvent) => void;
+}
+
+export const LazyImage = ({ src, alt, className, style, onClick }: LazyImageProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement | null>, boolean];
 
   return (
     <div ref={ref} className={className} style={style} onClick={onClick}>
@@ -312,8 +345,14 @@ export const LazyImage = ({ src, alt, className, style, onClick }) => {
  * Uses IntersectionObserver to only load images when they enter the viewport
  * This prevents overwhelming the proxy with 24+ simultaneous requests
  */
-export const CardDefaultImage = ({ src, alt, entityType }) => {
-  const [ref, shouldLoad] = useLazyLoad();
+interface CardDefaultImageProps {
+  src?: string | null;
+  alt?: string;
+  entityType?: string;
+}
+
+export const CardDefaultImage = ({ src, alt, entityType }: CardDefaultImageProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement | null>, boolean];
 
   return (
     <div
@@ -323,7 +362,7 @@ export const CardDefaultImage = ({ src, alt, entityType }) => {
     >
       <img
         className="w-full h-full object-contain"
-        src={shouldLoad ? src : undefined}
+        src={shouldLoad ? (src ?? undefined) : undefined}
         alt={alt || `${entityType} image`}
       />
     </div>
@@ -337,7 +376,13 @@ export const CardDefaultImage = ({ src, alt, entityType }) => {
  * @param {React.ReactNode} props.children - Content to render in overlay
  * @param {string} [props.className] - Additional CSS classes
  */
-export const CardOverlay = ({ position = "bottom-left", children, className = "" }) => {
+interface CardOverlayProps {
+  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "full";
+  children: ReactNode;
+  className?: string;
+}
+
+export const CardOverlay = ({ position = "bottom-left", children, className = "" }: CardOverlayProps) => {
   const positionClasses = {
     "top-left": "absolute top-0 left-0",
     "top-right": "absolute top-0 right-0",
@@ -365,6 +410,16 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
  * @param {string} [fromPageTitle] - Page title for back navigation context
  * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
+interface CardTitleProps {
+  title: string | ReactNode;
+  subtitle?: string | null;
+  hideSubtitle?: boolean;
+  linkTo?: string;
+  fromPageTitle?: string;
+  linkState?: Record<string, unknown>;
+  onClickOverride?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+}
+
 export const CardTitle = ({
   title,
   subtitle,
@@ -373,7 +428,7 @@ export const CardTitle = ({
   fromPageTitle,
   linkState = {},
   onClickOverride,
-}) => {
+}: CardTitleProps) => {
   const titleIsString = typeof title === "string";
 
   // String titles use MarqueeText for auto-scroll on overflow
@@ -447,7 +502,12 @@ export const CardTitle = ({
  * @param {string} description - Description text
  * @param {number} maxLines - Maximum lines to display (default: 3)
  */
-export const CardDescription = ({ description, maxLines = 3 }) => {
+interface CardDescriptionProps {
+  description: string | null | undefined;
+  maxLines?: number;
+}
+
+export const CardDescription = ({ description, maxLines = 3 }: CardDescriptionProps) => {
   return (
     <ExpandableDescription description={description} maxLines={maxLines} />
   );
@@ -458,7 +518,19 @@ export const CardDescription = ({ description, maxLines = 3 }) => {
  * @param {Array} indicators - Array of indicator objects
  * @param {React.ReactNode} menuComponent - Optional menu component to render on the right
  */
-export const CardIndicators = ({ indicators, menuComponent }) => {
+interface IndicatorItem {
+  type: string;
+  count?: number;
+  tooltipContent?: ReactNode;
+  onClick?: (e: React.MouseEvent) => void;
+}
+
+interface CardIndicatorsProps {
+  indicators?: IndicatorItem[];
+  menuComponent?: ReactNode;
+}
+
+export const CardIndicators = ({ indicators, menuComponent }: CardIndicatorsProps) => {
   const hasIndicators = indicators && indicators.length > 0;
 
   // Don't render anything if no indicators and no menu
@@ -469,7 +541,7 @@ export const CardIndicators = ({ indicators, menuComponent }) => {
   return (
     <div className="my-2 w-full flex items-center">
       <div className="flex-1">
-        {hasIndicators && <CardCountIndicators indicators={indicators} />}
+        {hasIndicators && <CardCountIndicators indicators={indicators as Parameters<typeof CardCountIndicators>[0]['indicators']} />}
       </div>
       {menuComponent && (
         <div className="flex-shrink-0 ml-2">
@@ -484,12 +556,26 @@ export const CardIndicators = ({ indicators, menuComponent }) => {
  * Standalone menu row - used when menu should appear without rating controls
  * Renders just the ellipsis menu on its own row
  */
-export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }) => {
+interface CardMenuRowProps {
+  entityType: string;
+  entityId: string;
+  entityTitle?: string;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+}
+
+interface HideInfo {
+  entityType: string;
+  entityId: string;
+  entityName: string;
+  skipConfirmation?: boolean;
+}
+
+export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }: CardMenuRowProps) => {
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
-  const [pendingHide, setPendingHide] = useState(null);
+  const [pendingHide, setPendingHide] = useState<HideInfo | null>(null);
   const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
 
-  const handleHideClick = async (hideInfo) => {
+  const handleHideClick = async (hideInfo: HideInfo) => {
     if (hideConfirmationDisabled) {
       const success = await hideEntity({
         ...hideInfo,
@@ -504,7 +590,7 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
     }
   };
 
-  const handleHideConfirm = async (dontAskAgain) => {
+  const handleHideConfirm = async (dontAskAgain: boolean) => {
     if (!pendingHide) return;
     const success = await hideEntity({
       ...pendingHide,
@@ -526,7 +612,7 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
         <EntityMenu
           entityType={entityType}
           entityId={entityId}
-          entityName={entityTitle}
+          entityName={entityTitle || ""}
           onHide={handleHideClick}
         />
       </div>
@@ -537,8 +623,8 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
           setPendingHide(null);
         }}
         onConfirm={handleHideConfirm}
-        entityType={pendingHide?.entityType}
-        entityName={pendingHide?.entityName}
+        entityType={pendingHide?.entityType ?? ""}
+        entityName={pendingHide?.entityName ?? ""}
       />
     </>
   );
@@ -560,6 +646,24 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
  * @param {boolean} showOCounter - Whether to show the O counter (default: true)
  * @param {boolean} showMenu - Whether to show the menu in this row (default: true)
  */
+interface CardRatingRowProps {
+  entityType: string;
+  entityId: string;
+  instanceId?: string | null;
+  initialRating: number | null | undefined;
+  initialFavorite: boolean;
+  initialOCounter: number | null | undefined;
+  entityTitle?: string;
+  onHideSuccess?: (entityId: string, entityType: string) => void;
+  onOCounterChange?: (entityId: string, count: number) => void;
+  onRatingChange?: (entityId: string, rating: number | null) => void;
+  onFavoriteChange?: (entityId: string, isFavorite: boolean) => void;
+  showRating?: boolean;
+  showFavorite?: boolean;
+  showOCounter?: boolean;
+  showMenu?: boolean;
+}
+
 export const CardRatingRow = ({
   entityType,
   entityId,
@@ -576,13 +680,13 @@ export const CardRatingRow = ({
   showFavorite = true,
   showOCounter = true,
   showMenu = true,
-}) => {
+}: CardRatingRowProps) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [oCounter, setOCounter] = useState(initialOCounter);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
-  const [pendingHide, setPendingHide] = useState(null);
+  const [pendingHide, setPendingHide] = useState<HideInfo | null>(null);
   const badgeRef = useRef(null);
   const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
 
@@ -599,7 +703,7 @@ export const CardRatingRow = ({
     setOCounter(initialOCounter);
   }, [initialOCounter]);
 
-  const handleRatingSave = async (newRating) => {
+  const handleRatingSave = async (newRating: number | null) => {
     setRating(newRating);
     try {
       await libraryApi.updateRating(entityType, entityId, newRating, instanceId);
@@ -611,7 +715,7 @@ export const CardRatingRow = ({
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite(entityType, entityId, newValue, instanceId);
@@ -623,13 +727,13 @@ export const CardRatingRow = ({
     }
   };
 
-  const handleOCounterChange = (newCount) => {
+  const handleOCounterChange = (newCount: number) => {
     setOCounter(newCount);
     // Notify parent of the change
     onOCounterChange?.(entityId, newCount);
   };
 
-  const handleHideClick = async (hideInfo) => {
+  const handleHideClick = async (hideInfo: HideInfo) => {
     // If confirmation is disabled, hide immediately without dialog
     if (hideConfirmationDisabled) {
       const success = await hideEntity({
@@ -648,7 +752,7 @@ export const CardRatingRow = ({
     }
   };
 
-  const handleHideConfirm = async (dontAskAgain) => {
+  const handleHideConfirm = async (dontAskAgain: boolean) => {
     if (!pendingHide) return;
 
     const success = await hideEntity({
@@ -693,8 +797,8 @@ export const CardRatingRow = ({
           isOpen={hideDialogOpen}
           onClose={handleHideCancel}
           onConfirm={handleHideConfirm}
-          entityType={pendingHide?.entityType}
-          entityName={pendingHide?.entityName}
+          entityType={pendingHide?.entityType ?? ""}
+          entityName={pendingHide?.entityName ?? ""}
         />
       </>
     );
@@ -721,8 +825,8 @@ export const CardRatingRow = ({
         <div className="flex items-center card-rating-icons">
           {showOCounter && (
             <OCounterButton
-              sceneId={entityType === "scene" ? entityId : null}
-              imageId={entityType === "image" ? entityId : null}
+              sceneId={entityType === "scene" ? entityId : undefined}
+              imageId={entityType === "image" ? entityId : undefined}
               initialCount={oCounter ?? 0}
               onChange={handleOCounterChange}
               size="small"
@@ -742,7 +846,7 @@ export const CardRatingRow = ({
             <EntityMenu
               entityType={entityType}
               entityId={entityId}
-              entityName={entityTitle}
+              entityName={entityTitle || ""}
               onHide={handleHideClick}
             />
           )}
@@ -763,8 +867,8 @@ export const CardRatingRow = ({
         isOpen={hideDialogOpen}
         onClose={handleHideCancel}
         onConfirm={handleHideConfirm}
-        entityType={pendingHide?.entityType}
-        entityName={pendingHide?.entityName}
+        entityType={pendingHide?.entityType ?? ""}
+        entityName={pendingHide?.entityName ?? ""}
       />
     </>
   );

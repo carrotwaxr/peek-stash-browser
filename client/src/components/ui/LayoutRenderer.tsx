@@ -1,27 +1,18 @@
+import { type ReactNode } from 'react';
 import { GridLayout } from './layouts/GridLayout';
 
-/**
- * LayoutRenderer - Pluggable layout system
- *
- * Responsibilities:
- * - Route to correct layout based on layoutType
- * - Each layout is pure - only knows about spacing/columns
- * - Extensible - easy to add new layouts
- *
- * Currently only supports 'grid' layout. Future layouts (list, compact) can be
- * added by importing them and adding cases to the switch statement.
- *
- * @param {Object} props
- * @param {'grid'|'list'|'compact'} props.layoutType - Layout mode
- * @param {string} props.entityType - For grid type selection ('scene' vs 'standard')
- * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
- * @param {Array} props.items - Items to render
- * @param {Function} props.renderItem - Render function for each item
- * @param {boolean} [props.loading] - Loading state
- * @param {Function} [props.renderSkeleton] - Custom skeleton renderer
- * @param {number} [props.skeletonCount] - Number of skeletons
- * @param {string} [props.className] - Additional CSS classes
- */
+interface Props {
+  layoutType?: "grid" | "list" | "compact";
+  entityType: string;
+  density?: "small" | "medium" | "large";
+  items: unknown[];
+  renderItem: (item: unknown, index: number) => ReactNode;
+  loading?: boolean;
+  renderSkeleton?: () => ReactNode;
+  skeletonCount?: number;
+  className?: string;
+}
+
 export const LayoutRenderer = ({
   layoutType = 'grid',
   entityType,
@@ -32,7 +23,7 @@ export const LayoutRenderer = ({
   renderSkeleton,
   skeletonCount = 12,
   className = "",
-}) => {
+}: Props) => {
   // Route to appropriate layout
   switch (layoutType) {
     // Future layouts will be added here:

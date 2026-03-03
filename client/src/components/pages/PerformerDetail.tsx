@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
@@ -26,13 +26,14 @@ import {
 } from "../ui/index";
 import { GalleryGrid, GroupGrid } from "../grids/index";
 import ViewInStashButton from "../ui/ViewInStashButton";
+import type { TagRef } from "@peek/shared-types";
 
 const PerformerDetail = () => {
-  const { performerId } = useParams();
+  const { performerId } = useParams<{ performerId: string }>();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [performer, setPerformer] = useState(null);
-  const [rating, setRating] = useState(null);
+  const [performer, setPerformer] = useState<Record<string, unknown> | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Navigation state for back button
@@ -47,10 +48,10 @@ const PerformerDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: 'scenes', label: 'Scenes', count: performer?.scene_count || 0 },
-    { id: 'galleries', label: 'Galleries', count: performer?.gallery_count || 0 },
-    { id: 'images', label: 'Images', count: performer?.image_count || 0 },
-    { id: 'groups', label: 'Collections', count: performer?.group_count || 0 },
+    { id: 'scenes', label: 'Scenes', count: (performer?.scene_count as number) || 0 },
+    { id: 'galleries', label: 'Galleries', count: (performer?.gallery_count as number) || 0 },
+    { id: 'images', label: 'Images', count: (performer?.image_count as number) || 0 },
+    { id: 'groups', label: 'Collections', count: (performer?.group_count as number) || 0 },
   ];
   const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
 
@@ -58,16 +59,16 @@ const PerformerDetail = () => {
   const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // Set page title to performer name
-  usePageTitle(performer?.name || "Performer");
+  usePageTitle((performer?.name as string) || "Performer");
 
   useEffect(() => {
     const fetchPerformer = async () => {
       try {
         setIsLoading(true);
-        const performerData = await libraryApi.findPerformerById(performerId, instanceId);
+        const performerData = await libraryApi.findPerformerById(performerId!, instanceId) as Record<string, unknown> | null;
         setPerformer(performerData);
-        setRating(performerData.rating);
-        setIsFavorite(performerData.favorite || false);
+        setRating(performerData?.rating as number | null);
+        setIsFavorite((performerData?.favorite as boolean) || false);
       } catch {
         // Error loading performer - will show loading spinner
       } finally {
@@ -78,23 +79,23 @@ const PerformerDetail = () => {
     fetchPerformer();
   }, [performerId, instanceId]);
 
-  const handleRatingChange = async (newRating) => {
+  const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("performer", performerId, newRating, instanceId);
+      await libraryApi.updateRating("performer", performerId!, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating(performer.rating); // Revert on error
+      setRating((performer as Record<string, unknown>)?.rating as number | null); // Revert on error
     }
   };
 
-  const handleFavoriteChange = async (newValue) => {
+  const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("performer", performerId, newValue, instanceId);
+      await libraryApi.updateFavorite("performer", performerId!, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
-      setIsFavorite(performer.favorite || false); // Revert on error
+      setIsFavorite((performer?.favorite as boolean) || false); // Revert on error
     }
   };
 
@@ -103,7 +104,8 @@ const PerformerDetail = () => {
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
-  useRatingHotkeys({
+   
+  (useRatingHotkeys as any)({
     enabled: !isLoading && !!performer,
     setRating: handleRatingChange,
     toggleFavorite });
@@ -135,28 +137,30 @@ const PerformerDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              <div className="flex gap-4 items-center">
-                <span>{performer.name}</span>
-                <GenderIcon gender={performer.gender} size={32} />
-                {settings.showFavorite && (
-                  <FavoriteButton
-                    isFavorite={isFavorite}
-                    onChange={handleFavoriteChange}
-                    size="large"
-                  />
-                )}
-                <ViewInStashButton stashUrl={performer?.stashUrl} size={24} />
-              </div>
+              (
+                <div className="flex gap-4 items-center">
+                  <span>{performer?.name as React.ReactNode}</span>
+                  <GenderIcon gender={performer?.gender as string} size={32} />
+                  {(settings.showFavorite as boolean) && (
+                    <FavoriteButton
+                      isFavorite={isFavorite}
+                      onChange={handleFavoriteChange}
+                      size="large"
+                    />
+                  )}
+                  <ViewInStashButton stashUrl={(performer?.stashUrl as string) || ""} size={24} />
+                </div>
+              ) as unknown as string
             }
             subtitle={
-              performer?.alias_list?.length
-                ? `Also known as: ${performer.alias_list.join(", ")}`
+              (performer?.alias_list as string[] | undefined)?.length
+                ? `Also known as: ${(performer?.alias_list as string[]).join(", ")}`
                 : null
             }
           />
 
           {/* Rating Slider */}
-          {settings.showRating && (
+          {(settings.showRating as boolean) && (
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
@@ -175,7 +179,7 @@ const PerformerDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          {settings.showDescriptionOnDetail && (
+          {(settings.showDescriptionOnDetail as boolean) && (
             <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <PerformerDetails performer={performer} />
             </div>
@@ -184,7 +188,7 @@ const PerformerDetail = () => {
 
         {/* Full Width Sections - Statistics, Tags, Links */}
         <div className="space-y-6 mb-8">
-          <PerformerStats performer={performer} performerId={performerId} />
+          <PerformerStats performer={performer} performerId={performerId!} />
           <PerformerLinks performer={performer} settings={settings} />
         </div>
 
@@ -207,12 +211,13 @@ const PerformerDetail = () => {
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
-                      value: [makeCompositeKey(performerId, instanceId)],
+                      value: [makeCompositeKey(performerId!, instanceId!)],
                       modifier: "INCLUDES" } }}
                   permanentFiltersMetadata={{
-                    performers: [{ id: makeCompositeKey(performerId, instanceId), name: performer.name }] }}
-                  title={`Scenes featuring ${performer.name}`}
-                  fromPageTitle={performer?.name || "Performer"}
+                    performers: [{ id: makeCompositeKey(performerId!, instanceId!), name: performer?.name as string }] }}
+                  subtitle={undefined}
+                  title={`Scenes featuring ${performer?.name as string}`}
+                  fromPageTitle={(performer?.name as string) || "Performer"}
                 />
               )}
 
@@ -221,15 +226,15 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId, instanceId)],
+                        value: [makeCompositeKey(performerId!, instanceId!)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
-                  emptyMessage={`No galleries found for ${performer.name}`}
+                  emptyMessage={`No galleries found for ${performer?.name as string}`}
                 />
               )}
 
               {activeTab === 'images' && (
-                <ImagesTab performerId={performerId} instanceId={instanceId} performerName={performer?.name} />
+                <ImagesTab performerId={performerId} instanceId={instanceId} performerName={performer?.name as string | undefined} />
               )}
 
               {activeTab === 'groups' && (
@@ -237,10 +242,10 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId, instanceId)],
+                        value: [makeCompositeKey(performerId!, instanceId!)],
                         modifier: "INCLUDES" } } }}
                   hideLockedFilters
-                  emptyMessage={`No collections found for ${performer.name}`}
+                  emptyMessage={`No collections found for ${performer?.name as string}`}
                 />
               )}
             </>
@@ -252,7 +257,12 @@ const PerformerDetail = () => {
 };
 
 // Reusable component for detail field (label/value pair)
-const DetailField = ({ label, value }) => {
+interface DetailFieldProps {
+  label: string;
+  value: React.ReactNode;
+}
+
+const DetailField = ({ label, value }: DetailFieldProps) => {
   if (!value) return null;
 
   return (
@@ -271,10 +281,18 @@ const DetailField = ({ label, value }) => {
 };
 
 // Reusable component for stat field (label/value pair in stats card)
-const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
+interface StatFieldProps {
+  label: string;
+  value: string | number | null | undefined;
+  valueColor?: string;
+  onClick?: () => void;
+  isActive?: boolean;
+}
+
+const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: StatFieldProps) => {
   if (!value && value !== 0) return null;
 
-  const clickable = onClick && value > 0;
+  const clickable = onClick && Number(value) > 0;
 
   return (
     <div className="flex justify-between">
@@ -301,7 +319,11 @@ const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, 
 };
 
 // Reusable component for section headings
-const SectionHeader = ({ children }) => {
+interface SectionHeaderProps {
+  children: React.ReactNode;
+}
+
+const SectionHeader = ({ children }: SectionHeaderProps) => {
   return (
     <h3
       className="text-sm font-medium mb-2"
@@ -313,7 +335,12 @@ const SectionHeader = ({ children }) => {
 };
 
 // Reusable component for card containers
-const Card = ({ children, title }) => {
+interface CardProps {
+  children: React.ReactNode;
+  title?: string;
+}
+
+const Card = ({ children, title }: CardProps) => {
   return (
     <div
       className="p-4 rounded-lg p-6 mb-6"
@@ -334,11 +361,15 @@ const Card = ({ children, title }) => {
   );
 };
 
-const PerformerDetails = ({ performer }) => {
+interface PerformerDetailsProps {
+  performer: Record<string, unknown> | null;
+}
+
+const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
   const { unitPreference, isLoading: isLoadingUnits } = useUnitPreference();
 
   // Calculate age from birthdate
-  const getAge = (birthdate) => {
+  const getAge = (birthdate: string): number | null => {
     if (!birthdate) return null;
     const birth = new Date(birthdate);
     const today = new Date();
@@ -353,7 +384,7 @@ const PerformerDetails = ({ performer }) => {
     return age;
   };
 
-  const age = performer?.birthdate ? getAge(performer.birthdate) : null;
+  const age = performer?.birthdate ? getAge(performer.birthdate as string) : null;
 
   return (
     <Card title="Details">
@@ -371,21 +402,23 @@ const PerformerDetails = ({ performer }) => {
           <DetailField
             label="Born"
             value={
-              performer?.birthdate &&
-              new Date(performer.birthdate).toLocaleDateString() +
-                (age ? ` (${age} years old)` : "")
+              performer?.birthdate
+                ? new Date(performer.birthdate as string).toLocaleDateString() +
+                  (age ? ` (${age} years old)` : "")
+                : null
             }
           />
           <DetailField
             label="Died"
             value={
-              performer?.death_date &&
-              new Date(performer.death_date).toLocaleDateString()
+              performer?.death_date
+                ? new Date(performer.death_date as string).toLocaleDateString()
+                : null
             }
           />
-          <DetailField label="Career" value={performer?.career_length} />
-          <DetailField label="Country" value={performer?.country} />
-          <DetailField label="Ethnicity" value={performer?.ethnicity} />
+          <DetailField label="Career" value={performer?.career_length as string | undefined} />
+          <DetailField label="Country" value={performer?.country as string | undefined} />
+          <DetailField label="Ethnicity" value={performer?.ethnicity as string | undefined} />
         </div>
       </div>
 
@@ -400,14 +433,14 @@ const PerformerDetails = ({ performer }) => {
           Physical Attributes
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DetailField label="Eye Color" value={performer?.eye_color} />
-          <DetailField label="Hair Color" value={performer?.hair_color} />
+          <DetailField label="Eye Color" value={performer?.eye_color as string | undefined} />
+          <DetailField label="Hair Color" value={performer?.hair_color as string | undefined} />
           <DetailField
             label="Height"
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.height_cm && formatHeight(performer.height_cm, unitPreference)
+                : performer?.height_cm ? formatHeight(performer.height_cm as number, unitPreference) : null
             }
           />
           <DetailField
@@ -415,25 +448,25 @@ const PerformerDetails = ({ performer }) => {
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.weight && formatWeight(performer.weight, unitPreference)
+                : performer?.weight ? formatWeight(performer.weight as number, unitPreference) : null
             }
           />
-          <DetailField label="Measurements" value={performer?.measurements} />
-          <DetailField label="Fake Tits" value={performer?.fake_tits} />
+          <DetailField label="Measurements" value={performer?.measurements as string | undefined} />
+          <DetailField label="Fake Tits" value={performer?.fake_tits as string | undefined} />
           <DetailField
             label="Penis Length"
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.penis_length && formatLength(performer.penis_length, unitPreference)
+                : performer?.penis_length ? formatLength(performer.penis_length as number, unitPreference) : null
             }
           />
-          <DetailField label="Circumcised" value={performer?.circumcised} />
+          <DetailField label="Circumcised" value={performer?.circumcised as string | undefined} />
         </div>
       </div>
 
       {/* Body Modifications */}
-      {(performer?.tattoos || performer?.piercings) && (
+      {!!(performer?.tattoos || performer?.piercings) && (
         <div className="mb-6">
           <h3
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -444,14 +477,14 @@ const PerformerDetails = ({ performer }) => {
             Body Modifications
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DetailField label="Tattoos" value={performer?.tattoos} />
-            <DetailField label="Piercings" value={performer?.piercings} />
+            <DetailField label="Tattoos" value={performer?.tattoos as string | undefined} />
+            <DetailField label="Piercings" value={performer?.piercings as string | undefined} />
           </div>
         </div>
       )}
 
       {/* Other */}
-      {performer?.disambiguation && (
+      {!!performer?.disambiguation && (
         <div>
           <h3
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -464,7 +497,7 @@ const PerformerDetails = ({ performer }) => {
           <div className="grid grid-cols-1 gap-4">
             <DetailField
               label="Disambiguation"
-              value={performer?.disambiguation}
+              value={performer?.disambiguation as string | undefined}
             />
           </div>
         </div>
@@ -473,11 +506,16 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer, performerId: _performerId }) => {  
+interface PerformerStatsProps {
+  performer: Record<string, unknown> | null;
+  performerId: string;
+}
+
+const PerformerStats = ({ performer, performerId: _performerId }: PerformerStatsProps) => {  
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (tabId === 'scenes') {
       newParams.delete('tab');
@@ -492,7 +530,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
   // Calculate O-Count percentage
   const oCountPercentage =
     performer?.scene_count && performer?.o_counter
-      ? ((performer.o_counter / performer.scene_count) * 100).toFixed(1)
+      ? (((performer.o_counter as number) / (performer.scene_count as number)) * 100).toFixed(1)
       : null;
 
   // Cap the progress bar width at 100% but show actual percentage
@@ -506,33 +544,33 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <StatField
           label="Scenes:"
-          value={performer?.scene_count || 0}
+          value={(performer?.scene_count as number) || 0}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('scenes')}
           isActive={activeTab === 'scenes'}
         />
         <StatField
           label="O-Count:"
-          value={performer?.o_counter || 0}
+          value={(performer?.o_counter as number) || 0}
           valueColor="var(--accent-primary)"
         />
         <StatField
           label="Galleries:"
-          value={performer?.gallery_count || 0}
+          value={(performer?.gallery_count as number) || 0}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('galleries')}
           isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Images:"
-          value={performer?.image_count || 0}
+          value={(performer?.image_count as number) || 0}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('images')}
           isActive={activeTab === 'images'}
         />
         <StatField
           label="Collections:"
-          value={performer?.group_count || 0}
+          value={(performer?.group_count as number) || 0}
           valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('groups')}
           isActive={activeTab === 'groups'}
@@ -540,7 +578,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
       </div>
 
       {/* Visual Rating Display */}
-      {performer?.rating100 && performer.rating100 > 0 && (
+      {!!performer?.rating100 && (performer.rating100 as number) > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
@@ -553,7 +591,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
               className="text-2xl font-bold"
               style={{ color: "var(--accent-primary)" }}
             >
-              {performer.rating100}/100
+              {performer!.rating100 as React.ReactNode}/100
             </span>
           </div>
           <div
@@ -563,7 +601,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
-                width: `${performer.rating100}%`,
+                width: `${performer!.rating100 as number}%`,
                 backgroundColor: "var(--accent-primary)" }}
             />
           </div>
@@ -599,7 +637,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
             />
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-            {performer.o_counter} O-Counts in {performer.scene_count} scenes
+            {performer?.o_counter as React.ReactNode} O-Counts in {performer?.scene_count as React.ReactNode} scenes
           </div>
         </div>
       )}
@@ -607,7 +645,11 @@ const PerformerStats = ({ performer, performerId: _performerId }) => {
   );
 };
 
-const PerformerImage = ({ performer }) => {
+interface PerformerImageProps {
+  performer: Record<string, unknown> | null;
+}
+
+const PerformerImage = ({ performer }: PerformerImageProps) => {
   return (
     <div
       className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
@@ -619,8 +661,8 @@ const PerformerImage = ({ performer }) => {
     >
       {performer?.image_path ? (
         <img
-          src={performer.image_path}
-          alt={performer.name}
+          src={performer.image_path as string}
+          alt={performer.name as string}
           style={{
             width: "100%",
             height: "100%",
@@ -644,13 +686,20 @@ const PerformerImage = ({ performer }) => {
   );
 };
 
-const PerformerLinks = ({ performer, settings }) => {
+interface PerformerLinksProps {
+  performer: Record<string, unknown> | null;
+  settings: Record<string, unknown>;
+}
+
+const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
+  const urls = performer?.urls as string[] | undefined;
+  const tags = performer?.tags as TagRef[] | undefined;
   const hasLinks =
     performer?.twitter ||
     performer?.instagram ||
     performer?.url ||
-    performer?.urls?.length > 0;
-  const hasTags = performer?.tags?.length > 0;
+    (urls?.length ?? 0) > 0;
+  const hasTags = (tags?.length ?? 0) > 0;
   const showDetails = settings?.showDescriptionOnDetail !== false;
 
   if (!hasLinks && !hasTags && !(performer?.details && showDetails)) return null;
@@ -661,16 +710,16 @@ const PerformerLinks = ({ performer, settings }) => {
       {hasLinks && (
         <Card title="Links">
           <div className="flex flex-wrap gap-2">
-            {performer?.url && <SectionLink url={performer.url} />}
-            {performer?.twitter && (
-              <SectionLink url={`https://twitter.com/${performer.twitter}`} />
+            {!!performer?.url && <SectionLink url={performer.url as string} />}
+            {!!performer?.twitter && (
+              <SectionLink url={`https://twitter.com/${performer.twitter as string}`} />
             )}
-            {performer?.instagram && (
+            {!!performer?.instagram && (
               <SectionLink
-                url={`https://instagram.com/${performer.instagram}`}
+                url={`https://instagram.com/${performer.instagram as string}`}
               />
             )}
-            {performer?.urls?.map((url, idx) => (
+            {urls?.map((url: string, idx: number) => (
               <SectionLink key={idx} url={url} />
             ))}
           </div>
@@ -680,7 +729,7 @@ const PerformerLinks = ({ performer, settings }) => {
       {/* Tags Section */}
       {hasTags && (
         <Card title="Tags">
-          <TagChips tags={performer.tags} />
+          <TagChips tags={tags!} />
         </Card>
       )}
 
@@ -691,7 +740,7 @@ const PerformerLinks = ({ performer, settings }) => {
             className="text-sm whitespace-pre-wrap"
             style={{ color: "var(--text-primary)" }}
           >
-            {performer.details}
+            {performer.details as React.ReactNode}
           </p>
         </Card>
       )}
@@ -700,13 +749,19 @@ const PerformerLinks = ({ performer, settings }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ performerId, instanceId, performerName }) => {
+interface ImagesTabProps {
+  performerId: string | undefined;
+  instanceId: string | null;
+  performerName: string | undefined;
+}
+
+const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPage = parseInt(searchParams.get('page') || '1', 10) || 1;
 
-  const handleImagePageChange = useCallback((newPage) => {
+  const handleImagePageChange = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams);
     if (newPage === 1) {
       params.delete('page');
@@ -718,16 +773,16 @@ const ImagesTab = ({ performerId, instanceId, performerName }) => {
   }, [searchParams, setSearchParams]);
 
   const fetchImages = useCallback(
-    async (page, perPage) => {
+    async (page: number, perPage: number) => {
       const data = await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
-            value: [makeCompositeKey(performerId, instanceId)],
+            value: [makeCompositeKey(performerId!, instanceId!)],
             modifier: "INCLUDES",
           },
         },
-      });
+      }) as Record<string, any>;
       return {
         images: data.findImages?.images || [],
         count: data.findImages?.count || 0,
@@ -736,7 +791,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }) => {
     [performerId, instanceId]
   );
 
-  const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
+  const { images, totalCount, isLoading, lightbox, setImages } = (useImagesPagination as any)({
     fetchImages,
     dependencies: [performerId, instanceId],
     externalPage: urlPage,

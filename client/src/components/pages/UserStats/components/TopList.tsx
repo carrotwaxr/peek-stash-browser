@@ -1,4 +1,4 @@
-// client/src/components/pages/UserStats/components/TopList.jsx
+// client/src/components/pages/UserStats/components/TopList.tsx
 
 import { Link } from "react-router-dom";
 import { Paper } from "../../../ui/index";
@@ -7,11 +7,36 @@ import {
   getFilenameFromPath,
 } from "../../../../utils/format";
 
+type EntityType = "performer" | "studio" | "tag" | "scene";
+type SortBy = "engagement" | "oCount" | "playCount";
+
+interface TopListItem {
+  id: string;
+  name?: string;
+  title?: string;
+  filePath?: string;
+  imageUrl?: string;
+  playDuration: number;
+  playCount: number;
+  oCount: number;
+  score: number;
+}
+
+interface Props {
+  title: string;
+  items: TopListItem[];
+  linkPrefix: string;
+  entityType?: EntityType;
+  showImage?: boolean;
+  sortBy?: SortBy;
+  onSortChange?: (sortBy: string) => void;
+}
+
 /**
  * Get fallback icon for entity type
  */
-const getFallbackIcon = (entityType) => {
-  const icons = {
+const getFallbackIcon = (entityType: EntityType): string => {
+  const icons: Record<EntityType, string> = {
     performer: "P",
     studio: "S",
     tag: "T",
@@ -23,10 +48,10 @@ const getFallbackIcon = (entityType) => {
 /**
  * Get display name for item
  */
-const getDisplayName = (item) => {
+const getDisplayName = (item: TopListItem): string => {
   if (item.name) return item.name;
   if (item.title) return item.title;
-  if (item.filePath) return getFilenameFromPath(item.filePath);
+  if (item.filePath) return getFilenameFromPath(item.filePath) || "Unknown";
   return "Unknown";
 };
 
@@ -57,7 +82,7 @@ const TopList = ({
   showImage = true,
   sortBy = "engagement",
   onSortChange,
-}) => {
+}: Props) => {
   if (!items || items.length === 0) {
     return null;
   }
@@ -68,7 +93,7 @@ const TopList = ({
   /**
    * Get all stats for display, with sort-relevant stat first
    */
-  const getStats = (item) => {
+  const getStats = (item: TopListItem): string => {
     const duration =
       item.playDuration > 0
         ? formatDurationHumanReadable(item.playDuration, {
@@ -140,7 +165,7 @@ const TopList = ({
           maxHeight: LIST_HEIGHT,
         }}
       >
-        {items.map((item, index) => {
+        {items.map((item: TopListItem, index: number) => {
           const displayName = getDisplayName(item);
 
           return (

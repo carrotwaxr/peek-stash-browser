@@ -11,7 +11,12 @@ import { useTruncationDetection } from "../../hooks/useTruncationDetection";
  * - The "more" button is positioned absolutely over that reserved space
  * - This ensures "more" appears at the end of the text regardless of line count
  */
-export const ExpandableDescription = ({ description, maxLines = 3 }) => {
+interface Props {
+  description: string | null | undefined;
+  maxLines?: number;
+}
+
+export const ExpandableDescription = ({ description, maxLines = 3 }: Props) => {
   const [ref] = useTruncationDetection();
   const [isExpanded, setIsExpanded] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
@@ -29,7 +34,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
     );
   }
 
-  const handleMoreClick = (e) => {
+  const handleMoreClick = (e: React.MouseEvent<HTMLParagraphElement>) => {
     e.stopPropagation();
     e.preventDefault();
 
@@ -46,7 +51,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
   };
 
   // Handle click outside - stop propagation to prevent card navigation
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
     handleClose();
@@ -65,7 +70,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
           3. "more" button positioned over the spacer
         */}
         <p
-          ref={ref}
+          ref={ref as React.Ref<HTMLParagraphElement>}
           className="card-description leading-relaxed m-0"
           onClick={handleMoreClick}
           style={{

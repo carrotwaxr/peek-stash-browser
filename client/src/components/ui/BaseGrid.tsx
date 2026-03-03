@@ -1,26 +1,25 @@
+import type { ReactNode } from "react";
 import { getGridClasses } from "../../constants/grids";
 import EmptyState from "./EmptyState";
 import Pagination from "./Pagination";
 
-/**
- * BaseGrid - Base grid component for layout, responsive columns, pagination, and loading/empty states
- *
- * @param {Object} props
- * @param {any[]} props.items - Array of items to render
- * @param {Function} props.renderItem - Function to render each item (item, index) => ReactNode
- * @param {'scene'|'standard'} props.gridType - Grid type for responsive columns
- * @param {'small'|'medium'|'large'} [props.density] - Grid density for spacing/sizing
- * @param {boolean} [props.loading] - Show loading skeleton
- * @param {Error} [props.error] - Error to display
- * @param {string} [props.emptyMessage] - Message when no items
- * @param {string} [props.emptyDescription] - Description for empty state
- * @param {number} [props.currentPage] - Current page number
- * @param {number} [props.totalPages] - Total number of pages
- * @param {Function} [props.onPageChange] - Page change handler (page: number) => void
- * @param {number} [props.skeletonCount] - Number of skeleton cards to show while loading
- * @param {Function} [props.renderSkeleton] - Custom skeleton renderer
- * @param {string} [props.className] - Additional CSS classes
- */
+export interface BaseGridProps {
+  items: unknown[];
+  renderItem: (item: unknown, index: number) => ReactNode;
+  gridType?: "scene" | "standard";
+  density?: "small" | "medium" | "large";
+  loading?: boolean;
+  error?: Error | null;
+  emptyMessage?: string;
+  emptyDescription?: string;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
+  skeletonCount?: number;
+  renderSkeleton?: () => ReactNode;
+  className?: string;
+}
+
 export const BaseGrid = ({
   items,
   renderItem,
@@ -36,7 +35,7 @@ export const BaseGrid = ({
   skeletonCount = 12,
   renderSkeleton,
   className = "",
-}) => {
+}: BaseGridProps) => {
   const gridClasses = getGridClasses(gridType, density);
 
   // Default skeleton renderer
@@ -85,7 +84,7 @@ export const BaseGrid = ({
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && onPageChange && (
+      {totalPages != null && totalPages > 1 && onPageChange && (
         <nav role="navigation" aria-label="Pagination" className="mt-6">
           <Pagination
             currentPage={currentPage}

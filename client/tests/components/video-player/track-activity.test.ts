@@ -23,7 +23,8 @@ vi.mock("video.js", () => ({
   default: {
     getPlugin: vi.fn(() =>
       class MockPlugin {
-        constructor(player) {
+        player: any;
+        constructor(player: any) {
           this.player = player;
         }
       }
@@ -36,7 +37,7 @@ vi.mock("video.js", () => ({
 import TrackActivityPlugin from "../../../src/components/video-player/plugins/track-activity";
 
 describe("TrackActivityPlugin", () => {
-  let plugin;
+  let plugin: any;
 
   beforeEach(() => {
     vi.useFakeTimers();

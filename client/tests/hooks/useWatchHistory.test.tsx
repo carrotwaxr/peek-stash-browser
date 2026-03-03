@@ -1,9 +1,10 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import {
   useWatchHistory,
   useAllWatchHistory,
 } from "../../src/hooks/useWatchHistory";
+import type { AuthContextValue } from "../../src/contexts/AuthContextProvider";
 
 vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
@@ -17,16 +18,20 @@ vi.mock("../../src/api", () => ({
 import { useAuth } from "../../src/hooks/useAuth";
 import { apiGet, apiPost } from "../../src/api";
 
+const useAuthMock = useAuth as unknown as Mock;
+const apiGetMock = apiGet as unknown as Mock;
+const apiPostMock = apiPost as unknown as Mock;
+
 describe("useWatchHistory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
   });
 
   describe("initial fetch", () => {
     it("fetches watch history for scene on mount", async () => {
       const mockHistory = { resumeTime: 120, oCount: 3, playCount: 10 };
-      apiGet.mockResolvedValue(mockHistory);
+      apiGetMock.mockResolvedValue(mockHistory);
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -40,7 +45,7 @@ describe("useWatchHistory", () => {
     });
 
     it("handles fetch error", async () => {
-      apiGet.mockRejectedValue(new Error("Not found"));
+      apiGetMock.mockRejectedValue(new Error("Not found"));
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -53,7 +58,7 @@ describe("useWatchHistory", () => {
     });
 
     it("does not fetch without sceneId", async () => {
-      const { result } = renderHook(() => useWatchHistory(null));
+      const { result } = renderHook(() => useWatchHistory(null as any));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -63,7 +68,7 @@ describe("useWatchHistory", () => {
     });
 
     it("does not fetch when not authenticated", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -77,8 +82,8 @@ describe("useWatchHistory", () => {
 
   describe("incrementOCounter", () => {
     it("increments O counter and updates local state", async () => {
-      apiGet.mockResolvedValue({ resumeTime: 0, oCount: 1 });
-      apiPost.mockResolvedValue({ success: true, oCount: 2 });
+      apiGetMock.mockResolvedValue({ resumeTime: 0, oCount: 1 });
+      apiPostMock.mockResolvedValue({ success: true, oCount: 2 });
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -95,11 +100,11 @@ describe("useWatchHistory", () => {
         sceneId: "scene-1",
       });
       expect(response).toEqual({ success: true, oCount: 2 });
-      expect(result.current.watchHistory.oCount).toBe(2);
+      expect(result.current.watchHistory!.oCount).toBe(2);
     });
 
     it("returns null when not authenticated", async () => {
-      useAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -117,8 +122,8 @@ describe("useWatchHistory", () => {
     });
 
     it("throws on API error", async () => {
-      apiGet.mockResolvedValue({ oCount: 1 });
-      apiPost.mockRejectedValue(new Error("Server error"));
+      apiGetMock.mockResolvedValue({ oCount: 1 });
+      apiPostMock.mockRejectedValue(new Error("Server error"));
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -136,7 +141,7 @@ describe("useWatchHistory", () => {
 
   describe("updateQuality", () => {
     it("stores quality value in ref", async () => {
-      apiGet.mockResolvedValue({});
+      apiGetMock.mockResolvedValue({});
 
       const { result } = renderHook(() => useWatchHistory("scene-1"));
 
@@ -153,7 +158,7 @@ describe("useWatchHistory", () => {
 
   describe("refresh", () => {
     it("re-fetches watch history", async () => {
-      apiGet
+      apiGetMock
         .mockResolvedValueOnce({ oCount: 1 })
         .mockResolvedValueOnce({ oCount: 5 });
 
@@ -176,7 +181,7 @@ describe("useWatchHistory", () => {
 describe("useAllWatchHistory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    useAuthMock.mockReturnValue({ isAuthenticated: true, isLoading: false });
   });
 
   it("fetches all watch history on mount", async () => {
@@ -184,7 +189,7 @@ describe("useAllWatchHistory", () => {
       { sceneId: "1", resumeTime: 60 },
       { sceneId: "2", resumeTime: 120 },
     ];
-    apiGet.mockResolvedValue({ watchHistory: mockHistory });
+    apiGetMock.mockResolvedValue({ watchHistory: mockHistory });
 
     const { result } = renderHook(() => useAllWatchHistory());
 
@@ -199,7 +204,7 @@ describe("useAllWatchHistory", () => {
   });
 
   it("passes inProgress and limit params", async () => {
-    apiGet.mockResolvedValue({ watchHistory: [] });
+    apiGetMock.mockResolvedValue({ watchHistory: [] });
 
     renderHook(() => useAllWatchHistory({ inProgress: true, limit: 10 }));
 
@@ -211,7 +216,7 @@ describe("useAllWatchHistory", () => {
   });
 
   it("does not fetch when not authenticated", async () => {
-    useAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+    useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
     const { result } = renderHook(() => useAllWatchHistory());
 
@@ -224,7 +229,7 @@ describe("useAllWatchHistory", () => {
   });
 
   it("handles fetch error", async () => {
-    apiGet.mockRejectedValue(new Error("Network error"));
+    apiGetMock.mockRejectedValue(new Error("Network error"));
 
     const { result } = renderHook(() => useAllWatchHistory());
 
@@ -236,7 +241,7 @@ describe("useAllWatchHistory", () => {
   });
 
   it("provides refresh function", async () => {
-    apiGet
+    apiGetMock
       .mockResolvedValueOnce({ watchHistory: [{ sceneId: "1" }] })
       .mockResolvedValueOnce({ watchHistory: [{ sceneId: "1" }, { sceneId: "2" }] });
 

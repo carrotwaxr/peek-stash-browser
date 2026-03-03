@@ -4,18 +4,35 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
+interface OrphanScene {
+  id: string;
+  title: string | null;
+  deletedAt: string;
+  phash: string | null;
+  totalPlayCount: number;
+  hasRatings: boolean;
+  hasFavorites: boolean;
+}
+
+interface MatchResult {
+  sceneId: string;
+  title: string | null;
+  similarity: string;
+  recommended: boolean;
+}
+
 const MergeRecoveryTab = () => {
-  const [orphans, setOrphans] = useState([]);
+  const [orphans, setOrphans] = useState<OrphanScene[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(null);
-  const [expandedOrphan, setExpandedOrphan] = useState(null);
-  const [matches, setMatches] = useState({});
-  const [manualTargetId, setManualTargetId] = useState({});
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [expandedOrphan, setExpandedOrphan] = useState<string | null>(null);
+  const [matches, setMatches] = useState<Record<string, MatchResult[]>>({});
+  const [manualTargetId, setManualTargetId] = useState<Record<string, string>>({});
 
   const fetchOrphans = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiGet("/admin/orphaned-scenes");
+      const data = await apiGet<{ scenes: OrphanScene[] }>("/admin/orphaned-scenes");
       setOrphans(data.scenes);
     } catch {
       showError("Failed to load orphaned scenes");
@@ -28,17 +45,17 @@ const MergeRecoveryTab = () => {
     fetchOrphans();
   }, [fetchOrphans]);
 
-  const fetchMatches = async (sceneId) => {
+  const fetchMatches = async (sceneId: string) => {
     if (matches[sceneId]) return;
     try {
-      const data = await apiGet(`/admin/orphaned-scenes/${sceneId}/matches`);
+      const data = await apiGet<{ matches: MatchResult[] }>(`/admin/orphaned-scenes/${sceneId}/matches`);
       setMatches((prev) => ({ ...prev, [sceneId]: data.matches }));
     } catch {
       showError("Failed to load matches");
     }
   };
 
-  const handleExpand = (sceneId) => {
+  const handleExpand = (sceneId: string) => {
     if (expandedOrphan === sceneId) {
       setExpandedOrphan(null);
     } else {
@@ -47,7 +64,7 @@ const MergeRecoveryTab = () => {
     }
   };
 
-  const handleReconcile = async (sourceId, targetId) => {
+  const handleReconcile = async (sourceId: string, targetId: string) => {
     try {
       setProcessing(sourceId);
       await apiPost(`/admin/orphaned-scenes/${sourceId}/reconcile`, { targetSceneId: targetId });
@@ -60,7 +77,7 @@ const MergeRecoveryTab = () => {
     }
   };
 
-  const handleDiscard = async (sceneId) => {
+  const handleDiscard = async (sceneId: string) => {
     if (!confirm("Are you sure you want to discard this orphaned data? This cannot be undone.")) {
       return;
     }
@@ -82,7 +99,7 @@ const MergeRecoveryTab = () => {
     }
     try {
       setProcessing("all");
-      const data = await apiPost("/admin/reconcile-all");
+      const data = await apiPost<{ reconciled: number; skipped: number }>("/admin/reconcile-all");
       showSuccess(`Reconciled ${data.reconciled} scenes, skipped ${data.skipped}`);
       fetchOrphans();
     } catch {
@@ -241,7 +258,7 @@ const MergeRecoveryTab = () => {
                       <Button
                         onClick={() => handleDiscard(orphan.id)}
                         disabled={processing === orphan.id}
-                        variant="danger"
+                        variant="destructive"
                         size="sm"
                       >
                         Discard Activity

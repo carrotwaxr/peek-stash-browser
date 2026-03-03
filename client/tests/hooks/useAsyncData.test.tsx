@@ -8,8 +8,9 @@ vi.mock("../../src/hooks/useAuth", () => ({
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
+import type { Mock } from "vitest";
 
-const useAuthMock = vi.mocked(useAuth);
+const useAuthMock = useAuth as unknown as Mock;
 
 describe("useAsyncData", () => {
   beforeEach(() => {
@@ -67,8 +68,8 @@ describe("useAsyncData", () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error.isInitializing).toBe(true);
-      expect(result.current.error.status).toBe(503);
+      expect((result.current.error as any).isInitializing).toBe(true);
+      expect((result.current.error as any).status).toBe(503);
     });
   });
 

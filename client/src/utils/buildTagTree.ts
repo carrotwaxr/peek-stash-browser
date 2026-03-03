@@ -1,12 +1,14 @@
-// client/src/utils/buildTagTree.js
+// client/src/utils/buildTagTree.ts
+
+type TagNode = Record<string, any>;
 
 /**
  * Get sort compare function for a given field and direction
  */
-const getSortFn = (sortField, sortDirection) => {
+const getSortFn = (sortField: string, sortDirection: string) => {
   const dir = sortDirection === "ASC" ? 1 : -1;
 
-  return (a, b) => {
+  return (a: TagNode, b: TagNode) => {
     let valA, valB;
 
     switch (sortField) {
@@ -57,7 +59,7 @@ const getSortFn = (sortField, sortDirection) => {
  * @param {string} options.sortDirection - Sort direction (ASC or DESC)
  * @returns {Array} Array of root tree nodes, each with nested `children` array
  */
-export function buildTagTree(tags, options = {}) {
+export function buildTagTree(tags: TagNode[], options: { filterQuery?: string; sortField?: string; sortDirection?: string } = {}) {
   const { filterQuery = "", sortField = "name", sortDirection = "ASC" } = options;
   if (!tags || tags.length === 0) {
     return [];
@@ -65,7 +67,7 @@ export function buildTagTree(tags, options = {}) {
 
   // Create a map for quick lookup
   const tagMap = new Map();
-  tags.forEach((tag) => {
+  tags.forEach((tag: TagNode) => {
     tagMap.set(tag.id, { ...tag, children: [] });
   });
 
@@ -77,7 +79,7 @@ export function buildTagTree(tags, options = {}) {
     const query = filterQuery.toLowerCase();
 
     // Find all matching tags
-    tags.forEach((tag) => {
+    tags.forEach((tag: TagNode) => {
       if (tag.name?.toLowerCase().includes(query)) {
         matchingIds.add(tag.id);
       }
@@ -89,13 +91,13 @@ export function buildTagTree(tags, options = {}) {
     }
 
     // Find all ancestors of matching tags
-    const findAncestors = (tagId, visited = new Set()) => {
+    const findAncestors = (tagId: string, visited = new Set<string>()) => {
       if (visited.has(tagId)) return;
       visited.add(tagId);
 
-      const tag = tags.find((t) => t.id === tagId);
+      const tag = tags.find((t: TagNode) => t.id === tagId);
       if (tag?.parents) {
-        tag.parents.forEach((parent) => {
+        tag.parents.forEach((parent: TagNode) => {
           if (!matchingIds.has(parent.id)) {
             ancestorIds.add(parent.id);
           }
@@ -104,15 +106,15 @@ export function buildTagTree(tags, options = {}) {
       }
     };
 
-    matchingIds.forEach((id) => findAncestors(id));
+    matchingIds.forEach((id) => findAncestors(id as string));
   }
 
   // Build tree by nesting children under parents
-  const roots = [];
+  const roots: TagNode[] = [];
   const sortFn = getSortFn(sortField, sortDirection);
 
   // Recursive function to build tree node with children
-  const buildNode = (tagId, visitedPath = new Set()) => {
+  const buildNode = (tagId: string, visitedPath = new Set<string>()): TagNode | null => {
     // Prevent infinite loops from circular references
     if (visitedPath.has(tagId)) return null;
 
@@ -134,13 +136,13 @@ export function buildTagTree(tags, options = {}) {
     }
 
     // Build children
-    const originalTag = tags.find((t) => t.id === tagId);
+    const originalTag = tags.find((t: TagNode) => t.id === tagId);
     if (originalTag?.children) {
       const newPath = new Set(visitedPath);
       newPath.add(tagId);
 
       node.children = originalTag.children
-        .map((childRef) => buildNode(childRef.id, newPath))
+        .map((childRef: TagNode) => buildNode(childRef.id, newPath))
         .filter(Boolean)
         .sort(sortFn);
     }
@@ -149,7 +151,7 @@ export function buildTagTree(tags, options = {}) {
   };
 
   // Find root tags and build tree
-  tags.forEach((tag) => {
+  tags.forEach((tag: TagNode) => {
     if (!tag.parents || tag.parents.length === 0) {
       const node = buildNode(tag.id);
       if (node) {

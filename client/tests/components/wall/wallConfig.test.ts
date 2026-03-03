@@ -63,7 +63,7 @@ describe("wallConfig", () => {
     });
 
     it("returns null for preview URL (galleries have no preview)", () => {
-      expect(config.getPreviewUrl({ cover: "/cover.jpg" })).toBeNull();
+      expect((config.getPreviewUrl as (...args: unknown[]) => unknown)({ cover: "/cover.jpg" })).toBeNull();
     });
 
     it("calculates aspect ratio from cover dimensions", () => {
@@ -124,7 +124,7 @@ describe("wallConfig", () => {
     });
 
     it("returns null for preview URL (images have no preview)", () => {
-      expect(config.getPreviewUrl({})).toBeNull();
+      expect((config.getPreviewUrl as (...args: unknown[]) => unknown)({})).toBeNull();
     });
 
     it("calculates aspect ratio from dimensions", () => {

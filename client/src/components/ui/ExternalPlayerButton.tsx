@@ -3,6 +3,13 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { showSuccess, showError } from "../../utils/toast";
 
+interface Props {
+  sceneId: string;
+  instanceId: string;
+  title: string;
+  className?: string;
+}
+
 /**
  * Button to open the current scene in an external media player.
  *
@@ -28,11 +35,11 @@ export default function ExternalPlayerButton({
   instanceId,
   title,
   className = "",
-}) {
+}: Props) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-  const buttonRef = useRef(null);
-  const dropdownRef = useRef(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isAndroid = /(android)/i.test(navigator.userAgent);
   const isAppleDevice = /(ipod|iphone|ipad)/i.test(navigator.userAgent);
@@ -93,7 +100,7 @@ export default function ExternalPlayerButton({
   /**
    * Copy stream URL to clipboard
    */
-  const handleCopyUrl = async (e) => {
+  const handleCopyUrl = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDropdownOpen(false);
@@ -122,12 +129,12 @@ export default function ExternalPlayerButton({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         dropdownRef.current &&
-        !dropdownRef.current.contains(event.target) &&
+        !dropdownRef.current.contains(event.target as Node) &&
         buttonRef.current &&
-        !buttonRef.current.contains(event.target)
+        !buttonRef.current.contains(event.target as Node)
       ) {
         setIsDropdownOpen(false);
       }
@@ -164,7 +171,7 @@ export default function ExternalPlayerButton({
   if (isMobile) {
     return (
       <a
-        href={externalUrl}
+        href={externalUrl ?? undefined}
         className={`inline-flex items-center justify-center p-2 rounded-lg transition-colors ${className}`}
         style={{
           backgroundColor: "var(--bg-tertiary)",
@@ -192,7 +199,7 @@ export default function ExternalPlayerButton({
     <div ref={buttonRef} className={`inline-flex ${className}`}>
       {/* Primary button: Open in VLC */}
       <a
-        href={externalUrl}
+        href={externalUrl ?? undefined}
         className="inline-flex items-center justify-center p-2 rounded-l-lg transition-colors"
         style={{
           backgroundColor: "var(--bg-tertiary)",

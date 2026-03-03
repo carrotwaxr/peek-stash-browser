@@ -5,6 +5,7 @@ import { getSceneTitle } from "../../utils/format";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import { useLazyLoad } from "./CardComponents";
+import type { NormalizedScene } from "@peek/shared-types";
 
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar
@@ -12,12 +13,17 @@ import { useLazyLoad } from "./CardComponents";
  * @param {string} sceneId - Current scene ID for fetching similar scenes
  * @param {number} maxHeight - Maximum height in pixels to match left column
  */
-const RecommendedSidebar = ({ sceneId, maxHeight }) => {
+interface Props {
+  sceneId: string;
+  maxHeight?: number;
+}
+
+const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
-  const [scenes, setScenes] = useState([]);
+  const [scenes, setScenes] = useState<NormalizedScene[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRecommendedScenes = async () => {
@@ -27,7 +33,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
 
         const data = await apiGet(
           `/library/scenes/${sceneId}/similar?page=1`,
-        );
+        ) as { scenes: NormalizedScene[] };
 
         // Only take first 12 scenes for sidebar
         setScenes(data.scenes.slice(0, 12));
@@ -44,9 +50,9 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
     }
   }, [sceneId]);
 
-  const handleSceneClick = (scene) => {
+  const handleSceneClick = (scene: NormalizedScene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
-    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
+    navigate(getEntityPath('scene', scene as unknown as Parameters<typeof getEntityPath>[1], hasMultipleInstances), {
       state: {
         scene,
         fromPageTitle: "Recommended",
@@ -121,7 +127,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
                 {/* Thumbnail with lazy loading */}
                 <SidebarThumbnail
                   thumbnail={thumbnail}
-                  alt={getSceneTitle(scene)}
+                  alt={getSceneTitle(scene as unknown as Record<string, unknown>)}
                   duration={duration}
                 />
 
@@ -132,7 +138,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
                     className="text-sm font-medium line-clamp-2 mb-1 group-hover:underline"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {getSceneTitle(scene)}
+                    {getSceneTitle(scene as unknown as Record<string, unknown>)}
                   </h4>
 
                   {/* Studio */}
@@ -167,7 +173,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
 /**
  * Format duration in seconds to HH:MM:SS or MM:SS
  */
-const formatDuration = (seconds) => {
+const formatDuration = (seconds: number) => {
   if (!seconds) return "?:??";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -184,8 +190,14 @@ const formatDuration = (seconds) => {
 /**
  * SidebarThumbnail - Lazy-loaded thumbnail for sidebar items
  */
-const SidebarThumbnail = ({ thumbnail, alt, duration }) => {
-  const [ref, shouldLoad] = useLazyLoad();
+interface SidebarThumbnailProps {
+  thumbnail: string | null | undefined;
+  alt: string;
+  duration: number | null | undefined;
+}
+
+const SidebarThumbnail = ({ thumbnail, alt, duration }: SidebarThumbnailProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement>, boolean];
 
   return (
     <div

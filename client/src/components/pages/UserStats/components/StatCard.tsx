@@ -1,11 +1,19 @@
-// client/src/components/pages/UserStats/components/StatCard.jsx
+// client/src/components/pages/UserStats/components/StatCard.tsx
 
+import { type ReactNode } from "react";
 import { Paper } from "../../../ui/index";
+
+interface Props {
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  icon?: ReactNode;
+}
 
 /**
  * Simple stat display card
  */
-const StatCard = ({ label, value, subtitle, icon }) => (
+const StatCard = ({ label, value, subtitle, icon }: Props) => (
   <Paper padding="md" className="text-center flex flex-col items-center gap-1">
     {icon && (
       <div style={{ color: "var(--text-muted)" }} className="mb-1">

@@ -24,7 +24,7 @@ describe("SceneCard", () => {
   });
 
   it("accepts expected props", () => {
-    const element = createElement(SceneCard, {
+    const element = createElement(SceneCard as any, {
       scene: mockScene,
       fromPageTitle: "Performers",
       tabIndex: 0,
@@ -35,7 +35,7 @@ describe("SceneCard", () => {
   });
 
   it("accepts fromPageTitle prop", () => {
-    const element = createElement(SceneCard, {
+    const element = createElement(SceneCard as any, {
       scene: mockScene,
       fromPageTitle: "My Tag Name",
     });
@@ -47,7 +47,7 @@ describe("SceneCard", () => {
 
   it("accepts onClick callback", () => {
     const onClick = () => {};
-    const element = createElement(SceneCard, {
+    const element = createElement(SceneCard as any, {
       scene: mockScene,
       onClick,
     });
@@ -57,7 +57,7 @@ describe("SceneCard", () => {
 
   it("accepts onHideSuccess callback", () => {
     const onHideSuccess = () => {};
-    const element = createElement(SceneCard, {
+    const element = createElement(SceneCard as any, {
       scene: mockScene,
       onHideSuccess,
     });
