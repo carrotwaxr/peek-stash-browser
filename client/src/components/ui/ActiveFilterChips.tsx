@@ -1,12 +1,6 @@
 import { LucideX } from "lucide-react";
+import type { FilterOption } from "../../utils/filterConfig";
 import Button from "./Button";
-
-interface FilterOption {
-  key: string;
-  label: string;
-  type: string;
-  options?: Array<{ value: string; label: string }>;
-}
 
 interface PermanentFiltersMetadata {
   performers?: Array<{ id: string; name: string }>;

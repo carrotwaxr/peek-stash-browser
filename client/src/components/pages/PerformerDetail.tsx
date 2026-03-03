@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import type { NormalizedImage } from "@peek/shared-types";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
@@ -782,7 +783,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) =
             modifier: "INCLUDES",
           },
         },
-      }) as Record<string, any>;
+      }) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
         images: data.findImages?.images || [],
         count: data.findImages?.count || 0,
@@ -791,7 +792,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) =
     [performerId, instanceId]
   );
 
-  const { images, totalCount, isLoading, lightbox, setImages } = (useImagesPagination as any)({
+  const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination<NormalizedImage>({
     fetchImages,
     dependencies: [performerId, instanceId],
     externalPage: urlPage,

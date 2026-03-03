@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { ThemeConfig } from "./themes";
 
 export interface ThemeDefinition {
   name: string;
@@ -10,7 +11,7 @@ export interface ThemeDefinition {
 export interface CustomTheme {
   id: number;
   name: string;
-  config: Record<string, unknown>;
+  config: ThemeConfig;
 }
 
 export interface AvailableTheme {

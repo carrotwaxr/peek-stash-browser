@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -34,17 +35,19 @@ const formatDuration = (seconds: number | undefined | null): string => {
  * Merge and deduplicate tags from scene direct tags and inherited tags
  * (inherited tags are pre-computed on server from performers, studio, groups)
  */
-const mergeAllTags = (scene: Record<string, any>) => {
-  const tagMap = new Map();
+const mergeAllTags = (scene: NormalizedScene) => {
+  const tagMap = new Map<string, { id: string; name: string }>();
 
   // Add direct scene tags
-  if (scene.tags) {
-    (scene.tags as any[]).forEach((tag: any) => tagMap.set(tag.id, tag));
+  for (const tag of scene.tags) {
+    tagMap.set(tag.id, tag);
   }
 
   // Add inherited tags (pre-computed from performers, studio, groups)
   if (scene.inheritedTags) {
-    (scene.inheritedTags as any[]).forEach((tag: any) => tagMap.set(tag.id, tag));
+    for (const tag of scene.inheritedTags) {
+      tagMap.set(tag.id, tag);
+    }
   }
 
   return Array.from(tagMap.values());
@@ -56,10 +59,9 @@ const SceneDetails = ({
   showTechnicalDetails,
   setShowTechnicalDetails,
 }: SceneDetailsProps) => {
-  const { scene: rawScene, sceneLoading, compatibility } = useScenePlayer();
-  const scene = rawScene as Record<string, any> | null;
+  const { scene, sceneLoading, compatibility } = useScenePlayer();
   const { getSettings } = useCardDisplaySettings();
-  const sceneSettings = getSettings("scene");
+  const sceneSettings = getSettings("scene") as Record<string, boolean>;
   const { hasMultipleInstances } = useConfig();
 
   // Clips state
@@ -73,8 +75,8 @@ const SceneDetails = ({
       if (!scene?.id) return;
       setClipsLoading(true);
       try {
-        const response = await getClipsForScene(scene.id as string, scene.instanceId as string, true);
-        setClips((response as any).clips || []);
+        const response = await getClipsForScene(scene.id, scene.instanceId, true) as { clips?: Record<string, unknown>[] };
+        setClips(response.clips || []);
       } catch (err) {
         console.error("Failed to fetch clips", err);
         setClips([]);
@@ -183,24 +185,6 @@ const SceneDetails = ({
                   )}
                 </div>
 
-                {/* Director */}
-                {scene.director && (
-                  <div className="mb-4">
-                    <h3
-                      className="text-sm font-medium mb-1"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Director
-                    </h3>
-                    <p
-                      className="text-base"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {scene.director}
-                    </p>
-                  </div>
-                )}
-
                 {/* Description - Full Width */}
                 {sceneSettings.showDescriptionOnDetail && scene.details && (
                   <div className="mb-6">
@@ -248,7 +232,7 @@ const SceneDetails = ({
                       className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
                       style={{ scrollbarWidth: "thin" }}
                     >
-                      {scene.performers.map((performer: any) => (
+                      {scene.performers.map((performer) => (
                         <Link
                           key={performer.id}
                           to={getEntityPath('performer', performer, hasMultipleInstances)}
@@ -472,24 +456,13 @@ const SceneDetails = ({
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span style={{ color: "var(--text-secondary)" }}>
-                            Format:
-                          </span>
-                          <span
-                            className="font-medium"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {firstFile.format?.toUpperCase() || "Unknown"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>
                             File Size:
                           </span>
                           <span
                             className="font-medium"
                             style={{ color: "var(--text-primary)" }}
                           >
-                            {formatFileSize(firstFile.size)}
+                            {firstFile.size ? formatFileSize(firstFile.size) : "Unknown"}
                           </span>
                         </div>
                       </div>

@@ -198,7 +198,8 @@ describe("usePaginatedLightbox", () => {
         } as any)
       );
 
-      expect(result.current.onPageBoundary).toBeUndefined();
+      // With only 1 page, onPageBoundary is a no-op that returns false
+      expect(result.current.onPageBoundary("next")).toBe(false);
     });
   });
 

@@ -32,6 +32,7 @@ import {
   buildSceneFilter,
   buildStudioFilter,
   buildTagFilter,
+  type FilterOption,
 } from "../../utils/filterConfig";
 // Note: parseSearchParams and buildSearchParams now handled by useFilterState hook
 import {
@@ -218,11 +219,11 @@ const SearchControls = ({
   });
 
   // Get filter options for this artifact type
-  const filterOptions = useMemo(() => {
+  const filterOptions: FilterOption[] = useMemo(() => {
     // Transform filter options based on unit preference
-    const transformForUnits = (options: Record<string, any>[]) => {
+    const transformForUnits = (options: FilterOption[]) => {
       if (unitPreference !== "imperial") return options;
-      return options.map((opt: Record<string, any>) => {
+      return options.map((opt) => {
         // Transform height filter for imperial
         if (opt.key === "height") {
           return {
@@ -278,7 +279,7 @@ const SearchControls = ({
   // Track collapsed state for each filter section
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    filterOptions.forEach((opt: Record<string, any>) => {
+    filterOptions.forEach((opt) => {
       if (opt.type === "section-header" && opt.collapsible) {
         initial[opt.key] = !opt.defaultOpen;
       }
@@ -988,7 +989,7 @@ const SearchControls = ({
             {/* Active Filter Chips */}
             <ActiveFilterChips
               filters={filters}
-              filterOptions={filterOptions as any}
+              filterOptions={filterOptions}
               onRemoveFilter={handleRemoveFilter}
               onChipClick={handleFilterChipClick}
               permanentFilters={permanentFilters}
@@ -1034,7 +1035,7 @@ const SearchControls = ({
         highlightedFilterKey={highlightedFilterKey}
         filterRefs={filterRefs}
       >
-        {filterOptions.map((opt: Record<string, any>, index: number) => {
+        {filterOptions.map((opt, index) => {
           const { defaultValue, key, type, ...rest } = opt;
 
           // Render section header
@@ -1128,10 +1129,10 @@ const SearchControls = ({
               isHighlighted={highlightedFilterKey === key}
               onChange={(value: unknown) => handleFilterChange(key, value)}
               value={(localFilters as Record<string, any>)[key] || defaultValue}
-              type={type}
-              label={filterProps.label}
+              type={type as "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range"}
+              label={filterProps.label!}
               modifierOptions={modifierOptions}
-              modifierValue={(localFilters as Record<string, any>)[modifierKey] || defaultModifier}
+              modifierValue={modifierKey ? (localFilters as Record<string, any>)[modifierKey] : defaultModifier}
               onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)
               }

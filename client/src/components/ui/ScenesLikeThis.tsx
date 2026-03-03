@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { apiGet } from "../../api";
 import SceneGrid from "../scene-search/SceneGrid";
 import Pagination from "./Pagination";
@@ -11,7 +12,7 @@ interface Props {
 
 const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [scenes, setScenes] = useState<Array<{ id: string; [key: string]: unknown }>>([]);
+  const [scenes, setScenes] = useState<NormalizedScene[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -31,7 +32,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
         `/library/scenes/${currentSceneId}/similar?page=${pageNum}`,
       );
 
-      const { scenes: newScenes, count } = data as { scenes: Array<{ id: string; [key: string]: unknown }>; count: number };
+      const { scenes: newScenes, count } = data as { scenes: NormalizedScene[]; count: number };
       setScenes(newScenes);
       setTotalCount(count);
       // Notify parent of count change for tab badge
@@ -118,7 +119,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
 
       {/* Scene Grid - reuse existing component */}
       <SceneGrid
-        scenes={scenes as any}
+        scenes={scenes}
         loading={loading}
         error={null}
         currentPage={page}

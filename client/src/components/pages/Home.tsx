@@ -18,6 +18,7 @@ import { ApiError } from "../../api/client";
 import {
   carouselRulesToFilterState,
   SCENE_FILTER_OPTIONS,
+  type FilterOption,
 } from "../../utils/filterConfig";
 import { buildSearchParams } from "../../utils/urlParams";
 import type { NormalizedScene } from "@peek/shared-types";
@@ -85,7 +86,7 @@ const buildCustomCarouselUrl = (rules: Record<string, unknown> | null | undefine
     currentPage: 1,
     perPage: 24,
     filters: filterState as Record<string, unknown>,
-    filterOptions: SCENE_FILTER_OPTIONS as any,
+    filterOptions: SCENE_FILTER_OPTIONS as FilterOption[],
     viewMode: "grid",
     zoomLevel: "medium",
     gridDensity: "medium",

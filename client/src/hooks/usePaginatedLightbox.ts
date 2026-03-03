@@ -214,7 +214,7 @@ export function usePaginatedLightbox({
     // Lightbox handlers
     openLightbox,
     closeLightbox: handleLightboxClose,
-    onPageBoundary: totalPages > 1 ? handlePageBoundary : undefined,
+    onPageBoundary: totalPages > 1 ? handlePageBoundary : () => false,
     onIndexChange: handleLightboxIndexChange,
 
     // For consuming pending navigation after page load

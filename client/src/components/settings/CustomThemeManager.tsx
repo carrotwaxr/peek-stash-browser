@@ -190,14 +190,14 @@ const CustomThemeManager = () => {
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: (themeWithDates.config.accents as Record<string, any>)?.primary,
+                            backgroundColor: themeWithDates.config.accents?.primary,
                           }}
                           title="Primary Accent"
                         />
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: (themeWithDates.config.accents as Record<string, any>)?.secondary,
+                            backgroundColor: themeWithDates.config.accents?.secondary,
                           }}
                           title="Secondary Accent"
                         />

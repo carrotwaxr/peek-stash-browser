@@ -664,29 +664,29 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagIm
             ...(includeSubTags && { depth: -1 }),
           },
         },
-      }) as Record<string, Record<string, unknown>>;
+      }) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
-        images: (data.findImages?.images || []) as NormalizedImage[],
-        count: (data.findImages?.count || 0) as number,
+        images: data.findImages?.images || [],
+        count: data.findImages?.count || 0,
       };
     },
     [tagId, instanceId, includeSubTags]
   );
 
-  const paginationResult = useImagesPagination({
-    fetchImages: fetchImages as unknown as Parameters<typeof useImagesPagination>[0]['fetchImages'],
-    dependencies: [tagId, instanceId, includeSubTags] as never[],
+  const paginationResult = useImagesPagination<NormalizedImage>({
+    fetchImages,
+    dependencies: [tagId, instanceId, includeSubTags],
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
   });
 
   return (
     <PaginatedImageGrid
-      images={paginationResult.images as unknown as NormalizedImage[]}
-      totalCount={paginationResult.totalCount as number}
-      isLoading={paginationResult.isLoading as boolean}
-      lightbox={paginationResult.lightbox as Parameters<typeof PaginatedImageGrid>[0]['lightbox']}
-      setImages={paginationResult.setImages as unknown as (images: NormalizedImage[]) => void}
+      images={paginationResult.images}
+      totalCount={paginationResult.totalCount}
+      isLoading={paginationResult.isLoading}
+      lightbox={paginationResult.lightbox}
+      setImages={paginationResult.setImages}
       emptyMessage={`No images found with tag "${tagName}"`}
       className="mt-6"
     />

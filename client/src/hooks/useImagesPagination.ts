@@ -15,25 +15,24 @@ import { usePaginatedLightbox } from "./usePaginatedLightbox";
  */
 interface ImageItem {
   id: string;
-  [key: string]: unknown;
 }
 
-interface UseImagesPaginationOptions {
-  fetchImages: (page: number, perPage: number) => Promise<{ images?: ImageItem[]; count?: number }>;
+interface UseImagesPaginationOptions<T extends ImageItem = ImageItem> {
+  fetchImages: (page: number, perPage: number) => Promise<{ images?: T[]; count?: number }>;
   dependencies?: unknown[];
   perPage?: number;
   externalPage: number;
   onExternalPageChange: (page: number) => void;
 }
 
-export function useImagesPagination({
+export function useImagesPagination<T extends ImageItem = ImageItem>({
   fetchImages,
   dependencies = [],
   perPage = 100,
   externalPage,
   onExternalPageChange,
-}: UseImagesPaginationOptions) {
-  const [images, setImages] = useState<ImageItem[]>([]);
+}: UseImagesPaginationOptions<T>) {
+  const [images, setImages] = useState<T[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -84,7 +83,7 @@ export function useImagesPagination({
   }, [lightbox.currentPage, ...dependencies]);
 
   // Wrapper to update images (for lightbox modifications like rating changes)
-  const handleImagesUpdate = useCallback((updatedImages: ImageItem[]) => {
+  const handleImagesUpdate = useCallback((updatedImages: T[]) => {
     setImages(updatedImages);
   }, []);
 
