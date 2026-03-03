@@ -82,9 +82,9 @@ const VideoPlayer = () => {
     prevScene,
   } = useScenePlayer();
 
-  const scene = rawScene as any;
+  const scene = rawScene;
 
-  const firstFile = (scene?.files as any[])?.[0];
+  const firstFile = scene?.files?.[0];
 
   // Calculate aspect ratio from actual video dimensions
   const videoWidth = firstFile?.width || 1920;
@@ -134,7 +134,7 @@ const VideoPlayer = () => {
     watchHistory,
     loading: loadingWatchHistory,
     updateQuality,
-  } = useWatchHistory(scene?.id, playerRef);
+  } = useWatchHistory(scene?.id ?? "", playerRef);
 
   // ============================================================================
   // CUSTOM HOOKS: VIDEO PLAYER LOGIC

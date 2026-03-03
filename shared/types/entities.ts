@@ -142,6 +142,11 @@ export interface NormalizedScene {
   // Used internally by populateRelations to look up studios without re-parsing.
   studioId?: string | null;
 
+  // Server-enriched fields (added by addStreamabilityInfo in scenes controller)
+  isStreamable?: boolean;
+  streamabilityReasons?: string[];
+  stashUrl?: string | null;
+
   // Timestamps
   created_at: string | null;
   updated_at: string | null;

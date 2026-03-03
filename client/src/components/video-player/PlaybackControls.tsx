@@ -16,9 +16,9 @@ import {
 const PlaybackControls = () => {
   const { scene: rawScene, sceneLoading, videoLoading, oCounter, dispatch } =
     useScenePlayer();
-  const scene = rawScene as any;
+  const scene = rawScene;
   const { getSettings } = useCardDisplaySettings();
-  const sceneSettings = getSettings("scene") as any;
+  const sceneSettings = getSettings("scene") as Record<string, boolean>;
 
   // Rating and favorite state
   const [rating, setRating] = useState<number | null>(null);
@@ -94,6 +94,7 @@ const PlaybackControls = () => {
   const handleDownload = async () => {
     try {
       setDownloading(true);
+      if (!scene) return;
       const response = await apiPost<{ download: { id: string; status: string } }>(`/downloads/scene/${scene.id}`);
       const download = response.download;
 

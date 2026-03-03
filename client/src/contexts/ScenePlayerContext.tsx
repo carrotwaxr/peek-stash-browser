@@ -6,6 +6,7 @@ import {
   useReducer,
   type Dispatch,
 } from "react";
+import type { NormalizedScene } from "@peek/shared-types";
 import { apiPost } from "../api";
 import { initialState, scenePlayerReducer, type ScenePlayerReducerState } from "./scenePlayerReducer";
 import { useConfig } from "./ConfigContext";
@@ -54,7 +55,7 @@ export function ScenePlayerProvider({
   initialQuality = "direct",
   initialShouldAutoplay = false,
 }: ScenePlayerProviderProps) {
-  const [state, dispatch] = useReducer(scenePlayerReducer as React.Reducer<ScenePlayerState, any>, initialState);
+  const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
   const { hasMultipleInstances } = useConfig();
 
   // Initialize context from props
@@ -85,10 +86,8 @@ export function ScenePlayerProvider({
       if (sceneInstanceId) {
         requestBody.scene_filter = { instance_id: sceneInstanceId };
       }
-      const data = await apiPost<Record<string, unknown>>("/library/scenes", requestBody);
-      const findScenes = data?.findScenes as Record<string, unknown> | undefined;
-      const scenes = findScenes?.scenes as Array<Record<string, unknown>> | undefined;
-      const scene = scenes?.[0];
+      const data = await apiPost<{ findScenes: { scenes: NormalizedScene[] } }>("/library/scenes", requestBody);
+      const scene = data?.findScenes?.scenes?.[0];
 
       if (!scene) {
         throw new Error("Scene not found");
