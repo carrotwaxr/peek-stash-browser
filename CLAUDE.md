@@ -120,10 +120,10 @@ These are **mandatory** — do not skip or rationalize around them.
 
 | Metric | Client | Server |
 |--------|--------|--------|
-| Statements | 31% | 53% |
+| Statements | 31% | 56% |
 | Branches | 75% | 71% |
-| Functions | 36% | 62% |
-| Lines | 31% | 53% |
+| Functions | 36% | 64% |
+| Lines | 31% | 56% |
 
 **Before merging:**
 - CI passes (when available)

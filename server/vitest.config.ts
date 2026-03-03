@@ -36,10 +36,10 @@ export default defineConfig({
         "index.ts",
       ],
       thresholds: {
-        statements: 53,
+        statements: 56,
         branches: 71,
-        functions: 61,
-        lines: 53,
+        functions: 64,
+        lines: 56,
       },
     },
   },
