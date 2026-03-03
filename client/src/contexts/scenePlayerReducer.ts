@@ -1,3 +1,5 @@
+import type { NormalizedScene } from "@peek/shared-types";
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -37,7 +39,7 @@ interface PlaylistData {
 }
 
 export interface ScenePlayerReducerState {
-  scene: Record<string, unknown> | null;
+  scene: NormalizedScene | null;
   sceneLoading: boolean;
   sceneError: unknown;
   video: Record<string, unknown> | null;
@@ -123,7 +125,7 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
       };
 
     case "LOAD_SCENE_SUCCESS": {
-      const payload = action.payload as { scene: Record<string, unknown>; oCounter?: number };
+      const payload = action.payload as { scene: NormalizedScene; oCounter?: number };
       const scene = payload.scene;
 
       // Smart default quality selection based on codec detection (Phase 3)
@@ -137,7 +139,7 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
           autoSelectedQuality = "direct";
         } else {
           // Scene needs transcoding - choose highest quality <= source resolution
-          const sourceHeight = (scene.files as Array<Record<string, unknown>> | undefined)?.[0]?.height as number || 1080;
+          const sourceHeight = scene.files?.[0]?.height || 1080;
           autoSelectedQuality = getBestTranscodeQuality(sourceHeight);
         }
       }
@@ -543,10 +545,10 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
         compatibility: initPayload.compatibility || null,
         quality: initPayload.initialQuality || "direct",
         // Initialize playlist controls from playlist object
-        autoplayNext: playlist?.autoplayNext ?? true,
-        shuffle: playlist?.shuffle ?? false,
-        repeat: playlist?.repeat ?? "none",
-        shuffleHistory: playlist?.shuffleHistory ?? [],
+        autoplayNext: (playlist?.autoplayNext as boolean | undefined) ?? true,
+        shuffle: (playlist?.shuffle as boolean | undefined) ?? false,
+        repeat: (playlist?.repeat as string | undefined) ?? "none",
+        shuffleHistory: (playlist?.shuffleHistory as number[] | undefined) ?? [],
         // Use the determined shouldAutoplay value
         shouldAutoplay: shouldAutoplay,
       };
