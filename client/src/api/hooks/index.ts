@@ -7,3 +7,4 @@ export { useGroupList, useGroupDetail } from "./useGroups";
 export { useImageList } from "./useImages";
 export { useUpdateRating } from "./useRatingMutation";
 export { useUpdateFavorite } from "./useFavoriteMutation";
+export { useIncrementOCounter } from "./useOCounterMutation";
