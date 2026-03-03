@@ -47,12 +47,12 @@ export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters 
 
         // Use filtered endpoint if filters are provided
         if (filters && (filters.performerId || filters.tagId || filters.studioId || filters.groupId)) {
-          const result = await apiPost("/library/tags/for-scenes", {
+          const result = await apiPost<{ tags: Array<{ id: string; name: string }> }>("/library/tags/for-scenes", {
             performerId: filters.performerId,
             tagId: filters.tagId,
             studioId: filters.studioId,
             groupId: filters.groupId,
-          }) as any;
+          });
           fetchedTags = result?.tags || [];
         } else {
           // Fetch all tags (existing behavior)
@@ -62,8 +62,8 @@ export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters 
               sort: "name",
               direction: "ASC",
             },
-          }) as any;
-          fetchedTags = result?.findTags?.tags || [];
+          });
+          fetchedTags = (result as { findTags?: { tags?: Array<{ id: string; name: string }> } })?.findTags?.tags || [];
         }
 
         setTags(fetchedTags);

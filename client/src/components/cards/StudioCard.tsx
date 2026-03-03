@@ -50,7 +50,7 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.scene_count,
           onClick:
             studio.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio, hasMultipleInstances))
               : undefined,
         },
         {
@@ -58,7 +58,7 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.image_count,
           onClick:
             studio.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio, hasMultipleInstances))
               : undefined,
         },
         {
@@ -94,7 +94,7 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
         imagePath={studio.image_path}
         title={studio.name}
         description={studio.details}
-        linkTo={getEntityPath('studio', studio as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={getEntityPath('studio', studio, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

@@ -34,7 +34,7 @@ const TagThumbnailLink = ({ tag, hasMultipleInstances }: TagThumbnailLinkProps) 
 
   return (
     <Link
-      to={getEntityPath('tag', tag as unknown as Record<string, unknown>, hasMultipleInstances)}
+      to={getEntityPath('tag', tag, hasMultipleInstances)}
       className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
       onClick={(e) => e.stopPropagation()}
     >
@@ -78,7 +78,7 @@ const SceneMetadata = ({ scene }: Props) => {
         {scene.performers.map((performer) => (
           <Link
             key={performer.id}
-            to={getEntityPath('performer', performer as unknown as Record<string, unknown>, hasMultipleInstances)}
+            to={getEntityPath('performer', performer, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
@@ -123,7 +123,7 @@ const SceneMetadata = ({ scene }: Props) => {
         {scene.groups.map((group) => (
           <Link
             key={group.id}
-            to={getEntityPath('group', group as unknown as Record<string, unknown>, hasMultipleInstances)}
+            to={getEntityPath('group', group, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >

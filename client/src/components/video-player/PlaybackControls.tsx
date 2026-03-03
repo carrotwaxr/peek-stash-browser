@@ -21,12 +21,12 @@ const PlaybackControls = () => {
   const sceneSettings = getSettings("scene") as any;
 
   // Rating and favorite state
-  const [rating, setRating] = useState<any>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Download state
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState<any>(null);
+  const [permissions, setPermissions] = useState<Record<string, unknown> | null>(null);
 
   // Sync state when scene changes
   const sceneId = scene?.id;
@@ -54,7 +54,7 @@ const PlaybackControls = () => {
   }, []);
 
   // Handle rating change
-  const handleRatingChange = async (newRating: any) => {
+  const handleRatingChange = async (newRating: number | null) => {
     if (!scene?.id) return;
 
     const previousRating = rating;
@@ -69,7 +69,7 @@ const PlaybackControls = () => {
   };
 
   // Handle favorite change
-  const handleFavoriteChange = async (newFavorite: any) => {
+  const handleFavoriteChange = async (newFavorite: boolean) => {
     if (!scene?.id) return;
 
     const previousFavorite = isFavorite;
@@ -94,7 +94,7 @@ const PlaybackControls = () => {
   const handleDownload = async () => {
     try {
       setDownloading(true);
-      const response: any = await apiPost(`/downloads/scene/${scene.id}`);
+      const response = await apiPost<{ download: { id: string; status: string } }>(`/downloads/scene/${scene.id}`);
       const download = response.download;
 
       // For scenes, download is immediate - redirect to file endpoint
@@ -170,7 +170,7 @@ const PlaybackControls = () => {
               />
             )}
             <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
-            {permissions?.canDownloadFiles && (
+            {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
                 onClick={handleDownload}
@@ -228,7 +228,7 @@ const PlaybackControls = () => {
           {/* Row 2: Add to Playlist + Download */}
           <div className="flex items-center justify-end gap-4">
             <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
-            {permissions?.canDownloadFiles && (
+            {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
                 onClick={handleDownload}
@@ -266,7 +266,7 @@ const PlaybackControls = () => {
               />
             )}
             <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
-            {permissions?.canDownloadFiles && (
+            {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
                 onClick={handleDownload}

@@ -127,7 +127,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
                 {/* Thumbnail with lazy loading */}
                 <SidebarThumbnail
                   thumbnail={thumbnail}
-                  alt={getSceneTitle(scene as unknown as Record<string, unknown>)}
+                  alt={getSceneTitle(scene)}
                   duration={duration}
                 />
 
@@ -138,7 +138,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
                     className="text-sm font-medium line-clamp-2 mb-1 group-hover:underline"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {getSceneTitle(scene as unknown as Record<string, unknown>)}
+                    {getSceneTitle(scene)}
                   </h4>
 
                   {/* Studio */}

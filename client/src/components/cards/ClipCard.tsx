@@ -172,7 +172,7 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
     );
 
     // Handle navigation - navigate with autoplay state
-    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId } as unknown as Record<string, unknown>, clip.seconds ?? 0, hasMultipleInstances);
+    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds ?? 0, hasMultipleInstances);
     const handleNavigate = () => {
       if (onClick) {
         onClick(clip);

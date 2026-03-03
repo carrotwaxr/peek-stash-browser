@@ -13,36 +13,40 @@
 interface Entity {
   id: string;
   name?: string | null;
-  [key: string]: any;
+  image_path?: string | null;
+  gender?: string | null;
+}
+
+interface StudioLike {
+  id: string;
+  name?: string | null;
 }
 
 interface Gallery {
   id?: string;
   performers?: Entity[];
   tags?: Entity[];
-  studio?: any;
-  studioId?: string;
-  studioName?: string;
-  date?: string;
-  details?: string;
-  photographer?: string;
+  studio?: StudioLike | null;
+  studioId?: string | null;
+  studioName?: string | null;
+  date?: string | null;
+  details?: string | null;
+  photographer?: string | null;
   urls?: string[];
-  [key: string]: any;
 }
 
 interface ImageObject {
   id?: string;
-  title?: string;
-  filePath?: string;
+  title?: string | null;
+  filePath?: string | null;
   galleries?: Gallery[];
   performers?: Entity[];
   tags?: Entity[];
-  studio?: any;
-  date?: string;
-  details?: string;
-  photographer?: string;
+  studio?: StudioLike | null;
+  date?: string | null;
+  details?: string | null;
+  photographer?: string | null;
   urls?: string[];
-  [key: string]: any;
 }
 
 function mergeEntitiesById(primary: Entity[] = [], inherited: Entity[] = []): Entity[] {
@@ -103,7 +107,7 @@ function getInheritedTags(galleries: Gallery[] = []): Entity[] {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Object|null} Studio object or null
  */
-function getInheritedStudio(galleries: Gallery[] = []): any {
+function getInheritedStudio(galleries: Gallery[] = []): StudioLike | null {
   for (const gallery of galleries) {
     if (gallery?.studio) {
       return gallery.studio;

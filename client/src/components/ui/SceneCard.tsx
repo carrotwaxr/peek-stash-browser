@@ -107,9 +107,8 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
     const sceneSettings = getSettings("scene");
     const { hasMultipleInstances } = useConfig();
 
-    const sceneRecord = scene as unknown as Record<string, unknown>;
-    const title = getSceneTitle(sceneRecord);
-    const description = getSceneDescription(sceneRecord);
+    const title = getSceneTitle(scene);
+    const description = getSceneDescription(scene);
     const subtitle = buildSceneSubtitle(scene, {
       showCodeOnCard: sceneSettings.showCodeOnCard as boolean,
       showStudio: sceneSettings.showStudio as boolean,
@@ -180,7 +179,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           tooltipContent: performersTooltip,
           // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
           onClick: getIndicatorBehavior('scene', 'performers') === 'nav' && scene.performers?.length > 0
-            ? () => navigate(appendInstanceParam(`/performers?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/performers?sceneId=${scene.id}`, scene, hasMultipleInstances))
             : undefined,
         },
         {
@@ -188,7 +187,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           count: scene.groups?.length,
           tooltipContent: groupsTooltip,
           onClick: getIndicatorBehavior('scene', 'groups') === 'nav' && scene.groups?.length > 0
-            ? () => navigate(appendInstanceParam(`/collections?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/collections?sceneId=${scene.id}`, scene, hasMultipleInstances))
             : undefined,
         },
         {
@@ -196,7 +195,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           count: scene.galleries?.length,
           tooltipContent: galleriesTooltip,
           onClick: getIndicatorBehavior('scene', 'galleries') === 'nav' && scene.galleries?.length > 0
-            ? () => navigate(appendInstanceParam(`/galleries?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/galleries?sceneId=${scene.id}`, scene, hasMultipleInstances))
             : undefined,
         },
         {
@@ -204,11 +203,11 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           count: allTags?.length,
           tooltipContent: tagsTooltip,
           onClick: getIndicatorBehavior('scene', 'tags') === 'nav' && allTags?.length > 0
-            ? () => navigate(appendInstanceParam(`/tags?sceneId=${scene.id}`, sceneRecord as Parameters<typeof appendInstanceParam>[1], hasMultipleInstances))
+            ? () => navigate(appendInstanceParam(`/tags?sceneId=${scene.id}`, scene, hasMultipleInstances))
             : undefined,
         },
       ];
-    }, [scene, sceneRecord, allTags, navigate, hasMultipleInstances]);
+    }, [scene, allTags, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];
@@ -305,7 +304,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="scene"
         entity={scene as unknown as Record<string, unknown>}
-        linkTo={getEntityPath('scene', sceneRecord as Parameters<typeof getEntityPath>[1], hasMultipleInstances)}
+        linkTo={getEntityPath('scene', scene, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}

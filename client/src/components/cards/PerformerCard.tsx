@@ -50,7 +50,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         {
           type: "SCENES",
           count: performer.scene_count,
-          onClick: performer.scene_count > 0 ? () => navigate(appendInstanceParam(`/scenes?performerId=${performer.id}`, performer as unknown as Record<string, unknown>, hasMultipleInstances)) : undefined,
+          onClick: performer.scene_count > 0 ? () => navigate(appendInstanceParam(`/scenes?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
         },
         {
           type: "GROUPS",
@@ -60,7 +60,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
         {
           type: "IMAGES",
           count: performer.image_count,
-          onClick: performer.image_count > 0 ? () => navigate(appendInstanceParam(`/images?performerId=${performer.id}`, performer as unknown as Record<string, unknown>, hasMultipleInstances)) : undefined,
+          onClick: performer.image_count > 0 ? () => navigate(appendInstanceParam(`/images?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
         },
         {
           type: "GALLERIES",
@@ -94,7 +94,7 @@ const PerformerCard = forwardRef<HTMLDivElement, Props>(
             <GenderIcon gender={performer.gender} size={16} />
           </div>
         }
-        linkTo={getEntityPath('performer', performer as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={getEntityPath('performer', performer, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
         description={performer.details}

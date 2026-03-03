@@ -63,7 +63,7 @@ export const useHiddenEntities = () => {
     async ({ entities, skipConfirmation = false }: { entities: Array<{ entityType: string; entityId: string }>; skipConfirmation?: boolean }) => {
       setIsHiding(true);
       try {
-        const response = await apiPost("/user/hidden-entities/bulk", {
+        const response = await apiPost<{ successCount: number; failCount: number }>("/user/hidden-entities/bulk", {
           entities,
         });
 
@@ -77,8 +77,8 @@ export const useHiddenEntities = () => {
 
         return {
           success: true,
-          successCount: (response as any).successCount,
-          failCount: (response as any).failCount,
+          successCount: response.successCount,
+          failCount: response.failCount,
         };
       } catch (error) {
         console.error("Failed to hide entities:", error);
@@ -122,7 +122,7 @@ export const useHiddenEntities = () => {
       const endpoint = entityType
         ? `/user/hidden-entities?entityType=${entityType}`
         : "/user/hidden-entities";
-      const response = await apiGet(endpoint) as any;
+      const response = await apiGet<{ hiddenEntities: Array<{ entityType: string; entityId: string }> }>(endpoint);
       return response.hiddenEntities;
     } catch (error) {
       console.error("Failed to get hidden entities:", error);

@@ -39,7 +39,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
     const imageSettings = getSettings("image");
     const { hasMultipleInstances } = useConfig();
     // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image as unknown as Record<string, unknown>);
+    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -148,11 +148,11 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="image"
         imagePath={image.paths?.thumbnail || image.paths?.image}
-        title={getImageTitle(image as unknown as Record<string, unknown>) as React.ReactNode}
+        title={getImageTitle(image)}
         subtitle={subtitle}
         description={image.details}
         onClick={handleClick}
-        linkTo={onClick ? undefined : getEntityPath('image', image as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={onClick ? undefined : getEntityPath('image', image, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

@@ -154,9 +154,9 @@ const PreviewCard = ({ scene }: PreviewCardProps) => {
         <p
           className="text-xs line-clamp-2"
           style={{ color: "var(--text-primary)" }}
-          title={getSceneTitle(scene as unknown as Record<string, unknown>)}
+          title={getSceneTitle(scene)}
         >
-          {getSceneTitle(scene as unknown as Record<string, unknown>)}
+          {getSceneTitle(scene)}
         </p>
       </div>
     </div>

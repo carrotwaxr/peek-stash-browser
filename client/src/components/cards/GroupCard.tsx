@@ -59,7 +59,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           count: group.scene_count,
           onClick:
             group.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group, hasMultipleInstances))
               : undefined,
         },
         {
@@ -67,7 +67,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           count: group.sub_group_count,
           onClick:
             (group.sub_group_count ?? 0) > 0
-              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group as unknown as Record<string, unknown>, hasMultipleInstances))
+              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group, hasMultipleInstances))
               : undefined,
         },
         {
@@ -99,7 +99,7 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         title={group.name}
         subtitle={subtitle}
         description={group.description}
-        linkTo={getEntityPath('group', group as unknown as Record<string, unknown>, hasMultipleInstances)}
+        linkTo={getEntityPath('group', group, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
