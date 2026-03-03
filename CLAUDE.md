@@ -121,8 +121,8 @@ These are **mandatory** — do not skip or rationalize around them.
 | Metric | Client | Server |
 |--------|--------|--------|
 | Statements | 31% | 56% |
-| Branches | 75% | 71% |
-| Functions | 36% | 64% |
+| Branches | 76% | 71% |
+| Functions | 39% | 64% |
 | Lines | 31% | 56% |
 
 **Before merging:**
