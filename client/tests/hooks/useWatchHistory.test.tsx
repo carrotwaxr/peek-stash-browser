@@ -12,15 +12,13 @@ vi.mock("../../src/hooks/useAuth", () => ({
 
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
-  apiPost: vi.fn(),
 }));
 
 import { useAuth } from "../../src/hooks/useAuth";
-import { apiGet, apiPost } from "../../src/api";
+import { apiGet } from "../../src/api";
 
 const useAuthMock = useAuth as unknown as Mock;
 const apiGetMock = apiGet as unknown as Mock;
-const apiPostMock = apiPost as unknown as Mock;
 
 describe("useWatchHistory", () => {
   beforeEach(() => {
@@ -77,65 +75,6 @@ describe("useWatchHistory", () => {
       });
 
       expect(apiGet).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("incrementOCounter", () => {
-    it("increments O counter and updates local state", async () => {
-      apiGetMock.mockResolvedValue({ resumeTime: 0, oCount: 1 });
-      apiPostMock.mockResolvedValue({ success: true, oCount: 2 });
-
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      let response;
-      await act(async () => {
-        response = await result.current.incrementOCounter();
-      });
-
-      expect(apiPost).toHaveBeenCalledWith("/watch-history/increment-o", {
-        sceneId: "scene-1",
-      });
-      expect(response).toEqual({ success: true, oCount: 2 });
-      expect(result.current.watchHistory!.oCount).toBe(2);
-    });
-
-    it("returns null when not authenticated", async () => {
-      useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
-
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      let response;
-      await act(async () => {
-        response = await result.current.incrementOCounter();
-      });
-
-      expect(response).toBeNull();
-      expect(apiPost).not.toHaveBeenCalled();
-    });
-
-    it("throws on API error", async () => {
-      apiGetMock.mockResolvedValue({ oCount: 1 });
-      apiPostMock.mockRejectedValue(new Error("Server error"));
-
-      const { result } = renderHook(() => useWatchHistory("scene-1"));
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      await expect(
-        act(async () => {
-          await result.current.incrementOCounter();
-        })
-      ).rejects.toThrow("Server error");
     });
   });
 

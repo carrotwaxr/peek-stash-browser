@@ -60,7 +60,6 @@ export interface ScenePlayerReducerState {
   shuffleHistory: number[];
   compatibility: Record<string, unknown> | null;
   oCounter: number;
-  oCounterLoading: boolean;
 }
 
 interface ScenePlayerAction {
@@ -107,7 +106,6 @@ export const initialState: ScenePlayerReducerState = {
 
   // O Counter
   oCounter: 0,
-  oCounterLoading: false,
 };
 
 // ============================================================================
@@ -442,25 +440,6 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
       };
 
     // O Counter
-    case "INCREMENT_O_COUNTER_START":
-      return {
-        ...state,
-        oCounterLoading: true,
-      };
-
-    case "INCREMENT_O_COUNTER_SUCCESS":
-      return {
-        ...state,
-        oCounter: state.oCounter + 1,
-        oCounterLoading: false,
-      };
-
-    case "INCREMENT_O_COUNTER_ERROR":
-      return {
-        ...state,
-        oCounterLoading: false,
-      };
-
     case "SET_O_COUNTER":
       return {
         ...state,

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, apiPost } from "../api";
+import { apiGet } from "../api";
 import { useAuth } from "./useAuth";
 
 /**
- * Hook for watch history state and O counter
+ * Hook for watch history state
  *
  * Note: Playback tracking (play duration, play count) is now handled by the
  * track-activity Video.js plugin in useVideoPlayer.js. This hook only provides:
  * - Watch history state (for resume time display)
- * - O counter increment
  * - Quality tracking
  *
  * @param {string} sceneId - Stash scene ID
@@ -18,11 +17,6 @@ import { useAuth } from "./useAuth";
 interface WatchHistoryData {
   oCount?: number;
   [key: string]: unknown;
-}
-
-interface IncrementOResponse {
-  success: boolean;
-  oCount: number;
 }
 
 export function useWatchHistory(sceneId: string, _playerRef = { current: null }) {
@@ -63,32 +57,6 @@ export function useWatchHistory(sceneId: string, _playerRef = { current: null })
     currentQualityRef.current = quality;
   }, []);
 
-  /**
-   * Increment O counter
-   */
-  const incrementOCounter = useCallback(async () => {
-    if (!sceneId || !isAuthenticated) {
-      return null;
-    }
-
-    try {
-      const response = await apiPost<IncrementOResponse>("/watch-history/increment-o", { sceneId });
-
-      if (response.success) {
-        // Update local state
-        setWatchHistory((prev) => prev ? ({
-          ...prev,
-          oCount: response.oCount,
-        }) : prev);
-
-        return response;
-      }
-    } catch (err) {
-      console.error("Error incrementing O counter:", err);
-      throw err;
-    }
-  }, [sceneId, isAuthenticated]);
-
   // Fetch watch history on mount
   useEffect(() => {
     fetchWatchHistory();
@@ -102,7 +70,6 @@ export function useWatchHistory(sceneId: string, _playerRef = { current: null })
 
     // Methods
     updateQuality,
-    incrementOCounter,
     refresh: fetchWatchHistory,
   };
 }

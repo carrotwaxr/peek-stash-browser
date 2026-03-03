@@ -19,7 +19,6 @@ interface ScenePlayerContextValue extends ScenePlayerState {
   shouldResume: boolean;
   dispatch: Dispatch<{ type: string; payload?: unknown }>;
   loadScene: (sceneId: string, instanceId?: string | null) => Promise<void>;
-  incrementOCounter: () => Promise<void>;
   nextScene: () => void;
   prevScene: () => void;
   gotoSceneIndex: (index: number, shouldAutoplay?: boolean) => void;
@@ -109,20 +108,6 @@ export function ScenePlayerProvider({
     }
   }, []);
 
-  // Complex action creators (with side effects or logic)
-  const incrementOCounter = useCallback(async () => {
-    if (!state.scene?.id) return;
-
-    dispatch({ type: "INCREMENT_O_COUNTER_START" });
-    try {
-      await apiPost("/watch-history/increment-o", { sceneId: state.scene.id });
-      dispatch({ type: "INCREMENT_O_COUNTER_SUCCESS" });
-    } catch (error) {
-      console.error("Error incrementing O counter:", error);
-      dispatch({ type: "INCREMENT_O_COUNTER_ERROR" });
-    }
-  }, [state.scene?.id]);
-
   // Playlist navigation helpers (kept for convenience)
   const nextScene = useCallback(() => {
     dispatch({ type: "NEXT_SCENE" });
@@ -194,7 +179,6 @@ export function ScenePlayerProvider({
 
     // Complex actions (with side effects)
     loadScene,
-    incrementOCounter,
 
     // Playlist navigation helpers (kept for convenience)
     nextScene,

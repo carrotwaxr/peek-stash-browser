@@ -118,7 +118,6 @@ describe("ScenePlayerContext", () => {
 
       // Action creators
       expect(typeof result.current.loadScene).toBe("function");
-      expect(typeof result.current.incrementOCounter).toBe("function");
       expect(typeof result.current.nextScene).toBe("function");
       expect(typeof result.current.prevScene).toBe("function");
       expect(typeof result.current.gotoSceneIndex).toBe("function");
@@ -363,103 +362,6 @@ describe("ScenePlayerContext", () => {
         ids: ["playlist-scene-1"],
         scene_filter: { instance_id: "pl-inst-1" },
       });
-    });
-  });
-
-  // =========================================================================
-  // incrementOCounter
-  // =========================================================================
-
-  describe("incrementOCounter", () => {
-    it("sends increment request and updates counter on success", async () => {
-      mockPost.mockImplementation((url) => {
-        if (url === "/library/scenes") {
-          return Promise.resolve(mockApiResponse());
-        }
-        if (url === "/watch-history/increment-o") {
-          return Promise.resolve({});
-        }
-        return Promise.resolve({});
-      });
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper(),
-      });
-
-      // Wait for scene to load
-      await waitFor(() => {
-        expect(result.current.scene).not.toBeNull();
-      });
-
-      const prevCounter = result.current.oCounter;
-
-      await act(async () => {
-        await result.current.incrementOCounter();
-      });
-
-      expect(mockPost).toHaveBeenCalledWith("/watch-history/increment-o", {
-        sceneId: "scene-42",
-      });
-      expect(result.current.oCounter).toBe(prevCounter + 1);
-      expect(result.current.oCounterLoading).toBe(false);
-    });
-
-    it("handles increment error gracefully", async () => {
-      mockPost.mockImplementation((url) => {
-        if (url === "/library/scenes") {
-          return Promise.resolve(mockApiResponse());
-        }
-        if (url === "/watch-history/increment-o") {
-          return Promise.reject(new Error("Server error"));
-        }
-        return Promise.resolve({});
-      });
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper(),
-      });
-
-      // Wait for scene to load
-      await waitFor(() => {
-        expect(result.current.scene).not.toBeNull();
-      });
-
-      const prevCounter = result.current.oCounter;
-
-      await act(async () => {
-        await result.current.incrementOCounter();
-      });
-
-      // Counter should not change on error
-      expect(result.current.oCounter).toBe(prevCounter);
-      expect(result.current.oCounterLoading).toBe(false);
-    });
-
-    it("does not call API when scene is null", async () => {
-      mockPost.mockResolvedValue({
-        findScenes: { scenes: [] },
-      });
-
-      const { result } = renderHook(() => useScenePlayer(), {
-        wrapper: createWrapper({ sceneId: null }),
-      });
-
-      // Wait for any effects to settle
-      await waitFor(() => {
-        expect(result.current.sceneLoading).toBe(false);
-      });
-
-      mockPost.mockClear();
-
-      await act(async () => {
-        await result.current.incrementOCounter();
-      });
-
-      // Should not have called any API since scene is null
-      expect(mockPost).not.toHaveBeenCalledWith(
-        "/watch-history/increment-o",
-        expect.anything()
-      );
     });
   });
 

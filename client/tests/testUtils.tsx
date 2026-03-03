@@ -122,7 +122,6 @@ export const createMockApi = () => ({
     getScene: vi.fn().mockResolvedValue(null),
     updateRating: vi.fn().mockResolvedValue({}),
     updateFavorite: vi.fn().mockResolvedValue({}),
-    incrementOCounter: vi.fn().mockResolvedValue({}),
   },
 });
 
