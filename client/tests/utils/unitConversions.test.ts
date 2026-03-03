@@ -38,6 +38,19 @@ describe("unitConversions", () => {
       expect(cmToFeetInches(undefined as any)).toEqual({ feet: 0, inches: 0 });
     });
 
+    it("returns zeros for zero input", () => {
+      expect(cmToFeetInches(0)).toEqual({ feet: 0, inches: 0 });
+    });
+
+    it("handles 12-inch rounding edge case (rounds up to next foot)", () => {
+      // Find a cm value where Math.round(totalInches % 12) === 12
+      // 152.4 cm is exactly 5 feet (60 inches)
+      // 152.3 cm = 59.96 inches, feet=4, inches=Math.round(11.96)=12 -> should become 5 feet 0 inches
+      const result = cmToFeetInches(152.3);
+      expect(result.feet).toBe(5);
+      expect(result.inches).toBe(0);
+    });
+
     it("converts 5 feet 10 inches to 178 cm", () => {
       expect(feetInchesToCm(5, 10)).toBe(178);
     });

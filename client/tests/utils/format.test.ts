@@ -7,6 +7,8 @@ import {
   formatFileSize,
   formatBitRate,
   getSceneTitle,
+  getSceneDescription,
+  formatResolution,
 } from "../../src/utils/format";
 
 describe("format utilities", () => {
@@ -222,6 +224,133 @@ describe("format utilities", () => {
     it("returns 'Unknown Scene' if no title and no files", () => {
       expect(getSceneTitle({ title: "" })).toBe("Unknown Scene");
       expect(getSceneTitle({ title: "", files: [] })).toBe("Unknown Scene");
+    });
+
+    it("returns 'Unknown Scene' when files exist but no basename", () => {
+      expect(getSceneTitle({ title: "", files: [{ path: "/foo" }] })).toBe("Unknown Scene");
+    });
+  });
+
+  describe("getSceneDescription", () => {
+    it("returns empty string for null scene", () => {
+      expect(getSceneDescription(null)).toBe("");
+    });
+
+    it("returns empty string for undefined scene", () => {
+      expect(getSceneDescription(undefined as any)).toBe("");
+    });
+
+    it("returns empty string when no details", () => {
+      expect(getSceneDescription({})).toBe("");
+      expect(getSceneDescription({ details: "" })).toBe("");
+    });
+
+    it("returns trimmed details", () => {
+      expect(getSceneDescription({ details: "  Some description  " })).toBe("Some description");
+    });
+
+    it("returns details as-is when already trimmed", () => {
+      expect(getSceneDescription({ details: "Clean description" })).toBe("Clean description");
+    });
+  });
+
+  describe("formatResolution", () => {
+    it("returns empty string for null/undefined/zero dimensions", () => {
+      expect(formatResolution(null as any, null as any)).toBe("");
+      expect(formatResolution(0, 0)).toBe("");
+      expect(formatResolution(1920, 0)).toBe("");
+      expect(formatResolution(0, 1080)).toBe("");
+    });
+
+    it("returns '4K' for 2160p+ heights", () => {
+      expect(formatResolution(3840, 2160)).toBe("4K");
+      expect(formatResolution(7680, 4320)).toBe("4K"); // 8K height > 2160
+    });
+
+    it("returns '1440p' for 1440p heights", () => {
+      expect(formatResolution(2560, 1440)).toBe("1440p");
+    });
+
+    it("returns '1080p' for 1080p heights", () => {
+      expect(formatResolution(1920, 1080)).toBe("1080p");
+    });
+
+    it("returns '720p' for 720p heights", () => {
+      expect(formatResolution(1280, 720)).toBe("720p");
+    });
+
+    it("returns '480p' for 480p heights", () => {
+      expect(formatResolution(854, 480)).toBe("480p");
+    });
+
+    it("returns '360p' for 360p heights", () => {
+      expect(formatResolution(640, 360)).toBe("360p");
+    });
+
+    it("returns '240p' for 240p heights", () => {
+      expect(formatResolution(426, 240)).toBe("240p");
+    });
+
+    it("returns height with p suffix for small resolutions", () => {
+      expect(formatResolution(320, 180)).toBe("180p");
+      expect(formatResolution(176, 144)).toBe("144p");
+    });
+  });
+
+  describe("formatBitRate - edge cases", () => {
+    it("formats sub-kbps values", () => {
+      expect(formatBitRate(500)).toBe("1 Kbps");
+    });
+
+    it("formats exactly 1 Mbps", () => {
+      expect(formatBitRate(1000000)).toBe("1.00 Mbps");
+    });
+  });
+
+  describe("formatFileSize - edge cases", () => {
+    it("formats terabytes", () => {
+      expect(formatFileSize(1099511627776)).toBe("1 TB");
+    });
+  });
+
+  describe("formatDuration - edge cases", () => {
+    it("pads seconds with leading zero", () => {
+      expect(formatDuration(5)).toBe("0:05");
+    });
+
+    it("handles exact minute boundaries", () => {
+      expect(formatDuration(120)).toBe("2:00");
+    });
+  });
+
+  describe("formatDurationCompact - edge cases", () => {
+    it("formats hours with minutes padded", () => {
+      expect(formatDurationCompact(3601)).toBe("1h00m");
+    });
+  });
+
+  describe("formatDurationHumanReadable - edge cases", () => {
+    it("shows only days and minutes when hours are 0", () => {
+      // 1 day + 30 minutes = 86400 + 1800 = 88200
+      expect(formatDurationHumanReadable(88200)).toBe("1d 30m");
+    });
+
+    it("shows only minutes for durations under an hour", () => {
+      expect(formatDurationHumanReadable(1800)).toBe("30m");
+    });
+
+    it("falls back to 0m for very small durations that round to 0", () => {
+      expect(formatDurationHumanReadable(10)).toBe("0m");
+    });
+
+    it("handles includeDays=false with minutes", () => {
+      // 1 day + 0 hours + 30 minutes
+      expect(formatDurationHumanReadable(88200, { includeDays: false })).toBe("24h 30m");
+    });
+
+    it("handles includeDays=false with no remaining minutes", () => {
+      // 2 days exactly = 172800 seconds
+      expect(formatDurationHumanReadable(172800, { includeDays: false })).toBe("48h");
     });
   });
 });

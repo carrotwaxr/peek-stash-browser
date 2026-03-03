@@ -349,6 +349,102 @@ describe("buildFolderTree - folder thumbnails", () => {
   });
 });
 
+describe("buildFolderTree - getItemThumbnail variants", () => {
+  it("uses gallery cover thumbnail as folder thumbnail", () => {
+    const tags = [createTag("art", "Art")];
+    // Gallery item (cover with thumbnail)
+    const galleryItem = {
+      id: "gallery1",
+      tags: [{ id: "art" }],
+      cover: { paths: { thumbnail: "/gallery-thumb.jpg" } },
+    };
+
+    const result = buildFolderTree([galleryItem], tags, []);
+
+    expect(result.folders[0].thumbnail).toBe("/gallery-thumb.jpg");
+  });
+
+  it("uses image paths.thumbnail as folder thumbnail", () => {
+    const tags = [createTag("art", "Art")];
+    // Image item (paths.thumbnail but no paths.screenshot)
+    const imageItem = {
+      id: "img1",
+      tags: [{ id: "art" }],
+      paths: { thumbnail: "/img-thumb.jpg" },
+    };
+
+    const result = buildFolderTree([imageItem], tags, []);
+
+    expect(result.folders[0].thumbnail).toBe("/img-thumb.jpg");
+  });
+
+  it("returns null thumbnail when item has no thumbnail paths", () => {
+    const tags = [createTag("art", "Art")];
+    const item = {
+      id: "item1",
+      tags: [{ id: "art" }],
+      // No paths at all
+    };
+
+    const result = buildFolderTree([item], tags, []);
+
+    // tag has no image_path, item has no thumbnail -> null thumbnail
+    expect(result.folders[0].thumbnail).toBeNull();
+  });
+});
+
+describe("buildFolderTree - container tags", () => {
+  it("shows container tags (with children) even if truly empty", () => {
+    // A parent tag with children should always show, even with 0 items and 0 pre-computed count
+    const parent = {
+      ...createTag("parent", "Parent", [], [{ id: "child", name: "Child" }]),
+      image_count: 0,
+    };
+    const child = {
+      ...createTag("child", "Child", [{ id: "parent", name: "Parent" }]),
+      image_count: 5,
+    };
+    const tags = [parent, child];
+    const items: ReturnType<typeof createItem>[] = [];
+
+    const result = buildFolderTree(items, tags, []);
+
+    // Parent should still show because it has children (is a container)
+    expect(result.folders).toHaveLength(1);
+    expect(result.folders[0].name).toBe("Parent");
+  });
+});
+
+describe("buildFolderTree - breadcrumbs with unknown tags", () => {
+  it("shows Unknown for breadcrumb tags not in tagMap", () => {
+    const tags = [createTag("known", "Known Tag")];
+    const items: ReturnType<typeof createItem>[] = [];
+
+    const result = buildFolderTree(items, tags, ["known", "missing-tag"]);
+
+    expect(result.breadcrumbs).toHaveLength(2);
+    expect(result.breadcrumbs[0].name).toBe("Known Tag");
+    expect(result.breadcrumbs[1].name).toBe("Unknown");
+  });
+});
+
+describe("buildFolderTree - untagged items not shown inside folders", () => {
+  it("does not show untagged items when inside a tag folder", () => {
+    const tags = [createTag("action", "Action")];
+    const items = [
+      createItem("scene1", ["action"]),
+      createItem("scene2", []), // untagged
+    ];
+
+    const result = buildFolderTree(items, tags, ["action"]);
+
+    // Untagged items should not appear as loose items inside a tag folder
+    // scene1 has the current tag directly and no child tags -> loose item
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].id).toBe("scene1");
+  });
+});
+
 describe("buildFolderTree - multi-tag items at root", () => {
   it("item with multiple root tags appears in both folders", () => {
     const tags = [

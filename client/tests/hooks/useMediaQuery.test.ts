@@ -124,4 +124,26 @@ describe("useMediaQuery", () => {
     );
     expect(result2.current).toBe(false);
   });
+
+  it("falls back to addListener/removeListener for older browsers", () => {
+    const addListener = vi.fn();
+    const removeListener = vi.fn();
+
+    matchMediaMock.mockReturnValue({
+      matches: false,
+      // No addEventListener/removeEventListener (older browsers)
+      addEventListener: undefined,
+      removeEventListener: undefined,
+      addListener,
+      removeListener,
+    });
+
+    const { unmount } = renderHook(() => useMediaQuery("(max-width: 768px)"));
+
+    expect(addListener).toHaveBeenCalled();
+
+    unmount();
+
+    expect(removeListener).toHaveBeenCalled();
+  });
 });

@@ -145,4 +145,103 @@ describe("buildTagTree with sorting", () => {
     expect(result[0].children[0].name).toBe("Apple");
     expect(result[0].children[1].name).toBe("Zebra");
   });
+
+  it("sorts by scene_count field (alternate key)", () => {
+    const tags = [
+      { id: "1", name: "A", scene_count: 5, parents: [], children: [] },
+      { id: "2", name: "B", scene_count: 15, parents: [], children: [] },
+      { id: "3", name: "C", scene_count: 10, parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "scene_count", sortDirection: "ASC" });
+    expect(result[0].scene_count).toBe(5);
+    expect(result[1].scene_count).toBe(10);
+    expect(result[2].scene_count).toBe(15);
+  });
+
+  it("sorts by performer_count", () => {
+    const tags = [
+      { id: "1", name: "A", performer_count: 30, parents: [], children: [] },
+      { id: "2", name: "B", performer_count: 10, parents: [], children: [] },
+      { id: "3", name: "C", performer_count: 20, parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "performer_count", sortDirection: "DESC" });
+    expect(result[0].performer_count).toBe(30);
+    expect(result[1].performer_count).toBe(20);
+    expect(result[2].performer_count).toBe(10);
+  });
+
+  it("sorts by created_at", () => {
+    const tags = [
+      { id: "1", name: "A", created_at: "2024-03-01", parents: [], children: [] },
+      { id: "2", name: "B", created_at: "2024-01-01", parents: [], children: [] },
+      { id: "3", name: "C", created_at: "2024-02-01", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "created_at", sortDirection: "ASC" });
+    expect(result[0].created_at).toBe("2024-01-01");
+    expect(result[1].created_at).toBe("2024-02-01");
+    expect(result[2].created_at).toBe("2024-03-01");
+  });
+
+  it("sorts by updated_at", () => {
+    const tags = [
+      { id: "1", name: "A", updated_at: "2024-03-01", parents: [], children: [] },
+      { id: "2", name: "B", updated_at: "2024-01-01", parents: [], children: [] },
+      { id: "3", name: "C", updated_at: "2024-02-01", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "updated_at", sortDirection: "DESC" });
+    expect(result[0].updated_at).toBe("2024-03-01");
+    expect(result[1].updated_at).toBe("2024-02-01");
+    expect(result[2].updated_at).toBe("2024-01-01");
+  });
+
+  it("falls back to name sort for unknown sort field", () => {
+    const tags = [
+      { id: "1", name: "Zebra", parents: [], children: [] },
+      { id: "2", name: "Apple", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "unknown_field", sortDirection: "ASC" });
+    expect(result[0].name).toBe("Apple");
+    expect(result[1].name).toBe("Zebra");
+  });
+
+  it("handles missing sort values gracefully (defaults to 0 or empty string)", () => {
+    const tags = [
+      { id: "1", name: "A", parents: [], children: [] }, // no scene_count
+      { id: "2", name: "B", scene_count: 5, parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "scene_count", sortDirection: "DESC" });
+    expect(result[0].scene_count).toBe(5);
+    // Tag without scene_count defaults to 0, sorts last in DESC
+    expect(result[1].scene_count).toBeUndefined();
+  });
+});
+
+describe("buildTagTree edge cases", () => {
+  it("returns empty array for null input", () => {
+    expect(buildTagTree(null as any)).toEqual([]);
+  });
+
+  it("returns empty array for undefined input", () => {
+    expect(buildTagTree(undefined as any)).toEqual([]);
+  });
+
+  it("handles tags without parents property (treated as root)", () => {
+    const tags = [
+      { id: "1", name: "Root" } as any,
+    ];
+    const result = buildTagTree(tags);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("Root");
+  });
+
+  it("handles circular references without infinite loop", () => {
+    const tags = [
+      { id: "1", name: "A", parents: [], children: [{ id: "2", name: "B" }] },
+      { id: "2", name: "B", parents: [{ id: "1", name: "A" }], children: [{ id: "1", name: "A" }] },
+    ];
+    // Should not hang or throw
+    const result = buildTagTree(tags);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("1");
+  });
 });

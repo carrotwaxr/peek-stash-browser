@@ -157,6 +157,121 @@ describe("wallConfig", () => {
       expect(config.hasPreview).toBe(false);
     });
   });
+
+  describe("clip config", () => {
+    const config = wallConfig.clip;
+
+    it("returns clip preview URL when id exists", () => {
+      const clip = { id: "clip-1" };
+      expect(config.getImageUrl(clip)).toBe("/api/proxy/clip/clip-1/preview");
+    });
+
+    it("returns null when clip has no id", () => {
+      expect(config.getImageUrl({})).toBeNull();
+    });
+
+    it("returns preview URL for generated clips", () => {
+      const clip = { id: "clip-1", isGenerated: true };
+      expect(config.getPreviewUrl(clip)).toBe("/api/proxy/clip/clip-1/preview");
+    });
+
+    it("returns null preview URL for non-generated clips", () => {
+      const clip = { id: "clip-1", isGenerated: false };
+      expect(config.getPreviewUrl(clip)).toBeNull();
+    });
+
+    it("calculates aspect ratio from parent scene file dimensions", () => {
+      const clip = { scene: { files: [{ width: 1920, height: 1080 }] } };
+      expect(config.getAspectRatio(clip)).toBeCloseTo(16 / 9, 2);
+    });
+
+    it("returns default 16:9 aspect ratio when no scene dimensions", () => {
+      expect(config.getAspectRatio({})).toBeCloseTo(16 / 9, 2);
+      expect(config.getAspectRatio({ scene: {} })).toBeCloseTo(16 / 9, 2);
+      expect(config.getAspectRatio({ scene: { files: [] } })).toBeCloseTo(16 / 9, 2);
+      expect(config.getAspectRatio({ scene: { files: [{}] } })).toBeCloseTo(16 / 9, 2);
+    });
+
+    it("returns title or fallback", () => {
+      expect(config.getTitle({ title: "Clip Title" })).toBe("Clip Title");
+      expect(config.getTitle({})).toBe("Untitled");
+    });
+
+    it("builds subtitle from scene title and primary tag", () => {
+      const clip = { scene: { title: "Scene 1" }, primaryTag: { name: "Action" } };
+      expect(config.getSubtitle(clip)).toBe("Scene 1 • Action");
+    });
+
+    it("builds subtitle with scene title only", () => {
+      const clip = { scene: { title: "Scene 1" } };
+      expect(config.getSubtitle(clip)).toBe("Scene 1");
+    });
+
+    it("builds subtitle with primary tag only", () => {
+      const clip = { primaryTag: { name: "Action" } };
+      expect(config.getSubtitle(clip)).toBe("Action");
+    });
+
+    it("returns empty subtitle when no scene or tag", () => {
+      expect(config.getSubtitle({})).toBe("");
+    });
+
+    it("has preview enabled", () => {
+      expect(config.hasPreview).toBe(true);
+    });
+  });
+
+  describe("scene config - edge cases", () => {
+    const config = wallConfig.scene;
+
+    it("builds subtitle with studio only (no date)", () => {
+      const scene = { studio: { name: "Studio" } };
+      expect(config.getSubtitle(scene)).toBe("Studio");
+    });
+
+    it("builds subtitle with date only (no studio)", () => {
+      const scene = { date: "2024-01-15" };
+      const subtitle = config.getSubtitle(scene);
+      // date-fns formats relative dates
+      expect(subtitle).toBeTruthy();
+      expect(subtitle).not.toContain("•");
+    });
+
+    it("returns empty subtitle when no studio or date", () => {
+      expect(config.getSubtitle({})).toBe("");
+    });
+
+    it("handles invalid date gracefully", () => {
+      const scene = { date: "not-a-date" };
+      // formatDate should catch and return the raw string
+      const subtitle = config.getSubtitle(scene);
+      expect(subtitle).toBeTruthy();
+    });
+
+    it("returns undefined for image URL when no paths", () => {
+      expect(config.getImageUrl({})).toBeUndefined();
+    });
+
+    it("returns undefined for preview URL when no paths", () => {
+      expect(config.getPreviewUrl({})).toBeUndefined();
+    });
+  });
+
+  describe("image config - edge cases", () => {
+    const config = wallConfig.image;
+
+    it("returns undefined for image URL when no paths", () => {
+      expect(config.getImageUrl({})).toBeUndefined();
+    });
+
+    it("returns null subtitle when only width provided", () => {
+      expect(config.getSubtitle({ width: 1920 })).toBeNull();
+    });
+
+    it("returns null subtitle when only height provided", () => {
+      expect(config.getSubtitle({ height: 1080 })).toBeNull();
+    });
+  });
 });
 
 describe("ZOOM_LEVELS", () => {
