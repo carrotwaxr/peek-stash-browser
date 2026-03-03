@@ -92,6 +92,10 @@ COPY server/package*.json ./
 # Copy pruned node_modules from build stage (already has prisma client generated)
 COPY --from=backend-build /app/server/node_modules ./node_modules
 
+# Replace file: symlink with actual shared-types package
+# (npm ci creates a symlink to ../../../shared which resolves differently between stages)
+COPY --from=backend-build /app/shared ./node_modules/@peek/shared-types
+
 # Copy Prisma schema and migrations (for runtime migrations)
 COPY server/prisma/schema.prisma ./prisma/
 COPY server/prisma/migrations ./prisma/migrations
