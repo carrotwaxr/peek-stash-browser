@@ -40,6 +40,7 @@ export interface ClipWithRelations {
   seconds: number;
   endSeconds: number | null;
   primaryTagId: string | null;
+  screenshotPath: string | null;
   isGenerated: boolean;
   stashCreatedAt: Date | null;
   stashUpdatedAt: Date | null;
@@ -65,6 +66,7 @@ interface ClipRow {
   endSeconds: number | null;
   primaryTagId: string | null;
   primaryTagInstanceId: string | null;
+  screenshotPath: string | null;
   isGenerated: number; // SQLite returns 0/1
   stashCreatedAt: string | null;
   stashUpdatedAt: string | null;
@@ -85,6 +87,7 @@ class ClipQueryBuilder {
     c.id, c.stashInstanceId, c.sceneId, c.sceneInstanceId,
     c.title, c.seconds, c.endSeconds,
     c.primaryTagId, c.primaryTagInstanceId,
+    c.screenshotPath,
     c.isGenerated, c.stashCreatedAt, c.stashUpdatedAt,
     s.title AS sceneTitle, s.pathScreenshot AS scenePathScreenshot,
     s.studioId AS sceneStudioId,
@@ -419,6 +422,7 @@ class ClipQueryBuilder {
         seconds: row.seconds,
         endSeconds: row.endSeconds,
         primaryTagId: row.primaryTagId,
+        screenshotPath: row.screenshotPath,
         // SQLite via Prisma raw queries may return number or string for boolean columns
         isGenerated: Number(row.isGenerated) === 1,
         stashCreatedAt: row.stashCreatedAt ? new Date(row.stashCreatedAt) : null,

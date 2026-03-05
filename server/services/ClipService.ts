@@ -28,6 +28,7 @@ export interface ClipWithRelations {
   seconds: number;
   endSeconds: number | null;
   primaryTagId: string | null;
+  screenshotUrl: string | null;
   isGenerated: boolean;
   stashCreatedAt: Date | null;
   stashUpdatedAt: Date | null;
@@ -85,13 +86,15 @@ export class ClipService {
    * Transform clip from query builder to client-safe format with proxy URLs
    */
   private transformClip(clip: RawClipWithRelations): ClipWithRelations {
+    const { screenshotPath, scene, ...rest } = clip;
     return {
-      ...clip,
+      ...rest,
+      screenshotUrl: this.transformUrl(screenshotPath, scene.stashInstanceId),
       scene: {
-        id: clip.scene.id,
-        title: clip.scene.title,
-        pathScreenshot: this.transformUrl(clip.scene.pathScreenshot, clip.scene.stashInstanceId),
-        studioId: clip.scene.studioId,
+        id: scene.id,
+        title: scene.title,
+        pathScreenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        studioId: scene.studioId,
       },
     };
   }
