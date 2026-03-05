@@ -59,7 +59,7 @@ describe("useTagList", () => {
     const mockData = { tags: [], total: 0 };
     (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useTagList(params), {
       wrapper: createWrapper(),
     });
@@ -73,7 +73,7 @@ describe("useTagList", () => {
     const mockData = { tags: [], total: 0 };
     (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useTagList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findTags).toHaveBeenCalled());

@@ -58,7 +58,7 @@ describe("useImageList", () => {
     const mockData = { images: [], total: 0 };
     (libraryApi.findImages as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useImageList(params), {
       wrapper: createWrapper(),
     });
@@ -72,7 +72,7 @@ describe("useImageList", () => {
     const mockData = { images: [], total: 0 };
     (libraryApi.findImages as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useImageList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findImages).toHaveBeenCalled());

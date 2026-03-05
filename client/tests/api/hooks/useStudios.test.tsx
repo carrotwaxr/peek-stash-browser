@@ -59,7 +59,7 @@ describe("useStudioList", () => {
     const mockData = { studios: [], total: 0 };
     (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useStudioList(params), {
       wrapper: createWrapper(),
     });
@@ -73,7 +73,7 @@ describe("useStudioList", () => {
     const mockData = { studios: [], total: 0 };
     (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useStudioList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findStudios).toHaveBeenCalled());

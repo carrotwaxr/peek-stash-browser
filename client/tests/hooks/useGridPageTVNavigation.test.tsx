@@ -29,7 +29,7 @@ vi.mock("@/hooks/useTVNavigation", () => ({
 }));
 
 const mockSetItemRef = vi.fn();
-const mockIsFocused = vi.fn(() => false);
+const mockIsFocused = vi.fn((_index: number) => false);
 
 vi.mock("@/hooks/useSpatialNavigation", () => ({
   useSpatialNavigation: vi.fn(() => ({
