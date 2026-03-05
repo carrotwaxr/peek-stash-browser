@@ -17,6 +17,7 @@ export interface Clip {
   seconds?: number | null;
   endSeconds?: number | null;
   isGenerated?: boolean;
+  screenshotUrl?: string | null;
   primaryTag?: { id: string; name: string } | null;
   tags?: Array<{ id: string; name: string }>;
   scene?: {

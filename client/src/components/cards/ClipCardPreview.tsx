@@ -15,8 +15,8 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
 
   // Get preview URLs
   const previewUrl = clip.isGenerated ? getClipPreviewUrl(clip.id) : null;
-  // pathScreenshot is already transformed to a proxy URL by the server
-  const screenshotUrl = clip.scene?.pathScreenshot || null;
+  // Prefer the marker's own screenshot over the scene cover
+  const screenshotUrl = clip.screenshotUrl || clip.scene?.pathScreenshot || null;
 
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
