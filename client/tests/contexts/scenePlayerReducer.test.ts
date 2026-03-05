@@ -3,6 +3,7 @@ import {
   scenePlayerReducer,
   initialState,
 } from "@/contexts/scenePlayerReducer";
+import type { ScenePlayerReducerState } from "@/contexts/scenePlayerReducer";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1209,7 +1210,7 @@ describe("scenePlayerReducer", () => {
     it("preserves other state fields not set by INITIALIZE", () => {
       const state = {
         ...initialState,
-        scene: { id: "existing" },
+        scene: { id: "existing" } as unknown as ScenePlayerReducerState["scene"],
         video: { url: "existing" },
         sessionId: "existing-sess",
         oCounter: 5,

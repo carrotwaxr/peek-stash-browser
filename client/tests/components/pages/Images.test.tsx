@@ -74,23 +74,23 @@ vi.mock("@tanstack/react-query", async () => {
 
 // Mock API
 const mockUseImageList = vi.fn(() => ({
-  data: null,
+  data: null as Record<string, unknown> | null,
   isLoading: false,
-  error: null,
+  error: null as Error | null,
 }));
 vi.mock("@/api/hooks", () => ({
-  useImageList: (...args: unknown[]) => mockUseImageList(...args),
+  useImageList: (..._args: unknown[]) => mockUseImageList(),
 }));
 vi.mock("@/api/client", () => ({
   ApiError: class ApiError extends Error {
     isInitializing = false;
     status: number;
-    constructor(message: string, isInitializing = false) {
+    data: Record<string, unknown>;
+    constructor(message: string, status = 500, data: Record<string, unknown> = {}) {
       super(message);
-      if (typeof isInitializing === "boolean") {
-        this.isInitializing = isInitializing;
-      }
-      this.status = 500;
+      this.status = status;
+      this.data = data;
+      this.isInitializing = status === 503 && data.ready === false;
     }
   },
 }));
@@ -146,13 +146,13 @@ vi.mock("@/components/ui/index", () => ({
       </div>
     );
   },
-  PageLayout: ({ children }: Record<string, unknown>) => (
-    <div data-testid="page-layout">{children as React.ReactNode}</div>
+  PageLayout: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="page-layout">{children}</div>
   ),
   PageHeader: ({ title, subtitle }: Record<string, unknown>) => (
     <div data-testid="page-header">
       {title as string}
-      {subtitle && <span>{subtitle as string}</span>}
+      {subtitle ? <span>{subtitle as string}</span> : null}
     </div>
   ),
   ErrorMessage: ({ error }: Record<string, unknown>) => (
@@ -223,8 +223,7 @@ describe("Images", () => {
 
   describe("Error State", () => {
     it("shows ErrorMessage when error is present and not initializing", () => {
-      const error = new ApiError("Something went wrong");
-      error.isInitializing = false;
+      const error = new ApiError("Something went wrong", 500);
       mockUseImageList.mockReturnValue({
         data: null,
         isLoading: false,
@@ -238,8 +237,7 @@ describe("Images", () => {
     });
 
     it("shows SyncProgressBanner when error is initializing", () => {
-      const error = new ApiError("init", true);
-      error.isInitializing = true;
+      const error = new ApiError("init", 503, { ready: false });
       mockUseImageList.mockReturnValue({
         data: null,
         isLoading: false,

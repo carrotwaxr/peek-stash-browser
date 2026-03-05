@@ -59,7 +59,7 @@ describe("useSceneList", () => {
     const mockData = { scenes: [], total: 0 };
     (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useSceneList(params), {
       wrapper: createWrapper(),
     });
@@ -73,7 +73,7 @@ describe("useSceneList", () => {
     const mockData = { scenes: [], total: 0 };
     (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useSceneList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findScenes).toHaveBeenCalled());
@@ -85,7 +85,7 @@ describe("useSceneList", () => {
     const mockData = { scenes: [], total: 0 };
     (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useSceneList(params, "instance-1"), {
       wrapper: createWrapper(),
     });

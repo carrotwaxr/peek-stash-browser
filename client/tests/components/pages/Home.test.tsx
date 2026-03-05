@@ -39,9 +39,9 @@ const mockApiGet = vi.fn().mockResolvedValue({
 });
 const mockGetCarousels = vi.fn().mockResolvedValue({ carousels: [] });
 vi.mock("@/api", () => ({
-  apiGet: (...args: unknown[]) => mockApiGet(...args),
+  apiGet: (endpoint: string) => mockApiGet(endpoint),
   libraryApi: {
-    getCarousels: (...args: unknown[]) => mockGetCarousels(...args),
+    getCarousels: () => mockGetCarousels(),
     executeCarousel: vi.fn(),
   },
 }));
@@ -60,8 +60,8 @@ vi.mock("@/api/client", () => ({
 const mockMigrateCarouselPreferences = vi.fn((prefs: unknown) => prefs || []);
 vi.mock("@/constants/carousels", () => ({
   CAROUSEL_DEFINITIONS: [],
-  migrateCarouselPreferences: (...args: unknown[]) =>
-    mockMigrateCarouselPreferences(...args),
+  migrateCarouselPreferences: (prefs: unknown) =>
+    mockMigrateCarouselPreferences(prefs),
 }));
 
 vi.mock("@/utils/entityLinks", () => ({
@@ -115,11 +115,11 @@ vi.mock("@/components/ui/index", () => ({
   PageHeader: ({ title, subtitle }: Record<string, unknown>) => (
     <div data-testid="page-header">
       <h1>{title as string}</h1>
-      {subtitle && <p>{subtitle as string}</p>}
+      {subtitle ? <p>{subtitle as string}</p> : null}
     </div>
   ),
-  PageLayout: ({ children }: Record<string, unknown>) => (
-    <div data-testid="page-layout">{children as React.ReactNode}</div>
+  PageLayout: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="page-layout">{children}</div>
   ),
   SceneCarousel: ({ title }: Record<string, unknown>) => (
     <div data-testid="scene-carousel">{title as string}</div>

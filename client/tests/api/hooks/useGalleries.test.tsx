@@ -62,7 +62,7 @@ describe("useGalleryList", () => {
     const mockData = { galleries: [], total: 0 };
     (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useGalleryList(params), {
       wrapper: createWrapper(),
     });
@@ -76,7 +76,7 @@ describe("useGalleryList", () => {
     const mockData = { galleries: [], total: 0 };
     (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useGalleryList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findGalleries).toHaveBeenCalled());

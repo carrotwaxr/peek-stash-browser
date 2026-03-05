@@ -59,7 +59,7 @@ describe("useGroupList", () => {
     const mockData = { groups: [], total: 0 };
     (libraryApi.findGroups as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useGroupList(params), {
       wrapper: createWrapper(),
     });
@@ -73,7 +73,7 @@ describe("useGroupList", () => {
     const mockData = { groups: [], total: 0 };
     (libraryApi.findGroups as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
 
-    const params = { page: 1, perPage: 24 };
+    const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useGroupList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findGroups).toHaveBeenCalled());

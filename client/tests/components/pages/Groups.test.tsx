@@ -50,19 +50,23 @@ vi.mock("@/utils/entityLinks", () => ({
 
 // Mock API
 const mockUseGroupList = vi.fn(() => ({
-  data: null,
+  data: null as Record<string, unknown> | null,
   isLoading: false,
-  error: null,
+  error: null as Error | null,
 }));
 vi.mock("@/api/hooks", () => ({
-  useGroupList: (...args: unknown[]) => mockUseGroupList(...args),
+  useGroupList: (..._args: unknown[]) => mockUseGroupList(),
 }));
 vi.mock("@/api/client", () => ({
   ApiError: class ApiError extends Error {
     isInitializing = false;
-    constructor(message: string, isInitializing = false) {
+    status: number;
+    data: Record<string, unknown>;
+    constructor(message: string, status = 500, data: Record<string, unknown> = {}) {
       super(message);
-      this.isInitializing = isInitializing;
+      this.status = status;
+      this.data = data;
+      this.isInitializing = status === 503 && data.ready === false;
     }
   },
 }));
@@ -92,13 +96,13 @@ vi.mock("@/components/ui/index", () => ({
       </div>
     );
   },
-  PageLayout: ({ children }: Record<string, unknown>) => (
-    <div data-testid="page-layout">{children as React.ReactNode}</div>
+  PageLayout: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="page-layout">{children}</div>
   ),
   PageHeader: ({ title, subtitle }: Record<string, unknown>) => (
     <div data-testid="page-header">
       {title as string}
-      {subtitle && <span>{subtitle as string}</span>}
+      {subtitle ? <span>{subtitle as string}</span> : null}
     </div>
   ),
   ErrorMessage: ({ error }: Record<string, unknown>) => (
@@ -161,8 +165,7 @@ describe("Groups", () => {
 
   describe("Error State", () => {
     it("shows ErrorMessage when error is present and not initializing", () => {
-      const error = new ApiError("Something went wrong");
-      error.isInitializing = false;
+      const error = new ApiError("Something went wrong", 500);
       mockUseGroupList.mockReturnValue({
         data: null,
         isLoading: false,
@@ -176,8 +179,7 @@ describe("Groups", () => {
     });
 
     it("shows SyncProgressBanner when error is initializing", () => {
-      const error = new ApiError("init", true);
-      error.isInitializing = true;
+      const error = new ApiError("init", 503, { ready: false });
       mockUseGroupList.mockReturnValue({
         data: null,
         isLoading: false,
