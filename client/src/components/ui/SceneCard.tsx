@@ -31,6 +31,11 @@ interface Props {
   fromPageTitle?: string;
   enableKeyboard?: boolean;
   showProgress?: boolean;
+  /**
+   * TV-mode: indicates this card is the currently highlighted item via keyboard navigation.
+   * Provided by `useGridPageTVNavigation().gridItemProps`.
+   */
+  tvPreviewActive?: boolean;
 }
 
 /**
@@ -98,6 +103,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
       hideRatingControls = false,
       onHideSuccess,
       fromPageTitle,
+      tvPreviewActive = false,
     },
     ref
   ) => {
@@ -271,6 +277,10 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           <SceneCardPreview
             scene={scene}
             autoplayOnScroll={autoplayOnScroll}
+            // In TV mode, previews should play when the card is navigated to (highlighted)
+            // rather than on mouse hover.
+            active={isTVMode ? tvPreviewActive : undefined}
+            disableHover={isTVMode}
             cycleInterval={600}
             spriteCount={10}
             duration={duration}

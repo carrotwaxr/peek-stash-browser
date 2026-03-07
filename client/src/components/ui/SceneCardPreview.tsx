@@ -14,6 +14,15 @@ interface Props {
   duration?: string | null;
   resolution?: string | null;
   objectFit?: "contain" | "cover";
+  /**
+   * External active state to trigger preview playback (e.g., TV-mode keyboard focus/highlight).
+   * When provided, it overrides hover-based activation.
+   */
+  active?: boolean;
+  /**
+   * Disable hover handlers entirely (e.g., in TV mode where previews should not start on hover).
+   */
+  disableHover?: boolean;
 }
 
 const SceneCardPreview = ({
@@ -24,6 +33,8 @@ const SceneCardPreview = ({
   duration = null,
   resolution = null,
   objectFit = "contain",
+  active,
+  disableHover = false,
 }: Props) => {
   const { user } = useAuth();
   type SpriteData = ReturnType<typeof getEvenlySpacedSprites>[number];
@@ -40,6 +51,13 @@ const SceneCardPreview = ({
   const [activePreviewType, setActivePreviewType] = useState<string | null>(null); // Track which type is actually being used (after fallback)
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false); // True lazy loading for screenshots
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // If hover is disabled (TV mode), ensure any previous hover state is cleared
+  useEffect(() => {
+    if (disableHover) {
+      setIsHovering(false);
+    }
+  }, [disableHover]);
 
   // Determine preview type based on user preference
   // Note: We don't check if paths exist yet - that happens in the lazy-load effect
@@ -120,7 +138,8 @@ const SceneCardPreview = ({
   // Implements user preference with smart 404 fallback for high quality options
   useEffect(() => {
     // Determine if we should trigger loading
-    const shouldTriggerLoad = autoplayOnScroll ? isInView : isHovering;
+    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
+    const shouldTriggerLoad = autoplayOnScroll ? isInView : isUserActive;
 
     // Don't load if not triggered yet, already loaded, no preview type, or already loading
     if (
@@ -214,6 +233,8 @@ const SceneCardPreview = ({
     isHovering,
     isInView,
     autoplayOnScroll,
+    active,
+    hasHoverCapability,
     preferredPreviewType,
     previewDataLoaded,
     isLoading,
@@ -258,11 +279,10 @@ const SceneCardPreview = ({
     }
 
     // Determine if we should animate based on hover capability and autoplayOnScroll setting
+    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
     const shouldAnimate = autoplayOnScroll
       ? isInView // When autoplayOnScroll is enabled, animate when in view (mobile-first)
-      : hasHoverCapability
-        ? isHovering
-        : false; // Otherwise, use hover detection
+      : isUserActive;
 
     if (!shouldAnimate || sprites.length === 0) {
       if (intervalRef.current) {
@@ -290,16 +310,17 @@ const SceneCardPreview = ({
     isInView,
     hasHoverCapability,
     autoplayOnScroll,
+    active,
     sprites.length,
     cycleInterval,
   ]);
 
   // Determine if we should show animation based on hover/scroll state
-  const shouldShowAnimation = autoplayOnScroll
-    ? isInView
-    : hasHoverCapability
-      ? isHovering
-      : false;
+  const shouldShowAnimation = (() => {
+    if (autoplayOnScroll) return isInView;
+    const isUserActive = active ?? (hasHoverCapability ? isHovering : false);
+    return isUserActive;
+  })();
 
   // For sprite preview, calculate scale factor
   const currentSprite = sprites[currentSpriteIndex];
@@ -326,8 +347,12 @@ const SceneCardPreview = ({
     <div
       ref={setContainerElement}
       className="w-full h-full relative overflow-hidden"
-      onMouseEnter={() => hasHoverCapability && setIsHovering(true)}
-      onMouseLeave={() => hasHoverCapability && setIsHovering(false)}
+      onMouseEnter={() => {
+        if (!disableHover && hasHoverCapability) setIsHovering(true);
+      }}
+      onMouseLeave={() => {
+        if (!disableHover && hasHoverCapability) setIsHovering(false);
+      }}
     >
       {/* Screenshot base layer - true lazy loading via IntersectionObserver */}
       {/* Only set src when card enters viewport to prevent browser from queuing all images */}
