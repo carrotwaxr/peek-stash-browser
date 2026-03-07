@@ -217,6 +217,8 @@ export const useGridPageTVNavigation = ({
       ref: (el: HTMLElement | null) => gridNavigation.setItemRef(index, el),
       className: gridNavigation.isFocused(index) ? "keyboard-focus" : "",
       tabIndex: gridNavigation.isFocused(index) ? 0 : -1,
+      // Use an explicit boolean for "highlighted" state so cards can react (e.g., start previews)
+      tvPreviewActive: gridNavigation.isFocused(index),
     }),
   };
 };
