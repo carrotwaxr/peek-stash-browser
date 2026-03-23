@@ -18,7 +18,22 @@ export function getStashBaseUrl(): string | null {
 }
 
 /**
- * Builds a Stash entity URL
+ * Gets the UI Stash URL from the current instance configuration
+ * This is used for "View in Stash" links - uses uiUrl if set
+ * @returns UI Stash URL (e.g., http://localhost:9999 or https://stash.example.com)
+ */
+export function getStashUiUrl(): string | null {
+  try {
+    return stashInstanceManager.getUiUrl();
+  } catch {
+    // No instance configured
+    return null;
+  }
+}
+
+/**
+ * Builds a Stash entity URL for "View in Stash" links
+ * Uses the uiUrl if configured, otherwise falls back to the base url
  * @param entityType - Type of entity (scene, performer, studio, tag, group, gallery, image)
  * @param entityId - ID of the entity
  * @returns Full URL to the entity in Stash, or null if stashBaseUrl is not available
@@ -27,7 +42,7 @@ export function buildStashEntityUrl(
   entityType: 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image',
   entityId: string | number
 ): string | null {
-  const baseUrl = getStashBaseUrl();
+  const baseUrl = getStashUiUrl();
 
   if (!baseUrl) {
     return null;
