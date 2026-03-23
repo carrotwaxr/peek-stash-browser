@@ -43,6 +43,7 @@ const INSTANCE_A = {
   name: "Primary Stash",
   description: null,
   url: "http://stash-a:9999/graphql",
+  uiUrl: "https://stash-a.example.com",
   apiKey: "key-a",
   enabled: true,
   priority: 0,
@@ -55,6 +56,7 @@ const INSTANCE_B = {
   name: "Secondary Stash",
   description: "Backup instance",
   url: "http://stash-b:9999/graphql",
+  uiUrl: null,
   apiKey: "key-b",
   enabled: true,
   priority: 1,
@@ -347,6 +349,54 @@ describe("StashInstanceManager", () => {
       await manager.initialize();
 
       expect(() => manager.getBaseUrl()).toThrow("No Stash instance configured");
+    });
+  });
+
+  describe("getUiUrl", () => {
+    it("returns uiUrl when configured", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_A]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(manager.getUiUrl(INSTANCE_A.id)).toBe("https://stash-a.example.com");
+    });
+
+    it("strips trailing slash from uiUrl", async () => {
+      const instanceWithTrailingSlash = { ...INSTANCE_A, uiUrl: "https://stash-a.example.com/" };
+      mockFindMany.mockResolvedValue([instanceWithTrailingSlash]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(manager.getUiUrl(INSTANCE_A.id)).toBe("https://stash-a.example.com");
+    });
+
+    it("falls back to url stripped of /graphql when uiUrl not set", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_B]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(manager.getUiUrl(INSTANCE_B.id)).toBe("http://stash-b:9999");
+    });
+
+    it("returns default instance uiUrl when no instanceId provided", async () => {
+      mockFindMany.mockResolvedValue([INSTANCE_A, INSTANCE_B]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(manager.getUiUrl()).toBe("https://stash-a.example.com");
+    });
+
+    it("throws when no instances configured", async () => {
+      mockFindMany.mockResolvedValue([]);
+
+      const manager = await importFresh();
+      await manager.initialize();
+
+      expect(() => manager.getUiUrl()).toThrow("No Stash instance configured");
     });
   });
 

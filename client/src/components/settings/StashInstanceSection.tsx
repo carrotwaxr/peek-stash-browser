@@ -8,6 +8,7 @@ interface StashInstance {
   name: string;
   description: string | null;
   url: string;
+  uiUrl: string | null;
   enabled: boolean;
   priority: number;
   createdAt: string;
@@ -17,6 +18,7 @@ interface InstanceFormData {
   name: string;
   description: string;
   url: string;
+  uiUrl: string;
   apiKey: string;
   enabled: boolean;
   priority: number;
@@ -40,6 +42,7 @@ const StashInstanceSection = () => {
     name: "",
     description: "",
     url: "",
+    uiUrl: "",
     apiKey: "",
     enabled: true,
     priority: 0,
@@ -96,6 +99,7 @@ const StashInstanceSection = () => {
       name: "",
       description: "",
       url: "",
+      uiUrl: "",
       apiKey: "",
       enabled: true,
       priority: instances.length,
@@ -111,6 +115,7 @@ const StashInstanceSection = () => {
       name: instance.name,
       description: instance.description || "",
       url: instance.url,
+      uiUrl: instance.uiUrl || "",
       apiKey: "", // Don't show existing key
       enabled: instance.enabled,
       priority: instance.priority,
@@ -174,6 +179,7 @@ const StashInstanceSection = () => {
           name: formData.name,
           description: formData.description || null,
           url: formData.url,
+          uiUrl: formData.uiUrl || null,
           enabled: formData.enabled,
           priority: formData.priority,
         };
@@ -189,6 +195,7 @@ const StashInstanceSection = () => {
           name: formData.name,
           description: formData.description || null,
           url: formData.url,
+          uiUrl: formData.uiUrl || null,
           apiKey: formData.apiKey,
           enabled: formData.enabled,
           priority: formData.priority,
@@ -341,6 +348,30 @@ const StashInstanceSection = () => {
                 }}
                 placeholder="http://localhost:9999/graphql"
               />
+              <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
+                GraphQL endpoint for API access
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                Stash UI URL (optional)
+              </label>
+              <input
+                type="text"
+                value={formData.uiUrl}
+                onChange={(e) => setFormData({ ...formData, uiUrl: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border"
+                style={{
+                  backgroundColor: "var(--bg-input)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+                placeholder="https://stash.example.com"
+              />
+              <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
+                Web UI URL for "View in Stash" links. If not set, uses the Stash URL.
+              </p>
             </div>
 
             <div>
@@ -453,6 +484,9 @@ const StashInstanceSection = () => {
                     )}
                     <div className="flex items-center gap-4 mt-2 text-sm" style={{ color: "var(--text-tertiary)" }}>
                       <span className="font-mono">{getDisplayUrl(instance.url)}</span>
+                      {instance.uiUrl && (
+                        <span className="font-mono" title="UI URL">→ {getDisplayUrl(instance.uiUrl)}</span>
+                      )}
                       <span>Priority: {instance.priority}</span>
                       <span>Added: {formatDate(instance.createdAt)}</span>
                     </div>
