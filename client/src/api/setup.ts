@@ -19,8 +19,13 @@ export const setupApi = {
   testStashConnection: (url: string, apiKey: string) =>
     apiPost<TestStashConnectionResponse>("/setup/test-stash-connection", { url, apiKey }),
 
-  createFirstStashInstance: (url: string, apiKey: string, name = "Default") =>
-    apiPost<CreateFirstStashInstanceResponse>("/setup/create-stash-instance", { url, apiKey, name }),
+  createFirstStashInstance: (url: string, apiKey: string, name = "Default", uiUrl?: string) =>
+    apiPost<CreateFirstStashInstanceResponse>("/setup/create-stash-instance", {
+      url,
+      uiUrl: uiUrl || null,
+      apiKey,
+      name,
+    }),
 
   resetSetup: () => apiPost<ResetSetupResponse>("/setup/reset", {}),
 };

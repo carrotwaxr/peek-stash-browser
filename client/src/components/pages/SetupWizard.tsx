@@ -29,8 +29,10 @@ interface StashConfigStepProps {
   testing: boolean;
   testSuccess: boolean;
   stashUrl: string;
+  stashUiUrl: string;
   stashApiKey: string;
   onStashUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onStashUiUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onStashApiKeyChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTestConnection: () => void;
   onBack: () => void;
@@ -273,8 +275,10 @@ const StashConfigStep = ({
   testing,
   testSuccess,
   stashUrl,
+  stashUiUrl,
   stashApiKey,
   onStashUrlChange,
+  onStashUiUrlChange,
   onStashApiKeyChange,
   onTestConnection,
   onBack,
@@ -348,6 +352,35 @@ const StashConfigStep = ({
           style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
         >
           The full URL to your Stash GraphQL endpoint (usually ends with /graphql)
+        </p>
+      </div>
+
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Stash UI URL
+        </label>
+        <input
+          type="text"
+          value={stashUiUrl}
+          onChange={onStashUiUrlChange}
+          className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+          placeholder="https://stash.example.com"
+        />
+        <p
+          className="text-xs mt-1"
+          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+        >
+          Optional. Used for "View in Stash" links. If blank, Peek uses the API URL.
         </p>
       </div>
 
@@ -462,6 +495,7 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
 
   // Stash configuration
   const [stashUrl, setStashUrl] = useState("");
+  const [stashUiUrl, setStashUiUrl] = useState("");
   const [stashApiKey, setStashApiKey] = useState("");
   const [testing, setTesting] = useState(false);
   const [testSuccess, setTestSuccess] = useState(false);
@@ -556,7 +590,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
     try {
       const response = await setupApi.createFirstStashInstance(
         stashUrl,
-        stashApiKey
+        stashApiKey,
+        "Default",
+        stashUiUrl
       );
 
       if (response.success) {
@@ -603,10 +639,14 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
             testing={testing}
             testSuccess={testSuccess}
             stashUrl={stashUrl}
+            stashUiUrl={stashUiUrl}
             stashApiKey={stashApiKey}
             onStashUrlChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setStashUrl(e.target.value);
               setTestSuccess(false); // Reset test status when URL changes
+            }}
+            onStashUiUrlChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              setStashUiUrl(e.target.value);
             }}
             onStashApiKeyChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setStashApiKey(e.target.value);

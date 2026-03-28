@@ -249,7 +249,7 @@ export const findGroups = async (
     // Add stashUrl to each group
     const groupsWithStashUrl = paginatedGroups.map(group => ({
       ...group,
-      stashUrl: buildStashEntityUrl('group', group.id),
+      stashUrl: buildStashEntityUrl('group', group.id, group.instanceId || undefined),
     }));
 
     logger.info("findGroups completed", {

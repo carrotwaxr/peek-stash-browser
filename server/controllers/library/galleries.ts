@@ -300,7 +300,7 @@ export const findGalleries = async (
     // Add stashUrl to each gallery
     const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
       ...gallery,
-      stashUrl: buildStashEntityUrl("gallery", gallery.id),
+      stashUrl: buildStashEntityUrl("gallery", gallery.id, gallery.instanceId || undefined),
     }));
 
     logger.info("findGalleries completed", {
