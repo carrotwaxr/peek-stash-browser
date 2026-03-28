@@ -196,7 +196,7 @@ export const findTags = async (
     // Add stashUrl to each tag
     const tagsWithStashUrl = hydratedTags.map((tag) => ({
       ...tag,
-      stashUrl: buildStashEntityUrl("tag", tag.id),
+      stashUrl: buildStashEntityUrl("tag", tag.id, tag.instanceId || undefined),
     }));
 
     logger.info("findTags completed", {

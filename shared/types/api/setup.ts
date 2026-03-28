@@ -77,6 +77,7 @@ export interface TestStashConnectionResponse {
 export interface CreateFirstStashInstanceRequest {
   name?: string;
   url: string;
+  uiUrl?: string;
   apiKey: string;
 }
 
@@ -86,6 +87,7 @@ export interface CreateFirstStashInstanceResponse {
     id: string;
     name: string;
     url: string;
+    uiUrl: string | null;
     enabled: boolean;
     createdAt: Date;
   };
@@ -104,6 +106,7 @@ export interface GetStashInstanceResponse {
     id: string;
     name: string;
     url: string;
+    uiUrl: string | null;
     enabled: boolean;
     priority: number;
     createdAt: Date;
@@ -145,6 +148,7 @@ export interface StashInstanceData {
   name: string;
   description: string | null;
   url: string;
+  uiUrl: string | null;
   enabled: boolean;
   priority: number;
   createdAt: Date;
@@ -167,6 +171,7 @@ export interface CreateStashInstanceRequest {
   name: string;
   description?: string;
   url: string;
+  uiUrl?: string;
   apiKey: string;
   enabled?: boolean;
   priority?: number;
@@ -189,6 +194,7 @@ export interface UpdateStashInstanceRequest {
   name?: string;
   description?: string;
   url?: string;
+  uiUrl?: string;
   apiKey?: string;
   enabled?: boolean;
   priority?: number;

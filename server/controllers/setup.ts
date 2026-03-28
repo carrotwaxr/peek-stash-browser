@@ -283,7 +283,7 @@ export const createFirstStashInstance = async (
       });
     }
 
-    const { name, url, apiKey } = req.body;
+    const { name, url, uiUrl, apiKey } = req.body;
 
     if (!url || !apiKey) {
       return res.status(400).json({
@@ -298,6 +298,17 @@ export const createFirstStashInstance = async (
       return res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+    }
+
+    // Validate uiUrl format if provided (optional)
+    if (uiUrl) {
+      try {
+        new URL(uiUrl);
+      } catch {
+        return res.status(400).json({
+          error: "Invalid UI URL format. Expected: https://hostname:port",
+        });
+      }
     }
 
     // Test connection before saving (skip in test environment for E2E setup)
@@ -320,6 +331,7 @@ export const createFirstStashInstance = async (
       data: {
         name: name || "Default",
         url,
+        uiUrl: uiUrl || null,
         apiKey,
         enabled: true,
         priority: 0,
@@ -328,6 +340,7 @@ export const createFirstStashInstance = async (
         id: true,
         name: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         createdAt: true,
       },
@@ -378,6 +391,7 @@ export const getStashInstance = async (
         id: true,
         name: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         priority: true,
         createdAt: true,
@@ -496,6 +510,7 @@ export const getAllStashInstances = async (
         name: true,
         description: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         priority: true,
         createdAt: true,
@@ -524,7 +539,7 @@ export const createStashInstance = async (
   res: TypedResponse<CreateStashInstanceResponse | ApiErrorResponse>
 ) => {
   try {
-    const { name, description, url, apiKey, enabled = true, priority } = req.body;
+    const { name, description, url, uiUrl, apiKey, enabled = true, priority } = req.body;
 
     if (!name || !url || !apiKey) {
       return res.status(400).json({
@@ -539,6 +554,17 @@ export const createStashInstance = async (
       return res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+    }
+
+    // Validate uiUrl format if provided (optional)
+    if (uiUrl) {
+      try {
+        new URL(uiUrl);
+      } catch {
+        return res.status(400).json({
+          error: "Invalid UI URL format. Expected: https://hostname:port",
+        });
+      }
     }
 
     // Test connection before saving
@@ -569,6 +595,7 @@ export const createStashInstance = async (
         name,
         description: description || null,
         url,
+        uiUrl: uiUrl || null,
         apiKey,
         enabled,
         priority: instancePriority,
@@ -578,6 +605,7 @@ export const createStashInstance = async (
         name: true,
         description: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         priority: true,
         createdAt: true,
@@ -628,7 +656,7 @@ export const updateStashInstance = async (
 ) => {
   try {
     const { id } = req.params;
-    const { name, description, url, apiKey, enabled, priority } = req.body;
+    const { name, description, url, uiUrl, apiKey, enabled, priority } = req.body;
 
     // Check instance exists
     const existing = await prisma.stashInstance.findUnique({
@@ -662,6 +690,17 @@ export const updateStashInstance = async (
       }
     }
 
+    // Validate uiUrl format if provided (optional)
+    if (uiUrl) {
+      try {
+        new URL(uiUrl);
+      } catch {
+        return res.status(400).json({
+          error: "Invalid UI URL format. Expected: https://hostname:port",
+        });
+      }
+    }
+
     // Update instance
     const instance = await prisma.stashInstance.update({
       where: { id },
@@ -669,6 +708,7 @@ export const updateStashInstance = async (
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(url !== undefined && { url }),
+        ...(uiUrl !== undefined && { uiUrl }),
         ...(apiKey !== undefined && { apiKey }),
         ...(enabled !== undefined && { enabled }),
         ...(priority !== undefined && { priority }),
@@ -678,6 +718,7 @@ export const updateStashInstance = async (
         name: true,
         description: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         priority: true,
         createdAt: true,

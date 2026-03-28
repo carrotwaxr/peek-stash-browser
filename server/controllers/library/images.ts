@@ -238,7 +238,7 @@ export const findImages = async (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- transformImageResult intentionally returns any (dynamic DB row transformer)
     const imagesWithStashUrl = result.images.map((image) => ({
       ...transformImageResult(image),
-      stashUrl: buildStashEntityUrl("image", image.id),
+      stashUrl: buildStashEntityUrl("image", image.id, image.instanceId || undefined),
     }));
 
     const totalTime = Date.now() - startTime;
@@ -292,7 +292,7 @@ export const findImageById = async (
     // Add stashUrl
     const imageWithStashUrl = {
       ...mergedImage,
-      stashUrl: buildStashEntityUrl("image", mergedImage.id) || "",
+      stashUrl: buildStashEntityUrl("image", mergedImage.id, mergedImage.instanceId || imageInstanceId) || "",
     };
 
     res.json(imageWithStashUrl);

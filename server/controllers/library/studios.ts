@@ -205,7 +205,7 @@ export const findStudios = async (
     // Add stashUrl to each studio
     const studiosWithStashUrl = hydratedStudios.map((studio) => ({
       ...studio,
-      stashUrl: buildStashEntityUrl("studio", studio.id),
+      stashUrl: buildStashEntityUrl("studio", studio.id, studio.instanceId || undefined),
     }));
 
     logger.info("findStudios completed", {

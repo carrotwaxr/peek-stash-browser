@@ -196,6 +196,27 @@ class StashInstanceManager {
   }
 
   /**
+   * Get the UI URL for a Stash instance for "View in Stash" links
+   * Uses uiUrl if configured, otherwise falls back to the base url (without /graphql)
+   * @param instanceId - Optional instance ID. If not provided, uses the default instance
+   */
+  getUiUrl(instanceId?: string): string {
+    const config = instanceId
+      ? this.configs.get(instanceId)
+      : this.configs.values().next().value;
+
+    if (!config) {
+      throw new Error("No Stash instance configured");
+    }
+
+    // Use uiUrl if set, otherwise use url stripped of /graphql
+    if (config.uiUrl) {
+      return config.uiUrl.replace("/graphql", "").replace(/\/$/, "");
+    }
+    return config.url.replace("/graphql", "").replace(/\/$/, "");
+  }
+
+  /**
    * Get the API key for a Stash instance
    * Used by proxy controllers to authenticate requests
    */
