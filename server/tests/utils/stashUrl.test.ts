@@ -8,18 +8,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock function so it can be referenced in vi.mock factory
-const { mockGetBaseUrl } = vi.hoisted(() => ({
+const { mockGetBaseUrl, mockGetUiUrl } = vi.hoisted(() => ({
   mockGetBaseUrl: vi.fn(),
+  mockGetUiUrl: vi.fn(),
 }));
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getBaseUrl: mockGetBaseUrl,
+    getUiUrl: mockGetUiUrl,
   },
 }));
 
-import { getStashBaseUrl, buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { getStashBaseUrl, getStashUiUrl, buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 describe("stashUrl", () => {
   beforeEach(() => {
@@ -47,6 +49,36 @@ describe("stashUrl", () => {
     });
   });
 
+  describe("getStashUiUrl", () => {
+    it("returns URL from stashInstanceManager for the default instance", () => {
+      mockGetUiUrl.mockReturnValue("https://stash.example.com");
+
+      const result = getStashUiUrl();
+
+      expect(result).toBe("https://stash.example.com");
+      expect(mockGetUiUrl).toHaveBeenCalledWith(undefined);
+    });
+
+    it("passes through a specific instanceId", () => {
+      mockGetUiUrl.mockReturnValue("https://stash-b.example.com");
+
+      const result = getStashUiUrl("instance-b");
+
+      expect(result).toBe("https://stash-b.example.com");
+      expect(mockGetUiUrl).toHaveBeenCalledWith("instance-b");
+    });
+
+    it("returns null when stashInstanceManager throws", () => {
+      mockGetUiUrl.mockImplementation(() => {
+        throw new Error("No instance configured");
+      });
+
+      const result = getStashUiUrl("instance-b");
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("buildStashEntityUrl", () => {
     const BASE_URL = "http://localhost:9999";
 
@@ -61,7 +93,7 @@ describe("stashUrl", () => {
     ] as const)(
       "returns correct URL for entity type %s -> %s",
       (entityType, expectedPath) => {
-        mockGetBaseUrl.mockReturnValue(BASE_URL);
+        mockGetUiUrl.mockReturnValue(BASE_URL);
 
         const result = buildStashEntityUrl(entityType, "42");
 
@@ -69,8 +101,17 @@ describe("stashUrl", () => {
       }
     );
 
-    it("returns null when getStashBaseUrl returns null", () => {
-      mockGetBaseUrl.mockImplementation(() => {
+    it("passes the instanceId through to getStashUiUrl", () => {
+      mockGetUiUrl.mockReturnValue("https://stash-b.example.com");
+
+      const result = buildStashEntityUrl("scene", "42", "instance-b");
+
+      expect(result).toBe("https://stash-b.example.com/scenes/42");
+      expect(mockGetUiUrl).toHaveBeenCalledWith("instance-b");
+    });
+
+    it("returns null when getStashUiUrl returns null", () => {
+      mockGetUiUrl.mockImplementation(() => {
         throw new Error("No instance configured");
       });
 
@@ -80,7 +121,7 @@ describe("stashUrl", () => {
     });
 
     it("returns null for unknown entity type", () => {
-      mockGetBaseUrl.mockReturnValue(BASE_URL);
+      mockGetUiUrl.mockReturnValue(BASE_URL);
 
       // Cast to bypass TypeScript type checking for the test
       const result = buildStashEntityUrl(
@@ -92,7 +133,7 @@ describe("stashUrl", () => {
     });
 
     it("works with string entityId", () => {
-      mockGetBaseUrl.mockReturnValue(BASE_URL);
+      mockGetUiUrl.mockReturnValue(BASE_URL);
 
       const result = buildStashEntityUrl("scene", "123");
 
@@ -100,7 +141,7 @@ describe("stashUrl", () => {
     });
 
     it("works with number entityId", () => {
-      mockGetBaseUrl.mockReturnValue(BASE_URL);
+      mockGetUiUrl.mockReturnValue(BASE_URL);
 
       const result = buildStashEntityUrl("performer", 456);
 

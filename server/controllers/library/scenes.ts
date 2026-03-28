@@ -186,7 +186,7 @@ export function addStreamabilityInfo(
 ): NormalizedScene[] {
   return scenes.map((scene) => {
     const streamabilityInfo = isSceneStreamable(scene);
-    const stashUrl = buildStashEntityUrl('scene', scene.id);
+    const stashUrl = buildStashEntityUrl('scene', scene.id, scene.instanceId || undefined);
 
     return {
       ...scene,

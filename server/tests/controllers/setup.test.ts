@@ -282,6 +282,7 @@ describe("Setup Controller", () => {
         id: "inst-1",
         name: "Default",
         url: "http://stash:9999/graphql",
+        uiUrl: "https://stash.example.com",
         enabled: true,
         createdAt: new Date(),
       } as any);
@@ -291,6 +292,7 @@ describe("Setup Controller", () => {
         mockReq({
           name: "My Stash",
           url: "http://stash:9999/graphql",
+          uiUrl: "https://stash.example.com",
           apiKey: "test-key",
         }),
         res
@@ -298,6 +300,13 @@ describe("Setup Controller", () => {
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res._getBody().success).toBe(true);
+      expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            uiUrl: "https://stash.example.com",
+          }),
+        })
+      );
     });
 
     it("returns 403 when instances already exist", async () => {
@@ -335,6 +344,7 @@ describe("Setup Controller", () => {
         id: "inst-1",
         name: "Default",
         url: "http://stash:9999/graphql",
+        uiUrl: null,
         enabled: true,
         createdAt: new Date(),
       } as any);
@@ -353,6 +363,24 @@ describe("Setup Controller", () => {
           data: expect.objectContaining({ name: "Default" }),
         })
       );
+    });
+
+    it("returns 400 for invalid uiUrl format", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(0);
+
+      const res = mockRes();
+      await createFirstStashInstance(
+        mockReq({
+          url: "http://stash:9999/graphql",
+          uiUrl: "not-a-url",
+          apiKey: "test-key",
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getBody().error).toContain("Invalid UI URL");
+      expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
     });
   });
 

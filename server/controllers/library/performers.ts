@@ -224,7 +224,7 @@ export const findPerformers = async (
     // Add stashUrl to each performer
     const performersWithStashUrl = resultPerformers.map(performer => ({
       ...performer,
-      stashUrl: buildStashEntityUrl('performer', performer.id),
+      stashUrl: buildStashEntityUrl('performer', performer.id, performer.instanceId || undefined),
     }));
 
     logger.info("findPerformers completed", {

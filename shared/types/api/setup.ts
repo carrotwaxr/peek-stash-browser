@@ -77,6 +77,7 @@ export interface TestStashConnectionResponse {
 export interface CreateFirstStashInstanceRequest {
   name?: string;
   url: string;
+  uiUrl?: string;
   apiKey: string;
 }
 
@@ -86,6 +87,7 @@ export interface CreateFirstStashInstanceResponse {
     id: string;
     name: string;
     url: string;
+    uiUrl: string | null;
     enabled: boolean;
     createdAt: Date;
   };

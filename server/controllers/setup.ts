@@ -283,7 +283,7 @@ export const createFirstStashInstance = async (
       });
     }
 
-    const { name, url, apiKey } = req.body;
+    const { name, url, uiUrl, apiKey } = req.body;
 
     if (!url || !apiKey) {
       return res.status(400).json({
@@ -298,6 +298,17 @@ export const createFirstStashInstance = async (
       return res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+    }
+
+    // Validate uiUrl format if provided (optional)
+    if (uiUrl) {
+      try {
+        new URL(uiUrl);
+      } catch {
+        return res.status(400).json({
+          error: "Invalid UI URL format. Expected: https://hostname:port",
+        });
+      }
     }
 
     // Test connection before saving (skip in test environment for E2E setup)
@@ -320,6 +331,7 @@ export const createFirstStashInstance = async (
       data: {
         name: name || "Default",
         url,
+        uiUrl: uiUrl || null,
         apiKey,
         enabled: true,
         priority: 0,
@@ -328,6 +340,7 @@ export const createFirstStashInstance = async (
         id: true,
         name: true,
         url: true,
+        uiUrl: true,
         enabled: true,
         createdAt: true,
       },
