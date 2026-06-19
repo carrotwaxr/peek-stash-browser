@@ -97,6 +97,13 @@ const ENTITY_PLURALS: Record<EntityType, string> = {
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
 
+// Cleanup safety: refuse to soft-delete more than this fraction of the live
+// (non-deleted) local entities in a single cleanup pass. A truncated or partial
+// ID list from Stash (e.g. a broken paginated fetch, or - per #526 - a temp table
+// landing on a different pooled connection) would otherwise mass-delete real
+// scenes. Soft-deletes are recoverable, but the guard stops it before it happens.
+const MAX_CLEANUP_DELETE_RATIO = 0.5;
+
 /**
  * Format a timestamp for Stash GraphQL queries.
  *
@@ -1375,6 +1382,39 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * Safety guard against a bad/truncated keep-set wiping a large share of the
+   * library. Returns true (and logs loudly) when the proposed soft-delete count
+   * exceeds MAX_CLEANUP_DELETE_RATIO of the live (non-deleted) local entities.
+   *
+   * This protects against ANY cause of a bad keep-set - a partial paginated
+   * fetch, a transient Stash error, or the connection-pool race described in
+   * #526 - not just one specific failure mode. The keep-set size is surfaced in
+   * the log so a truncated fetch is easy to spot.
+   */
+  private exceedsCleanupDeleteThreshold(
+    plural: string,
+    keepSetSize: number,
+    liveCount: number,
+    toDeleteCount: number
+  ): boolean {
+    // Nothing to protect (empty/new library) or nothing to delete - let it run.
+    if (liveCount === 0 || toDeleteCount === 0) {
+      return false;
+    }
+    const ratio = toDeleteCount / liveCount;
+    if (ratio > MAX_CLEANUP_DELETE_RATIO) {
+      logger.error(
+        `Cleanup safety: refusing to soft-delete ${toDeleteCount}/${liveCount} ${plural} ` +
+          `(${(ratio * 100).toFixed(1)}% > ${(MAX_CLEANUP_DELETE_RATIO * 100).toFixed(0)}% limit). ` +
+          `Stash returned only ${keepSetSize} ${plural} ID(s) - the list looks truncated or partial, ` +
+          `so cleanup is being skipped to prevent mass deletion. Run a full sync if this is expected.`
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Cleanup entities that no longer exist in Stash.
    * Called during full sync after each entity type has been synced.
    *
@@ -1514,31 +1554,54 @@ class StashSyncService extends EventEmitter {
           // 1. Loading all scene IDs into memory
           // 2. Exceeding SQLite's parameter limit (~32k)
           //
-          // Strategy: Insert stashIds into temp table, then query scenes NOT IN temp table
-
-          // Create temp table and populate with Stash IDs in batches
-          await prisma.$executeRawUnsafe(`CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`);
-          await prisma.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
-
-          const BATCH_SIZE = 500;
-          for (let i = 0; i < stashIds.length; i += BATCH_SIZE) {
-            const batch = stashIds.slice(i, i + BATCH_SIZE);
-            if (batch.length > 0) {
-              const values = batch.map((id) => `('${id}')`).join(",");
-              await prisma.$executeRawUnsafe(`INSERT OR IGNORE INTO _stash_scene_ids (id) VALUES ${values}`);
-            }
-          }
-
-          // Find scenes to delete (in local DB but not in Stash) - only fetch what we need
+          // The CREATE TEMP TABLE -> INSERT -> SELECT (NOT IN) -> DROP sequence MUST run on a
+          // single connection: a TEMP table is connection-scoped, so if the SELECT landed on a
+          // different pooled connection it would see an empty table and mark the entire library
+          // for deletion (#526). Peek pins connection_limit=1 today, but we run the whole
+          // sequence inside one interactive transaction so the guarantee holds explicitly
+          // regardless of pool/adapter configuration. The transaction is kept short - it only
+          // computes the delete-set; reconciliation and the soft-delete writes happen outside,
+          // after the safety threshold check below.
+          const sceneBatchSize = 500;
           const instanceFilter = stashInstanceId ? `stashInstanceId = '${stashInstanceId}'` : `stashInstanceId IS NULL`;
-          const scenesToDelete = await prisma.$queryRawUnsafe<Array<{ id: string; phash: string | null }>>(
-            `SELECT id, phash FROM StashScene
-             WHERE deletedAt IS NULL
-             AND ${instanceFilter}
-             AND id NOT IN (SELECT id FROM _stash_scene_ids)`
+          const scenesToDelete = await prisma.$transaction(
+            async (tx) => {
+              await tx.$executeRawUnsafe(`CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`);
+              await tx.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
+
+              for (let i = 0; i < stashIds.length; i += sceneBatchSize) {
+                const batch = stashIds.slice(i, i + sceneBatchSize);
+                if (batch.length > 0) {
+                  const values = batch.map((id) => `('${id}')`).join(",");
+                  await tx.$executeRawUnsafe(`INSERT OR IGNORE INTO _stash_scene_ids (id) VALUES ${values}`);
+                }
+              }
+
+              // Find scenes to delete (in local DB but not in Stash) - only fetch what we need
+              const rows = await tx.$queryRawUnsafe<Array<{ id: string; phash: string | null }>>(
+                `SELECT id, phash FROM StashScene
+                 WHERE deletedAt IS NULL
+                 AND ${instanceFilter}
+                 AND id NOT IN (SELECT id FROM _stash_scene_ids)`
+              );
+
+              await tx.$executeRawUnsafe(`DROP TABLE IF EXISTS _stash_scene_ids`);
+              return rows;
+            },
+            // Generous timeout: the insert loop can run many batches for very large libraries.
+            // Cleanup is a serial maintenance step, so a long-lived txn is fine.
+            { maxWait: 10000, timeout: 120000 }
           );
 
           if (scenesToDelete.length > 0) {
+            // Safety threshold (#526): abort before mutating anything if this would soft-delete
+            // an implausibly large share of the library, which indicates a truncated/partial
+            // keep-set rather than genuine deletions in Stash.
+            const liveCount = await this.getLocalEntityCount("scene", stashInstanceId);
+            if (this.exceedsCleanupDeleteThreshold(plural, stashIds.length, liveCount, scenesToDelete.length)) {
+              return 0;
+            }
+
             // Check for merges and reconcile user data before soft-deleting
             for (const scene of scenesToDelete) {
               if (scene.phash) {
@@ -1560,8 +1623,8 @@ class StashSyncService extends EventEmitter {
             // Soft-delete in batches
             const deleteIds = scenesToDelete.map((s) => s.id);
             const instanceId = stashInstanceId;
-            for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
-              const batch = deleteIds.slice(i, i + BATCH_SIZE);
+            for (let i = 0; i < deleteIds.length; i += sceneBatchSize) {
+              const batch = deleteIds.slice(i, i + sceneBatchSize);
               await prisma.stashScene.updateMany({
                 where: { id: { in: batch }, stashInstanceId: instanceId },
                 data: { deletedAt: now },
@@ -1569,9 +1632,8 @@ class StashSyncService extends EventEmitter {
             }
             deletedCount = deleteIds.length;
           }
-
-          // Clean up temp table
-          await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS _stash_scene_ids`);
+          // Note: the _stash_scene_ids temp table is created and dropped inside the
+          // transaction above, so there is nothing to clean up here.
           break;
         }
         case "performer": {
