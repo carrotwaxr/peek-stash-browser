@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // Mock prisma before any imports - define mock inline (vi.mock is hoisted)
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
+vi.mock("../../prisma/singleton.js", () => {
+  const mockPrisma: Record<string, unknown> = {
     stashScene: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([]),
@@ -73,8 +73,14 @@ vi.mock("../../prisma/singleton.js", () => ({
     $queryRaw: vi.fn(),
     $executeRawUnsafe: vi.fn().mockResolvedValue(undefined),
     $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-  },
-}));
+  };
+  // Interactive transaction: invoke the callback with the same mock acting as `tx`
+  // so the scene cleanup's temp-table sequence runs against the mocked raw methods.
+  mockPrisma.$transaction = vi.fn(
+    async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma)
+  );
+  return { default: mockPrisma };
+});
 
 // Create mock functions for stash API
 const mockFindSceneIDs = vi.fn();
@@ -161,10 +167,17 @@ vi.mock("../../utils/logger.js", () => ({
 // Import after mocking
 import { stashSyncService } from "../../services/StashSyncService.js";
 import prisma from "../../services/../prisma/singleton.js";
+import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 
 describe("StashSyncService Cleanup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-establish implementations that restoreAllMocks (afterEach) would wipe.
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (cb: unknown) => (cb as (tx: typeof prisma) => unknown)(prisma)
+    );
+    vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(undefined);
+    vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -397,6 +410,99 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(0);
       expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Cleanup safety threshold (#526)", () => {
+    it("should skip scene cleanup when the delete ratio exceeds the threshold", async () => {
+      // Stash returns a small, likely-truncated keep-set...
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
+      });
+      // ...the NOT IN query reports 80 local scenes would be soft-deleted...
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue(
+        Array.from({ length: 80 }, (_, i) => ({ id: `${i + 100}`, phash: null }))
+      );
+      // ...out of 100 live scenes locally -> 80% > 50% threshold.
+      vi.mocked(prisma.stashScene.count).mockResolvedValue(100);
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities(
+        "scene",
+        "test-instance"
+      );
+
+      expect(result).toBe(0);
+      // Mass deletion blocked: no soft-deletes, and no merge reconciliation either.
+      expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
+      expect(mergeReconciliationService.reconcileScene).not.toHaveBeenCalled();
+    });
+
+    it("should proceed with scene cleanup when the delete ratio is under the threshold", async () => {
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }], count: 1 },
+      });
+      // Only 2 of 100 live scenes would be deleted -> 2% < 50%.
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([
+        { id: "4", phash: null },
+        { id: "5", phash: null },
+      ]);
+      vi.mocked(prisma.stashScene.count).mockResolvedValue(100);
+      vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 2 });
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities(
+        "scene",
+        "test-instance"
+      );
+
+      expect(result).toBe(2);
+      expect(prisma.stashScene.updateMany).toHaveBeenCalled();
+    });
+
+    it("should not apply the threshold when there are no live scenes locally", async () => {
+      // Empty/new library: liveCount === 0, so the ratio guard must not divide-by-zero
+      // or block.
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }], count: 1 },
+      });
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([
+        { id: "9", phash: null },
+      ]);
+      vi.mocked(prisma.stashScene.count).mockResolvedValue(0);
+      vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 1 });
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities(
+        "scene",
+        "test-instance"
+      );
+
+      expect(result).toBe(1);
+      expect(prisma.stashScene.updateMany).toHaveBeenCalled();
+    });
+  });
+
+  describe("Single-connection transaction (#526)", () => {
+    it("should run the temp-table cleanup sequence inside one transaction and drop the table", async () => {
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }, { id: "2" }], count: 2 },
+      });
+      // No scenes to delete - we only care that the temp-table sequence is wrapped.
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
+
+      await (stashSyncService as any).cleanupDeletedEntities(
+        "scene",
+        "test-instance"
+      );
+
+      // The whole CREATE/INSERT/SELECT/DROP sequence runs in a single interactive
+      // transaction so it is guaranteed to be same-connection (#526).
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const execSql = vi
+        .mocked(prisma.$executeRawUnsafe)
+        .mock.calls.map((c) => String(c[0]));
+      expect(execSql.some((sql) => /CREATE TEMP TABLE/i.test(sql))).toBe(true);
+      expect(
+        execSql.some((sql) => /DROP TABLE IF EXISTS _stash_scene_ids/i.test(sql))
+      ).toBe(true);
     });
   });
 });
