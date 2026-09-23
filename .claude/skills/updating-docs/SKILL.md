@@ -20,7 +20,7 @@ docs/
   user-guide/                   # Feature documentation (14 files)
   development/                  # Developer docs (4 files)
   reference/                    # API reference, entity relationships, Docker basics
-  plans/                        # Design docs and implementation plans (~120 files)
+  plans/                        # Local design docs and plans (gitignored)
   audits/                       # Documentation audits
   assets/                       # Images, logos
   stylesheets/                  # Custom CSS
@@ -75,78 +75,11 @@ More detail as needed.
 | How to use a feature | `user-guide/` |
 | How the code works | `development/` |
 | API endpoints, entity models | `reference/` |
-| Feature design before implementation | `plans/` |
+| Feature design before implementation | `plans/` (local only) |
 
 ## Plan Documents
 
-### Naming Convention
-
-```
-docs/plans/YYYY-MM-DD-feature-name-type.md
-```
-
-Types:
-- `-design.md` — Problem statement, proposed solution, architecture decisions
-- `-plan.md` — Task-by-task implementation steps
-- `-impl.md` or `-implementation.md` — Detailed implementation notes
-
-### Design Document Template
-
-```markdown
-# Feature Name
-
-## Objective
-Brief statement of what we're building and why.
-
-## Current State
-What exists today, what's missing or broken.
-
-## Solution
-
-### Approach
-High-level description of the solution.
-
-### Changes
-#### File: `path/to/file.ts`
-- Description of changes with code context
-
-## Files Affected
-- `path/to/file.ts` — description
-```
-
-### Implementation Plan Template
-
-```markdown
-# Feature Name — Implementation Plan
-
-## Goal
-One-line goal.
-
-## Architecture
-Brief architecture summary.
-
----
-
-### Task 1: Task Title
-
-**Files:**
-- Modify: `path/to/file.ts`
-- Create: `path/to/new-file.ts`
-
-**Steps:**
-1. Step description
-2. Step description
-
-**Verification:** `npm test` or manual check description.
-
----
-
-### Summary
-
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Task title | file.ts |
-```
+`docs/plans/` is gitignored, so plans stay local. Write them with `/fluffer:plan-write`, which sets the format and naming. Never add a plan to the MkDocs nav.
 
 ## API Reference
 
@@ -184,8 +117,7 @@ plugins:
 ## Local Preview
 
 ```bash
-pip install mkdocs-material mkdocs-minify-plugin mkdocs-redirects
-mkdocs serve
+npm run docs   # from the repo root; serves http://localhost:8001
 ```
 
-Site available at `http://localhost:8000`.
+It runs `.venv/bin/mkdocs`, so create that virtualenv once with `mkdocs-material`, `mkdocs-minify-plugin` and `mkdocs-redirects` installed. Port 8000 belongs to the Peek server.
