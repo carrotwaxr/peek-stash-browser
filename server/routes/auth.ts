@@ -36,8 +36,11 @@ router.post("/login", authRateLimiter, async (req, res) => {
         .json({ error: "Username and password are required" });
     }
 
+    // Lockout is per username and client address
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
+
     // Check if account is locked out
-    const lockoutStatus = checkAccountLockout(username);
+    const lockoutStatus = checkAccountLockout(username, clientIp);
     if (lockoutStatus.locked) {
       const retryAfterSeconds = Math.ceil(
         (lockoutStatus.remainingMs || 0) / 1000
@@ -62,18 +65,18 @@ router.post("/login", authRateLimiter, async (req, res) => {
     });
 
     if (!user) {
-      recordFailedAttempt(username);
+      recordFailedAttempt(username, clientIp);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      recordFailedAttempt(username);
+      recordFailedAttempt(username, clientIp);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Clear failed attempts on successful login
-    clearFailedAttempts(username);
+    clearFailedAttempts(username, clientIp);
 
     // A password sign-in: the token's authTime starts the 30-day session
     const token = generateToken({

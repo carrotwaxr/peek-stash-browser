@@ -47,6 +47,7 @@ import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import { logger } from "../utils/logger.js";
 import { authenticated } from "../utils/routeHelpers.js";
+import { resolveTrustProxy } from "../utils/trustProxy.js";
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -55,18 +56,9 @@ const __dirname = path.dirname(__filename);
 export const setupAPI = () => {
   const app = express();
 
-  // Configure trust proxy for reverse proxy setups (nginx, etc.)
-  // Prevents express-rate-limit ERR_ERL_UNEXPECTED_X_FORWARDED_FOR errors
-  const trustProxy = process.env.TRUST_PROXY;
-  if (trustProxy) {
-    if (trustProxy === "true") {
-      app.set("trust proxy", true);
-    } else if (/^\d+$/.test(trustProxy)) {
-      app.set("trust proxy", parseInt(trustProxy, 10));
-    } else {
-      app.set("trust proxy", trustProxy);
-    }
-  }
+  // Trust the image's own nginx (a loopback hop) and TRUST_PROXY more hops,
+  // so rate limiting and lockout see each visitor's address
+  app.set("trust proxy", resolveTrustProxy(process.env.TRUST_PROXY));
 
   app.use(
     cors({

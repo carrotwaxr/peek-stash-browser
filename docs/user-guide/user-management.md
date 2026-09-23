@@ -302,16 +302,14 @@ Passwords must meet these requirements:
 
 To protect against brute-force attacks:
 
-- After **5 failed login attempts**, the account is locked for **15 minutes**
-- The lockout applies per username
+- **5 failed sign-ins** for one username from one address lock that username for **15 minutes** from that address only; the owner can still sign in from elsewhere
 - Admins cannot manually unlock accounts—wait for the lockout to expire
 
 ### Rate Limiting
 
 Authentication endpoints are rate-limited:
 
-- **10 requests per 15 minutes** per IP address
-- Applies to login, password reset, and registration endpoints
+- **10 failed attempts per 15 minutes** per address, across sign-in and password recovery; successful sign-ins don't count
 - Helps prevent automated attacks
 
 ### Recovery Keys

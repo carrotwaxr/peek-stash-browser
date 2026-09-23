@@ -76,6 +76,7 @@ These settings have sensible defaults but can be customized:
 | `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database location            |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
+| `TRUST_PROXY`        | Reverse proxies in front of Peek | Unset (trusts only the image's own nginx) | Set to the number of reverse proxies between browsers and Peek. See [Behind a reverse proxy](#behind-a-reverse-proxy) |
 
 ### Generating a JWT Secret
 
@@ -117,6 +118,13 @@ This is a significant simplification from v1.x which required mounting media dir
     - **Never expose Peek directly to the internet** - always use a reverse proxy
     - Admin credentials are created during setup wizard (no default passwords)
     - Stash API key is stored securely in the database (not in environment variables)
+
+### Behind a reverse proxy
+
+The image trusts its own nginx, so sign-in lockouts and rate limits see each visitor's address when browsers reach the container directly. With SWAG, Nginx Proxy Manager, Traefik or Caddy in front, set `TRUST_PROXY=1` (one per proxy) so they still see each visitor's address rather than the proxy's.
+
+!!! warning
+    Never set `TRUST_PROXY` higher than the real number of proxies. A higher value lets anyone fake their address and get around lockouts and rate limits.
 
 ## Proxy Authentication
 
