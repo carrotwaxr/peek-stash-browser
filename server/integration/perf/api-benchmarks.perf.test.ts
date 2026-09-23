@@ -259,9 +259,9 @@ describe("Detail Page Benchmarks", () => {
 
   it("gallery detail", async () => {
     const result = await measureEndpoint("gallery-detail", async () => {
-      const res = await adminClient.get(
-        `/api/library/galleries/${discoveredGalleryId}`
-      );
+      const res = await adminClient.post("/api/library/galleries", {
+        ids: [discoveredGalleryId],
+      });
       expect(res.ok).toBe(true);
     });
     assertBenchmark(result);
@@ -269,9 +269,12 @@ describe("Detail Page Benchmarks", () => {
 
   it("gallery images", async () => {
     const result = await measureEndpoint("gallery-images", async () => {
-      const res = await adminClient.get(
-        `/api/library/galleries/${discoveredGalleryId}/images?page=1&per_page=25`
-      );
+      const res = await adminClient.post("/api/library/images", {
+        filter: { page: 1, per_page: 25, sort: "path", direction: "ASC" },
+        image_filter: {
+          galleries: { value: [discoveredGalleryId], modifier: "INCLUDES" },
+        },
+      });
       expect(res.ok).toBe(true);
     });
     assertBenchmark(result);

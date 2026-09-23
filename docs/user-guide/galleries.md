@@ -56,7 +56,7 @@ The lightbox supports:
 - Full-screen viewing
 - Slideshow mode (click "Play Slideshow")
 - Individual image rating and favoriting
-- O counter
+- O counter (your own count)
 - Navigation with automatic page boundary handling
 
 **Scenes**

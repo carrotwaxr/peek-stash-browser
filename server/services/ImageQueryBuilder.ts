@@ -605,9 +605,11 @@ class ImageQueryBuilder {
       ...params
     );
 
-    // Convert BigInt fields to Number and transform URLs to proxy paths with instanceId
+    // Convert BigInt fields to Number and transform URLs to proxy paths with instanceId.
+    // instanceId is the API name; stashInstanceId stays because callers spread the row.
     const transformedRows = rows.map((row) => ({
       ...row,
+      instanceId: row.stashInstanceId as string,
       title:
         (row.title as string) ||
         getImageFallbackTitle(row.filePath as string | null),

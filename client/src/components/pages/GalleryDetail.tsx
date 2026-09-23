@@ -98,12 +98,12 @@ const GalleryDetail = () => {
   // Fetch function for prefetching adjacent pages
   const fetchPage = useCallback(
     async (page: number) => {
-      const data = (await libraryApi.getGalleryImages(galleryId!, {
-        page,
-        per_page: PER_PAGE,
+      const { images } = await libraryApi.findGalleryImages(
+        galleryId!,
         instanceId,
-      })) as Record<string, unknown>;
-      return { images: (data.images || []) as NormalizedImage[] };
+        { page, perPage: PER_PAGE }
+      );
+      return { images };
     },
     [galleryId, instanceId]
   );
@@ -152,18 +152,13 @@ const GalleryDetail = () => {
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
-        const data = (await libraryApi.getGalleryImages(galleryId!, {
-          page: lightbox.currentPage,
-          per_page: PER_PAGE,
+        const data = await libraryApi.findGalleryImages(
+          galleryId!,
           instanceId,
-        })) as Record<string, unknown>;
-        setImages((data.images || []) as NormalizedImage[]);
-        setTotalCount(
-          ((data.pagination as Record<string, unknown> | undefined)
-            ?.total as number) ||
-            (data.images as unknown[] | undefined)?.length ||
-            0
+          { page: lightbox.currentPage, perPage: PER_PAGE }
         );
+        setImages(data.images);
+        setTotalCount(data.count);
 
         // Handle pending lightbox navigation after page loads
         lightbox.consumePendingLightboxIndex();

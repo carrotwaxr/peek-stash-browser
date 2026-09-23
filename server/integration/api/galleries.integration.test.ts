@@ -59,18 +59,23 @@ describe("Gallery API", () => {
     });
   });
 
-  describe("GET /api/library/galleries/:id/images", () => {
-    it("returns paginated images from gallery", async () => {
-      const response = await adminClient.get<{
-        images: Array<{ id: string }>;
-        count: number;
-        page: number;
-        per_page: number;
-      }>(`/api/library/galleries/${TEST_ENTITIES.galleryWithImages}/images`);
+  describe("POST /api/library/images with a galleries filter", () => {
+    it("returns that gallery's images", async () => {
+      const response = await adminClient.post<{
+        findImages: { images: Array<{ id: string }>; count: number };
+      }>("/api/library/images", {
+        filter: { page: 1, per_page: 100, sort: "path", direction: "ASC" },
+        image_filter: {
+          galleries: {
+            value: [TEST_ENTITIES.galleryWithImages],
+            modifier: "INCLUDES",
+          },
+        },
+      });
 
       expect(response.ok).toBe(true);
-      expect(response.data.images).toBeDefined();
-      expect(Array.isArray(response.data.images)).toBe(true);
+      expect(response.data.findImages.images).toBeDefined();
+      expect(Array.isArray(response.data.findImages.images)).toBe(true);
     });
   });
 });

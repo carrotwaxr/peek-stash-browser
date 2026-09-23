@@ -290,12 +290,6 @@ export type {
   // Galleries
   FindGalleriesRequest,
   FindGalleriesResponse,
-  GetGalleryParams,
-  GetGalleryResponse,
-  GetGalleryImagesParams,
-  GetGalleryImagesQuery,
-  GetGalleryImagesResponse,
-  GalleryImageWithContext,
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
   // Groups
@@ -306,8 +300,6 @@ export type {
   // Images
   FindImagesRequest,
   FindImagesResponse,
-  GetImageParams,
-  GetImageResponse,
 } from "./library.js";
 
 // Playlist endpoint types
