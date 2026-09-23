@@ -11,6 +11,8 @@ To use the download feature, you must have the appropriate permissions:
 | **Can Download Files** | Individual scenes and images |
 | **Can Download Playlists** | Playlist zip archives |
 
+Downloads follow the same rules as browsing. You can download only scenes and images you can see: your hidden items, any content restrictions and your Content Sources selection apply. Each file comes from the Stash server it lives on. A file in your download history stops downloading if the item is later hidden or restricted for you, or if your download permission is removed.
+
 !!! note "Permission Setup"
     Admins grant download permissions through [User Groups](user-management.md#user-groups) or [individual user permissions](user-management.md#permissions).
 
@@ -49,6 +51,8 @@ Image downloads also stream directly from Stash.
 ## Downloading Playlists
 
 Playlist downloads create a zip archive containing all scenes in the playlist, plus helpful metadata files.
+
+Anyone a playlist is shared with can download it too, with the Can Download Playlists permission. The zip holds only the scenes you can see. A finished zip stops downloading if the playlist is unshared or deleted, or if your permission is removed.
 
 ### Starting a Playlist Download
 
@@ -116,6 +120,7 @@ View all your downloads in one place.
 | **Processing** | Playlist zip being created (shows progress %) |
 | **Completed** | Ready to download |
 | **Failed** | Something went wrong |
+| **Expired** | Playlist zips expire after 24 hours; scene and image downloads made before this release are also marked expired. Download them again. |
 
 ### Managing Downloads
 
@@ -129,7 +134,7 @@ From the Downloads page, you can:
 
 ### Download Expiration
 
-Completed playlist downloads are available for **24 hours**, then automatically cleaned up to save server space. Individual scene and image downloads don't expire—you can re-download them anytime.
+Completed playlist downloads are available for **24 hours**, then automatically cleaned up to save server space. Scene and image downloads don't expire, but their links from before this release are marked expired: start those again from the scene or image.
 
 ---
 
@@ -140,6 +145,10 @@ Completed playlist downloads are available for **24 hours**, then automatically 
 Your account doesn't have download permissions. Ask an admin to:
 1. Add you to a group with download permissions, or
 2. Enable download permissions on your account directly
+
+### "This playlist has no scenes you can download"
+
+Every scene in the playlist is hidden or restricted for you, deleted from Stash, or on a Stash server you don't use. The zip holds only scenes you can see, so there is nothing to download.
 
 ### "Playlist exceeds maximum download size"
 

@@ -188,7 +188,7 @@ To stop sharing, uncheck all groups and save.
 | Reorder or remove scenes | Yes | No |
 | Manage sharing settings | Yes | No |
 | Delete playlist | Yes | No |
-| Download playlist | Yes (with permission) | No |
+| Download playlist | Yes (with permission) | Yes (with permission) |
 
 !!! tip "Duplicating Shared Playlists"
     Shared users can duplicate a shared playlist to create their own copy, which they can then edit freely.
@@ -202,6 +202,8 @@ You can download entire playlists as zip archives for offline viewing. The zip i
 2. Click the **Download** button
 3. Wait for the zip to be created (progress shown)
 4. Download starts automatically when ready
+
+Users a playlist is shared with can download it too. The zip leaves out any scenes hidden or restricted for the person downloading it.
 
 !!! note "Permission Required"
     Downloading playlists requires the "Can Download Playlists" permission. See [Downloads](downloads.md) for details.

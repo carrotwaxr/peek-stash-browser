@@ -20,6 +20,8 @@ export interface SerializedDownload {
   playlistId: number | null;
   entityType: string | null;
   entityId: string | null;
+  /** The entity's Stash instance; "" for playlist zips. */
+  instanceId: string;
   fileName: string;
   fileSize: string | null;
   filePath: string | null;
@@ -28,6 +30,14 @@ export interface SerializedDownload {
   createdAt: Date;
   completedAt: Date | null;
   expiresAt: Date | null;
+}
+
+/**
+ * Body of POST /api/downloads/scene/:sceneId and POST /api/downloads/image/:imageId:
+ * the Stash instance the entity lives on.
+ */
+export interface StartEntityDownloadRequest {
+  instanceId: string;
 }
 
 // =============================================================================

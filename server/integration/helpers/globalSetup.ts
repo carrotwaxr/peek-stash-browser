@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { TEST_CONFIG } from "./config.js";
@@ -53,6 +54,12 @@ export async function setup() {
 
   // Set test database URL
   process.env.DATABASE_URL = TEST_CONFIG.databaseUrl;
+
+  // The server runs in this process. Files it writes under CONFIG_DIR, such
+  // as the playlist zips the download tests start, go to a temp directory
+  // that teardown removes, never to a real config directory.
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-it-config-"));
+  process.env.CONFIG_DIR = configDir;
 
   // Handle fresh DB mode
   if (
@@ -146,6 +153,8 @@ export async function setup() {
 
     // Close the HTTP server
     await stopServer();
+
+    fs.rmSync(configDir, { recursive: true, force: true });
 
     // Disconnect Prisma — suppress stderr noise from SQLite cleanup
     // Prisma emits benign connection-close warnings that pollute test output

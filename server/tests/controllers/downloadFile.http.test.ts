@@ -35,7 +35,24 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 }));
 
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(),
+  resolveUserPermissions: vi.fn(async () => ({
+    canShare: false,
+    canDownloadFiles: true,
+    canDownloadPlaylists: true,
+    sources: {
+      canShare: "default",
+      canDownloadFiles: "override",
+      canDownloadPlaylists: "override",
+    },
+  })),
+}));
+
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn(async () => true),
+}));
+
+vi.mock("../../services/PlaylistAccessService.js", () => ({
+  getPlaylistAccess: vi.fn(async () => ({ level: "owner" })),
 }));
 
 vi.mock("../../services/PlaylistZipService.js", () => ({
@@ -118,12 +135,13 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
       status: "COMPLETED",
       entityType: null,
       entityId: null,
+      instanceId: "",
       fileName: "Kate’s picks 🎬.zip",
       fileSize: BigInt(9),
       filePath: zipPath,
       progress: 100,
       error: null,
-      playlistId: 1,
+      playlistId: 5,
       createdAt: new Date(),
       completedAt: new Date(),
       expiresAt: null,
@@ -146,6 +164,7 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
       status: "COMPLETED",
       entityType: "scene",
       entityId: "12",
+      instanceId: "inst-a",
       fileName: "Part 1 – Intro.mp4",
       fileSize: BigInt(11),
       filePath: null,

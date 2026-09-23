@@ -115,7 +115,7 @@ const PlaybackControls = () => {
       if (!scene) return;
       const response = await apiPost<{
         download: { id: string; status: string };
-      }>(`/downloads/scene/${scene.id}`);
+      }>(`/downloads/scene/${scene.id}`, { instanceId: scene.instanceId });
       const download = response.download;
 
       // For scenes, download is immediate - redirect to file endpoint
