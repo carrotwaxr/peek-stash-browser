@@ -2,6 +2,7 @@
  * Setup API — initial setup wizard and user setup endpoints.
  */
 import type {
+  CompleteSetupResponse,
   CreateFirstAdminResponse,
   CreateFirstStashInstanceResponse,
   GetSetupStatusResponse,
@@ -44,13 +45,18 @@ export const setupApi = {
 export const userSetupApi = {
   getSetupStatus: () =>
     apiGet<{
-      needsSetup: boolean;
-      instances: Array<{ id: string; name: string }>;
+      setupCompleted: boolean;
+      instances: Array<{
+        id: string;
+        name: string;
+        description?: string | null;
+      }>;
+      instanceCount: number;
     }>("/user/setup-status"),
 
+  /** Returns the first recovery key, shown this once (null if setup was already complete). */
   completeSetup: (selectedInstanceIds: string[]) =>
-    apiPost<{ success: boolean; user: Record<string, unknown> }>(
-      "/user/complete-setup",
-      { selectedInstanceIds }
-    ),
+    apiPost<CompleteSetupResponse>("/user/complete-setup", {
+      selectedInstanceIds,
+    }),
 };

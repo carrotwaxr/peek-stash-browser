@@ -7,6 +7,10 @@
  * and cache readiness.
  */
 import type { NextFunction, Request, Response } from "express";
+import fs from "fs";
+import jwt from "jsonwebtoken";
+import os from "os";
+import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   authenticate,
@@ -18,6 +22,10 @@ import {
 } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
+import {
+  _resetJwtSecretForTesting,
+  getJwtSecret,
+} from "../../utils/jwtSecret.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -59,6 +67,7 @@ const MOCK_USER = {
   hideConfirmationDisabled: false,
   landingPagePreference: null,
   setupCompleted: true,
+  passwordChangedAt: null,
 };
 
 const MOCK_ADMIN = {
@@ -106,6 +115,7 @@ describe("Auth Middleware", () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    _resetJwtSecretForTesting();
   });
 
   describe("authenticateToken", () => {
@@ -195,8 +205,7 @@ describe("Auth Middleware", () => {
     it("does not refresh token for Bearer auth (only cookie-based)", async () => {
       // Create a token with a backdated iat (older than 1 hour threshold)
       const jwt = await import("jsonwebtoken");
-      const secret =
-        process.env.JWT_SECRET || "your-secret-key-change-in-production";
+      const secret = getJwtSecret();
       const twoHoursAgoIat = Math.floor(Date.now() / 1000) - 2 * 3600;
       const token = jwt.default.sign(
         {
@@ -228,8 +237,7 @@ describe("Auth Middleware", () => {
 
     it("refreshes token when cookie-based and older than 1 hour", async () => {
       const jwt = await import("jsonwebtoken");
-      const secret =
-        process.env.JWT_SECRET || "your-secret-key-change-in-production";
+      const secret = getJwtSecret();
       const twoHoursAgoIat = Math.floor(Date.now() / 1000) - 2 * 3600;
       const token = jwt.default.sign(
         {
@@ -277,6 +285,200 @@ describe("Auth Middleware", () => {
       expect(nextFn).toHaveBeenCalled();
       // Fresh token — no refresh needed
       expect(cookieFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("session end on password change", () => {
+    const nowSeconds = () => Math.floor(Date.now() / 1000);
+    const signToken = (
+      claims: Record<string, unknown>,
+      secret = getJwtSecret()
+    ) =>
+      jwt.sign(
+        {
+          id: MOCK_USER.id,
+          username: MOCK_USER.username,
+          role: MOCK_USER.role,
+          ...claims,
+        },
+        secret,
+        { expiresIn: "24h" }
+      );
+
+    it("rejects a token issued before the user's last password change", async () => {
+      const token = signToken({ iat: nowSeconds() - 10 });
+      const req = createMockReq({ cookies: { token } });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...MOCK_USER,
+        passwordChangedAt: new Date(),
+      } as any);
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(jsonFn).toHaveBeenCalledWith({
+        error: "Session expired. Please log in again.",
+      });
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("accepts a token issued in the same second as the password change", async () => {
+      const iat = nowSeconds();
+      const token = signToken({ iat });
+      const req = createMockReq({ cookies: { token } });
+      const { res } = createMockRes();
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...MOCK_USER,
+        passwordChangedAt: new Date(iat * 1000 + 999),
+      } as any);
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+    });
+
+    it("does not put passwordChangedAt on req.user", async () => {
+      const passwordChangedAt = new Date((nowSeconds() - 60) * 1000);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...MOCK_USER,
+        passwordChangedAt,
+      } as any);
+
+      // Token path
+      const tokenReq = createMockReq({ cookies: { token: signToken({}) } });
+      await authenticateToken(
+        tokenReq as Request,
+        createMockRes().res as Response,
+        nextFn
+      );
+      expect((tokenReq as any).user.id).toBe(MOCK_USER.id);
+      expect((tokenReq as any).user).not.toHaveProperty("passwordChangedAt");
+
+      // Proxy-header path
+      process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
+      const proxyReq = createMockReq({
+        header: vi.fn((name: string) =>
+          name === "X-Forwarded-User" ? "testuser" : undefined
+        ),
+      } as any);
+      await authenticate(
+        proxyReq as Request,
+        createMockRes().res as Response,
+        nextFn
+      );
+      expect((proxyReq as any).user.id).toBe(MOCK_USER.id);
+      expect((proxyReq as any).user).not.toHaveProperty("passwordChangedAt");
+      expect(nextFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects a token signed with the old built-in fallback secret", async () => {
+      delete process.env.JWT_SECRET;
+      const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "peek-jwt-"));
+      process.env.CONFIG_DIR = configDir;
+      _resetJwtSecretForTesting();
+
+      try {
+        const token = signToken({}, "your-secret-key-change-in-production");
+        const req = createMockReq({ cookies: { token } });
+        const { res, statusFn } = createMockRes();
+
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+
+        await authenticateToken(req as Request, res as Response, nextFn);
+
+        expect(statusFn).toHaveBeenCalledWith(403);
+        expect(nextFn).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("30-day session cap", () => {
+    const T = new Date("2026-09-23T12:00:00Z");
+    const Tsec = Math.floor(T.getTime() / 1000);
+    const signToken = (claims: Record<string, unknown>) =>
+      jwt.sign(
+        {
+          id: MOCK_USER.id,
+          username: MOCK_USER.username,
+          role: MOCK_USER.role,
+          ...claims,
+        },
+        getJwtSecret(),
+        { expiresIn: "24h" }
+      );
+    const refreshedClaims = (cookieFn: ReturnType<typeof vi.fn>) => {
+      expect(cookieFn).toHaveBeenCalledWith(
+        "token",
+        expect.any(String),
+        expect.anything()
+      );
+      return jwt.decode(cookieFn.mock.calls[0][1] as string) as {
+        authTime?: number;
+      };
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(T);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("the hourly refresh keeps the original authTime", async () => {
+      const token = signToken({
+        iat: Tsec - 2 * 3600,
+        authTime: Tsec - 5 * 86400,
+      });
+      const req = createMockReq({ cookies: { token } });
+      const { res, cookieFn } = createMockRes();
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+      expect(refreshedClaims(cookieFn).authTime).toBe(Tsec - 5 * 86400);
+    });
+
+    it("treats a token without authTime as signed in at iat", async () => {
+      const token = signToken({ iat: Tsec - 2 * 3600 });
+      const req = createMockReq({ cookies: { token } });
+      const { res, cookieFn } = createMockRes();
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+      expect(refreshedClaims(cookieFn).authTime).toBe(Tsec - 2 * 3600);
+    });
+
+    it("rejects a session 30 days and one second after sign-in", async () => {
+      const token = signToken({ iat: Tsec - 10, authTime: Tsec - 2592001 });
+      const req = createMockReq({ cookies: { token } });
+      const { res, statusFn, jsonFn } = createMockRes();
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(statusFn).toHaveBeenCalledWith(401);
+      expect(jsonFn).toHaveBeenCalledWith({
+        error: "Session expired. Please log in again.",
+      });
+      expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    it("accepts a session one second short of 30 days", async () => {
+      const token = signToken({ iat: Tsec - 10, authTime: Tsec - 2591999 });
+      const req = createMockReq({ cookies: { token } });
+      const { res } = createMockRes();
+
+      await authenticateToken(req as Request, res as Response, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
     });
   });
 

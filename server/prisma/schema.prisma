@@ -70,8 +70,9 @@ model User {
   canDownloadFilesOverride     Boolean?
   canDownloadPlaylistsOverride Boolean?
 
-  // Recovery key for password reset (stored plaintext for user viewing)
-  recoveryKey String?
+  // Recovery key for password reset
+  recoveryKeyHash   String? // SHA-256 hex of the normalized key; the key is shown once
+  passwordChangedAt DateTime? // set by setUserPassword(); tokens issued earlier are rejected
 
   // Group memberships relation
   groupMemberships UserGroupMembership[]

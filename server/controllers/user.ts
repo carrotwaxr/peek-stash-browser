@@ -1,7 +1,9 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import type { EntityType } from "../services/UserHiddenEntityService.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
@@ -16,6 +18,7 @@ import type {
   ChangePasswordBody,
   ChangePasswordResponse,
   CompleteSetupBody,
+  CompleteSetupResponse,
   CreateUserBody,
   CreateUserResponse,
   DefaultFilterPresets,
@@ -43,6 +46,7 @@ import type {
   HideEntityResponse,
   LandingPagePreference,
   NavPreference,
+  RegenerateRecoveryKeyBody,
   RegenerateRecoveryKeyResponse,
   SaveFilterPresetBody,
   SaveFilterPresetResponse,
@@ -77,6 +81,7 @@ import { validatePassword } from "../utils/passwordValidation.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
+  hashRecoveryKey,
 } from "../utils/recoveryKey.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
@@ -606,14 +611,19 @@ export const changePassword = async (
       return res.status(401).json({ error: "Current password is incorrect" });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Signs out every other session of this user
+    await setUserPassword(userId, newPassword);
 
-    // Update password
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
+    // The current password was just proven: this session gets a fresh token,
+    // and its 30 days restart
+    setTokenCookie(
+      res,
+      generateToken({
+        id: userId,
+        username: req.user.username,
+        role: req.user.role,
+      })
+    );
 
     res.json({ success: true, message: "Password changed successfully" });
   } catch (error) {
@@ -625,7 +635,8 @@ export const changePassword = async (
 };
 
 /**
- * Get current user's recovery key (formatted for display)
+ * Whether the current user has a recovery key. Only its hash is stored, so the
+ * key itself cannot be shown again.
  */
 export const getRecoveryKey = async (
   req: TypedAuthRequest,
@@ -640,19 +651,14 @@ export const getRecoveryKey = async (
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { recoveryKey: true },
+      select: { recoveryKeyHash: true },
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Format with dashes if key exists
-    const formattedKey = user.recoveryKey
-      ? formatRecoveryKey(user.recoveryKey)
-      : null;
-
-    res.json({ recoveryKey: formattedKey });
+    res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
   } catch (error) {
     logger.error("Error getting recovery key", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -662,10 +668,12 @@ export const getRecoveryKey = async (
 };
 
 /**
- * Regenerate current user's recovery key
+ * Create a new recovery key for the current user, replacing the old one.
+ * Needs the current password; the key is returned this once and only its
+ * hash is stored.
  */
 export const regenerateRecoveryKey = async (
-  req: TypedAuthRequest,
+  req: TypedAuthRequest<RegenerateRecoveryKeyBody>,
   res: TypedResponse<RegenerateRecoveryKeyResponse | ApiErrorResponse>
 ) => {
   try {
@@ -675,16 +683,33 @@ export const regenerateRecoveryKey = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Generate new recovery key
-    const newKey = generateRecoveryKey();
+    // Express 5 leaves req.body undefined when the request has no body
+    const { currentPassword } = req.body ?? {};
+    if (!currentPassword) {
+      return res.status(400).json({ error: "Current password is required" });
+    }
 
-    // Update user in database
-    await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      data: { recoveryKey: newKey },
+      select: { password: true },
     });
 
-    // Return formatted key
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 400, not 401: the client treats 401 as a lost session
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+
+    const newKey = generateRecoveryKey();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { recoveryKeyHash: hashRecoveryKey(newKey) },
+    });
+
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
     logger.error("Error regenerating recovery key", {
@@ -2922,14 +2947,8 @@ export const adminResetPassword = async (
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password
-    await prisma.user.update({
-      where: { id: userIdInt },
-      data: { password: hashedPassword },
-    });
+    // Also signs the user out everywhere
+    await setUserPassword(userIdInt, newPassword);
 
     res.json({ success: true });
   } catch (error) {
@@ -2971,16 +2990,13 @@ export const adminRegenerateRecoveryKey = async (
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Generate new recovery key
+    // Only the hash is stored; the admin passes the key on
     const newKey = generateRecoveryKey();
-
-    // Update user in database
     await prisma.user.update({
       where: { id: userIdInt },
-      data: { recoveryKey: newKey },
+      data: { recoveryKeyHash: hashRecoveryKey(newKey) },
     });
 
-    // Return formatted key
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
     logger.error("Error regenerating user recovery key", {
@@ -3129,7 +3145,6 @@ export const getSetupStatus = async (
   res: TypedResponse<
     | {
         setupCompleted: boolean;
-        recoveryKey: string | null;
         instances: unknown[];
         instanceCount: number;
       }
@@ -3146,7 +3161,6 @@ export const getSetupStatus = async (
       where: { id: userId },
       select: {
         setupCompleted: true,
-        recoveryKey: true,
       },
     });
 
@@ -3169,7 +3183,6 @@ export const getSetupStatus = async (
 
     res.json({
       setupCompleted: user.setupCompleted,
-      recoveryKey: user.recoveryKey,
       instances,
       instanceCount,
     });
@@ -3187,7 +3200,7 @@ export const getSetupStatus = async (
  */
 export const completeSetup = async (
   req: TypedAuthRequest<CompleteSetupBody>,
-  res: TypedResponse<{ success: true } | ApiErrorResponse>
+  res: TypedResponse<CompleteSetupResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -3246,16 +3259,23 @@ export const completeSetup = async (
       });
     }
 
-    // Mark setup as complete
-    await prisma.user.update({
-      where: { id: userId },
+    // Mark setup as complete and issue the first recovery key. The
+    // conditional update issues at most one key per user: a repeated call
+    // leaves the saved key alone and returns none.
+    const key = generateRecoveryKey();
+    const { count } = await prisma.user.updateMany({
+      where: { id: userId, setupCompleted: false },
       data: {
         setupCompleted: true,
         setupCompletedAt: new Date(),
+        recoveryKeyHash: hashRecoveryKey(key),
       },
     });
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      recoveryKey: count === 1 ? formatRecoveryKey(key) : null,
+    });
   } catch (error) {
     logger.error("Error completing setup", {
       error: error instanceof Error ? error.message : "Unknown error",

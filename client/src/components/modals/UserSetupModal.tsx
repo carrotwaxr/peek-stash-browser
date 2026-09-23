@@ -7,21 +7,30 @@ import { Button } from "../ui/index";
 interface StashInstance {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
 }
 
 interface Props {
   onComplete?: () => void;
 }
 
+/**
+ * First sign-in setup, in two steps:
+ * 1. Content Sources (when there are 2+ instances) and Continue, which
+ *    completes setup on the server and creates the first recovery key.
+ * 2. The recovery key, shown this once, and Get Started.
+ * When the server returns no key (setup was already complete), step two is
+ * skipped.
+ */
 const UserSetupModal = ({ onComplete }: Props) => {
   const { updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [recoveryKey, setRecoveryKey] = useState("");
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
   const [showInstanceSelection, setShowInstanceSelection] = useState(false);
@@ -29,21 +38,16 @@ const UserSetupModal = ({ onComplete }: Props) => {
   useEffect(() => {
     const fetchSetupStatus = async () => {
       try {
-        const data = (await userSetupApi.getSetupStatus()) as {
-          needsSetup: boolean;
-          instances: StashInstance[];
-          recoveryKey?: string;
-          instanceCount?: number;
-        };
-        const { recoveryKey: key, instances: inst, instanceCount } = data;
+        const { instances: inst, instanceCount } =
+          await userSetupApi.getSetupStatus();
 
-        setRecoveryKey(key || "");
         setInstances(inst || []);
         setShowInstanceSelection((instanceCount ?? 0) >= 2);
 
         // Pre-select all instances
         setSelectedInstanceIds((inst || []).map((i: StashInstance) => i.id));
       } catch (err) {
+        setLoadFailed(true);
         setError("Failed to load setup data");
         console.error("Setup status error:", err);
       } finally {
@@ -55,6 +59,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
   }, []);
 
   const handleCopyKey = async () => {
+    if (!recoveryKey) return;
     try {
       await navigator.clipboard.writeText(recoveryKey);
       setCopied(true);
@@ -75,19 +80,26 @@ const UserSetupModal = ({ onComplete }: Props) => {
     });
   };
 
-  const handleComplete = async () => {
+  const finish = () => {
+    // Update auth context
+    updateUser({ setupCompleted: true });
+    onComplete?.();
+  };
+
+  const handleContinue = async () => {
     setSubmitting(true);
     setError(null);
 
     try {
-      await userSetupApi.completeSetup(
+      const { recoveryKey: key } = await userSetupApi.completeSetup(
         showInstanceSelection ? selectedInstanceIds : []
       );
 
-      // Update auth context
-      updateUser({ setupCompleted: true });
-
-      onComplete?.();
+      if (key) {
+        setRecoveryKey(key);
+      } else {
+        finish();
+      }
     } catch (err) {
       setError((err as Error).message || "Failed to complete setup");
       console.error("Complete setup error:", err);
@@ -127,7 +139,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
         </div>
 
         {/* Error state - show retry if we failed to load data */}
-        {error && !recoveryKey && (
+        {loadFailed && (
           <div
             className="p-6 rounded-lg border text-center"
             style={{
@@ -147,21 +159,8 @@ const UserSetupModal = ({ onComplete }: Props) => {
           </div>
         )}
 
-        {/* Error during submit - show above form */}
-        {error && recoveryKey && (
-          <div
-            className="p-4 rounded border-l-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "#ef4444",
-            }}
-          >
-            <p style={{ color: "#ef4444" }}>{error}</p>
-          </div>
-        )}
-
-        {/* Recovery Key Section - only show if we have data */}
-        {recoveryKey && (
+        {/* Step two: the recovery key, shown this once */}
+        {!loadFailed && recoveryKey && (
           <>
             <div
               className="p-6 rounded-lg border"
@@ -177,11 +176,18 @@ const UserSetupModal = ({ onComplete }: Props) => {
                 Your Recovery Key
               </h2>
               <p
-                className="text-sm mb-4"
+                className="text-sm mb-2"
                 style={{ color: "var(--text-secondary)" }}
               >
                 Save this somewhere safe - you'll need it if you forget your
                 password
+              </p>
+              <p
+                className="text-sm mb-4 font-medium"
+                style={{ color: "var(--status-warning)" }}
+              >
+                Peek shows it only this once; you can create a new one in
+                Settings → Account
               </p>
 
               <div className="flex items-center gap-2">
@@ -199,11 +205,34 @@ const UserSetupModal = ({ onComplete }: Props) => {
                   size="sm"
                   onClick={handleCopyKey}
                   className="shrink-0"
+                  aria-label="Copy recovery key"
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />}
                 </Button>
               </div>
             </div>
+
+            <Button variant="primary" size="lg" fullWidth onClick={finish}>
+              Get Started
+            </Button>
+          </>
+        )}
+
+        {/* Step one: content sources, then Continue */}
+        {!loadFailed && !recoveryKey && (
+          <>
+            {/* Error during submit - show above form */}
+            {error && (
+              <div
+                className="p-4 rounded border-l-4"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "#ef4444",
+                }}
+              >
+                <p style={{ color: "#ef4444" }}>{error}</p>
+              </div>
+            )}
 
             {/* Instance Selection Section */}
             {showInstanceSelection && (
@@ -266,16 +295,15 @@ const UserSetupModal = ({ onComplete }: Props) => {
               </div>
             )}
 
-            {/* Complete Button */}
             <Button
               variant="primary"
               size="lg"
               fullWidth
-              onClick={handleComplete}
+              onClick={handleContinue}
               disabled={submitting}
               loading={submitting}
             >
-              Get Started
+              Continue
             </Button>
           </>
         )}

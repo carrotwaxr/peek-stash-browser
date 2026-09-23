@@ -1,6 +1,10 @@
 /**
  * Admin API — groups, permissions, recovery keys, password reset.
  */
+import type {
+  GetRecoveryKeyResponse,
+  RegenerateRecoveryKeyResponse,
+} from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 // ── User Groups (admin management) ────────────────────────────────────
@@ -49,10 +53,12 @@ export const updateUserPermissionOverrides = (
 // ── Recovery Key & Password Reset ─────────────────────────────────────
 
 export const getRecoveryKey = () =>
-  apiGet<{ recoveryKey: string | null }>("/user/recovery-key");
+  apiGet<GetRecoveryKeyResponse>("/user/recovery-key");
 
-export const regenerateRecoveryKey = () =>
-  apiPost<{ recoveryKey: string }>("/user/recovery-key/regenerate");
+export const regenerateRecoveryKey = (currentPassword: string) =>
+  apiPost<RegenerateRecoveryKeyResponse>("/user/recovery-key/regenerate", {
+    currentPassword,
+  });
 
 export const forgotPasswordInit = (username: string) =>
   apiPost<{ hasRecoveryKey: boolean }>("/auth/forgot-password/init", {

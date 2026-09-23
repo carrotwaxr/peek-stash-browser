@@ -22,7 +22,7 @@ docker logs peek-stash-browser
 
 **Common causes:**
 
-- Missing `JWT_SECRET` environment variable
+- `/app/data` not writable (Peek stores its generated session secret there)
 - Port 6969 already in use
 - Volume mount issues for `/app/data`
 

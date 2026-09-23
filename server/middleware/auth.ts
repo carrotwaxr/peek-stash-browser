@@ -4,15 +4,18 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+import { getJwtSecret } from "../utils/jwtSecret.js";
 
 // Token expires after 2 hours, but we refresh it if older than 1 hour
 // This gives users a 1-hour inactivity window before session expires
 // Active users (making API requests) stay logged in seamlessly
 const TOKEN_EXPIRY_HOURS = 2;
 const TOKEN_REFRESH_THRESHOLD_HOURS = 1;
+
+/** A session ends this long after its password sign-in (`authTime`), even while in use. */
+export const MAX_SESSION_AGE_SECONDS = 30 * 24 * 60 * 60;
+
+const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 /**
  * User information attached to request by auth middleware
@@ -39,13 +42,19 @@ export interface AuthenticatedRequest extends Request {
   user: RequestUser;
 }
 
-export const generateToken = (user: {
-  id: number;
-  username: string;
-  role: string;
-}) => {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: `${TOKEN_EXPIRY_HOURS}h` });
-};
+/**
+ * Sign a session token. `authTime` is the second of the password sign-in the
+ * session started from; the hourly refresh passes the original one along.
+ */
+export const generateToken = (
+  user: { id: number; username: string; role: string },
+  authTime: number = nowSeconds()
+) =>
+  jwt.sign(
+    { id: user.id, username: user.username, role: user.role, authTime },
+    getJwtSecret(),
+    { expiresIn: `${TOKEN_EXPIRY_HOURS}h` }
+  );
 
 /**
  * Set the auth token cookie on a response
@@ -60,13 +69,29 @@ export const setTokenCookie = (res: Response, token: string) => {
 };
 
 export const verifyToken = (token: string) => {
-  return jwt.verify(token, JWT_SECRET) as {
+  return jwt.verify(token, getJwtSecret()) as {
     id: number;
     username: string;
     role: string;
     iat?: number;
+    authTime?: number;
   };
 };
+
+// != null, not !== null: a test mock that omits the field passes undefined, and .getTime() on it would throw into the 403 catch.
+export const tokenPredatesPasswordChange = (
+  iat: number | undefined,
+  passwordChangedAt: Date | null | undefined
+): boolean =>
+  passwordChangedAt != null &&
+  (iat ?? 0) < Math.floor(passwordChangedAt.getTime() / 1000);
+
+/** Tokens issued before this release have no authTime; their iat stands in (they expire 2 h after iat, so the 30 days start at most 2 h before the upgrade). */
+export const sessionPastMaxAge = (
+  authTime: number | undefined,
+  iat: number | undefined,
+  now = nowSeconds()
+): boolean => now - (authTime ?? iat ?? 0) > MAX_SESSION_AGE_SECONDS;
 
 export const authenticate = async (
   req: Request,
@@ -99,6 +124,7 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       hideConfirmationDisabled: true,
       landingPagePreference: true,
       setupCompleted: true,
+      passwordChangedAt: true,
     },
   });
 
@@ -116,8 +142,11 @@ const authenticateUser = async (
       );
     }
 
+    // The proxy owns this session's length: no token, so no 30-day cap here
+    const { passwordChangedAt: _passwordChangedAt, ...requestUser } = user;
+
     // Cast to AuthenticatedRequest to set user property
-    (req as AuthenticatedRequest).user = user;
+    (req as AuthenticatedRequest).user = requestUser;
     next();
   } catch {
     return await authenticateToken(req, res, next);
@@ -142,23 +171,35 @@ export const authenticateToken = async (
     if (!user) {
       return res.status(401).json({ error: "Invalid token. User not found." });
     }
+    const { passwordChangedAt, ...requestUser } = user;
+
+    // A password change or reset ends every session issued before it, and a
+    // session ends 30 days after its password sign-in even while in use
+    if (
+      tokenPredatesPasswordChange(decoded.iat, passwordChangedAt) ||
+      sessionPastMaxAge(decoded.authTime, decoded.iat)
+    ) {
+      return res
+        .status(401)
+        .json({ error: "Session expired. Please log in again." });
+    }
 
     // Check if token needs refresh (older than threshold)
     // Only refresh for cookie-based auth (not Bearer tokens from external clients)
     if (req.cookies?.token && decoded.iat) {
       const tokenAgeHours = (Date.now() / 1000 - decoded.iat) / 3600;
       if (tokenAgeHours > TOKEN_REFRESH_THRESHOLD_HOURS) {
-        const newToken = generateToken({
-          id: user.id,
-          username: user.username,
-          role: user.role,
-        });
+        // Keep the sign-in time, so refreshing never extends the 30 days
+        const newToken = generateToken(
+          { id: user.id, username: user.username, role: user.role },
+          decoded.authTime ?? decoded.iat
+        );
         setTokenCookie(res, newToken);
       }
     }
 
     // Cast to AuthenticatedRequest to set user property
-    (req as AuthenticatedRequest).user = user;
+    (req as AuthenticatedRequest).user = requestUser;
     next();
   } catch {
     res.status(403).json({ error: "Invalid token." });

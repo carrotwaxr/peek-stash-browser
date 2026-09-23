@@ -85,9 +85,9 @@ docker run -d \
 
 - `peek-data` - Database and app data (Docker named volume)
 
-**Required Environment Variables**:
+**Environment Variables**: none are required.
 
-- `JWT_SECRET` - Secret for JWT authentication (recommended to set manually)
+- `JWT_SECRET` (optional) - Signs login sessions. When unset, Peek generates one on first start and keeps it in `/app/data/.jwt-secret`
 
 > **Note**: Stash URL and API key are configured via the Setup Wizard on first access - no environment variables needed!
 

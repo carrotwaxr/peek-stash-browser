@@ -5,6 +5,7 @@ import { setupAPI, startServer } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
 import { installProcessHandlers } from "./initializers/processHandlers.js";
+import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
@@ -12,6 +13,7 @@ import prisma, { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { stashSyncService } from "./services/StashSyncService.js";
+import { getJwtSecret } from "./utils/jwtSecret.js";
 import { logger } from "./utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -36,12 +38,19 @@ const main = async () => {
 
   validateStartup();
 
+  // Resolve the session secret now: a missing or unwritable one stops the
+  // server here rather than on the first login
+  getJwtSecret();
+
   // Run database migrations and seeding
   await initializeDatabase();
 
   // Configure SQLite for production performance (WAL mode, busy_timeout, etc.)
   await configureSQLite();
   logger.info("SQLite PRAGMAs configured (WAL mode, busy_timeout, etc.)");
+
+  // Recovery keys from before 3.3.7 were stored in plaintext
+  await hashLegacyRecoveryKeys();
 
   // Initialize Stash instances (migrate from env vars if needed)
   const stashConfig = await initializeStashInstances();

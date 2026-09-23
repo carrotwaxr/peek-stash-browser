@@ -316,12 +316,18 @@ Authentication endpoints are rate-limited:
 
 ### Recovery Keys
 
-Each user has a recovery key that can be used to reset their password if forgotten.
+A recovery key resets your password if you forget it. Peek stores only a fingerprint of each key, so it can show a key only once, when it is created.
 
-**Viewing your recovery key:**
+**Getting your recovery key:**
+1. Your first key is shown once at your first sign-in, in the welcome screen
+2. Copy it and store it in a safe place (password manager recommended)
+
+**Creating a new key:**
 1. Go to **Settings** → **Account** tab
-2. Your recovery key is displayed in the Security section
-3. Copy and store it in a safe place (password manager recommended)
+2. Under **Recovery Key**, enter your current password and click **Create new key** (**Create key** if you have none)
+3. Copy the new key: Peek won't show it again. The old key stops working.
+
+Peek cannot show an existing key. If you lost yours, create a new one.
 
 **Using a recovery key:**
 1. On the login page, click **Forgot Password**
@@ -329,8 +335,10 @@ Each user has a recovery key that can be used to reset their password if forgott
 3. Enter your recovery key
 4. Set a new password
 
+Resetting a password with a recovery key signs out every existing session of that user.
+
 !!! warning "Keep Your Recovery Key Safe"
-    Recovery keys are the only way to reset a forgotten password without admin intervention. Store yours securely—if you lose both your password and recovery key, an admin must reset your password.
+    Recovery keys are the only way to reset a forgotten password without admin intervention. Store yours securely. If you lose both your password and your recovery key, an admin must reset your password.
 
 ### Admin Password Reset
 
@@ -340,14 +348,12 @@ Admins can reset any user's password:
 2. In the Account section, enter a new password
 3. Click **Save**
 
-The user should change their password after logging in.
+The reset signs the user out everywhere. The user should change their password after logging in.
 
 ### Security Best Practices
 
 - Passwords are hashed with bcrypt (never stored in plain text)
-- Sessions expire after 24 hours of activity
-- Inactive sessions expire after 4 hours
-- Change the default admin password immediately after setup
+- A session ends after 2 hours without activity, and 30 days after you signed in with your password even while active. Changing or resetting a password signs out every other session.
 - Store recovery keys in a password manager
 - Use unique passwords for each user account
 

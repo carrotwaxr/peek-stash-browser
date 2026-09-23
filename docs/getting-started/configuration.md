@@ -63,11 +63,23 @@ When multiple instances are configured, each user can choose which instances the
 
 ## Required Environment Variables
 
-| Variable     | Description     | Example                             |
-| ------------ | --------------- | ----------------------------------- |
-| `JWT_SECRET` | JWT signing key | Generate with `openssl rand -base64 32` |
+None. Peek starts with no environment variables set; everything below is optional.
 
-### Generating JWT Secret
+## Optional Environment Variables
+
+These settings have sensible defaults but can be customized:
+
+| Variable             | Description                | Default                                | Notes                        |
+| -------------------- | -------------------------- | -------------------------------------- | ---------------------------- |
+| `JWT_SECRET`         | Signs login sessions       | Generated on first start, kept in `/app/data/.jwt-secret` | Set it only to control the value. Values copied from examples in these docs are ignored, with a warning in the log |
+| `DATABASE_URL`       | SQLite database file       | `file:/app/data/peek-stash-browser.db` | Path inside container        |
+| `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database location            |
+| `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
+| `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
+
+### Generating a JWT Secret
+
+Only needed if you set `JWT_SECRET` yourself.
 
 **Linux/macOS/unRAID:**
 ```bash
@@ -81,17 +93,6 @@ $bytes = New-Object byte[] 32
 $rng.GetBytes($bytes)
 [Convert]::ToBase64String($bytes)
 ```
-
-## Optional Environment Variables
-
-These settings have sensible defaults but can be customized:
-
-| Variable             | Description                | Default                                | Notes                        |
-| -------------------- | -------------------------- | -------------------------------------- | ---------------------------- |
-| `DATABASE_URL`       | SQLite database file       | `file:/app/data/peek-stash-browser.db` | Path inside container        |
-| `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database location            |
-| `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
-| `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 
 ## Video Streaming (v2.0+)
 
@@ -111,7 +112,7 @@ This is a significant simplification from v1.x which required mounting media dir
 | `SECURE_COOKIES` | Enable secure cookie flag      | `false` | Set to `true` when using HTTPS reverse proxy |
 
 !!! warning "Security Best Practices"
-    - Set a strong `JWT_SECRET` during installation (required)
+    - Keep `/app/data` private: it holds the database and the generated session secret
     - Set `SECURE_COOKIES=true` when using HTTPS
     - **Never expose Peek directly to the internet** - always use a reverse proxy
     - Admin credentials are created during setup wizard (no default passwords)
@@ -231,9 +232,7 @@ When `PROXY_AUTH_HEADER` is set but the header is not present in a request, Peek
 ### Minimal Production Configuration (v2.0+)
 
 ```bash
-# Required
-JWT_SECRET=your_very_long_random_secret_key_here
-
+# No variables are required
 # Stash connection configured via Setup Wizard (stored in database)
 # All other settings use defaults
 ```
@@ -241,9 +240,6 @@ JWT_SECRET=your_very_long_random_secret_key_here
 ### Complete Production Configuration
 
 ```bash
-# Authentication (Required)
-JWT_SECRET=your_very_long_random_secret_key_here
-
 # Database (Optional - defaults shown)
 DATABASE_URL=file:/app/data/peek-stash-browser.db
 CONFIG_DIR=/app/data
@@ -260,9 +256,6 @@ NODE_ENV=production
 ### Development Configuration
 
 ```bash
-# Authentication
-JWT_SECRET=dev-secret-change-in-production
-
 # Database (local SQLite file)
 DATABASE_URL=file:./data/peek-db.db
 
@@ -285,7 +278,6 @@ services:
     volumes:
       - peek-data:/app/data
     environment:
-      - JWT_SECRET=${JWT_SECRET}
       # Optional
       - NODE_ENV=production
       - SECURE_COOKIES=false
@@ -331,7 +323,7 @@ Check:
 
 Check:
 
-- `JWT_SECRET` is set
+- If you set `JWT_SECRET`, keep it the same across restarts; changing it signs everyone out
 - `SECURE_COOKIES` matches your HTTP/HTTPS setup
 - Database is writable
 
