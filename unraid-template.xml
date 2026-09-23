@@ -119,4 +119,5 @@
   <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and database. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
   <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (HTTPS only). Set to 'true' only if you use HTTPS with a reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="Reverse proxies in front of Peek" Target="TRUST_PROXY" Default="" Description="Number of reverse proxies (SWAG, Nginx Proxy Manager, Traefik) between browsers and Peek. Leave empty if none. Too high lets anyone fake their address." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 </Container>
