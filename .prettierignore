@@ -1,0 +1,13 @@
+# Prettier formats application code and config. Gitignored paths are skipped too.
+
+# Hand-formatted: MkDocs admonitions and config, Claude prompt files
+docs/
+mkdocs.yml
+.claude/
+
+# Generated
+server/graphql/generated/
+package-lock.json
+
+# A separate Stash plugin, not Peek code
+plugins/
