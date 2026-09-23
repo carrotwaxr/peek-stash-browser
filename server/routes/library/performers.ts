@@ -2,7 +2,6 @@ import express from "express";
 import {
   findPerformers,
   findPerformersMinimal,
-  updatePerformer,
 } from "../../controllers/library/performers.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -21,8 +20,5 @@ router.post(
   requireCacheReady,
   authenticated(findPerformersMinimal)
 );
-
-// Update performer
-router.put("/performers/:id", authenticated(updatePerformer));
 
 export default router;

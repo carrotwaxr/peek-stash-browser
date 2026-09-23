@@ -1189,14 +1189,6 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
-### PUT /api/library/performers/:id
-
-**Authentication:** Required
-
-**Controller:** `updatePerformer` in `../../controllers/library/performers.ts`
-
----
-
 ### POST /api/library/scenes
 
 **Authentication:** Required
@@ -1221,14 +1213,6 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
-### PUT /api/library/scenes/:id
-
-**Authentication:** Required
-
-**Controller:** `updateScene` in `../../controllers/library/scenes.ts`
-
----
-
 ### POST /api/library/studios
 
 **Authentication:** Required
@@ -1245,14 +1229,6 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
-### PUT /api/library/studios/:id
-
-**Authentication:** Required
-
-**Controller:** `updateStudio` in `../../controllers/library/studios.ts`
-
----
-
 ### POST /api/library/tags
 
 **Authentication:** Required
@@ -1266,13 +1242,5 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 **Authentication:** Required
 
 **Controller:** `findTagsMinimal` in `../../controllers/library/tags.ts`
-
----
-
-### PUT /api/library/tags/:id
-
-**Authentication:** Required
-
-**Controller:** `updateTag` in `../../controllers/library/tags.ts`
 
 ---

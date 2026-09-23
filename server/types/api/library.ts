@@ -91,29 +91,6 @@ export interface GetRecommendedScenesResponse {
   };
 }
 
-/**
- * PUT /api/library/scenes/:id - Update scene
- */
-export interface UpdateSceneParams extends Record<string, string> {
-  id: string;
-}
-
-export interface UpdateSceneRequest {
-  title?: string;
-  details?: string;
-  date?: string;
-  rating100?: number;
-  studio_id?: string;
-  performer_ids?: string[];
-  tag_ids?: string[];
-  [key: string]: unknown; // Allow pass-through to Stash API
-}
-
-export interface UpdateSceneResponse {
-  success: true;
-  scene: NormalizedScene;
-}
-
 // =============================================================================
 // PERFORMERS
 // =============================================================================
@@ -144,24 +121,6 @@ export interface FindPerformersMinimalRequest {
 
 export interface FindPerformersMinimalResponse {
   performers: Array<{ id: string; name: string; instanceId: string }>;
-}
-
-/**
- * PUT /api/library/performers/:id - Update performer
- */
-export interface UpdatePerformerParams extends Record<string, string> {
-  id: string;
-}
-
-export interface UpdatePerformerRequest {
-  name?: string;
-  details?: string;
-  [key: string]: unknown;
-}
-
-export interface UpdatePerformerResponse {
-  success: true;
-  performer: NormalizedPerformer;
 }
 
 // =============================================================================
@@ -196,24 +155,6 @@ export interface FindStudiosMinimalResponse {
   studios: Array<{ id: string; name: string; instanceId: string }>;
 }
 
-/**
- * PUT /api/library/studios/:id - Update studio
- */
-export interface UpdateStudioParams extends Record<string, string> {
-  id: string;
-}
-
-export interface UpdateStudioRequest {
-  name?: string;
-  details?: string;
-  [key: string]: unknown;
-}
-
-export interface UpdateStudioResponse {
-  success: true;
-  studio: NormalizedStudio;
-}
-
 // =============================================================================
 // TAGS
 // =============================================================================
@@ -244,24 +185,6 @@ export interface FindTagsMinimalRequest {
 
 export interface FindTagsMinimalResponse {
   tags: Array<{ id: string; name: string; instanceId: string }>;
-}
-
-/**
- * PUT /api/library/tags/:id - Update tag
- */
-export interface UpdateTagParams extends Record<string, string> {
-  id: string;
-}
-
-export interface UpdateTagRequest {
-  name?: string;
-  description?: string;
-  [key: string]: unknown;
-}
-
-export interface UpdateTagResponse {
-  success: true;
-  tag: NormalizedTag;
 }
 
 // =============================================================================

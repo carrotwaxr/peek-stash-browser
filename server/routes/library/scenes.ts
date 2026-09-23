@@ -3,7 +3,6 @@ import {
   findScenes,
   findSimilarScenes,
   getRecommendedScenes,
-  updateScene,
 } from "../../controllers/library/scenes.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -29,8 +28,5 @@ router.get(
   requireCacheReady,
   authenticated(getRecommendedScenes)
 );
-
-// Update scene
-router.put("/scenes/:id", authenticated(updateScene));
 
 export default router;

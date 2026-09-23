@@ -12,7 +12,6 @@ import {
   getRecommendedScenes,
   mergeScenesWithUserData,
   sortScenes,
-  updateScene,
 } from "../../../controllers/library/scenes.js";
 import prisma from "../../../prisma/singleton.js";
 import {
@@ -21,9 +20,7 @@ import {
 } from "../../../services/RecommendationScoringService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import {
   createMockPerformer,
@@ -58,13 +55,6 @@ vi.mock("../../../services/StashEntityService.js", () => ({
     getSimilarSceneCandidates: vi.fn().mockResolvedValue([]),
     getScenesPaginated: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
     getScenesForScoring: vi.fn().mockResolvedValue([]),
-  },
-}));
-
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
   },
 }));
 
@@ -145,10 +135,6 @@ vi.mock("../../../utils/sqlFilterBuilders.js", () => ({
   })),
 }));
 
-vi.mock("../../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("default"),
-}));
-
 vi.mock("../../../utils/seededRandom.js", () => ({
   parseRandomSort: vi
     .fn()
@@ -194,8 +180,6 @@ vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
 const mockPrisma = vi.mocked(prisma);
 const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
-const mockStashInstanceManager = vi.mocked(stashInstanceManager);
-const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
 const mockCountUserCriteria = vi.mocked(countUserCriteria);
@@ -1646,90 +1630,6 @@ describe("findScenes", () => {
 
     expect(res._getStatus()).toBe(500);
     expect(res._getBody()).toMatchObject({ error: "Failed to find scenes" });
-  });
-});
-
-describe("updateScene", () => {
-  it("returns 404 when stash instance is not found", async () => {
-    mockGetEntityInstanceId.mockResolvedValue("unknown");
-    mockStashInstanceManager.get.mockReturnValue(undefined as any);
-
-    const req = mockReq(
-      { title: "Updated Title" },
-      { id: "123" },
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
-
-    await updateScene(req, res);
-
-    expect(res._getStatus()).toBe(404);
-    expect(res._getBody()).toMatchObject({
-      error: "Stash instance not found for scene",
-    });
-  });
-
-  it("returns 500 when sceneUpdate returns null", async () => {
-    mockGetEntityInstanceId.mockResolvedValue("default");
-    const mockStash = {
-      sceneUpdate: vi.fn().mockResolvedValue({ sceneUpdate: null }),
-    };
-    mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-
-    const req = mockReq(
-      { title: "Updated Title" },
-      { id: "123" },
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
-
-    await updateScene(req, res);
-
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({
-      error: "Scene update returned null",
-    });
-  });
-
-  it("returns updated scene on success", async () => {
-    mockGetEntityInstanceId.mockResolvedValue("default");
-    const updatedScene = createMockScene({ id: "123", title: "Updated Title" });
-    const mockStash = {
-      sceneUpdate: vi.fn().mockResolvedValue({ sceneUpdate: updatedScene }),
-    };
-    mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-    // Ensure mergeScenesWithUserData returns the scene unchanged
-    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
-    mockPrisma.sceneRating.findMany.mockResolvedValue([]);
-    mockPrisma.performerRating.findMany.mockResolvedValue([]);
-    mockPrisma.studioRating.findMany.mockResolvedValue([]);
-    mockPrisma.tagRating.findMany.mockResolvedValue([]);
-
-    const req = mockReq(
-      { title: "Updated Title" },
-      { id: "123" },
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
-
-    await updateScene(req, res);
-
-    expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
-    expect(body.success).toBe(true);
-    expect(body.scene.title).toBe("Updated Title");
-  });
-
-  it("returns 500 on unexpected error", async () => {
-    mockGetEntityInstanceId.mockRejectedValue(new Error("DB crash"));
-
-    const req = mockReq({ title: "x" }, { id: "123" }, { id: 1, role: "USER" });
-    const res = mockRes();
-
-    await updateScene(req, res);
-
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({ error: "Failed to update scene" });
   });
 });
 

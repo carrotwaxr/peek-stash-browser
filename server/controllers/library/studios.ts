@@ -2,7 +2,6 @@ import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
@@ -15,15 +14,9 @@ import type {
   FindStudiosResponse,
   TypedAuthRequest,
   TypedResponse,
-  UpdateStudioParams,
-  UpdateStudioRequest,
-  UpdateStudioResponse,
 } from "../../types/api/index.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
-import {
-  disambiguateEntityNames,
-  getEntityInstanceId,
-} from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -559,44 +552,5 @@ export const findStudiosMinimal = async (
       error: "Failed to find studios",
       details: error instanceof Error ? error.message : "Unknown error",
     });
-  }
-};
-
-export const updateStudio = async (
-  req: TypedAuthRequest<UpdateStudioRequest, UpdateStudioParams>,
-  res: TypedResponse<UpdateStudioResponse | ApiErrorResponse>
-) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const instanceId = await getEntityInstanceId("studio", id);
-    const stash = stashInstanceManager.get(instanceId);
-    if (!stash) {
-      return res
-        .status(404)
-        .json({ error: "Stash instance not found for studio" });
-    }
-
-    const updatedStudio = await stash.studioUpdate({
-      input: {
-        id,
-        ...updateData,
-      },
-    });
-
-    if (!updatedStudio.studioUpdate) {
-      return res.status(500).json({ error: "Studio update returned null" });
-    }
-
-    res.json({
-      success: true,
-      studio: updatedStudio.studioUpdate as unknown as NormalizedStudio,
-    });
-  } catch (error) {
-    logger.error("Error updating studio", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update studio" });
   }
 };

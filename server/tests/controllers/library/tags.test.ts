@@ -1,8 +1,8 @@
 /**
  * Unit Tests for Tags Library Controller
  *
- * Tests mergeTagsWithUserData, applyTagFilters, findTags, findTagsMinimal,
- * findTagsForScenes, and updateTag.
+ * Tests mergeTagsWithUserData, applyTagFilters, findTags, findTagsMinimal
+ * and findTagsForScenes.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -11,16 +11,13 @@ import {
   findTagsForScenes,
   findTagsMinimal,
   mergeTagsWithUserData,
-  updateTag,
 } from "../../../controllers/library/tags.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 
@@ -51,13 +48,6 @@ vi.mock("../../../services/UserStatsService.js", () => ({
   userStatsService: { getTagStats: vi.fn().mockResolvedValue(new Map()) },
 }));
 
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
-  },
-}));
-
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
     filterExcluded: vi.fn().mockImplementation((items) => items),
@@ -69,7 +59,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("default"),
   disambiguateEntityNames: vi.fn().mockImplementation((entities) => entities),
 }));
 
@@ -104,8 +93,6 @@ const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
 const mockUserStatsService = vi.mocked(userStatsService);
-const mockStashInstanceManager = vi.mocked(stashInstanceManager);
-const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 
 const defaultUser = { id: 1, role: "USER" };
 const adminUser = { id: 1, role: "ADMIN" };
@@ -631,68 +618,6 @@ describe("Tags Controller", () => {
 
       expect(res._getStatus()).toBe(500);
       expect(res._getBody().error).toBe("Failed to find tags for scenes");
-    });
-  });
-
-  // ─── updateTag ──────────────────────────────────────────────
-
-  describe("updateTag", () => {
-    it("updates tag on happy path", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("default");
-      const mockStash = {
-        tagUpdate: vi.fn().mockResolvedValue({
-          tagUpdate: { id: "t1", name: "Updated" },
-        }),
-      };
-      mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-
-      const req = mockReq({ name: "Updated" }, { id: "t1" }, defaultUser);
-      const res = mockRes();
-
-      await updateTag(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getBody().success).toBe(true);
-    });
-
-    it("returns 404 when stash instance not found", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("unknown");
-      mockStashInstanceManager.get.mockReturnValue(undefined as any);
-
-      const req = mockReq({}, { id: "t1" }, defaultUser);
-      const res = mockRes();
-
-      await updateTag(req, res);
-
-      expect(res._getStatus()).toBe(404);
-    });
-
-    it("returns 500 when tagUpdate returns null", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("default");
-      const mockStash = {
-        tagUpdate: vi.fn().mockResolvedValue({ tagUpdate: null }),
-      };
-      mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-
-      const req = mockReq({ name: "X" }, { id: "t1" }, defaultUser);
-      const res = mockRes();
-
-      await updateTag(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Tag update returned null");
-    });
-
-    it("returns 500 on unexpected error", async () => {
-      mockGetEntityInstanceId.mockRejectedValue(new Error("lookup fail"));
-
-      const req = mockReq({}, { id: "t1" }, defaultUser);
-      const res = mockRes();
-
-      await updateTag(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to update tag");
     });
   });
 });

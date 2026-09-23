@@ -3,7 +3,6 @@ import {
   findTags,
   findTagsForScenes,
   findTagsMinimal,
-  updateTag,
 } from "../../controllers/library/tags.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -25,8 +24,5 @@ router.post(
   requireCacheReady,
   authenticated(findTagsForScenes)
 );
-
-// Update tag
-router.put("/tags/:id", authenticated(updateTag));
 
 export default router;

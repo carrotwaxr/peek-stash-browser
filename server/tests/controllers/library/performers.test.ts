@@ -9,15 +9,12 @@ import {
   findPerformersMinimal,
   mergePerformersWithUserData,
   parseCareerLength,
-  updatePerformer,
 } from "../../../controllers/library/performers.js";
 import prisma from "../../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
 
@@ -36,13 +33,6 @@ vi.mock("../../../services/StashEntityService.js", () => ({
     getAllPerformers: vi.fn(),
     getPerformerIdsByStudios: vi.fn().mockResolvedValue(new Set()),
     getPerformerIdsByGroups: vi.fn().mockResolvedValue(new Set()),
-  },
-}));
-
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
   },
 }));
 
@@ -67,7 +57,6 @@ vi.mock("../../../services/UserStatsService.js", () => ({
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("default"),
   disambiguateEntityNames: vi.fn().mockImplementation((entities) => entities),
 }));
 
@@ -688,65 +677,6 @@ describe("findPerformersMinimal", () => {
     expect(res._getStatus()).toBe(500);
     expect(res._getBody()).toMatchObject({
       error: "Failed to find performers",
-    });
-  });
-});
-
-describe("updatePerformer", () => {
-  it("updates a performer via the stash instance", async () => {
-    const mockStash = {
-      performerUpdate: vi.fn().mockResolvedValue({
-        performerUpdate: { id: "p1", name: "Updated" },
-      }),
-    };
-    vi.mocked(getEntityInstanceId).mockResolvedValue("default");
-    vi.mocked(stashInstanceManager.get).mockReturnValue(mockStash as any);
-
-    const req = mockReq(
-      { name: "Updated" },
-      { id: "p1" },
-      { id: 1, role: "ADMIN" }
-    );
-    const res = mockRes();
-
-    await updatePerformer(req, res);
-
-    expect(res._getStatus()).toBe(200);
-    expect(res._getBody()).toMatchObject({ success: true });
-    expect(mockStash.performerUpdate).toHaveBeenCalledWith({
-      input: { id: "p1", name: "Updated" },
-    });
-  });
-
-  it("returns 404 when stash instance is not found", async () => {
-    vi.mocked(getEntityInstanceId).mockResolvedValue("missing");
-    vi.mocked(stashInstanceManager.get).mockReturnValue(undefined as any);
-
-    const req = mockReq({}, { id: "p1" }, { id: 1, role: "ADMIN" });
-    const res = mockRes();
-
-    await updatePerformer(req, res);
-
-    expect(res._getStatus()).toBe(404);
-    expect(res._getBody()).toMatchObject({
-      error: "Stash instance not found for performer",
-    });
-  });
-
-  it("returns 500 when stash API throws", async () => {
-    vi.mocked(getEntityInstanceId).mockResolvedValue("default");
-    vi.mocked(stashInstanceManager.get).mockReturnValue({
-      performerUpdate: vi.fn().mockRejectedValue(new Error("network error")),
-    } as any);
-
-    const req = mockReq({}, { id: "p1" }, { id: 1, role: "ADMIN" });
-    const res = mockRes();
-
-    await updatePerformer(req, res);
-
-    expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({
-      error: "Failed to update performer",
     });
   });
 });

@@ -15,7 +15,6 @@ import {
 } from "../../services/RecommendationScoringService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   AmbiguousLookupResponse,
@@ -30,13 +29,9 @@ import type {
   ScoredSceneId,
   TypedAuthRequest,
   TypedResponse,
-  UpdateSceneParams,
-  UpdateSceneRequest,
-  UpdateSceneResponse,
 } from "../../types/api/index.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
-import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import {
@@ -1337,52 +1332,6 @@ export const findScenes = async (
       error: "Failed to find scenes",
       details: error instanceof Error ? error.message : "Unknown error",
     });
-  }
-};
-
-export const updateScene = async (
-  req: TypedAuthRequest<UpdateSceneRequest, UpdateSceneParams>,
-  res: TypedResponse<UpdateSceneResponse | ApiErrorResponse>
-) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-    const updateData = req.body;
-
-    const instanceId = await getEntityInstanceId("scene", id);
-    const stash = stashInstanceManager.get(instanceId);
-    if (!stash) {
-      return res
-        .status(404)
-        .json({ error: "Stash instance not found for scene" });
-    }
-
-    const updatedScene = await stash.sceneUpdate({
-      input: {
-        id,
-        ...updateData,
-      },
-    });
-
-    if (!updatedScene.sceneUpdate) {
-      return res.status(500).json({ error: "Scene update returned null" });
-    }
-
-    // Override with per-user watch history
-    const sceneWithUserHistory = await mergeScenesWithUserData(
-      [updatedScene.sceneUpdate] as unknown as NormalizedScene[],
-      userId
-    );
-
-    res.json({
-      success: true,
-      scene: sceneWithUserHistory[0] as NormalizedScene,
-    });
-  } catch (error) {
-    logger.error("Error updating scene", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update scene" });
   }
 };
 

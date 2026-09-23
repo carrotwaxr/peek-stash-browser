@@ -2,7 +2,6 @@ import express from "express";
 import {
   findStudios,
   findStudiosMinimal,
-  updateStudio,
 } from "../../controllers/library/studios.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
@@ -21,8 +20,5 @@ router.post(
   requireCacheReady,
   authenticated(findStudiosMinimal)
 );
-
-// Update studio
-router.put("/studios/:id", authenticated(updateStudio));
 
 export default router;
