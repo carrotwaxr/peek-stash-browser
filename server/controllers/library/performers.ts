@@ -3,7 +3,6 @@ import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type {
@@ -15,18 +14,12 @@ import type {
   FindPerformersResponse,
   TypedAuthRequest,
   TypedResponse,
-  UpdatePerformerParams,
-  UpdatePerformerRequest,
-  UpdatePerformerResponse,
 } from "../../types/api/index.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
 } from "../../types/index.js";
-import {
-  disambiguateEntityNames,
-  getEntityInstanceId,
-} from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -940,45 +933,5 @@ export const findPerformersMinimal = async (
       error: "Failed to find performers",
       details: error instanceof Error ? error.message : "Unknown error",
     });
-  }
-};
-
-export const updatePerformer = async (
-  req: TypedAuthRequest<UpdatePerformerRequest, UpdatePerformerParams>,
-  res: TypedResponse<UpdatePerformerResponse | ApiErrorResponse>
-) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const instanceId = await getEntityInstanceId("performer", id);
-    const stash = stashInstanceManager.get(instanceId);
-    if (!stash) {
-      return res
-        .status(404)
-        .json({ error: "Stash instance not found for performer" });
-    }
-
-    const updatedPerformer = await stash.performerUpdate({
-      input: {
-        id,
-        ...updateData,
-      },
-    });
-
-    if (!updatedPerformer.performerUpdate) {
-      return res.status(500).json({ error: "Performer update returned null" });
-    }
-
-    res.json({
-      success: true,
-      performer:
-        updatedPerformer.performerUpdate as unknown as NormalizedPerformer,
-    });
-  } catch (error) {
-    logger.error("Error updating performer", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update performer" });
   }
 };

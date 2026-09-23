@@ -1,8 +1,8 @@
 /**
  * Unit Tests for Studios Library Controller
  *
- * Tests mergeStudiosWithUserData, applyStudioFilters (sync), findStudios,
- * findStudiosMinimal, and updateStudio.
+ * Tests mergeStudiosWithUserData, applyStudioFilters (sync), findStudios
+ * and findStudiosMinimal.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -10,16 +10,13 @@ import {
   findStudios,
   findStudiosMinimal,
   mergeStudiosWithUserData,
-  updateStudio,
 } from "../../../controllers/library/studios.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
 import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 
@@ -46,13 +43,6 @@ vi.mock("../../../services/UserStatsService.js", () => ({
   userStatsService: { getStudioStats: vi.fn().mockResolvedValue(new Map()) },
 }));
 
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
-  },
-}));
-
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
     filterExcluded: vi.fn().mockImplementation((items) => items),
@@ -64,7 +54,6 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("default"),
   disambiguateEntityNames: vi.fn().mockImplementation((entities) => entities),
 }));
 
@@ -99,8 +88,6 @@ const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockStudioQueryBuilder = vi.mocked(studioQueryBuilder);
 const mockUserStatsService = vi.mocked(userStatsService);
-const mockStashInstanceManager = vi.mocked(stashInstanceManager);
-const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 
 const defaultUser = { id: 1, role: "USER" };
 const adminUser = { id: 1, role: "ADMIN" };
@@ -544,68 +531,6 @@ describe("Studios Controller", () => {
       await findStudiosMinimal(req, res);
 
       expect(res._getStatus()).toBe(500);
-    });
-  });
-
-  // ─── updateStudio ──────────────────────────────────────────
-
-  describe("updateStudio", () => {
-    it("updates studio on happy path", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("default");
-      const mockStash = {
-        studioUpdate: vi.fn().mockResolvedValue({
-          studioUpdate: { id: "s1", name: "Updated" },
-        }),
-      };
-      mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-
-      const req = mockReq({ name: "Updated" }, { id: "s1" }, defaultUser);
-      const res = mockRes();
-
-      await updateStudio(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(res._getBody().success).toBe(true);
-    });
-
-    it("returns 404 when stash instance not found", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("unknown");
-      mockStashInstanceManager.get.mockReturnValue(undefined as any);
-
-      const req = mockReq({}, { id: "s1" }, defaultUser);
-      const res = mockRes();
-
-      await updateStudio(req, res);
-
-      expect(res._getStatus()).toBe(404);
-    });
-
-    it("returns 500 when studioUpdate returns null", async () => {
-      mockGetEntityInstanceId.mockResolvedValue("default");
-      const mockStash = {
-        studioUpdate: vi.fn().mockResolvedValue({ studioUpdate: null }),
-      };
-      mockStashInstanceManager.get.mockReturnValue(mockStash as any);
-
-      const req = mockReq({ name: "X" }, { id: "s1" }, defaultUser);
-      const res = mockRes();
-
-      await updateStudio(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Studio update returned null");
-    });
-
-    it("returns 500 on unexpected error", async () => {
-      mockGetEntityInstanceId.mockRejectedValue(new Error("lookup fail"));
-
-      const req = mockReq({}, { id: "s1" }, defaultUser);
-      const res = mockRes();
-
-      await updateStudio(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to update studio");
     });
   });
 });

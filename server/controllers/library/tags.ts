@@ -2,7 +2,6 @@ import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
@@ -15,15 +14,9 @@ import type {
   FindTagsResponse,
   TypedAuthRequest,
   TypedResponse,
-  UpdateTagParams,
-  UpdateTagRequest,
-  UpdateTagResponse,
 } from "../../types/api/index.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
-import {
-  disambiguateEntityNames,
-  getEntityInstanceId,
-} from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -784,44 +777,5 @@ export const findTagsForScenes = async (
       error: "Failed to find tags for scenes",
       details: error instanceof Error ? error.message : "Unknown error",
     });
-  }
-};
-
-export const updateTag = async (
-  req: TypedAuthRequest<UpdateTagRequest, UpdateTagParams>,
-  res: TypedResponse<UpdateTagResponse | ApiErrorResponse>
-) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const instanceId = await getEntityInstanceId("tag", id);
-    const stash = stashInstanceManager.get(instanceId);
-    if (!stash) {
-      return res
-        .status(404)
-        .json({ error: "Stash instance not found for tag" });
-    }
-
-    const updatedTag = await stash.tagUpdate({
-      input: {
-        id,
-        ...updateData,
-      },
-    });
-
-    if (!updatedTag.tagUpdate) {
-      return res.status(500).json({ error: "Tag update returned null" });
-    }
-
-    res.json({
-      success: true,
-      tag: updatedTag.tagUpdate as unknown as NormalizedTag,
-    });
-  } catch (error) {
-    logger.error("Error updating tag", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({ error: "Failed to update tag" });
   }
 };
