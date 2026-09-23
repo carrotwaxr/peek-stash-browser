@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
+import {
+  entityRefKey,
+  getVisibleEntityKeys,
+} from "../../services/EntityAccessService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -22,8 +26,20 @@ vi.mock("../../prisma/singleton.js", () => ({
     playlist: {
       findUnique: vi.fn(),
     },
+    playlistItem: {
+      findMany: vi.fn(),
+    },
+    $queryRawUnsafe: vi.fn(),
   },
 }));
+
+vi.mock("../../services/EntityAccessService.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../services/EntityAccessService.js")
+    >();
+  return { ...actual, getVisibleEntityKeys: vi.fn() };
+});
 
 describe("DownloadService", () => {
   let service: DownloadService;
@@ -62,19 +78,35 @@ describe("DownloadService", () => {
         expiresAt: null,
       } as any);
 
-      const result = await service.createSceneDownload(1, "scene-123");
+      const result = await service.createSceneDownload(
+        1,
+        "scene-123",
+        "inst-a"
+      );
 
       expect(result.type).toBe("SCENE");
       expect(result.status).toBe("COMPLETED");
       expect(result.fileName).toBe("Test Scene.mp4");
+      expect(prisma.stashScene.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: "scene-123",
+            stashInstanceId: "inst-a",
+            deletedAt: null,
+          },
+        })
+      );
+      expect(
+        vi.mocked(prisma.download.create).mock.calls[0][0].data.instanceId
+      ).toBe("inst-a");
     });
 
     it("should throw if scene not found", async () => {
       vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(null);
 
-      await expect(service.createSceneDownload(1, "unknown")).rejects.toThrow(
-        "Scene not found"
-      );
+      await expect(
+        service.createSceneDownload(1, "unknown", "inst-a")
+      ).rejects.toThrow("Scene not found");
     });
   });
 
@@ -107,19 +139,35 @@ describe("DownloadService", () => {
         expiresAt: null,
       } as any);
 
-      const result = await service.createImageDownload(1, "image-123");
+      const result = await service.createImageDownload(
+        1,
+        "image-123",
+        "inst-a"
+      );
 
       expect(result.type).toBe("IMAGE");
       expect(result.status).toBe("COMPLETED");
       expect(result.fileName).toBe("Test Image.jpg");
+      expect(prisma.stashImage.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: "image-123",
+            stashInstanceId: "inst-a",
+            deletedAt: null,
+          },
+        })
+      );
+      expect(
+        vi.mocked(prisma.download.create).mock.calls[0][0].data.instanceId
+      ).toBe("inst-a");
     });
 
     it("should throw if image not found", async () => {
       vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(null);
 
-      await expect(service.createImageDownload(1, "unknown")).rejects.toThrow(
-        "Image not found"
-      );
+      await expect(
+        service.createImageDownload(1, "unknown", "inst-a")
+      ).rejects.toThrow("Image not found");
     });
   });
 
@@ -170,69 +218,92 @@ describe("DownloadService", () => {
   });
 
   describe("calculatePlaylistSize", () => {
-    it("should sum file sizes of all playlist items", async () => {
-      const mockPlaylist = {
-        id: 1,
-        items: [{ sceneId: "s1" }, { sceneId: "s2" }],
-      };
+    const items = [
+      { sceneId: "s1", instanceId: "inst-a" },
+      { sceneId: "s1", instanceId: "inst-b" },
+    ];
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
-        mockPlaylist as any
-      );
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        { fileSize: BigInt(1000000) },
-        { fileSize: BigInt(2000000) },
-      ] as any);
+    it("returns 0 for no items without a query", async () => {
+      const size = await service.calculatePlaylistSize([]);
 
-      const size = await service.calculatePlaylistSize(1);
+      expect(size).toBe(BigInt(0));
+      expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+    });
+
+    it("sums the given (id, instance) pairs in one query with one JSON parameter", async () => {
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([
+        { total: BigInt(3000000) },
+      ]);
+
+      const size = await service.calculatePlaylistSize(items);
 
       expect(size).toBe(BigInt(3000000));
-      expect(prisma.stashScene.findMany).toHaveBeenCalledWith({
-        where: { id: { in: ["s1", "s2"] } },
-        select: { fileSize: true },
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+      const [sql, ...params] = vi.mocked(prisma.$queryRawUnsafe).mock.calls[0];
+      expect(params).toEqual([
+        JSON.stringify([
+          ["s1", "inst-a"],
+          ["s1", "inst-b"],
+        ]),
+      ]);
+      expect(sql).toContain("json_each(?)");
+      expect(sql).toContain(
+        "s.stashInstanceId = json_extract(j.value, '$[1]')"
+      );
+      expect(sql).toContain("s.deletedAt IS NULL");
+    });
+
+    it("converts a number total to bigint", async () => {
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([{ total: 1500 }]);
+
+      const size = await service.calculatePlaylistSize(items);
+
+      expect(size).toBe(BigInt(1500));
+    });
+
+    it("returns 0 for a null total", async () => {
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([{ total: null }]);
+
+      const size = await service.calculatePlaylistSize(items);
+
+      expect(size).toBe(BigInt(0));
+    });
+  });
+
+  describe("getDownloadablePlaylistItems", () => {
+    it("keeps the visible items in position order", async () => {
+      vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([
+        { sceneId: "s1", instanceId: "inst-b" },
+        { sceneId: "s1", instanceId: "inst-a" },
+        { sceneId: "s2", instanceId: "inst-a" },
+        { sceneId: "s3", instanceId: "inst-a" },
+      ] as never);
+      vi.mocked(getVisibleEntityKeys).mockResolvedValue(
+        new Set([
+          entityRefKey("s3", "inst-a"),
+          entityRefKey("s1", "inst-b"),
+          entityRefKey("s1", "inst-a"),
+        ])
+      );
+
+      const result = await service.getDownloadablePlaylistItems(7, 5);
+
+      expect(prisma.playlistItem.findMany).toHaveBeenCalledWith({
+        where: { playlistId: 5, instanceId: { not: null } },
+        orderBy: { position: "asc" },
+        select: { sceneId: true, instanceId: true },
       });
-    });
-
-    it("should return 0 for playlist not found", async () => {
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(null);
-
-      const size = await service.calculatePlaylistSize(999);
-
-      expect(size).toBe(BigInt(0));
-    });
-
-    it("should return 0 for empty playlist", async () => {
-      const mockPlaylist = {
-        id: 1,
-        items: [],
-      };
-
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
-        mockPlaylist as any
-      );
-
-      const size = await service.calculatePlaylistSize(1);
-
-      expect(size).toBe(BigInt(0));
-    });
-
-    it("should handle items with null fileSize", async () => {
-      const mockPlaylist = {
-        id: 1,
-        items: [{ sceneId: "s1" }, { sceneId: "s2" }],
-      };
-
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
-        mockPlaylist as any
-      );
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        { fileSize: BigInt(1000000) },
-        { fileSize: null },
-      ] as any);
-
-      const size = await service.calculatePlaylistSize(1);
-
-      expect(size).toBe(BigInt(1000000));
+      expect(getVisibleEntityKeys).toHaveBeenCalledWith(7, "scene", [
+        { id: "s1", instanceId: "inst-b" },
+        { id: "s1", instanceId: "inst-a" },
+        { id: "s2", instanceId: "inst-a" },
+        { id: "s3", instanceId: "inst-a" },
+      ]);
+      expect(result).toEqual([
+        { sceneId: "s1", instanceId: "inst-b" },
+        { sceneId: "s1", instanceId: "inst-a" },
+        { sceneId: "s3", instanceId: "inst-a" },
+      ]);
     });
   });
 

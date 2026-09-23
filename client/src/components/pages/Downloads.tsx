@@ -70,6 +70,11 @@ const getStatusBadge = (status: string) => {
       color: "rgb(239, 68, 68)",
       text: "Failed",
     },
+    EXPIRED: {
+      backgroundColor: "var(--bg-tertiary)",
+      color: "var(--text-muted)",
+      text: "Expired",
+    },
   };
 
   const style =
@@ -89,17 +94,33 @@ const getStatusBadge = (status: string) => {
 };
 
 /**
+ * The hint shown on an expired download, by download type
+ */
+const EXPIRED_HINTS: Record<string, string> = {
+  SCENE: "This download has expired. Download it again from the scene page.",
+  IMAGE: "This download has expired. Download it again from the image.",
+  PLAYLIST: "This download has expired. Download the playlist again.",
+};
+
+/**
  * Get thumbnail or icon for download
  * @param {Object} download - Download object
  * @returns {JSX.Element} Thumbnail or type icon
  */
 const getDownloadThumbnail = (download: Record<string, unknown>) => {
+  // The thumbnail comes from the instance the download's entity lives on
+  const instanceId =
+    typeof download.instanceId === "string" ? download.instanceId : "";
+  const instanceParam = instanceId
+    ? `instanceId=${encodeURIComponent(instanceId)}`
+    : "";
+
   // For scenes and images, show actual thumbnail
   if (download.type === "SCENE" && download.entityId) {
     return (
       <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${download.entityId}/screenshot`)}`}
+          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${download.entityId}/screenshot`)}${instanceParam ? `&${instanceParam}` : ""}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -122,7 +143,7 @@ const getDownloadThumbnail = (download: Record<string, unknown>) => {
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/image/${download.entityId}/thumbnail`}
+          src={`/api/proxy/image/${download.entityId}/thumbnail${instanceParam ? `?${instanceParam}` : ""}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -312,6 +333,10 @@ const Downloads = () => {
                 download.status === "PROCESSING") &&
               download.progress !== undefined;
             const hasFailed = download.status === "FAILED" && download.error;
+            const expiredHint =
+              download.status === "EXPIRED"
+                ? EXPIRED_HINTS[download.type as string]
+                : undefined;
             return (
               <div
                 key={download.id as string}
@@ -387,6 +412,16 @@ const Downloads = () => {
                         }}
                       >
                         {download.error as string}
+                      </div>
+                    ) : null}
+
+                    {/* Hint for expired downloads */}
+                    {expiredHint ? (
+                      <div
+                        className="mt-2 text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {expiredHint}
                       </div>
                     ) : null}
                   </div>

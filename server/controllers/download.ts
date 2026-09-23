@@ -1,6 +1,8 @@
 import { DownloadStatus, DownloadType } from "@prisma/client";
 import { downloadService } from "../services/DownloadService.js";
+import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import { getPlaylistAccess } from "../services/PlaylistAccessService.js";
 import { playlistZipService } from "../services/PlaylistZipService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
@@ -13,6 +15,7 @@ import type {
   GetUserDownloadsResponse,
   RetryDownloadParams,
   RetryDownloadResponse,
+  StartEntityDownloadRequest,
   StartImageDownloadParams,
   StartImageDownloadResponse,
   StartPlaylistDownloadParams,
@@ -47,6 +50,7 @@ function serializeDownload(download: {
   playlistId: number | null;
   entityType: string | null;
   entityId: string | null;
+  instanceId: string;
   fileName: string;
   fileSize: bigint | null;
   filePath: string | null;
@@ -67,7 +71,10 @@ function serializeDownload(download: {
  * POST /api/downloads/scene/:sceneId
  */
 export async function startSceneDownload(
-  req: TypedAuthRequest<never, StartSceneDownloadParams>,
+  req: TypedAuthRequest<
+    Partial<StartEntityDownloadRequest> | undefined,
+    StartSceneDownloadParams
+  >,
   res: TypedResponse<StartSceneDownloadResponse | ApiErrorResponse>
 ) {
   try {
@@ -86,7 +93,20 @@ export async function startSceneDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createSceneDownload(userId, sceneId);
+    // Express 5 leaves req.body undefined on a POST with no body
+    const instanceId = req.body?.instanceId;
+    if (typeof instanceId !== "string" || instanceId === "") {
+      return res.status(400).json({ error: "instanceId is required" });
+    }
+    if (!(await canUserAccessEntity(userId, "scene", sceneId, instanceId))) {
+      return res.status(404).json({ error: "Scene not found" });
+    }
+
+    const download = await downloadService.createSceneDownload(
+      userId,
+      sceneId,
+      instanceId
+    );
 
     logger.info("Scene download created", {
       downloadId: download.id,
@@ -108,7 +128,10 @@ export async function startSceneDownload(
  * POST /api/downloads/image/:imageId
  */
 export async function startImageDownload(
-  req: TypedAuthRequest<never, StartImageDownloadParams>,
+  req: TypedAuthRequest<
+    Partial<StartEntityDownloadRequest> | undefined,
+    StartImageDownloadParams
+  >,
   res: TypedResponse<StartImageDownloadResponse | ApiErrorResponse>
 ) {
   try {
@@ -127,7 +150,20 @@ export async function startImageDownload(
         .json({ error: "You do not have permission to download files" });
     }
 
-    const download = await downloadService.createImageDownload(userId, imageId);
+    // Express 5 leaves req.body undefined on a POST with no body
+    const instanceId = req.body?.instanceId;
+    if (typeof instanceId !== "string" || instanceId === "") {
+      return res.status(400).json({ error: "instanceId is required" });
+    }
+    if (!(await canUserAccessEntity(userId, "image", imageId, instanceId))) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    const download = await downloadService.createImageDownload(
+      userId,
+      imageId,
+      instanceId
+    );
 
     logger.info("Image download created", {
       downloadId: download.id,
@@ -171,8 +207,25 @@ export async function startPlaylistDownload(
         .json({ error: "You do not have permission to download playlists" });
     }
 
+    // The owner, or anyone the playlist is shared with
+    const access = await getPlaylistAccess(playlistId, userId);
+    if (access.level === "none") {
+      return res.status(404).json({ error: "Playlist not found" });
+    }
+
+    // Only the scenes this user may see, each on its own instance
+    const items = await downloadService.getDownloadablePlaylistItems(
+      userId,
+      playlistId
+    );
+    if (items.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "This playlist has no scenes you can download" });
+    }
+
     // Check size limit
-    const totalSize = await downloadService.calculatePlaylistSize(playlistId);
+    const totalSize = await downloadService.calculatePlaylistSize(items);
     if (totalSize > MAX_PLAYLIST_SIZE_BYTES) {
       const totalSizeMB = Math.ceil(Number(totalSize) / (1024 * 1024));
       return res.status(400).json({
@@ -304,6 +357,14 @@ export async function getDownloadFile(
       return res.status(403).json({ error: "Access denied" });
     }
 
+    // A zip past 24 hours, or a scene or image download from before
+    // instances were stored
+    if (download.status === DownloadStatus.EXPIRED) {
+      return res
+        .status(410)
+        .json({ error: "This download has expired. Download it again." });
+    }
+
     // Check if download is completed
     if (download.status !== DownloadStatus.COMPLETED) {
       return res.status(400).json({
@@ -312,92 +373,100 @@ export async function getDownloadFile(
       });
     }
 
-    // Handle different download types
-    switch (download.type) {
-      case DownloadType.PLAYLIST:
-        // Serve the zip file from filePath
-        if (!download.filePath) {
-          return res.status(500).json({ error: "Download file path missing" });
-        }
-        return res.sendFile(download.filePath, {
-          headers: {
-            "Content-Disposition": attachmentContentDisposition(
-              download.fileName
-            ),
-          },
-        });
+    // Access is checked again now: a permission, a hide, a restriction or a
+    // share may have changed since the download was created.
+    const permissions = await resolveUserPermissions(userId);
 
-      case DownloadType.SCENE: {
-        // Proxy scene stream with Content-Disposition header for download
-        const stashBaseUrl = stashInstanceManager.getBaseUrl();
-        const apiKey = stashInstanceManager.getApiKey();
-        const sceneUrl = `${stashBaseUrl}/scene/${download.entityId}/stream`;
-
-        // Abort the upstream fetch if the client disconnects
-        const sceneAbort = new AbortController();
-        res.on("close", () => sceneAbort.abort());
-
-        const sceneResponse = await fetch(sceneUrl, {
-          headers: { ApiKey: apiKey },
-          signal: sceneAbort.signal,
-        });
-
-        if (!sceneResponse.ok) {
-          return res.status(sceneResponse.status).json({
-            error: "Failed to fetch scene from Stash",
-          });
-        }
-
-        // Set headers for download
-        res.setHeader(
-          "Content-Disposition",
-          attachmentContentDisposition(download.fileName)
-        );
-
-        await pipeResponseToClient(sceneResponse, res, "[DOWNLOAD]", [
-          "content-type",
-          "content-length",
-        ]);
-        return;
+    if (download.type === DownloadType.PLAYLIST) {
+      if (!permissions?.canDownloadPlaylists) {
+        return res
+          .status(403)
+          .json({ error: "You do not have permission to download playlists" });
       }
-
-      case DownloadType.IMAGE: {
-        // Proxy image with Content-Disposition header for download
-        const stashBaseUrl2 = stashInstanceManager.getBaseUrl();
-        const apiKey2 = stashInstanceManager.getApiKey();
-        const imageUrl = `${stashBaseUrl2}/image/${download.entityId}/image`;
-
-        // Abort the upstream fetch if the client disconnects
-        const imageAbort = new AbortController();
-        res.on("close", () => imageAbort.abort());
-
-        const imageResponse = await fetch(imageUrl, {
-          headers: { ApiKey: apiKey2 },
-          signal: imageAbort.signal,
-        });
-
-        if (!imageResponse.ok) {
-          return res.status(imageResponse.status).json({
-            error: "Failed to fetch image from Stash",
-          });
-        }
-
-        // Set headers for download
-        res.setHeader(
-          "Content-Disposition",
-          attachmentContentDisposition(download.fileName)
-        );
-
-        await pipeResponseToClient(imageResponse, res, "[DOWNLOAD]", [
-          "content-type",
-          "content-length",
-        ]);
-        return;
+      // The zip's contents were filtered for this user when it was built
+      if (
+        !download.playlistId ||
+        (await getPlaylistAccess(download.playlistId, userId)).level === "none"
+      ) {
+        return res.status(404).json({ error: "Download not found" });
       }
-
-      default:
-        return res.status(400).json({ error: "Unknown download type" });
+      // Serve the zip file from filePath
+      if (!download.filePath) {
+        return res.status(500).json({ error: "Download file path missing" });
+      }
+      return res.sendFile(download.filePath, {
+        headers: {
+          "Content-Disposition": attachmentContentDisposition(
+            download.fileName
+          ),
+        },
+      });
     }
+
+    if (
+      download.type !== DownloadType.SCENE &&
+      download.type !== DownloadType.IMAGE
+    ) {
+      return res.status(400).json({ error: "Unknown download type" });
+    }
+
+    // Scene and image files are proxied from Stash, so check before any fetch
+    if (!permissions?.canDownloadFiles) {
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to download files" });
+    }
+    if (!download.entityId || !download.instanceId) {
+      return res
+        .status(410)
+        .json({ error: "This download has expired. Download it again." });
+    }
+    const entityType = download.type === DownloadType.SCENE ? "scene" : "image";
+    if (
+      !(await canUserAccessEntity(
+        userId,
+        entityType,
+        download.entityId,
+        download.instanceId
+      ))
+    ) {
+      return res.status(404).json({ error: "Download not found" });
+    }
+
+    // Each file comes from the instance it lives on
+    const stashBaseUrl = stashInstanceManager.getBaseUrl(download.instanceId);
+    const apiKey = stashInstanceManager.getApiKey(download.instanceId);
+    const fileUrl =
+      entityType === "scene"
+        ? `${stashBaseUrl}/scene/${download.entityId}/stream`
+        : `${stashBaseUrl}/image/${download.entityId}/image`;
+
+    // Abort the upstream fetch if the client disconnects
+    const abort = new AbortController();
+    res.on("close", () => abort.abort());
+
+    const upstream = await fetch(fileUrl, {
+      headers: { ApiKey: apiKey },
+      signal: abort.signal,
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        error: `Failed to fetch ${entityType} from Stash`,
+      });
+    }
+
+    // Set headers for download
+    res.setHeader(
+      "Content-Disposition",
+      attachmentContentDisposition(download.fileName)
+    );
+
+    await pipeResponseToClient(upstream, res, "[DOWNLOAD]", [
+      "content-type",
+      "content-length",
+    ]);
+    return;
   } catch (error) {
     logger.error("Error serving download file", {
       error: error instanceof Error ? error.message : String(error),
@@ -486,6 +555,20 @@ export async function retryDownload(
         error: "Only failed downloads can be retried",
         details: `Current status: ${download.status}`,
       });
+    }
+
+    // The zip is rebuilt from the items the user may see now
+    // (getDownloadablePlaylistItems), so only the playlist needs checking here
+    if (!(await resolveUserPermissions(userId))?.canDownloadPlaylists) {
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to download playlists" });
+    }
+    if (
+      !download.playlistId ||
+      (await getPlaylistAccess(download.playlistId, userId)).level === "none"
+    ) {
+      return res.status(404).json({ error: "Playlist not found" });
     }
 
     // Reset progress and restart zip creation

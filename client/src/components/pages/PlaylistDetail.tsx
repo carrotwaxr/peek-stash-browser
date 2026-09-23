@@ -523,22 +523,20 @@ const PlaylistDetail = () => {
                   </Button>
                 )}
 
-                {/* Download button - owner only */}
-                {isOwner &&
-                  !!permissions?.canDownloadPlaylists &&
-                  scenes.length > 0 && (
-                    <Button
-                      onClick={handleDownload}
-                      variant="secondary"
-                      disabled={downloading}
-                      icon={<ThemedIcon name="download" size={16} />}
-                      title="Download Playlist"
-                    >
-                      <span className="hidden sm:inline">
-                        {downloading ? "Starting..." : "Download"}
-                      </span>
-                    </Button>
-                  )}
+                {/* Download button: owner or shared viewer with the permission */}
+                {!!permissions?.canDownloadPlaylists && scenes.length > 0 && (
+                  <Button
+                    onClick={handleDownload}
+                    variant="secondary"
+                    disabled={downloading}
+                    icon={<ThemedIcon name="download" size={16} />}
+                    title="Download Playlist"
+                  >
+                    <span className="hidden sm:inline">
+                      {downloading ? "Starting..." : "Download"}
+                    </span>
+                  </Button>
+                )}
 
                 {/* Share button - owner only with share permission */}
                 {isOwner && !!permissions?.canShare && (

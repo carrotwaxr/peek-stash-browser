@@ -69,14 +69,9 @@ export class PlaylistZipService {
       throw new Error(`Download ${downloadId} has no associated playlist`);
     }
 
-    // Get the playlist with items
+    // Get the playlist for its name
     const playlist = await prisma.playlist.findUnique({
       where: { id: download.playlistId },
-      include: {
-        items: {
-          orderBy: { position: "asc" },
-        },
-      },
     });
 
     if (!playlist) {
@@ -84,11 +79,24 @@ export class PlaylistZipService {
       throw new Error(`Playlist not found: ${download.playlistId}`);
     }
 
+    // Only the scenes the requester may see, each on its own instance
+    const items = await downloadService.getDownloadablePlaylistItems(
+      download.userId,
+      download.playlistId
+    );
+    if (items.length === 0) {
+      await downloadService.markFailed(
+        downloadId,
+        "No scenes you can download"
+      );
+      return;
+    }
+
     logger.info(`Starting playlist zip creation`, {
       downloadId,
       playlistId: playlist.id,
       playlistName: playlist.name,
-      itemCount: playlist.items.length,
+      itemCount: items.length,
     });
 
     // Mark as processing
@@ -120,16 +128,16 @@ export class PlaylistZipService {
       archive.pipe(output);
 
       // Process each playlist item
-      const totalItems = playlist.items.length;
+      const totalItems = items.length;
       let processedItems = 0;
 
-      for (const item of playlist.items) {
+      for (const item of items) {
         // Get scene with relations for NFO generation
-        // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
         const scene = await prisma.stashScene.findFirst({
           where: {
             id: item.sceneId,
-            ...(item.instanceId ? { stashInstanceId: item.instanceId } : {}),
+            stashInstanceId: item.instanceId,
+            deletedAt: null,
           },
           include: {
             performers: {
@@ -199,9 +207,11 @@ export class PlaylistZipService {
           name: `${playlistDirName}/${nfoFileName}`,
         });
 
-        // Stream video file from Stash
-        const stashBaseUrl = stashInstanceManager.getBaseUrl();
-        const apiKey = stashInstanceManager.getApiKey();
+        // Stream video file from the Stash instance the scene lives on
+        const stashBaseUrl = stashInstanceManager.getBaseUrl(
+          scene.stashInstanceId
+        );
+        const apiKey = stashInstanceManager.getApiKey(scene.stashInstanceId);
         const streamUrl = `${stashBaseUrl}/scene/${scene.id}/stream`;
 
         logger.debug(`Fetching video from Stash`, {
