@@ -1,12 +1,15 @@
+import prisma from "../prisma/singleton.js";
+import rankingComputeService from "../services/RankingComputeService.js";
+import {
+  type TopListSortBy,
+  userStatsAggregationService,
+} from "../services/UserStatsAggregationService.js";
 import type {
+  ApiErrorResponse,
   TypedAuthRequest,
   TypedResponse,
-  ApiErrorResponse,
   UserStatsResponse,
 } from "../types/api/index.js";
-import { userStatsAggregationService, type TopListSortBy } from "../services/UserStatsAggregationService.js";
-import rankingComputeService from "../services/RankingComputeService.js";
-import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -30,8 +33,7 @@ async function ensureFreshRankings(userId: number): Promise<void> {
   });
 
   const isStale =
-    !lastRanking ||
-    Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS;
+    !lastRanking || Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS;
 
   if (isStale) {
     logger.info("Rankings stale for user stats, recomputing", { userId });
@@ -58,12 +60,16 @@ export async function getUserStats(
 
     // Parse sortBy query parameter
     const sortByParam = req.query.sortBy;
-    const sortBy: TopListSortBy = isValidSortBy(sortByParam) ? sortByParam : "engagement";
+    const sortBy: TopListSortBy = isValidSortBy(sortByParam)
+      ? sortByParam
+      : "engagement";
 
     // Ensure rankings are fresh before returning stats
     await ensureFreshRankings(userId);
 
-    const stats = await userStatsAggregationService.getUserStats(userId, { sortBy });
+    const stats = await userStatsAggregationService.getUserStats(userId, {
+      sortBy,
+    });
 
     res.json(stats);
   } catch (error) {

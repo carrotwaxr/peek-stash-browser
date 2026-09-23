@@ -1,12 +1,12 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedStudio } from "@peek/shared-types";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
+import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
 interface Props {
   studio: NormalizedStudio;
@@ -23,24 +23,51 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
     const { hasMultipleInstances } = useConfig();
 
     const indicators = useMemo(() => {
-      const tagsTooltip = getIndicatorBehavior('studio', 'tags') === 'rich' &&
+      const tagsTooltip = getIndicatorBehavior("studio", "tags") === "rich" &&
         studio.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={studio.tags} title="Tags" parentInstanceId={studio.instanceId} />
+          <TooltipEntityGrid
+            entityType="tag"
+            entities={studio.tags}
+            title="Tags"
+            parentInstanceId={studio.instanceId}
+          />
         );
 
-      const performersTooltip = getIndicatorBehavior('studio', 'performers') === 'rich' &&
+      const performersTooltip = getIndicatorBehavior("studio", "performers") ===
+        "rich" &&
         (studio.performers?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={studio.performers} title="Performers" parentInstanceId={studio.instanceId} />
+          <TooltipEntityGrid
+            entityType="performer"
+            entities={studio.performers}
+            title="Performers"
+            parentInstanceId={studio.instanceId}
+          />
         );
 
-      const groupsTooltip = getIndicatorBehavior('studio', 'groups') === 'rich' &&
+      const groupsTooltip = getIndicatorBehavior("studio", "groups") ===
+        "rich" &&
         (studio.groups?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="group" entities={studio.groups} title="Collections" parentInstanceId={studio.instanceId} />
+          <TooltipEntityGrid
+            entityType="group"
+            entities={studio.groups}
+            title="Collections"
+            parentInstanceId={studio.instanceId}
+          />
         );
 
-      const galleriesTooltip = getIndicatorBehavior('studio', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior("studio", "galleries") ===
+        "rich" &&
         (studio.galleries?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={studio.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={studio.instanceId} />
+          <TooltipEntityGrid
+            entityType="gallery"
+            entities={
+              studio.galleries as React.ComponentProps<
+                typeof TooltipEntityGrid
+              >["entities"]
+            }
+            title="Galleries"
+            parentInstanceId={studio.instanceId}
+          />
         );
 
       return [
@@ -50,7 +77,14 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.scene_count,
           onClick:
             studio.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/scenes?studioId=${studio.id}`,
+                      studio,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -58,7 +92,14 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
           count: studio.image_count,
           onClick:
             studio.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/images?studioId=${studio.id}`,
+                      studio,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -85,7 +126,9 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
     }, [studio, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
-    const indicatorsToShow = studioSettings.showRelationshipIndicators ? indicators : [];
+    const indicatorsToShow = studioSettings.showRelationshipIndicators
+      ? indicators
+      : [];
 
     return (
       <BaseCard
@@ -94,11 +137,15 @@ const StudioCard = forwardRef<HTMLDivElement, Props>(
         imagePath={studio.image_path}
         title={studio.name}
         description={studio.details}
-        linkTo={getEntityPath('studio', studio, hasMultipleInstances)}
+        linkTo={getEntityPath("studio", studio, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard as boolean | undefined }}
+        displayPreferences={{
+          showDescription: studioSettings.showDescriptionOnCard as
+            | boolean
+            | undefined,
+        }}
         ratingControlsProps={{
           entityId: studio.id,
           instanceId: studio.instanceId,

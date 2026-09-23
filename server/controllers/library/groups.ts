@@ -1,21 +1,21 @@
-import type {
-  TypedAuthRequest,
-  TypedResponse,
-  FindGroupsRequest,
-  FindGroupsResponse,
-  FindGroupsMinimalRequest,
-  FindGroupsMinimalResponse,
-  ApiErrorResponse,
-  AmbiguousLookupResponse,
-} from "../../types/api/index.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import type {
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
+  FindGroupsMinimalRequest,
+  FindGroupsMinimalResponse,
+  FindGroupsRequest,
+  FindGroupsResponse,
+  TypedAuthRequest,
+  TypedResponse,
+} from "../../types/api/index.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -86,7 +86,9 @@ export async function applyGroupFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((g) => {
-        const groupTagIds = (g.tags || []).map((t: { id: string }) => String(t.id));
+        const groupTagIds = (g.tags || []).map((t: { id: string }) =>
+          String(t.id)
+        );
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
@@ -109,7 +111,8 @@ export async function applyGroupFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.performers && filters.performers.value) {
     const performerIds = filters.performers.value.map(String);
-    const groupIdsWithPerformers = await stashEntityService.getGroupIdsByPerformers(performerIds);
+    const groupIdsWithPerformers =
+      await stashEntityService.getGroupIdsByPerformers(performerIds);
     filtered = filtered.filter((g) => groupIdsWithPerformers.has(g.id));
   }
 
@@ -151,7 +154,9 @@ export async function applyGroupFilters(
  */
 export const findGroups = async (
   req: TypedAuthRequest<FindGroupsRequest>,
-  res: TypedResponse<FindGroupsResponse | ApiErrorResponse | AmbiguousLookupResponse>
+  res: TypedResponse<
+    FindGroupsResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   try {
     const startTime = Date.now();
@@ -169,7 +174,10 @@ export const findGroups = async (
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
+    const { sortField, randomSeed } = parseRandomSort(
+      sortFieldRaw,
+      requestingUser.id
+    );
 
     // Merge root-level ids with group_filter
     const normalizedIds = ids
@@ -206,12 +214,12 @@ export const findGroups = async (
       logger.warn("Ambiguous group lookup", {
         id: ids[0],
         matchCount: groups.length,
-        instances: groups.map(g => g.instanceId),
+        instances: groups.map((g) => g.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple groups found with ID ${ids[0]}. Specify instance_id parameter.`,
-        matches: groups.map(g => ({
+        matches: groups.map((g) => ({
           id: g.id,
           name: g.name,
           instanceId: g.instanceId,
@@ -223,7 +231,10 @@ export const findGroups = async (
     let paginatedGroups = groups;
     if (ids && ids.length === 1 && paginatedGroups.length === 1) {
       const firstGroup = paginatedGroups[0] as (typeof paginatedGroups)[number];
-      const groupWithCounts = await stashEntityService.getGroup(ids[0] as string, firstGroup.instanceId);
+      const groupWithCounts = await stashEntityService.getGroup(
+        ids[0] as string,
+        firstGroup.instanceId
+      );
       if (groupWithCounts) {
         const existingGroup = firstGroup;
         paginatedGroups = [
@@ -247,9 +258,13 @@ export const findGroups = async (
     }
 
     // Add stashUrl to each group
-    const groupsWithStashUrl = paginatedGroups.map(group => ({
+    const groupsWithStashUrl = paginatedGroups.map((group) => ({
       ...group,
-      stashUrl: buildStashEntityUrl('group', group.id, group.instanceId || undefined),
+      stashUrl: buildStashEntityUrl(
+        "group",
+        group.id,
+        group.instanceId || undefined
+      ),
     }));
 
     logger.info("findGroups completed", {
@@ -318,8 +333,10 @@ export const findGroupsMinimal = async (
       const { min_scene_count, min_performer_count } = count_filter;
       groups = groups.filter((g) => {
         const conditions: boolean[] = [];
-        if (min_scene_count !== undefined) conditions.push(g.scene_count >= min_scene_count);
-        if (min_performer_count !== undefined) conditions.push(g.performer_count >= min_performer_count);
+        if (min_scene_count !== undefined)
+          conditions.push(g.scene_count >= min_scene_count);
+        if (min_performer_count !== undefined)
+          conditions.push(g.performer_count >= min_performer_count);
         return conditions.length === 0 || conditions.some((c) => c);
       });
     }

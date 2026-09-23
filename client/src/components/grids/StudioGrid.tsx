@@ -1,5 +1,5 @@
-import { SearchableGrid } from "../ui/SearchableGrid";
 import { StudioCard } from "../cards/index";
+import { SearchableGrid } from "../ui/SearchableGrid";
 
 interface Props {
   lockedFilters?: Record<string, unknown>;

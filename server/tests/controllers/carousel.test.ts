@@ -10,7 +10,20 @@
  * - previewCarousel (preview carousel query results)
  * - executeCarouselById (execute saved carousel and return scenes)
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createCarousel,
+  deleteCarousel,
+  executeCarouselById,
+  getCarousel,
+  getUserCarousels,
+  previewCarousel,
+  updateCarousel,
+} from "../../controllers/carousel.js";
+import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
+import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock Prisma - hoisted before imports
 vi.mock("../../prisma/singleton.js", () => ({
@@ -70,20 +83,6 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
-import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
-import {
-  getUserCarousels,
-  getCarousel,
-  createCarousel,
-  updateCarousel,
-  deleteCarousel,
-  previewCarousel,
-  executeCarouselById,
-} from "../../controllers/carousel.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
-
 const mockPrisma = vi.mocked(prisma);
 const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
@@ -129,7 +128,10 @@ describe("Carousel Controller", () => {
     });
 
     it("returns array of user carousels on success", async () => {
-      const carousels = [SAMPLE_CAROUSEL, { ...SAMPLE_CAROUSEL, id: 2, title: "Recent" }];
+      const carousels = [
+        SAMPLE_CAROUSEL,
+        { ...SAMPLE_CAROUSEL, id: 2, title: "Recent" },
+      ];
       mockPrisma.userCarousel.findMany.mockResolvedValue(carousels as any);
 
       const req = mockReq({}, {}, USER);
@@ -179,7 +181,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns carousel on success", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -190,7 +194,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.userCarousel.findFirst.mockRejectedValue(new Error("DB error"));
+      mockPrisma.userCarousel.findFirst.mockRejectedValue(
+        new Error("DB error")
+      );
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -213,7 +219,11 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 400 when title is empty", async () => {
-      const req = mockReq({ title: "", rules: [{ field: "rating" }] }, {}, USER);
+      const req = mockReq(
+        { title: "", rules: [{ field: "rating" }] },
+        {},
+        USER
+      );
       const res = mockRes();
       await createCarousel(req, res);
       expect(res._getStatus()).toBe(400);
@@ -267,7 +277,10 @@ describe("Carousel Controller", () => {
       mockPrisma.user.update.mockResolvedValue({} as any);
 
       const req = mockReq(
-        { title: "New Carousel", rules: [{ field: "rating", operator: "gte", value: 50 }] },
+        {
+          title: "New Carousel",
+          rules: [{ field: "rating", operator: "gte", value: 50 }],
+        },
         {},
         USER
       );
@@ -391,7 +404,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 400 when title is set to empty string", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
 
       const req = mockReq({ title: "" }, { id: "1" }, USER);
       const res = mockRes();
@@ -402,7 +417,9 @@ describe("Carousel Controller", () => {
     });
 
     it("allows partial update (only title)", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
       mockPrisma.userCarousel.update.mockResolvedValue({
         ...SAMPLE_CAROUSEL,
         title: "Updated Title",
@@ -418,7 +435,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.userCarousel.findFirst.mockRejectedValue(new Error("DB error"));
+      mockPrisma.userCarousel.findFirst.mockRejectedValue(
+        new Error("DB error")
+      );
 
       const req = mockReq({ title: "Updated" }, { id: "1" }, USER);
       const res = mockRes();
@@ -451,7 +470,9 @@ describe("Carousel Controller", () => {
     });
 
     it("deletes carousel on happy path", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
       mockPrisma.userCarousel.delete.mockResolvedValue(SAMPLE_CAROUSEL as any);
 
       const req = mockReq({}, { id: "1" }, USER);
@@ -463,7 +484,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.userCarousel.findFirst.mockRejectedValue(new Error("DB error"));
+      mockPrisma.userCarousel.findFirst.mockRejectedValue(
+        new Error("DB error")
+      );
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -552,7 +575,9 @@ describe("Carousel Controller", () => {
 
     it("executes carousel query and returns scenes on success", async () => {
       const scenes = [SAMPLE_SCENE];
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
       mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
       mockAddStreamability.mockReturnValue(scenes as any);
 
@@ -565,7 +590,9 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
       mockQueryBuilder.execute.mockRejectedValue(new Error("Execution failed"));
 
       const req = mockReq({}, { id: "1" }, USER);

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for User Group management in Settings.
@@ -121,7 +121,9 @@ test.describe("User Group Management", () => {
     });
 
     // The member dropdown should be available (if there are users to add)
-    const memberSelect = page.locator("select").filter({ hasText: "Select a user to add" });
+    const memberSelect = page
+      .locator("select")
+      .filter({ hasText: "Select a user to add" });
     const hasUsersToAdd = await memberSelect.isVisible().catch(() => false);
 
     if (hasUsersToAdd) {

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 /**
  * Hook to scroll the current item into view within a scrollable container.
@@ -18,7 +18,10 @@ interface UseScrollToCurrentItemOptions {
   delay?: number;
 }
 
-export const useScrollToCurrentItem = (currentIndex: number, options: UseScrollToCurrentItemOptions = {}) => {
+export const useScrollToCurrentItem = (
+  currentIndex: number,
+  options: UseScrollToCurrentItemOptions = {}
+) => {
   const { direction = "horizontal", delay = 100 } = options;
 
   const containerElRef = useRef<HTMLElement | null>(null);
@@ -89,7 +92,10 @@ export const useScrollToCurrentItem = (currentIndex: number, options: UseScrollT
           pendingScrollIndexRef.current = null;
         } else if (attempt < 3) {
           // Retry with exponential backoff: delay, delay*2, delay*4
-          setTimeout(() => tryScroll(attempt + 1), delay * Math.pow(2, attempt));
+          setTimeout(
+            () => tryScroll(attempt + 1),
+            delay * Math.pow(2, attempt)
+          );
         }
       };
 
@@ -104,7 +110,11 @@ export const useScrollToCurrentItem = (currentIndex: number, options: UseScrollT
       containerElRef.current = el;
 
       // If we have a pending scroll and now have the container, trigger it
-      if (el && pendingScrollIndexRef.current !== null && currentItemRef.current) {
+      if (
+        el &&
+        pendingScrollIndexRef.current !== null &&
+        currentItemRef.current
+      ) {
         attemptScroll(pendingScrollIndexRef.current);
       }
     },

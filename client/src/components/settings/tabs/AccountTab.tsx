@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { apiPost } from "../../../api";
-import { Copy, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
-import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
 
 const AccountTab = () => {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -33,7 +33,11 @@ const AccountTab = () => {
   }, []);
 
   const handleRegenerateKey = async () => {
-    if (!confirm("Are you sure you want to regenerate your recovery key?\n\nYour old key will no longer work for password recovery.")) {
+    if (
+      !confirm(
+        "Are you sure you want to regenerate your recovery key?\n\nYour old key will no longer work for password recovery."
+      )
+    ) {
       return;
     }
 
@@ -145,7 +149,10 @@ const AccountTab = () => {
               >
                 New Password
               </label>
-              <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-xs mb-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 8+ characters with at least one letter and one number
               </p>
               <input
@@ -188,7 +195,10 @@ const AccountTab = () => {
               />
             </div>
 
-            <div className="flex justify-end pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
+            <div
+              className="flex justify-end pt-4 border-t"
+              style={{ borderColor: "var(--border-color)" }}
+            >
               <Button
                 type="submit"
                 disabled={passwordChanging}
@@ -216,11 +226,9 @@ const AccountTab = () => {
         >
           Recovery Key
         </h3>
-        <p
-          className="text-sm mb-4"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Use this key to reset your password if you forget it. Keep it somewhere safe.
+        <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+          Use this key to reset your password if you forget it. Keep it
+          somewhere safe.
         </p>
 
         {keyLoading ? (
@@ -236,7 +244,9 @@ const AccountTab = () => {
                   color: "var(--text-primary)",
                 }}
               >
-                {showRecoveryKey ? recoveryKey : "••••-••••-••••-••••-••••-••••-••••"}
+                {showRecoveryKey
+                  ? recoveryKey
+                  : "••••-••••-••••-••••-••••-••••-••••"}
               </div>
               <Button
                 variant="secondary"

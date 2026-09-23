@@ -15,8 +15,10 @@
  * @param {string} [instanceId] - The Stash instance ID
  * @returns {string} Composite key string
  */
-export const makeCompositeKey = (id: string | number, instanceId?: string | null) =>
-  instanceId ? `${id}:${instanceId}` : String(id);
+export const makeCompositeKey = (
+  id: string | number,
+  instanceId?: string | null
+) => (instanceId ? `${id}:${instanceId}` : String(id));
 
 /**
  * Parse a composite key back to its component parts.
@@ -32,5 +34,8 @@ export const parseCompositeKey = (key: string) => {
   const str = String(key);
   const colonIdx = str.indexOf(":");
   if (colonIdx === -1) return { id: str, instanceId: undefined };
-  return { id: str.substring(0, colonIdx), instanceId: str.substring(colonIdx + 1) };
+  return {
+    id: str.substring(0, colonIdx),
+    instanceId: str.substring(colonIdx + 1),
+  };
 };

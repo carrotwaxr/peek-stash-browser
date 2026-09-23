@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
-import { Button } from "../ui/index";
 import { CAROUSEL_FILTER_DEFINITIONS } from "../../utils/filterConfig";
 import SearchableSelect from "../ui/SearchableSelect";
+import { Button } from "../ui/index";
 
 interface CarouselRule {
   id: string;
@@ -40,7 +40,9 @@ interface Props {
  * Renders appropriate input based on filter type.
  */
 const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
-  const filterDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === rule.filterKey);
+  const filterDef = CAROUSEL_FILTER_DEFINITIONS.find(
+    (f) => f.key === rule.filterKey
+  );
 
   // Get available filters (current + unused)
   const availableFilters = CAROUSEL_FILTER_DEFINITIONS.filter(
@@ -48,7 +50,9 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
   );
 
   const handleFilterChange = (newFilterKey: string) => {
-    const newDef = CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === newFilterKey);
+    const newDef = CAROUSEL_FILTER_DEFINITIONS.find(
+      (f) => f.key === newFilterKey
+    );
     if (!newDef) return;
 
     // Reset value when changing filter type
@@ -93,7 +97,10 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
       {/* Modifier (if applicable) */}
       {filterDef?.modifierOptions && (
         <div className="space-y-1 min-w-[120px]">
-          <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+          <label
+            className="block text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
             Condition
           </label>
           <select
@@ -126,14 +133,19 @@ const RuleEditor = ({ rule, usedFilterKeys, onChange, onRemove }: Props) => {
       {/* Hierarchy Toggle */}
       {filterDef?.supportsHierarchy && (
         <div className="space-y-1">
-          <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+          <label
+            className="block text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
             Sub-items
           </label>
           <label className="flex items-center gap-2 py-2">
             <input
               type="checkbox"
               checked={rule.depth === -1}
-              onChange={(e) => onChange({ depth: e.target.checked ? -1 : undefined })}
+              onChange={(e) =>
+                onChange({ depth: e.target.checked ? -1 : undefined })
+              }
               className="rounded border"
               style={{ accentColor: "var(--accent-primary)" }}
             />
@@ -171,14 +183,23 @@ interface RuleValueInputProps {
  */
 const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
   if (!filterDef) {
-    return <span style={{ color: "var(--text-secondary)" }}>Unknown filter</span>;
+    return (
+      <span style={{ color: "var(--text-secondary)" }}>Unknown filter</span>
+    );
   }
 
   switch (filterDef.type) {
     case "searchable-select":
       return (
         <SearchableSelect
-          entityType={filterDef.entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
+          entityType={
+            filterDef.entityType as
+              | "performers"
+              | "studios"
+              | "tags"
+              | "galleries"
+              | "groups"
+          }
           value={rule.value as string | string[]}
           onChange={(val) => onChange({ value: val })}
           multi={filterDef.multi}
@@ -187,7 +208,13 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       );
 
     case "range":
-      return <RangeInput filterDef={filterDef} value={rule.value as { min?: number; max?: number } | undefined} onChange={(val) => onChange({ value: val })} />;
+      return (
+        <RangeInput
+          filterDef={filterDef}
+          value={rule.value as { min?: number; max?: number } | undefined}
+          onChange={(val) => onChange({ value: val })}
+        />
+      );
 
     case "checkbox":
       return (
@@ -236,10 +263,19 @@ const RuleValueInput = ({ filterDef, rule, onChange }: RuleValueInputProps) => {
       );
 
     case "date-range":
-      return <DateRangeInput value={rule.value as { min?: string; max?: string } | undefined} onChange={(val) => onChange({ value: val })} />;
+      return (
+        <DateRangeInput
+          value={rule.value as { min?: string; max?: string } | undefined}
+          onChange={(val) => onChange({ value: val })}
+        />
+      );
 
     default:
-      return <span style={{ color: "var(--text-secondary)" }}>Unsupported type: {filterDef.type}</span>;
+      return (
+        <span style={{ color: "var(--text-secondary)" }}>
+          Unsupported type: {filterDef.type}
+        </span>
+      );
   }
 };
 

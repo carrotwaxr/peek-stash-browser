@@ -1,11 +1,25 @@
 import prisma from "../prisma/singleton.js";
+import type {
+  NormalizedGallery,
+  NormalizedGroup,
+  NormalizedImage,
+  NormalizedPerformer,
+  NormalizedScene,
+  NormalizedStudio,
+  NormalizedTag,
+} from "../types/index.js";
+import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { exclusionComputationService } from "./ExclusionComputationService.js";
-import type { NormalizedScene, NormalizedPerformer, NormalizedStudio, NormalizedTag, NormalizedGroup, NormalizedGallery, NormalizedImage } from "../types/index.js";
 
-type NormalizedEntity = NormalizedScene | NormalizedPerformer | NormalizedStudio | NormalizedTag | NormalizedGroup | NormalizedGallery | NormalizedImage;
-
+type NormalizedEntity =
+  | NormalizedScene
+  | NormalizedPerformer
+  | NormalizedStudio
+  | NormalizedTag
+  | NormalizedGroup
+  | NormalizedGallery
+  | NormalizedImage;
 
 export type EntityType =
   | "scene"
@@ -66,7 +80,12 @@ class UserHiddenEntityService {
     this.hiddenIdsCache.delete(userId);
 
     // Update pre-computed exclusions (pass instanceId so cascades are scoped)
-    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId, instanceId);
+    await exclusionComputationService.addHiddenEntity(
+      userId,
+      entityType,
+      entityId,
+      instanceId
+    );
   }
 
   /**
@@ -91,7 +110,12 @@ class UserHiddenEntityService {
     this.hiddenIdsCache.delete(userId);
 
     // Update pre-computed exclusions (async recompute)
-    exclusionComputationService.removeHiddenEntity(userId, entityType, entityId, instanceId);
+    exclusionComputationService.removeHiddenEntity(
+      userId,
+      entityType,
+      entityId,
+      instanceId
+    );
   }
 
   /**
@@ -147,16 +171,23 @@ class UserHiddenEntityService {
       hiddenEntities.map(async (hidden) => {
         let entity = null;
 
-        const instId = hidden.instanceId || stashInstanceManager.getDefaultConfig().id;
+        const instId =
+          hidden.instanceId || stashInstanceManager.getDefaultConfig().id;
         switch (hidden.entityType) {
           case "scene":
             entity = await stashEntityService.getScene(hidden.entityId, instId);
             break;
           case "performer":
-            entity = await stashEntityService.getPerformer(hidden.entityId, instId);
+            entity = await stashEntityService.getPerformer(
+              hidden.entityId,
+              instId
+            );
             break;
           case "studio":
-            entity = await stashEntityService.getStudio(hidden.entityId, instId);
+            entity = await stashEntityService.getStudio(
+              hidden.entityId,
+              instId
+            );
             break;
           case "tag":
             entity = await stashEntityService.getTag(hidden.entityId, instId);
@@ -165,7 +196,10 @@ class UserHiddenEntityService {
             entity = await stashEntityService.getGroup(hidden.entityId, instId);
             break;
           case "gallery":
-            entity = await stashEntityService.getGallery(hidden.entityId, instId);
+            entity = await stashEntityService.getGallery(
+              hidden.entityId,
+              instId
+            );
             break;
           case "image":
             entity = await stashEntityService.getImage(hidden.entityId, instId);

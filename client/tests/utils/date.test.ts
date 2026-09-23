@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { formatDate, formatRelativeTime } from "../../src/utils/date";
 
 describe("date utilities", () => {
@@ -53,7 +53,9 @@ describe("date utilities", () => {
     });
 
     it("returns hours ago for timestamps earlier today", () => {
-      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+      const threeHoursAgo = new Date(
+        Date.now() - 3 * 60 * 60 * 1000
+      ).toISOString();
       expect(formatRelativeTime(threeHoursAgo)).toBe("3 hours ago");
     });
 

@@ -23,29 +23,35 @@ const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
   const page = parseInt(searchParams.get("page") ?? "1") || 1;
 
   // Memoized fetch function
-  const fetchSimilarScenes = useCallback(async (pageNum: number, currentSceneId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchSimilarScenes = useCallback(
+    async (pageNum: number, currentSceneId: string) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const data = await apiGet(
-        `/library/scenes/${currentSceneId}/similar?page=${pageNum}`,
-      );
+        const data = await apiGet(
+          `/library/scenes/${currentSceneId}/similar?page=${pageNum}`
+        );
 
-      const { scenes: newScenes, count } = data as { scenes: NormalizedScene[]; count: number };
-      setScenes(newScenes);
-      setTotalCount(count);
-      // Notify parent of count change for tab badge
-      if (onCountChange) {
-        onCountChange(count);
+        const { scenes: newScenes, count } = data as {
+          scenes: NormalizedScene[];
+          count: number;
+        };
+        setScenes(newScenes);
+        setTotalCount(count);
+        // Notify parent of count change for tab badge
+        if (onCountChange) {
+          onCountChange(count);
+        }
+      } catch (err) {
+        console.error("Error fetching similar scenes:", err);
+        setError((err as Error).message || "Failed to load similar scenes");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching similar scenes:", err);
-      setError((err as Error).message || "Failed to load similar scenes");
-    } finally {
-      setLoading(false);
-    }
-  }, [onCountChange]);
+    },
+    [onCountChange]
+  );
 
   // Combined effect: reset page on scene change, then fetch
   // This prevents the race condition of two separate effects
@@ -66,15 +72,18 @@ const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
     fetchSimilarScenes(page, sceneId);
   }, [sceneId, page, searchParams, setSearchParams, fetchSimilarScenes]);
 
-  const handlePageChange = useCallback((newPage: number) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      newParams.delete("page");
-    } else {
-      newParams.set("page", String(newPage));
-    }
-    setSearchParams(newParams);
-  }, [searchParams, setSearchParams]);
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      const newParams = new URLSearchParams(searchParams);
+      if (newPage === 1) {
+        newParams.delete("page");
+      } else {
+        newParams.set("page", String(newPage));
+      }
+      setSearchParams(newParams);
+    },
+    [searchParams, setSearchParams]
+  );
 
   // Handle successful hide - remove scene from state
   const handleHideSuccess = (hiddenSceneId: string) => {

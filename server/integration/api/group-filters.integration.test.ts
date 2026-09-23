@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Group Filters Integration Tests
@@ -41,12 +41,15 @@ describe("Group Filters", () => {
 
   describe("favorite filter", () => {
     it("filters favorite groups", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          favorite: true,
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            favorite: true,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -57,12 +60,15 @@ describe("Group Filters", () => {
     });
 
     it("filters non-favorite groups", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          favorite: false,
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            favorite: false,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -71,45 +77,57 @@ describe("Group Filters", () => {
 
   describe("tags filter", () => {
     it("filters groups by tag with INCLUDES", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters groups by tag with EXCLUDES", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters groups by multiple tags with INCLUDES_ALL", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities, TEST_ENTITIES.restrictableTag],
-            modifier: "INCLUDES_ALL",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            tags: {
+              value: [
+                TEST_ENTITIES.tagWithEntities,
+                TEST_ENTITIES.restrictableTag,
+              ],
+              modifier: "INCLUDES_ALL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -118,55 +136,64 @@ describe("Group Filters", () => {
 
   describe("scenes filter", () => {
     it("filters groups containing specific scene with INCLUDES", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          scenes: {
-            value: [TEST_ENTITIES.sceneInGroup],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            scenes: {
+              value: [TEST_ENTITIES.sceneInGroup],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
 
       // The group should be in the results
-      const groupIds = response.data.findGroups.groups.map(g => g.id);
+      const groupIds = response.data.findGroups.groups.map((g) => g.id);
       expect(groupIds).toContain(TEST_ENTITIES.groupWithScenes);
     });
 
     it("filters groups excluding specific scene with EXCLUDES", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          scenes: {
-            value: [TEST_ENTITIES.sceneInGroup],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            scenes: {
+              value: [TEST_ENTITIES.sceneInGroup],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
 
       // The group should NOT be in the results
-      const groupIds = response.data.findGroups.groups.map(g => g.id);
+      const groupIds = response.data.findGroups.groups.map((g) => g.id);
       expect(groupIds).not.toContain(TEST_ENTITIES.groupWithScenes);
     });
   });
 
   describe("performers filter", () => {
     it("filters groups containing scenes with performer", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -175,15 +202,18 @@ describe("Group Filters", () => {
 
   describe("studios filter", () => {
     it("filters groups by studio", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -192,46 +222,55 @@ describe("Group Filters", () => {
 
   describe("rating100 filter", () => {
     it("filters by rating GREATER_THAN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          rating100: {
-            value: 70,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            rating100: {
+              value: 70,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters by rating LESS_THAN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          rating100: {
-            value: 50,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            rating100: {
+              value: 50,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters by rating BETWEEN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          rating100: {
-            value: 50,
-            value2: 80,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            rating100: {
+              value: 50,
+              value2: 80,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -240,30 +279,36 @@ describe("Group Filters", () => {
 
   describe("o_counter filter", () => {
     it("filters by o_counter GREATER_THAN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters by o_counter EQUALS zero", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -272,30 +317,36 @@ describe("Group Filters", () => {
 
   describe("play_count filter", () => {
     it("filters by play_count GREATER_THAN (watched groups)", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          play_count: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            play_count: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters by play_count EQUALS zero (unwatched groups)", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          play_count: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            play_count: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -304,46 +355,55 @@ describe("Group Filters", () => {
 
   describe("scene_count filter", () => {
     it("filters groups with many scenes", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          scene_count: {
-            value: 10,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            scene_count: {
+              value: 10,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters groups with few scenes", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          scene_count: {
-            value: 5,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            scene_count: {
+              value: 5,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("filters groups with scene_count BETWEEN", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          scene_count: {
-            value: 5,
-            value2: 50,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            scene_count: {
+              value: 5,
+              value2: 50,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -352,12 +412,15 @@ describe("Group Filters", () => {
 
   describe("text search (q parameter)", () => {
     it("searches groups by name", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 50,
-          q: "a",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 50,
+            q: "a",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -366,16 +429,19 @@ describe("Group Filters", () => {
 
   describe("combined filters", () => {
     it("combines favorite and scene_count filters", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          favorite: true,
-          scene_count: {
-            value: 5,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            favorite: true,
+            scene_count: {
+              value: 5,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -386,38 +452,44 @@ describe("Group Filters", () => {
     });
 
     it("combines rating and tags filters", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          rating100: {
-            value: 60,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            rating100: {
+              value: 60,
+              modifier: "GREATER_THAN",
+            },
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("combines studio and performer filters", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: { per_page: 50 },
-        group_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: { per_page: 50 },
+          group_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -426,39 +498,48 @@ describe("Group Filters", () => {
 
   describe("sorting", () => {
     it("sorts groups by name ASC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 50,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 50,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("sorts groups by scene_count DESC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 50,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 50,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("sorts groups by rating100 DESC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 50,
-          sort: "rating100",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 50,
+            sort: "rating100",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -467,13 +548,18 @@ describe("Group Filters", () => {
 
   describe("group by ID", () => {
     it("returns group by ID with details", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        ids: [TEST_ENTITIES.groupWithScenes],
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          ids: [TEST_ENTITIES.groupWithScenes],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups.groups).toHaveLength(1);
-      expect(response.data.findGroups.groups[0].id).toBe(TEST_ENTITIES.groupWithScenes);
+      expect(response.data.findGroups.groups[0].id).toBe(
+        TEST_ENTITIES.groupWithScenes
+      );
     });
   });
 });

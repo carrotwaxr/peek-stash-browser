@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
-import { useDebouncedValue } from "../../hooks/useDebounce";
 import { libraryApi } from "../../api";
-import { getCache, setCache } from "../../utils/filterCache";
+import { useDebouncedValue } from "../../hooks/useDebounce";
 import { makeCompositeKey, parseCompositeKey } from "../../utils/compositeKey";
+import { getCache, setCache } from "../../utils/filterCache";
 import Button from "./Button";
 
 /**
@@ -30,7 +30,13 @@ interface Props {
   onChange: (value: string | string[]) => void;
   multi?: boolean;
   placeholder?: string;
-  countFilterContext?: "scenes" | "galleries" | "images" | "performers" | "groups" | null;
+  countFilterContext?:
+    | "scenes"
+    | "galleries"
+    | "images"
+    | "performers"
+    | "groups"
+    | null;
 }
 
 const SearchableSelect = ({
@@ -129,7 +135,9 @@ const SearchableSelect = ({
 
           // Add instance filter for non-bare groups
           if (groupKey !== "__bare__" && filterKey) {
-            (params as Record<string, unknown>)[filterKey] = { instance_id: groupKey };
+            (params as Record<string, unknown>)[filterKey] = {
+              instance_id: groupKey,
+            };
           }
 
           const response = await apiMethod(params as Record<string, unknown>);
@@ -165,11 +173,15 @@ const SearchableSelect = ({
     }
 
     const loadSelectedNames = async () => {
-      const valueArray: string[] = multi ? (value as string[]) : [value as string];
+      const valueArray: string[] = multi
+        ? (value as string[])
+        : [value as string];
 
       // First, try to find in already-loaded options
       if (options.length > 0) {
-        const selected = options.filter((opt: SelectOption) => valueArray.includes(opt.id));
+        const selected = options.filter((opt: SelectOption) =>
+          valueArray.includes(opt.id)
+        );
         if (selected.length === valueArray.length) {
           setSelectedItems(selected);
           return;
@@ -269,10 +281,20 @@ const SearchableSelect = ({
         };
 
         const count_filter = getCountFilter();
-        const rawResults = await apiMethod({ filter, count_filter } as Record<string, unknown>);
+        const rawResults = await apiMethod({ filter, count_filter } as Record<
+          string,
+          unknown
+        >);
 
         // Transform results to use composite id:instanceId keys
-        const results = (rawResults as Array<{ id: string; instanceId?: string; name?: string; title?: string }>).map((item) => ({
+        const results = (
+          rawResults as Array<{
+            id: string;
+            instanceId?: string;
+            name?: string;
+            title?: string;
+          }>
+        ).map((item) => ({
           id: makeCompositeKey(item.id, item.instanceId),
           name: item.name || item.title || "Unknown",
         }));
@@ -325,7 +347,10 @@ const SearchableSelect = ({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         setSearchTerm("");
       }
@@ -367,7 +392,9 @@ const SearchableSelect = ({
   const handleRemove = (optionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (multi) {
-      onChange(((value || []) as string[]).filter((id: string) => id !== optionId));
+      onChange(
+        ((value || []) as string[]).filter((id: string) => id !== optionId)
+      );
     } else {
       onChange("");
     }
@@ -445,7 +472,9 @@ const SearchableSelect = ({
               className="hover:opacity-70 !p-1 !border-0"
               aria-label="Clear all selections"
               title="Clear all"
-              icon={<LucideX size={16} style={{ color: "var(--text-muted)" }} />}
+              icon={
+                <LucideX size={16} style={{ color: "var(--text-muted)" }} />
+              }
             />
           )}
           <LucideChevronDown

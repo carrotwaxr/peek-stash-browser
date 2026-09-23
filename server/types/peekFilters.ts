@@ -8,6 +8,7 @@
  * format ("entityId:instanceId") at compile time, preventing multi-instance
  * collision bugs (#361, #368, #390, #400, #401).
  */
+import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
 import type {
   GalleryFilterType as BaseGalleryFilterType,
   GroupFilterType as BaseGroupFilterType,
@@ -16,7 +17,6 @@ import type {
   StudioFilterType as BaseStudioFilterType,
   TagFilterType as BaseTagFilterType,
 } from "../graphql/types.js";
-import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
 
 /** Entity reference filter field with branded composite keys */
 export interface EntityRefFilter {

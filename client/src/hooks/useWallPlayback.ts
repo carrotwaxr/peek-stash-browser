@@ -12,7 +12,9 @@ export const useWallPlayback = () => {
   useEffect(() => {
     const loadSetting = async () => {
       try {
-        const response = await apiGet<{ settings?: { wallPlayback?: string } }>("/user/settings");
+        const response = await apiGet<{ settings?: { wallPlayback?: string } }>(
+          "/user/settings"
+        );
         setWallPlayback(response.settings?.wallPlayback || "autoplay");
       } catch {
         // Default to autoplay on error

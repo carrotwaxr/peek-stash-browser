@@ -1,21 +1,21 @@
 import prisma from "../prisma/singleton.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
   ApiErrorResponse,
-  ThemeConfig,
-  GetUserCustomThemesResponse,
-  GetCustomThemeParams,
-  GetCustomThemeResponse,
   CreateCustomThemeRequest,
   CreateCustomThemeResponse,
-  UpdateCustomThemeParams,
-  UpdateCustomThemeRequest,
-  UpdateCustomThemeResponse,
   DeleteCustomThemeParams,
   DeleteCustomThemeResponse,
   DuplicateCustomThemeParams,
   DuplicateCustomThemeResponse,
+  GetCustomThemeParams,
+  GetCustomThemeResponse,
+  GetUserCustomThemesResponse,
+  ThemeConfig,
+  TypedAuthRequest,
+  TypedResponse,
+  UpdateCustomThemeParams,
+  UpdateCustomThemeRequest,
+  UpdateCustomThemeResponse,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
 
@@ -108,7 +108,9 @@ export const getUserCustomThemes = async (
 
     res.json({ themes });
   } catch (error) {
-    logger.error("Error getting custom themes", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting custom themes", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get custom themes" });
   }
 };
@@ -145,7 +147,9 @@ export const getCustomTheme = async (
 
     res.json({ theme });
   } catch (error) {
-    logger.error("Error getting custom theme", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting custom theme", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get custom theme" });
   }
 };
@@ -206,7 +210,9 @@ export const createCustomTheme = async (
 
     res.status(201).json({ theme });
   } catch (error) {
-    logger.error("Error creating custom theme", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error creating custom theme", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to create custom theme" });
   }
 };
@@ -289,7 +295,9 @@ export const updateCustomTheme = async (
 
     res.json({ theme });
   } catch (error) {
-    logger.error("Error updating custom theme", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating custom theme", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update custom theme" });
   }
 };
@@ -332,7 +340,9 @@ export const deleteCustomTheme = async (
 
     res.json({ success: true });
   } catch (error) {
-    logger.error("Error deleting custom theme", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error deleting custom theme", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to delete custom theme" });
   }
 };
@@ -392,7 +402,9 @@ export const duplicateCustomTheme = async (
 
     res.status(201).json({ theme });
   } catch (error) {
-    logger.error("Error duplicating custom theme", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error duplicating custom theme", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to duplicate custom theme" });
   }
 };

@@ -1,32 +1,38 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { type LibrarySearchParams } from "../../api";
+import { ApiError } from "../../api/client";
+import { useImageList } from "../../api/hooks";
+import { queryKeys } from "../../api/queryKeys";
 import { getGridClasses } from "../../constants/grids";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 import { useGridColumns } from "../../hooks/useGridColumns";
-import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
-import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { type LibrarySearchParams } from "../../api";
-import { useImageList } from "../../api/hooks";
-import { ApiError } from "../../api/client";
-import { queryKeys } from "../../api/queryKeys";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
 import { ImageCard } from "../cards/index";
+import { FolderView } from "../folder/index";
+import { ColumnConfigPopover, TableView } from "../table/index";
+import TimelineView from "../timeline/TimelineView";
+import Lightbox from "../ui/Lightbox";
 import {
-  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
+  SyncProgressBanner,
 } from "../ui/index";
-import Lightbox from "../ui/Lightbox";
 import WallView from "../wall/WallView";
-import TimelineView from "../timeline/TimelineView";
-import { TableView, ColumnConfigPopover } from "../table/index";
-import { FolderView } from "../folder/index";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for images page
 const VIEW_MODES: { id: string; label: string }[] = [
@@ -69,7 +75,10 @@ const Images = () => {
   );
 
   // Track timeline date filter for filtering by selected period
-  const [timelineDateFilter, setTimelineDateFilter] = useState<{ start: string; end: string } | null>(null);
+  const [timelineDateFilter, setTimelineDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
 
   // Track folder tag filter for filtering by selected folder
   const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
@@ -109,7 +118,9 @@ const Images = () => {
   const consumePendingLightboxIndexRef = useRef<(() => void) | null>(null);
 
   // TanStack Query for images
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
+    null
+  );
   const queryClient = useQueryClient();
   const { data, isLoading: queryLoading, error } = useImageList(queryParams);
   const initMessage =
@@ -127,8 +138,13 @@ const Images = () => {
     }
   }, [data]);
 
-  const findImages = (data as Record<string, unknown>)?.findImages as Record<string, unknown> | undefined;
-  const currentImages = useMemo(() => (findImages?.images as Record<string, unknown>[]) || [], [findImages?.images]);
+  const findImages = (data as Record<string, unknown>)?.findImages as
+    | Record<string, unknown>
+    | undefined;
+  const currentImages = useMemo(
+    () => (findImages?.images as Record<string, unknown>[]) || [],
+    [findImages?.images]
+  );
   const totalCount = (findImages?.count as number) || 0;
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
   const pageOffset = (urlPage - 1) * urlPerPage;
@@ -152,17 +168,16 @@ const Images = () => {
   // Store the consume function in ref for the onDataChange callback
   consumePendingLightboxIndexRef.current = lightbox.consumePendingLightboxIndex;
 
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
+  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
+    setQueryParams(newQuery);
+  }, []);
 
   // Handle image click - open lightbox
   const handleImageClick = useCallback(
     (image: Record<string, unknown>) => {
-      const index = currentImages.findIndex((img: Record<string, unknown>) => img.id === image.id);
+      const index = currentImages.findIndex(
+        (img: Record<string, unknown>) => img.id === image.id
+      );
       openLightbox(index >= 0 ? index : 0);
     },
     [currentImages, openLightbox]
@@ -172,7 +187,10 @@ const Images = () => {
   const updateImageInCache = useCallback(
     (imageId: string, updates: Record<string, unknown>) => {
       if (!queryParams) return;
-      const qk = queryKeys.images.list(undefined, (queryParams ?? {}) as Record<string, unknown>);
+      const qk = queryKeys.images.list(
+        undefined,
+        (queryParams ?? {}) as Record<string, unknown>
+      );
       queryClient.setQueryData(qk, (old: unknown) => {
         if (!old || typeof old !== "object") return old;
         const oldData = old as Record<string, unknown>;
@@ -194,32 +212,38 @@ const Images = () => {
   );
 
   // Handle O counter change from card - update local state
-  const handleOCounterChange = useCallback((imageId: string, newCount: number) => {
-    updateImageInCache(imageId, { oCounter: newCount });
-  }, [updateImageInCache]);
+  const handleOCounterChange = useCallback(
+    (imageId: string, newCount: number) => {
+      updateImageInCache(imageId, { oCounter: newCount });
+    },
+    [updateImageInCache]
+  );
 
   // Handle rating change from card - update local state
-  const handleRatingChange = useCallback((imageId: string, newRating: number | null) => {
-    updateImageInCache(imageId, { rating100: newRating });
-  }, [updateImageInCache]);
+  const handleRatingChange = useCallback(
+    (imageId: string, newRating: number | null) => {
+      updateImageInCache(imageId, { rating100: newRating });
+    },
+    [updateImageInCache]
+  );
 
   // Handle favorite change from card - update local state
-  const handleFavoriteChange = useCallback((imageId: string, newFavorite: boolean) => {
-    updateImageInCache(imageId, { favorite: newFavorite });
-  }, [updateImageInCache]);
+  const handleFavoriteChange = useCallback(
+    (imageId: string, newFavorite: boolean) => {
+      updateImageInCache(imageId, { favorite: newFavorite });
+    },
+    [updateImageInCache]
+  );
 
   // TV Navigation - use shared hook for all grid pages
   // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
-  const {
-    isTVMode,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentImages,
-    columns,
-    totalPages,
-    onItemSelect: handleImageClick,
-  });
+  const { isTVMode, searchControlsProps, gridItemProps } =
+    useGridPageTVNavigation({
+      items: currentImages,
+      columns,
+      totalPages,
+      onItemSelect: handleImageClick,
+    });
 
   useInitialFocus(
     pageRef,
@@ -257,7 +281,6 @@ const Images = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
-           
           viewModes={VIEW_MODES}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
@@ -273,143 +296,208 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {(({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }: { viewMode: string; gridDensity: string; zoomLevel: number; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void; timelinePeriod: string; setTimelinePeriod: (period: string) => void }) =>
-            viewMode === "table" ? (
-              <TableView
-                items={currentImages as Record<string, unknown>[]}
-                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
-                onSort={onSort}
-                onHideColumn={hideColumn}
-                entityType="image"
-                isLoading={isLoading}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : viewMode === "wall" ? (
-              <WallView
-                items={currentImages as Record<string, unknown>[]}
-                entityType="image"
-                zoomLevel={zoomLevel as unknown as "small" | "medium" | "large"}
-                playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
-                onItemClick={handleImageClick}
-                loading={isLoading}
-                emptyMessage="No images found"
-              />
-            ) : viewMode === "timeline" ? (
-              <TimelineView
-                entityType="image"
-                items={currentImages as Record<string, unknown>[]}
-                renderItem={(image: Record<string, unknown>, index: number, { onItemClick }: { onItemClick?: (item: Record<string, unknown>) => void }) => (
-                  <ImageCard
-                    key={image.id as string}
-                    image={image as unknown as import("@peek/shared-types").NormalizedImage}
-                    onClick={() => onItemClick?.(image)}
-                    fromPageTitle="Images"
-                    tabIndex={0}
-                    onOCounterChange={handleOCounterChange}
-                    onRatingChange={handleRatingChange}
-                    onFavoriteChange={handleFavoriteChange}
-                  />
-                )}
-                onItemClick={handleImageClick}
-                onDateFilterChange={setTimelineDateFilter}
-                onPeriodChange={setTimelinePeriod as (period: string | null) => void}
-                initialPeriod={timelinePeriod}
-                loading={isLoading}
-                emptyMessage="No images found for this time period"
-                gridDensity={gridDensity}
-              />
-            ) : viewMode === "folder" ? (
-              <FolderView
-                items={currentImages as Record<string, unknown>[]}
-                tags={folderTags}
-                gridDensity={gridDensity}
-                loading={isLoading || tagsLoading}
-                emptyMessage="No images found"
-                onFolderPathChange={setFolderTagFilter}
-                renderItem={(image: Record<string, unknown>) => (
-                  <ImageCard
-                    key={image.id as string}
-                    image={image as unknown as import("@peek/shared-types").NormalizedImage}
-                    onClick={() => handleImageClick(image)}
-                    fromPageTitle="Images"
-                    tabIndex={0}
-                    onOCounterChange={handleOCounterChange}
-                    onRatingChange={handleRatingChange}
-                    onFavoriteChange={handleFavoriteChange}
-                  />
-                )}
-              />
-            ) : isLoading ? (
-              <div className={getGridClasses("standard", gridDensity)}>
-                {[...Array(24)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg animate-pulse"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      height: "16rem",
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentImages.map((image: Record<string, unknown>, index: number) => {
-                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
-                  return (
+          {
+            (({
+              viewMode,
+              gridDensity,
+              zoomLevel,
+              sortField,
+              sortDirection,
+              onSort,
+              timelinePeriod,
+              setTimelinePeriod,
+            }: {
+              viewMode: string;
+              gridDensity: string;
+              zoomLevel: number;
+              sortField: string;
+              sortDirection: string;
+              onSort: (field: string, direction: "ASC" | "DESC") => void;
+              timelinePeriod: string;
+              setTimelinePeriod: (period: string) => void;
+            }) =>
+              viewMode === "table" ? (
+                <TableView
+                  items={currentImages as Record<string, unknown>[]}
+                  columns={
+                    visibleColumns as {
+                      id: string;
+                      label: string;
+                      sortable: boolean;
+                      width: string;
+                      mandatory: boolean;
+                    }[]
+                  }
+                  sort={{
+                    field: sortField,
+                    direction: sortDirection as "ASC" | "DESC",
+                  }}
+                  onSort={onSort}
+                  onHideColumn={hideColumn}
+                  entityType="image"
+                  isLoading={isLoading}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
+                />
+              ) : viewMode === "wall" ? (
+                <WallView
+                  items={currentImages as Record<string, unknown>[]}
+                  entityType="image"
+                  zoomLevel={
+                    zoomLevel as unknown as "small" | "medium" | "large"
+                  }
+                  playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
+                  onItemClick={handleImageClick}
+                  loading={isLoading}
+                  emptyMessage="No images found"
+                />
+              ) : viewMode === "timeline" ? (
+                <TimelineView
+                  entityType="image"
+                  items={currentImages as Record<string, unknown>[]}
+                  renderItem={(
+                    image: Record<string, unknown>,
+                    index: number,
+                    {
+                      onItemClick,
+                    }: { onItemClick?: (item: Record<string, unknown>) => void }
+                  ) => (
                     <ImageCard
                       key={image.id as string}
-                      image={image as unknown as import("@peek/shared-types").NormalizedImage}
-                      onClick={() => handleImageClick(image as Record<string, unknown>)}
+                      image={
+                        image as unknown as import("@peek/shared-types").NormalizedImage
+                      }
+                      onClick={() => onItemClick?.(image)}
                       fromPageTitle="Images"
-                      tabIndex={isTVMode ? _tabIndex : -1}
+                      tabIndex={0}
                       onOCounterChange={handleOCounterChange}
                       onRatingChange={handleRatingChange}
                       onFavoriteChange={handleFavoriteChange}
-                      {...restItemProps}
                     />
-                  );
-                })}
-              </div>
-            )
-          ) as unknown as React.ReactNode}
+                  )}
+                  onItemClick={handleImageClick}
+                  onDateFilterChange={setTimelineDateFilter}
+                  onPeriodChange={
+                    setTimelinePeriod as (period: string | null) => void
+                  }
+                  initialPeriod={timelinePeriod}
+                  loading={isLoading}
+                  emptyMessage="No images found for this time period"
+                  gridDensity={gridDensity}
+                />
+              ) : viewMode === "folder" ? (
+                <FolderView
+                  items={currentImages as Record<string, unknown>[]}
+                  tags={folderTags}
+                  gridDensity={gridDensity}
+                  loading={isLoading || tagsLoading}
+                  emptyMessage="No images found"
+                  onFolderPathChange={setFolderTagFilter}
+                  renderItem={(image: Record<string, unknown>) => (
+                    <ImageCard
+                      key={image.id as string}
+                      image={
+                        image as unknown as import("@peek/shared-types").NormalizedImage
+                      }
+                      onClick={() => handleImageClick(image)}
+                      fromPageTitle="Images"
+                      tabIndex={0}
+                      onOCounterChange={handleOCounterChange}
+                      onRatingChange={handleRatingChange}
+                      onFavoriteChange={handleFavoriteChange}
+                    />
+                  )}
+                />
+              ) : isLoading ? (
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {[...Array(24)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        height: "16rem",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  ref={gridRef}
+                  className={getGridClasses("standard", gridDensity)}
+                >
+                  {currentImages.map(
+                    (image: Record<string, unknown>, index: number) => {
+                      const { tabIndex: _tabIndex, ...restItemProps } =
+                        gridItemProps(index);
+                      return (
+                        <ImageCard
+                          key={image.id as string}
+                          image={
+                            image as unknown as import("@peek/shared-types").NormalizedImage
+                          }
+                          onClick={() =>
+                            handleImageClick(image as Record<string, unknown>)
+                          }
+                          fromPageTitle="Images"
+                          tabIndex={isTVMode ? _tabIndex : -1}
+                          onOCounterChange={handleOCounterChange}
+                          onRatingChange={handleRatingChange}
+                          onFavoriteChange={handleFavoriteChange}
+                          {...restItemProps}
+                        />
+                      );
+                    }
+                  )}
+                </div>
+              )) as unknown as React.ReactNode
+          }
         </SearchControls>
 
         {/* Lightbox for viewing images */}
         {currentImages.length > 0 && (
           <Lightbox
             isOpen={lightbox.lightboxOpen}
-            images={currentImages.map((img: Record<string, unknown>) => {
-              const paths = img.paths as Record<string, string> | undefined;
-              return {
-                ...(img as Record<string, unknown>),
-                paths: {
-                  image: paths?.image || `/api/proxy/image/${img.id as string}/image`,
-                  preview: paths?.preview || paths?.thumbnail,
-                  thumbnail: paths?.thumbnail || `/api/proxy/image/${img.id as string}/thumbnail`,
-                },
-                oCounter: (img.oCounter as number) ?? 0,
-              };
-            }) as unknown as import("@peek/shared-types").NormalizedImage[]}
+            images={
+              currentImages.map((img: Record<string, unknown>) => {
+                const paths = img.paths as Record<string, string> | undefined;
+                return {
+                  ...(img as Record<string, unknown>),
+                  paths: {
+                    image:
+                      paths?.image ||
+                      `/api/proxy/image/${img.id as string}/image`,
+                    preview: paths?.preview || paths?.thumbnail,
+                    thumbnail:
+                      paths?.thumbnail ||
+                      `/api/proxy/image/${img.id as string}/thumbnail`,
+                  },
+                  oCounter: (img.oCounter as number) ?? 0,
+                };
+              }) as unknown as import("@peek/shared-types").NormalizedImage[]
+            }
             initialIndex={lightbox.lightboxIndex}
             onClose={lightbox.closeLightbox}
             onImagesUpdate={(updatedImages) => {
               // Sync updated images back to cache
               if (!queryParams) return;
-              const qk = queryKeys.images.list(undefined, (queryParams ?? {}) as Record<string, unknown>);
+              const qk = queryKeys.images.list(
+                undefined,
+                (queryParams ?? {}) as Record<string, unknown>
+              );
               queryClient.setQueryData(qk, (old: unknown) => {
                 if (!old || typeof old !== "object") return old;
                 const oldData = old as Record<string, unknown>;
-                const fi = oldData.findImages as Record<string, unknown> | undefined;
+                const fi = oldData.findImages as
+                  | Record<string, unknown>
+                  | undefined;
                 if (!fi?.images) return old;
                 return {
                   ...oldData,

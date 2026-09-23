@@ -1,5 +1,5 @@
-import { AlertCircle, Eye, Loader2, ImageOff } from "lucide-react";
 import type { NormalizedScene } from "@peek/shared-types";
+import { AlertCircle, Eye, ImageOff, Loader2 } from "lucide-react";
 import { getSceneTitle } from "../../utils/format";
 import { useLazyLoad } from "../ui/CardComponents";
 
@@ -24,7 +24,10 @@ const CarouselPreview = ({ scenes, error, loading }: Props) => {
       }}
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Preview
         </h2>
         {scenes && (
@@ -131,7 +134,10 @@ const PreviewCard = ({ scene }: PreviewCardProps) => {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageOff className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
+            <ImageOff
+              className="w-8 h-8"
+              style={{ color: "var(--text-muted)" }}
+            />
           </div>
         )}
 

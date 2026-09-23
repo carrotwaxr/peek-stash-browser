@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useSpatialNavigation } from "./useSpatialNavigation";
 import { useTVMode } from "./useTVMode";
 import { useTVNavigation } from "./useTVNavigation";
-import { useSpatialNavigation } from "./useSpatialNavigation";
 
 /**
  * Shared TV navigation logic for grid pages (Performers, Scenes, Studios, etc.)
@@ -113,7 +113,8 @@ export const useGridPageTVNavigation = ({
     };
 
     window.addEventListener("tvSearchZoneEscape", handleSearchZoneEscape);
-    return () => window.removeEventListener("tvSearchZoneEscape", handleSearchZoneEscape);
+    return () =>
+      window.removeEventListener("tvSearchZoneEscape", handleSearchZoneEscape);
   }, [isTVMode, tvNavigation]);
 
   // Listen for pagination zone escape events
@@ -142,7 +143,8 @@ export const useGridPageTVNavigation = ({
     };
 
     window.addEventListener("tvPaginationEscape", handlePaginationEscape);
-    return () => window.removeEventListener("tvPaginationEscape", handlePaginationEscape);
+    return () =>
+      window.removeEventListener("tvPaginationEscape", handlePaginationEscape);
   }, [isTVMode, tvNavigation]);
 
   // Global keyboard handler for mainNav zone
@@ -165,7 +167,12 @@ export const useGridPageTVNavigation = ({
 
   // Global keyboard handler for content zones (search, pagination)
   useEffect(() => {
-    if (!isTVMode || tvNavigation.isZoneActive("grid") || tvNavigation.isZoneActive("mainNav")) return;
+    if (
+      !isTVMode ||
+      tvNavigation.isZoneActive("grid") ||
+      tvNavigation.isZoneActive("mainNav")
+    )
+      return;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Content zones (search, topPagination, bottomPagination)
@@ -208,8 +215,10 @@ export const useGridPageTVNavigation = ({
     // Props to pass to SearchControls
     searchControlsProps: {
       tvSearchZoneActive: isTVMode && tvNavigation.isZoneActive("search"),
-      tvTopPaginationZoneActive: isTVMode && tvNavigation.isZoneActive("topPagination"),
-      tvBottomPaginationZoneActive: isTVMode && tvNavigation.isZoneActive("bottomPagination"),
+      tvTopPaginationZoneActive:
+        isTVMode && tvNavigation.isZoneActive("topPagination"),
+      tvBottomPaginationZoneActive:
+        isTVMode && tvNavigation.isZoneActive("bottomPagination"),
       paginationHandlerRef,
     },
     // Props to pass to grid items

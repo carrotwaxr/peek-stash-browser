@@ -5,8 +5,19 @@
  * the same numeric ID, the scene map must use composite keys (id + instanceId)
  * to avoid one instance's data overwriting another's.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getPlaylist,
+  getSharedPlaylists,
+  getUserPlaylists,
+} from "../../controllers/playlist.js";
+// ---------- imports ----------
+
+import prisma from "../../prisma/singleton.js";
+import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // ---------- mocks (must be before imports of modules under test) ----------
 
@@ -65,21 +76,10 @@ vi.mock("../../controllers/library/scenes.js", () => ({
 }));
 
 vi.mock("../../utils/instanceUtils.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../utils/instanceUtils.js")>();
+  const actual =
+    await importOriginal<typeof import("../../utils/instanceUtils.js")>();
   return { ...actual };
 });
-
-// ---------- imports ----------
-
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
-import {
-  getUserPlaylists,
-  getSharedPlaylists,
-  getPlaylist,
-} from "../../controllers/playlist.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetScenes = vi.mocked(stashEntityService.getScenesByIdsWithRelations);
@@ -88,7 +88,11 @@ const mockGetAccess = vi.mocked(getPlaylistAccess);
 const USER = { id: 1, username: "testuser", role: "USER" };
 
 /** Minimal NormalizedScene stub with the fields the controller reads. */
-function stubScene(id: string, instanceId: string, title: string): NormalizedScene {
+function stubScene(
+  id: string,
+  instanceId: string,
+  title: string
+): NormalizedScene {
   return {
     id,
     instanceId,
@@ -120,7 +124,15 @@ function stubScene(id: string, instanceId: string, title: string): NormalizedSce
     groups: [],
     galleries: [],
     files: [],
-    paths: { screenshot: null, preview: null, stream: null, funscript: null, sprite: null, vtt: null, chapters_vtt: null },
+    paths: {
+      screenshot: null,
+      preview: null,
+      stream: null,
+      funscript: null,
+      sprite: null,
+      vtt: null,
+      chapters_vtt: null,
+    },
     sceneStreams: [],
     stash_ids: [],
   } as unknown as NormalizedScene;
@@ -156,16 +168,30 @@ describe("Playlist multi-instance scene map (#393)", () => {
         updatedAt: new Date(),
         _count: { items: 2 },
         items: [
-          { id: 1, playlistId: 1, sceneId: "42", instanceId: "inst-A", position: 0, addedAt: new Date() },
-          { id: 2, playlistId: 1, sceneId: "42", instanceId: "inst-B", position: 1, addedAt: new Date() },
+          {
+            id: 1,
+            playlistId: 1,
+            sceneId: "42",
+            instanceId: "inst-A",
+            position: 0,
+            addedAt: new Date(),
+          },
+          {
+            id: 2,
+            playlistId: 1,
+            sceneId: "42",
+            instanceId: "inst-B",
+            position: 1,
+            addedAt: new Date(),
+          },
         ],
       } as any,
     ]);
 
     // getScenesByIdsWithRelations is called once per instance group
     mockGetScenes
-      .mockResolvedValueOnce([sceneA])   // inst-A batch
-      .mockResolvedValueOnce([sceneB]);   // inst-B batch
+      .mockResolvedValueOnce([sceneA]) // inst-A batch
+      .mockResolvedValueOnce([sceneB]); // inst-B batch
 
     const req = mockReq({}, {}, USER);
     const res = mockRes();
@@ -197,8 +223,22 @@ describe("Playlist multi-instance scene map (#393)", () => {
         shares: [{ sharedAt: new Date(), group: { name: "Group1" } }],
         _count: { items: 2 },
         items: [
-          { id: 10, playlistId: 2, sceneId: "42", instanceId: "inst-A", position: 0, addedAt: new Date() },
-          { id: 11, playlistId: 2, sceneId: "42", instanceId: "inst-B", position: 1, addedAt: new Date() },
+          {
+            id: 10,
+            playlistId: 2,
+            sceneId: "42",
+            instanceId: "inst-A",
+            position: 0,
+            addedAt: new Date(),
+          },
+          {
+            id: 11,
+            playlistId: 2,
+            sceneId: "42",
+            instanceId: "inst-B",
+            position: 1,
+            addedAt: new Date(),
+          },
         ],
       } as any,
     ]);
@@ -234,8 +274,22 @@ describe("Playlist multi-instance scene map (#393)", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       items: [
-        { id: 20, playlistId: 3, sceneId: "42", instanceId: "inst-A", position: 0, addedAt: new Date() },
-        { id: 21, playlistId: 3, sceneId: "42", instanceId: "inst-B", position: 1, addedAt: new Date() },
+        {
+          id: 20,
+          playlistId: 3,
+          sceneId: "42",
+          instanceId: "inst-A",
+          position: 0,
+          addedAt: new Date(),
+        },
+        {
+          id: 21,
+          playlistId: 3,
+          sceneId: "42",
+          instanceId: "inst-B",
+          position: 1,
+          addedAt: new Date(),
+        },
       ],
     } as any);
 

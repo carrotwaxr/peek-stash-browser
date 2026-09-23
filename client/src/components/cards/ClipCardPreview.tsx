@@ -11,12 +11,14 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false);
-  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
+  const [containerElement, setContainerElement] =
+    useState<HTMLDivElement | null>(null);
 
   // Get preview URLs
   const previewUrl = clip.isGenerated ? getClipPreviewUrl(clip.id) : null;
   // Prefer the marker's own screenshot over the scene cover
-  const screenshotUrl = clip.screenshotUrl || clip.scene?.pathScreenshot || null;
+  const screenshotUrl =
+    clip.screenshotUrl || clip.scene?.pathScreenshot || null;
 
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
@@ -53,7 +55,8 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
   }, [containerElement, shouldLoadScreenshot]);
 
   const shouldShowVideo = isHovering && hasHoverCapability && previewUrl;
-  const objectFitClass = objectFit === "cover" ? "object-cover" : "object-contain";
+  const objectFitClass =
+    objectFit === "cover" ? "object-cover" : "object-contain";
 
   return (
     <div

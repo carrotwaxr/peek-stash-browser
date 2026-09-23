@@ -13,7 +13,13 @@ interface Props {
  */
 const IconPickerButton = ({ icon, onChange }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[icon] || LucideIcons.Film;
+  const IconComponent =
+    (
+      LucideIcons as unknown as Record<
+        string,
+        React.ComponentType<{ className?: string }>
+      >
+    )[icon] || LucideIcons.Film;
 
   return (
     <div className="relative">

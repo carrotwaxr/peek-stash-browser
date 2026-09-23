@@ -1,16 +1,4 @@
-import type {
-  TypedAuthRequest,
-  TypedResponse,
-  FindStudiosRequest,
-  FindStudiosResponse,
-  FindStudiosMinimalRequest,
-  FindStudiosMinimalResponse,
-  UpdateStudioParams,
-  UpdateStudioRequest,
-  UpdateStudioResponse,
-  ApiErrorResponse,
-  AmbiguousLookupResponse,
-} from "../../types/api/index.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -18,9 +6,24 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import type {
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
+  FindStudiosMinimalRequest,
+  FindStudiosMinimalResponse,
+  FindStudiosRequest,
+  FindStudiosResponse,
+  TypedAuthRequest,
+  TypedResponse,
+  UpdateStudioParams,
+  UpdateStudioRequest,
+  UpdateStudioResponse,
+} from "../../types/api/index.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
-import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import {
+  disambiguateEntityNames,
+  getEntityInstanceId,
+} from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -72,7 +75,9 @@ export async function mergeStudiosWithUserData(
  */
 export const findStudios = async (
   req: TypedAuthRequest<FindStudiosRequest>,
-  res: TypedResponse<FindStudiosResponse | ApiErrorResponse | AmbiguousLookupResponse>
+  res: TypedResponse<
+    FindStudiosResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   try {
     const startTime = Date.now();
@@ -81,13 +86,18 @@ export const findStudios = async (
     const { filter, studio_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
+    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
+      | "ASC"
+      | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
+    const { sortField, randomSeed } = parseRandomSort(
+      sortFieldRaw,
+      requestingUser.id
+    );
 
     // Merge root-level ids with studio_filter
     const normalizedIds = ids
@@ -126,12 +136,12 @@ export const findStudios = async (
       logger.warn("Ambiguous studio lookup", {
         id: ids[0],
         matchCount: studios.length,
-        instances: studios.map(s => s.instanceId),
+        instances: studios.map((s) => s.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple studios found with ID ${ids[0]}. Specify instance_id parameter.`,
-        matches: studios.map(s => ({
+        matches: studios.map((s) => ({
           id: s.id,
           name: s.name,
           instanceId: s.instanceId,
@@ -144,7 +154,10 @@ export const findStudios = async (
     if (ids && ids.length === 1 && resultStudios.length === 1) {
       // Get studio with computed counts from junction tables
       const firstStudio = resultStudios[0] as (typeof resultStudios)[number];
-      const studioWithCounts = await stashEntityService.getStudio(ids[0] as string, firstStudio.instanceId);
+      const studioWithCounts = await stashEntityService.getStudio(
+        ids[0] as string,
+        firstStudio.instanceId
+      );
       if (studioWithCounts) {
         // Merge with the studio data (which has user ratings/stats)
         const existingStudio = firstStudio;
@@ -180,12 +193,16 @@ export const findStudios = async (
       const allHydrated = await hydrateStudioRelationships(allStudios);
       // Filter by both id AND instanceId to handle multi-instance correctly
       hydratedStudios = allHydrated.filter((s) =>
-        resultStudios.some((r) => r.id === s.id && r.instanceId === s.instanceId)
+        resultStudios.some(
+          (r) => r.id === s.id && r.instanceId === s.instanceId
+        )
       );
       // Merge the computed counts back (preserving hydrated parent_studio and child_studios)
       hydratedStudios = hydratedStudios.map((h) => {
         // Match by both id AND instanceId
-        const result = resultStudios.find((r) => r.id === h.id && r.instanceId === h.instanceId);
+        const result = resultStudios.find(
+          (r) => r.id === h.id && r.instanceId === h.instanceId
+        );
         if (!result) return h;
         return {
           ...result,
@@ -205,7 +222,11 @@ export const findStudios = async (
     // Add stashUrl to each studio
     const studiosWithStashUrl = hydratedStudios.map((studio) => ({
       ...studio,
-      stashUrl: buildStashEntityUrl("studio", studio.id, studio.instanceId || undefined),
+      stashUrl: buildStashEntityUrl(
+        "studio",
+        studio.id,
+        studio.instanceId || undefined
+      ),
     }));
 
     logger.info("findStudios completed", {
@@ -260,7 +281,9 @@ export function applyStudioFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((s) => {
-        const studioTagIds = (s.tags || []).map((t: { id: string }) => String(t.id));
+        const studioTagIds = (s.tags || []).map((t: { id: string }) =>
+          String(t.id)
+        );
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
@@ -459,14 +482,25 @@ export const findStudiosMinimal = async (
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {
-      const { min_scene_count, min_gallery_count, min_image_count, min_performer_count, min_group_count } = count_filter;
+      const {
+        min_scene_count,
+        min_gallery_count,
+        min_image_count,
+        min_performer_count,
+        min_group_count,
+      } = count_filter;
       studios = studios.filter((s) => {
         const conditions: boolean[] = [];
-        if (min_scene_count !== undefined) conditions.push(s.scene_count >= min_scene_count);
-        if (min_gallery_count !== undefined) conditions.push(s.gallery_count >= min_gallery_count);
-        if (min_image_count !== undefined) conditions.push(s.image_count >= min_image_count);
-        if (min_performer_count !== undefined) conditions.push(s.performer_count >= min_performer_count);
-        if (min_group_count !== undefined) conditions.push(s.group_count >= min_group_count);
+        if (min_scene_count !== undefined)
+          conditions.push(s.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined)
+          conditions.push(s.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined)
+          conditions.push(s.image_count >= min_image_count);
+        if (min_performer_count !== undefined)
+          conditions.push(s.performer_count >= min_performer_count);
+        if (min_group_count !== undefined)
+          conditions.push(s.group_count >= min_group_count);
         return conditions.length === 0 || conditions.some((c) => c);
       });
     }
@@ -536,10 +570,12 @@ export const updateStudio = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const instanceId = await getEntityInstanceId('studio', id);
+    const instanceId = await getEntityInstanceId("studio", id);
     const stash = stashInstanceManager.get(instanceId);
     if (!stash) {
-      return res.status(404).json({ error: "Stash instance not found for studio" });
+      return res
+        .status(404)
+        .json({ error: "Stash instance not found for studio" });
     }
 
     const updatedStudio = await stash.studioUpdate({
@@ -553,9 +589,14 @@ export const updateStudio = async (
       return res.status(500).json({ error: "Studio update returned null" });
     }
 
-    res.json({ success: true, studio: updatedStudio.studioUpdate as unknown as NormalizedStudio });
+    res.json({
+      success: true,
+      studio: updatedStudio.studioUpdate as unknown as NormalizedStudio,
+    });
   } catch (error) {
-    logger.error("Error updating studio", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating studio", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update studio" });
   }
 };

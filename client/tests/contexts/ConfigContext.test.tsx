@@ -1,19 +1,15 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { setupApi } from "../../src/api";
+import { ConfigProvider, useConfig } from "../../src/contexts/ConfigContext";
 
 vi.mock("../../src/api", () => ({
   setupApi: {
     getSetupStatus: vi.fn(),
   },
 }));
-
-import { setupApi } from "../../src/api";
-import {
-  ConfigProvider,
-  useConfig,
-} from "../../src/contexts/ConfigContext";
-import type { Mock } from "vitest";
 
 const getSetupStatusMock = setupApi.getSetupStatus as unknown as Mock;
 

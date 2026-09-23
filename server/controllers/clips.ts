@@ -1,23 +1,26 @@
 import { clipService } from "../services/ClipService.js";
-import { logger } from "../utils/logger.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
-import type { ApiErrorResponse } from "../types/api/common.js";
 import type {
-  GetClipsQuery,
-  GetClipsResponse,
   GetClipByIdParams,
   GetClipByIdResponse,
   GetClipsForSceneParams,
   GetClipsForSceneQuery,
   GetClipsForSceneResponse,
+  GetClipsQuery,
+  GetClipsResponse,
 } from "../types/api/clips.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import { logger } from "../utils/logger.js";
 import { parseRandomSort } from "../utils/seededRandom.js";
 
 /**
  * GET /api/clips
  * Browse clips with filtering
  */
-export const getClips = async (req: TypedAuthRequest<never, Record<string, string>, GetClipsQuery>, res: TypedResponse<GetClipsResponse | ApiErrorResponse>) => {
+export const getClips = async (
+  req: TypedAuthRequest<never, Record<string, string>, GetClipsQuery>,
+  res: TypedResponse<GetClipsResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user.id;
     const {
@@ -36,7 +39,10 @@ export const getClips = async (req: TypedAuthRequest<never, Record<string, strin
     } = req.query;
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField: sortBy, randomSeed } = parseRandomSort(sortByRaw, userId);
+    const { sortField: sortBy, randomSeed } = parseRandomSort(
+      sortByRaw,
+      userId
+    );
 
     const result = await clipService.getClips(userId, {
       page: parseInt(page, 10),
@@ -71,7 +77,10 @@ export const getClips = async (req: TypedAuthRequest<never, Record<string, strin
  * GET /api/clips/:id
  * Get single clip
  */
-export const getClipById = async (req: TypedAuthRequest<never, GetClipByIdParams>, res: TypedResponse<GetClipByIdResponse | ApiErrorResponse>) => {
+export const getClipById = async (
+  req: TypedAuthRequest<never, GetClipByIdParams>,
+  res: TypedResponse<GetClipByIdResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
@@ -93,7 +102,10 @@ export const getClipById = async (req: TypedAuthRequest<never, GetClipByIdParams
  * GET /api/scenes/:id/clips
  * Get clips for a scene
  */
-export const getClipsForScene = async (req: TypedAuthRequest<never, GetClipsForSceneParams, GetClipsForSceneQuery>, res: TypedResponse<GetClipsForSceneResponse | ApiErrorResponse>) => {
+export const getClipsForScene = async (
+  req: TypedAuthRequest<never, GetClipsForSceneParams, GetClipsForSceneQuery>,
+  res: TypedResponse<GetClipsForSceneResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;

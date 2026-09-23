@@ -7,7 +7,10 @@
  * For date-only strings (YYYY-MM-DD), formats directly without timezone conversion
  * since these are publication dates, not moments in time.
  */
-export function formatDate(dateString: string, options: Intl.DateTimeFormatOptions = {}) {
+export function formatDate(
+  dateString: string,
+  options: Intl.DateTimeFormatOptions = {}
+) {
   if (!dateString) return "Unknown";
 
   try {
@@ -15,8 +18,20 @@ export function formatDate(dateString: string, options: Intl.DateTimeFormatOptio
     // to avoid timezone issues - publication dates don't have timezones
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       const [year, month, day] = dateString.split("-").map(Number);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
       return `${monthNames[month - 1]} ${day}, ${year}`;
     }
 
@@ -51,8 +66,12 @@ export function formatRelativeTime(dateString: string) {
       const todayDay = now.getDate();
 
       // Calculate days since epoch for both dates (simple day count comparison)
-      const dateEpochDays = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
-      const todayEpochDays = Math.floor(Date.UTC(todayYear, todayMonth - 1, todayDay) / 86400000);
+      const dateEpochDays = Math.floor(
+        Date.UTC(year, month - 1, day) / 86400000
+      );
+      const todayEpochDays = Math.floor(
+        Date.UTC(todayYear, todayMonth - 1, todayDay) / 86400000
+      );
       const diffDays = todayEpochDays - dateEpochDays;
 
       if (diffDays > 7 || diffDays < 0) {

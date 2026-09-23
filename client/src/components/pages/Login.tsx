@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { REDIRECT_STORAGE_KEY } from "../../api";
+import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
 import { Button } from "../ui/index";
-import { REDIRECT_STORAGE_KEY } from "../../api";
-import { getLandingPage } from "../../constants/navigation";
 
 const Login = () => {
   const { login } = useAuth();
@@ -32,7 +32,9 @@ const Login = () => {
           window.location.href = redirectUrl;
         } else {
           // Use landing page preference if available
-          const destination = getLandingPage(result.user?.landingPagePreference);
+          const destination = getLandingPage(
+            result.user?.landingPagePreference
+          );
           window.location.href = destination;
         }
       } else {

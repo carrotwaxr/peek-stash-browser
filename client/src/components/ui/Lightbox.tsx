@@ -1,13 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Heart, Info, Maximize, Minimize, Pause, Play, Plus, X } from "lucide-react";
+import type { NormalizedImage } from "@peek/shared-types";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Heart,
+  Info,
+  Maximize,
+  Minimize,
+  Pause,
+  Play,
+  Plus,
+  X,
+} from "lucide-react";
 import { useSwipeable } from "react-swipeable";
-import { TransformWrapper, TransformComponent, type ReactZoomPanPinchContentRef } from "react-zoom-pan-pinch";
+import {
+  type ReactZoomPanPinchContentRef,
+  TransformComponent,
+  TransformWrapper,
+} from "react-zoom-pan-pinch";
+import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { useFullscreen } from "../../hooks/useFullscreen";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { apiGet, imageViewHistoryApi, libraryApi } from "../../api";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import MetadataDrawer from "./MetadataDrawer";
-import type { NormalizedImage } from "@peek/shared-types";
 
 // Percentage of screen width on each side that triggers navigation on click
 const EDGE_ZONE_PERCENT = 0.15;
@@ -71,9 +87,13 @@ const Lightbox = ({
 
   // Double-tap/double-click preference and feedback
   const [doubleTapAction, setDoubleTapAction] = useState("favorite");
-  const [doubleTapFeedback, setDoubleTapFeedback] = useState<string | null>(null); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState<string | null>(
+    null
+  ); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
   const lastTapTimeRef = useRef(0);
-  const doubleTapFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doubleTapFeedbackTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const doubleTapGuardRef = useRef(0);
 
   // Fetch user's lightbox double-tap preference
@@ -81,7 +101,9 @@ const Lightbox = ({
     if (!isOpen) return;
     apiGet("/user/settings")
       .then((data) => {
-        const action = (data as { settings?: { lightboxDoubleTapAction?: string } })?.settings?.lightboxDoubleTapAction;
+        const action = (
+          data as { settings?: { lightboxDoubleTapAction?: string } }
+        )?.settings?.lightboxDoubleTapAction;
         if (action) setDoubleTapAction(action);
       })
       .catch(() => {
@@ -132,11 +154,16 @@ const Lightbox = ({
   const staleImageIdRef = useRef<string | null>(null);
 
   // Check if current image is stale (should not be displayed)
-  const isShowingStaleImage = staleImageIdRef.current !== null && currentImageId === staleImageIdRef.current;
+  const isShowingStaleImage =
+    staleImageIdRef.current !== null &&
+    currentImageId === staleImageIdRef.current;
 
   // Clear stale ref when we get a new (non-stale) image
   useEffect(() => {
-    if (staleImageIdRef.current !== null && currentImageId !== staleImageIdRef.current) {
+    if (
+      staleImageIdRef.current !== null &&
+      currentImageId !== staleImageIdRef.current
+    ) {
       staleImageIdRef.current = null;
     }
   }, [currentImageId]);
@@ -179,7 +206,8 @@ const Lightbox = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e: MediaQueryListEvent) => setHasHoverCapability(e.matches);
+    const handleChange = (e: MediaQueryListEvent) =>
+      setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -189,7 +217,8 @@ const Lightbox = ({
   useEffect(() => {
     const check = () => {
       setIsPortraitMobile(
-        window.innerWidth <= 768 && window.matchMedia("(orientation: portrait)").matches
+        window.innerWidth <= 768 &&
+          window.matchMedia("(orientation: portrait)").matches
       );
     };
     check();
@@ -299,7 +328,12 @@ const Lightbox = ({
       }
 
       try {
-        await libraryApi.updateRating("image", currentImage.id, newRating, currentImage.instanceId);
+        await libraryApi.updateRating(
+          "image",
+          currentImage.id,
+          newRating,
+          currentImage.instanceId
+        );
       } catch (error) {
         console.error("Failed to update image rating:", error);
         // Revert on error
@@ -334,7 +368,12 @@ const Lightbox = ({
       }
 
       try {
-        await libraryApi.updateFavorite("image", currentImage.id, newFavorite, currentImage.instanceId);
+        await libraryApi.updateFavorite(
+          "image",
+          currentImage.id,
+          newFavorite,
+          currentImage.instanceId
+        );
       } catch (error) {
         console.error("Failed to update image favorite:", error);
         // Revert on error
@@ -387,9 +426,11 @@ const Lightbox = ({
     if (doubleTapAction === "o_counter") {
       const newCount = oCounter + 1;
       handleOCounterChange(newCount);
-      imageViewHistoryApi.incrementO(currentImage.id, currentImage.instanceId).catch((err) => {
-        console.error("Failed to increment O counter:", err);
-      });
+      imageViewHistoryApi
+        .incrementO(currentImage.id, currentImage.instanceId)
+        .catch((err) => {
+          console.error("Failed to increment O counter:", err);
+        });
       setDoubleTapFeedback("o_counter");
     } else if (doubleTapAction === "fullscreen") {
       toggleFullscreen();
@@ -397,7 +438,9 @@ const Lightbox = ({
     } else {
       const newFavoriteValue = !isFavorite;
       handleFavoriteChange(newFavoriteValue);
-      setDoubleTapFeedback(newFavoriteValue ? "favorite_add" : "favorite_remove");
+      setDoubleTapFeedback(
+        newFavoriteValue ? "favorite_add" : "favorite_remove"
+      );
     }
 
     // Clear feedback after animation
@@ -405,18 +448,34 @@ const Lightbox = ({
       setDoubleTapFeedback(null);
       doubleTapFeedbackTimerRef.current = null;
     }, 800);
-  }, [images, currentIndex, doubleTapAction, oCounter, isFavorite, handleOCounterChange, handleFavoriteChange, toggleFullscreen]);
+  }, [
+    images,
+    currentIndex,
+    doubleTapAction,
+    oCounter,
+    isFavorite,
+    handleOCounterChange,
+    handleFavoriteChange,
+    toggleFullscreen,
+  ]);
 
   // Desktop double-click handler on image container
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    // Only trigger in center zone (not edge navigation zones)
-    const clickX = e.clientX;
-    const screenWidth = window.innerWidth;
-    const clickPercent = clickX / screenWidth;
-    if (clickPercent < EDGE_ZONE_PERCENT || clickPercent > 1 - EDGE_ZONE_PERCENT) return;
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Only trigger in center zone (not edge navigation zones)
+      const clickX = e.clientX;
+      const screenWidth = window.innerWidth;
+      const clickPercent = clickX / screenWidth;
+      if (
+        clickPercent < EDGE_ZONE_PERCENT ||
+        clickPercent > 1 - EDGE_ZONE_PERCENT
+      )
+        return;
 
-    triggerDoubleTapAction();
-  }, [triggerDoubleTapAction]);
+      triggerDoubleTapAction();
+    },
+    [triggerDoubleTapAction]
+  );
 
   // Auto-hide controls after inactivity
   const showControls = useCallback(() => {
@@ -448,32 +507,44 @@ const Lightbox = ({
   }, [showControls]);
 
   // Toggle controls on tap (mobile), with double-tap detection
-  const handleTap = useCallback(({ event }: { event: React.MouseEvent | TouchEvent | MouseEvent }) => {
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapTimeRef.current;
-    lastTapTimeRef.current = now;
+  const handleTap = useCallback(
+    ({ event }: { event: React.MouseEvent | TouchEvent | MouseEvent }) => {
+      const now = Date.now();
+      const timeSinceLastTap = now - lastTapTimeRef.current;
+      lastTapTimeRef.current = now;
 
-    if (timeSinceLastTap < 300) {
-      // Double-tap detected — check if in center zone
-      const tapX = "clientX" in event ? event.clientX : window.innerWidth / 2;
-      const screenWidth = window.innerWidth;
-      const tapPercent = tapX / screenWidth;
-      if (tapPercent >= EDGE_ZONE_PERCENT && tapPercent <= 1 - EDGE_ZONE_PERCENT) {
-        triggerDoubleTapAction();
-        return;
+      if (timeSinceLastTap < 300) {
+        // Double-tap detected — check if in center zone
+        const tapX = "clientX" in event ? event.clientX : window.innerWidth / 2;
+        const screenWidth = window.innerWidth;
+        const tapPercent = tapX / screenWidth;
+        if (
+          tapPercent >= EDGE_ZONE_PERCENT &&
+          tapPercent <= 1 - EDGE_ZONE_PERCENT
+        ) {
+          triggerDoubleTapAction();
+          return;
+        }
       }
-    }
 
-    setControlsVisible((prev) => !prev);
-  }, [triggerDoubleTapAction]);
+      setControlsVisible((prev) => !prev);
+    },
+    [triggerDoubleTapAction]
+  );
 
   const isZoomed = zoomScale > 1;
 
   // Swipe gesture handlers — disabled when zoomed in so pan gestures work
   const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => { if (!isZoomed) goToNext(); },
-    onSwipedRight: () => { if (!isZoomed) goToPrevious(); },
-    onSwipedUp: () => { if (!isZoomed) setDrawerOpen(true); },
+    onSwipedLeft: () => {
+      if (!isZoomed) goToNext();
+    },
+    onSwipedRight: () => {
+      if (!isZoomed) goToPrevious();
+    },
+    onSwipedUp: () => {
+      if (!isZoomed) setDrawerOpen(true);
+    },
     onSwipedDown: () => {
       if (isZoomed) return;
       if (drawerOpen) {
@@ -516,9 +587,11 @@ const Lightbox = ({
 
     // Start 3-second dwell timer
     viewTimerRef.current = setTimeout(() => {
-      imageViewHistoryApi.recordView(currentImage.id, currentImage.instanceId).catch((err) => {
-        console.error("Failed to record image view:", err);
-      });
+      imageViewHistoryApi
+        .recordView(currentImage.id, currentImage.instanceId)
+        .catch((err) => {
+          console.error("Failed to record image view:", err);
+        });
       viewTimerRef.current = null;
     }, 3000);
 
@@ -564,7 +637,11 @@ const Lightbox = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
+      if (
+        (e.target as HTMLElement)?.tagName === "INPUT" ||
+        (e.target as HTMLElement)?.tagName === "TEXTAREA"
+      )
+        return;
 
       switch (e.key) {
         case "Escape":
@@ -600,7 +677,17 @@ const Lightbox = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleCloseWithFullscreenExit, goToPrevious, goToNext, toggleSlideshow, drawerOpen, isFullscreen, toggleFullscreen, showControls]);
+  }, [
+    isOpen,
+    handleCloseWithFullscreenExit,
+    goToPrevious,
+    goToNext,
+    toggleSlideshow,
+    drawerOpen,
+    isFullscreen,
+    toggleFullscreen,
+    showControls,
+  ]);
 
   // Cleanup timers
   useEffect(() => {
@@ -631,7 +718,9 @@ const Lightbox = ({
 
   const currentImage = images[currentIndex];
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
-  const imageTitle = getImageTitle(currentImage as Parameters<typeof getImageTitle>[0]);
+  const imageTitle = getImageTitle(
+    currentImage as Parameters<typeof getImageTitle>[0]
+  );
 
   // Handle backdrop click - edge zones navigate, center does nothing
   // Left 15% = previous, right 15% = next, center = no action
@@ -711,14 +800,53 @@ const Lightbox = ({
               className="bg-transparent border-0 outline-none cursor-pointer text-sm"
               style={{ color: "var(--text-primary)" }}
             >
-              <option value={2000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>2s</option>
-              <option value={3000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>3s</option>
-              <option value={5000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>5s</option>
-              <option value={10000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>10s</option>
-              <option value={15000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>15s</option>
+              <option
+                value={2000}
+                style={{
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                2s
+              </option>
+              <option
+                value={3000}
+                style={{
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                3s
+              </option>
+              <option
+                value={5000}
+                style={{
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                5s
+              </option>
+              <option
+                value={10000}
+                style={{
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                10s
+              </option>
+              <option
+                value={15000}
+                style={{
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                15s
+              </option>
             </select>
           </div>
-
         </div>
 
         {/* Right side - Lightbox controls */}
@@ -833,7 +961,10 @@ const Lightbox = ({
       )}
 
       {/* Loading spinner - show when image loading, page transitioning, post-transition, or showing stale image */}
-      {(!imageLoaded || isPageTransitioning || isPostTransition || isShowingStaleImage) && (
+      {(!imageLoaded ||
+        isPageTransitioning ||
+        isPostTransition ||
+        isShowingStaleImage) && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ color: "var(--text-primary)" }}
@@ -849,7 +980,10 @@ const Lightbox = ({
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={handleDoubleClick}
         style={{
-          visibility: isPageTransitioning || isShowingStaleImage || isPostTransition ? "hidden" : "visible",
+          visibility:
+            isPageTransitioning || isShowingStaleImage || isPostTransition
+              ? "hidden"
+              : "visible",
         }}
       >
         {/* Image with pinch-to-zoom and pan support */}
@@ -865,7 +999,13 @@ const Lightbox = ({
         >
           <TransformComponent
             wrapperStyle={{ width: "100%", height: "100%" }}
-            contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+            contentStyle={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <img
               src={imageSrc ?? undefined}
@@ -887,11 +1027,15 @@ const Lightbox = ({
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
             key={Date.now()}
           >
-            <div className={`rounded-full bg-white/20 p-6 ${
-              doubleTapFeedback === "favorite_add" ? "animate-heart-pop" :
-              doubleTapFeedback === "favorite_remove" ? "animate-heart-shrink" :
-              "animate-ping-once"
-            }`}>
+            <div
+              className={`rounded-full bg-white/20 p-6 ${
+                doubleTapFeedback === "favorite_add"
+                  ? "animate-heart-pop"
+                  : doubleTapFeedback === "favorite_remove"
+                    ? "animate-heart-shrink"
+                    : "animate-ping-once"
+              }`}
+            >
               {doubleTapFeedback === "favorite_add" ? (
                 <Heart size={48} className="text-red-500 fill-red-500" />
               ) : doubleTapFeedback === "favorite_remove" ? (

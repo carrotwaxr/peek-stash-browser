@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Scene Date Filters Integration Tests
@@ -34,15 +34,18 @@ describe("Scene Date Filters", () => {
   describe("date filter (scene date)", () => {
     it("filters scenes by date GREATER_THAN", async () => {
       // Get scenes from 2020 onwards
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2020-01-01",
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2020-01-01",
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -51,15 +54,18 @@ describe("Scene Date Filters", () => {
 
     it("filters scenes by date LESS_THAN", async () => {
       // Get scenes before 2020
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2020-01-01",
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2020-01-01",
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -68,16 +74,19 @@ describe("Scene Date Filters", () => {
 
     it("filters scenes by date BETWEEN", async () => {
       // Get scenes from 2022
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2022-01-01",
-            value2: "2022-12-31",
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2022-01-01",
+              value2: "2022-12-31",
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -86,16 +95,19 @@ describe("Scene Date Filters", () => {
 
     it("filters scenes by date NOT_BETWEEN", async () => {
       // Get scenes NOT from 2022
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2022-01-01",
-            value2: "2022-12-31",
-            modifier: "NOT_BETWEEN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2022-01-01",
+              value2: "2022-12-31",
+              modifier: "NOT_BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -104,14 +116,17 @@ describe("Scene Date Filters", () => {
 
     it("filters scenes by date IS_NULL", async () => {
       // Get scenes without a date set
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            modifier: "IS_NULL",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              modifier: "IS_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -119,14 +134,17 @@ describe("Scene Date Filters", () => {
 
     it("filters scenes by date NOT_NULL", async () => {
       // Get scenes with a date set
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            modifier: "NOT_NULL",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              modifier: "NOT_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -156,7 +174,9 @@ describe("Scene Date Filters", () => {
 
       // If there are no scenes with null dates, skip this test
       if (scenesWithNullDates === 0) {
-        console.log("Skipping NULL date exclusion test - no scenes with NULL dates in test data");
+        console.log(
+          "Skipping NULL date exclusion test - no scenes with NULL dates in test data"
+        );
         return;
       }
 
@@ -193,15 +213,18 @@ describe("Scene Date Filters", () => {
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       const dateStr = oneYearAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          created_at: {
-            value: dateStr,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            created_at: {
+              value: dateStr,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -214,15 +237,18 @@ describe("Scene Date Filters", () => {
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       const dateStr = oneYearAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          created_at: {
-            value: dateStr,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            created_at: {
+              value: dateStr,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -234,16 +260,19 @@ describe("Scene Date Filters", () => {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const today = new Date();
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          created_at: {
-            value: sixMonthsAgo.toISOString().split("T")[0],
-            value2: today.toISOString().split("T")[0],
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            created_at: {
+              value: sixMonthsAgo.toISOString().split("T")[0],
+              value2: today.toISOString().split("T")[0],
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -257,15 +286,18 @@ describe("Scene Date Filters", () => {
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const dateStr = oneMonthAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          updated_at: {
-            value: dateStr,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            updated_at: {
+              value: dateStr,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -276,16 +308,19 @@ describe("Scene Date Filters", () => {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       const today = new Date();
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          updated_at: {
-            value: threeMonthsAgo.toISOString().split("T")[0],
-            value2: today.toISOString().split("T")[0],
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            updated_at: {
+              value: threeMonthsAgo.toISOString().split("T")[0],
+              value2: today.toISOString().split("T")[0],
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -299,15 +334,18 @@ describe("Scene Date Filters", () => {
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const dateStr = oneWeekAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          last_played_at: {
-            value: dateStr,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            last_played_at: {
+              value: dateStr,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -316,28 +354,34 @@ describe("Scene Date Filters", () => {
     });
 
     it("filters scenes by last_played_at IS_NULL (never played)", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          last_played_at: {
-            modifier: "IS_NULL",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            last_played_at: {
+              modifier: "IS_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("filters scenes by last_played_at NOT_NULL (has been played)", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          last_played_at: {
-            modifier: "NOT_NULL",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            last_played_at: {
+              modifier: "NOT_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -346,19 +390,22 @@ describe("Scene Date Filters", () => {
 
   describe("combined date filters", () => {
     it("can combine date with created_at filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2021-01-01",
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2021-01-01",
+              modifier: "GREATER_THAN",
+            },
+            created_at: {
+              value: "2022-01-01",
+              modifier: "GREATER_THAN",
+            },
           },
-          created_at: {
-            value: "2022-01-01",
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -368,23 +415,26 @@ describe("Scene Date Filters", () => {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          date: {
-            value: "2020-01-01",
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            date: {
+              value: "2020-01-01",
+              modifier: "GREATER_THAN",
+            },
+            created_at: {
+              value: oneYearAgo.toISOString().split("T")[0],
+              modifier: "GREATER_THAN",
+            },
+            updated_at: {
+              value: oneYearAgo.toISOString().split("T")[0],
+              modifier: "GREATER_THAN",
+            },
           },
-          created_at: {
-            value: oneYearAgo.toISOString().split("T")[0],
-            modifier: "GREATER_THAN",
-          },
-          updated_at: {
-            value: oneYearAgo.toISOString().split("T")[0],
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();

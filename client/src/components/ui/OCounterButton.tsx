@@ -73,7 +73,10 @@ const OCounterButton = ({
     setIsAnimating(true);
 
     try {
-      const response = await incrementMutation.mutateAsync({ sceneId, imageId });
+      const response = await incrementMutation.mutateAsync({
+        sceneId,
+        imageId,
+      });
 
       if (response?.success) {
         setCount(response.oCount ?? newCount); // Update with server value
@@ -98,8 +101,13 @@ const OCounterButton = ({
       }`}
       style={{
         backgroundColor:
-          variant === "card" || variant === "lightbox" ? "transparent" : "var(--bg-tertiary)",
-        border: variant === "card" || variant === "lightbox" ? "none" : "1px solid var(--border-color)",
+          variant === "card" || variant === "lightbox"
+            ? "transparent"
+            : "var(--bg-tertiary)",
+        border:
+          variant === "card" || variant === "lightbox"
+            ? "none"
+            : "1px solid var(--border-color)",
         cursor:
           interactive && entityId
             ? incrementMutation.isPending

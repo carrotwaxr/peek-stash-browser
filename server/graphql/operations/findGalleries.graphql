@@ -3,11 +3,7 @@ query FindGalleries(
   $ids: [ID!]
   $gallery_filter: GalleryFilterType
 ) {
-  findGalleries(
-    filter: $filter
-    ids: $ids
-    gallery_filter: $gallery_filter
-  ) {
+  findGalleries(filter: $filter, ids: $ids, gallery_filter: $gallery_filter) {
     count
     galleries {
       id

@@ -1,6 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  addMember,
+  createGroup,
+  deleteGroup,
+  getAllGroups,
+  getGroup,
+  getUserGroups,
+  removeMember,
+  updateGroup,
+} from "../../controllers/groups.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
@@ -19,18 +30,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
   },
 }));
-
-import {
-  getAllGroups,
-  getGroup,
-  createGroup,
-  updateGroup,
-  deleteGroup,
-  addMember,
-  removeMember,
-  getUserGroups,
-} from "../../controllers/groups.js";
-import prisma from "../../prisma/singleton.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -51,7 +50,10 @@ describe("Groups Controller", () => {
     it("should return 403 if user is not admin", async () => {
       mockRequest = { user: { id: 1, role: "USER" } };
 
-      await getAllGroups(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getAllGroups(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -72,7 +74,10 @@ describe("Groups Controller", () => {
         },
       ] as never);
 
-      await getAllGroups(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getAllGroups(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseJson).toHaveBeenCalledWith({
         groups: expect.arrayContaining([
@@ -86,7 +91,10 @@ describe("Groups Controller", () => {
     it("should return 403 if user is not admin", async () => {
       mockRequest = { user: { id: 1, role: "USER" }, params: { id: "1" } };
 
-      await getGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -95,7 +103,10 @@ describe("Groups Controller", () => {
       mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "999" } };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
-      await getGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
@@ -113,11 +124,20 @@ describe("Groups Controller", () => {
         createdAt,
         updatedAt: createdAt,
         members: [
-          { id: 1, userId: 2, groupId: 1, createdAt, user: { id: 2, username: "user1", role: "USER" } },
+          {
+            id: 1,
+            userId: 2,
+            groupId: 1,
+            createdAt,
+            user: { id: 2, username: "user1", role: "USER" },
+          },
         ],
       } as never);
 
-      await getGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseJson).toHaveBeenCalledWith({
         group: expect.objectContaining({
@@ -138,7 +158,10 @@ describe("Groups Controller", () => {
     it("should return 403 if user is not admin", async () => {
       mockRequest = { user: { id: 1, role: "USER" }, body: { name: "Test" } };
 
-      await createGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await createGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -146,16 +169,25 @@ describe("Groups Controller", () => {
     it("should return 400 if name is missing", async () => {
       mockRequest = { user: { id: 1, role: "ADMIN" }, body: {} };
 
-      await createGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await createGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
     });
 
     it("should return 409 if name already exists", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, body: { name: "Family" } };
+      mockRequest = {
+        user: { id: 1, role: "ADMIN" },
+        body: { name: "Family" },
+      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
 
-      await createGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await createGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(409);
     });
@@ -182,7 +214,10 @@ describe("Groups Controller", () => {
         updatedAt: new Date(),
       } as never);
 
-      await createGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await createGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.userGroup.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -197,18 +232,32 @@ describe("Groups Controller", () => {
 
   describe("updateGroup", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = { user: { id: 1, role: "USER" }, params: { id: "1" }, body: { name: "Updated" } };
+      mockRequest = {
+        user: { id: 1, role: "USER" },
+        params: { id: "1" },
+        body: { name: "Updated" },
+      };
 
-      await updateGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await updateGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
 
     it("should return 404 if group not found", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "999" }, body: { name: "Updated" } };
+      mockRequest = {
+        user: { id: 1, role: "ADMIN" },
+        params: { id: "999" },
+        body: { name: "Updated" },
+      };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
-      await updateGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await updateGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
@@ -219,7 +268,10 @@ describe("Groups Controller", () => {
         params: { id: "1" },
         body: { name: "Updated Family", canShare: true },
       };
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1, name: "Family" } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue({
+        id: 1,
+        name: "Family",
+      } as never);
       mockPrisma.userGroup.update.mockResolvedValue({
         id: 1,
         name: "Updated Family",
@@ -231,7 +283,10 @@ describe("Groups Controller", () => {
         updatedAt: new Date(),
       } as never);
 
-      await updateGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await updateGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.userGroup.update).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -250,7 +305,10 @@ describe("Groups Controller", () => {
     it("should return 403 if user is not admin", async () => {
       mockRequest = { user: { id: 1, role: "USER" }, params: { id: "1" } };
 
-      await deleteGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await deleteGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -259,19 +317,30 @@ describe("Groups Controller", () => {
       mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "999" } };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
-      await deleteGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await deleteGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
 
     it("should delete group by id", async () => {
       mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "1" } };
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1, name: "Family" } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue({
+        id: 1,
+        name: "Family",
+      } as never);
       mockPrisma.userGroup.delete.mockResolvedValue({ id: 1 } as never);
 
-      await deleteGroup(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await deleteGroup(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
-      expect(mockPrisma.userGroup.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(mockPrisma.userGroup.delete).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
       expect(responseJson).toHaveBeenCalledWith({ success: true });
     });
   });
@@ -284,7 +353,10 @@ describe("Groups Controller", () => {
         body: { userId: 2 },
       };
 
-      await addMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await addMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -297,7 +369,10 @@ describe("Groups Controller", () => {
       };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
-      await addMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await addMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
@@ -310,7 +385,10 @@ describe("Groups Controller", () => {
       };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
 
-      await addMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await addMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
     });
@@ -329,7 +407,10 @@ describe("Groups Controller", () => {
         groupId: 1,
       } as never);
 
-      await addMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await addMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.userGroupMembership.create).toHaveBeenCalledWith({
         data: { userId: 2, groupId: 1 },
@@ -344,9 +425,14 @@ describe("Groups Controller", () => {
         body: { userId: 2 },
       };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
-      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
+        id: 1,
+      } as never);
 
-      await addMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await addMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(409);
     });
@@ -359,7 +445,10 @@ describe("Groups Controller", () => {
         params: { id: "1", userId: "2" },
       };
 
-      await removeMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await removeMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(403);
     });
@@ -371,7 +460,10 @@ describe("Groups Controller", () => {
       };
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue(null);
 
-      await removeMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await removeMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
     });
@@ -381,10 +473,17 @@ describe("Groups Controller", () => {
         user: { id: 1, role: "ADMIN" },
         params: { id: "1", userId: "2" },
       };
-      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({ id: 1 } as never);
-      mockPrisma.userGroupMembership.delete.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
+        id: 1,
+      } as never);
+      mockPrisma.userGroupMembership.delete.mockResolvedValue({
+        id: 1,
+      } as never);
 
-      await removeMember(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await removeMember(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.userGroupMembership.delete).toHaveBeenCalled();
       expect(responseJson).toHaveBeenCalledWith({ success: true });
@@ -395,7 +494,10 @@ describe("Groups Controller", () => {
     it("should return 401 if user is not authenticated", async () => {
       mockRequest = { user: undefined };
 
-      await getUserGroups(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getUserGroups(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
       expect(responseJson).toHaveBeenCalledWith({ error: "User not found" });
@@ -434,7 +536,10 @@ describe("Groups Controller", () => {
         },
       ] as never);
 
-      await getUserGroups(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getUserGroups(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.userGroupMembership.findMany).toHaveBeenCalledWith({
         where: { userId: 2 },

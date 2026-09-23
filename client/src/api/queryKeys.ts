@@ -22,8 +22,10 @@ export const queryKeys = {
       ["performers", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["performers", instanceId, "detail", id] as const,
-    minimal: (instanceId: string | undefined, params: Record<string, unknown>) =>
-      ["performers", instanceId, "minimal", params] as const,
+    minimal: (
+      instanceId: string | undefined,
+      params: Record<string, unknown>
+    ) => ["performers", instanceId, "minimal", params] as const,
   },
   studios: {
     all: (instanceId?: string) => ["studios", instanceId] as const,
@@ -31,8 +33,10 @@ export const queryKeys = {
       ["studios", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["studios", instanceId, "detail", id] as const,
-    minimal: (instanceId: string | undefined, params: Record<string, unknown>) =>
-      ["studios", instanceId, "minimal", params] as const,
+    minimal: (
+      instanceId: string | undefined,
+      params: Record<string, unknown>
+    ) => ["studios", instanceId, "minimal", params] as const,
   },
   tags: {
     all: (instanceId?: string) => ["tags", instanceId] as const,
@@ -40,8 +44,10 @@ export const queryKeys = {
       ["tags", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["tags", instanceId, "detail", id] as const,
-    minimal: (instanceId: string | undefined, params: Record<string, unknown>) =>
-      ["tags", instanceId, "minimal", params] as const,
+    minimal: (
+      instanceId: string | undefined,
+      params: Record<string, unknown>
+    ) => ["tags", instanceId, "minimal", params] as const,
   },
   galleries: {
     all: (instanceId?: string) => ["galleries", instanceId] as const,
@@ -49,10 +55,15 @@ export const queryKeys = {
       ["galleries", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["galleries", instanceId, "detail", id] as const,
-    images: (instanceId: string | undefined, galleryId: string, params: Record<string, unknown>) =>
-      ["galleries", instanceId, "images", galleryId, params] as const,
-    minimal: (instanceId: string | undefined, params: Record<string, unknown>) =>
-      ["galleries", instanceId, "minimal", params] as const,
+    images: (
+      instanceId: string | undefined,
+      galleryId: string,
+      params: Record<string, unknown>
+    ) => ["galleries", instanceId, "images", galleryId, params] as const,
+    minimal: (
+      instanceId: string | undefined,
+      params: Record<string, unknown>
+    ) => ["galleries", instanceId, "minimal", params] as const,
   },
   groups: {
     all: (instanceId?: string) => ["groups", instanceId] as const,
@@ -60,8 +71,10 @@ export const queryKeys = {
       ["groups", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["groups", instanceId, "detail", id] as const,
-    minimal: (instanceId: string | undefined, params: Record<string, unknown>) =>
-      ["groups", instanceId, "minimal", params] as const,
+    minimal: (
+      instanceId: string | undefined,
+      params: Record<string, unknown>
+    ) => ["groups", instanceId, "minimal", params] as const,
   },
   images: {
     all: (instanceId?: string) => ["images", instanceId] as const,
@@ -91,13 +104,15 @@ export const queryKeys = {
   playlists: {
     all: () => ["playlists"] as const,
     shared: () => ["playlists", "shared"] as const,
-    shares: (playlistId: number) => ["playlists", "shares", playlistId] as const,
+    shares: (playlistId: number) =>
+      ["playlists", "shares", playlistId] as const,
   },
 
   // ── Clips ────────────────────────────────────────────────────────────
   clips: {
     all: () => ["clips"] as const,
-    list: (params: Record<string, unknown>) => ["clips", "list", params] as const,
+    list: (params: Record<string, unknown>) =>
+      ["clips", "list", params] as const,
     forScene: (sceneId: string, instanceId?: string) =>
       ["clips", "forScene", sceneId, instanceId] as const,
   },
@@ -106,7 +121,8 @@ export const queryKeys = {
   admin: {
     groups: () => ["admin", "groups"] as const,
     group: (id: string) => ["admin", "groups", id] as const,
-    userPermissions: (userId: number) => ["admin", "userPermissions", userId] as const,
+    userPermissions: (userId: number) =>
+      ["admin", "userPermissions", userId] as const,
     userGroups: (userId: number) => ["admin", "userGroups", userId] as const,
   },
 

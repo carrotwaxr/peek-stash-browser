@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
+import type React from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import type { NormalizedImage, TagRef } from "@peek/shared-types";
 import { ArrowLeft, Play } from "lucide-react";
+import { libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useConfig } from "../../contexts/ConfigContext";
-import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
-import { galleryTitle } from "../../utils/gallery";
 import { getEntityPath } from "../../utils/entityLinks";
+import { galleryTitle } from "../../utils/gallery";
 import SceneSearch from "../scene-search/SceneSearch";
-import WallView from "../wall/WallView";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   FavoriteButton,
@@ -24,9 +26,7 @@ import {
   TabNavigation,
   TagChips,
 } from "../ui/index";
-import ViewInStashButton from "../ui/ViewInStashButton";
-import type { TagRef, NormalizedImage } from "@peek/shared-types";
-import type React from "react";
+import WallView from "../wall/WallView";
 
 interface EntityRef {
   id: string;
@@ -66,39 +66,47 @@ const GalleryDetail = () => {
   // Compute tabs with counts for smart default selection
   // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
   const galleryImageCount = totalCount || (gallery?.image_count as number) || 0;
-  const galleryScenesCount = (gallery?.scenes as unknown[] | undefined)?.length || 0;
+  const galleryScenesCount =
+    (gallery?.scenes as unknown[] | undefined)?.length || 0;
   const contentTabs = [
-    { id: 'images', label: 'Images', count: galleryImageCount },
-    { id: 'scenes', label: 'Scenes', count: galleryScenesCount },
+    { id: "images", label: "Images", count: galleryImageCount },
+    { id: "scenes", label: "Scenes", count: galleryScenesCount },
   ];
-  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'images';
+  const effectiveDefaultTab =
+    contentTabs.find((t) => t.count > 0)?.id || "images";
 
   // Get active tab from URL or default to first tab with content
-  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
+  const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
+  const urlPage = parseInt(searchParams.get("page") || "1") || 1;
 
-  const handleImagePageChange = useCallback((newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(newPage));
-    }
-    // Preserve tab param if present
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
+  const handleImagePageChange = useCallback(
+    (newPage: number) => {
+      const params = new URLSearchParams(searchParams);
+      if (newPage === 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(newPage));
+      }
+      // Preserve tab param if present
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams]
+  );
 
   // Fetch function for prefetching adjacent pages
-  const fetchPage = useCallback(async (page: number) => {
-    const data = await libraryApi.getGalleryImages(galleryId!, {
-      page,
-      per_page: PER_PAGE,
-      instanceId,
-    }) as Record<string, unknown>;
-    return { images: (data.images || []) as NormalizedImage[] };
-  }, [galleryId, instanceId]);
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const data = (await libraryApi.getGalleryImages(galleryId!, {
+        page,
+        per_page: PER_PAGE,
+        instanceId,
+      })) as Record<string, unknown>;
+      return { images: (data.images || []) as NormalizedImage[] };
+    },
+    [galleryId, instanceId]
+  );
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -116,10 +124,20 @@ const GalleryDetail = () => {
     const fetchGallery = async () => {
       try {
         setIsLoading(true);
-        const galleryData = await libraryApi.findGalleryById(galleryId!, instanceId) as Record<string, unknown> | null;
+        const galleryData = (await libraryApi.findGalleryById(
+          galleryId!,
+          instanceId
+        )) as Record<string, unknown> | null;
         setGallery(galleryData);
-        setRating((galleryData as Record<string, unknown> | null)?.rating as number | null);
-        setIsFavorite(((galleryData as Record<string, unknown> | null)?.favorite as boolean) || false);
+        setRating(
+          (galleryData as Record<string, unknown> | null)?.rating as
+            | number
+            | null
+        );
+        setIsFavorite(
+          ((galleryData as Record<string, unknown> | null)
+            ?.favorite as boolean) || false
+        );
       } catch (error) {
         console.error("Error loading gallery:", error);
       } finally {
@@ -134,13 +152,18 @@ const GalleryDetail = () => {
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
-        const data = await libraryApi.getGalleryImages(galleryId!, {
+        const data = (await libraryApi.getGalleryImages(galleryId!, {
           page: lightbox.currentPage,
           per_page: PER_PAGE,
           instanceId,
-        }) as Record<string, unknown>;
+        })) as Record<string, unknown>;
         setImages((data.images || []) as NormalizedImage[]);
-        setTotalCount(((data.pagination as Record<string, unknown> | undefined)?.total as number) || (data.images as unknown[] | undefined)?.length || 0);
+        setTotalCount(
+          ((data.pagination as Record<string, unknown> | undefined)
+            ?.total as number) ||
+            (data.images as unknown[] | undefined)?.length ||
+            0
+        );
 
         // Handle pending lightbox navigation after page loads
         lightbox.consumePendingLightboxIndex();
@@ -152,13 +175,18 @@ const GalleryDetail = () => {
     };
 
     fetchImages();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryId, instanceId, lightbox.currentPage]);
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("gallery", galleryId!, newRating, instanceId);
+      await libraryApi.updateRating(
+        "gallery",
+        galleryId!,
+        newRating,
+        instanceId
+      );
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((gallery?.rating as number | null) ?? null);
@@ -168,7 +196,12 @@ const GalleryDetail = () => {
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("gallery", galleryId!, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        "gallery",
+        galleryId!,
+        newValue,
+        instanceId
+      );
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((gallery?.favorite as boolean) || false);
@@ -249,7 +282,10 @@ const GalleryDetail = () => {
                       size="large"
                     />
                   )}
-                  <ViewInStashButton stashUrl={gallery?.stashUrl as string} size={24} />
+                  <ViewInStashButton
+                    stashUrl={gallery?.stashUrl as string}
+                    size={24}
+                  />
                 </div>
               ) as unknown as string
             }
@@ -259,7 +295,11 @@ const GalleryDetail = () => {
                   {studioRef && (
                     <>
                       <Link
-                        to={getEntityPath('studio', studioRef, hasMultipleInstances)}
+                        to={getEntityPath(
+                          "studio",
+                          studioRef,
+                          hasMultipleInstances
+                        )}
                         className="hover:underline"
                         style={{ color: "var(--accent-primary)" }}
                       >
@@ -276,7 +316,9 @@ const GalleryDetail = () => {
                   {!!gallery.date && (
                     <>
                       <span>•</span>
-                      <span>{new Date(gallery.date as string).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(gallery.date as string).toLocaleDateString()}
+                      </span>
                     </>
                   )}
                   {!!gallery.photographer && (
@@ -335,7 +377,11 @@ const GalleryDetail = () => {
                 {performers.map((performer: EntityRef) => (
                   <Link
                     key={performer.id}
-                    to={getEntityPath('performer', performer, hasMultipleInstances)}
+                    to={getEntityPath(
+                      "performer",
+                      performer,
+                      hasMultipleInstances
+                    )}
                     className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                   >
                     <div
@@ -389,8 +435,11 @@ const GalleryDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mb-6">
-          {contentTabs.every(t => t.count === 0) ? (
-            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+          {contentTabs.every((t) => t.count === 0) ? (
+            <div
+              className="py-16 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
               This gallery has no content in Peek
             </div>
           ) : (
@@ -401,7 +450,7 @@ const GalleryDetail = () => {
               />
 
               {/* Images Tab */}
-              {activeTab === 'images' && (
+              {activeTab === "images" && (
                 <div className="mt-6">
                   {/* Pagination - Top */}
                   {lightbox.totalPages > 1 && (
@@ -419,7 +468,9 @@ const GalleryDetail = () => {
                     entityType="image"
                     zoomLevel="medium"
                     onItemClick={(image: Record<string, unknown>) => {
-                      const index = images.findIndex((img) => img.id === image.id);
+                      const index = images.findIndex(
+                        (img) => img.id === image.id
+                      );
                       lightbox.openLightbox(index >= 0 ? index : 0);
                     }}
                     loading={imagesLoading}
@@ -440,17 +491,22 @@ const GalleryDetail = () => {
               )}
 
               {/* Scenes Tab */}
-              {activeTab === 'scenes' && (
+              {activeTab === "scenes" && (
                 <SceneSearch
                   context="gallery_scenes"
                   permanentFilters={{
                     galleries: {
                       value: [makeCompositeKey(galleryId!, instanceId)],
-                      modifier: "INCLUDES"
-                    }
+                      modifier: "INCLUDES",
+                    },
                   }}
                   permanentFiltersMetadata={{
-                    galleries: [{ id: makeCompositeKey(galleryId!, instanceId), title: galleryTitle(gallery) as string }]
+                    galleries: [
+                      {
+                        id: makeCompositeKey(galleryId!, instanceId),
+                        title: galleryTitle(gallery) as string,
+                      },
+                    ],
                   }}
                   title={`Scenes in ${galleryTitle(gallery) as string}`}
                   fromPageTitle={(galleryTitle(gallery) as string) || "Gallery"}

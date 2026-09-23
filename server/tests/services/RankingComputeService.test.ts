@@ -4,7 +4,9 @@
  * Tests the percentile ranking algorithm, engagement score calculation,
  * tie handling, edge cases, and BigInt/float rounding from SQLite.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { rankingComputeService } from "../../services/RankingComputeService.js";
 
 // Mock prisma before importing service
 vi.mock("../../prisma/singleton.js", () => ({
@@ -27,9 +29,6 @@ vi.mock("../../utils/logger.js", () => ({
     debug: vi.fn(),
   },
 }));
-
-import { rankingComputeService } from "../../services/RankingComputeService.js";
-import prisma from "../../prisma/singleton.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -196,11 +195,32 @@ describe("RankingComputeService", () => {
         avgDuration: 1200,
         performerStats: [
           // High engagement
-          { entityId: "top", instanceId: "i1", playCount: 100, oCount: 20, playDuration: 50000, libraryPresence: 1 },
+          {
+            entityId: "top",
+            instanceId: "i1",
+            playCount: 100,
+            oCount: 20,
+            playDuration: 50000,
+            libraryPresence: 1,
+          },
           // Medium engagement
-          { entityId: "mid", instanceId: "i1", playCount: 10, oCount: 2, playDuration: 5000, libraryPresence: 1 },
+          {
+            entityId: "mid",
+            instanceId: "i1",
+            playCount: 10,
+            oCount: 2,
+            playDuration: 5000,
+            libraryPresence: 1,
+          },
           // Low engagement
-          { entityId: "low", instanceId: "i1", playCount: 1, oCount: 0, playDuration: 100, libraryPresence: 1 },
+          {
+            entityId: "low",
+            instanceId: "i1",
+            playCount: 1,
+            oCount: 0,
+            playDuration: 100,
+            libraryPresence: 1,
+          },
         ],
       });
 
@@ -218,7 +238,14 @@ describe("RankingComputeService", () => {
     it("assigns 100 to a single entity", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          { entityId: "only", instanceId: "i1", playCount: 5, oCount: 1, playDuration: 600, libraryPresence: 1 },
+          {
+            entityId: "only",
+            instanceId: "i1",
+            playCount: 5,
+            oCount: 1,
+            playDuration: 600,
+            libraryPresence: 1,
+          },
         ],
       });
 
@@ -240,9 +267,30 @@ describe("RankingComputeService", () => {
       const txMock = setupRankingMocks({
         avgDuration: 1200,
         performerStats: [
-          { entityId: "a", instanceId: "i1", playCount: 10, oCount: 2, playDuration: 2400, libraryPresence: 5 },
-          { entityId: "b", instanceId: "i1", playCount: 10, oCount: 2, playDuration: 2400, libraryPresence: 5 },
-          { entityId: "c", instanceId: "i1", playCount: 1, oCount: 0, playDuration: 100, libraryPresence: 10 },
+          {
+            entityId: "a",
+            instanceId: "i1",
+            playCount: 10,
+            oCount: 2,
+            playDuration: 2400,
+            libraryPresence: 5,
+          },
+          {
+            entityId: "b",
+            instanceId: "i1",
+            playCount: 10,
+            oCount: 2,
+            playDuration: 2400,
+            libraryPresence: 5,
+          },
+          {
+            entityId: "c",
+            instanceId: "i1",
+            playCount: 1,
+            oCount: 0,
+            playDuration: 100,
+            libraryPresence: 10,
+          },
         ],
       });
 
@@ -276,11 +324,25 @@ describe("RankingComputeService", () => {
     it("handles some entity types empty and others populated", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          { entityId: "perf1", instanceId: "i1", playCount: 5, oCount: 1, playDuration: 600, libraryPresence: 3 },
+          {
+            entityId: "perf1",
+            instanceId: "i1",
+            playCount: 5,
+            oCount: 1,
+            playDuration: 600,
+            libraryPresence: 3,
+          },
         ],
         studioStats: [], // Empty
         tagStats: [
-          { entityId: "tag1", instanceId: "i1", playCount: 3, oCount: 0, playDuration: 300, libraryPresence: 10 },
+          {
+            entityId: "tag1",
+            instanceId: "i1",
+            playCount: 3,
+            oCount: 0,
+            playDuration: 300,
+            libraryPresence: 10,
+          },
         ],
         sceneStats: [], // Empty
       });
@@ -307,16 +369,44 @@ describe("RankingComputeService", () => {
     it("computes rankings for all four entity types in parallel", async () => {
       const txMock = setupRankingMocks({
         performerStats: [
-          { entityId: "p1", instanceId: "i1", playCount: 10, oCount: 2, playDuration: 5000, libraryPresence: 3 },
+          {
+            entityId: "p1",
+            instanceId: "i1",
+            playCount: 10,
+            oCount: 2,
+            playDuration: 5000,
+            libraryPresence: 3,
+          },
         ],
         studioStats: [
-          { entityId: "s1", instanceId: "i1", playCount: 8, oCount: 1, playDuration: 4000, libraryPresence: 5 },
+          {
+            entityId: "s1",
+            instanceId: "i1",
+            playCount: 8,
+            oCount: 1,
+            playDuration: 4000,
+            libraryPresence: 5,
+          },
         ],
         tagStats: [
-          { entityId: "t1", instanceId: "i1", playCount: 20, oCount: 5, playDuration: 10000, libraryPresence: 15 },
+          {
+            entityId: "t1",
+            instanceId: "i1",
+            playCount: 20,
+            oCount: 5,
+            playDuration: 10000,
+            libraryPresence: 15,
+          },
         ],
         sceneStats: [
-          { entityId: "sc1", instanceId: "i1", playCount: 3, oCount: 1, playDuration: 900, libraryPresence: 1 },
+          {
+            entityId: "sc1",
+            instanceId: "i1",
+            playCount: 3,
+            oCount: 1,
+            playDuration: 900,
+            libraryPresence: 1,
+          },
         ],
       });
 
@@ -341,7 +431,14 @@ describe("RankingComputeService", () => {
       queryRawMock
         .mockResolvedValueOnce([{ avgDuration: null }]) // No scenes
         .mockResolvedValueOnce([
-          { entityId: "p1", instanceId: "i1", playCount: 0, oCount: 0, playDuration: 2400, libraryPresence: 1 },
+          {
+            entityId: "p1",
+            instanceId: "i1",
+            playCount: 0,
+            oCount: 0,
+            playDuration: 2400,
+            libraryPresence: 1,
+          },
         ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])

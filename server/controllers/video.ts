@@ -9,7 +9,10 @@ import { pipeResponseToClient } from "../utils/streamProxy.js";
  * @param instanceId - Optional instance ID. If not provided, uses default instance.
  * @returns Object with baseUrl and apiKey
  */
-function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey: string } {
+function getInstanceCredentials(instanceId?: string): {
+  baseUrl: string;
+  apiKey: string;
+} {
   // Treat "default" the same as undefined - use the default instance
   if (instanceId && instanceId !== "default") {
     const instance = stashInstanceManager.get(instanceId);
@@ -44,69 +47,76 @@ function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey:
  *
  * All should be rewritten to: /api/scene/{sceneId}/proxy-stream/{path}?{params without apikey}&instanceId=xxx
  */
-function rewriteHlsPlaylist(content: string, sceneId: string, _stashBaseUrl: string, instanceId?: string): string {
-  const lines = content.split('\n');
+function rewriteHlsPlaylist(
+  content: string,
+  sceneId: string,
+  _stashBaseUrl: string,
+  instanceId?: string
+): string {
+  const lines = content.split("\n");
 
-  return lines.map(line => {
-    // Skip empty lines and HLS tags (start with #)
-    if (!line.trim() || line.startsWith('#')) {
-      return line;
-    }
-
-    try {
-      let urlPath: string;
-      let queryParams: URLSearchParams;
-
-      // Check if it's a full URL or a path
-      if (line.includes('://')) {
-        // Absolute URL: http://stash:9999/scene/123/stream/segment.ts?apikey=xxx
-        const url = new URL(line);
-        urlPath = url.pathname;
-        queryParams = url.searchParams;
-      } else if (line.startsWith('/')) {
-        // Absolute path: /scene/123/stream/segment.ts?apikey=xxx
-        const [path, query] = line.split('?');
-        urlPath = path ?? '';
-        queryParams = new URLSearchParams(query || '');
-      } else {
-        // Relative path: stream/segment.ts?apikey=xxx or segment.ts?apikey=xxx
-        const [path, query] = line.split('?');
-        urlPath = path ?? '';
-        queryParams = new URLSearchParams(query || '');
+  return lines
+    .map((line) => {
+      // Skip empty lines and HLS tags (start with #)
+      if (!line.trim() || line.startsWith("#")) {
+        return line;
       }
 
-      // Strip apikey from query params (case-insensitive)
-      queryParams.delete('apikey');
-      queryParams.delete('ApiKey');
-      queryParams.delete('APIKEY');
+      try {
+        let urlPath: string;
+        let queryParams: URLSearchParams;
 
-      // Add instanceId for multi-instance routing
-      if (instanceId) {
-        queryParams.set('instanceId', instanceId);
+        // Check if it's a full URL or a path
+        if (line.includes("://")) {
+          // Absolute URL: http://stash:9999/scene/123/stream/segment.ts?apikey=xxx
+          const url = new URL(line);
+          urlPath = url.pathname;
+          queryParams = url.searchParams;
+        } else if (line.startsWith("/")) {
+          // Absolute path: /scene/123/stream/segment.ts?apikey=xxx
+          const [path, query] = line.split("?");
+          urlPath = path ?? "";
+          queryParams = new URLSearchParams(query || "");
+        } else {
+          // Relative path: stream/segment.ts?apikey=xxx or segment.ts?apikey=xxx
+          const [path, query] = line.split("?");
+          urlPath = path ?? "";
+          queryParams = new URLSearchParams(query || "");
+        }
+
+        // Strip apikey from query params (case-insensitive)
+        queryParams.delete("apikey");
+        queryParams.delete("ApiKey");
+        queryParams.delete("APIKEY");
+
+        // Add instanceId for multi-instance routing
+        if (instanceId) {
+          queryParams.set("instanceId", instanceId);
+        }
+
+        // Extract the stream path (everything after /scene/{id}/)
+        let streamPath: string;
+        const scenePathMatch = urlPath.match(/\/scene\/\d+\/(.+)/);
+        if (scenePathMatch) {
+          streamPath = scenePathMatch[1] as string;
+        } else {
+          // If no scene path pattern, use the path as-is
+          streamPath = urlPath.startsWith("/") ? urlPath.slice(1) : urlPath;
+        }
+
+        // Build clean query string
+        const cleanQuery = queryParams.toString();
+        const queryString = cleanQuery ? `?${cleanQuery}` : "";
+
+        // Return proxied URL
+        return `/api/scene/${sceneId}/proxy-stream/${streamPath}${queryString}`;
+      } catch {
+        // If parsing fails, return original line (shouldn't happen for valid playlists)
+        logger.warn(`[PROXY] Failed to rewrite HLS line: ${line}`);
+        return line;
       }
-
-      // Extract the stream path (everything after /scene/{id}/)
-      let streamPath: string;
-      const scenePathMatch = urlPath.match(/\/scene\/\d+\/(.+)/);
-      if (scenePathMatch) {
-        streamPath = scenePathMatch[1] as string;
-      } else {
-        // If no scene path pattern, use the path as-is
-        streamPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-      }
-
-      // Build clean query string
-      const cleanQuery = queryParams.toString();
-      const queryString = cleanQuery ? `?${cleanQuery}` : '';
-
-      // Return proxied URL
-      return `/api/scene/${sceneId}/proxy-stream/${streamPath}${queryString}`;
-    } catch {
-      // If parsing fails, return original line (shouldn't happen for valid playlists)
-      logger.warn(`[PROXY] Failed to rewrite HLS line: ${line}`);
-      return line;
-    }
-  }).join('\n');
+    })
+    .join("\n");
 }
 
 /**
@@ -123,7 +133,14 @@ function rewriteHlsPlaylist(content: string, sceneId: string, _stashBaseUrl: str
  * SECURITY: For HLS playlists (.m3u8), we rewrite internal URLs to strip the Stash API key
  * and route segment requests through Peek's proxy.
  */
-export const proxyStashStream = async (req: TypedRequest<never, { sceneId: string; streamPath: string; subPath?: string }, { instanceId?: string }>, res: Response) => {
+export const proxyStashStream = async (
+  req: TypedRequest<
+    never,
+    { sceneId: string; streamPath: string; subPath?: string },
+    { instanceId?: string }
+  >,
+  res: Response
+) => {
   try {
     const { sceneId, streamPath, subPath } = req.params;
     const instanceId = req.query.instanceId;
@@ -132,8 +149,8 @@ export const proxyStashStream = async (req: TypedRequest<never, { sceneId: strin
     const fullStreamPath = subPath ? `${streamPath}/${subPath}` : streamPath;
 
     // Parse query string from original request, but remove instanceId (it's for Peek routing only)
-    const urlParams = new URLSearchParams(req.url.split('?')[1] || '');
-    urlParams.delete('instanceId');
+    const urlParams = new URLSearchParams(req.url.split("?")[1] || "");
+    urlParams.delete("instanceId");
     const queryString = urlParams.toString();
 
     // Get Stash instance configuration
@@ -145,23 +162,26 @@ export const proxyStashStream = async (req: TypedRequest<never, { sceneId: strin
       stashBaseUrl = creds.baseUrl;
       apiKey = creds.apiKey;
     } catch (error) {
-      logger.error("[PROXY] Failed to get Stash instance credentials", { error, instanceId });
+      logger.error("[PROXY] Failed to get Stash instance credentials", {
+        error,
+        instanceId,
+      });
       return res.status(500).send("Stash not configured");
     }
 
-    const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? '?' + queryString : ''}`;
+    const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? "?" + queryString : ""}`;
 
     logger.debug(`[PROXY] Proxying stream: ${req.url} -> ${stashUrl}`);
 
     // Abort the upstream fetch if the client disconnects (seek, refresh, navigate away).
     // This prevents orphaned connections from downloading entire files into memory.
     const abortController = new AbortController();
-    res.on('close', () => abortController.abort());
+    res.on("close", () => abortController.abort());
 
     // Forward request to Stash using fetch
-    const headers: Record<string, string> = { 'ApiKey': apiKey };
+    const headers: Record<string, string> = { ApiKey: apiKey };
     if (req.headers.range) {
-      headers['Range'] = req.headers.range;
+      headers["Range"] = req.headers.range;
     }
 
     const response = await fetch(stashUrl, {
@@ -171,24 +191,32 @@ export const proxyStashStream = async (req: TypedRequest<never, { sceneId: strin
 
     if (!response.ok) {
       logger.warn(`[PROXY] Stash returned ${response.status} for ${stashUrl}`);
-      return res.status(response.status).send(`Stash stream error: ${response.statusText}`);
+      return res
+        .status(response.status)
+        .send(`Stash stream error: ${response.statusText}`);
     }
 
     // Check if this is an HLS playlist that needs URL rewriting
-    const contentType = response.headers.get('content-type') || '';
-    const isHlsPlaylist = fullStreamPath.endsWith('.m3u8') ||
-                          contentType.includes('mpegurl') ||
-                          contentType.includes('x-mpegURL');
+    const contentType = response.headers.get("content-type") || "";
+    const isHlsPlaylist =
+      fullStreamPath.endsWith(".m3u8") ||
+      contentType.includes("mpegurl") ||
+      contentType.includes("x-mpegURL");
 
     if (isHlsPlaylist) {
       // For HLS playlists, read the entire response and rewrite URLs
       const playlistContent = await response.text();
-      const rewrittenContent = rewriteHlsPlaylist(playlistContent, sceneId, stashBaseUrl, instanceId);
+      const rewrittenContent = rewriteHlsPlaylist(
+        playlistContent,
+        sceneId,
+        stashBaseUrl,
+        instanceId
+      );
 
       // Set headers for the rewritten playlist
       res.status(response.status);
-      res.setHeader('content-type', 'application/vnd.apple.mpegurl');
-      res.setHeader('cache-control', 'no-cache');
+      res.setHeader("content-type", "application/vnd.apple.mpegurl");
+      res.setHeader("cache-control", "no-cache");
       res.send(rewrittenContent);
 
       logger.debug(`[PROXY] Rewrote HLS playlist: ${fullStreamPath}`);
@@ -200,13 +228,13 @@ export const proxyStashStream = async (req: TypedRequest<never, { sceneId: strin
 
     // Stream response body to client with proper backpressure and cleanup
     const headersToForward = [
-      'content-type',
-      'content-length',
-      'accept-ranges',
-      'content-range',
-      'cache-control',
-      'last-modified',
-      'etag',
+      "content-type",
+      "content-length",
+      "accept-ranges",
+      "content-range",
+      "cache-control",
+      "last-modified",
+      "etag",
     ];
 
     await pipeResponseToClient(response, res, "[PROXY]", headersToForward);
@@ -233,7 +261,14 @@ export const proxyStashStream = async (req: TypedRequest<never, { sceneId: strin
  * Stash stores captions as separate .vtt or .srt files alongside video files
  * This endpoint proxies those files and converts SRT to VTT if needed
  */
-export const getCaption = async (req: TypedRequest<never, { sceneId: string }, { lang?: string; type?: string; instanceId?: string }>, res: Response) => {
+export const getCaption = async (
+  req: TypedRequest<
+    never,
+    { sceneId: string },
+    { lang?: string; type?: string; instanceId?: string }
+  >,
+  res: Response
+) => {
   try {
     const { sceneId } = req.params;
     const { lang, type, instanceId } = req.query;
@@ -244,9 +279,11 @@ export const getCaption = async (req: TypedRequest<never, { sceneId: string }, {
 
     const langStr = lang;
     const typeStr = type;
-    const instanceIdStr = instanceId ?? '(not specified)';
+    const instanceIdStr = instanceId ?? "(not specified)";
 
-    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${langStr}, type=${typeStr}, instanceId=${instanceIdStr}`);
+    logger.info(
+      `[CAPTION] Request: scene=${sceneId}, lang=${langStr}, type=${typeStr}, instanceId=${instanceIdStr}`
+    );
 
     // Get Stash instance configuration
     let stashUrl: string;
@@ -257,7 +294,10 @@ export const getCaption = async (req: TypedRequest<never, { sceneId: string }, {
       stashUrl = creds.baseUrl;
       apiKey = creds.apiKey;
     } catch (error) {
-      logger.error("[CAPTION] Failed to get Stash instance credentials", { error, instanceId });
+      logger.error("[CAPTION] Failed to get Stash instance credentials", {
+        error,
+        instanceId,
+      });
       return res.status(500).send("Stash configuration missing");
     }
 
@@ -268,12 +308,14 @@ export const getCaption = async (req: TypedRequest<never, { sceneId: string }, {
     // Fetch caption from Stash with API key
     const response = await fetch(captionUrl, {
       headers: {
-        'ApiKey': apiKey,
+        ApiKey: apiKey,
       },
     });
 
     if (!response.ok) {
-      logger.warn(`[CAPTION] Stash returned ${response.status} for scene ${sceneId}`);
+      logger.warn(
+        `[CAPTION] Stash returned ${response.status} for scene ${sceneId}`
+      );
       return res.status(response.status).send("Caption not found");
     }
 
@@ -284,7 +326,9 @@ export const getCaption = async (req: TypedRequest<never, { sceneId: string }, {
     res.setHeader("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
     res.send(captionData);
 
-    logger.info(`[CAPTION] Served caption: scene=${sceneId}, lang=${langStr}, size=${captionData.length} bytes`);
+    logger.info(
+      `[CAPTION] Served caption: scene=${sceneId}, lang=${langStr}, size=${captionData.length} bytes`
+    );
   } catch (error) {
     logger.error("[CAPTION] Error serving caption", {
       error: error instanceof Error ? error.message : String(error),

@@ -9,8 +9,6 @@
     "**/*.spec.ts",
     "prisma/migrations/**"
   ],
-  "ignoreDependencies": [
-    "@trivago/prettier-plugin-sort-imports"
-  ],
+  "ignoreDependencies": ["@trivago/prettier-plugin-sort-imports"],
   "ignoreExportsUsedInFile": true
 }

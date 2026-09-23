@@ -7,11 +7,17 @@
  * This service maintains compatibility with existing controller patterns
  * while using the new SQLite-backed architecture.
  */
-
 import { Prisma } from "@prisma/client";
-import type { StashScene, StashPerformer, StashStudio, StashTag, StashGroup, StashGallery, StashImage } from "@prisma/client";
+import type {
+  StashGallery,
+  StashGroup,
+  StashImage,
+  StashPerformer,
+  StashScene,
+  StashStudio,
+  StashTag,
+} from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -23,7 +29,12 @@ import type {
   SceneScoringData,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
-import { getSceneFallbackTitle, getGalleryFallbackTitle, getImageFallbackTitle } from "../utils/titleUtils.js";
+import {
+  getGalleryFallbackTitle,
+  getImageFallbackTitle,
+  getSceneFallbackTitle,
+} from "../utils/titleUtils.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
  * Row shape returned by FTS search queries (raw SQL returning StashScene columns).
@@ -155,14 +166,44 @@ type ImageInput = StashImage & {
 };
 
 /** Scene fields returned by BROWSE_SELECT queries (subset of StashScene without streams/data) */
-type BrowseSceneRow = Pick<StashScene,
-  'id' | 'stashInstanceId' | 'title' | 'code' | 'date' | 'studioId' |
-  'rating100' | 'duration' | 'organized' | 'details' | 'director' | 'urls' |
-  'filePath' | 'fileBitRate' | 'fileFrameRate' | 'fileWidth' | 'fileHeight' |
-  'fileVideoCodec' | 'fileAudioCodec' | 'fileSize' | 'pathScreenshot' |
-  'pathPreview' | 'pathSprite' | 'pathVtt' | 'pathChaptersVtt' | 'pathStream' |
-  'pathCaption' | 'captions' | 'oCounter' | 'playCount' | 'playDuration' |
-  'stashCreatedAt' | 'stashUpdatedAt' | 'syncedAt' | 'deletedAt' | 'inheritedTagIds'
+type BrowseSceneRow = Pick<
+  StashScene,
+  | "id"
+  | "stashInstanceId"
+  | "title"
+  | "code"
+  | "date"
+  | "studioId"
+  | "rating100"
+  | "duration"
+  | "organized"
+  | "details"
+  | "director"
+  | "urls"
+  | "filePath"
+  | "fileBitRate"
+  | "fileFrameRate"
+  | "fileWidth"
+  | "fileHeight"
+  | "fileVideoCodec"
+  | "fileAudioCodec"
+  | "fileSize"
+  | "pathScreenshot"
+  | "pathPreview"
+  | "pathSprite"
+  | "pathVtt"
+  | "pathChaptersVtt"
+  | "pathStream"
+  | "pathCaption"
+  | "captions"
+  | "oCounter"
+  | "playCount"
+  | "playDuration"
+  | "stashCreatedAt"
+  | "stashUpdatedAt"
+  | "syncedAt"
+  | "deletedAt"
+  | "inheritedTagIds"
 >;
 
 /** Transformed image output shape (returned by transformImage) */
@@ -320,7 +361,9 @@ class StashEntityService {
     this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
-    logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -350,27 +393,33 @@ class StashEntityService {
       GROUP BY s.id, s.stashInstanceId
     `;
 
-    const rows = await prisma.$queryRawUnsafe<Array<{
-      id: string;
-      stashInstanceId: string;
-      studioId: string | null;
-      oCounter: number;
-      date: string | null;
-      performerIds: string;
-      tagIds: string;
-    }>>(sql);
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        id: string;
+        stashInstanceId: string;
+        studioId: string | null;
+        oCounter: number;
+        date: string | null;
+        performerIds: string;
+        tagIds: string;
+      }>
+    >(sql);
 
-    const result: SceneScoringData[] = rows.map(row => ({
+    const result: SceneScoringData[] = rows.map((row) => ({
       id: row.id,
       instanceId: row.stashInstanceId,
       studioId: row.studioId,
-      performerIds: row.performerIds ? row.performerIds.split(',').filter(Boolean) : [],
-      tagIds: row.tagIds ? row.tagIds.split(',').filter(Boolean) : [],
+      performerIds: row.performerIds
+        ? row.performerIds.split(",").filter(Boolean)
+        : [],
+      tagIds: row.tagIds ? row.tagIds.split(",").filter(Boolean) : [],
       oCounter: row.oCounter || 0,
       date: row.date,
     }));
 
-    logger.info(`getScenesForScoring: ${Date.now() - startTime}ms, count=${result.length}`);
+    logger.info(
+      `getScenesForScoring: ${Date.now() - startTime}ms, count=${result.length}`
+    );
 
     return result;
   }
@@ -399,9 +448,8 @@ class StashEntityService {
 
     // Convert excludedIds to array for SQL IN clause
     // If empty, use a dummy value that won't match any ID
-    const excludedArray = excludedIds.size > 0
-      ? Array.from(excludedIds)
-      : ['__NONE__'];
+    const excludedArray =
+      excludedIds.size > 0 ? Array.from(excludedIds) : ["__NONE__"];
 
     // SQL query to find candidate scenes sharing performers, tags, or studio
     // Uses UNION ALL to combine weighted matches, then groups and sums weights
@@ -442,7 +490,7 @@ class StashEntityService {
       SELECT c.sceneId, SUM(c.weight) as totalWeight, s.date
       FROM candidates c
       JOIN StashScene s ON s.id = c.sceneId
-      WHERE c.sceneId NOT IN (${excludedArray.map(() => '?').join(',')})
+      WHERE c.sceneId NOT IN (${excludedArray.map(() => "?").join(",")})
       GROUP BY c.sceneId
       ORDER BY totalWeight DESC, s.date DESC
       LIMIT ?
@@ -451,26 +499,33 @@ class StashEntityService {
     // Build params array: sceneId appears 6 times (for each WHERE clause),
     // then excludedIds, then maxCandidates
     const params = [
-      sceneId, sceneId,  // performers
-      sceneId, sceneId,  // studio
-      sceneId, sceneId,  // tags
+      sceneId,
+      sceneId, // performers
+      sceneId,
+      sceneId, // studio
+      sceneId,
+      sceneId, // tags
       ...excludedArray,
       maxCandidates,
     ];
 
-    const rows = await prisma.$queryRawUnsafe<Array<{
-      sceneId: string;
-      totalWeight: number;
-      date: string | null;
-    }>>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        sceneId: string;
+        totalWeight: number;
+        date: string | null;
+      }>
+    >(sql, ...params);
 
-    const result = rows.map(row => ({
+    const result = rows.map((row) => ({
       sceneId: row.sceneId,
       weight: Number(row.totalWeight),
       date: row.date,
     }));
 
-    logger.info(`getSimilarSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`);
+    logger.info(
+      `getSimilarSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`
+    );
 
     return result;
   }
@@ -486,20 +541,22 @@ class StashEntityService {
    * - tags: Array<{ id: string }> - tag IDs
    * - studio: { id: string } | null - studio ID
    */
-  async getScenesForVisibility(): Promise<Array<{
-    id: string;
-    performers: Array<{ id: string }>;
-    tags: Array<{ id: string }>;
-    studio: { id: string } | null;
-  }>> {
+  async getScenesForVisibility(): Promise<
+    Array<{
+      id: string;
+      performers: Array<{ id: string }>;
+      tags: Array<{ id: string }>;
+      studio: { id: string } | null;
+    }>
+  > {
     const scoringData = await this.getScenesForScoring();
 
     // Transform to the shape expected by empty entity filters
-    return scoringData.map(s => ({
+    return scoringData.map((s) => ({
       id: s.id,
       // Transform to array of objects with id property (matches existing interface)
-      performers: s.performerIds.map(id => ({ id })),
-      tags: s.tagIds.map(id => ({ id })),
+      performers: s.performerIds.map((id) => ({ id })),
+      tags: s.tagIds.map((id) => ({ id })),
       // studio property needs to match { id: string } | null shape
       studio: s.studioId ? { id: s.studioId } : null,
     }));
@@ -532,7 +589,8 @@ class StashEntityService {
     const result = cached.map((c) => {
       const scene = this.transformSceneForBrowse(c);
       // Override tags with the junction table data (cast to satisfy type checker - only id is needed for filtering)
-      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) || []) as typeof scene.tags;
+      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) ||
+        []) as typeof scene.tags;
       return scene;
     });
     const transformTime = Date.now() - transformStart;
@@ -547,7 +605,9 @@ class StashEntityService {
     this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
-    logger.info(`getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -577,7 +637,9 @@ class StashEntityService {
     const transformStart = Date.now();
     const result = cached.map((c) => {
       const scene = this.transformSceneForBrowse(c);
-      scene.performers = (c.performers?.map((p: { performerId: string }) => ({ id: p.performerId })) || []) as typeof scene.performers;
+      scene.performers = (c.performers?.map((p: { performerId: string }) => ({
+        id: p.performerId,
+      })) || []) as typeof scene.performers;
       return scene;
     });
     const transformTime = Date.now() - transformStart;
@@ -592,7 +654,9 @@ class StashEntityService {
     this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
-    logger.info(`getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -625,8 +689,11 @@ class StashEntityService {
     const transformStart = Date.now();
     const result = cached.map((c) => {
       const scene = this.transformSceneForBrowse(c);
-      scene.performers = (c.performers?.map((p: { performerId: string }) => ({ id: p.performerId })) || []) as typeof scene.performers;
-      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) || []) as typeof scene.tags;
+      scene.performers = (c.performers?.map((p: { performerId: string }) => ({
+        id: p.performerId,
+      })) || []) as typeof scene.performers;
+      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) ||
+        []) as typeof scene.tags;
       return scene;
     });
     const transformTime = Date.now() - transformStart;
@@ -641,18 +708,22 @@ class StashEntityService {
     this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
-    logger.info(`getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
-
 
   /**
    * Get scene by ID (includes related entities)
    * @param id - Scene ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScene(id: string, instanceId: string): Promise<NormalizedScene | null> {
+  async getScene(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedScene | null> {
     const cached = await prisma.stashScene.findFirst({
       where: {
         id,
@@ -686,7 +757,10 @@ class StashEntityService {
    * @param ids - Array of scene IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIds(ids: string[], instanceId: string): Promise<NormalizedScene[]> {
+  async getScenesByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedScene[]> {
     const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
@@ -705,7 +779,10 @@ class StashEntityService {
    * @param ids - Array of scene IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIdsWithRelations(ids: string[], instanceId: string): Promise<NormalizedScene[]> {
+  async getScenesByIdsWithRelations(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedScene[]> {
     if (ids.length === 0) return [];
 
     const cached = await prisma.stashScene.findMany({
@@ -757,7 +834,7 @@ class StashEntityService {
     page: number;
     perPage: number;
     sortField: string;
-    sortDirection: 'ASC' | 'DESC';
+    sortDirection: "ASC" | "DESC";
     excludeIds?: Set<string>;
   }): Promise<{ scenes: NormalizedScene[]; total: number }> {
     const startTotal = Date.now();
@@ -765,19 +842,19 @@ class StashEntityService {
 
     // Map API sort fields to database columns
     const sortColumnMap: Record<string, string> = {
-      created_at: 'stashCreatedAt',
-      updated_at: 'stashUpdatedAt',
-      date: 'date',
-      title: 'title',
-      duration: 'duration',
-      filesize: 'fileSize',
-      bitrate: 'fileBitRate',
-      framerate: 'fileFrameRate',
-      random: 'id', // Will use special handling
+      created_at: "stashCreatedAt",
+      updated_at: "stashUpdatedAt",
+      date: "date",
+      title: "title",
+      duration: "duration",
+      filesize: "fileSize",
+      bitrate: "fileBitRate",
+      framerate: "fileFrameRate",
+      random: "id", // Will use special handling
     };
 
-    const sortColumn = sortColumnMap[sortField] || 'stashCreatedAt';
-    const isRandom = sortField === 'random';
+    const sortColumn = sortColumnMap[sortField] || "stashCreatedAt";
+    const isRandom = sortField === "random";
 
     // Build where clause with exclusions at DB level
     const where: Prisma.StashSceneWhereInput = { deletedAt: null };
@@ -788,7 +865,9 @@ class StashEntityService {
     // Get total count first (for pagination info) - respecting exclusions
     const countStart = Date.now();
     const total = await prisma.stashScene.count({ where });
-    logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`);
+    logger.debug(
+      `getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`
+    );
 
     // Build orderBy
     const direction = sortDirection.toLowerCase() as Prisma.SortOrder;
@@ -827,7 +906,9 @@ class StashEntityService {
     this.hydrateInheritedTags(scenes, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
-    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`);
+    logger.info(
+      `getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`
+    );
 
     return { scenes, total };
   }
@@ -842,8 +923,10 @@ class StashEntityService {
       where: { deletedAt: null },
       select: { id: true },
     });
-    logger.info(`getSceneIds: took ${Date.now() - startTime}ms, count=${cached.length}`);
-    return cached.map(c => c.id);
+    logger.info(
+      `getSceneIds: took ${Date.now() - startTime}ms, count=${cached.length}`
+    );
+    return cached.map((c) => c.id);
   }
 
   /**
@@ -880,10 +963,7 @@ class StashEntityService {
     const cached = await prisma.stashScene.findMany({
       where: {
         deletedAt: null,
-        OR: [
-          { title: { contains: query } },
-          { code: { contains: query } },
-        ],
+        OR: [{ title: { contains: query } }, { code: { contains: query } }],
       },
       take: limit,
     });
@@ -912,7 +992,9 @@ class StashEntityService {
     const result = cached.map((c) => this.transformPerformer(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -922,7 +1004,10 @@ class StashEntityService {
    * @param id - Performer ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getPerformer(id: string, instanceId: string): Promise<NormalizedPerformer | null> {
+  async getPerformer(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedPerformer | null> {
     const cached = await prisma.stashPerformer.findFirst({
       where: {
         id,
@@ -978,7 +1063,10 @@ class StashEntityService {
    * @param ids - Array of performer IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getPerformersByIds(ids: string[], instanceId: string): Promise<NormalizedPerformer[]> {
+  async getPerformersByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedPerformer[]> {
     const cached = await prisma.stashPerformer.findMany({
       where: {
         id: { in: ids },
@@ -1002,7 +1090,10 @@ class StashEntityService {
   /**
    * Search performers using FTS5
    */
-  async searchPerformers(query: string, limit = 100): Promise<NormalizedPerformer[]> {
+  async searchPerformers(
+    query: string,
+    limit = 100
+  ): Promise<NormalizedPerformer[]> {
     try {
       const results = await prisma.$queryRaw<FtsPerformerRow[]>`
         SELECT p.*
@@ -1016,7 +1107,9 @@ class StashEntityService {
 
       return results.map((r) => this.transformPerformer(r));
     } catch (error) {
-      logger.warn("FTS5 performer search failed, falling back to LIKE", { error });
+      logger.warn("FTS5 performer search failed, falling back to LIKE", {
+        error,
+      });
       const cached = await prisma.stashPerformer.findMany({
         where: {
           deletedAt: null,
@@ -1140,7 +1233,9 @@ class StashEntityService {
     const result = cached.map((c) => this.transformStudio(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllStudios: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllStudios: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -1150,7 +1245,10 @@ class StashEntityService {
    * @param id - Studio ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getStudio(id: string, instanceId: string): Promise<NormalizedStudio | null> {
+  async getStudio(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedStudio | null> {
     const cached = await prisma.stashStudio.findFirst({
       where: {
         id,
@@ -1217,7 +1315,10 @@ class StashEntityService {
    * @param ids - Array of studio IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getStudiosByIds(ids: string[], instanceId: string): Promise<NormalizedStudio[]> {
+  async getStudiosByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedStudio[]> {
     const cached = await prisma.stashStudio.findMany({
       where: {
         id: { in: ids },
@@ -1256,7 +1357,9 @@ class StashEntityService {
     const result = cached.map((c) => this.transformTag(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    logger.info(
+      `getAllTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`
+    );
 
     return result;
   }
@@ -1279,43 +1382,44 @@ class StashEntityService {
 
     // Compute counts from junction tables (except imageCount which uses stored inherited value)
     const tagInstanceId = cached.stashInstanceId;
-    const [sceneCount, galleryCount, performerCount, studioCount, groupCount] = await Promise.all([
-      prisma.sceneTag.count({
-        where: {
-          tagId: id,
-          tagInstanceId,
-          scene: { deletedAt: null },
-        },
-      }),
-      prisma.galleryTag.count({
-        where: {
-          tagId: id,
-          tagInstanceId,
-          gallery: { deletedAt: null },
-        },
-      }),
-      prisma.performerTag.count({
-        where: {
-          tagId: id,
-          tagInstanceId,
-          performer: { deletedAt: null },
-        },
-      }),
-      prisma.studioTag.count({
-        where: {
-          tagId: id,
-          tagInstanceId,
-          studio: { deletedAt: null },
-        },
-      }),
-      prisma.groupTag.count({
-        where: {
-          tagId: id,
-          tagInstanceId,
-          group: { deletedAt: null },
-        },
-      }),
-    ]);
+    const [sceneCount, galleryCount, performerCount, studioCount, groupCount] =
+      await Promise.all([
+        prisma.sceneTag.count({
+          where: {
+            tagId: id,
+            tagInstanceId,
+            scene: { deletedAt: null },
+          },
+        }),
+        prisma.galleryTag.count({
+          where: {
+            tagId: id,
+            tagInstanceId,
+            gallery: { deletedAt: null },
+          },
+        }),
+        prisma.performerTag.count({
+          where: {
+            tagId: id,
+            tagInstanceId,
+            performer: { deletedAt: null },
+          },
+        }),
+        prisma.studioTag.count({
+          where: {
+            tagId: id,
+            tagInstanceId,
+            studio: { deletedAt: null },
+          },
+        }),
+        prisma.groupTag.count({
+          where: {
+            tagId: id,
+            tagInstanceId,
+            group: { deletedAt: null },
+          },
+        }),
+      ]);
     // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
 
     return this.transformTag({
@@ -1334,7 +1438,10 @@ class StashEntityService {
    * @param ids - Array of tag IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getTagsByIds(ids: string[], instanceId: string): Promise<NormalizedTag[]> {
+  async getTagsByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedTag[]> {
     const cached = await prisma.stashTag.findMany({
       where: {
         id: { in: ids },
@@ -1378,7 +1485,10 @@ class StashEntityService {
    * @param id - Gallery ID
    * @param instanceId - Stash instance ID for multi-instance support
    */
-  async getGallery(id: string, instanceId: string): Promise<NormalizedGallery | null> {
+  async getGallery(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedGallery | null> {
     const cached = await prisma.stashGallery.findFirst({
       where: {
         id,
@@ -1458,7 +1568,10 @@ class StashEntityService {
    * @param id - Group ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getGroup(id: string, instanceId: string): Promise<NormalizedGroup | null> {
+  async getGroup(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedGroup | null> {
     const cached = await prisma.stashGroup.findFirst({
       where: {
         id,
@@ -1503,7 +1616,10 @@ class StashEntityService {
    * @param ids - Array of group IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getGroupsByIds(ids: string[], instanceId: string): Promise<NormalizedGroup[]> {
+  async getGroupsByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedGroup[]> {
     const cached = await prisma.stashGroup.findMany({
       where: {
         id: { in: ids },
@@ -1566,8 +1682,12 @@ class StashEntityService {
         where: { deletedAt: null },
         include: this.imageIncludes,
       });
-      const result = cached.map((c) => this.transformImage(c as unknown as ImageInput));
-      logger.info(`getAllImages: single query for ${totalCount} images in ${Date.now() - startTime}ms`);
+      const result = cached.map((c) =>
+        this.transformImage(c as unknown as ImageInput)
+      );
+      logger.info(
+        `getAllImages: single query for ${totalCount} images in ${Date.now() - startTime}ms`
+      );
       return result;
     }
 
@@ -1584,17 +1704,23 @@ class StashEntityService {
         include: this.imageIncludes,
         skip: offset,
         take: CHUNK_SIZE,
-        orderBy: { id: 'asc' }, // Consistent ordering for pagination
+        orderBy: { id: "asc" }, // Consistent ordering for pagination
       });
 
-      const transformed = chunk.map((c) => this.transformImage(c as unknown as ImageInput));
+      const transformed = chunk.map((c) =>
+        this.transformImage(c as unknown as ImageInput)
+      );
       allImages.push(...transformed);
 
-      logger.debug(`getAllImages chunk: offset=${offset}, fetched=${chunk.length} in ${Date.now() - chunkStart}ms`);
+      logger.debug(
+        `getAllImages chunk: offset=${offset}, fetched=${chunk.length} in ${Date.now() - chunkStart}ms`
+      );
       offset += CHUNK_SIZE;
     }
 
-    logger.info(`getAllImages: chunked query for ${totalCount} images in ${Date.now() - startTime}ms`);
+    logger.info(
+      `getAllImages: chunked query for ${totalCount} images in ${Date.now() - startTime}ms`
+    );
     return allImages;
   }
 
@@ -1603,7 +1729,10 @@ class StashEntityService {
    * @param id - Image ID
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getImage(id: string, instanceId: string): Promise<NormalizedImage | null> {
+  async getImage(
+    id: string,
+    instanceId: string
+  ): Promise<NormalizedImage | null> {
     const cached = await prisma.stashImage.findFirst({
       where: {
         id,
@@ -1623,7 +1752,10 @@ class StashEntityService {
    * @param ids - Array of image IDs
    * @param instanceId - Stash instance ID for multi-instance disambiguation
    */
-  async getImagesByIds(ids: string[], instanceId: string): Promise<NormalizedImage[]> {
+  async getImagesByIds(
+    ids: string[],
+    instanceId: string
+  ): Promise<NormalizedImage[]> {
     if (ids.length === 0) return [];
 
     // For smaller sets, use single query
@@ -1653,7 +1785,9 @@ class StashEntityService {
         },
         include: this.imageIncludes,
       });
-      allImages.push(...chunk.map((c) => this.transformImage(c as unknown as ImageInput)));
+      allImages.push(
+        ...chunk.map((c) => this.transformImage(c as unknown as ImageInput))
+      );
     }
 
     return allImages;
@@ -1703,20 +1837,39 @@ class StashEntityService {
     clips: number;
     ungeneratedClips: number;
   }> {
-    const [scenes, performers, studios, tags, galleries, groups, images, clips, ungeneratedClips] =
-      await Promise.all([
-        this.getSceneCount(),
-        this.getPerformerCount(),
-        this.getStudioCount(),
-        this.getTagCount(),
-        this.getGalleryCount(),
-        this.getGroupCount(),
-        this.getImageCount(),
-        this.getClipCount(),
-        this.getUngeneratedClipCount(),
-      ]);
+    const [
+      scenes,
+      performers,
+      studios,
+      tags,
+      galleries,
+      groups,
+      images,
+      clips,
+      ungeneratedClips,
+    ] = await Promise.all([
+      this.getSceneCount(),
+      this.getPerformerCount(),
+      this.getStudioCount(),
+      this.getTagCount(),
+      this.getGalleryCount(),
+      this.getGroupCount(),
+      this.getImageCount(),
+      this.getClipCount(),
+      this.getUngeneratedClipCount(),
+    ]);
 
-    return { scenes, performers, studios, tags, galleries, groups, images, clips, ungeneratedClips };
+    return {
+      scenes,
+      performers,
+      studios,
+      tags,
+      galleries,
+      groups,
+      images,
+      clips,
+      ungeneratedClips,
+    };
   }
 
   /**
@@ -1727,7 +1880,10 @@ class StashEntityService {
       where: { entityType: "scene" },
     });
 
-    return !!(syncState?.lastFullSyncTimestamp || syncState?.lastIncrementalSyncTimestamp);
+    return !!(
+      syncState?.lastFullSyncTimestamp ||
+      syncState?.lastIncrementalSyncTimestamp
+    );
   }
 
   /**
@@ -1746,7 +1902,9 @@ class StashEntityService {
     if (!lastFullSyncActual) return lastIncrementalSyncActual;
     if (!lastIncrementalSyncActual) return lastFullSyncActual;
 
-    return lastFullSyncActual > lastIncrementalSyncActual ? lastFullSyncActual : lastIncrementalSyncActual;
+    return lastFullSyncActual > lastIncrementalSyncActual
+      ? lastFullSyncActual
+      : lastIncrementalSyncActual;
   }
 
   /**
@@ -1769,31 +1927,90 @@ class StashEntityService {
    * Returns absolute Stash URLs (without API key) matching original Stash format.
    * The client will rewrite these to Peek proxy endpoints.
    */
-  public generateSceneStreams(sceneId: string, instanceId?: string): Array<{url: string; mime_type: string; label: string}> {
+  public generateSceneStreams(
+    sceneId: string,
+    instanceId?: string
+  ): Array<{ url: string; mime_type: string; label: string }> {
     // Get Stash base URL (without /graphql path) — use instance-specific config when available
     const config = instanceId
-      ? stashInstanceManager.getConfig(instanceId) || stashInstanceManager.getDefaultConfig()
+      ? stashInstanceManager.getConfig(instanceId) ||
+        stashInstanceManager.getDefaultConfig()
       : stashInstanceManager.getDefaultConfig();
     const stashUrl = new URL(config.url);
     const baseUrl = `${stashUrl.protocol}//${stashUrl.host}`;
 
     const formats = [
-      { ext: '', mime: 'video/mp4', label: 'Direct stream', resolution: null },
-      { ext: '.mp4', mime: 'video/mp4', label: 'MP4', resolution: 'ORIGINAL' },
-      { ext: '.mp4', mime: 'video/mp4', label: 'MP4 Standard (480p)', resolution: 'STANDARD' },
-      { ext: '.mp4', mime: 'video/mp4', label: 'MP4 Low (240p)', resolution: 'LOW' },
-      { ext: '.webm', mime: 'video/webm', label: 'WEBM', resolution: 'ORIGINAL' },
-      { ext: '.webm', mime: 'video/webm', label: 'WEBM Standard (480p)', resolution: 'STANDARD' },
-      { ext: '.webm', mime: 'video/webm', label: 'WEBM Low (240p)', resolution: 'LOW' },
-      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS', resolution: 'ORIGINAL' },
-      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS Standard (480p)', resolution: 'STANDARD' },
-      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS Low (240p)', resolution: 'LOW' },
-      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH', resolution: 'ORIGINAL' },
-      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH Standard (480p)', resolution: 'STANDARD' },
-      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH Low (240p)', resolution: 'LOW' },
+      { ext: "", mime: "video/mp4", label: "Direct stream", resolution: null },
+      { ext: ".mp4", mime: "video/mp4", label: "MP4", resolution: "ORIGINAL" },
+      {
+        ext: ".mp4",
+        mime: "video/mp4",
+        label: "MP4 Standard (480p)",
+        resolution: "STANDARD",
+      },
+      {
+        ext: ".mp4",
+        mime: "video/mp4",
+        label: "MP4 Low (240p)",
+        resolution: "LOW",
+      },
+      {
+        ext: ".webm",
+        mime: "video/webm",
+        label: "WEBM",
+        resolution: "ORIGINAL",
+      },
+      {
+        ext: ".webm",
+        mime: "video/webm",
+        label: "WEBM Standard (480p)",
+        resolution: "STANDARD",
+      },
+      {
+        ext: ".webm",
+        mime: "video/webm",
+        label: "WEBM Low (240p)",
+        resolution: "LOW",
+      },
+      {
+        ext: ".m3u8",
+        mime: "application/vnd.apple.mpegurl",
+        label: "HLS",
+        resolution: "ORIGINAL",
+      },
+      {
+        ext: ".m3u8",
+        mime: "application/vnd.apple.mpegurl",
+        label: "HLS Standard (480p)",
+        resolution: "STANDARD",
+      },
+      {
+        ext: ".m3u8",
+        mime: "application/vnd.apple.mpegurl",
+        label: "HLS Low (240p)",
+        resolution: "LOW",
+      },
+      {
+        ext: ".mpd",
+        mime: "application/dash+xml",
+        label: "DASH",
+        resolution: "ORIGINAL",
+      },
+      {
+        ext: ".mpd",
+        mime: "application/dash+xml",
+        label: "DASH Standard (480p)",
+        resolution: "STANDARD",
+      },
+      {
+        ext: ".mpd",
+        mime: "application/dash+xml",
+        label: "DASH Low (240p)",
+        resolution: "LOW",
+      },
     ];
 
-    return formats.map(f => {
+    return formats.map((f) => {
       const streamPath = `/scene/${sceneId}/stream${f.ext}`;
       const fullUrl = f.resolution
         ? `${baseUrl}${streamPath}?resolution=${f.resolution}`
@@ -1824,9 +2041,11 @@ class StashEntityService {
       WHERE cs.studioId IN (${Prisma.join(studioIds)})
         AND cs.deletedAt IS NULL
     `;
-    logger.debug(`getPerformerIdsByStudios: ${Date.now() - startTime}ms, studios=${studioIds.length}, performers=${results.length}`);
+    logger.debug(
+      `getPerformerIdsByStudios: ${Date.now() - startTime}ms, studios=${studioIds.length}, performers=${results.length}`
+    );
 
-    return new Set(results.map(r => r.performerId));
+    return new Set(results.map((r) => r.performerId));
   }
 
   /**
@@ -1844,9 +2063,11 @@ class StashEntityService {
       INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
       WHERE sg.groupId IN (${Prisma.join(groupIds)})
     `;
-    logger.debug(`getPerformerIdsByGroups: ${Date.now() - startTime}ms, groups=${groupIds.length}, performers=${results.length}`);
+    logger.debug(
+      `getPerformerIdsByGroups: ${Date.now() - startTime}ms, groups=${groupIds.length}, performers=${results.length}`
+    );
 
-    return new Set(results.map(r => r.performerId));
+    return new Set(results.map((r) => r.performerId));
   }
 
   /**
@@ -1864,9 +2085,11 @@ class StashEntityService {
       INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
       WHERE sp.performerId IN (${Prisma.join(performerIds)})
     `;
-    logger.debug(`getGroupIdsByPerformers: ${Date.now() - startTime}ms, performers=${performerIds.length}, groups=${results.length}`);
+    logger.debug(
+      `getGroupIdsByPerformers: ${Date.now() - startTime}ms, performers=${performerIds.length}, groups=${results.length}`
+    );
 
-    return new Set(results.map(r => r.groupId));
+    return new Set(results.map((r) => r.groupId));
   }
 
   private transformScene(scene: StashScene): NormalizedScene {
@@ -1887,25 +2110,35 @@ class StashEntityService {
       urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
 
       // File metadata
-      files: scene.filePath ? [{
-        path: scene.filePath,
-        duration: scene.duration,
-        bit_rate: scene.fileBitRate,
-        frame_rate: scene.fileFrameRate,
-        width: scene.fileWidth,
-        height: scene.fileHeight,
-        video_codec: scene.fileVideoCodec,
-        audio_codec: scene.fileAudioCodec,
-        size: scene.fileSize ? Number(scene.fileSize) : null,
-      }] : [],
+      files: scene.filePath
+        ? [
+            {
+              path: scene.filePath,
+              duration: scene.duration,
+              bit_rate: scene.fileBitRate,
+              frame_rate: scene.fileFrameRate,
+              width: scene.fileWidth,
+              height: scene.fileHeight,
+              video_codec: scene.fileVideoCodec,
+              audio_codec: scene.fileAudioCodec,
+              size: scene.fileSize ? Number(scene.fileSize) : null,
+            },
+          ]
+        : [],
 
       // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        screenshot: this.transformUrl(
+          scene.pathScreenshot,
+          scene.stashInstanceId
+        ),
         preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
         sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
         vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
-        chapters_vtt: this.transformUrl(scene.pathChaptersVtt, scene.stashInstanceId),
+        chapters_vtt: this.transformUrl(
+          scene.pathChaptersVtt,
+          scene.stashInstanceId
+        ),
         stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
         caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
       },
@@ -1914,7 +2147,12 @@ class StashEntityService {
       sceneStreams: this.generateSceneStreams(scene.id, scene.stashInstanceId),
 
       // Caption metadata for multi-language subtitle support
-      captions: scene.captions ? (JSON.parse(scene.captions) as { language_code: string; caption_type: string }[]) : [],
+      captions: scene.captions
+        ? (JSON.parse(scene.captions) as {
+            language_code: string;
+            caption_type: string;
+          }[])
+        : [],
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
@@ -1933,7 +2171,9 @@ class StashEntityService {
       galleries: [],
 
       // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds ? (JSON.parse(scene.inheritedTagIds) as string[]) : [],
+      inheritedTagIds: scene.inheritedTagIds
+        ? (JSON.parse(scene.inheritedTagIds) as string[])
+        : [],
     };
   }
 
@@ -1958,25 +2198,35 @@ class StashEntityService {
       urls: scene.urls ? (JSON.parse(scene.urls) as string[]) : [],
 
       // File metadata
-      files: scene.filePath ? [{
-        path: scene.filePath,
-        duration: scene.duration,
-        bit_rate: scene.fileBitRate,
-        frame_rate: scene.fileFrameRate,
-        width: scene.fileWidth,
-        height: scene.fileHeight,
-        video_codec: scene.fileVideoCodec,
-        audio_codec: scene.fileAudioCodec,
-        size: scene.fileSize ? Number(scene.fileSize) : null,
-      }] : [],
+      files: scene.filePath
+        ? [
+            {
+              path: scene.filePath,
+              duration: scene.duration,
+              bit_rate: scene.fileBitRate,
+              frame_rate: scene.fileFrameRate,
+              width: scene.fileWidth,
+              height: scene.fileHeight,
+              video_codec: scene.fileVideoCodec,
+              audio_codec: scene.fileAudioCodec,
+              size: scene.fileSize ? Number(scene.fileSize) : null,
+            },
+          ]
+        : [],
 
       // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        screenshot: this.transformUrl(
+          scene.pathScreenshot,
+          scene.stashInstanceId
+        ),
         preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
         sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
         vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
-        chapters_vtt: this.transformUrl(scene.pathChaptersVtt, scene.stashInstanceId),
+        chapters_vtt: this.transformUrl(
+          scene.pathChaptersVtt,
+          scene.stashInstanceId
+        ),
         stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
         caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
       },
@@ -1985,7 +2235,12 @@ class StashEntityService {
       sceneStreams: [],
 
       // Caption metadata for multi-language subtitle support
-      captions: scene.captions ? (JSON.parse(scene.captions) as { language_code: string; caption_type: string }[]) : [],
+      captions: scene.captions
+        ? (JSON.parse(scene.captions) as {
+            language_code: string;
+            caption_type: string;
+          }[])
+        : [],
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
@@ -2004,7 +2259,9 @@ class StashEntityService {
       galleries: [],
 
       // Inherited tag IDs (pre-computed at sync time)
-      inheritedTagIds: scene.inheritedTagIds ? (JSON.parse(scene.inheritedTagIds) as string[]) : [],
+      inheritedTagIds: scene.inheritedTagIds
+        ? (JSON.parse(scene.inheritedTagIds) as string[])
+        : [],
     };
   }
 
@@ -2013,12 +2270,17 @@ class StashEntityService {
    * Mutates scenes in-place for performance.
    * This is a workaround until StashScene has a proper studio relation in Prisma.
    */
-  private hydrateStudioNames(scenes: NormalizedScene[], studioNames: Map<string, string>): void {
+  private hydrateStudioNames(
+    scenes: NormalizedScene[],
+    studioNames: Map<string, string>
+  ): void {
     for (const scene of scenes) {
       if (scene.studio?.id) {
-        const sceneInstanceId = scene.instanceId || '';
+        const sceneInstanceId = scene.instanceId || "";
         // Try composite key first, fall back to ID-only
-        const name = studioNames.get(`${scene.studio.id}\0${sceneInstanceId}`) || studioNames.get(scene.studio.id);
+        const name =
+          studioNames.get(`${scene.studio.id}\0${sceneInstanceId}`) ||
+          studioNames.get(scene.studio.id);
         if (name) {
           (scene.studio as { id: string; name?: string }).name = name;
         }
@@ -2030,27 +2292,40 @@ class StashEntityService {
    * Hydrate inherited tag names on an array of scenes using a pre-fetched name map.
    * Mutates scenes in-place for performance.
    */
-  private hydrateInheritedTags(scenes: NormalizedScene[], tagNames: Map<string, string>): void {
+  private hydrateInheritedTags(
+    scenes: NormalizedScene[],
+    tagNames: Map<string, string>
+  ): void {
     for (const scene of scenes) {
       const inheritedTagIds = scene.inheritedTagIds;
-      if (inheritedTagIds && Array.isArray(inheritedTagIds) && inheritedTagIds.length > 0) {
-        const sceneInstanceId = scene.instanceId || '';
+      if (
+        inheritedTagIds &&
+        Array.isArray(inheritedTagIds) &&
+        inheritedTagIds.length > 0
+      ) {
+        const sceneInstanceId = scene.instanceId || "";
         scene.inheritedTags = inheritedTagIds.map((tagId: string) => ({
           id: tagId,
           // Try composite key first, fall back to ID-only
-          name: tagNames.get(`${tagId}\0${sceneInstanceId}`) || tagNames.get(tagId) || "Unknown",
+          name:
+            tagNames.get(`${tagId}\0${sceneInstanceId}`) ||
+            tagNames.get(tagId) ||
+            "Unknown",
         }));
       }
     }
   }
 
-  private transformSceneWithRelations(scene: SceneWithRelations): NormalizedScene {
+  private transformSceneWithRelations(
+    scene: SceneWithRelations
+  ): NormalizedScene {
     const base = this.transformScene(scene);
 
     // Add nested entities
     if (scene.performers) {
-      base.performers = scene.performers.map((sp: ScenePerformerWithPerformer) =>
-        this.transformPerformer(sp.performer)
+      base.performers = scene.performers.map(
+        (sp: ScenePerformerWithPerformer) =>
+          this.transformPerformer(sp.performer)
       );
     }
     if (scene.tags) {
@@ -2088,11 +2363,14 @@ class StashEntityService {
 
   private transformPerformer(performer: PerformerInput): NormalizedPerformer {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = performer.tags?.map((pt: PerformerTagWithTag) => ({
-      id: pt.tagId,
-      name: pt.tag?.name || "Unknown",
-      image_path: pt.tag?.imagePath ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId) : null,
-    })) || [];
+    const tags =
+      performer.tags?.map((pt: PerformerTagWithTag) => ({
+        id: pt.tagId,
+        name: pt.tag?.name || "Unknown",
+        image_path: pt.tag?.imagePath
+          ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId)
+          : null,
+      })) || [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -2108,7 +2386,9 @@ class StashEntityService {
       gallery_count: performer.galleryCount ?? 0,
       group_count: performer.groupCount ?? 0,
       details: performer.details,
-      alias_list: performer.aliasList ? (JSON.parse(performer.aliasList) as string[]) : [],
+      alias_list: performer.aliasList
+        ? (JSON.parse(performer.aliasList) as string[])
+        : [],
       country: performer.country,
       ethnicity: performer.ethnicity,
       hair_color: performer.hairColor,
@@ -2124,7 +2404,10 @@ class StashEntityService {
       url: performer.url,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
+      image_path: this.transformUrl(
+        performer.imagePath,
+        performer.stashInstanceId
+      ),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
     };
@@ -2132,11 +2415,14 @@ class StashEntityService {
 
   private transformStudio(studio: StudioInput): NormalizedStudio {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = studio.tags?.map((st: StudioTagWithTag) => ({
-      id: st.tagId,
-      name: st.tag?.name || "Unknown",
-      image_path: st.tag?.imagePath ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId) : null,
-    })) || [];
+    const tags =
+      studio.tags?.map((st: StudioTagWithTag) => ({
+        id: st.tagId,
+        name: st.tag?.name || "Unknown",
+        image_path: st.tag?.imagePath
+          ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId)
+          : null,
+      })) || [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -2177,7 +2463,9 @@ class StashEntityService {
       scene_count_via_performers: tag.sceneCountViaPerformers ?? 0,
       description: tag.description,
       aliases: tag.aliases ? (JSON.parse(tag.aliases) as string[]) : [],
-      parents: tag.parentIds ? (JSON.parse(tag.parentIds) as string[]).map((id: string) => ({ id })) : [],
+      parents: tag.parentIds
+        ? (JSON.parse(tag.parentIds) as string[]).map((id: string) => ({ id }))
+        : [],
       image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
@@ -2186,11 +2474,14 @@ class StashEntityService {
 
   private transformGroup(group: GroupInput): NormalizedGroup {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = group.tags?.map((gt: GroupTagWithTag) => ({
-      id: gt.tagId,
-      name: gt.tag?.name || "Unknown",
-      image_path: gt.tag?.imagePath ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId) : null,
-    })) || [];
+    const tags =
+      group.tags?.map((gt: GroupTagWithTag) => ({
+        id: gt.tagId,
+        name: gt.tag?.name || "Unknown",
+        image_path: gt.tag?.imagePath
+          ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
+          : null,
+      })) || [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
@@ -2207,50 +2498,75 @@ class StashEntityService {
       urls: group.urls ? (JSON.parse(group.urls) as string[]) : [],
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      front_image_path: this.transformUrl(group.frontImagePath, group.stashInstanceId),
-      back_image_path: this.transformUrl(group.backImagePath, group.stashInstanceId),
+      front_image_path: this.transformUrl(
+        group.frontImagePath,
+        group.stashInstanceId
+      ),
+      back_image_path: this.transformUrl(
+        group.backImagePath,
+        group.stashInstanceId
+      ),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
       updated_at: group.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 
   private transformGallery(gallery: GalleryInput): NormalizedGallery {
-    const coverUrl = this.transformUrl(gallery.coverPath, gallery.stashInstanceId);
+    const coverUrl = this.transformUrl(
+      gallery.coverPath,
+      gallery.stashInstanceId
+    );
     // Extract tags from junction table relation (if included) or empty array
     // Include image_path for TooltipEntityGrid display
-    const tags = gallery.tags?.map((gt: GalleryTagWithTag) => ({
-      id: gt.tagId,
-      name: gt.tag?.name || "Unknown",
-      image_path: this.transformUrl(gt.tag?.imagePath ?? null, gt.tag?.stashInstanceId),
-    })) || [];
+    const tags =
+      gallery.tags?.map((gt: GalleryTagWithTag) => ({
+        id: gt.tagId,
+        name: gt.tag?.name || "Unknown",
+        image_path: this.transformUrl(
+          gt.tag?.imagePath ?? null,
+          gt.tag?.stashInstanceId
+        ),
+      })) || [];
 
     // Transform performers from junction table
     // Include image_path and gender for TooltipEntityGrid display
-    const performers = gallery.performers?.map((gp: GalleryPerformerEntry) => ({
-      id: gp.performer.id,
-      name: gp.performer.name,
-      gender: gp.performer.gender,
-      image_path: this.transformUrl(gp.performer.imagePath, gp.performer.stashInstanceId),
-    })) || [];
+    const performers =
+      gallery.performers?.map((gp: GalleryPerformerEntry) => ({
+        id: gp.performer.id,
+        name: gp.performer.name,
+        gender: gp.performer.gender,
+        image_path: this.transformUrl(
+          gp.performer.imagePath,
+          gp.performer.stashInstanceId
+        ),
+      })) || [];
 
     // Transform scenes from junction table
     // Include minimal data for display (id, title, screenshot)
-    const scenes = gallery.scenes?.map((gs: GallerySceneEntry) => ({
-      id: gs.scene.id,
-      title: gs.scene.title,
-      paths: {
-        screenshot: this.transformUrl(gs.scene.pathScreenshot, gs.scene.stashInstanceId),
-      },
-    })) || [];
+    const scenes =
+      gallery.scenes?.map((gs: GallerySceneEntry) => ({
+        id: gs.scene.id,
+        title: gs.scene.title,
+        paths: {
+          screenshot: this.transformUrl(
+            gs.scene.pathScreenshot,
+            gs.scene.stashInstanceId
+          ),
+        },
+      })) || [];
 
     // Build files array for frontend title fallback (zip galleries)
-    const files = gallery.fileBasename ? [{ basename: gallery.fileBasename }] : [];
+    const files = gallery.fileBasename
+      ? [{ basename: gallery.fileBasename }]
+      : [];
 
     return {
       ...DEFAULT_GALLERY_USER_FIELDS,
       id: gallery.id,
       instanceId: gallery.stashInstanceId,
-      title: gallery.title || getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
+      title:
+        gallery.title ||
+        getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
       date: gallery.date,
       studio: gallery.studioId ? { id: gallery.studioId } : null,
       rating100: gallery.rating100,
@@ -2276,12 +2592,17 @@ class StashEntityService {
 
   private transformImage(image: ImageInput): TransformedImage {
     // Transform performers from junction table (include image_path and gender for display)
-    const performers = (image.performers ?? []).map((ip: ImagePerformerEntry) => ({
-      id: ip.performer.id,
-      name: ip.performer.name,
-      gender: ip.performer.gender,
-      image_path: this.transformUrl(ip.performer.imagePath, ip.performer.stashInstanceId),
-    }));
+    const performers = (image.performers ?? []).map(
+      (ip: ImagePerformerEntry) => ({
+        id: ip.performer.id,
+        name: ip.performer.name,
+        gender: ip.performer.gender,
+        image_path: this.transformUrl(
+          ip.performer.imagePath,
+          ip.performer.stashInstanceId
+        ),
+      })
+    );
 
     // Transform tags from junction table
     const tags = (image.tags ?? []).map((it: ImageTagEntry) => ({
@@ -2297,19 +2618,29 @@ class StashEntityService {
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
       urls: ig.gallery.urls ? (JSON.parse(ig.gallery.urls) as string[]) : [],
-      cover: this.transformUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
+      cover: this.transformUrl(
+        ig.gallery.coverPath,
+        ig.gallery.stashInstanceId
+      ),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
-      studio: ig.gallery.studio ? {
-        id: ig.gallery.studio.id,
-        name: ig.gallery.studio.name,
-      } : null,
-      performers: (ig.gallery.performers ?? []).map((gp: GalleryPerformerEntry) => ({
-        id: gp.performer.id,
-        name: gp.performer.name,
-        gender: gp.performer.gender,
-        image_path: this.transformUrl(gp.performer.imagePath, gp.performer.stashInstanceId),
-      })),
+      studio: ig.gallery.studio
+        ? {
+            id: ig.gallery.studio.id,
+            name: ig.gallery.studio.name,
+          }
+        : null,
+      performers: (ig.gallery.performers ?? []).map(
+        (gp: GalleryPerformerEntry) => ({
+          id: gp.performer.id,
+          name: gp.performer.name,
+          gender: gp.performer.gender,
+          image_path: this.transformUrl(
+            gp.performer.imagePath,
+            gp.performer.stashInstanceId
+          ),
+        })
+      ),
       tags: (ig.gallery.tags ?? []).map((gt: GalleryTagWithTag) => ({
         id: gt.tag?.id ?? gt.tagId,
         name: gt.tag?.name || "Unknown",
@@ -2317,10 +2648,14 @@ class StashEntityService {
     }));
 
     // Build studio object with name if available
-    const studio = image.studio ? {
-      id: image.studio.id,
-      name: image.studio.name,
-    } : (image.studioId ? { id: image.studioId } : null);
+    const studio = image.studio
+      ? {
+          id: image.studio.id,
+          name: image.studio.name,
+        }
+      : image.studioId
+        ? { id: image.studioId }
+        : null;
 
     return {
       id: image.id,
@@ -2340,12 +2675,16 @@ class StashEntityService {
       width: image.width,
       height: image.height,
       fileSize: image.fileSize ? Number(image.fileSize) : null,
-      files: image.filePath ? [{
-        path: image.filePath,
-        width: image.width,
-        height: image.height,
-        size: image.fileSize ? Number(image.fileSize) : null,
-      }] : [],
+      files: image.filePath
+        ? [
+            {
+              path: image.filePath,
+              width: image.width,
+              height: image.height,
+              size: image.fileSize ? Number(image.fileSize) : null,
+            },
+          ]
+        : [],
       paths: {
         thumbnail: `/api/proxy/image/${image.id}/thumbnail`,
         preview: `/api/proxy/image/${image.id}/preview`,
@@ -2366,7 +2705,10 @@ class StashEntityService {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is

@@ -202,7 +202,8 @@ const HelpModal = ({ onClose }: Props) => {
   };
 
   // Get shortcuts for current page (fall back to global if page has no specific shortcuts)
-  const pageShortcuts = shortcuts[currentPage as keyof typeof shortcuts] || shortcuts.global;
+  const pageShortcuts =
+    shortcuts[currentPage as keyof typeof shortcuts] || shortcuts.global;
 
   const renderShortcutKey = (key: string) => {
     return (
@@ -220,7 +221,13 @@ const HelpModal = ({ onClose }: Props) => {
     );
   };
 
-  const renderShortcutRow = ({ keys, description }: { keys: string[]; description: string }) => {
+  const renderShortcutRow = ({
+    keys,
+    description,
+  }: {
+    keys: string[];
+    description: string;
+  }) => {
     return (
       <div
         key={keys.join("+")}
@@ -270,7 +277,13 @@ const HelpModal = ({ onClose }: Props) => {
     );
   };
 
-  const renderShortcutCategory = ({ category, items }: { category: string; items: { keys: string[]; description: string }[] }) => {
+  const renderShortcutCategory = ({
+    category,
+    items,
+  }: {
+    category: string;
+    items: { keys: string[]; description: string }[];
+  }) => {
     return (
       <div key={category} className="mb-6">
         <h4
@@ -280,7 +293,9 @@ const HelpModal = ({ onClose }: Props) => {
           {category}
         </h4>
         <div className="space-y-1">
-          {items.map((item: { keys: string[]; description: string }) => renderShortcutRow(item))}
+          {items.map((item: { keys: string[]; description: string }) =>
+            renderShortcutRow(item)
+          )}
         </div>
       </div>
     );
@@ -490,8 +505,11 @@ const HelpModal = ({ onClose }: Props) => {
                 </div>
 
                 <div>
-                  {pageShortcuts.map((category: { category: string; items: { keys: string[]; description: string }[] }) =>
-                    renderShortcutCategory(category)
+                  {pageShortcuts.map(
+                    (category: {
+                      category: string;
+                      items: { keys: string[]; description: string }[];
+                    }) => renderShortcutCategory(category)
                   )}
                 </div>
 

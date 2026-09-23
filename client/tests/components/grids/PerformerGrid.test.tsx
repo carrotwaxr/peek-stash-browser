@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PerformerGrid } from "../../../src/components/grids/index";
 
 describe("PerformerGrid", () => {
@@ -36,7 +36,9 @@ describe("PerformerGrid", () => {
     const element = PerformerGrid({});
     const mockPerformer = { id: "1", name: "Test" };
 
-    const renderedCard = element.props.renderItem(mockPerformer, 0, { onHideSuccess: () => {} });
+    const renderedCard = element.props.renderItem(mockPerformer, 0, {
+      onHideSuccess: () => {},
+    });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.performer).toEqual(mockPerformer);

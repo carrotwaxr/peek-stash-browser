@@ -46,7 +46,9 @@ export function generateMarkdown(groups: DocumentedGroup[]): string {
     for (const route of group.routes) {
       lines.push(`### ${route.method} ${route.fullPath}`);
       lines.push("");
-      lines.push(`**Authentication:** ${route.requiresAuth ? "Required" : "None"}`);
+      lines.push(
+        `**Authentication:** ${route.requiresAuth ? "Required" : "None"}`
+      );
       lines.push("");
 
       // Request body
@@ -93,7 +95,9 @@ export function generateMarkdown(groups: DocumentedGroup[]): string {
       }
 
       // Controller reference
-      lines.push(`**Controller:** \`${route.controllerName}\` in \`${route.controllerFile}\``);
+      lines.push(
+        `**Controller:** \`${route.controllerName}\` in \`${route.controllerFile}\``
+      );
       lines.push("");
       lines.push("---");
       lines.push("");

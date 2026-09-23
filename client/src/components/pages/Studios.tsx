@@ -1,24 +1,24 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getGridClasses } from "../../constants/grids";
-import { useInitialFocus } from "../../hooks/useFocusTrap";
-import { usePageTitle } from "../../hooks/usePageTitle";
-import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
-import { useTableColumns } from "../../hooks/useTableColumns";
-import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath } from "../../utils/entityLinks";
 import { type LibrarySearchParams } from "../../api";
-import { useStudioList } from "../../api/hooks";
 import { ApiError } from "../../api/client";
+import { useStudioList } from "../../api/hooks";
+import { getGridClasses } from "../../constants/grids";
+import { useConfig } from "../../contexts/ConfigContext";
+import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { usePageTitle } from "../../hooks/usePageTitle";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { getEntityPath } from "../../utils/entityLinks";
 import { StudioCard } from "../cards/index";
+import { ColumnConfigPopover, TableView } from "../table/index";
 import {
-  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
+  SyncProgressBanner,
 } from "../ui/index";
-import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for studios page
 const VIEW_MODES: { id: string; label: string }[] = [
@@ -47,7 +47,9 @@ const Studios = () => {
     getColumnConfig,
   } = useTableColumns("studio");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
+    null
+  );
   const { data, isLoading: queryLoading, error } = useStudioList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
@@ -55,15 +57,15 @@ const Studios = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
+  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
+    setQueryParams(newQuery);
+  }, []);
 
-  const findStudios = (data as Record<string, unknown>)?.findStudios as Record<string, unknown> | undefined;
-  const currentStudios = (findStudios?.studios as Record<string, unknown>[]) || [];
+  const findStudios = (data as Record<string, unknown>)?.findStudios as
+    | Record<string, unknown>
+    | undefined;
+  const currentStudios =
+    (findStudios?.studios as Record<string, unknown>[]) || [];
   const totalCount = (findStudios?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
@@ -73,19 +75,16 @@ const Studios = () => {
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
-  const {
-    isTVMode,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentStudios,
-    columns,
-    totalPages,
-    onItemSelect: (studio) =>
-      navigate(getEntityPath('studio', studio, hasMultipleInstances), {
-        state: { fromPageTitle: "Studios" },
-      }),
-  });
+  const { isTVMode, searchControlsProps, gridItemProps } =
+    useGridPageTVNavigation({
+      items: currentStudios,
+      columns,
+      totalPages,
+      onItemSelect: (studio) =>
+        navigate(getEntityPath("studio", studio, hasMultipleInstances), {
+          state: { fromPageTitle: "Studios" },
+        }),
+    });
 
   // Initial focus
   useInitialFocus(
@@ -122,7 +121,6 @@ const Studios = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-           
           viewModes={VIEW_MODES}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -136,17 +134,85 @@ const Studios = () => {
           }
           {...searchControlsProps}
         >
-          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
-            isLoading ? (
-              viewMode === "table" ? (
+          {
+            (({
+              viewMode,
+              gridDensity,
+              sortField,
+              sortDirection,
+              onSort,
+            }: {
+              viewMode: string;
+              gridDensity: string;
+              sortField: string;
+              sortDirection: string;
+              onSort: (field: string, direction: "ASC" | "DESC") => void;
+            }) =>
+              isLoading ? (
+                viewMode === "table" ? (
+                  <TableView
+                    items={[]}
+                    columns={
+                      visibleColumns as {
+                        id: string;
+                        label: string;
+                        sortable: boolean;
+                        width: string;
+                        mandatory: boolean;
+                      }[]
+                    }
+                    sort={{
+                      field: sortField,
+                      direction: sortDirection as "ASC" | "DESC",
+                    }}
+                    onSort={onSort}
+                    onHideColumn={hideColumn}
+                    entityType="studio"
+                    isLoading={true}
+                    columnsPopover={
+                      <ColumnConfigPopover
+                        allColumns={allColumns}
+                        visibleColumnIds={visibleColumnIds}
+                        columnOrder={columnOrder}
+                        onToggleColumn={toggleColumn}
+                        onMoveColumn={moveColumn}
+                      />
+                    }
+                  />
+                ) : (
+                  <div className={getGridClasses("standard", gridDensity)}>
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg animate-pulse"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          height: "18rem",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : viewMode === "table" ? (
                 <TableView
-                  items={[]}
-                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
+                  items={currentStudios as Record<string, unknown>[]}
+                  columns={
+                    visibleColumns as {
+                      id: string;
+                      label: string;
+                      sortable: boolean;
+                      width: string;
+                      mandatory: boolean;
+                    }[]
+                  }
+                  sort={{
+                    field: sortField,
+                    direction: sortDirection as "ASC" | "DESC",
+                  }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="studio"
-                  isLoading={true}
+                  isLoading={false}
                   columnsPopover={
                     <ColumnConfigPopover
                       allColumns={allColumns}
@@ -158,55 +224,30 @@ const Studios = () => {
                   }
                 />
               ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(12)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "18rem",
-                      }}
-                    />
-                  ))}
+                <div
+                  ref={gridRef}
+                  className={getGridClasses("standard", gridDensity)}
+                >
+                  {currentStudios.map(
+                    (studio: Record<string, unknown>, index: number) => {
+                      const { tabIndex: _tabIndex, ...restItemProps } =
+                        gridItemProps(index);
+                      return (
+                        <StudioCard
+                          key={studio.id as string}
+                          studio={
+                            studio as unknown as import("@peek/shared-types").NormalizedStudio
+                          }
+                          fromPageTitle="Studios"
+                          tabIndex={isTVMode ? _tabIndex : -1}
+                          {...restItemProps}
+                        />
+                      );
+                    }
+                  )}
                 </div>
-              )
-            ) : viewMode === "table" ? (
-              <TableView
-                items={currentStudios as Record<string, unknown>[]}
-                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
-                onSort={onSort}
-                onHideColumn={hideColumn}
-                entityType="studio"
-                isLoading={false}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : (
-              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentStudios.map((studio: Record<string, unknown>, index: number) => {
-                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
-                  return (
-                    <StudioCard
-                      key={studio.id as string}
-                      studio={studio as unknown as import("@peek/shared-types").NormalizedStudio}
-                      fromPageTitle="Studios"
-                      tabIndex={isTVMode ? _tabIndex : -1}
-                      {...restItemProps}
-                    />
-                  );
-                })}
-              </div>
-            )
-          ) as unknown as React.ReactNode}
+              )) as unknown as React.ReactNode
+          }
         </SearchControls>
       </div>
     </PageLayout>

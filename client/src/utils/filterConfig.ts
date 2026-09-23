@@ -1,13 +1,7 @@
 /**
  * Sorting and filtering configuration for all entity types
  */
-
-import {
-  UNITS,
-  feetInchesToCm,
-  lbsToKg,
-  inchesToCm,
-} from "./unitConversions";
+import { UNITS, feetInchesToCm, inchesToCm, lbsToKg } from "./unitConversions";
 
 /** Shared type for filter configuration objects used across filter UI, URL serialization, and filter chips */
 export interface FilterOption {
@@ -58,7 +52,10 @@ export const SCENE_SORT_OPTIONS_BASE = [
 ];
 
 // Scene Number option - only shown when group filter is active
-export const SCENE_INDEX_SORT_OPTION = { value: "scene_index", label: "Scene Number" };
+export const SCENE_INDEX_SORT_OPTION = {
+  value: "scene_index",
+  label: "Scene Number",
+};
 
 // Full list for backwards compatibility
 export const SCENE_SORT_OPTIONS = [
@@ -533,7 +530,6 @@ export const SCENE_FILTER_OPTIONS = [
     min: 0,
     max: 50,
   },
-
 ];
 
 export const PERFORMER_FILTER_OPTIONS = [
@@ -1418,7 +1414,9 @@ export const CLIP_FILTER_OPTIONS = [
  * Helper functions to convert UI filter values to GraphQL filter format
  */
 
-export const buildSceneFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildSceneFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const sceneFilter: Record<string, any> = {};
 
   // ID-based filters - merge permanent filters with UI filters
@@ -1535,7 +1533,6 @@ export const buildSceneFilter = (filters: Record<string, any>): Record<string, a
   if (filters.tagFavorite === true || filters.tagFavorite === "TRUE") {
     sceneFilter.tag_favorite = true;
   }
-
 
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
@@ -1914,14 +1911,20 @@ export const buildSceneFilter = (filters: Record<string, any>): Record<string, a
  * Converts filter values from imperial to metric if needed.
  * Height uses feet/inches fields, weight uses lbs, penisLength uses inches.
  */
-const convertFilterUnits = (filters: Record<string, any>, unitPreference: string): Record<string, any> => {
+const convertFilterUnits = (
+  filters: Record<string, any>,
+  unitPreference: string
+): Record<string, any> => {
   if (unitPreference !== UNITS.IMPERIAL) return filters;
 
   const converted = { ...filters };
 
   // Height: convert feet/inches to cm (from imperial-height-range filter type)
   // The filter stores: { feetMin, inchesMin, feetMax, inchesMax }
-  if (filters.height?.feetMin !== undefined || filters.height?.inchesMin !== undefined) {
+  if (
+    filters.height?.feetMin !== undefined ||
+    filters.height?.inchesMin !== undefined
+  ) {
     const feet = parseInt(filters.height.feetMin || 0);
     const inches = parseInt(filters.height.inchesMin || 0);
     if (feet || inches) {
@@ -1931,7 +1934,10 @@ const convertFilterUnits = (filters: Record<string, any>, unitPreference: string
       };
     }
   }
-  if (filters.height?.feetMax !== undefined || filters.height?.inchesMax !== undefined) {
+  if (
+    filters.height?.feetMax !== undefined ||
+    filters.height?.inchesMax !== undefined
+  ) {
     const feet = parseInt(filters.height.feetMax || 0);
     const inches = parseInt(filters.height.inchesMax || 0);
     if (feet || inches) {
@@ -1973,7 +1979,10 @@ const convertFilterUnits = (filters: Record<string, any>, unitPreference: string
   return converted;
 };
 
-export const buildPerformerFilter = (filters: Record<string, any>, unitPreference: string = UNITS.METRIC): Record<string, any> => {
+export const buildPerformerFilter = (
+  filters: Record<string, any>,
+  unitPreference: string = UNITS.METRIC
+): Record<string, any> => {
   // Convert imperial values to metric before building filter
   const convertedFilters = convertFilterUnits(filters, unitPreference);
   const performerFilter: Record<string, any> = {};
@@ -2420,7 +2429,9 @@ export const buildPerformerFilter = (filters: Record<string, any>, unitPreferenc
   return performerFilter;
 };
 
-export const buildStudioFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildStudioFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const studioFilter: Record<string, any> = {};
 
   // Boolean filter
@@ -2592,7 +2603,9 @@ export const buildStudioFilter = (filters: Record<string, any>): Record<string, 
   return studioFilter;
 };
 
-export const buildTagFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildTagFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const tagFilter: Record<string, any> = {};
 
   // Boolean filter
@@ -2784,7 +2797,9 @@ export const buildTagFilter = (filters: Record<string, any>): Record<string, any
   return tagFilter;
 };
 
-export const buildGroupFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildGroupFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const groupFilter: Record<string, any> = {};
 
   // Boolean filter
@@ -2964,7 +2979,9 @@ export const buildGroupFilter = (filters: Record<string, any>): Record<string, a
   return groupFilter;
 };
 
-export const buildGalleryFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildGalleryFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const galleryFilter: Record<string, any> = {};
 
   // Boolean filter
@@ -2973,7 +2990,10 @@ export const buildGalleryFilter = (filters: Record<string, any>): Record<string,
   }
 
   // Has favorite image filter
-  if (filters.hasFavoriteImage === true || filters.hasFavoriteImage === "TRUE") {
+  if (
+    filters.hasFavoriteImage === true ||
+    filters.hasFavoriteImage === "TRUE"
+  ) {
     galleryFilter.hasFavoriteImage = true;
   }
 
@@ -3085,7 +3105,9 @@ export const buildGalleryFilter = (filters: Record<string, any>): Record<string,
   return galleryFilter;
 };
 
-export const buildImageFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildImageFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const imageFilter: Record<string, any> = {};
 
   // Boolean filter
@@ -3162,7 +3184,10 @@ export const buildImageFilter = (filters: Record<string, any>): Record<string, a
   }
 
   // O Counter filter
-  if (filters.oCounter?.min !== undefined || filters.oCounter?.max !== undefined) {
+  if (
+    filters.oCounter?.min !== undefined ||
+    filters.oCounter?.max !== undefined
+  ) {
     const hasMin =
       filters.oCounter.min !== undefined && filters.oCounter.min !== "";
     const hasMax =
@@ -3203,7 +3228,9 @@ export const buildImageFilter = (filters: Record<string, any>): Record<string, a
  * Unlike other build*Filter functions that return GraphQL filter objects,
  * this returns params for the Peek REST API's getClips endpoint.
  */
-export const buildClipFilter = (filters: Record<string, any>): Record<string, any> => {
+export const buildClipFilter = (
+  filters: Record<string, any>
+): Record<string, any> => {
   const clipParams: Record<string, any> = {};
 
   // Tag filters
@@ -3228,7 +3255,8 @@ export const buildClipFilter = (filters: Record<string, any>): Record<string, an
 
   // isGenerated filter
   if (filters.isGenerated !== undefined && filters.isGenerated !== "") {
-    clipParams.isGenerated = filters.isGenerated === "true" || filters.isGenerated === true;
+    clipParams.isGenerated =
+      filters.isGenerated === "true" || filters.isGenerated === true;
   }
 
   return clipParams;
@@ -3460,7 +3488,9 @@ export const getCarouselFilterDefinition = (key: string) => {
  * Output (UI state):
  *   { performerIds: ['1', '2'], performerIdsModifier: 'INCLUDES' }
  */
-export const carouselRulesToFilterState = (rules: Record<string, any> | null | undefined): Record<string, any> => {
+export const carouselRulesToFilterState = (
+  rules: Record<string, any> | null | undefined
+): Record<string, any> => {
   const filterState: Record<string, any> = {};
 
   if (!rules || typeof rules !== "object") {
@@ -3635,7 +3665,9 @@ export const carouselRulesToFilterState = (rules: Record<string, any> | null | u
 /**
  * Helper to convert API date filter to UI date range format
  */
-const dateRangeFromApi = (dateFilter: Record<string, any> | null | undefined): Record<string, any> => {
+const dateRangeFromApi = (
+  dateFilter: Record<string, any> | null | undefined
+): Record<string, any> => {
   if (!dateFilter) return {};
 
   if (dateFilter.modifier === "BETWEEN") {
@@ -3651,7 +3683,9 @@ const dateRangeFromApi = (dateFilter: Record<string, any> | null | undefined): R
 /**
  * Count active filters in a carousel's rules
  */
-export const countCarouselRules = (rules: Record<string, any> | null | undefined): number => {
+export const countCarouselRules = (
+  rules: Record<string, any> | null | undefined
+): number => {
   if (!rules || typeof rules !== "object") return 0;
   return Object.keys(rules).length;
 };

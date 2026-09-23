@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Share2 } from "lucide-react";
-import { getMyGroups, getPlaylistShares, updatePlaylistShares } from "../../api";
+import {
+  getMyGroups,
+  getPlaylistShares,
+  updatePlaylistShares,
+} from "../../api";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
@@ -20,11 +24,18 @@ interface Props {
   onClose: () => void;
 }
 
-const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props) => {
+const SharePlaylistModal = ({
+  playlistId,
+  playlistName,
+  isOpen,
+  onClose,
+}: Props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set());
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(
+    new Set()
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -35,7 +46,9 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props
       ]);
 
       setUserGroups((groupsResult.groups || []) as UserGroup[]);
-      setSelectedGroupIds(new Set((sharesResult.shares as Share[]).map((s) => s.groupId)));
+      setSelectedGroupIds(
+        new Set((sharesResult.shares as Share[]).map((s) => s.groupId))
+      );
     } catch (error) {
       console.error("Error loading share data:", error);
       showError("Failed to load sharing options");
@@ -74,7 +87,9 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props
       onClose();
     } catch (error) {
       console.error("Error updating shares:", error);
-      const message = (error as { data?: { error?: string } })?.data?.error || "Failed to update sharing";
+      const message =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to update sharing";
       showError(message);
     } finally {
       setSaving(false);
@@ -95,7 +110,12 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props
         <Paper.Header>
           <div className="flex items-center gap-2">
             <Share2 size={20} />
-            <span className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>Share Playlist</span>
+            <span
+              className="text-lg font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Share Playlist
+            </span>
           </div>
         </Paper.Header>
         <Paper.Body>
@@ -108,7 +128,10 @@ const SharePlaylistModal = ({ playlistId, playlistName, isOpen, onClose }: Props
               <p style={{ color: "var(--text-secondary)" }}>
                 You are not a member of any groups.
               </p>
-              <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-sm mt-2"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Ask an admin to add you to a group to enable sharing.
               </p>
             </div>

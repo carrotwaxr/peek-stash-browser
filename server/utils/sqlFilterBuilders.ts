@@ -4,7 +4,6 @@
  * Extracted from QueryBuilder classes to eliminate duplication of filter-building
  * logic for numeric comparisons, date ranges, text matching, and favorites.
  */
-
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { InstanceAwareId } from "@peek/shared-types/instanceAwareId.js";
 
@@ -31,7 +30,9 @@ export interface ParsedFilterValue {
  * @param values - Array of entity reference values (InstanceAwareId or string)
  * @returns Object with parsed components and whether any had instance IDs
  */
-export function parseCompositeFilterValues(values: readonly (InstanceAwareId | string)[]): {
+export function parseCompositeFilterValues(
+  values: readonly (InstanceAwareId | string)[]
+): {
   parsed: ParsedFilterValue[];
   hasInstanceIds: boolean;
 } {
@@ -155,7 +156,10 @@ export function buildDirectFilter(
       case "INCLUDES":
         return { sql: `${idColumn} IN (${placeholders})`, params: bareIds };
       case "EXCLUDES":
-        return { sql: `(${idColumn} IS NULL OR ${idColumn} NOT IN (${placeholders}))`, params: bareIds };
+        return {
+          sql: `(${idColumn} IS NULL OR ${idColumn} NOT IN (${placeholders}))`,
+          params: bareIds,
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -196,7 +200,11 @@ export function buildDirectFilter(
  */
 export function buildNumericFilter(
   filter:
-    | { value?: number | null; value2?: number | null; modifier?: string | null }
+    | {
+        value?: number | null;
+        value2?: number | null;
+        modifier?: string | null;
+      }
     | undefined
     | null,
   columnExpr: string
@@ -218,12 +226,18 @@ export function buildNumericFilter(
       return { sql: `${columnExpr} < ?`, params: [value] };
     case "BETWEEN":
       if (value2 !== undefined && value2 !== null) {
-        return { sql: `${columnExpr} BETWEEN ? AND ?`, params: [value, value2] };
+        return {
+          sql: `${columnExpr} BETWEEN ? AND ?`,
+          params: [value, value2],
+        };
       }
       return { sql: `${columnExpr} >= ?`, params: [value] };
     case "NOT_BETWEEN":
       if (value2 !== undefined && value2 !== null) {
-        return { sql: `(${columnExpr} < ? OR ${columnExpr} > ?)`, params: [value, value2] };
+        return {
+          sql: `(${columnExpr} < ? OR ${columnExpr} > ?)`,
+          params: [value, value2],
+        };
       }
       return { sql: `${columnExpr} < ?`, params: [value] };
     default:
@@ -240,7 +254,11 @@ export function buildNumericFilter(
  */
 export function buildDateFilter(
   filter:
-    | { value?: string | null; value2?: string | null; modifier?: string | null }
+    | {
+        value?: string | null;
+        value2?: string | null;
+        modifier?: string | null;
+      }
     | undefined
     | null,
   column: string
@@ -308,7 +326,10 @@ export function buildDateFilter(
  * @param additionalColumns - Optional extra columns to search (for INCLUDES/EXCLUDES)
  */
 export function buildTextFilter(
-  filter: { value?: string | null; modifier?: string | null } | undefined | null,
+  filter:
+    | { value?: string | null; modifier?: string | null }
+    | undefined
+    | null,
   column: string,
   additionalColumns: string[] = []
 ): FilterClause {
@@ -335,7 +356,9 @@ export function buildTextFilter(
 
   switch (modifier) {
     case "INCLUDES": {
-      const conditions = allColumns.map((col) => `LOWER(${col}) LIKE LOWER(?)`).join(" OR ");
+      const conditions = allColumns
+        .map((col) => `LOWER(${col}) LIKE LOWER(?)`)
+        .join(" OR ");
       return {
         sql: `(${conditions})`,
         params: allColumns.map(() => `%${value}%`),
@@ -368,7 +391,9 @@ export function buildTextFilter(
  *
  * @param favorite - true for favorites, false for non-favorites, undefined for no filter
  */
-export function buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
+export function buildFavoriteFilter(
+  favorite: boolean | undefined
+): FilterClause {
   if (favorite === undefined) {
     return { sql: "", params: [] };
   }

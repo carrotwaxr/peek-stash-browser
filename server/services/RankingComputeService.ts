@@ -10,7 +10,6 @@
  * 4. Compute percentile rank within the user's engaged entities
  * 5. Store results in UserEntityRanking table
  */
-
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
@@ -59,7 +58,10 @@ class RankingComputeService {
       ]);
 
       const duration = Date.now() - startTime;
-      logger.info("Ranking computation complete", { userId, durationMs: duration });
+      logger.info("Ranking computation complete", {
+        userId,
+        durationMs: duration,
+      });
     } catch (error) {
       logger.error("Failed to compute rankings", {
         userId,
@@ -73,7 +75,9 @@ class RankingComputeService {
    * Get average scene duration for normalizing watch times
    */
   private async getAverageSceneDuration(): Promise<number> {
-    const result = await prisma.$queryRaw<Array<{ avgDuration: number | null }>>`
+    const result = await prisma.$queryRaw<
+      Array<{ avgDuration: number | null }>
+    >`
       SELECT AVG(duration) as avgDuration FROM StashScene WHERE duration > 0
     `;
     return Number(result[0]?.avgDuration) || 1200; // Default 20 min
@@ -98,7 +102,10 @@ class RankingComputeService {
    * Compute percentile ranks for a list of entities
    * Returns entities sorted by engagement rate with percentile ranks assigned
    */
-  private computePercentileRanks(entities: RawEntityStats[], avgSceneDuration: number): ComputedRanking[] {
+  private computePercentileRanks(
+    entities: RawEntityStats[],
+    avgSceneDuration: number
+  ): ComputedRanking[] {
     if (entities.length === 0) return [];
 
     // Calculate scores (convert BigInt values from SQL to Number)
@@ -111,7 +118,11 @@ class RankingComputeService {
       const libraryPresence = Math.round(Number(e.libraryPresence));
 
       const normalizedDuration = playDuration / avgSceneDuration;
-      const engagementScore = this.calculateEngagementScore(oCount, normalizedDuration, playCount);
+      const engagementScore = this.calculateEngagementScore(
+        oCount,
+        normalizedDuration,
+        playCount
+      );
       const engagementRate = engagementScore / Math.max(libraryPresence, 1);
       return {
         entityId: e.entityId,
@@ -135,7 +146,9 @@ class RankingComputeService {
       // Formula: percentile = 100 * (n - rank) / n
       // Where rank is 1-indexed position (1 = best)
       const item = scored[i] as (typeof scored)[number];
-      item.percentileRank = Math.round((100 * (n - i - 1)) / Math.max(n - 1, 1));
+      item.percentileRank = Math.round(
+        (100 * (n - i - 1)) / Math.max(n - 1, 1)
+      );
     }
 
     // Handle ties: entities with same engagement rate get same percentile
@@ -194,7 +207,10 @@ class RankingComputeService {
   /**
    * Compute performer rankings
    */
-  private async computePerformerRankings(userId: number, avgSceneDuration: number): Promise<void> {
+  private async computePerformerRankings(
+    userId: number,
+    avgSceneDuration: number
+  ): Promise<void> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         ups.performerId as entityId,
@@ -232,7 +248,10 @@ class RankingComputeService {
   /**
    * Compute studio rankings
    */
-  private async computeStudioRankings(userId: number, avgSceneDuration: number): Promise<void> {
+  private async computeStudioRankings(
+    userId: number,
+    avgSceneDuration: number
+  ): Promise<void> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uss.studioId as entityId,
@@ -272,7 +291,10 @@ class RankingComputeService {
   /**
    * Compute tag rankings
    */
-  private async computeTagRankings(userId: number, avgSceneDuration: number): Promise<void> {
+  private async computeTagRankings(
+    userId: number,
+    avgSceneDuration: number
+  ): Promise<void> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uts.tagId as entityId,
@@ -311,7 +333,10 @@ class RankingComputeService {
    * Compute scene rankings
    * Scenes don't have library presence normalization - just raw engagement scores
    */
-  private async computeSceneRankings(userId: number, avgSceneDuration: number): Promise<void> {
+  private async computeSceneRankings(
+    userId: number,
+    avgSceneDuration: number
+  ): Promise<void> {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         w.sceneId as entityId,

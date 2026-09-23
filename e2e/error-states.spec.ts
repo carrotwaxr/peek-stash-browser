@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for error handling and edge cases.
@@ -53,9 +53,7 @@ test.describe("Error States", () => {
     });
   });
 
-  test("special characters in URL are handled gracefully", async ({
-    page,
-  }) => {
+  test("special characters in URL are handled gracefully", async ({ page }) => {
     await page.goto("/scenes?q=%3Cscript%3Ealert(1)%3C/script%3E");
     // Should not crash — navigation still visible
     await expect(page.getByRole("navigation").first()).toBeVisible({

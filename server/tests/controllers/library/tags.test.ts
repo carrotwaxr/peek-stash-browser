@@ -4,7 +4,25 @@
  * Tests mergeTagsWithUserData, applyTagFilters, findTags, findTagsMinimal,
  * findTagsForScenes, and updateTag.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyTagFilters,
+  findTags,
+  findTagsForScenes,
+  findTagsMinimal,
+  mergeTagsWithUserData,
+  updateTag,
+} from "../../../controllers/library/tags.js";
+// --- Imports ---
+
+import prisma from "../../../prisma/singleton.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
+import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
+import { userStatsService } from "../../../services/UserStatsService.js";
+import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
+import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { createMockTag } from "../../helpers/mockDataGenerators.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -70,9 +88,10 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi
-    .fn()
-    .mockImplementation((field) => ({ sortField: field, randomSeed: undefined })),
+  parseRandomSort: vi.fn().mockImplementation((field) => ({
+    sortField: field,
+    randomSeed: undefined,
+  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -80,25 +99,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     .fn()
     .mockImplementation((_type, id) => `http://stash/tags/${id}`),
 }));
-
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
-import {
-  mergeTagsWithUserData,
-  applyTagFilters,
-  findTags,
-  findTagsMinimal,
-  findTagsForScenes,
-  updateTag,
-} from "../../../controllers/library/tags.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
-import { createMockTag } from "../../helpers/mockDataGenerators.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -328,10 +328,7 @@ describe("Tags Controller", () => {
         },
       ] as any);
 
-      const tags = [
-        createMockTag({ id: "t1" }),
-        createMockTag({ id: "t2" }),
-      ];
+      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         performers: { value: ["p1"], modifier: "INCLUDES" },
       });
@@ -348,10 +345,7 @@ describe("Tags Controller", () => {
         },
       ] as any);
 
-      const tags = [
-        createMockTag({ id: "t1" }),
-        createMockTag({ id: "t2" }),
-      ];
+      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         studios: { value: ["s1"], modifier: "INCLUDES" },
       });
@@ -369,10 +363,7 @@ describe("Tags Controller", () => {
       ] as any);
       mockStashEntityService.getAllPerformers.mockResolvedValue([]);
 
-      const tags = [
-        createMockTag({ id: "t1" }),
-        createMockTag({ id: "t2" }),
-      ];
+      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         scenes_filter: {
           id: { value: ["sc1"], modifier: "INCLUDES" },
@@ -393,10 +384,7 @@ describe("Tags Controller", () => {
       ] as any);
       mockStashEntityService.getAllPerformers.mockResolvedValue([]);
 
-      const tags = [
-        createMockTag({ id: "t1" }),
-        createMockTag({ id: "t2" }),
-      ];
+      const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         scenes_filter: {
           groups: { value: ["g1"], modifier: "INCLUDES" },
@@ -557,11 +545,7 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq(
-        { filter: { per_page: 2 } },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: { per_page: 2 } }, {}, defaultUser);
       const res = mockRes();
 
       await findTagsMinimal(req, res);

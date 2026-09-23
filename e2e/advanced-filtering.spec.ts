@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for advanced filtering and combined search+filter behavior.
@@ -21,9 +21,7 @@ test.describe("Advanced Filtering", () => {
     await filtersButton.click();
 
     // Filter panel should have some content (look for "Clear All" or filter labels)
-    const filterPanel = page.locator(
-      '[class*="filter"], [class*="Filter"]'
-    );
+    const filterPanel = page.locator('[class*="filter"], [class*="Filter"]');
     await filterPanel
       .first()
       .isVisible({ timeout: 3_000 })
@@ -150,8 +148,7 @@ test.describe("Advanced Filtering", () => {
     // Use a soft check since debounce timing varies
     await page
       .waitForURL(
-        (url) =>
-          !url.searchParams.has("q") || url.searchParams.get("q") === "",
+        (url) => !url.searchParams.has("q") || url.searchParams.get("q") === "",
         { timeout: 5_000 }
       )
       .catch(() => {

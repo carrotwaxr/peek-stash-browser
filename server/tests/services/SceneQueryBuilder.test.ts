@@ -5,7 +5,9 @@
  * Verifies multi-instance support, exclusion filtering, search queries,
  * and allowedInstanceIds filtering by inspecting generated SQL.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -44,9 +46,6 @@ vi.mock("../../utils/hierarchyUtils.js", () => ({
 vi.mock("../../utils/titleUtils.js", () => ({
   getSceneFallbackTitle: vi.fn().mockReturnValue("Untitled"),
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -342,7 +341,9 @@ describe("SceneQueryBuilder", () => {
       const countQuerySql = mockPrisma.$queryRawUnsafe.mock
         .calls[1][0] as string;
 
-      expect(countQuerySql).toContain("COUNT(DISTINCT s.id || ':' || s.stashInstanceId)");
+      expect(countQuerySql).toContain(
+        "COUNT(DISTINCT s.id || ':' || s.stashInstanceId)"
+      );
     });
 
     it("uses fast path COUNT(*) when exclusions are disabled and no user data filters", async () => {

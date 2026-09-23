@@ -1,8 +1,7 @@
 // client/src/components/pages/UserStats/components/HighlightCard.tsx
-
 import { Link } from "react-router-dom";
-import { Paper } from "../../../ui/index";
 import { getFilenameFromPath } from "../../../../utils/format";
+import { Paper } from "../../../ui/index";
 
 interface HighlightItem {
   id: string;
@@ -55,7 +54,14 @@ const getFallbackIcon = (entityType: EntityType): string => {
  * All cards use consistent 16/9 container height - portrait images are pillarboxed
  * @param {string} entityType - Type of entity for fallback icon (scene, image, performer)
  */
-const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue, entityType = "scene" }: Props) => {
+const HighlightCard = ({
+  title,
+  item,
+  linkPrefix,
+  statLabel,
+  statValue,
+  entityType = "scene",
+}: Props) => {
   if (!item) {
     return null;
   }

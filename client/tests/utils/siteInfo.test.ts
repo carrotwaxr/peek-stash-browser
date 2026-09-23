@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { getSiteInfo, getDomainFromUrl } from "../../src/utils/siteInfo";
+import { describe, expect, it } from "vitest";
+import { getDomainFromUrl, getSiteInfo } from "../../src/utils/siteInfo";
 
 describe("siteInfo utilities", () => {
   describe("getSiteInfo", () => {
@@ -19,7 +19,9 @@ describe("siteInfo utilities", () => {
     });
 
     it("returns correct name for IAFD URL", () => {
-      const result = getSiteInfo("https://www.iafd.com/person.rme/perfid=example");
+      const result = getSiteInfo(
+        "https://www.iafd.com/person.rme/perfid=example"
+      );
       expect(result.name).toBe("IAFD");
     });
 

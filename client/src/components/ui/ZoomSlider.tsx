@@ -27,7 +27,8 @@ const ZoomSlider = ({ value = "medium", onChange, className = "" }: Props) => {
           onClick={() => onChange(id)}
           className="px-2.5 h-full text-sm font-medium transition-colors flex items-center justify-center min-w-[28px]"
           style={{
-            backgroundColor: value === id ? "var(--accent-primary)" : "transparent",
+            backgroundColor:
+              value === id ? "var(--accent-primary)" : "transparent",
             color: value === id ? "white" : "var(--text-secondary)",
           }}
           title={`${label} size`}

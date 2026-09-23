@@ -114,7 +114,10 @@ export function formatDurationCompact(seconds: number) {
  * @param {boolean} options.includeDays - Include days in output (default true)
  * @returns {string} Formatted duration string (e.g., "2d 5h 30m", "3h 45m", "12m")
  */
-export function formatDurationHumanReadable(seconds: number, options: { includeDays?: boolean } = {}) {
+export function formatDurationHumanReadable(
+  seconds: number,
+  options: { includeDays?: boolean } = {}
+) {
   const { includeDays = true } = options;
 
   if (!seconds || seconds === 0) return "0m";

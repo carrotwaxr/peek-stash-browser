@@ -4,15 +4,15 @@
  * Builds parameterized SQL queries for clip filtering, sorting, and pagination.
  * Uses JOIN-based exclusions to avoid SQLite parameter limits (P2029 error).
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import type { FilterClause } from "../utils/sqlFilterBuilders.js";
 import {
-  parseCompositeFilterValues,
-  buildJunctionFilter,
   buildDirectFilter,
+  buildJunctionFilter,
+  parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 
 // Query builder options
 export interface ClipQueryOptions {
@@ -122,7 +122,9 @@ class ClipQueryBuilder {
   /**
    * Build instance filter clause
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -187,8 +189,14 @@ class ClipQueryBuilder {
 
     // ClipTag junction filter (instance-aware)
     const junctionFilter = buildJunctionFilter(
-      coerceEntityRefs(tagIds), "ClipTag", "clipId", "clipInstanceId",
-      "tagId", "tagInstanceId", "c", "INCLUDES"
+      coerceEntityRefs(tagIds),
+      "ClipTag",
+      "clipId",
+      "clipInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "c",
+      "INCLUDES"
     );
 
     if (!hasInstanceIds) {
@@ -274,7 +282,9 @@ class ClipQueryBuilder {
    * Build performer filter (matches clips from scenes with ANY of these performers).
    * Joins via c.sceneId/c.sceneInstanceId → ScenePerformer.
    */
-  private buildPerformerFilter(performerIds: string[] | undefined): FilterClause {
+  private buildPerformerFilter(
+    performerIds: string[] | undefined
+  ): FilterClause {
     if (!performerIds || performerIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -323,13 +333,22 @@ class ClipQueryBuilder {
     if (!studioId) {
       return { sql: "", params: [] };
     }
-    return buildDirectFilter(coerceEntityRefs([studioId]), "s.studioId", "s.stashInstanceId", "INCLUDES");
+    return buildDirectFilter(
+      coerceEntityRefs([studioId]),
+      "s.studioId",
+      "s.stashInstanceId",
+      "INCLUDES"
+    );
   }
 
   /**
    * Build ORDER BY clause
    */
-  private buildOrderBy(sortBy: string, sortDir: "asc" | "desc", randomSeed?: number): string {
+  private buildOrderBy(
+    sortBy: string,
+    sortDir: "asc" | "desc",
+    randomSeed?: number
+  ): string {
     const direction = sortDir.toUpperCase();
     const seed = randomSeed || 12345;
 
@@ -367,22 +386,30 @@ class ClipQueryBuilder {
   /**
    * Fetch tags for clips
    */
-  private async fetchClipTags(clipIds: Array<{ id: string; instanceId: string }>): Promise<Map<string, Array<{ id: string; name: string; color: string | null }>>> {
+  private async fetchClipTags(
+    clipIds: Array<{ id: string; instanceId: string }>
+  ): Promise<
+    Map<string, Array<{ id: string; name: string; color: string | null }>>
+  > {
     if (clipIds.length === 0) {
       return new Map();
     }
 
     // Build query to get all tags for these clips
-    const conditions = clipIds.map(() => "(ct.clipId = ? AND ct.clipInstanceId = ?)").join(" OR ");
+    const conditions = clipIds
+      .map(() => "(ct.clipId = ? AND ct.clipInstanceId = ?)")
+      .join(" OR ");
     const params = clipIds.flatMap((c) => [c.id, c.instanceId]);
 
-    const tags = await prisma.$queryRawUnsafe<Array<{
-      clipId: string;
-      clipInstanceId: string;
-      tagId: string;
-      tagName: string;
-      tagColor: string | null;
-    }>>(
+    const tags = await prisma.$queryRawUnsafe<
+      Array<{
+        clipId: string;
+        clipInstanceId: string;
+        tagId: string;
+        tagName: string;
+        tagColor: string | null;
+      }>
+    >(
       `SELECT ct.clipId, ct.clipInstanceId, t.id AS tagId, t.name AS tagName, t.color AS tagColor
        FROM ClipTag ct
        INNER JOIN StashTag t ON ct.tagId = t.id AND ct.tagInstanceId = t.stashInstanceId
@@ -390,7 +417,10 @@ class ClipQueryBuilder {
       ...params
     );
 
-    const tagMap = new Map<string, Array<{ id: string; name: string; color: string | null }>>();
+    const tagMap = new Map<
+      string,
+      Array<{ id: string; name: string; color: string | null }>
+    >();
     for (const tag of tags) {
       const key = `${tag.clipId}:${tag.clipInstanceId}`;
       if (!tagMap.has(key)) {
@@ -411,7 +441,10 @@ class ClipQueryBuilder {
    */
   private transformRows(
     rows: ClipRow[],
-    tagMap: Map<string, Array<{ id: string; name: string; color: string | null }>>
+    tagMap: Map<
+      string,
+      Array<{ id: string; name: string; color: string | null }>
+    >
   ): ClipWithRelations[] {
     return rows.map((row) => {
       const key = `${row.id}:${row.stashInstanceId}`;
@@ -425,10 +458,18 @@ class ClipQueryBuilder {
         screenshotPath: row.screenshotPath,
         // SQLite via Prisma raw queries may return number or string for boolean columns
         isGenerated: Number(row.isGenerated) === 1,
-        stashCreatedAt: row.stashCreatedAt ? new Date(row.stashCreatedAt) : null,
-        stashUpdatedAt: row.stashUpdatedAt ? new Date(row.stashUpdatedAt) : null,
+        stashCreatedAt: row.stashCreatedAt
+          ? new Date(row.stashCreatedAt)
+          : null,
+        stashUpdatedAt: row.stashUpdatedAt
+          ? new Date(row.stashUpdatedAt)
+          : null,
         primaryTag: row.primaryTagId
-          ? { id: row.primaryTagId, name: row.primaryTagName || "", color: row.primaryTagColor }
+          ? {
+              id: row.primaryTagId,
+              name: row.primaryTagName || "",
+              color: row.primaryTagColor,
+            }
           : null,
         tags: tagMap.get(key) || [],
         scene: {
@@ -445,7 +486,9 @@ class ClipQueryBuilder {
   /**
    * Execute query and return clips with pagination
    */
-  async getClips(options: ClipQueryOptions): Promise<{ clips: ClipWithRelations[]; total: number }> {
+  async getClips(
+    options: ClipQueryOptions
+  ): Promise<{ clips: ClipWithRelations[]; total: number }> {
     const {
       userId,
       page = 1,
@@ -503,12 +546,20 @@ class ClipQueryBuilder {
     try {
       // Execute queries in parallel
       const [rows, countResult] = await Promise.all([
-        prisma.$queryRawUnsafe<ClipRow[]>(dataQuery, ...queryParams, perPage, offset),
+        prisma.$queryRawUnsafe<ClipRow[]>(
+          dataQuery,
+          ...queryParams,
+          perPage,
+          offset
+        ),
         prisma.$queryRawUnsafe<[{ total: bigint }]>(countQuery, ...queryParams),
       ]);
 
       // Fetch tags for all clips
-      const clipIds = rows.map((r) => ({ id: r.id, instanceId: r.stashInstanceId }));
+      const clipIds = rows.map((r) => ({
+        id: r.id,
+        instanceId: r.stashInstanceId,
+      }));
       const tagMap = await this.fetchClipTags(clipIds);
 
       return {
@@ -537,7 +588,9 @@ class ClipQueryBuilder {
       baseWhere,
       this.buildInstanceFilter(allowedInstanceIds),
       { sql: "c.sceneId = ?", params: [sceneId] },
-      includeUngenerated ? { sql: "", params: [] } : this.buildGeneratedFilter(true),
+      includeUngenerated
+        ? { sql: "", params: [] }
+        : this.buildGeneratedFilter(true),
     ]);
 
     const whereClause = filters.sql ? `WHERE ${filters.sql}` : "";
@@ -552,15 +605,25 @@ class ClipQueryBuilder {
     const queryParams = [...fromClause.params, ...filters.params];
 
     try {
-      const rows = await prisma.$queryRawUnsafe<ClipRow[]>(query, ...queryParams);
+      const rows = await prisma.$queryRawUnsafe<ClipRow[]>(
+        query,
+        ...queryParams
+      );
 
       // Fetch tags for all clips
-      const clipIds = rows.map((r) => ({ id: r.id, instanceId: r.stashInstanceId }));
+      const clipIds = rows.map((r) => ({
+        id: r.id,
+        instanceId: r.stashInstanceId,
+      }));
       const tagMap = await this.fetchClipTags(clipIds);
 
       return this.transformRows(rows, tagMap);
     } catch (error) {
-      logger.error("ClipQueryBuilder.getClipsForScene failed", { error, sceneId, userId });
+      logger.error("ClipQueryBuilder.getClipsForScene failed", {
+        error,
+        sceneId,
+        userId,
+      });
       throw error;
     }
   }
@@ -594,7 +657,10 @@ class ClipQueryBuilder {
     const queryParams = [...fromClause.params, ...filters.params];
 
     try {
-      const rows = await prisma.$queryRawUnsafe<ClipRow[]>(query, ...queryParams);
+      const rows = await prisma.$queryRawUnsafe<ClipRow[]>(
+        query,
+        ...queryParams
+      );
 
       if (rows.length === 0) {
         return null;
@@ -602,12 +668,18 @@ class ClipQueryBuilder {
 
       // Fetch tags for this clip
       const firstRow = rows[0] as (typeof rows)[number];
-      const clipIds = [{ id: firstRow.id, instanceId: firstRow.stashInstanceId }];
+      const clipIds = [
+        { id: firstRow.id, instanceId: firstRow.stashInstanceId },
+      ];
       const tagMap = await this.fetchClipTags(clipIds);
 
       return this.transformRows(rows, tagMap)[0] ?? null;
     } catch (error) {
-      logger.error("ClipQueryBuilder.getClipById failed", { error, clipId, userId });
+      logger.error("ClipQueryBuilder.getClipById failed", {
+        error,
+        clipId,
+        userId,
+      });
       throw error;
     }
   }

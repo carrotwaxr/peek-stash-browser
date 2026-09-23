@@ -66,9 +66,12 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
     setSyncResult(null);
 
     try {
-      const data = await apiPost<{ stats: SyncStats }>(`/user/${user.id}/sync-from-stash`, {
-        options: syncOptions,
-      });
+      const data = await apiPost<{ stats: SyncStats }>(
+        `/user/${user.id}/sync-from-stash`,
+        {
+          options: syncOptions,
+        }
+      );
       setSyncResult(data.stats);
       onSyncComplete(user.username);
     } catch (err) {
@@ -293,18 +296,12 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
                   Sync Completed Successfully
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  <SyncResultItem
-                    label="Scenes"
-                    stats={syncResult.scenes}
-                  />
+                  <SyncResultItem label="Scenes" stats={syncResult.scenes} />
                   <SyncResultItem
                     label="Performers"
                     stats={syncResult.performers}
                   />
-                  <SyncResultItem
-                    label="Studios"
-                    stats={syncResult.studios}
-                  />
+                  <SyncResultItem label="Studios" stats={syncResult.studios} />
                   <SyncResultItem label="Tags" stats={syncResult.tags} />
                   <SyncResultItem
                     label="Galleries"
@@ -367,10 +364,7 @@ const SyncOptionGroup = ({ title, children }: SyncOptionGroupProps) => (
       border: "1px solid var(--border-color)",
     }}
   >
-    <h4
-      className="font-medium mb-3"
-      style={{ color: "var(--text-primary)" }}
-    >
+    <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
       {title}
     </h4>
     <div className="space-y-2">{children}</div>

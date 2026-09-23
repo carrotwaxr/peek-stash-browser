@@ -1,4 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { logger } from "../../utils/logger.js";
+import { pipeResponseToClient } from "../../utils/streamProxy.js";
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { debug: vi.fn(), error: vi.fn() },
@@ -11,11 +15,6 @@ vi.mock("stream/promises", () => ({
 vi.mock("stream", () => ({
   Readable: { fromWeb: vi.fn() },
 }));
-
-import { pipeResponseToClient } from "../../utils/streamProxy.js";
-import { logger } from "../../utils/logger.js";
-import { pipeline } from "stream/promises";
-import { Readable } from "stream";
 
 function makeFetchResponse(opts: {
   headers?: Record<string, string>;
@@ -111,7 +110,7 @@ describe("pipeResponseToClient", () => {
     await pipeResponseToClient(fetchRes, res, "[PROXY]");
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "[PROXY] Client disconnected (stream closed early)",
+      "[PROXY] Client disconnected (stream closed early)"
     );
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -120,7 +119,9 @@ describe("pipeResponseToClient", () => {
     const fakeBody = { locked: false };
     vi.mocked(Readable.fromWeb).mockReturnValue({} as never);
 
-    const prematureCloseError = new Error("Premature close") as NodeJS.ErrnoException;
+    const prematureCloseError = new Error(
+      "Premature close"
+    ) as NodeJS.ErrnoException;
     prematureCloseError.code = "ERR_STREAM_PREMATURE_CLOSE";
     vi.mocked(pipeline).mockRejectedValue(prematureCloseError);
 
@@ -130,7 +131,7 @@ describe("pipeResponseToClient", () => {
     await pipeResponseToClient(fetchRes, res, "[STREAM]");
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "[STREAM] Client disconnected (stream closed early)",
+      "[STREAM] Client disconnected (stream closed early)"
     );
     expect(logger.error).not.toHaveBeenCalled();
   });

@@ -1,11 +1,10 @@
 // client/src/components/pages/UserStats/components/TopList.tsx
-
 import { Link } from "react-router-dom";
-import { Paper } from "../../../ui/index";
 import {
   formatDurationHumanReadable,
   getFilenameFromPath,
 } from "../../../../utils/format";
+import { Paper } from "../../../ui/index";
 
 type EntityType = "performer" | "studio" | "tag" | "scene";
 type SortBy = "engagement" | "oCount" | "playCount";
@@ -198,7 +197,10 @@ const TopList = ({
                       className="max-w-full max-h-full object-contain"
                     />
                   ) : (
-                    <span className="text-xl" style={{ color: "var(--text-muted)" }}>
+                    <span
+                      className="text-xl"
+                      style={{ color: "var(--text-muted)" }}
+                    >
                       {fallbackIcon}
                     </span>
                   )}
@@ -211,7 +213,10 @@ const TopList = ({
                 >
                   {displayName}
                 </div>
-                <div className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
+                <div
+                  className="text-sm mt-0.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {getStats(item)}
                 </div>
               </div>

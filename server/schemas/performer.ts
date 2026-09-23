@@ -4,8 +4,8 @@
  * Zod schemas for performer API responses.
  */
 import { z } from "zod";
-import { TagRefSchema } from "./refs.js";
 import { ProxyUrlSchema, TimestampSchema } from "./base.js";
+import { TagRefSchema } from "./refs.js";
 
 /**
  * Full performer response
@@ -88,5 +88,7 @@ export const PerformerMinimalSchema = z.object({
 
 // Type exports
 export type Performer = z.infer<typeof PerformerSchema>;
-export type FindPerformersResponse = z.infer<typeof FindPerformersResponseSchema>;
+export type FindPerformersResponse = z.infer<
+  typeof FindPerformersResponseSchema
+>;
 export type PerformerMinimal = z.infer<typeof PerformerMinimalSchema>;

@@ -1,8 +1,8 @@
 // client/src/components/timeline/TimelineStrip.jsx
-import { memo, useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { format, parse } from "date-fns";
 import TimelineBar from "./TimelineBar";
 import TimelineEdgeNav from "./TimelineEdgeNav";
-import { format, parse } from "date-fns";
 
 type ZoomLevel = "years" | "months" | "weeks" | "days";
 
@@ -26,7 +26,12 @@ interface TimelineStripProps {
   selectedPeriod: DistributionItem | null;
   onSelectPeriod: (period: string) => void;
   onKeyboardNavigate?: (e: React.KeyboardEvent) => void;
-  onVisibleRangeChange?: (range: { firstPeriod: string; lastPeriod: string; firstLabel: string; lastLabel: string }) => void;
+  onVisibleRangeChange?: (range: {
+    firstPeriod: string;
+    lastPeriod: string;
+    firstLabel: string;
+    lastLabel: string;
+  }) => void;
   className?: string;
 }
 
@@ -133,12 +138,16 @@ function TimelineStrip({
 }: TimelineStripProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [scrollState, setScrollState] = useState({ atStart: true, atEnd: true });
+  const [scrollState, setScrollState] = useState({
+    atStart: true,
+    atEnd: true,
+  });
   const isMouseDownRef = useRef(false); // Track if focus came from mouse click
 
   const getShortLabel = useCallback(
     (period: string) => {
-      const labelFn = SHORT_LABELS[zoomLevel as ZoomLevel] || SHORT_LABELS.months;
+      const labelFn =
+        SHORT_LABELS[zoomLevel as ZoomLevel] || SHORT_LABELS.months;
       return labelFn(period);
     },
     [zoomLevel]
@@ -153,7 +162,8 @@ function TimelineStrip({
   );
 
   // Get point spacing for current zoom level
-  const pointSpacing = POINT_SPACING[zoomLevel as ZoomLevel] || POINT_SPACING.months;
+  const pointSpacing =
+    POINT_SPACING[zoomLevel as ZoomLevel] || POINT_SPACING.months;
 
   // Determine which labels to show (every other, unless selected or years zoom)
   const shouldShowLabel = useCallback(
@@ -163,7 +173,9 @@ function TimelineStrip({
 
       // Find selected index
       const selectedIndex = selectedPeriod
-        ? distribution.findIndex((d: DistributionItem) => d.period === selectedPeriod.period)
+        ? distribution.findIndex(
+            (d: DistributionItem) => d.period === selectedPeriod.period
+          )
         : -1;
 
       // Always show selected
@@ -193,19 +205,34 @@ function TimelineStrip({
       if (zoomLevel === "months" || zoomLevel === "weeks") {
         // Show year marker when year changes
         if (ctx.year && ctx.year !== lastYear) {
-          markers.push({ index, type: "year", label: ctx.year, context: ctx.year });
+          markers.push({
+            index,
+            type: "year",
+            label: ctx.year,
+            context: ctx.year,
+          });
           lastYear = ctx.year;
         }
       } else if (zoomLevel === "days") {
         // Show month marker when month changes
         if (ctx.year && ctx.month) {
           const monthKey = `${ctx.year}-${ctx.month}`;
-          const prevMonthKey = lastYear && lastMonth ? `${lastYear}-${lastMonth}` : null;
+          const prevMonthKey =
+            lastYear && lastMonth ? `${lastYear}-${lastMonth}` : null;
           if (monthKey !== prevMonthKey) {
             try {
-              const date = parse(`${ctx.year}-${ctx.month}-01`, "yyyy-MM-dd", new Date());
+              const date = parse(
+                `${ctx.year}-${ctx.month}-01`,
+                "yyyy-MM-dd",
+                new Date()
+              );
               if (!isNaN(date.getTime())) {
-                markers.push({ index, type: "month", label: format(date, "MMM yyyy"), context: monthKey });
+                markers.push({
+                  index,
+                  type: "month",
+                  label: format(date, "MMM yyyy"),
+                  context: monthKey,
+                });
               }
             } catch {
               // Skip invalid dates
@@ -219,7 +246,10 @@ function TimelineStrip({
 
     // Calculate end indices for each marker (where the next context starts)
     for (let i = 0; i < markers.length; i++) {
-      markers[i].endIndex = i < markers.length - 1 ? markers[i + 1].index - 1 : distribution.length - 1;
+      markers[i].endIndex =
+        i < markers.length - 1
+          ? markers[i + 1].index - 1
+          : distribution.length - 1;
     }
 
     return markers;
@@ -285,7 +315,8 @@ function TimelineStrip({
   const hasScrolledRef = useRef(false);
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || distribution.length === 0 || hasScrolledRef.current) return;
+    if (!container || distribution.length === 0 || hasScrolledRef.current)
+      return;
 
     // Scroll to the end (most recent) without animation on initial load
     container.scrollLeft = container.scrollWidth;
@@ -384,7 +415,6 @@ function TimelineStrip({
       {/* Edge fade overlays to indicate scrollable content */}
       <TimelineEdgeNav side="left" visible={!scrollState.atStart} />
       <TimelineEdgeNav side="right" visible={!scrollState.atEnd} />
-
 
       {/* Scrollable timeline container */}
       <div

@@ -1,30 +1,30 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { type LibrarySearchParams } from "../../api";
+import { ApiError } from "../../api/client";
+import { useGalleryList } from "../../api/hooks";
 import { getGridClasses } from "../../constants/grids";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 import { useGridColumns } from "../../hooks/useGridColumns";
-import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
 import { useWallPlayback } from "../../hooks/useWallPlayback";
-import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { type LibrarySearchParams } from "../../api";
-import { useGalleryList } from "../../api/hooks";
-import { ApiError } from "../../api/client";
 import { GalleryCard } from "../cards/index";
+import { FolderView } from "../folder/index";
+import { ColumnConfigPopover, TableView } from "../table/index";
+import TimelineView from "../timeline/TimelineView";
 import {
-  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
+  SyncProgressBanner,
 } from "../ui/index";
-import { TableView, ColumnConfigPopover } from "../table/index";
 import WallView from "../wall/WallView";
-import TimelineView from "../timeline/TimelineView";
-import { FolderView } from "../folder/index";
-import { useFolderViewTags } from "../../hooks/useFolderViewTags";
 
 // View modes available for galleries page
 const VIEW_MODES: { id: string; label: string }[] = [
@@ -57,7 +57,9 @@ const Galleries = () => {
     getColumnConfig,
   } = useTableColumns("gallery");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
+    null
+  );
   const { data, isLoading: queryLoading, error } = useGalleryList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
@@ -77,7 +79,10 @@ const Galleries = () => {
   );
 
   // Track timeline date filter for filtering by selected period
-  const [timelineDateFilter, setTimelineDateFilter] = useState<{ start: string; end: string } | null>(null);
+  const [timelineDateFilter, setTimelineDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
 
   // Track folder tag filter for filtering by selected folder
   const [folderTagFilter, setFolderTagFilter] = useState<string | null>(null);
@@ -103,24 +108,24 @@ const Galleries = () => {
     return filters;
   }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
+  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
+    setQueryParams(newQuery);
+  }, []);
 
   const handleGalleryClick = useCallback(
     (gallery: { id: string; stashInstanceId?: string }) => {
-      navigate(getEntityPath('gallery', gallery, hasMultipleInstances), {
+      navigate(getEntityPath("gallery", gallery, hasMultipleInstances), {
         state: { fromPageTitle: "Galleries" },
       });
     },
     [navigate, hasMultipleInstances]
   );
 
-  const findGalleries = (data as Record<string, unknown>)?.findGalleries as Record<string, unknown> | undefined;
-  const currentGalleries = (findGalleries?.galleries as Record<string, unknown>[]) || [];
+  const findGalleries = (data as Record<string, unknown>)?.findGalleries as
+    | Record<string, unknown>
+    | undefined;
+  const currentGalleries =
+    (findGalleries?.galleries as Record<string, unknown>[]) || [];
   const totalCount = (findGalleries?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
@@ -130,16 +135,13 @@ const Galleries = () => {
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
-  const {
-    isTVMode,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentGalleries,
-    columns,
-    totalPages,
-    onItemSelect: handleGalleryClick,
-  });
+  const { isTVMode, searchControlsProps, gridItemProps } =
+    useGridPageTVNavigation({
+      items: currentGalleries,
+      columns,
+      totalPages,
+      onItemSelect: handleGalleryClick,
+    });
 
   useInitialFocus(
     pageRef,
@@ -177,7 +179,6 @@ const Galleries = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
-           
           viewModes={VIEW_MODES}
           onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
@@ -192,102 +193,152 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {(({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }: { viewMode: string; gridDensity: string; zoomLevel: number; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void; timelinePeriod: string; setTimelinePeriod: (period: string) => void }) =>
-            viewMode === "table" ? (
-              <TableView
-                items={currentGalleries as Record<string, unknown>[]}
-                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
-                onSort={onSort}
-                onHideColumn={hideColumn}
-                entityType="gallery"
-                isLoading={isLoading}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : viewMode === "wall" ? (
-              <WallView
-                items={currentGalleries as Record<string, unknown>[]}
-                entityType="gallery"
-                zoomLevel={zoomLevel as unknown as "small" | "medium" | "large"}
-                playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
-                onItemClick={handleGalleryClick as (item: Record<string, unknown>) => void}
-                loading={isLoading}
-                emptyMessage="No galleries found"
-              />
-            ) : viewMode === "timeline" ? (
-              <TimelineView
-                entityType="gallery"
-                items={currentGalleries}
-                renderItem={(gallery: Record<string, unknown>) => (
-                  <GalleryCard
-                    key={gallery.id as string}
-                    gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
-                    fromPageTitle="Galleries"
-                    tabIndex={0}
-                  />
-                )}
-                onDateFilterChange={setTimelineDateFilter}
-                onPeriodChange={setTimelinePeriod as (period: string | null) => void}
-                initialPeriod={timelinePeriod}
-                loading={isLoading}
-                emptyMessage="No galleries found for this time period"
-                gridDensity={gridDensity}
-              />
-            ) : viewMode === "folder" ? (
-              <FolderView
-                items={currentGalleries}
-                tags={folderTags}
-                gridDensity={gridDensity}
-                loading={isLoading || tagsLoading}
-                emptyMessage="No galleries found"
-                onFolderPathChange={setFolderTagFilter}
-                renderItem={(gallery: Record<string, unknown>) => (
-                  <GalleryCard
-                    key={gallery.id as string}
-                    gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
-                    fromPageTitle="Galleries"
-                    tabIndex={0}
-                  />
-                )}
-              />
-            ) : isLoading ? (
-              <div className={getGridClasses("standard", gridDensity)}>
-                {[...Array(24)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg animate-pulse"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      height: "20rem",
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentGalleries.map((gallery: Record<string, unknown>, index: number) => {
-                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
-                  return (
+          {
+            (({
+              viewMode,
+              gridDensity,
+              zoomLevel,
+              sortField,
+              sortDirection,
+              onSort,
+              timelinePeriod,
+              setTimelinePeriod,
+            }: {
+              viewMode: string;
+              gridDensity: string;
+              zoomLevel: number;
+              sortField: string;
+              sortDirection: string;
+              onSort: (field: string, direction: "ASC" | "DESC") => void;
+              timelinePeriod: string;
+              setTimelinePeriod: (period: string) => void;
+            }) =>
+              viewMode === "table" ? (
+                <TableView
+                  items={currentGalleries as Record<string, unknown>[]}
+                  columns={
+                    visibleColumns as {
+                      id: string;
+                      label: string;
+                      sortable: boolean;
+                      width: string;
+                      mandatory: boolean;
+                    }[]
+                  }
+                  sort={{
+                    field: sortField,
+                    direction: sortDirection as "ASC" | "DESC",
+                  }}
+                  onSort={onSort}
+                  onHideColumn={hideColumn}
+                  entityType="gallery"
+                  isLoading={isLoading}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
+                />
+              ) : viewMode === "wall" ? (
+                <WallView
+                  items={currentGalleries as Record<string, unknown>[]}
+                  entityType="gallery"
+                  zoomLevel={
+                    zoomLevel as unknown as "small" | "medium" | "large"
+                  }
+                  playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
+                  onItemClick={
+                    handleGalleryClick as (
+                      item: Record<string, unknown>
+                    ) => void
+                  }
+                  loading={isLoading}
+                  emptyMessage="No galleries found"
+                />
+              ) : viewMode === "timeline" ? (
+                <TimelineView
+                  entityType="gallery"
+                  items={currentGalleries}
+                  renderItem={(gallery: Record<string, unknown>) => (
                     <GalleryCard
                       key={gallery.id as string}
-                      gallery={gallery as unknown as import("@peek/shared-types").NormalizedGallery}
+                      gallery={
+                        gallery as unknown as import("@peek/shared-types").NormalizedGallery
+                      }
                       fromPageTitle="Galleries"
-                      tabIndex={isTVMode ? _tabIndex : -1}
-                      {...restItemProps}
+                      tabIndex={0}
                     />
-                  );
-                })}
-              </div>
-            )
-          ) as unknown as React.ReactNode}
+                  )}
+                  onDateFilterChange={setTimelineDateFilter}
+                  onPeriodChange={
+                    setTimelinePeriod as (period: string | null) => void
+                  }
+                  initialPeriod={timelinePeriod}
+                  loading={isLoading}
+                  emptyMessage="No galleries found for this time period"
+                  gridDensity={gridDensity}
+                />
+              ) : viewMode === "folder" ? (
+                <FolderView
+                  items={currentGalleries}
+                  tags={folderTags}
+                  gridDensity={gridDensity}
+                  loading={isLoading || tagsLoading}
+                  emptyMessage="No galleries found"
+                  onFolderPathChange={setFolderTagFilter}
+                  renderItem={(gallery: Record<string, unknown>) => (
+                    <GalleryCard
+                      key={gallery.id as string}
+                      gallery={
+                        gallery as unknown as import("@peek/shared-types").NormalizedGallery
+                      }
+                      fromPageTitle="Galleries"
+                      tabIndex={0}
+                    />
+                  )}
+                />
+              ) : isLoading ? (
+                <div className={getGridClasses("standard", gridDensity)}>
+                  {[...Array(24)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        height: "20rem",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  ref={gridRef}
+                  className={getGridClasses("standard", gridDensity)}
+                >
+                  {currentGalleries.map(
+                    (gallery: Record<string, unknown>, index: number) => {
+                      const { tabIndex: _tabIndex, ...restItemProps } =
+                        gridItemProps(index);
+                      return (
+                        <GalleryCard
+                          key={gallery.id as string}
+                          gallery={
+                            gallery as unknown as import("@peek/shared-types").NormalizedGallery
+                          }
+                          fromPageTitle="Galleries"
+                          tabIndex={isTVMode ? _tabIndex : -1}
+                          {...restItemProps}
+                        />
+                      );
+                    }
+                  )}
+                </div>
+              )) as unknown as React.ReactNode
+          }
         </SearchControls>
       </div>
     </PageLayout>

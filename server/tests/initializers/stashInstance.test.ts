@@ -4,7 +4,9 @@
  * Tests the startup initializer that checks for existing Stash instance configs
  * and migrates from environment variables when needed.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { initializeStashInstances } from "../../initializers/stashInstance.js";
+import prisma from "../../prisma/singleton.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -25,9 +27,6 @@ vi.mock("../../utils/logger.js", () => ({
     debug: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { initializeStashInstances } from "../../initializers/stashInstance.js";
 
 const mockPrisma = vi.mocked(prisma);
 

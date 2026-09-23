@@ -1,7 +1,7 @@
-import type { Reporter, File, Task } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import type { File, Reporter, Task } from "vitest";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,8 +24,18 @@ interface TestSummary {
   failures: FailureDetail[];
 }
 
-function collectTests(task: Task): { passed: number; failed: number; skipped: number; failures: FailureDetail[] } {
-  const result = { passed: 0, failed: 0, skipped: 0, failures: [] as FailureDetail[] };
+function collectTests(task: Task): {
+  passed: number;
+  failed: number;
+  skipped: number;
+  failures: FailureDetail[];
+} {
+  const result = {
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    failures: [] as FailureDetail[],
+  };
 
   if (task.type === "suite") {
     for (const child of task.tasks) {

@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
-import {
-  NAV_DEFINITIONS,
-  getNavDefinition,
-} from "../../constants/navigation";
+import { NAV_DEFINITIONS, getNavDefinition } from "../../constants/navigation";
 import { ThemedIcon } from "../icons/index";
 import { Button } from "../ui/index";
 
@@ -87,7 +84,9 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
   };
 
   const handleReset = () => {
-    const sorted = [...(navPreferences || [])].sort((a, b) => a.order - b.order);
+    const sorted = [...(navPreferences || [])].sort(
+      (a, b) => a.order - b.order
+    );
     setPreferences(sorted);
     setHasChanges(false);
   };

@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { type LucideIcon, Droplets, Eye } from "lucide-react";
+import { Droplets, Eye, type LucideIcon } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import Tooltip from "./Tooltip";
 
@@ -36,54 +36,62 @@ const CARD_COUNT_INDICATOR_TYPES = {
   O_COUNTER: {
     icon: Droplets,
     iconColor: "var(--status-info)",
-    label: (count: number) => count === 1 ? "1 O" : `${count} O's`,
+    label: (count: number) => (count === 1 ? "1 O" : `${count} O's`),
   },
   PLAY_COUNT: {
     icon: Eye,
     iconColor: hueify("var(--status-warning)", "lighter"),
-    label: (count: number) => count === 1 ? "Viewed 1 time" : `Viewed ${count} times`,
+    label: (count: number) =>
+      count === 1 ? "Viewed 1 time" : `Viewed ${count} times`,
   },
   PERFORMERS: {
     icon: ENTITY_ICONS.performer,
     iconColor: "var(--accent-primary)",
-    label: (count: number) => count === 1 ? "1 performer" : `${count} performers`,
+    label: (count: number) =>
+      count === 1 ? "1 performer" : `${count} performers`,
   },
   TAGS: {
     icon: ENTITY_ICONS.tag,
     iconColor: hueify("var(--status-info)", "darker"),
-    label: (count: number) => count === 1 ? "1 tag" : `${count} tags`,
+    label: (count: number) => (count === 1 ? "1 tag" : `${count} tags`),
   },
   SCENES: {
     icon: ENTITY_ICONS.scene,
     iconColor: hueify("var(--accent-secondary)", "lighter"),
-    label: (count: number) => count === 1 ? "1 scene" : `${count} scenes`,
+    label: (count: number) => (count === 1 ? "1 scene" : `${count} scenes`),
   },
   GROUPS: {
     icon: ENTITY_ICONS.group,
     iconColor: hueify("var(--accent-secondary)", "darker"),
-    label: (count: number) => count === 1 ? "1 collection" : `${count} collections`,
+    label: (count: number) =>
+      count === 1 ? "1 collection" : `${count} collections`,
   },
   IMAGES: {
     icon: ENTITY_ICONS.images,
     iconColor: hueify("var(--status-success)", "lighter"),
-    label: (count: number) => count === 1 ? "1 image" : `${count} images`,
+    label: (count: number) => (count === 1 ? "1 image" : `${count} images`),
   },
   GALLERIES: {
     icon: ENTITY_ICONS.gallery,
     iconColor: hueify("var(--status-success)", "darker"),
-    label: (count: number) => count === 1 ? "1 gallery" : `${count} galleries`,
+    label: (count: number) =>
+      count === 1 ? "1 gallery" : `${count} galleries`,
   },
   PLAYLISTS: {
     icon: ENTITY_ICONS.playlist,
     iconColor: hueify("var(--status-warning)", "darker"),
-    label: (count: number) => count === 1 ? "1 playlist" : `${count} playlists`,
+    label: (count: number) =>
+      count === 1 ? "1 playlist" : `${count} playlists`,
   },
   STUDIOS: {
     icon: ENTITY_ICONS.studio,
     iconColor: hueify("var(--status-info)", "lighter"),
-    label: (count: number) => count === 1 ? "1 studio" : `${count} studios`,
+    label: (count: number) => (count === 1 ? "1 studio" : `${count} studios`),
   },
-} as const satisfies Record<string, { icon: LucideIcon; iconColor: string; label: (count: number) => string }>;
+} as const satisfies Record<
+  string,
+  { icon: LucideIcon; iconColor: string; label: (count: number) => string }
+>;
 
 export const CardCountIndicators = ({
   indicators,
@@ -93,7 +101,10 @@ export const CardCountIndicators = ({
   return (
     <div className="flex flex-wrap items-center justify-center gap-4">
       {indicators.map((indicator, index) => {
-        const knownIndicatorProps = CARD_COUNT_INDICATOR_TYPES[indicator.type as keyof typeof CARD_COUNT_INDICATOR_TYPES];
+        const knownIndicatorProps =
+          CARD_COUNT_INDICATOR_TYPES[
+            indicator.type as keyof typeof CARD_COUNT_INDICATOR_TYPES
+          ];
         if (!knownIndicatorProps) return null;
         if ((!showZeroCounts && isNaN(indicator.count)) || indicator.count <= 0)
           return null;
@@ -127,7 +138,7 @@ const CardCountIndicator = ({
 
   const guts = (
     <div
-      className={`flex items-center gap-1 hover:scale-110 transition-transform ${onClick ? 'cursor-pointer' : ''}`}
+      className={`flex items-center gap-1 hover:scale-110 transition-transform ${onClick ? "cursor-pointer" : ""}`}
       onClick={(e) => {
         if (onClick) {
           e.stopPropagation();

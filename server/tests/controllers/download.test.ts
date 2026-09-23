@@ -1,6 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Response } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  deleteDownload,
+  getDownloadFile,
+  getDownloadStatus,
+  getUserDownloads,
+  retryDownload,
+  startPlaylistDownload,
+  startSceneDownload,
+} from "../../controllers/download.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.js";
+import { downloadService } from "../../services/DownloadService.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
+import { playlistZipService } from "../../services/PlaylistZipService.js";
+import { pipeResponseToClient } from "../../utils/streamProxy.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -45,20 +58,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     getApiKey: vi.fn(() => "test-api-key"),
   },
 }));
-
-import {
-  startSceneDownload,
-  startPlaylistDownload,
-  getUserDownloads,
-  getDownloadStatus,
-  getDownloadFile,
-  deleteDownload,
-  retryDownload,
-} from "../../controllers/download.js";
-import { downloadService } from "../../services/DownloadService.js";
-import { playlistZipService } from "../../services/PlaylistZipService.js";
-import { resolveUserPermissions } from "../../services/PermissionService.js";
-import { pipeResponseToClient } from "../../utils/streamProxy.js";
 
 const mockDownloadService = vi.mocked(downloadService);
 const mockPlaylistZipService = vi.mocked(playlistZipService);
@@ -201,7 +200,9 @@ describe("Download Controller", () => {
       });
       // Mock size exceeds limit (default is 10GB = 10 * 1024 * 1024 * 1024 bytes)
       const oversizedBytes = BigInt(11 * 1024 * 1024 * 1024); // 11GB
-      mockDownloadService.calculatePlaylistSize.mockResolvedValue(oversizedBytes);
+      mockDownloadService.calculatePlaylistSize.mockResolvedValue(
+        oversizedBytes
+      );
 
       await startPlaylistDownload(
         mockRequest as AuthenticatedRequest,
@@ -405,7 +406,9 @@ describe("Download Controller", () => {
       );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Download not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Download not found",
+      });
     });
   });
 
@@ -461,7 +464,7 @@ describe("Download Controller", () => {
         expect.objectContaining({ ok: true }),
         mockResponse,
         "[DOWNLOAD]",
-        ["content-type", "content-length"],
+        ["content-type", "content-length"]
       );
     });
 
@@ -516,7 +519,7 @@ describe("Download Controller", () => {
         expect.objectContaining({ ok: true }),
         mockResponse,
         "[DOWNLOAD]",
-        ["content-type", "content-length"],
+        ["content-type", "content-length"]
       );
     });
 
@@ -592,7 +595,9 @@ describe("Download Controller", () => {
       );
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Download not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Download not found",
+      });
     });
 
     it("should return 403 if user not authorized", async () => {
@@ -637,7 +642,12 @@ describe("Download Controller", () => {
         completedAt: null,
         expiresAt: null,
       };
-      const retriedDownload = { ...failedDownload, status: "PROCESSING", progress: 0, error: null };
+      const retriedDownload = {
+        ...failedDownload,
+        status: "PROCESSING",
+        progress: 0,
+        error: null,
+      };
 
       mockDownloadService.getDownload
         .mockResolvedValueOnce(failedDownload)

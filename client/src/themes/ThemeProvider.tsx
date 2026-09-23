@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { apiGet } from "../api";
-import { ThemeContext, type CustomTheme, type ThemeDefinition } from "./ThemeContext";
+import {
+  type CustomTheme,
+  ThemeContext,
+  type ThemeDefinition,
+} from "./ThemeContext";
 import {
   themes as builtInThemes,
   defaultTheme,
@@ -9,7 +13,9 @@ import {
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
-  const [allThemes, setAllThemes] = useState<Record<string, ThemeDefinition>>(builtInThemes as Record<string, ThemeDefinition>);
+  const [allThemes, setAllThemes] = useState<Record<string, ThemeDefinition>>(
+    builtInThemes as Record<string, ThemeDefinition>
+  );
 
   const [currentTheme, setCurrentTheme] = useState(() => {
     // Load theme from localStorage or use default
@@ -21,12 +27,16 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const loadCustomThemes = async () => {
       try {
-        const data = await apiGet("/themes/custom") as { themes?: CustomTheme[] };
+        const data = (await apiGet("/themes/custom")) as {
+          themes?: CustomTheme[];
+        };
         const themes = data.themes || [];
         setCustomThemes(themes);
 
         // Merge built-in themes with custom themes
-        const merged: Record<string, ThemeDefinition> = { ...(builtInThemes as Record<string, ThemeDefinition>) };
+        const merged: Record<string, ThemeDefinition> = {
+          ...(builtInThemes as Record<string, ThemeDefinition>),
+        };
         themes.forEach((customTheme) => {
           const key = `custom-${customTheme.id}`;
           merged[key] = {
@@ -56,12 +66,16 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshCustomThemes = async () => {
     try {
-      const data = await apiGet("/themes/custom") as { themes?: CustomTheme[] };
+      const data = (await apiGet("/themes/custom")) as {
+        themes?: CustomTheme[];
+      };
       const themes = data.themes || [];
       setCustomThemes(themes);
 
       // Merge built-in themes with custom themes
-      const merged: Record<string, ThemeDefinition> = { ...(builtInThemes as Record<string, ThemeDefinition>) };
+      const merged: Record<string, ThemeDefinition> = {
+        ...(builtInThemes as Record<string, ThemeDefinition>),
+      };
       themes.forEach((customTheme) => {
         const key = `custom-${customTheme.id}`;
         merged[key] = {
@@ -89,7 +103,9 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       });
     } else {
       // Fallback to built-in theme if custom theme not loaded yet
-      const builtIn = (builtInThemes as Record<string, ThemeDefinition>)[currentTheme];
+      const builtIn = (builtInThemes as Record<string, ThemeDefinition>)[
+        currentTheme
+      ];
       if (builtIn) {
         Object.entries(builtIn.properties).forEach(([property, value]) => {
           root.style.setProperty(property, value);

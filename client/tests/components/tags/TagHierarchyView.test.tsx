@@ -9,9 +9,9 @@
  * - Keyboard navigation
  * - Search filtering auto-expand
  */
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import TagHierarchyView from "../../../src/components/tags/TagHierarchyView";
 
 // Wrapper to provide router context
@@ -67,9 +67,7 @@ const mockFlatTags = [
 describe("TagHierarchyView", () => {
   describe("rendering", () => {
     it("renders tree container with correct role", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       expect(screen.getByRole("tree")).toBeInTheDocument();
       expect(screen.getByRole("tree")).toHaveAttribute(
         "aria-label",
@@ -78,26 +76,20 @@ describe("TagHierarchyView", () => {
     });
 
     it("renders root tags", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       // Parent Tag should be visible (it has no parents)
       expect(screen.getByText("Parent Tag")).toBeInTheDocument();
     });
 
     it("expands first level by default", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       // Root nodes should be expanded, showing their children
       expect(screen.getByText("Child 1")).toBeInTheDocument();
       expect(screen.getByText("Child 2")).toBeInTheDocument();
     });
 
     it("does not show grandchildren initially", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       // Grandchild should not be visible until Child 2 is expanded
       expect(screen.queryByText("Grandchild")).not.toBeInTheDocument();
     });
@@ -105,43 +97,33 @@ describe("TagHierarchyView", () => {
 
   describe("loading state", () => {
     it("renders skeleton placeholders when loading", () => {
-      renderWithRouter(
-        <TagHierarchy tags={[]} isLoading={true} />
-      );
+      renderWithRouter(<TagHierarchy tags={[]} isLoading={true} />);
       // Should show animated placeholders
       const placeholders = document.querySelectorAll(".animate-pulse");
       expect(placeholders.length).toBeGreaterThan(0);
     });
 
     it("does not render tree when loading", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={true} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={true} />);
       expect(screen.queryByRole("tree")).not.toBeInTheDocument();
     });
   });
 
   describe("empty state", () => {
     it("renders empty message when no tags", () => {
-      renderWithRouter(
-        <TagHierarchy tags={[]} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={[]} isLoading={false} />);
       expect(screen.getByText("No tags found")).toBeInTheDocument();
     });
 
     it("does not render tree when empty", () => {
-      renderWithRouter(
-        <TagHierarchy tags={[]} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={[]} isLoading={false} />);
       expect(screen.queryByRole("tree")).not.toBeInTheDocument();
     });
   });
 
   describe("expand/collapse", () => {
     it("expands node when clicked", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       // Child 2 should be visible but Grandchild should not
       expect(screen.getByText("Child 2")).toBeInTheDocument();
       expect(screen.queryByText("Grandchild")).not.toBeInTheDocument();
@@ -154,9 +136,7 @@ describe("TagHierarchyView", () => {
     });
 
     it("collapses node when clicked again", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       // First expand Child 2
       fireEvent.click(screen.getByText("Child 2"));
       expect(screen.getByText("Grandchild")).toBeInTheDocument();
@@ -178,8 +158,8 @@ describe("TagHierarchyView", () => {
         />
       );
       const items = screen.getAllByRole("treeitem");
-      const names = items.map((item) =>
-        item.querySelector(".font-medium")?.textContent
+      const names = items.map(
+        (item) => item.querySelector(".font-medium")?.textContent
       );
       expect(names).toEqual(["Alpha", "Beta", "Gamma"]);
     });
@@ -194,8 +174,8 @@ describe("TagHierarchyView", () => {
         />
       );
       const items = screen.getAllByRole("treeitem");
-      const names = items.map((item) =>
-        item.querySelector(".font-medium")?.textContent
+      const names = items.map(
+        (item) => item.querySelector(".font-medium")?.textContent
       );
       expect(names).toEqual(["Gamma", "Beta", "Alpha"]);
     });
@@ -210,8 +190,8 @@ describe("TagHierarchyView", () => {
         />
       );
       const items = screen.getAllByRole("treeitem");
-      const names = items.map((item) =>
-        item.querySelector(".font-medium")?.textContent
+      const names = items.map(
+        (item) => item.querySelector(".font-medium")?.textContent
       );
       // Gamma (8) > Alpha (5) > Beta (3)
       expect(names).toEqual(["Gamma", "Alpha", "Beta"]);
@@ -220,9 +200,7 @@ describe("TagHierarchyView", () => {
 
   describe("keyboard navigation", () => {
     it("navigates down with ArrowDown", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockFlatTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockFlatTags} isLoading={false} />);
       const tree = screen.getByRole("tree");
 
       // Initial focus should be on first item
@@ -238,9 +216,7 @@ describe("TagHierarchyView", () => {
     });
 
     it("navigates up with ArrowUp", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockFlatTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockFlatTags} isLoading={false} />);
       const tree = screen.getByRole("tree");
       const items = screen.getAllByRole("treeitem");
 
@@ -256,9 +232,7 @@ describe("TagHierarchyView", () => {
     });
 
     it("expands node with ArrowRight", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockTags} isLoading={false} />);
       const tree = screen.getByRole("tree");
 
       // Click on Child 2 to focus it (which has children)
@@ -275,9 +249,7 @@ describe("TagHierarchyView", () => {
     });
 
     it("jumps to start with Home key", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockFlatTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockFlatTags} isLoading={false} />);
       const tree = screen.getByRole("tree");
       const items = screen.getAllByRole("treeitem");
 
@@ -291,9 +263,7 @@ describe("TagHierarchyView", () => {
     });
 
     it("jumps to end with End key", () => {
-      renderWithRouter(
-        <TagHierarchy tags={mockFlatTags} isLoading={false} />
-      );
+      renderWithRouter(<TagHierarchy tags={mockFlatTags} isLoading={false} />);
       const tree = screen.getByRole("tree");
       const items = screen.getAllByRole("treeitem");
 

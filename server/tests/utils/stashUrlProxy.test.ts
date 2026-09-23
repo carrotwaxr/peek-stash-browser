@@ -8,7 +8,17 @@
  * transformStudio, transformTag, transformScene, transformGroup, and the private
  * stripApiKeyFromUrl (tested indirectly via transformScene.sceneStreams).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { logger } from "../../utils/logger.js";
+import {
+  appendApiKeyToUrl,
+  convertToProxyUrl,
+  transformGroup,
+  transformPerformer,
+  transformScene,
+  transformStudio,
+  transformTag,
+} from "../../utils/stashUrlProxy.js";
 
 // Mock logger to suppress output and allow assertion on error logging
 vi.mock("../../utils/logger.js", () => ({
@@ -20,17 +30,6 @@ vi.mock("../../utils/logger.js", () => ({
     verbose: vi.fn(),
   },
 }));
-
-import {
-  convertToProxyUrl,
-  appendApiKeyToUrl,
-  transformPerformer,
-  transformStudio,
-  transformTag,
-  transformScene,
-  transformGroup,
-} from "../../utils/stashUrlProxy.js";
-import { logger } from "../../utils/logger.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -69,9 +68,7 @@ describe("stashUrlProxy", () => {
         stashUrl("/scene/42/screenshot?width=640&t=10.5")
       );
 
-      expect(decodedPath(result)).toBe(
-        "/scene/42/screenshot?width=640&t=10.5"
-      );
+      expect(decodedPath(result)).toBe("/scene/42/screenshot?width=640&t=10.5");
     });
 
     it("returns an already-proxied URL unchanged", () => {
@@ -595,9 +592,7 @@ describe("stashUrlProxy", () => {
 
       expect(result.sceneStreams![0].mime_type).toBe("video/mp4");
       expect(result.sceneStreams![0].label).toBe("Direct");
-      expect(result.sceneStreams![1].mime_type).toBe(
-        "application/x-mpegURL"
-      );
+      expect(result.sceneStreams![1].mime_type).toBe("application/x-mpegURL");
     });
 
     it("handles empty sceneStreams array", () => {
@@ -634,9 +629,7 @@ describe("stashUrlProxy", () => {
     it("transforms nested performers image_paths", () => {
       const result = transformScene(makeScene());
 
-      expect(result.performers![0].image_path).toMatch(
-        /^\/api\/proxy\/stash/
-      );
+      expect(result.performers![0].image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("transforms nested performer tags image_paths", () => {
@@ -798,16 +791,15 @@ describe("stashUrlProxy", () => {
 
     it("does not mutate the original scene object", () => {
       const original = makeScene();
-      const originalScreenshot = (
-        original.paths as Record<string, string>
-      ).screenshot;
+      const originalScreenshot = (original.paths as Record<string, string>)
+        .screenshot;
       const originalStreamUrl = original.sceneStreams[0].url;
 
       transformScene(original);
 
-      expect(
-        (original.paths as Record<string, string>).screenshot
-      ).toBe(originalScreenshot);
+      expect((original.paths as Record<string, string>).screenshot).toBe(
+        originalScreenshot
+      );
       expect(original.sceneStreams[0].url).toBe(originalStreamUrl);
     });
 
@@ -848,12 +840,8 @@ describe("stashUrlProxy", () => {
           {
             group: {
               id: "g1",
-              front_image_path: stashUrl(
-                `/group/g1/front?apikey=${SECRET}`
-              ),
-              back_image_path: stashUrl(
-                `/group/g1/back?apikey=${SECRET}`
-              ),
+              front_image_path: stashUrl(`/group/g1/front?apikey=${SECRET}`),
+              back_image_path: stashUrl(`/group/g1/back?apikey=${SECRET}`),
             },
             scene_index: 0,
           },
@@ -876,9 +864,7 @@ describe("stashUrlProxy", () => {
       // never sees the raw key in a directly-usable form.
 
       // But sceneStreams MUST have the key fully stripped
-      const streamUrls = result
-        .sceneStreams!.map((s) => s.url)
-        .join(" ");
+      const streamUrls = result.sceneStreams!.map((s) => s.url).join(" ");
       expect(streamUrls).not.toContain(SECRET);
 
       // Verify all paths were proxied (no raw Stash host exposure)
@@ -1072,7 +1058,9 @@ describe("stashUrlProxy", () => {
     it("removes &apikey=xxx when it is a subsequent param", () => {
       const result = transformScene(
         makeStreamScene(
-          stashUrl("/scene/1/stream.mp4?resolution=720&apikey=SECRET&format=hls")
+          stashUrl(
+            "/scene/1/stream.mp4?resolution=720&apikey=SECRET&format=hls"
+          )
         )
       );
       const url = result.sceneStreams![0].url;
@@ -1129,9 +1117,7 @@ describe("stashUrlProxy", () => {
       // Edge case: multiple apikey params
       const result = transformScene(
         makeStreamScene(
-          stashUrl(
-            "/scene/1/stream.mp4?apikey=KEY1&other=val&apikey=KEY2"
-          )
+          stashUrl("/scene/1/stream.mp4?apikey=KEY1&other=val&apikey=KEY2")
         )
       );
       const url = result.sceneStreams![0].url;

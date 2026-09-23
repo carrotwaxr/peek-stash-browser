@@ -79,6 +79,7 @@ https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-temp
 **Step 2: Install the template**
 
 Copy `unraid-template.xml` to:
+
 ```
 /boot/config/plugins/dockerMan/templates-user/
 ```
@@ -135,12 +136,14 @@ The system will check GitHub for new releases and notify you if an update is ava
 To update your Docker container to the latest version:
 
 **Step 1: Stop and remove the current container**
+
 ```bash
 docker stop peek-stash-browser
 docker rm peek-stash-browser
 ```
 
 **Step 2: Pull the latest image**
+
 ```bash
 docker pull carrotwaxr/peek-stash-browser:latest
 ```
@@ -150,6 +153,7 @@ docker pull carrotwaxr/peek-stash-browser:latest
 Use the same `docker run` command you used for initial installation. Your data persists in the `peek-data` volume.
 
 **Linux/macOS example:**
+
 ```bash
 docker run -d \
   --name peek-stash-browser \
@@ -160,6 +164,7 @@ docker run -d \
 ```
 
 **Windows example:**
+
 ```powershell
 docker run -d `
   --name peek-stash-browser `

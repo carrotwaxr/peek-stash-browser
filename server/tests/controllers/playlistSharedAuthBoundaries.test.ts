@@ -11,13 +11,31 @@
  * shared users CAN add scenes (the intentional asymmetry documented
  * in the addSceneToPlaylist controller comment).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  deletePlaylist,
+  removeSceneFromPlaylist,
+  reorderPlaylist,
+  updatePlaylist,
+} from "../../controllers/playlist.js";
+import prisma from "../../prisma/singleton.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
-    playlist: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    playlistItem: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), update: vi.fn() },
+    playlist: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    playlistItem: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
     playlistShare: { findMany: vi.fn() },
   },
 }));
@@ -58,22 +76,17 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import {
-  removeSceneFromPlaylist,
-  reorderPlaylist,
-  updatePlaylist,
-  deletePlaylist,
-} from "../../controllers/playlist.js";
-import type { Request, Response } from "express";
-
 const mockPrisma = vi.mocked(prisma);
 
 /** User IDs: owner = 1, shared user = 2 */
 const OWNER_ID = 1;
 const SHARED_USER_ID = 2;
 
-const SHARED_USER = { id: SHARED_USER_ID, username: "shareduser", role: "USER" };
+const SHARED_USER = {
+  id: SHARED_USER_ID,
+  username: "shareduser",
+  role: "USER",
+};
 
 /** The shared playlist — owned by user 1, shared with user 2's group */
 const SHARED_PLAYLIST = {
@@ -130,13 +143,16 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1", sceneId: "scene-123" },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await removeSceneFromPlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("does not delete any playlist item", async () => {
@@ -161,7 +177,8 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1", sceneId: "scene-123" },
         user: { id: OWNER_ID, username: "owner", role: "USER" },
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await removeSceneFromPlaylist(mockReq as any, mockRes as any);
@@ -184,13 +201,16 @@ describe("Shared playlist authorization boundaries", () => {
         },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await reorderPlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("does not update any playlist item positions", async () => {
@@ -220,13 +240,16 @@ describe("Shared playlist authorization boundaries", () => {
         body: { name: "Hijacked Playlist Name" },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await updatePlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("returns 404 when shared user tries to change description", async () => {
@@ -235,13 +258,16 @@ describe("Shared playlist authorization boundaries", () => {
         body: { description: "Overwritten description" },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await updatePlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("returns 404 when shared user tries to toggle public/shuffle/repeat", async () => {
@@ -250,13 +276,16 @@ describe("Shared playlist authorization boundaries", () => {
         body: { isPublic: true, shuffle: true, repeat: "all" },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await updatePlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("does not update the playlist in the database", async () => {
@@ -280,13 +309,16 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1" },
         user: SHARED_USER,
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await deletePlaylist(mockReq as any, mockRes as any);
 
       expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Playlist not found" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Playlist not found",
+      });
     });
 
     it("does not delete the playlist from the database", async () => {
@@ -310,7 +342,8 @@ describe("Shared playlist authorization boundaries", () => {
         params: { id: "1" },
         user: { id: OWNER_ID, username: "owner", role: "USER" },
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       await deletePlaylist(mockReq as any, mockRes as any);
@@ -318,7 +351,10 @@ describe("Shared playlist authorization boundaries", () => {
       // Owner should succeed
       expect(responseStatus).not.toHaveBeenCalledWith(404);
       expect(mockPrisma.playlist.delete).toHaveBeenCalled();
-      expect(json).toHaveBeenCalledWith({ success: true, message: "Playlist deleted" });
+      expect(json).toHaveBeenCalledWith({
+        success: true,
+        message: "Playlist deleted",
+      });
     });
   });
 });

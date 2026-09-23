@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BaseGrid } from "../../../src/components/ui/BaseGrid";
 
 describe("BaseGrid", () => {

@@ -4,16 +4,16 @@
  * Tests the scene "expensive" filters (require merged user data) in controllers/library/scenes.ts
  * These filters access user-specific data like ratings, favorites, watch history
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyExpensiveSceneFilters } from "../../controllers/library/scenes.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import {
+  createMockGroups,
+  createMockPerformers,
   createMockScene,
   createMockScenes,
-  createMockPerformers,
   createMockStudios,
   createMockTags,
-  createMockGroups,
 } from "../helpers/mockDataGenerators.js";
 
 describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
@@ -304,9 +304,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       result.forEach((scene) => {
         expect(scene.last_played_at).toBeTruthy();
         const lastPlayedDate = new Date(scene.last_played_at!);
-        expect(lastPlayedDate.getTime()).toBeGreaterThanOrEqual(
-          min.getTime()
-        );
+        expect(lastPlayedDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(lastPlayedDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
     });
@@ -503,7 +501,10 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
         performer_favorite: true,
       };
 
-      const result = applyExpensiveSceneFilters([sceneWithoutPerformers], filter);
+      const result = applyExpensiveSceneFilters(
+        [sceneWithoutPerformers],
+        filter
+      );
 
       expect(result.length).toBe(0);
     });

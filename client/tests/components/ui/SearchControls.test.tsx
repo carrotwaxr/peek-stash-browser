@@ -7,10 +7,10 @@
  * Key principle: Test what SHOULD happen, not what currently happens.
  * If a test fails, investigate whether it's a bug in the code or the test.
  */
+import { MemoryRouter } from "react-router-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchControls from "../../../src/components/ui/SearchControls";
 
 // Create a mock state object that can be manipulated per test
@@ -56,15 +56,23 @@ vi.mock("../../../src/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ presets: {}, defaults: {} }),
   apiPost: vi.fn().mockResolvedValue({}),
   libraryApi: {
-    findPerformers: vi.fn().mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
+    findPerformers: vi
+      .fn()
+      .mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
     findPerformersMinimal: vi.fn().mockResolvedValue([]),
-    findStudios: vi.fn().mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
+    findStudios: vi
+      .fn()
+      .mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
     findStudiosMinimal: vi.fn().mockResolvedValue([]),
     findTags: vi.fn().mockResolvedValue({ findTags: { count: 0, tags: [] } }),
     findTagsMinimal: vi.fn().mockResolvedValue([]),
-    findGroups: vi.fn().mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
+    findGroups: vi
+      .fn()
+      .mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
     findGroupsMinimal: vi.fn().mockResolvedValue([]),
-    findGalleries: vi.fn().mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
+    findGalleries: vi
+      .fn()
+      .mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
     findGalleriesMinimal: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -312,7 +320,8 @@ describe("SearchControls", () => {
         { timeout: 1000 }
       );
 
-      const query = onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
+      const query =
+        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
       expect(query.filter.q).toBe("test query");
     });
 
@@ -337,7 +346,8 @@ describe("SearchControls", () => {
         { timeout: 1000 }
       );
 
-      const query = onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
+      const query =
+        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
       expect(query.filter.page).toBe(1);
     });
   });
@@ -366,7 +376,9 @@ describe("SearchControls", () => {
       const comboboxes = screen.getAllByRole("combobox");
       // Per page selector should be one with "24" as current value
       const perPageSelect = comboboxes.find((cb) =>
-        Array.from((cb as HTMLSelectElement).options).some((opt: HTMLOptionElement) => opt.value === "48")
+        Array.from((cb as HTMLSelectElement).options).some(
+          (opt: HTMLOptionElement) => opt.value === "48"
+        )
       ) as HTMLSelectElement | undefined;
 
       if (perPageSelect) {
@@ -388,10 +400,14 @@ describe("SearchControls", () => {
       renderSearchControls({ artifactType: "performer" });
 
       // Find the sort dropdown
-      const sortSelect = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
+      const sortSelect = screen.getAllByRole(
+        "combobox"
+      )[0] as HTMLSelectElement;
 
       // Should have performer-specific sort options like "Height"
-      const options = Array.from(sortSelect.options).map((opt: HTMLOptionElement) => opt.textContent);
+      const options = Array.from(sortSelect.options).map(
+        (opt: HTMLOptionElement) => opt.textContent
+      );
       expect(options).toContain("Height");
     });
 
@@ -540,7 +556,9 @@ describe("SearchControls", () => {
             totalPages={1}
             totalCount={10}
             deferInitialQueryUntilFiltersReady={true}
-            permanentFilters={{ date: { start: "2024-01-01", end: "2024-01-31" } }}
+            permanentFilters={{
+              date: { start: "2024-01-01", end: "2024-01-31" },
+            }}
           >
             {null}
           </SearchControls>

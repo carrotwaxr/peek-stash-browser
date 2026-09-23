@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { ClipService } from "../../services/ClipService.js";
+import { describe, expect, it, vi } from "vitest";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
+import { ClipService } from "../../services/ClipService.js";
 
 describe("ClipService", () => {
   const clipService = new ClipService();

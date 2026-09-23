@@ -1,36 +1,36 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import { stashEntityService } from "../services/StashEntityService.js";
 import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
-import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
   ApiErrorResponse,
-  GetUserCarouselsResponse,
-  GetCarouselParams,
-  GetCarouselResponse,
+  CarouselPreference,
   CreateCarouselRequest,
   CreateCarouselResponse,
+  DeleteCarouselParams,
+  DeleteCarouselResponse,
+  ExecuteCarouselByIdParams,
+  ExecuteCarouselByIdResponse,
+  GetCarouselParams,
+  GetCarouselResponse,
+  GetUserCarouselsResponse,
+  PreviewCarouselRequest,
+  PreviewCarouselResponse,
+  TypedAuthRequest,
+  TypedResponse,
   UpdateCarouselParams,
   UpdateCarouselRequest,
   UpdateCarouselResponse,
-  DeleteCarouselParams,
-  DeleteCarouselResponse,
-  PreviewCarouselRequest,
-  PreviewCarouselResponse,
-  ExecuteCarouselByIdParams,
-  ExecuteCarouselByIdResponse,
-  CarouselPreference,
 } from "../types/api/index.js";
+import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import {
-  mergeScenesWithUserData,
-  applyQuickSceneFilters,
-  applyExpensiveSceneFilters,
-  sortScenes,
   addStreamabilityInfo,
+  applyExpensiveSceneFilters,
+  applyQuickSceneFilters,
+  mergeScenesWithUserData,
+  sortScenes,
 } from "./library/scenes.js";
 
 // Maximum number of custom carousels per user
@@ -63,7 +63,9 @@ export const getUserCarousels = async (
 
     res.json({ carousels });
   } catch (error) {
-    logger.error("Error getting user carousels", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user carousels", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get carousels" });
   }
 };
@@ -96,7 +98,9 @@ export const getCarousel = async (
 
     res.json({ carousel });
   } catch (error) {
-    logger.error("Error getting carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get carousel" });
   }
 };
@@ -154,12 +158,16 @@ export const createCarousel = async (
       select: { carouselPreferences: true },
     });
 
-    const existingPrefs = (user?.carouselPreferences as CarouselPreference[] | null) || [];
+    const existingPrefs =
+      (user?.carouselPreferences as CarouselPreference[] | null) || [];
     const customCarouselId = `custom-${carousel.id}`;
 
     // Only add if not already present
     if (!existingPrefs.find((p) => p.id === customCarouselId)) {
-      const maxOrder = existingPrefs.reduce((max, p) => Math.max(max, p.order), -1);
+      const maxOrder = existingPrefs.reduce(
+        (max, p) => Math.max(max, p.order),
+        -1
+      );
       const newPrefs = [
         ...existingPrefs,
         { id: customCarouselId, enabled: true, order: maxOrder + 1 },
@@ -167,13 +175,17 @@ export const createCarousel = async (
 
       await prisma.user.update({
         where: { id: userId },
-        data: { carouselPreferences: newPrefs as unknown as Prisma.InputJsonValue },
+        data: {
+          carouselPreferences: newPrefs as unknown as Prisma.InputJsonValue,
+        },
       });
     }
 
     res.status(201).json({ carousel });
   } catch (error) {
-    logger.error("Error creating carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error creating carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to create carousel" });
   }
 };
@@ -217,7 +229,9 @@ export const updateCarousel = async (
       data: {
         ...(title !== undefined && { title: title.trim() }),
         ...(icon !== undefined && { icon }),
-        ...(rules !== undefined && { rules: rules as unknown as Prisma.InputJsonValue }),
+        ...(rules !== undefined && {
+          rules: rules as unknown as Prisma.InputJsonValue,
+        }),
         ...(sort !== undefined && { sort }),
         ...(direction !== undefined && { direction }),
       },
@@ -225,7 +239,9 @@ export const updateCarousel = async (
 
     res.json({ carousel });
   } catch (error) {
-    logger.error("Error updating carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update carousel" });
   }
 };
@@ -263,7 +279,9 @@ export const deleteCarousel = async (
 
     res.json({ success: true, message: "Carousel deleted" });
   } catch (error) {
-    logger.error("Error deleting carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error deleting carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to delete carousel" });
   }
 };
@@ -299,7 +317,9 @@ export const previewCarousel = async (
 
     res.json({ scenes });
   } catch (error) {
-    logger.error("Error previewing carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error previewing carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to preview carousel" });
   }
 };
@@ -332,7 +352,7 @@ export async function executeCarouselQuery(
       page: 1,
       perPage: CAROUSEL_SCENE_LIMIT,
       // Use different seed per carousel load for variety
-      randomSeed: sort === 'random' ? userId + Date.now() : userId,
+      randomSeed: sort === "random" ? userId + Date.now() : userId,
     });
 
     const scenes = addStreamabilityInfo(result.scenes);
@@ -362,17 +382,29 @@ export async function executeCarouselQuery(
     rules?.tag_favorite !== undefined;
 
   // Check if sort field is supported by DB
-  const dbSortFields = new Set(['created_at', 'updated_at', 'date', 'title', 'duration', 'random']);
+  const dbSortFields = new Set([
+    "created_at",
+    "updated_at",
+    "date",
+    "title",
+    "duration",
+    "random",
+  ]);
   const canUseDbSort = dbSortFields.has(sort);
 
   // FAST PATH: No filters, DB-supported sort
   if (!hasFilters && canUseDbSort) {
-    logger.info('executeCarouselQuery: using FAST PATH (no filters)');
+    logger.info("executeCarouselQuery: using FAST PATH (no filters)");
 
     // Get pre-computed scene exclusions
     const exclusionStart = Date.now();
-    const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
-    logger.info(`executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+    const excludeIds = await entityExclusionHelper.getExcludedIds(
+      userId,
+      "scene"
+    );
+    logger.info(
+      `executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`
+    );
 
     // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
     const dbStart = Date.now();
@@ -381,56 +413,81 @@ export async function executeCarouselQuery(
       page: 1,
       perPage: CAROUSEL_SCENE_LIMIT,
       sortField: sort,
-      sortDirection: direction.toUpperCase() as 'ASC' | 'DESC',
+      sortDirection: direction.toUpperCase() as "ASC" | "DESC",
       excludeIds,
     });
-    logger.info(`executeCarouselQuery: DB pagination took ${Date.now() - dbStart}ms`);
+    logger.info(
+      `executeCarouselQuery: DB pagination took ${Date.now() - dbStart}ms`
+    );
 
     // Merge with user data
     const mergeStart = Date.now();
     const scenesWithUserData = await mergeScenesWithUserData(scenes, userId);
-    logger.info(`executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`);
+    logger.info(
+      `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
+    );
 
     // Add streamability info
     const finalScenes = addStreamabilityInfo(scenesWithUserData);
 
-    logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`);
+    logger.info(
+      `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`
+    );
     return finalScenes;
   }
 
   // STANDARD PATH: Has filters, need to load more scenes
-  logger.info(`executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`);
+  logger.info(
+    `executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`
+  );
 
   // Get pre-computed scene exclusions (instance-aware)
   const exclusionStart = Date.now();
-  const exclusionData = await entityExclusionHelper.getExclusionData(userId, 'scene');
-  logger.info(`executeCarouselQuery: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`);
+  const exclusionData = await entityExclusionHelper.getExclusionData(
+    userId,
+    "scene"
+  );
+  logger.info(
+    `executeCarouselQuery: getExclusionData took ${Date.now() - exclusionStart}ms (${exclusionData.globalIds.size} global, ${exclusionData.scopedKeys.size} scoped exclusions)`
+  );
 
   // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();
   // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
   let scenes = await stashEntityService.getAllScenes();
-  logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
+  logger.info(
+    `executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`
+  );
 
   // Apply pre-computed exclusions (instance-aware filtering)
   const filterStart = Date.now();
-  scenes = scenes.filter(s => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData));
-  logger.info(`executeCarouselQuery: applied exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`);
+  scenes = scenes.filter(
+    (s) => !entityExclusionHelper.isExcluded(s.id, s.instanceId, exclusionData)
+  );
+  logger.info(
+    `executeCarouselQuery: applied exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`
+  );
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
   const quickFilterStart = Date.now();
   scenes = await applyQuickSceneFilters(scenes, rules);
-  logger.info(`executeCarouselQuery: applyQuickSceneFilters took ${Date.now() - quickFilterStart}ms`);
+  logger.info(
+    `executeCarouselQuery: applyQuickSceneFilters took ${Date.now() - quickFilterStart}ms`
+  );
 
   // Merge with user-specific data (ratings, watch history, favorites)
   const mergeStart = Date.now();
   scenes = await mergeScenesWithUserData(scenes, userId);
-  logger.info(`executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`);
+  logger.info(
+    `executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`
+  );
 
   // Apply filters that require user data (favorite, rating, play_count, etc.)
   const expensiveFilterStart = Date.now();
   scenes = applyExpensiveSceneFilters(scenes, rules);
-  logger.info(`executeCarouselQuery: applyExpensiveSceneFilters took ${Date.now() - expensiveFilterStart}ms`);
+  logger.info(
+    `executeCarouselQuery: applyExpensiveSceneFilters took ${Date.now() - expensiveFilterStart}ms`
+  );
 
   // Add streamability info
   scenes = addStreamabilityInfo(scenes);
@@ -439,7 +496,9 @@ export async function executeCarouselQuery(
   scenes = sortScenes(scenes, sort, direction);
 
   // Limit to carousel size
-  logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (STANDARD PATH)`);
+  logger.info(
+    `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (STANDARD PATH)`
+  );
   return scenes.slice(0, CAROUSEL_SCENE_LIMIT);
 }
 
@@ -488,7 +547,9 @@ export const executeCarouselById = async (
       scenes,
     });
   } catch (error) {
-    logger.error("Error executing carousel", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error executing carousel", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to execute carousel query" });
   }
 };

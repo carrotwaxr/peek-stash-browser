@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { NormalizedScene } from "@peek/shared-types";
 import { useAuth } from "../../hooks/useAuth";
 import {
   fetchAndParseVTT,
   getEvenlySpacedSprites,
 } from "../../utils/spriteSheet";
-import type { NormalizedScene } from "@peek/shared-types";
 
 interface Props {
   scene: NormalizedScene;
@@ -46,9 +46,12 @@ const SceneCardPreview = ({
   const [isLoading, setIsLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
+  const [containerElement, setContainerElement] =
+    useState<HTMLDivElement | null>(null);
   const [previewDataLoaded, setPreviewDataLoaded] = useState(false);
-  const [activePreviewType, setActivePreviewType] = useState<string | null>(null); // Track which type is actually being used (after fallback)
+  const [activePreviewType, setActivePreviewType] = useState<string | null>(
+    null
+  ); // Track which type is actually being used (after fallback)
   const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false); // True lazy loading for screenshots
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -341,7 +344,8 @@ const SceneCardPreview = ({
   };
 
   // Use explicit class names for Tailwind JIT detection (dynamic interpolation doesn't work)
-  const objectFitClass = objectFit === "cover" ? "object-cover" : "object-contain";
+  const objectFitClass =
+    objectFit === "cover" ? "object-cover" : "object-contain";
 
   return (
     <div
@@ -357,7 +361,11 @@ const SceneCardPreview = ({
       {/* Screenshot base layer - true lazy loading via IntersectionObserver */}
       {/* Only set src when card enters viewport to prevent browser from queuing all images */}
       <img
-        src={shouldLoadScreenshot ? (scene?.paths?.screenshot ?? undefined) : undefined}
+        src={
+          shouldLoadScreenshot
+            ? (scene?.paths?.screenshot ?? undefined)
+            : undefined
+        }
         alt={scene?.title || "Scene"}
         className={`w-full h-full pointer-events-none ${objectFitClass}`}
         style={{ backgroundColor: "var(--bg-secondary)" }}

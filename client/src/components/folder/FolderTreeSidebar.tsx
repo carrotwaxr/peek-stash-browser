@@ -1,6 +1,11 @@
 // client/src/components/folder/FolderTreeSidebar.jsx
-import { useState, useMemo, useEffect, useRef } from "react";
-import { LucideChevronRight, LucideChevronDown, LucideFolder, LucideFolderOpen } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  LucideChevronDown,
+  LucideChevronRight,
+  LucideFolder,
+  LucideFolderOpen,
+} from "lucide-react";
 import { buildTagTree } from "../../utils/buildTagTree";
 
 interface TagItem {
@@ -28,18 +33,38 @@ interface Props {
  * Shows tag hierarchy with expand/collapse controls.
  * Features sticky parent breadcrumb for scroll context.
  */
-const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }: Props) => {
+const FolderTreeSidebar = ({
+  tags,
+  currentPath,
+  onNavigate,
+  className = "",
+}: Props) => {
   // Build tree from tags
-  const tree = useMemo(() => buildTagTree(tags, { sortField: "name", sortDirection: "ASC" }) as TreeNodeData[], [tags]);
+  const tree = useMemo(
+    () =>
+      buildTagTree(tags, {
+        sortField: "name",
+        sortDirection: "ASC",
+      }) as TreeNodeData[],
+    [tags]
+  );
 
   // Create a map of tag IDs to names for breadcrumb display
   const tagNameMap = useMemo(() => {
     const map = new Map();
-    const addToMap = (nodes: Array<{ id: string; name: string; children?: unknown[] }>) => {
+    const addToMap = (
+      nodes: Array<{ id: string; name: string; children?: unknown[] }>
+    ) => {
       for (const node of nodes) {
         map.set(node.id, node.name);
         if ((node.children?.length ?? 0) > 0) {
-          addToMap(node.children as Array<{ id: string; name: string; children?: unknown[] }>);
+          addToMap(
+            node.children as Array<{
+              id: string;
+              name: string;
+              children?: unknown[];
+            }>
+          );
         }
       }
     };
@@ -74,7 +99,9 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }: Pr
       setTimeout(() => {
         // Use the full path as the selector to handle tags with multiple parents
         const pathKey = currentPath.join(",");
-        const nodeElement = scrollContentRef.current?.querySelector(`[data-node-path="${pathKey}"]`);
+        const nodeElement = scrollContentRef.current?.querySelector(
+          `[data-node-path="${pathKey}"]`
+        );
         if (nodeElement) {
           nodeElement.scrollIntoView({ behavior: "smooth", block: "center" });
         }
@@ -187,7 +214,15 @@ interface TreeNodeProps {
   onNavigate: (path: string[]) => void;
 }
 
-const TreeNode = ({ node, nodePath, depth, expanded, toggleExpanded, currentPath, onNavigate }: TreeNodeProps) => {
+const TreeNode = ({
+  node,
+  nodePath,
+  depth,
+  expanded,
+  toggleExpanded,
+  currentPath,
+  onNavigate,
+}: TreeNodeProps) => {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expanded.has(node.id);
   const isInPath = currentPath.includes(node.id);
@@ -216,9 +251,15 @@ const TreeNode = ({ node, nodePath, depth, expanded, toggleExpanded, currentPath
           style={{ visibility: hasChildren ? "visible" : "hidden" }}
         >
           {isExpanded ? (
-            <LucideChevronDown size={14} style={{ color: "var(--text-tertiary)" }} />
+            <LucideChevronDown
+              size={14}
+              style={{ color: "var(--text-tertiary)" }}
+            />
           ) : (
-            <LucideChevronRight size={14} style={{ color: "var(--text-tertiary)" }} />
+            <LucideChevronRight
+              size={14}
+              style={{ color: "var(--text-tertiary)" }}
+            />
           )}
         </button>
 

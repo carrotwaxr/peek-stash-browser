@@ -3,7 +3,9 @@ export interface PasswordValidationResult {
   errors: string[];
 }
 
-export const validatePassword = (password: string): PasswordValidationResult => {
+export const validatePassword = (
+  password: string
+): PasswordValidationResult => {
   const errors: string[] = [];
 
   if (password.length < 8) {

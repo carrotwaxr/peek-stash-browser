@@ -11,8 +11,11 @@
  * These tests follow the pattern from watchHistory.test.ts, testing the route
  * handlers directly with mock request/response objects.
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authenticate, requireAdmin } from "../../middleware/auth.js";
+// Import after mocks are set up
+import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 
 // Mock MergeReconciliationService - hoisted to top level
 vi.mock("../../services/MergeReconciliationService.js", () => ({
@@ -26,8 +29,12 @@ vi.mock("../../services/MergeReconciliationService.js", () => ({
 
 // Mock auth middleware
 vi.mock("../../middleware/auth.js", () => ({
-  authenticate: vi.fn((_req: Request, _res: Response, next: NextFunction) => next()),
-  requireAdmin: vi.fn((_req: Request, _res: Response, next: NextFunction) => next()),
+  authenticate: vi.fn((_req: Request, _res: Response, next: NextFunction) =>
+    next()
+  ),
+  requireAdmin: vi.fn((_req: Request, _res: Response, next: NextFunction) =>
+    next()
+  ),
 }));
 
 // Mock logger
@@ -38,10 +45,6 @@ vi.mock("../../utils/logger.js", () => ({
     error: vi.fn(),
   },
 }));
-
-// Import after mocks are set up
-import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
-import { authenticate, requireAdmin } from "../../middleware/auth.js";
 
 // Get mocked functions
 const mockService = vi.mocked(mergeReconciliationService);
@@ -93,25 +96,37 @@ describe("Merge Reconciliation Routes", () => {
     it("should have authenticate middleware that returns 401 for unauthenticated requests", async () => {
       const mockReq = createMockRequest();
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       // Configure authenticate to return 401
       mockAuthenticate.mockImplementation((_req, res, _next) => {
-        return res.status(401).json({ error: "Access denied. No token provided." });
+        return res
+          .status(401)
+          .json({ error: "Access denied. No token provided." });
       });
 
       await mockAuthenticate(mockReq as Request, mockRes, vi.fn());
 
       expect(responseStatus).toHaveBeenCalledWith(401);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Access denied. No token provided." });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Access denied. No token provided.",
+      });
     });
   });
 
   describe("Admin Requirement", () => {
     it("should have requireAdmin middleware that returns 403 for non-admin users", async () => {
-      const mockReq = createMockRequest({ user: { id: 1, username: "user", role: "USER" } });
+      const mockReq = createMockRequest({
+        user: { id: 1, username: "user", role: "USER" },
+      });
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       // Configure requireAdmin to return 403 for non-admin
       mockRequireAdmin.mockImplementation((req, res, _next) => {
@@ -124,11 +139,15 @@ describe("Merge Reconciliation Routes", () => {
       await mockRequireAdmin(mockReq as Request, mockRes, vi.fn());
 
       expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Admin access required." });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Admin access required.",
+      });
     });
 
     it("should allow admin users through requireAdmin middleware", async () => {
-      const mockReq = createMockRequest({ user: { id: 1, username: "admin", role: "ADMIN" } });
+      const mockReq = createMockRequest({
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
       const mockRes = {} as Response;
       const mockNext = vi.fn();
 
@@ -177,7 +196,9 @@ describe("Merge Reconciliation Routes", () => {
 
       mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
 
-      const mockReq = createMockRequest({ user: { id: 1, username: "admin", role: "ADMIN" } });
+      const mockReq = createMockRequest({
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
 
@@ -192,7 +213,9 @@ describe("Merge Reconciliation Routes", () => {
         scenes: mockOrphans,
         totalCount: 2,
       });
-      expect(mockService.findOrphanedScenesWithActivity).toHaveBeenCalledTimes(1);
+      expect(mockService.findOrphanedScenesWithActivity).toHaveBeenCalledTimes(
+        1
+      );
     });
 
     it("should return empty list when no orphaned scenes exist", async () => {
@@ -219,7 +242,10 @@ describe("Merge Reconciliation Routes", () => {
       );
 
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       try {
         await mockService.findOrphanedScenesWithActivity();
@@ -263,7 +289,7 @@ describe("Merge Reconciliation Routes", () => {
 
       const mockReq = createMockRequest({
         params: { id: "scene-123" },
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
@@ -291,11 +317,16 @@ describe("Merge Reconciliation Routes", () => {
     });
 
     it("should return 500 on service error", async () => {
-      mockService.findPhashMatches.mockRejectedValue(new Error("Lookup failed"));
+      mockService.findPhashMatches.mockRejectedValue(
+        new Error("Lookup failed")
+      );
 
       const mockReq = createMockRequest({ params: { id: "scene-123" } });
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       try {
         await mockService.findPhashMatches(mockReq.params!.id);
@@ -323,10 +354,13 @@ describe("Merge Reconciliation Routes", () => {
       const mockReq = createMockRequest({
         params: { id: "scene-123" },
         body: {},
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       const { targetSceneId } = mockReq.body as { targetSceneId?: string };
       if (!targetSceneId) {
@@ -334,7 +368,9 @@ describe("Merge Reconciliation Routes", () => {
       }
 
       expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({ error: "targetSceneId is required" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "targetSceneId is required",
+      });
     });
 
     it("should reconcile scene and return result", async () => {
@@ -350,7 +386,7 @@ describe("Merge Reconciliation Routes", () => {
       const mockReq = createMockRequest({
         params: { id: "scene-123" },
         body: { targetSceneId: "target-456" },
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
@@ -387,15 +423,20 @@ describe("Merge Reconciliation Routes", () => {
     });
 
     it("should return 500 on service error", async () => {
-      mockService.reconcileScene.mockRejectedValue(new Error("Transfer failed"));
+      mockService.reconcileScene.mockRejectedValue(
+        new Error("Transfer failed")
+      );
 
       const mockReq = createMockRequest({
         params: { id: "scene-123" },
         body: { targetSceneId: "target-456" },
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       try {
         await mockService.reconcileScene("scene-123", "target-456", null, 1);
@@ -429,7 +470,7 @@ describe("Merge Reconciliation Routes", () => {
 
       const mockReq = createMockRequest({
         params: { id: "scene-123" },
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
@@ -451,11 +492,16 @@ describe("Merge Reconciliation Routes", () => {
     });
 
     it("should return 500 on service error", async () => {
-      mockService.discardOrphanedData.mockRejectedValue(new Error("Delete failed"));
+      mockService.discardOrphanedData.mockRejectedValue(
+        new Error("Delete failed")
+      );
 
       const mockReq = createMockRequest({ params: { id: "scene-123" } });
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       try {
         await mockService.discardOrphanedData(mockReq.params!.id);
@@ -494,11 +540,21 @@ describe("Merge Reconciliation Routes", () => {
       mockService.findPhashMatches.mockImplementation(async (id: string) => {
         if (id === "orphan-1") {
           return [
-            { sceneId: "target-1", title: "Match 1", similarity: "exact" as const, recommended: true },
+            {
+              sceneId: "target-1",
+              title: "Match 1",
+              similarity: "exact" as const,
+              recommended: true,
+            },
           ];
         }
         return [
-          { sceneId: "target-2", title: "Match 2", similarity: "similar" as const, recommended: true },
+          {
+            sceneId: "target-2",
+            title: "Match 2",
+            similarity: "similar" as const,
+            recommended: true,
+          },
         ];
       });
 
@@ -510,7 +566,7 @@ describe("Merge Reconciliation Routes", () => {
       });
 
       const mockReq = createMockRequest({
-        user: { id: 1, username: "admin", role: "ADMIN" }
+        user: { id: 1, username: "admin", role: "ADMIN" },
       });
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
@@ -605,7 +661,12 @@ describe("Merge Reconciliation Routes", () => {
         mockOrphans as never
       );
       mockService.findPhashMatches.mockResolvedValue([
-        { sceneId: "target-1", title: "Similar", similarity: "similar" as const, recommended: true },
+        {
+          sceneId: "target-1",
+          title: "Similar",
+          similarity: "similar" as const,
+          recommended: true,
+        },
       ]);
 
       const { responseJson } = createMockResponse();
@@ -652,7 +713,10 @@ describe("Merge Reconciliation Routes", () => {
       );
 
       const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = { json: responseJson, status: responseStatus } as unknown as Response;
+      const mockRes = {
+        json: responseJson,
+        status: responseStatus,
+      } as unknown as Response;
 
       try {
         await mockService.findOrphanedScenesWithActivity();

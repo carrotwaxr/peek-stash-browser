@@ -400,10 +400,7 @@ export const createFilterPreset = (overrides = {}) => {
  * @param {object} options - Pagination options
  * @returns {object}
  */
-export const createPaginatedResponse = (
-  items,
-  { totalCount = null } = {}
-) => {
+export const createPaginatedResponse = (items, { totalCount = null } = {}) => {
   const count = totalCount ?? items.length;
   return {
     count,
@@ -466,7 +463,11 @@ export const createWatchHistoryEntry = (overrides = {}) => {
  */
 export const createPlaylist = (overrides = {}) => {
   const id = overrides.id ?? `playlist-${nextId()}`;
-  const scenes = overrides.scenes ?? [createScene(), createScene(), createScene()];
+  const scenes = overrides.scenes ?? [
+    createScene(),
+    createScene(),
+    createScene(),
+  ];
   return {
     id,
     name: `Playlist ${id}`,

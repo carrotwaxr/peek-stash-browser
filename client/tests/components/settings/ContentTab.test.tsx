@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet } from "../../../src/api";
 import ContentTab from "../../../src/components/settings/tabs/ContentTab";
 
 // Mock hooks and API
@@ -15,8 +16,6 @@ vi.mock("../../../src/api", () => ({
   apiGet: vi.fn(),
   apiPut: vi.fn(),
 }));
-
-import { apiGet } from "../../../src/api";
 
 const mockApiGet = apiGet as ReturnType<typeof vi.fn>;
 

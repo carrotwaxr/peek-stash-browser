@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPost, apiPut, apiDelete } from "../../api";
-import { Paper, Button } from "../ui/index";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
+import { Button, Paper } from "../ui/index";
 
 interface StashInstance {
   id: string;
@@ -36,7 +36,9 @@ const StashInstanceSection = () => {
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingInstance, setEditingInstance] = useState<StashInstance | null>(null);
+  const [editingInstance, setEditingInstance] = useState<StashInstance | null>(
+    null
+  );
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState<InstanceFormData>({
     name: "",
@@ -58,7 +60,9 @@ const StashInstanceSection = () => {
       setError(null);
 
       // Admin gets all instances, regular users get single instance
-      const endpoint = isAdmin ? "/setup/stash-instances" : "/setup/stash-instance";
+      const endpoint = isAdmin
+        ? "/setup/stash-instances"
+        : "/setup/stash-instance";
       const data = await apiGet<Record<string, unknown>>(endpoint);
 
       if (isAdmin) {
@@ -144,10 +148,13 @@ const StashInstanceSection = () => {
       setTestResult(null);
       setFormError(null);
 
-      const data = await apiPost<{ version?: string }>("/setup/test-stash-connection", {
-        url: formData.url,
-        apiKey: formData.apiKey || undefined,
-      });
+      const data = await apiPost<{ version?: string }>(
+        "/setup/test-stash-connection",
+        {
+          url: formData.url,
+          apiKey: formData.apiKey || undefined,
+        }
+      );
 
       setTestResult({
         success: true,
@@ -212,7 +219,11 @@ const StashInstanceSection = () => {
   };
 
   const handleDelete = async (instance: { id: string; name: string }) => {
-    if (!confirm(`Are you sure you want to delete "${instance.name}"? This cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${instance.name}"? This cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -224,7 +235,10 @@ const StashInstanceSection = () => {
     }
   };
 
-  const handleToggleEnabled = async (instance: { id: string; enabled: boolean }) => {
+  const handleToggleEnabled = async (instance: {
+    id: string;
+    enabled: boolean;
+  }) => {
     try {
       await apiPut(`/setup/stash-instance/${instance.id}`, {
         enabled: !instance.enabled,
@@ -242,7 +256,9 @@ const StashInstanceSection = () => {
           <div>
             <Paper.Title>Stash Instances</Paper.Title>
             <Paper.Subtitle className="mt-1">
-              {isAdmin ? "Manage connected Stash servers" : "Connected Stash server"}
+              {isAdmin
+                ? "Manage connected Stash servers"
+                : "Connected Stash server"}
             </Paper.Subtitle>
           </div>
           {isAdmin && !showAddForm && (
@@ -270,19 +286,27 @@ const StashInstanceSection = () => {
         ) : showAddForm ? (
           // Add/Edit Form
           <div className="space-y-4">
-            <h3 className="text-lg font-medium" style={{ color: "var(--text-primary)" }}>
+            <h3
+              className="text-lg font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
               {editingInstance ? "Edit Instance" : "Add New Instance"}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Name *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{
                     backgroundColor: "var(--bg-input)",
@@ -293,13 +317,21 @@ const StashInstanceSection = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Priority
                 </label>
                 <input
                   type="number"
                   value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      priority: parseInt(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{
                     backgroundColor: "var(--bg-input)",
@@ -308,20 +340,28 @@ const StashInstanceSection = () => {
                   }}
                   placeholder="0"
                 />
-                <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
                   Lower numbers = higher priority for deduplication
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Description
               </label>
               <input
                 type="text"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 className="w-full px-3 py-2 rounded-lg border"
                 style={{
                   backgroundColor: "var(--bg-input)",
@@ -333,13 +373,18 @@ const StashInstanceSection = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Stash URL *
               </label>
               <input
                 type="text"
                 value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, url: e.target.value })
+                }
                 className="w-full px-3 py-2 rounded-lg border"
                 style={{
                   backgroundColor: "var(--bg-input)",
@@ -348,19 +393,27 @@ const StashInstanceSection = () => {
                 }}
                 placeholder="http://localhost:9999/graphql"
               />
-              <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--text-tertiary)" }}
+              >
                 GraphQL endpoint for API access
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Stash UI URL (optional)
               </label>
               <input
                 type="text"
                 value={formData.uiUrl}
-                onChange={(e) => setFormData({ ...formData, uiUrl: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, uiUrl: e.target.value })
+                }
                 className="w-full px-3 py-2 rounded-lg border"
                 style={{
                   backgroundColor: "var(--bg-input)",
@@ -369,26 +422,38 @@ const StashInstanceSection = () => {
                 }}
                 placeholder="https://stash.example.com"
               />
-              <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
-                Web UI URL for "View in Stash" links. If not set, uses the Stash URL.
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                Web UI URL for "View in Stash" links. If not set, uses the Stash
+                URL.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                API Key {editingInstance ? "(leave blank to keep existing)" : ""}
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                API Key{" "}
+                {editingInstance ? "(leave blank to keep existing)" : ""}
               </label>
               <input
                 type="password"
                 value={formData.apiKey}
-                onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, apiKey: e.target.value })
+                }
                 className="w-full px-3 py-2 rounded-lg border"
                 style={{
                   backgroundColor: "var(--bg-input)",
                   borderColor: "var(--border-color)",
                   color: "var(--text-primary)",
                 }}
-                placeholder={editingInstance ? "••••••••" : "Your Stash API key"}
+                placeholder={
+                  editingInstance ? "••••••••" : "Your Stash API key"
+                }
               />
             </div>
 
@@ -397,10 +462,16 @@ const StashInstanceSection = () => {
                 type="checkbox"
                 id="enabled"
                 checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, enabled: e.target.checked })
+                }
                 className="rounded"
               />
-              <label htmlFor="enabled" className="text-sm" style={{ color: "var(--text-primary)" }}>
+              <label
+                htmlFor="enabled"
+                className="text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Enabled
               </label>
             </div>
@@ -410,8 +481,12 @@ const StashInstanceSection = () => {
               <div
                 className="p-3 rounded-lg text-sm"
                 style={{
-                  backgroundColor: testResult.success ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                  color: testResult.success ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)",
+                  backgroundColor: testResult.success
+                    ? "rgba(34, 197, 94, 0.1)"
+                    : "rgba(239, 68, 68, 0.1)",
+                  color: testResult.success
+                    ? "rgb(34, 197, 94)"
+                    : "rgb(239, 68, 68)",
                 }}
               >
                 {testResult.message}
@@ -433,11 +508,19 @@ const StashInstanceSection = () => {
 
             {/* Form Actions */}
             <div className="flex gap-3 pt-2">
-              <Button onClick={handleTestConnection} variant="secondary" disabled={testing || !formData.url}>
+              <Button
+                onClick={handleTestConnection}
+                variant="secondary"
+                disabled={testing || !formData.url}
+              >
                 {testing ? "Testing..." : "Test Connection"}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : editingInstance ? "Save Changes" : "Add Instance"}
+                {saving
+                  ? "Saving..."
+                  : editingInstance
+                    ? "Save Changes"
+                    : "Add Instance"}
               </Button>
               <Button onClick={handleCancel} variant="tertiary">
                 Cancel
@@ -459,7 +542,10 @@ const StashInstanceSection = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h4 className="font-medium" style={{ color: "var(--text-primary)" }}>
+                      <h4
+                        className="font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         {instance.name}
                       </h4>
                       <span
@@ -478,14 +564,24 @@ const StashInstanceSection = () => {
                       )}
                     </div>
                     {instance.description && (
-                      <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                      <p
+                        className="text-sm mt-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {instance.description}
                       </p>
                     )}
-                    <div className="flex items-center gap-4 mt-2 text-sm" style={{ color: "var(--text-tertiary)" }}>
-                      <span className="font-mono">{getDisplayUrl(instance.url)}</span>
+                    <div
+                      className="flex items-center gap-4 mt-2 text-sm"
+                      style={{ color: "var(--text-tertiary)" }}
+                    >
+                      <span className="font-mono">
+                        {getDisplayUrl(instance.url)}
+                      </span>
                       {instance.uiUrl && (
-                        <span className="font-mono" title="UI URL">→ {getDisplayUrl(instance.uiUrl)}</span>
+                        <span className="font-mono" title="UI URL">
+                          → {getDisplayUrl(instance.uiUrl)}
+                        </span>
                       )}
                       <span>Priority: {instance.priority}</span>
                       <span>Added: {formatDate(instance.createdAt)}</span>
@@ -500,7 +596,11 @@ const StashInstanceSection = () => {
                       >
                         {instance.enabled ? "Disable" : "Enable"}
                       </Button>
-                      <Button onClick={() => handleEdit(instance)} variant="tertiary" size="sm">
+                      <Button
+                        onClick={() => handleEdit(instance)}
+                        variant="tertiary"
+                        size="sm"
+                      >
                         Edit
                       </Button>
                       {instances.length > 1 && (
@@ -527,9 +627,9 @@ const StashInstanceSection = () => {
                   color: "var(--text-secondary)",
                 }}
               >
-                Content from all enabled instances is combined in your library. When duplicates are
-                found (via StashDB IDs), the instance with the lowest priority number is used as the
-                primary source.
+                Content from all enabled instances is combined in your library.
+                When duplicates are found (via StashDB IDs), the instance with
+                the lowest priority number is used as the primary source.
               </div>
             )}
           </div>

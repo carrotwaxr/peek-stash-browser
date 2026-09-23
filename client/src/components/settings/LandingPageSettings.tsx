@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LANDING_PAGE_OPTIONS } from "../../constants/navigation";
 import { Button, Switch } from "../ui/index";
 
@@ -124,9 +124,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
               key={option.key}
               className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-opacity-50"
               style={{
-                backgroundColor: isSelected
-                  ? "var(--bg-hover)"
-                  : "transparent",
+                backgroundColor: isSelected ? "var(--bg-hover)" : "transparent",
               }}
             >
               <input

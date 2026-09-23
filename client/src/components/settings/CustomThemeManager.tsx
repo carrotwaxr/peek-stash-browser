@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
-import { apiPost, apiPut, apiDelete } from "../../api";
-import { useTheme } from "../../themes/useTheme";
+import { apiDelete, apiPost, apiPut } from "../../api";
 import type { CustomTheme } from "../../themes/ThemeContext";
+import { useTheme } from "../../themes/useTheme";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper } from "../ui/index";
 import CustomThemeEditor from "./CustomThemeEditor";
@@ -17,9 +17,12 @@ interface CustomThemeWithDates extends CustomTheme {
 const CustomThemeManager = () => {
   const { customThemes, refreshCustomThemes, currentTheme, changeTheme } =
     useTheme();
-  const [editingTheme, setEditingTheme] = useState<CustomThemeWithDates | null>(null);
+  const [editingTheme, setEditingTheme] = useState<CustomThemeWithDates | null>(
+    null
+  );
   const [isCreating, setIsCreating] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<CustomThemeWithDates | null>(null);
+  const [deleteConfirm, setDeleteConfirm] =
+    useState<CustomThemeWithDates | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = () => {
@@ -32,10 +35,16 @@ const CustomThemeManager = () => {
     setIsCreating(false);
   };
 
-  const handleSaveNew = async (themeData: { name: string; config: Record<string, any> }) => {
+  const handleSaveNew = async (themeData: {
+    name: string;
+    config: Record<string, any>;
+  }) => {
     try {
       setLoading(true);
-      const data = await apiPost("/themes/custom", themeData) as Record<string, any>;
+      const data = (await apiPost("/themes/custom", themeData)) as Record<
+        string,
+        any
+      >;
       await refreshCustomThemes();
       showSuccess(`Theme "${themeData.name}" created successfully!`);
       setIsCreating(false);
@@ -49,7 +58,10 @@ const CustomThemeManager = () => {
     }
   };
 
-  const handleSaveEdit = async (themeData: { name: string; config: Record<string, any> }) => {
+  const handleSaveEdit = async (themeData: {
+    name: string;
+    config: Record<string, any>;
+  }) => {
     try {
       setLoading(true);
       await apiPut(`/themes/custom/${editingTheme!.id}`, themeData);
@@ -85,7 +97,9 @@ const CustomThemeManager = () => {
   const handleDuplicate = async (theme: CustomThemeWithDates) => {
     try {
       setLoading(true);
-      const data = await apiPost(`/themes/custom/${theme.id}/duplicate`) as Record<string, any>;
+      const data = (await apiPost(
+        `/themes/custom/${theme.id}/duplicate`
+      )) as Record<string, any>;
       await refreshCustomThemes();
       showSuccess(`Theme duplicated as "${data.theme.name}"!`);
     } catch (error) {
@@ -109,7 +123,9 @@ const CustomThemeManager = () => {
             className="text-xl font-semibold"
             style={{ color: "var(--text-primary)" }}
           >
-            {isCreating ? "Create Custom Theme" : `Edit "${editingTheme!.name}"`}
+            {isCreating
+              ? "Create Custom Theme"
+              : `Edit "${editingTheme!.name}"`}
           </h3>
           <Button variant="secondary" onClick={handleCancel} disabled={loading}>
             <X size={16} className="mr-2" />
@@ -117,7 +133,11 @@ const CustomThemeManager = () => {
           </Button>
         </div>
         <CustomThemeEditor
-          theme={editingTheme as unknown as React.ComponentProps<typeof CustomThemeEditor>["theme"]}
+          theme={
+            editingTheme as unknown as React.ComponentProps<
+              typeof CustomThemeEditor
+            >["theme"]
+          }
           onSave={isCreating ? handleSaveNew : handleSaveEdit}
           onCancel={handleCancel}
           isNew={isCreating}
@@ -190,14 +210,16 @@ const CustomThemeManager = () => {
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: themeWithDates.config.accents?.primary,
+                            backgroundColor:
+                              themeWithDates.config.accents?.primary,
                           }}
                           title="Primary Accent"
                         />
                         <div
                           className="w-8 h-8 rounded"
                           style={{
-                            backgroundColor: themeWithDates.config.accents?.secondary,
+                            backgroundColor:
+                              themeWithDates.config.accents?.secondary,
                           }}
                           title="Secondary Accent"
                         />
@@ -233,7 +255,9 @@ const CustomThemeManager = () => {
                           {theme.config.mode === "dark" ? "Dark" : "Light"} mode
                           {" • "}
                           Created{" "}
-                          {new Date((theme as CustomThemeWithDates).createdAt || "").toLocaleDateString()}
+                          {new Date(
+                            (theme as CustomThemeWithDates).createdAt || ""
+                          ).toLocaleDateString()}
                         </p>
                       </div>
                     </div>

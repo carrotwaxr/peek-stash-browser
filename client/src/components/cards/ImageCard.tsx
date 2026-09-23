@@ -1,12 +1,15 @@
 import { forwardRef } from "react";
 import type { NormalizedImage } from "@peek/shared-types";
-import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
+import {
+  getEffectiveImageMetadata,
+  getImageTitle,
+} from "../../utils/imageGalleryInheritance";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
 interface Props {
   image: NormalizedImage;
@@ -34,12 +37,30 @@ const formatResolution = (width: number | null, height: number | null) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef<HTMLDivElement, Props>(
-  ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
+  (
+    {
+      image,
+      onClick,
+      fromPageTitle,
+      tabIndex,
+      onHideSuccess,
+      onOCounterChange,
+      onRatingChange,
+      onFavoriteChange,
+      ...rest
+    },
+    ref
+  ) => {
     const { getSettings } = useCardDisplaySettings();
     const imageSettings = getSettings("image");
     const { hasMultipleInstances } = useConfig();
     // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
+    const {
+      effectivePerformers,
+      effectiveTags,
+      effectiveStudio,
+      effectiveDate,
+    } = getEffectiveImageMetadata(image);
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -53,7 +74,7 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
         parts.push(new Date(effectiveDate).toLocaleDateString());
       }
 
-      return parts.length > 0 ? parts.join(' • ') : null;
+      return parts.length > 0 ? parts.join(" • ") : null;
     })();
 
     // Resolution badge
@@ -62,32 +83,46 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
     const galleries = image.galleries || [];
 
     // Build rich tooltip content using centralized config
-    const performersTooltip = getIndicatorBehavior('image', 'performers') === 'rich' &&
+    const performersTooltip = getIndicatorBehavior("image", "performers") ===
+      "rich" &&
       effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
-          entities={effectivePerformers as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
+          entities={
+            effectivePerformers as React.ComponentProps<
+              typeof TooltipEntityGrid
+            >["entities"]
+          }
           title="Performers"
           parentInstanceId={image.instanceId}
         />
       );
 
-    const tagsTooltip = getIndicatorBehavior('image', 'tags') === 'rich' &&
+    const tagsTooltip = getIndicatorBehavior("image", "tags") === "rich" &&
       effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
-          entities={effectiveTags as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
+          entities={
+            effectiveTags as React.ComponentProps<
+              typeof TooltipEntityGrid
+            >["entities"]
+          }
           title="Tags"
           parentInstanceId={image.instanceId}
         />
       );
 
     const galleriesCount = galleries.length;
-    const galleriesContent = getIndicatorBehavior('image', 'galleries') === 'rich' &&
+    const galleriesContent = getIndicatorBehavior("image", "galleries") ===
+      "rich" &&
       galleriesCount > 0 && (
         <TooltipEntityGrid
           entityType="gallery"
-          entities={galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]}
+          entities={
+            galleries as React.ComponentProps<
+              typeof TooltipEntityGrid
+            >["entities"]
+          }
           title="Galleries"
           parentInstanceId={image.instanceId}
         />
@@ -133,7 +168,9 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
     ];
 
     // Only show indicators if setting is enabled
-    const indicatorsToShow = imageSettings.showRelationshipIndicators ? indicators : [];
+    const indicatorsToShow = imageSettings.showRelationshipIndicators
+      ? indicators
+      : [];
 
     // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
     const handleClick = onClick
@@ -152,13 +189,23 @@ const ImageCard = forwardRef<HTMLDivElement, Props>(
         subtitle={subtitle}
         description={image.details}
         onClick={handleClick}
-        linkTo={onClick ? undefined : getEntityPath('image', image, hasMultipleInstances)}
+        linkTo={
+          onClick
+            ? undefined
+            : getEntityPath("image", image, hasMultipleInstances)
+        }
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard as boolean | undefined }}
+        displayPreferences={{
+          showDescription: imageSettings.showDescriptionOnCard as
+            | boolean
+            | undefined,
+        }}
         ratingControlsProps={
-          image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
+          image.rating100 !== undefined ||
+          image.favorite !== undefined ||
+          image.oCounter !== undefined
             ? {
                 entityId: image.id,
                 instanceId: image.instanceId,

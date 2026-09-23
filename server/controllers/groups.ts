@@ -6,25 +6,25 @@
  * to get their own group memberships.
  */
 import prisma from "../prisma/singleton.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type {
-  GetAllUserGroupsResponse,
-  GetUserGroupParams,
-  GetUserGroupResponse,
+  AddMemberBody,
+  AddMemberParams,
+  AddMemberResponse,
   CreateUserGroupBody,
   CreateUserGroupResponse,
-  UpdateUserGroupParams,
-  UpdateUserGroupBody,
-  UpdateUserGroupResponse,
   DeleteUserGroupParams,
   DeleteUserGroupResponse,
-  AddMemberParams,
-  AddMemberBody,
-  AddMemberResponse,
+  GetAllUserGroupsResponse,
+  GetCurrentUserGroupsResponse,
+  GetUserGroupParams,
+  GetUserGroupResponse,
   RemoveMemberParams,
   RemoveMemberResponse,
-  GetCurrentUserGroupsResponse,
+  UpdateUserGroupBody,
+  UpdateUserGroupParams,
+  UpdateUserGroupResponse,
 } from "../types/api/groups.js";
 
 /**
@@ -65,7 +65,10 @@ export const getAllGroups = async (
 /**
  * Get single group with members (admin only)
  */
-export const getGroup = async (req: TypedAuthRequest<never, GetUserGroupParams>, res: TypedResponse<GetUserGroupResponse | ApiErrorResponse>) => {
+export const getGroup = async (
+  req: TypedAuthRequest<never, GetUserGroupParams>,
+  res: TypedResponse<GetUserGroupResponse | ApiErrorResponse>
+) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
@@ -122,13 +125,21 @@ export const getGroup = async (req: TypedAuthRequest<never, GetUserGroupParams>,
 /**
  * Create a new group (admin only)
  */
-export const createGroup = async (req: TypedAuthRequest<CreateUserGroupBody>, res: TypedResponse<CreateUserGroupResponse | ApiErrorResponse>) => {
+export const createGroup = async (
+  req: TypedAuthRequest<CreateUserGroupBody>,
+  res: TypedResponse<CreateUserGroupResponse | ApiErrorResponse>
+) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body;
+  const {
+    name,
+    description,
+    canShare,
+    canDownloadFiles,
+    canDownloadPlaylists,
+  } = req.body;
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     return res.status(400).json({ error: "Group name is required" });
@@ -140,7 +151,9 @@ export const createGroup = async (req: TypedAuthRequest<CreateUserGroupBody>, re
   });
 
   if (existing) {
-    return res.status(409).json({ error: "A group with this name already exists" });
+    return res
+      .status(409)
+      .json({ error: "A group with this name already exists" });
   }
 
   const group = await prisma.userGroup.create({
@@ -159,7 +172,10 @@ export const createGroup = async (req: TypedAuthRequest<CreateUserGroupBody>, re
 /**
  * Update a group (admin only)
  */
-export const updateGroup = async (req: TypedAuthRequest<UpdateUserGroupBody, UpdateUserGroupParams>, res: TypedResponse<UpdateUserGroupResponse | ApiErrorResponse>) => {
+export const updateGroup = async (
+  req: TypedAuthRequest<UpdateUserGroupBody, UpdateUserGroupParams>,
+  res: TypedResponse<UpdateUserGroupResponse | ApiErrorResponse>
+) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
@@ -177,8 +193,13 @@ export const updateGroup = async (req: TypedAuthRequest<UpdateUserGroupBody, Upd
     return res.status(404).json({ error: "Group not found" });
   }
 
-  const { name, description, canShare, canDownloadFiles, canDownloadPlaylists } =
-    req.body;
+  const {
+    name,
+    description,
+    canShare,
+    canDownloadFiles,
+    canDownloadPlaylists,
+  } = req.body;
 
   // Build update data, only including provided fields
   const updateData: {
@@ -223,7 +244,10 @@ export const updateGroup = async (req: TypedAuthRequest<UpdateUserGroupBody, Upd
 /**
  * Delete a group (admin only)
  */
-export const deleteGroup = async (req: TypedAuthRequest<never, DeleteUserGroupParams>, res: TypedResponse<DeleteUserGroupResponse | ApiErrorResponse>) => {
+export const deleteGroup = async (
+  req: TypedAuthRequest<never, DeleteUserGroupParams>,
+  res: TypedResponse<DeleteUserGroupResponse | ApiErrorResponse>
+) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
@@ -251,7 +275,10 @@ export const deleteGroup = async (req: TypedAuthRequest<never, DeleteUserGroupPa
 /**
  * Add a user to a group (admin only)
  */
-export const addMember = async (req: TypedAuthRequest<AddMemberBody, AddMemberParams>, res: TypedResponse<AddMemberResponse | ApiErrorResponse>) => {
+export const addMember = async (
+  req: TypedAuthRequest<AddMemberBody, AddMemberParams>,
+  res: TypedResponse<AddMemberResponse | ApiErrorResponse>
+) => {
   if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
@@ -285,7 +312,9 @@ export const addMember = async (req: TypedAuthRequest<AddMemberBody, AddMemberPa
   });
 
   if (existing) {
-    return res.status(409).json({ error: "User is already a member of this group" });
+    return res
+      .status(409)
+      .json({ error: "User is already a member of this group" });
   }
 
   const membership = await prisma.userGroupMembership.create({

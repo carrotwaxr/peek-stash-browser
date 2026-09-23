@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import jwt from "jsonwebtoken";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateToken, verifyToken } from "../../middleware/auth.js";
 
 // Mock the JWT secret to match what auth.ts uses
 vi.mock("../../middleware/auth.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../middleware/auth.js")>();
+  const actual =
+    await importOriginal<typeof import("../../middleware/auth.js")>();
   return {
     ...actual,
   };
@@ -65,7 +66,7 @@ describe("Auth Middleware - Token Refresh Logic", () => {
 
     it("should correctly calculate token age in hours", () => {
       // Create a token with a backdated iat to simulate an old token
-      const twentyOneHoursAgo = Math.floor(Date.now() / 1000) - (21 * 3600);
+      const twentyOneHoursAgo = Math.floor(Date.now() / 1000) - 21 * 3600;
 
       const tokenAgeHours = (Date.now() / 1000 - twentyOneHoursAgo) / 3600;
 
@@ -77,7 +78,7 @@ describe("Auth Middleware - Token Refresh Logic", () => {
     });
 
     it("should correctly identify 19-hour-old token as NOT needing refresh", () => {
-      const nineteenHoursAgo = Math.floor(Date.now() / 1000) - (19 * 3600);
+      const nineteenHoursAgo = Math.floor(Date.now() / 1000) - 19 * 3600;
 
       const tokenAgeHours = (Date.now() / 1000 - nineteenHoursAgo) / 3600;
 
@@ -87,7 +88,7 @@ describe("Auth Middleware - Token Refresh Logic", () => {
     });
 
     it("should correctly identify 21-hour-old token as needing refresh", () => {
-      const twentyOneHoursAgo = Math.floor(Date.now() / 1000) - (21 * 3600);
+      const twentyOneHoursAgo = Math.floor(Date.now() / 1000) - 21 * 3600;
 
       const tokenAgeHours = (Date.now() / 1000 - twentyOneHoursAgo) / 3600;
 
@@ -97,7 +98,8 @@ describe("Auth Middleware - Token Refresh Logic", () => {
 
     it("should handle boundary case just under 20 hours", () => {
       // Token issued 19 hours and 59 minutes ago
-      const justUnderTwentyHours = Math.floor(Date.now() / 1000) - (19 * 3600 + 59 * 60);
+      const justUnderTwentyHours =
+        Math.floor(Date.now() / 1000) - (19 * 3600 + 59 * 60);
 
       const tokenAgeHours = (Date.now() / 1000 - justUnderTwentyHours) / 3600;
 
@@ -108,7 +110,8 @@ describe("Auth Middleware - Token Refresh Logic", () => {
 
     it("should handle boundary case just over 20 hours", () => {
       // Token issued 20 hours and 1 minute ago
-      const justOverTwentyHours = Math.floor(Date.now() / 1000) - (20 * 3600 + 60);
+      const justOverTwentyHours =
+        Math.floor(Date.now() / 1000) - (20 * 3600 + 60);
 
       const tokenAgeHours = (Date.now() / 1000 - justOverTwentyHours) / 3600;
 

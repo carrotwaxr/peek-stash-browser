@@ -4,15 +4,30 @@
  * Builds parameterized SQL queries for group filtering, sorting, and pagination.
  * Eliminates the need to load all groups into memory.
  */
-import type { PeekGroupFilter, NormalizedGroup, PerformerRef, TagRef, StudioRef, GalleryRef } from "../types/index.js";
-import type { GroupQueryRow } from "../types/internal/queryRows.js";
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../prisma/singleton.js";
+import type {
+  GalleryRef,
+  NormalizedGroup,
+  PeekGroupFilter,
+  PerformerRef,
+  StudioRef,
+  TagRef,
+} from "../types/index.js";
+import type { GroupQueryRow } from "../types/internal/queryRows.js";
+import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { logger } from "../utils/logger.js";
+import {
+  type FilterClause,
+  buildDateFilter,
+  buildFavoriteFilter,
+  buildJunctionFilter,
+  buildNumericFilter,
+  buildTextFilter,
+  parseCompositeFilterValues,
+} from "../utils/sqlFilterBuilders.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
 export interface GroupQueryOptions {
@@ -90,7 +105,9 @@ class GroupQueryBuilder {
   /**
    * Build instance filter clause for multi-instance support
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -104,7 +121,9 @@ class GroupQueryBuilder {
   /**
    * Build filter for a specific instance ID (for disambiguation on detail pages)
    */
-  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+  private buildSpecificInstanceFilter(
+    instanceId: string | undefined
+  ): FilterClause {
     if (!instanceId) {
       return { sql: "", params: [] };
     }
@@ -118,14 +137,20 @@ class GroupQueryBuilder {
    * Build ID filter clause
    */
   private buildIdFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | string[] | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | string[]
+      | undefined
+      | null
   ): FilterClause {
     const ids = Array.isArray(filter) ? filter : filter?.value;
     if (!ids || ids.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const modifier = Array.isArray(filter) ? "INCLUDES" : filter?.modifier || "INCLUDES";
+    const modifier = Array.isArray(filter)
+      ? "INCLUDES"
+      : filter?.modifier || "INCLUDES";
     const placeholders = ids.map(() => "?").join(", ");
 
     switch (modifier) {
@@ -142,7 +167,14 @@ class GroupQueryBuilder {
    * Build studio filter clause with hierarchy support
    */
   private async buildStudioFilterWithHierarchy(
-    filter: { value?: string[] | null; modifier?: string | null; depth?: number | null } | undefined | null
+    filter:
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
+      | undefined
+      | null
   ): Promise<FilterClause> {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -150,7 +182,7 @@ class GroupQueryBuilder {
 
     // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -194,7 +226,10 @@ class GroupQueryBuilder {
    * Filter groups by scenes they contain
    */
   private buildScenesFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -244,7 +279,10 @@ class GroupQueryBuilder {
    * Groups don't have direct performer relationships - we check via scenes
    */
   private buildPerformerFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -297,7 +335,14 @@ class GroupQueryBuilder {
    * Build tag filter clause with hierarchy support
    */
   private async buildTagFilterWithHierarchy(
-    filter: { value?: string[] | null; modifier?: string | null; depth?: number | null } | undefined | null
+    filter:
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
+      | undefined
+      | null
   ): Promise<FilterClause> {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -305,7 +350,7 @@ class GroupQueryBuilder {
 
     // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -314,8 +359,14 @@ class GroupQueryBuilder {
     }
 
     return buildJunctionFilter(
-      coerceEntityRefs(ids), "GroupTag", "groupId", "groupInstanceId",
-      "tagId", "tagInstanceId", "g", modifier || "INCLUDES"
+      coerceEntityRefs(ids),
+      "GroupTag",
+      "groupId",
+      "groupInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "g",
+      modifier || "INCLUDES"
     );
   }
 
@@ -337,7 +388,11 @@ class GroupQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
+  private buildSortClause(
+    sort: string,
+    direction: "ASC" | "DESC",
+    randomSeed?: number
+  ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
     const seed = randomSeed || 12345;
 
@@ -372,7 +427,17 @@ class GroupQueryBuilder {
 
   async execute(options: GroupQueryOptions): Promise<GroupQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, specificInstanceId, randomSeed } = options;
+    const {
+      userId,
+      page,
+      perPage,
+      applyExclusions = true,
+      filters,
+      searchQuery,
+      allowedInstanceIds,
+      specificInstanceId,
+      randomSeed,
+    } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -388,7 +453,8 @@ class GroupQueryBuilder {
 
     // Specific instance filter (for disambiguation on detail pages)
     if (specificInstanceId) {
-      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      const specificFilter =
+        this.buildSpecificInstanceFilter(specificInstanceId);
       if (specificFilter.sql) {
         whereClauses.push(specificFilter);
       }
@@ -416,7 +482,9 @@ class GroupQueryBuilder {
 
     // Studio filter
     if (filters?.studios) {
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(
+        filters.studios
+      );
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -448,7 +516,10 @@ class GroupQueryBuilder {
 
     // Rating filter
     if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
+      const ratingFilter = buildNumericFilter(
+        filters.rating100,
+        "COALESCE(r.rating, 0)"
+      );
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
@@ -456,7 +527,10 @@ class GroupQueryBuilder {
 
     // Scene count filter
     if (filters?.scene_count) {
-      const sceneCountFilter = buildNumericFilter(filters.scene_count, "COALESCE(g.sceneCount, 0)");
+      const sceneCountFilter = buildNumericFilter(
+        filters.scene_count,
+        "COALESCE(g.sceneCount, 0)"
+      );
       if (sceneCountFilter.sql) {
         whereClauses.push(sceneCountFilter);
       }
@@ -464,7 +538,10 @@ class GroupQueryBuilder {
 
     // Duration filter
     if (filters?.duration) {
-      const durationFilter = buildNumericFilter(filters.duration, "COALESCE(g.duration, 0)");
+      const durationFilter = buildNumericFilter(
+        filters.duration,
+        "COALESCE(g.duration, 0)"
+      );
       if (durationFilter.sql) {
         whereClauses.push(durationFilter);
       }
@@ -487,25 +564,38 @@ class GroupQueryBuilder {
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at, "g.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(
+        filters.created_at,
+        "g.stashCreatedAt"
+      );
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at, "g.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(
+        filters.updated_at,
+        "g.stashUpdatedAt"
+      );
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
     }
 
     // Combine WHERE clauses
-    const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+    const whereSQL = whereClauses
+      .map((c) => c.sql)
+      .filter(Boolean)
+      .join(" AND ");
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
+    const sortClause = this.buildSortClause(
+      options.sort,
+      options.sortDirection,
+      randomSeed
+    );
 
     // Build full query
     const offset = (page - 1) * perPage;
@@ -538,8 +628,7 @@ class GroupQueryBuilder {
 
     // Check if we have any user-data filters that require the JOINs
     const hasUserDataFilters =
-      filters?.favorite !== undefined ||
-      filters?.rating100 !== undefined;
+      filters?.favorite !== undefined || filters?.rating100 !== undefined;
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `
@@ -548,14 +637,20 @@ class GroupQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...countParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...countParams
+      );
       total = Number(countResult[0]?.total || 0);
     } else {
       // Fast path: count without JOINs
       const baseWhereClauses = whereClauses.filter(
         (c) => !c.sql.includes("r.")
       );
-      const baseWhereSQL = baseWhereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+      const baseWhereSQL = baseWhereClauses
+        .map((c) => c.sql)
+        .filter(Boolean)
+        .join(" AND ");
       const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
 
       const countSql = `
@@ -563,7 +658,10 @@ class GroupQueryBuilder {
         FROM StashGroup g
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...baseWhereParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...baseWhereParams
+      );
       total = Number(countResult[0]?.total || 0);
     }
     const countMs = Date.now() - countStart;
@@ -606,8 +704,14 @@ class GroupQueryBuilder {
       duration: row.duration || 0,
 
       // Image paths - transform to proxy URLs with instanceId for multi-instance routing
-      front_image_path: this.transformUrl(row.frontImagePath, row.stashInstanceId),
-      back_image_path: this.transformUrl(row.backImagePath, row.stashInstanceId),
+      front_image_path: this.transformUrl(
+        row.frontImagePath,
+        row.stashInstanceId
+      ),
+      back_image_path: this.transformUrl(
+        row.backImagePath,
+        row.stashInstanceId
+      ),
 
       // Timestamps
       created_at: row.stashCreatedAt || null,
@@ -619,7 +723,9 @@ class GroupQueryBuilder {
       favorite: Boolean(row.userFavorite),
 
       // Relations - populated separately
-      studio: row.studioId ? { id: row.studioId, name: "" } as StudioRef : null,
+      studio: row.studioId
+        ? ({ id: row.studioId, name: "" } as StudioRef)
+        : null,
       studioId: row.studioId || null, // For multi-instance correctness in populateRelations
       tags: [] as TagRef[],
       scenes: [] as { id: string }[],
@@ -652,14 +758,24 @@ class GroupQueryBuilder {
           groupId: { in: groupIds },
           groupInstanceId: { in: groupInstanceIds },
         },
-        select: { groupId: true, groupInstanceId: true, sceneId: true, sceneInstanceId: true },
+        select: {
+          groupId: true,
+          groupInstanceId: true,
+          sceneId: true,
+          sceneInstanceId: true,
+        },
       }),
     ]);
 
     // Collect unique scene keys from junction records
-    const sceneKeys = [...new Map(
-      sceneGroups.map((sg) => [`${sg.sceneId}:${sg.sceneInstanceId}`, { id: sg.sceneId, instanceId: sg.sceneInstanceId }])
-    ).values()];
+    const sceneKeys = [
+      ...new Map(
+        sceneGroups.map((sg) => [
+          `${sg.sceneId}:${sg.sceneInstanceId}`,
+          { id: sg.sceneId, instanceId: sg.sceneInstanceId },
+        ])
+      ).values(),
+    ];
     const sceneIds = sceneKeys.map((k) => k.id);
     const sceneInstanceIds = [...new Set(sceneKeys.map((k) => k.instanceId))];
 
@@ -671,7 +787,12 @@ class GroupQueryBuilder {
               sceneId: { in: sceneIds },
               sceneInstanceId: { in: sceneInstanceIds },
             },
-            select: { sceneId: true, sceneInstanceId: true, performerId: true, performerInstanceId: true },
+            select: {
+              sceneId: true,
+              sceneInstanceId: true,
+              performerId: true,
+              performerInstanceId: true,
+            },
           })
         : [],
       sceneIds.length > 0
@@ -680,25 +801,55 @@ class GroupQueryBuilder {
               sceneId: { in: sceneIds },
               sceneInstanceId: { in: sceneInstanceIds },
             },
-            select: { sceneId: true, sceneInstanceId: true, galleryId: true, galleryInstanceId: true },
+            select: {
+              sceneId: true,
+              sceneInstanceId: true,
+              galleryId: true,
+              galleryInstanceId: true,
+            },
           })
         : [],
     ]);
 
     // Collect unique entity keys (id:instanceId) from junction tables
-    const tagKeys = [...new Map(
-      tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
-    ).values()];
-    const studioKeys = [...new Map(
-      groups
-        .flatMap((g) => g.studioId ? [[`${g.studioId}:${g.instanceId}`, { id: g.studioId, instanceId: g.instanceId }] as const] : [])
-    ).values()];
-    const performerKeys = [...new Map(
-      scenePerformers.map((sp) => [`${sp.performerId}:${sp.performerInstanceId}`, { id: sp.performerId, instanceId: sp.performerInstanceId }])
-    ).values()];
-    const galleryKeys = [...new Map(
-      sceneGalleries.map((sg) => [`${sg.galleryId}:${sg.galleryInstanceId}`, { id: sg.galleryId, instanceId: sg.galleryInstanceId }])
-    ).values()];
+    const tagKeys = [
+      ...new Map(
+        tagJunctions.map((j) => [
+          `${j.tagId}:${j.tagInstanceId}`,
+          { id: j.tagId, instanceId: j.tagInstanceId },
+        ])
+      ).values(),
+    ];
+    const studioKeys = [
+      ...new Map(
+        groups.flatMap((g) =>
+          g.studioId
+            ? [
+                [
+                  `${g.studioId}:${g.instanceId}`,
+                  { id: g.studioId, instanceId: g.instanceId },
+                ] as const,
+              ]
+            : []
+        )
+      ).values(),
+    ];
+    const performerKeys = [
+      ...new Map(
+        scenePerformers.map((sp) => [
+          `${sp.performerId}:${sp.performerInstanceId}`,
+          { id: sp.performerId, instanceId: sp.performerInstanceId },
+        ])
+      ).values(),
+    ];
+    const galleryKeys = [
+      ...new Map(
+        sceneGalleries.map((sg) => [
+          `${sg.galleryId}:${sg.galleryInstanceId}`,
+          { id: sg.galleryId, instanceId: sg.galleryInstanceId },
+        ])
+      ).values(),
+    ];
 
     // Build OR conditions for entity queries using composite keys
     const tagOrConditions = tagKeys.map((k) => ({
@@ -720,10 +871,20 @@ class GroupQueryBuilder {
 
     // Load all entities in parallel using composite key lookups
     const [tags, studios, performers, galleries] = await Promise.all([
-      tagOrConditions.length > 0 ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } }) : [],
-      studioOrConditions.length > 0 ? prisma.stashStudio.findMany({ where: { OR: studioOrConditions } }) : [],
-      performerOrConditions.length > 0 ? prisma.stashPerformer.findMany({ where: { OR: performerOrConditions } }) : [],
-      galleryOrConditions.length > 0 ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } }) : [],
+      tagOrConditions.length > 0
+        ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } })
+        : [],
+      studioOrConditions.length > 0
+        ? prisma.stashStudio.findMany({ where: { OR: studioOrConditions } })
+        : [],
+      performerOrConditions.length > 0
+        ? prisma.stashPerformer.findMany({
+            where: { OR: performerOrConditions },
+          })
+        : [],
+      galleryOrConditions.length > 0
+        ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } })
+        : [],
     ]);
 
     // Build lookup maps with composite keys (id:instanceId)
@@ -843,22 +1004,30 @@ class GroupQueryBuilder {
       const groupGalleryKeys = new Set<string>();
 
       for (const sceneKey of groupSceneKeys) {
-        for (const performerKey of performersByScene.get(sceneKey) || []) groupPerformerKeys.add(performerKey);
-        for (const galleryKey of galleriesByScene.get(sceneKey) || []) groupGalleryKeys.add(galleryKey);
+        for (const performerKey of performersByScene.get(sceneKey) || [])
+          groupPerformerKeys.add(performerKey);
+        for (const galleryKey of galleriesByScene.get(sceneKey) || [])
+          groupGalleryKeys.add(galleryKey);
       }
 
-      group.performers = [...groupPerformerKeys].map((key) => performersByKey.get(key)).filter((p): p is PerformerRef => !!p);
-      group.galleries = [...groupGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
+      group.performers = [...groupPerformerKeys]
+        .map((key) => performersByKey.get(key))
+        .filter((p): p is PerformerRef => !!p);
+      group.galleries = [...groupGalleryKeys]
+        .map((key) => galleriesByKey.get(key))
+        .filter((g): g is GalleryRef => !!g);
     }
   }
-
 
   /**
    * Transform a Stash URL/path to a proxy URL
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {

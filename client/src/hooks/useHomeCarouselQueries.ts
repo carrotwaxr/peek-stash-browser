@@ -20,16 +20,16 @@ interface FindTagsResponse {
 export const useHomeCarouselQueries = (perCarousel: number = 12) => {
   return {
     favoritePerformerScenes: async () => {
-      const response = await libraryApi.findScenes(
+      const response = (await libraryApi.findScenes(
         commonFilters.favoritePerformerScenes(1, perCarousel)
-      ) as FindScenesResponse;
+      )) as FindScenesResponse;
       // Extract scenes from server response structure
       return response?.findScenes?.scenes || [];
     },
     favoriteStudioScenes: async () => {
-      const response = await libraryApi.findStudios(
+      const response = (await libraryApi.findStudios(
         commonFilters.favoriteStudios(1, perCarousel)
-      ) as FindStudiosResponse;
+      )) as FindStudiosResponse;
 
       // Extract scenes from server response structure
       const favoriteStudios = response?.findStudios?.studios || [];
@@ -38,7 +38,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       if (favoriteStudioIds.length === 0) {
         return [];
       }
-      const scenesResponse = await libraryApi.findScenes({
+      const scenesResponse = (await libraryApi.findScenes({
         filter: {
           page: 1,
           per_page: perCarousel,
@@ -53,14 +53,14 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
             depth: 0,
           },
         },
-      }) as FindScenesResponse;
+      })) as FindScenesResponse;
 
       return scenesResponse?.findScenes?.scenes || [];
     },
     favoriteTagScenes: async () => {
-      const response = await libraryApi.findTags(
+      const response = (await libraryApi.findTags(
         commonFilters.favoriteTags(1, perCarousel)
-      ) as FindTagsResponse;
+      )) as FindTagsResponse;
 
       // Extract scenes from server response structure
       const favoriteTags = response?.findTags?.tags || [];
@@ -69,7 +69,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       if (favoriteTagIds.length === 0) {
         return [];
       }
-      const scenesResponse = await libraryApi.findScenes({
+      const scenesResponse = (await libraryApi.findScenes({
         filter: {
           page: 1,
           per_page: perCarousel,
@@ -84,22 +84,22 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
             depth: 0,
           },
         },
-      }) as FindScenesResponse;
+      })) as FindScenesResponse;
 
       return scenesResponse?.findScenes?.scenes || [];
     },
     highRatedScenes: async () => {
-      const response = await libraryApi.findScenes(
+      const response = (await libraryApi.findScenes(
         commonFilters.highRatedScenes(1, perCarousel)
-      ) as FindScenesResponse;
+      )) as FindScenesResponse;
 
       // Extract scenes from server response structure
       return response?.findScenes?.scenes || [];
     },
     recentlyAddedScenes: async () => {
-      const response = await libraryApi.findScenes(
+      const response = (await libraryApi.findScenes(
         commonFilters.recentlyAddedScenes(1, perCarousel)
-      ) as FindScenesResponse;
+      )) as FindScenesResponse;
 
       // Extract scenes from server response structure
       return response?.findScenes?.scenes || [];

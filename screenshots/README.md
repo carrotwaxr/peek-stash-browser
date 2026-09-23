@@ -27,12 +27,12 @@ Example:
     {
       "name": "scene-detail",
       "path": "/scene/{sceneId}",
-      "sceneId": "1234"  // ← Set this to your chosen scene ID
+      "sceneId": "1234" // ← Set this to your chosen scene ID
     },
     {
       "name": "performer-detail",
       "path": "/performer/{performerId}",
-      "performerId": "567"  // ← Set this to your chosen performer ID
+      "performerId": "567" // ← Set this to your chosen performer ID
     }
     // ... etc
   ]
@@ -58,6 +58,7 @@ npm run screenshots
 ```
 
 This will:
+
 1. Launch headless Chrome via Playwright
 2. Login to Peek with configured credentials
 3. Navigate to each page in the config
@@ -65,6 +66,7 @@ This will:
 5. Save screenshots to `screenshots/output/<version>/`
 
 **Output**:
+
 - Screenshots saved locally (gitignored)
 - Filename format: `<page>_<viewport>_<theme>.png`
 - Example: `home_desktop_dark.png`, `scene-detail_mobile_light.png`
@@ -82,12 +84,14 @@ npm run screenshots:publish
 ```
 
 This will:
+
 1. Upload all screenshots to ImgBash
 2. Generate responsive gallery HTML page
 3. Upload gallery page to ImgBash
 4. Output gallery URL
 
 **Output**:
+
 - Gallery URL to add to GitHub Release notes
 - Local gallery HTML saved for reference
 
@@ -162,6 +166,7 @@ Capture lightbox screenshot:
 ```
 
 Supported interaction actions:
+
 - `click`: Click element
 - `hover`: Hover over element
 - `scroll`: Scroll element into view

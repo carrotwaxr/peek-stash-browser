@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  checkAccountLockout,
-  recordFailedAttempt,
-  clearFailedAttempts,
   _resetForTesting,
+  checkAccountLockout,
+  clearFailedAttempts,
+  recordFailedAttempt,
 } from "../../middleware/accountLockout.js";
 
 describe("accountLockout", () => {

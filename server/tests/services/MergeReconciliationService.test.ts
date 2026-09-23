@@ -1,7 +1,9 @@
 /**
  * Unit Tests for MergeReconciliationService
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 
 // Mock stashInstanceManager to provide a default instance for entityInstanceId lookups
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -12,7 +14,9 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       url: "http://localhost:9999/graphql",
       apiKey: "test-key",
     }),
-    getAllConfigs: vi.fn().mockReturnValue([{ id: "test-instance", name: "Test", priority: 0 }]),
+    getAllConfigs: vi
+      .fn()
+      .mockReturnValue([{ id: "test-instance", name: "Test", priority: 0 }]),
     getAllEnabled: vi.fn().mockReturnValue([]),
     hasInstances: vi.fn().mockReturnValue(true),
   },
@@ -54,9 +58,6 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
-
 describe("MergeReconciliationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,7 +78,8 @@ describe("MergeReconciliationService", () => {
         },
       ]);
 
-      const result = await mergeReconciliationService.findOrphanedScenesWithActivity();
+      const result =
+        await mergeReconciliationService.findOrphanedScenesWithActivity();
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("scene-1");
@@ -95,10 +97,16 @@ describe("MergeReconciliationService", () => {
       } as never);
 
       vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        { id: "scene-2", title: "Match Scene", phash: "abc123", stashUpdatedAt: new Date() },
+        {
+          id: "scene-2",
+          title: "Match Scene",
+          phash: "abc123",
+          stashUpdatedAt: new Date(),
+        },
       ] as never);
 
-      const result = await mergeReconciliationService.findPhashMatches("scene-1");
+      const result =
+        await mergeReconciliationService.findPhashMatches("scene-1");
 
       expect(result).toHaveLength(1);
       expect(result[0].sceneId).toBe("scene-2");
@@ -112,7 +120,8 @@ describe("MergeReconciliationService", () => {
         phashes: null,
       } as never);
 
-      const result = await mergeReconciliationService.findPhashMatches("scene-1");
+      const result =
+        await mergeReconciliationService.findPhashMatches("scene-1");
 
       expect(result).toHaveLength(0);
     });
@@ -137,7 +146,9 @@ describe("MergeReconciliationService", () => {
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.watchHistory.create).mockResolvedValue({} as never);
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
+        id: "mr-1",
+      } as never);
 
       const result = await mergeReconciliationService.transferUserData(
         "source",
@@ -186,7 +197,9 @@ describe("MergeReconciliationService", () => {
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.watchHistory.update).mockResolvedValue({} as never);
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
+        id: "mr-1",
+      } as never);
 
       const result = await mergeReconciliationService.transferUserData(
         "source",
@@ -226,9 +239,17 @@ describe("MergeReconciliationService", () => {
 
       vi.mocked(prisma.sceneRating.update).mockResolvedValue({} as never);
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
+        id: "mr-1",
+      } as never);
 
-      await mergeReconciliationService.transferUserData("source", "target", 1, null, null);
+      await mergeReconciliationService.transferUserData(
+        "source",
+        "target",
+        1,
+        null,
+        null
+      );
 
       expect(prisma.sceneRating.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -246,7 +267,8 @@ describe("MergeReconciliationService", () => {
       vi.mocked(prisma.watchHistory.deleteMany).mockResolvedValue({ count: 3 });
       vi.mocked(prisma.sceneRating.deleteMany).mockResolvedValue({ count: 2 });
 
-      const result = await mergeReconciliationService.discardOrphanedData("scene-1");
+      const result =
+        await mergeReconciliationService.discardOrphanedData("scene-1");
 
       expect(result.watchHistoryDeleted).toBe(3);
       expect(result.ratingsDeleted).toBe(2);

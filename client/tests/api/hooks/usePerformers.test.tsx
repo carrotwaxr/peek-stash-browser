@@ -1,7 +1,12 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  usePerformerDetail,
+  usePerformerList,
+} from "../../../src/api/hooks/usePerformers";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -14,12 +19,10 @@ vi.mock("../../../src/api/queryKeys", () => ({
   queryKeys: {
     performers: {
       all: () => ["performers"],
-      list: (instanceId: string | undefined, params: Record<string, unknown>) => [
-        "performers",
-        instanceId,
-        "list",
-        params,
-      ],
+      list: (
+        instanceId: string | undefined,
+        params: Record<string, unknown>
+      ) => ["performers", instanceId, "list", params],
       detail: (instanceId: string | undefined, id: string) => [
         "performers",
         instanceId,
@@ -29,12 +32,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import {
-  usePerformerList,
-  usePerformerDetail,
-} from "../../../src/api/hooks/usePerformers";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -60,7 +57,9 @@ describe("usePerformerList", () => {
 
   it("fires query with correct params", async () => {
     const mockData = { performers: [], total: 0 };
-    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => usePerformerList(params), {
@@ -69,29 +68,40 @@ describe("usePerformerList", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
-    expect(libraryApi.findPerformers).toHaveBeenCalledWith(params, expect.any(AbortSignal));
+    expect(libraryApi.findPerformers).toHaveBeenCalledWith(
+      params,
+      expect.any(AbortSignal)
+    );
   });
 
   it("passes signal to queryFn", async () => {
     const mockData = { performers: [], total: 0 };
-    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => usePerformerList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findPerformers).toHaveBeenCalled());
-    const callArgs = (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (libraryApi.findPerformers as ReturnType<typeof vi.fn>)
+      .mock.calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 
   it("passes instanceId through to query key", async () => {
     const mockData = { performers: [], total: 0 };
-    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findPerformers as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
-    const { result } = renderHook(() => usePerformerList(params, "instance-1"), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => usePerformerList(params, "instance-1"),
+      {
+        wrapper: createWrapper(),
+      }
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
@@ -113,9 +123,9 @@ describe("usePerformerDetail", () => {
 
   it("fires query and returns data on success", async () => {
     const mockPerformer = { id: "perf-1", name: "Test Performer" };
-    (libraryApi.findPerformerById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockPerformer
-    );
+    (
+      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(mockPerformer);
 
     const { result } = renderHook(() => usePerformerDetail("perf-1"), {
       wrapper: createWrapper(),
@@ -128,22 +138,28 @@ describe("usePerformerDetail", () => {
 
   it("passes instanceId to findPerformerById", async () => {
     const mockPerformer = { id: "perf-1", name: "Test Performer" };
-    (libraryApi.findPerformerById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockPerformer
+    (
+      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(mockPerformer);
+
+    const { result } = renderHook(
+      () => usePerformerDetail("perf-1", "instance-2"),
+      {
+        wrapper: createWrapper(),
+      }
     );
 
-    const { result } = renderHook(() => usePerformerDetail("perf-1", "instance-2"), {
-      wrapper: createWrapper(),
-    });
-
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findPerformerById).toHaveBeenCalledWith("perf-1", "instance-2");
+    expect(libraryApi.findPerformerById).toHaveBeenCalledWith(
+      "perf-1",
+      "instance-2"
+    );
   });
 
   it("returns error state on failure", async () => {
-    (libraryApi.findPerformerById as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Not found")
-    );
+    (
+      libraryApi.findPerformerById as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new Error("Not found"));
 
     const { result } = renderHook(() => usePerformerDetail("bad-id"), {
       wrapper: createWrapper(),

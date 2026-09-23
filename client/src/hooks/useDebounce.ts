@@ -37,7 +37,10 @@ export const useDebouncedValue = <T>(value: T, delay = 300): T => {
  * const debouncedSave = useDebouncedCallback((value) => saveRating(value), 300);
  * const handleChange = (e) => { setValue(e.target.value); debouncedSave(e.target.value); };
  */
-export const useDebouncedCallback = (callback: (...args: unknown[]) => void, delay = 300) => {
+export const useDebouncedCallback = (
+  callback: (...args: unknown[]) => void,
+  delay = 300
+) => {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
 
@@ -60,7 +63,10 @@ export const useDebouncedCallback = (callback: (...args: unknown[]) => void, del
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      timeoutRef.current = setTimeout(() => callbackRef.current(...args), delay);
+      timeoutRef.current = setTimeout(
+        () => callbackRef.current(...args),
+        delay
+      );
     },
     [delay]
   );

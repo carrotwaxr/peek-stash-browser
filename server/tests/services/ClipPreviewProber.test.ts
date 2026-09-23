@@ -1,27 +1,34 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import http from "http";
-import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
 import crypto from "crypto";
+import http from "http";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
 
 describe("ClipPreviewProber", () => {
   describe("probePreviewUrl", () => {
     it("should return false for invalid URLs", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 1000 });
-      const result = await prober.probePreviewUrl("http://localhost:99999/nonexistent");
+      const result = await prober.probePreviewUrl(
+        "http://localhost:99999/nonexistent"
+      );
       expect(result).toBe(false);
     });
 
     it("should return false on timeout", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 1 });
       // This will timeout since we're using a very short timeout
-      const result = await prober.probePreviewUrl("http://httpbin.org/delay/10");
+      const result = await prober.probePreviewUrl(
+        "http://httpbin.org/delay/10"
+      );
       expect(result).toBe(false);
     });
   });
 
   describe("probeBatch", () => {
     it("should process all URLs and return results map", async () => {
-      const prober = new ClipPreviewProber({ maxConcurrent: 2, timeoutMs: 1000 });
+      const prober = new ClipPreviewProber({
+        maxConcurrent: 2,
+        timeoutMs: 1000,
+      });
       const urls = [
         "http://localhost:99999/fake1",
         "http://localhost:99999/fake2",
@@ -53,7 +60,10 @@ describe("ClipPreviewProber", () => {
     // Create a fake placeholder content that matches the MD5
     // Since we don't have the actual placeholder, we'll test the logic with mock content
     const mockPlaceholder = Buffer.alloc(PLACEHOLDER_SIZE, 0);
-    const mockPlaceholderHash = crypto.createHash("md5").update(mockPlaceholder).digest("hex");
+    const mockPlaceholderHash = crypto
+      .createHash("md5")
+      .update(mockPlaceholder)
+      .digest("hex");
 
     beforeEach(() => {
       return new Promise<void>((resolve) => {
@@ -70,7 +80,9 @@ describe("ClipPreviewProber", () => {
               });
               res.end(content.slice(0, 1));
             } else {
-              res.writeHead(200, { "Content-Length": content.length.toString() });
+              res.writeHead(200, {
+                "Content-Length": content.length.toString(),
+              });
               res.end(content);
             }
           } else if (url === "/small-preview") {
@@ -83,7 +95,9 @@ describe("ClipPreviewProber", () => {
               });
               res.end(content.slice(0, 1));
             } else {
-              res.writeHead(200, { "Content-Length": content.length.toString() });
+              res.writeHead(200, {
+                "Content-Length": content.length.toString(),
+              });
               res.end(content);
             }
           } else if (url === "/placeholder-size-real") {
@@ -96,7 +110,9 @@ describe("ClipPreviewProber", () => {
               });
               res.end(content.slice(0, 1));
             } else {
-              res.writeHead(200, { "Content-Length": content.length.toString() });
+              res.writeHead(200, {
+                "Content-Length": content.length.toString(),
+              });
               res.end(content);
             }
           } else if (url === "/placeholder-size-fake") {
@@ -109,7 +125,9 @@ describe("ClipPreviewProber", () => {
               });
               res.end(mockPlaceholder.slice(0, 1));
             } else {
-              res.writeHead(200, { "Content-Length": mockPlaceholder.length.toString() });
+              res.writeHead(200, {
+                "Content-Length": mockPlaceholder.length.toString(),
+              });
               res.end(mockPlaceholder);
             }
           } else if (url === "/404") {
@@ -139,26 +157,34 @@ describe("ClipPreviewProber", () => {
 
     it("should return true for large previews (>= 5KB)", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 5000 });
-      const result = await prober.probePreviewUrl(`http://localhost:${port}/large-preview`);
+      const result = await prober.probePreviewUrl(
+        `http://localhost:${port}/large-preview`
+      );
       expect(result).toBe(true);
     });
 
     it("should return false for small previews (< 5KB, not placeholder size)", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 5000 });
-      const result = await prober.probePreviewUrl(`http://localhost:${port}/small-preview`);
+      const result = await prober.probePreviewUrl(
+        `http://localhost:${port}/small-preview`
+      );
       expect(result).toBe(false);
     });
 
     it("should return true for 1199-byte file with different hash (real small clip)", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 5000 });
-      const result = await prober.probePreviewUrl(`http://localhost:${port}/placeholder-size-real`);
+      const result = await prober.probePreviewUrl(
+        `http://localhost:${port}/placeholder-size-real`
+      );
       // This should be TRUE because even though it's 1199 bytes, the hash doesn't match placeholder
       expect(result).toBe(true);
     });
 
     it("should return false for 404 responses", async () => {
       const prober = new ClipPreviewProber({ timeoutMs: 5000 });
-      const result = await prober.probePreviewUrl(`http://localhost:${port}/404`);
+      const result = await prober.probePreviewUrl(
+        `http://localhost:${port}/404`
+      );
       expect(result).toBe(false);
     });
   });

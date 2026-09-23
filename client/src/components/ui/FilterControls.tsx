@@ -1,4 +1,9 @@
-import { forwardRef, useEffect, type ReactNode, type MutableRefObject } from "react";
+import {
+  type MutableRefObject,
+  type ReactNode,
+  forwardRef,
+  useEffect,
+} from "react";
 import Button from "./Button";
 import SearchableSelect from "./SearchableSelect";
 
@@ -72,7 +77,17 @@ interface RangeValue {
 }
 
 interface FilterControlProps {
-  type?: "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range";
+  type?:
+    | "select"
+    | "searchable-select"
+    | "checkbox"
+    | "number"
+    | "text"
+    | "date"
+    | "range"
+    | "imperial-height-range"
+    | "date-range"
+    | "time-range";
   label: string;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -93,396 +108,443 @@ interface FilterControlProps {
   isHighlighted?: boolean;
 }
 
-export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(({
-  type = "select",
-  label,
-  value,
-  onChange,
-  options = [],
-  placeholder = "",
-  min,
-  max,
-  entityType,
-  multi,
-  countFilterContext,
-  modifierOptions,
-  modifierValue,
-  onModifierChange,
-  supportsHierarchy = false,
-  hierarchyLabel = "Include children",
-  hierarchyValue,
-  onHierarchyChange,
-  isHighlighted = false,
-}, ref) => {
-  // Standardized styles for all inputs in the filter panel
-  const baseInputStyle = {
-    backgroundColor: "var(--bg-card)",
-    borderColor: "var(--border-color)",
-    color: "var(--text-primary)",
-  };
+export const FilterControl = forwardRef<HTMLDivElement, FilterControlProps>(
+  (
+    {
+      type = "select",
+      label,
+      value,
+      onChange,
+      options = [],
+      placeholder = "",
+      min,
+      max,
+      entityType,
+      multi,
+      countFilterContext,
+      modifierOptions,
+      modifierValue,
+      onModifierChange,
+      supportsHierarchy = false,
+      hierarchyLabel = "Include children",
+      hierarchyValue,
+      onHierarchyChange,
+      isHighlighted = false,
+    },
+    ref
+  ) => {
+    // Standardized styles for all inputs in the filter panel
+    const baseInputStyle = {
+      backgroundColor: "var(--bg-card)",
+      borderColor: "var(--border-color)",
+      color: "var(--text-primary)",
+    };
 
-  // Standardized classes for all inputs (text, number, date, select)
-  const inputClasses = "px-3 py-2 border rounded-md text-sm w-full";
+    // Standardized classes for all inputs (text, number, date, select)
+    const inputClasses = "px-3 py-2 border rounded-md text-sm w-full";
 
-  const renderInput = () => {
-    switch (type) {
-      case "checkbox":
-        return (
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={value === true || value === "TRUE"}
-              onChange={(e) => onChange(e.target.checked)}
-              className="w-4 h-4 rounded border cursor-pointer"
-              style={{
-                accentColor: "var(--accent-primary)",
-              }}
-            />
-            <span
-              className="ml-2 text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {placeholder || "Enable"}
-            </span>
-          </label>
-        );
-      case "select":
-        return (
-          <div className="space-y-2">
-            {/* Modifier dropdown (if provided) */}
-            {modifierOptions && modifierOptions.length > 0 && (
+    const renderInput = () => {
+      switch (type) {
+        case "checkbox":
+          return (
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value === true || value === "TRUE"}
+                onChange={(e) => onChange(e.target.checked)}
+                className="w-4 h-4 rounded border cursor-pointer"
+                style={{
+                  accentColor: "var(--accent-primary)",
+                }}
+              />
+              <span
+                className="ml-2 text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {placeholder || "Enable"}
+              </span>
+            </label>
+          );
+        case "select":
+          return (
+            <div className="space-y-2">
+              {/* Modifier dropdown (if provided) */}
+              {modifierOptions && modifierOptions.length > 0 && (
+                <select
+                  value={modifierValue}
+                  onChange={(e) => onModifierChange?.(e.target.value)}
+                  className={inputClasses}
+                  style={baseInputStyle}
+                >
+                  {modifierOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {/* Main select */}
               <select
-                value={modifierValue}
-                onChange={(e) => onModifierChange?.(e.target.value)}
+                value={value as string}
+                onChange={(e) => onChange(e.target.value)}
                 className={inputClasses}
                 style={baseInputStyle}
               >
-                {modifierOptions.map((option) => (
+                <option value="">{placeholder || `All ${label}`}</option>
+                {options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
-            )}
-            {/* Main select */}
-            <select
-              value={value as string}
+            </div>
+          );
+        case "searchable-select": {
+          // When hierarchy is enabled, force modifier to INCLUDES
+          const isHierarchyEnabled = hierarchyValue === -1;
+          const effectiveModifierValue = isHierarchyEnabled
+            ? "INCLUDES"
+            : modifierValue;
+
+          return (
+            <div className="space-y-2">
+              {/* Modifier dropdown (if provided) */}
+              {modifierOptions && modifierOptions.length > 0 && (
+                <select
+                  value={effectiveModifierValue}
+                  onChange={(e) => onModifierChange?.(e.target.value)}
+                  className={inputClasses}
+                  style={{
+                    ...baseInputStyle,
+                    ...(isHierarchyEnabled
+                      ? { opacity: 0.6, cursor: "not-allowed" }
+                      : {}),
+                  }}
+                  disabled={isHierarchyEnabled}
+                  title={
+                    isHierarchyEnabled
+                      ? "Locked to 'Has ANY' when hierarchy is enabled"
+                      : undefined
+                  }
+                >
+                  {modifierOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {/* Main select */}
+              <SearchableSelect
+                entityType={
+                  entityType as
+                    | "performers"
+                    | "studios"
+                    | "tags"
+                    | "galleries"
+                    | "groups"
+                }
+                value={value as string | string[]}
+                onChange={onChange as (value: string | string[]) => void}
+                multi={multi}
+                placeholder={placeholder || `Select ${label}...`}
+                countFilterContext={
+                  countFilterContext as
+                    | "performers"
+                    | "scenes"
+                    | "galleries"
+                    | "groups"
+                    | "images"
+                    | null
+                    | undefined
+                }
+              />
+              {/* Hierarchy checkbox (for tags/studios) */}
+              {supportsHierarchy && onHierarchyChange && (
+                <label className="flex items-center cursor-pointer mt-1">
+                  <input
+                    type="checkbox"
+                    checked={hierarchyValue === -1}
+                    onChange={(e) => {
+                      const newHierarchyValue = e.target.checked
+                        ? -1
+                        : undefined;
+                      onHierarchyChange(newHierarchyValue);
+                      // When enabling hierarchy, force modifier to INCLUDES
+                      if (e.target.checked && onModifierChange) {
+                        onModifierChange("INCLUDES");
+                      }
+                    }}
+                    className="w-4 h-4 rounded border cursor-pointer"
+                    style={{
+                      accentColor: "var(--accent-primary)",
+                    }}
+                  />
+                  <span
+                    className="ml-2 text-xs"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {hierarchyLabel}
+                  </span>
+                </label>
+              )}
+            </div>
+          );
+        }
+        case "number":
+          return (
+            <input
+              type="number"
+              value={value as string | number | undefined}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              min={min}
+              max={max}
+              className={inputClasses}
+              style={baseInputStyle}
+            />
+          );
+        case "text":
+          return (
+            <input
+              type="text"
+              value={value as string | undefined}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              className={inputClasses}
+              style={baseInputStyle}
+            />
+          );
+        case "date":
+          return (
+            <input
+              type="date"
+              value={value as string | undefined}
               onChange={(e) => onChange(e.target.value)}
               className={inputClasses}
               style={baseInputStyle}
-            >
-              <option value="">{placeholder || `All ${label}`}</option>
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        );
-      case "searchable-select": {
-        // When hierarchy is enabled, force modifier to INCLUDES
-        const isHierarchyEnabled = hierarchyValue === -1;
-        const effectiveModifierValue = isHierarchyEnabled ? "INCLUDES" : modifierValue;
-
-        return (
-          <div className="space-y-2">
-            {/* Modifier dropdown (if provided) */}
-            {modifierOptions && modifierOptions.length > 0 && (
-              <select
-                value={effectiveModifierValue}
-                onChange={(e) => onModifierChange?.(e.target.value)}
-                className={inputClasses}
-                style={{
-                  ...baseInputStyle,
-                  ...(isHierarchyEnabled ? { opacity: 0.6, cursor: "not-allowed" } : {}),
-                }}
-                disabled={isHierarchyEnabled}
-                title={isHierarchyEnabled ? "Locked to 'Has ANY' when hierarchy is enabled" : undefined}
-              >
-                {modifierOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {/* Main select */}
-            <SearchableSelect
-              entityType={entityType as "performers" | "studios" | "tags" | "galleries" | "groups"}
-              value={value as string | string[]}
-              onChange={onChange as (value: string | string[]) => void}
-              multi={multi}
-              placeholder={placeholder || `Select ${label}...`}
-              countFilterContext={countFilterContext as "performers" | "scenes" | "galleries" | "groups" | "images" | null | undefined}
             />
-            {/* Hierarchy checkbox (for tags/studios) */}
-            {supportsHierarchy && onHierarchyChange && (
-              <label className="flex items-center cursor-pointer mt-1">
-                <input
-                  type="checkbox"
-                  checked={hierarchyValue === -1}
-                  onChange={(e) => {
-                    const newHierarchyValue = e.target.checked ? -1 : undefined;
-                    onHierarchyChange(newHierarchyValue);
-                    // When enabling hierarchy, force modifier to INCLUDES
-                    if (e.target.checked && onModifierChange) {
-                      onModifierChange("INCLUDES");
-                    }
-                  }}
-                  className="w-4 h-4 rounded border cursor-pointer"
-                  style={{
-                    accentColor: "var(--accent-primary)",
-                  }}
-                />
-                <span
-                  className="ml-2 text-xs"
-                  style={{ color: "var(--text-secondary)" }}
+          );
+        case "range": {
+          const rangeVal = (value || {}) as RangeValue;
+          return (
+            <div className="flex space-x-2">
+              <input
+                type="number"
+                value={rangeVal.min || ""}
+                onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
+                placeholder="Min"
+                min={min}
+                max={max}
+                className={inputClasses}
+                style={baseInputStyle}
+              />
+              <input
+                type="number"
+                value={rangeVal.max || ""}
+                onChange={(e) => onChange({ ...rangeVal, max: e.target.value })}
+                placeholder="Max"
+                min={min}
+                max={max}
+                className={inputClasses}
+                style={baseInputStyle}
+              />
+            </div>
+          );
+        }
+        case "imperial-height-range": {
+          // Imperial height input with feet and inches fields
+          const heightVal = (value || {}) as RangeValue;
+          return (
+            <div className="space-y-2">
+              <fieldset>
+                <legend
+                  className="text-xs"
+                  style={{ color: "var(--text-muted)" }}
                 >
-                  {hierarchyLabel}
-                </span>
-              </label>
-            )}
-          </div>
-        );
-      }
-      case "number":
-        return (
-          <input
-            type="number"
-            value={value as string | number | undefined}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            min={min}
-            max={max}
-            className={inputClasses}
-            style={baseInputStyle}
-          />
-        );
-      case "text":
-        return (
-          <input
-            type="text"
-            value={value as string | undefined}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            className={inputClasses}
-            style={baseInputStyle}
-          />
-        );
-      case "date":
-        return (
-          <input
-            type="date"
-            value={value as string | undefined}
-            onChange={(e) => onChange(e.target.value)}
-            className={inputClasses}
-            style={baseInputStyle}
-          />
-        );
-      case "range": {
-        const rangeVal = (value || {}) as RangeValue;
-        return (
-          <div className="flex space-x-2">
-            <input
-              type="number"
-              value={rangeVal.min || ""}
-              onChange={(e) => onChange({ ...rangeVal, min: e.target.value })}
-              placeholder="Min"
-              min={min}
-              max={max}
-              className={inputClasses}
-              style={baseInputStyle}
-            />
-            <input
-              type="number"
-              value={rangeVal.max || ""}
-              onChange={(e) => onChange({ ...rangeVal, max: e.target.value })}
-              placeholder="Max"
-              min={min}
-              max={max}
-              className={inputClasses}
-              style={baseInputStyle}
-            />
-          </div>
-        );
-      }
-      case "imperial-height-range": {
-        // Imperial height input with feet and inches fields
-        const heightVal = (value || {}) as RangeValue;
-        return (
-          <div className="space-y-2">
-            <fieldset>
-              <legend
-                className="text-xs"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Min Height:
-              </legend>
-              <div className="flex space-x-2 mt-1">
-                <div className="flex-1">
-                  <label htmlFor="height-feet-min" className="sr-only">
-                    Minimum height feet
-                  </label>
-                  <input
-                    id="height-feet-min"
-                    type="number"
-                    value={heightVal.feetMin || ""}
-                    onChange={(e) => onChange({ ...heightVal, feetMin: e.target.value })}
-                    placeholder="Feet"
-                    min={0}
-                    max={8}
-                    aria-label="Minimum height in feet"
-                    className={inputClasses}
-                    style={baseInputStyle}
-                  />
+                  Min Height:
+                </legend>
+                <div className="flex space-x-2 mt-1">
+                  <div className="flex-1">
+                    <label htmlFor="height-feet-min" className="sr-only">
+                      Minimum height feet
+                    </label>
+                    <input
+                      id="height-feet-min"
+                      type="number"
+                      value={heightVal.feetMin || ""}
+                      onChange={(e) =>
+                        onChange({ ...heightVal, feetMin: e.target.value })
+                      }
+                      placeholder="Feet"
+                      min={0}
+                      max={8}
+                      aria-label="Minimum height in feet"
+                      className={inputClasses}
+                      style={baseInputStyle}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="height-inches-min" className="sr-only">
+                      Minimum height inches
+                    </label>
+                    <input
+                      id="height-inches-min"
+                      type="number"
+                      value={heightVal.inchesMin || ""}
+                      onChange={(e) =>
+                        onChange({ ...heightVal, inchesMin: e.target.value })
+                      }
+                      placeholder="Inches"
+                      min={0}
+                      max={11}
+                      aria-label="Minimum height in inches"
+                      className={inputClasses}
+                      style={baseInputStyle}
+                    />
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <label htmlFor="height-inches-min" className="sr-only">
-                    Minimum height inches
-                  </label>
-                  <input
-                    id="height-inches-min"
-                    type="number"
-                    value={heightVal.inchesMin || ""}
-                    onChange={(e) => onChange({ ...heightVal, inchesMin: e.target.value })}
-                    placeholder="Inches"
-                    min={0}
-                    max={11}
-                    aria-label="Minimum height in inches"
-                    className={inputClasses}
-                    style={baseInputStyle}
-                  />
+              </fieldset>
+              <fieldset>
+                <legend
+                  className="text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Max Height:
+                </legend>
+                <div className="flex space-x-2 mt-1">
+                  <div className="flex-1">
+                    <label htmlFor="height-feet-max" className="sr-only">
+                      Maximum height feet
+                    </label>
+                    <input
+                      id="height-feet-max"
+                      type="number"
+                      value={heightVal.feetMax || ""}
+                      onChange={(e) =>
+                        onChange({ ...heightVal, feetMax: e.target.value })
+                      }
+                      placeholder="Feet"
+                      min={0}
+                      max={8}
+                      aria-label="Maximum height in feet"
+                      className={inputClasses}
+                      style={baseInputStyle}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="height-inches-max" className="sr-only">
+                      Maximum height inches
+                    </label>
+                    <input
+                      id="height-inches-max"
+                      type="number"
+                      value={heightVal.inchesMax || ""}
+                      onChange={(e) =>
+                        onChange({ ...heightVal, inchesMax: e.target.value })
+                      }
+                      placeholder="Inches"
+                      min={0}
+                      max={11}
+                      aria-label="Maximum height in inches"
+                      className={inputClasses}
+                      style={baseInputStyle}
+                    />
+                  </div>
                 </div>
+              </fieldset>
+            </div>
+          );
+        }
+        case "date-range": {
+          const dateRangeVal = (value || {}) as RangeValue;
+          return (
+            <div className="flex flex-col space-y-2">
+              <div>
+                <div
+                  className="text-xs mb-1"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  From:
+                </div>
+                <input
+                  type="date"
+                  value={dateRangeVal.start || ""}
+                  onChange={(e) =>
+                    onChange({ ...dateRangeVal, start: e.target.value })
+                  }
+                  className={inputClasses}
+                  style={baseInputStyle}
+                />
               </div>
-            </fieldset>
-            <fieldset>
-              <legend
-                className="text-xs"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Max Height:
-              </legend>
-              <div className="flex space-x-2 mt-1">
-                <div className="flex-1">
-                  <label htmlFor="height-feet-max" className="sr-only">
-                    Maximum height feet
-                  </label>
-                  <input
-                    id="height-feet-max"
-                    type="number"
-                    value={heightVal.feetMax || ""}
-                    onChange={(e) => onChange({ ...heightVal, feetMax: e.target.value })}
-                    placeholder="Feet"
-                    min={0}
-                    max={8}
-                    aria-label="Maximum height in feet"
-                    className={inputClasses}
-                    style={baseInputStyle}
-                  />
+              <div>
+                <div
+                  className="text-xs mb-1"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  To:
                 </div>
-                <div className="flex-1">
-                  <label htmlFor="height-inches-max" className="sr-only">
-                    Maximum height inches
-                  </label>
-                  <input
-                    id="height-inches-max"
-                    type="number"
-                    value={heightVal.inchesMax || ""}
-                    onChange={(e) => onChange({ ...heightVal, inchesMax: e.target.value })}
-                    placeholder="Inches"
-                    min={0}
-                    max={11}
-                    aria-label="Maximum height in inches"
-                    className={inputClasses}
-                    style={baseInputStyle}
-                  />
-                </div>
+                <input
+                  type="date"
+                  value={dateRangeVal.end || ""}
+                  onChange={(e) =>
+                    onChange({ ...dateRangeVal, end: e.target.value })
+                  }
+                  className={inputClasses}
+                  style={baseInputStyle}
+                />
               </div>
-            </fieldset>
-          </div>
-        );
-      }
-      case "date-range": {
-        const dateRangeVal = (value || {}) as RangeValue;
-        return (
-          <div className="flex flex-col space-y-2">
-            <div>
-              <div
-                className="text-xs mb-1"
-                style={{ color: "var(--text-muted)" }}
-              >
-                From:
-              </div>
+            </div>
+          );
+        }
+        case "time-range": {
+          const timeRangeVal = (value || {}) as RangeValue;
+          return (
+            <div className="flex space-x-2">
               <input
-                type="date"
-                value={dateRangeVal.start || ""}
-                onChange={(e) => onChange({ ...dateRangeVal, start: e.target.value })}
-                className={inputClasses}
+                type="time"
+                value={timeRangeVal.start || ""}
+                onChange={(e) =>
+                  onChange({ ...timeRangeVal, start: e.target.value })
+                }
+                placeholder="Start"
+                className="px-3 py-2 border rounded-md text-sm w-full"
+                style={baseInputStyle}
+              />
+              <input
+                type="time"
+                value={timeRangeVal.end || ""}
+                onChange={(e) =>
+                  onChange({ ...timeRangeVal, end: e.target.value })
+                }
+                placeholder="End"
+                className="px-3 py-2 border rounded-md text-sm w-full"
                 style={baseInputStyle}
               />
             </div>
-            <div>
-              <div
-                className="text-xs mb-1"
-                style={{ color: "var(--text-muted)" }}
-              >
-                To:
-              </div>
-              <input
-                type="date"
-                value={dateRangeVal.end || ""}
-                onChange={(e) => onChange({ ...dateRangeVal, end: e.target.value })}
-                className={inputClasses}
-                style={baseInputStyle}
-              />
-            </div>
-          </div>
-        );
+          );
+        }
+        default:
+          return null;
       }
-      case "time-range": {
-        const timeRangeVal = (value || {}) as RangeValue;
-        return (
-          <div className="flex space-x-2">
-            <input
-              type="time"
-              value={timeRangeVal.start || ""}
-              onChange={(e) => onChange({ ...timeRangeVal, start: e.target.value })}
-              placeholder="Start"
-              className="px-3 py-2 border rounded-md text-sm w-full"
-              style={baseInputStyle}
-            />
-            <input
-              type="time"
-              value={timeRangeVal.end || ""}
-              onChange={(e) => onChange({ ...timeRangeVal, end: e.target.value })}
-              placeholder="End"
-              className="px-3 py-2 border rounded-md text-sm w-full"
-              style={baseInputStyle}
-            />
-          </div>
-        );
-      }
-      default:
-        return null;
-    }
-  };
+    };
 
-  return (
-    <div
-      ref={ref}
-      className={`flex flex-col ${isHighlighted ? "filter-highlight" : ""}`}
-    >
-      <label
-        className="text-sm font-medium mb-2"
-        style={{ color: "var(--text-primary)" }}
+    return (
+      <div
+        ref={ref}
+        className={`flex flex-col ${isHighlighted ? "filter-highlight" : ""}`}
       >
-        {label}
-      </label>
-      {renderInput()}
-    </div>
-  );
-});
+        <label
+          className="text-sm font-medium mb-2"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {label}
+        </label>
+        {renderInput()}
+      </div>
+    );
+  }
+);
 
 FilterControl.displayName = "FilterControl";
 

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Exclusion Application Integration Tests
@@ -39,30 +39,36 @@ describe("Exclusion Application", () => {
 
   describe("restriction tag filtering", () => {
     it("can filter scenes by restrictable tag with INCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("can filter scenes by restrictable tag with EXCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -71,15 +77,18 @@ describe("Exclusion Application", () => {
 
   describe("performer exclusions", () => {
     it("can filter scenes excluding specific performer", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -94,25 +103,31 @@ describe("Exclusion Application", () => {
     });
 
     it("EXCLUDES returns different count than INCLUDES for same performer", async () => {
-      const includesResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const includesResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
-      const excludesResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "EXCLUDES",
+      const excludesResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(includesResponse.ok).toBe(true);
       expect(excludesResponse.ok).toBe(true);
@@ -130,15 +145,18 @@ describe("Exclusion Application", () => {
 
   describe("studio exclusions", () => {
     it("can filter scenes excluding specific studio", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -154,15 +172,18 @@ describe("Exclusion Application", () => {
 
   describe("tag exclusions", () => {
     it("can filter scenes excluding specific tag", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -179,38 +200,44 @@ describe("Exclusion Application", () => {
 
   describe("combined exclusions", () => {
     it("can apply multiple exclusion types simultaneously", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "EXCLUDES",
+            },
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "EXCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "EXCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("can combine INCLUDES and EXCLUDES on different entity types", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "EXCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "EXCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -238,19 +265,22 @@ describe("Exclusion Application", () => {
 
   describe("count filters with exclusions", () => {
     it("combines performer_count with exclusions", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performer_count: {
-            value: 1,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performer_count: {
+              value: 1,
+              modifier: "GREATER_THAN",
+            },
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "EXCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "EXCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();

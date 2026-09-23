@@ -26,7 +26,9 @@ export class TestClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Login failed: ${response.status} ${await response.text()}`);
+      throw new Error(
+        `Login failed: ${response.status} ${await response.text()}`
+      );
     }
 
     // Extract token from Set-Cookie header
@@ -66,7 +68,10 @@ export class TestClient {
     return headers;
   }
 
-  async get<T = unknown>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  async get<T = unknown>(
+    path: string,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "GET",
       headers: this.getHeaders(options),
@@ -80,7 +85,11 @@ export class TestClient {
     };
   }
 
-  async post<T = unknown>(path: string, body?: object, options?: RequestOptions): Promise<ApiResponse<T>> {
+  async post<T = unknown>(
+    path: string,
+    body?: object,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: this.getHeaders(options),
@@ -95,7 +104,11 @@ export class TestClient {
     };
   }
 
-  async put<T = unknown>(path: string, body?: object, options?: RequestOptions): Promise<ApiResponse<T>> {
+  async put<T = unknown>(
+    path: string,
+    body?: object,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "PUT",
       headers: this.getHeaders(options),
@@ -110,7 +123,10 @@ export class TestClient {
     };
   }
 
-  async delete<T = unknown>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+  async delete<T = unknown>(
+    path: string,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "DELETE",
       headers: this.getHeaders(options),
@@ -177,7 +193,9 @@ export async function selectTestInstanceOnly(): Promise<string> {
  *
  * @param client - The TestClient to set instance selection for
  */
-export async function selectTestInstanceForClient(client: TestClient): Promise<string> {
+export async function selectTestInstanceForClient(
+  client: TestClient
+): Promise<string> {
   if (!cachedTestInstanceId) {
     // Ensure we discover the test instance first
     await selectTestInstanceOnly();
@@ -201,7 +219,9 @@ export async function selectAllInstances(): Promise<void> {
 /**
  * Reset instance selection for a specific client to all instances.
  */
-export async function selectAllInstancesForClient(client: TestClient): Promise<void> {
+export async function selectAllInstancesForClient(
+  client: TestClient
+): Promise<void> {
   await client.put("/api/user/stash-instances", {
     instanceIds: [],
   });

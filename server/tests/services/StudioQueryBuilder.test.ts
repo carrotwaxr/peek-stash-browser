@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -35,9 +37,6 @@ vi.mock("../../utils/hierarchyUtils.js", () => ({
 vi.mock("../../utils/titleUtils.js", () => ({
   getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 
 const mockPrisma = vi.mocked(prisma);
 

@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Info } from "lucide-react";
+import { apiGet } from "../../api";
+import { ApiError } from "../../api/client";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTVMode } from "../../hooks/useTVMode";
-import { apiGet } from "../../api";
-import { ApiError } from "../../api/client";
 import SceneGrid from "../scene-search/SceneGrid";
-import { Info } from "lucide-react";
 import {
-  SyncProgressBanner,
   PageHeader,
   PageLayout,
   Pagination,
+  SyncProgressBanner,
   Tooltip,
 } from "../ui/index";
 
@@ -28,8 +28,8 @@ const RecommendationInfoContent = () => (
     </p>
     <p className="mb-1">
       <span className="font-medium">Implicit signals</span> &mdash; Your
-      top-engaged entities (top 50% by engagement rank) also contribute, weighted
-      by how strongly you engage with them.
+      top-engaged entities (top 50% by engagement rank) also contribute,
+      weighted by how strongly you engage with them.
     </p>
     <p className="mb-1">
       <span className="font-medium">Freshness</span> &mdash; Unwatched scenes
@@ -52,7 +52,10 @@ const Recommended = () => {
 
   const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ message: string; errorType: string | null } | null>(null);
+  const [error, setError] = useState<{
+    message: string;
+    errorType: string | null;
+  } | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [initMessage, setInitMessage] = useState<string | null>(null);
@@ -82,9 +85,7 @@ const Recommended = () => {
           count: number;
           message?: string;
           criteria?: Record<string, number>;
-        }>(
-          `/library/scenes/recommended?page=${page}&per_page=${perPage}`
-        );
+        }>(`/library/scenes/recommended?page=${page}&per_page=${perPage}`);
 
         const {
           scenes: fetchedScenes,
@@ -105,7 +106,9 @@ const Recommended = () => {
 
         // Check if server is initializing cache
         const isInitializing =
-          err instanceof ApiError && err.status === 503 && err.data?.ready === false;
+          err instanceof ApiError &&
+          err.status === 503 &&
+          err.data?.ready === false;
 
         if (isInitializing && retryCount < MAX_RETRIES) {
           setInitMessage("Server is syncing library, please wait...");
@@ -117,8 +120,13 @@ const Recommended = () => {
         }
 
         setError({
-          message: (err instanceof ApiError ? err.message : null) || "Failed to load recommendations",
-          errorType: (err instanceof ApiError ? (err.data as Record<string, unknown>)?.errorType as string : null) || null,
+          message:
+            (err instanceof ApiError ? err.message : null) ||
+            "Failed to load recommendations",
+          errorType:
+            (err instanceof ApiError
+              ? ((err.data as Record<string, unknown>)?.errorType as string)
+              : null) || null,
         });
         setLoading(false);
       }
@@ -276,19 +284,25 @@ const Recommended = () => {
 
         {/* Scene Grid (includes bottom pagination) */}
         <SceneGrid
-          scenes={scenes as unknown as import("@peek/shared-types").NormalizedScene[]}
+          scenes={
+            scenes as unknown as import("@peek/shared-types").NormalizedScene[]
+          }
           loading={loading}
           error={!initMessage && error ? error.message : undefined}
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
-          onHideSuccess={handleHideSuccess as (sceneId: string, entityType: string) => void}
+          onHideSuccess={
+            handleHideSuccess as (sceneId: string, entityType: string) => void
+          }
           emptyMessage={message ?? "No Recommendations Yet"}
-          emptyDescription={(
-            criteria
+          emptyDescription={
+            (criteria
               ? renderCriteriaFeedback()
-              : "Rate or Favorite more items to get personalized recommendations."
-          ) as string | undefined}
+              : "Rate or Favorite more items to get personalized recommendations.") as
+              | string
+              | undefined
+          }
         />
       </div>
     </PageLayout>

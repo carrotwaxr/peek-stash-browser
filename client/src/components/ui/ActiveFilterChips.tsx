@@ -26,7 +26,11 @@ const ActiveFilterChips = ({
   permanentFilters = {},
   permanentFiltersMetadata = {},
 }: Props) => {
-  const getFilterLabel = (_filterKey: string, filterValue: unknown, filterConfig: FilterOption) => {
+  const getFilterLabel = (
+    _filterKey: string,
+    filterValue: unknown,
+    filterConfig: FilterOption
+  ) => {
     const { label, type, options } = filterConfig;
 
     // Skip undefined or empty values
@@ -67,7 +71,10 @@ const ActiveFilterChips = ({
       }
 
       case "range": {
-        const range = filterValue as { min?: string | number; max?: string | number } | null;
+        const range = filterValue as {
+          min?: string | number;
+          max?: string | number;
+        } | null;
         if (!range?.min && !range?.max) return null;
         if (range.min && range.max) {
           return `${label}: ${range.min} - ${range.max}`;
@@ -79,7 +86,10 @@ const ActiveFilterChips = ({
       }
 
       case "date-range": {
-        const dateRange = filterValue as { start?: string; end?: string } | null;
+        const dateRange = filterValue as {
+          start?: string;
+          end?: string;
+        } | null;
         if (!dateRange?.start && !dateRange?.end) return null;
         if (dateRange.start && dateRange.end) {
           return `${label}: ${dateRange.start} to ${dateRange.end}`;
@@ -96,7 +106,11 @@ const ActiveFilterChips = ({
   };
 
   // Build array of permanent filter chips
-  const permanentChips: Array<{ key: string; label: string; isPermanent: boolean }> = [];
+  const permanentChips: Array<{
+    key: string;
+    label: string;
+    isPermanent: boolean;
+  }> = [];
 
   // Check for performer permanent filters
   if ((permanentFiltersMetadata.performers?.length ?? 0) > 0) {
@@ -132,7 +146,11 @@ const ActiveFilterChips = ({
   }
 
   // Build array of regular active filter chips (exclude permanent filters)
-  const activeChips: Array<{ key: string; label: string; isPermanent: boolean }> = [];
+  const activeChips: Array<{
+    key: string;
+    label: string;
+    isPermanent: boolean;
+  }> = [];
 
   filterOptions.forEach((filterConfig) => {
     // Skip if this is a permanent filter

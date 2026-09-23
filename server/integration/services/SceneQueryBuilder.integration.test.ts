@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 // Skip if no database connection
@@ -214,7 +214,7 @@ describeWithDb("SceneQueryBuilder Integration", () => {
       return;
     }
 
-    const idsToFetch = initial.scenes.slice(0, 2).map(s => s.id);
+    const idsToFetch = initial.scenes.slice(0, 2).map((s) => s.id);
 
     const result = await sceneQueryBuilder.getByIds({
       userId: 1,
@@ -222,7 +222,7 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     });
 
     expect(result.scenes).toHaveLength(2);
-    expect(result.scenes.map(s => s.id).sort()).toEqual(idsToFetch.sort());
+    expect(result.scenes.map((s) => s.id).sort()).toEqual(idsToFetch.sort());
 
     // Verify relations are populated
     for (const scene of result.scenes) {

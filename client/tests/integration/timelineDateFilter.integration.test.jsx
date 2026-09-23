@@ -5,8 +5,12 @@
  * to the query builder, ensuring galleries/images with null dates are excluded
  * when in timeline view.
  */
-import { describe, it, expect } from "vitest";
-import { buildGalleryFilter, buildImageFilter, buildSceneFilter } from "../../src/utils/filterConfig";
+import { describe, expect, it } from "vitest";
+import {
+  buildGalleryFilter,
+  buildImageFilter,
+  buildSceneFilter,
+} from "../../src/utils/filterConfig";
 
 // Test the filter builders directly - the core of Bug #1
 describe("Date Filter Integration", () => {

@@ -8,7 +8,11 @@ interface Props {
  * SectionSelector - Segmented control for switching between User/Server settings
  * Two-button toggle with accent styling for active section
  */
-const SectionSelector = ({ activeSection, onSectionChange, isAdmin }: Props) => {
+const SectionSelector = ({
+  activeSection,
+  onSectionChange,
+  isAdmin,
+}: Props) => {
   return (
     <div className="flex justify-center mb-6">
       <div
@@ -25,7 +29,9 @@ const SectionSelector = ({ activeSection, onSectionChange, isAdmin }: Props) => 
           className="px-6 py-2 rounded-md text-sm font-medium transition-all duration-200"
           style={{
             backgroundColor:
-              activeSection === "user" ? "var(--accent-primary)" : "transparent",
+              activeSection === "user"
+                ? "var(--accent-primary)"
+                : "transparent",
             color: activeSection === "user" ? "white" : "var(--text-primary)",
           }}
           role="radio"

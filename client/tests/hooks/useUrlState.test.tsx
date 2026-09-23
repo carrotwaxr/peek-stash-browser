@@ -1,7 +1,7 @@
 // client/src/hooks/__tests__/useUrlState.test.jsx
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { useUrlState } from "../../src/hooks/useUrlState";
 
 // Wrapper to provide router context
@@ -92,7 +92,8 @@ describe("useUrlState", () => {
   describe("setValues", () => {
     it("updates multiple values at once", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: "1", sort: "date", filter: "" } }),
+        () =>
+          useUrlState({ defaults: { page: "1", sort: "date", filter: "" } }),
         { wrapper: createWrapper(["/"]) }
       );
 
@@ -122,10 +123,11 @@ describe("useUrlState", () => {
   describe("hasUrlParams", () => {
     it("returns true when URL has params beyond defaults", () => {
       const { result } = renderHook(
-        () => useUrlState({
-          defaults: { page: "1" },
-          ignoreKeys: ["page", "per_page"]
-        }),
+        () =>
+          useUrlState({
+            defaults: { page: "1" },
+            ignoreKeys: ["page", "per_page"],
+          }),
         { wrapper: createWrapper(["/?page=1&tagIds=123"]) }
       );
 
@@ -134,10 +136,11 @@ describe("useUrlState", () => {
 
     it("returns false when URL only has ignored params", () => {
       const { result } = renderHook(
-        () => useUrlState({
-          defaults: { page: "1" },
-          ignoreKeys: ["page", "per_page"]
-        }),
+        () =>
+          useUrlState({
+            defaults: { page: "1" },
+            ignoreKeys: ["page", "per_page"],
+          }),
         { wrapper: createWrapper(["/?page=2"]) }
       );
 

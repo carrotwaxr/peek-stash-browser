@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 interface TabDefinition {
   id: string;
@@ -29,7 +35,8 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }: Props) => {
 
     setShowLeftFade(container.scrollLeft > 0);
     setShowRightFade(
-      container.scrollLeft < container.scrollWidth - container.clientWidth - SCROLL_THRESHOLD
+      container.scrollLeft <
+        container.scrollWidth - container.clientWidth - SCROLL_THRESHOLD
     );
   }, []);
 
@@ -114,7 +121,8 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }: Props) => {
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+                    e.currentTarget.style.backgroundColor =
+                      "var(--bg-secondary)";
                   }
                 }}
                 onMouseLeave={(e) => {

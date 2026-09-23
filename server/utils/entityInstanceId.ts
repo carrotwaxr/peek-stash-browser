@@ -5,12 +5,18 @@
  * needs to include the instanceId in composite keys to support the same
  * entity ID from different Stash instances.
  */
-
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "./logger.js";
 
-type EntityType = 'scene' | 'performer' | 'studio' | 'tag' | 'gallery' | 'group' | 'image';
+type EntityType =
+  | "scene"
+  | "performer"
+  | "studio"
+  | "tag"
+  | "gallery"
+  | "group"
+  | "image";
 
 /**
  * Get the fallback instance ID (primary/default instance's UUID).
@@ -39,24 +45,29 @@ export async function getEntityInstanceId(
   const fallbackId = getFallbackInstanceId();
 
   if (!fallbackId) {
-    throw new Error(`Cannot get instanceId for ${entityType} ${entityId}: No Stash instances configured`);
+    throw new Error(
+      `Cannot get instanceId for ${entityType} ${entityId}: No Stash instances configured`
+    );
   }
 
   try {
     switch (entityType) {
-      case 'scene': {
+      case "scene": {
         const scenes = await prisma.stashScene.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (scenes.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: scenes.length,
-            instanceIds: scenes.map(s => s.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: scenes.length,
+              instanceIds: scenes.map((s) => s.stashInstanceId),
+            }
+          );
         }
         const firstScene = scenes[0];
         if (firstScene?.stashInstanceId) {
@@ -64,19 +75,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'performer': {
+      case "performer": {
         const performers = await prisma.stashPerformer.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (performers.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: performers.length,
-            instanceIds: performers.map(p => p.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: performers.length,
+              instanceIds: performers.map((p) => p.stashInstanceId),
+            }
+          );
         }
         const firstPerformer = performers[0];
         if (firstPerformer?.stashInstanceId) {
@@ -84,19 +98,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'studio': {
+      case "studio": {
         const studios = await prisma.stashStudio.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (studios.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: studios.length,
-            instanceIds: studios.map(s => s.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: studios.length,
+              instanceIds: studios.map((s) => s.stashInstanceId),
+            }
+          );
         }
         const firstStudio = studios[0];
         if (firstStudio?.stashInstanceId) {
@@ -104,19 +121,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'tag': {
+      case "tag": {
         const tags = await prisma.stashTag.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (tags.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: tags.length,
-            instanceIds: tags.map(t => t.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: tags.length,
+              instanceIds: tags.map((t) => t.stashInstanceId),
+            }
+          );
         }
         const firstTag = tags[0];
         if (firstTag?.stashInstanceId) {
@@ -124,19 +144,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'gallery': {
+      case "gallery": {
         const galleries = await prisma.stashGallery.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (galleries.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: galleries.length,
-            instanceIds: galleries.map(g => g.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: galleries.length,
+              instanceIds: galleries.map((g) => g.stashInstanceId),
+            }
+          );
         }
         const firstGallery = galleries[0];
         if (firstGallery?.stashInstanceId) {
@@ -144,19 +167,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'group': {
+      case "group": {
         const groups = await prisma.stashGroup.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (groups.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: groups.length,
-            instanceIds: groups.map(g => g.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: groups.length,
+              instanceIds: groups.map((g) => g.stashInstanceId),
+            }
+          );
         }
         const firstGroup = groups[0];
         if (firstGroup?.stashInstanceId) {
@@ -164,19 +190,22 @@ export async function getEntityInstanceId(
         }
         break;
       }
-      case 'image': {
+      case "image": {
         const images = await prisma.stashImage.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
-          orderBy: { stashInstanceId: 'asc' },
+          orderBy: { stashInstanceId: "asc" },
         });
         if (images.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
-            entityType,
-            entityId,
-            instanceCount: images.length,
-            instanceIds: images.map(i => i.stashInstanceId),
-          });
+          logger.warn(
+            `Entity exists in multiple instances, using first by ID order`,
+            {
+              entityType,
+              entityId,
+              instanceCount: images.length,
+              instanceIds: images.map((i) => i.stashInstanceId),
+            }
+          );
         }
         const firstImage = images[0];
         if (firstImage?.stashInstanceId) {
@@ -227,12 +256,15 @@ function warnBatchDuplicates(
   // Log warnings for any IDs that appear in multiple instances
   for (const [entityId, instanceIds] of idGroups) {
     if (instanceIds.length > 1) {
-      logger.warn(`Batch lookup: entity exists in multiple instances, using first by ID order`, {
-        entityType,
-        entityId,
-        instanceCount: instanceIds.length,
-        instanceIds,
-      });
+      logger.warn(
+        `Batch lookup: entity exists in multiple instances, using first by ID order`,
+        {
+          entityType,
+          entityId,
+          instanceCount: instanceIds.length,
+          instanceIds,
+        }
+      );
     }
   }
 }
@@ -256,12 +288,14 @@ export async function getEntityInstanceIds(
   const fallbackId = getFallbackInstanceId();
 
   if (!fallbackId) {
-    throw new Error(`Cannot get instanceIds for ${entityType}: No Stash instances configured`);
+    throw new Error(
+      `Cannot get instanceIds for ${entityType}: No Stash instances configured`
+    );
   }
 
   try {
     switch (entityType) {
-      case 'scene': {
+      case "scene": {
         const scenes = await prisma.stashScene.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
@@ -271,85 +305,85 @@ export async function getEntityInstanceIds(
         // Query order is undefined, so the winning instance is arbitrary.
         // This is acceptable since this function is a fallback — callers
         // should prefer providing instanceId directly.
-        scenes.forEach(s => {
+        scenes.forEach((s) => {
           if (s.stashInstanceId && !result.has(s.id)) {
             result.set(s.id, s.stashInstanceId);
           }
         });
         break;
       }
-      case 'performer': {
+      case "performer": {
         const performers = await prisma.stashPerformer.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, performers);
-        performers.forEach(p => {
+        performers.forEach((p) => {
           if (p.stashInstanceId && !result.has(p.id)) {
             result.set(p.id, p.stashInstanceId);
           }
         });
         break;
       }
-      case 'studio': {
+      case "studio": {
         const studios = await prisma.stashStudio.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, studios);
-        studios.forEach(s => {
+        studios.forEach((s) => {
           if (s.stashInstanceId && !result.has(s.id)) {
             result.set(s.id, s.stashInstanceId);
           }
         });
         break;
       }
-      case 'tag': {
+      case "tag": {
         const tags = await prisma.stashTag.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, tags);
-        tags.forEach(t => {
+        tags.forEach((t) => {
           if (t.stashInstanceId && !result.has(t.id)) {
             result.set(t.id, t.stashInstanceId);
           }
         });
         break;
       }
-      case 'gallery': {
+      case "gallery": {
         const galleries = await prisma.stashGallery.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, galleries);
-        galleries.forEach(g => {
+        galleries.forEach((g) => {
           if (g.stashInstanceId && !result.has(g.id)) {
             result.set(g.id, g.stashInstanceId);
           }
         });
         break;
       }
-      case 'group': {
+      case "group": {
         const groups = await prisma.stashGroup.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, groups);
-        groups.forEach(g => {
+        groups.forEach((g) => {
           if (g.stashInstanceId && !result.has(g.id)) {
             result.set(g.id, g.stashInstanceId);
           }
         });
         break;
       }
-      case 'image': {
+      case "image": {
         const images = await prisma.stashImage.findMany({
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, images);
-        images.forEach(i => {
+        images.forEach((i) => {
           if (i.stashInstanceId && !result.has(i.id)) {
             result.set(i.id, i.stashInstanceId);
           }
@@ -367,7 +401,7 @@ export async function getEntityInstanceIds(
 
   // Fill in fallback for any missing IDs and log warnings
   const missingIds: string[] = [];
-  entityIds.forEach(id => {
+  entityIds.forEach((id) => {
     if (!result.has(id)) {
       result.set(id, fallbackId);
       missingIds.push(id);
@@ -375,12 +409,15 @@ export async function getEntityInstanceIds(
   });
 
   if (missingIds.length > 0) {
-    logger.warn(`Some entities not found in database, using fallback instance`, {
-      entityType,
-      missingCount: missingIds.length,
-      missingIds: missingIds.slice(0, 10), // Only log first 10 to avoid spam
-      fallbackInstanceId: fallbackId,
-    });
+    logger.warn(
+      `Some entities not found in database, using fallback instance`,
+      {
+        entityType,
+        missingCount: missingIds.length,
+        missingIds: missingIds.slice(0, 10), // Only log first 10 to avoid spam
+        fallbackInstanceId: fallbackId,
+      }
+    );
   }
 
   return result;
@@ -416,13 +453,19 @@ interface MinimalEntityResult {
  * @param entities - Array of entities with id, name, and instanceId
  * @returns Array of minimal entities with disambiguated names
  */
-export function disambiguateEntityNames(entities: EntityWithInstance[]): MinimalEntityResult[] {
+export function disambiguateEntityNames(
+  entities: EntityWithInstance[]
+): MinimalEntityResult[] {
   // Get all instance configs to determine priorities
   const instances = stashInstanceManager.getAllConfigs();
 
   // If only one instance or no instances, no disambiguation needed
   if (instances.length <= 1) {
-    return entities.map(e => ({ id: e.id, name: e.name, instanceId: e.instanceId }));
+    return entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      instanceId: e.instanceId,
+    }));
   }
 
   // Find the default instance (lowest priority number)
@@ -432,11 +475,11 @@ export function disambiguateEntityNames(entities: EntityWithInstance[]): Minimal
 
   // Build instance name lookup
   const instanceNames = new Map<string, string>();
-  instances.forEach(inst => instanceNames.set(inst.id, inst.name));
+  instances.forEach((inst) => instanceNames.set(inst.id, inst.name));
 
   // Group entities by name (case-insensitive) to find duplicates
   const nameGroups = new Map<string, EntityWithInstance[]>();
-  entities.forEach(entity => {
+  entities.forEach((entity) => {
     const normalizedName = (entity.name || "").toLowerCase();
     const group = nameGroups.get(normalizedName) || [];
     group.push(entity);
@@ -446,21 +489,22 @@ export function disambiguateEntityNames(entities: EntityWithInstance[]): Minimal
   // Find names that have duplicates across different instances
   const duplicatedNames = new Set<string>();
   nameGroups.forEach((group, normalizedName) => {
-    const uniqueInstances = new Set(group.map(e => e.instanceId));
+    const uniqueInstances = new Set(group.map((e) => e.instanceId));
     if (uniqueInstances.size > 1) {
       duplicatedNames.add(normalizedName);
     }
   });
 
   // Build result with disambiguated names
-  return entities.map(entity => {
+  return entities.map((entity) => {
     const normalizedName = (entity.name || "").toLowerCase();
     const hasDuplicates = duplicatedNames.has(normalizedName);
     const isNonDefault = entity.instanceId !== defaultInstanceId;
 
     // Only suffix if there are duplicates AND this is a non-default instance
     if (hasDuplicates && isNonDefault) {
-      const instanceName = instanceNames.get(entity.instanceId) || entity.instanceId;
+      const instanceName =
+        instanceNames.get(entity.instanceId) || entity.instanceId;
       return {
         id: entity.id,
         name: `${entity.name} (${instanceName})`,

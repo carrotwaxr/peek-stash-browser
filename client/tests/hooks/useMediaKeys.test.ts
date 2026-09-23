@@ -1,8 +1,8 @@
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { usePlaylistMediaKeys } from "@/hooks/useMediaKeys";
 import { useVideoPlayerShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { usePlaylistMediaKeys } from "@/hooks/useMediaKeys";
 import { isInRatingMode } from "@/hooks/useRatingHotkeys";
 
 vi.mock("@/hooks/useKeyboardShortcuts", () => ({
@@ -75,7 +75,9 @@ describe("usePlaylistMediaKeys", () => {
   // ─── Play/pause ─────────────────────────────────────────────────────────
 
   it("toggles play/pause with space key (plays when paused)", () => {
-    const { player, shortcuts } = captureShortcuts({ paused: vi.fn(() => true) });
+    const { player, shortcuts } = captureShortcuts({
+      paused: vi.fn(() => true),
+    });
 
     shortcuts.space();
 
@@ -84,7 +86,9 @@ describe("usePlaylistMediaKeys", () => {
   });
 
   it("toggles play/pause with space key (pauses when playing)", () => {
-    const { player, shortcuts } = captureShortcuts({ paused: vi.fn(() => false) });
+    const { player, shortcuts } = captureShortcuts({
+      paused: vi.fn(() => false),
+    });
 
     shortcuts.space();
 
@@ -93,7 +97,9 @@ describe("usePlaylistMediaKeys", () => {
   });
 
   it("toggles play/pause with k key", () => {
-    const { player, shortcuts } = captureShortcuts({ paused: vi.fn(() => true) });
+    const { player, shortcuts } = captureShortcuts({
+      paused: vi.fn(() => true),
+    });
 
     shortcuts.k();
 
@@ -356,11 +362,14 @@ describe("usePlaylistMediaKeys", () => {
   it("includes mediatracknext/mediatrackprevious when playlist has multiple scenes", () => {
     const playNext = vi.fn();
     const playPrevious = vi.fn();
-    const { shortcuts } = captureShortcuts({}, {
-      playlist: { scenes: [{}, {}] },
-      playNext,
-      playPrevious,
-    });
+    const { shortcuts } = captureShortcuts(
+      {},
+      {
+        playlist: { scenes: [{}, {}] },
+        playNext,
+        playPrevious,
+      }
+    );
 
     expect(shortcuts.mediatracknext).toBeDefined();
     expect(shortcuts.mediatrackprevious).toBeDefined();

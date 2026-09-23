@@ -99,7 +99,8 @@ export const cmToInches = (cm: number) => Math.round((cm / 2.54) * 10) / 10;
  * @param {number} inches - Length in inches
  * @returns {number} Length in centimeters
  */
-export const inchesToCm = (inches: number) => Math.round(inches * 2.54 * 10) / 10;
+export const inchesToCm = (inches: number) =>
+  Math.round(inches * 2.54 * 10) / 10;
 
 /**
  * Format length for display based on unit preference

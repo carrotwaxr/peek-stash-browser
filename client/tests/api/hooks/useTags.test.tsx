@@ -1,7 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useTagDetail, useTagList } from "../../../src/api/hooks/useTags";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -14,12 +16,10 @@ vi.mock("../../../src/api/queryKeys", () => ({
   queryKeys: {
     tags: {
       all: () => ["tags"],
-      list: (instanceId: string | undefined, params: Record<string, unknown>) => [
-        "tags",
-        instanceId,
-        "list",
-        params,
-      ],
+      list: (
+        instanceId: string | undefined,
+        params: Record<string, unknown>
+      ) => ["tags", instanceId, "list", params],
       detail: (instanceId: string | undefined, id: string) => [
         "tags",
         instanceId,
@@ -29,9 +29,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import { useTagList, useTagDetail } from "../../../src/api/hooks/useTags";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -57,7 +54,9 @@ describe("useTagList", () => {
 
   it("fires query with correct params", async () => {
     const mockData = { tags: [], total: 0 };
-    (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useTagList(params), {
@@ -66,18 +65,24 @@ describe("useTagList", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
-    expect(libraryApi.findTags).toHaveBeenCalledWith(params, expect.any(AbortSignal));
+    expect(libraryApi.findTags).toHaveBeenCalledWith(
+      params,
+      expect.any(AbortSignal)
+    );
   });
 
   it("passes signal to queryFn", async () => {
     const mockData = { tags: [], total: 0 };
-    (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findTags as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useTagList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findTags).toHaveBeenCalled());
-    const callArgs = (libraryApi.findTags as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (libraryApi.findTags as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 });
@@ -97,7 +102,9 @@ describe("useTagDetail", () => {
 
   it("fires query and returns data on success", async () => {
     const mockTag = { id: "tag-1", name: "Test Tag" };
-    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(mockTag);
+    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockTag
+    );
 
     const { result } = renderHook(() => useTagDetail("tag-1"), {
       wrapper: createWrapper(),
@@ -110,7 +117,9 @@ describe("useTagDetail", () => {
 
   it("passes instanceId to findTagById", async () => {
     const mockTag = { id: "tag-1", name: "Test Tag" };
-    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(mockTag);
+    (libraryApi.findTagById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockTag
+    );
 
     const { result } = renderHook(() => useTagDetail("tag-1", "instance-4"), {
       wrapper: createWrapper(),

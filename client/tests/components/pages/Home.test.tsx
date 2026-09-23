@@ -1,5 +1,6 @@
-import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import Home from "@/components/pages/Home";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Mock react-router-dom
@@ -107,7 +108,9 @@ vi.mock("@/components/ui/index", () => ({
     </div>
   ),
   Button: ({ children, onClick }: Record<string, unknown>) => (
-    <button onClick={onClick as () => void}>{children as React.ReactNode}</button>
+    <button onClick={onClick as () => void}>
+      {children as React.ReactNode}
+    </button>
   ),
   ContinueWatchingCarousel: () => <div data-testid="continue-watching" />,
   HideConfirmationDialog: () => <div data-testid="hide-dialog" />,
@@ -128,8 +131,6 @@ vi.mock("@/components/ui/index", () => ({
 
 // Mock shared-types
 vi.mock("@peek/shared-types", () => ({}));
-
-import Home from "@/components/pages/Home";
 
 describe("Home", () => {
   beforeEach(() => {
@@ -190,9 +191,7 @@ describe("Home", () => {
         render(<Home />);
       });
       expect(screen.queryByTestId("scene-carousel")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("continue-watching")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("continue-watching")).not.toBeInTheDocument();
     });
   });
 
@@ -200,7 +199,9 @@ describe("Home", () => {
     it("renders hardcoded carousels when preferences match definitions", async () => {
       const { CAROUSEL_DEFINITIONS } = await import("@/constants/carousels");
       // Temporarily push a definition into the mocked empty array
-      const defs = CAROUSEL_DEFINITIONS as unknown as Array<Record<string, unknown>>;
+      const defs = CAROUSEL_DEFINITIONS as unknown as Array<
+        Record<string, unknown>
+      >;
       defs.push({
         fetchKey: "recentlyAddedScenes",
         title: "Recently Added",
@@ -226,7 +227,9 @@ describe("Home", () => {
 
     it("renders ContinueWatchingCarousel for special carousel", async () => {
       const { CAROUSEL_DEFINITIONS } = await import("@/constants/carousels");
-      const defs = CAROUSEL_DEFINITIONS as unknown as Array<Record<string, unknown>>;
+      const defs = CAROUSEL_DEFINITIONS as unknown as Array<
+        Record<string, unknown>
+      >;
       defs.push({
         fetchKey: "continueWatching",
         title: "Continue Watching",

@@ -34,7 +34,9 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
   const [error, setError] = useState<string | null>(null);
 
   // Restriction state for each entity type
-  const [restrictions, setRestrictions] = useState<Record<EntityType, RestrictionConfig>>({
+  const [restrictions, setRestrictions] = useState<
+    Record<EntityType, RestrictionConfig>
+  >({
     groups: { mode: "NONE", entityIds: [], restrictEmpty: false },
     tags: { mode: "NONE", entityIds: [], restrictEmpty: false },
     studios: { mode: "NONE", entityIds: [], restrictEmpty: false },
@@ -52,18 +54,32 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
       setLoading(true);
       setError(null);
 
-      const data = await apiGet<{ restrictions: Array<{ entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }> }>(`/user/${user.id}/restrictions`);
+      const data = await apiGet<{
+        restrictions: Array<{
+          entityType: EntityType;
+          mode: RestrictionMode;
+          entityIds: string;
+          restrictEmpty: boolean;
+        }>;
+      }>(`/user/${user.id}/restrictions`);
       const existingRestrictions = data.restrictions || [];
 
       // Convert API format to component state
       const newRestrictions = { ...restrictions };
-      existingRestrictions.forEach((restriction: { entityType: EntityType; mode: RestrictionMode; entityIds: string; restrictEmpty: boolean }) => {
-        newRestrictions[restriction.entityType] = {
-          mode: restriction.mode,
-          entityIds: JSON.parse(restriction.entityIds),
-          restrictEmpty: restriction.restrictEmpty,
-        };
-      });
+      existingRestrictions.forEach(
+        (restriction: {
+          entityType: EntityType;
+          mode: RestrictionMode;
+          entityIds: string;
+          restrictEmpty: boolean;
+        }) => {
+          newRestrictions[restriction.entityType] = {
+            mode: restriction.mode,
+            entityIds: JSON.parse(restriction.entityIds),
+            restrictEmpty: restriction.restrictEmpty,
+          };
+        }
+      );
 
       setRestrictions(newRestrictions);
     } catch (err) {
@@ -85,7 +101,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
     }));
   };
 
-  const handleEntityIdsChange = (entityType: EntityType, entityIds: string[]) => {
+  const handleEntityIdsChange = (
+    entityType: EntityType,
+    entityIds: string[]
+  ) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -95,7 +114,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
     }));
   };
 
-  const handleRestrictEmptyChange = (entityType: EntityType, checked: boolean) => {
+  const handleRestrictEmptyChange = (
+    entityType: EntityType,
+    checked: boolean
+  ) => {
     setRestrictions((prev) => ({
       ...prev,
       [entityType]: {
@@ -214,7 +236,9 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
                   name={`${entityType}-mode`}
                   value={mode}
                   checked={config.mode === mode}
-                  onChange={() => handleModeChange(entityType, mode as RestrictionMode)}
+                  onChange={() =>
+                    handleModeChange(entityType, mode as RestrictionMode)
+                  }
                   className="mt-0.5"
                   style={{ accentColor: "var(--primary-color)" }}
                 />
@@ -250,7 +274,12 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
               <SearchableSelect
                 entityType={entityType}
                 value={config.entityIds}
-                onChange={(ids) => handleEntityIdsChange(entityType, Array.isArray(ids) ? ids : [ids])}
+                onChange={(ids) =>
+                  handleEntityIdsChange(
+                    entityType,
+                    Array.isArray(ids) ? ids : [ids]
+                  )
+                }
                 multi={true}
                 placeholder={`Select ${getEntityLabel(
                   entityType

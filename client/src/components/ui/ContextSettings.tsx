@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideSettings } from "lucide-react";
 import { apiPut } from "../../api";
-import { showError, showSuccess } from "../../utils/toast";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import {
+  SETTING_LABELS,
   getAvailableSettings,
   getViewModes,
-  SETTING_LABELS,
 } from "../../config/entityDisplayConfig";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { showError, showSuccess } from "../../utils/toast";
 import ZoomSlider from "./ZoomSlider";
 
 /**
@@ -67,7 +67,10 @@ const ContextSettings = ({
   // native select dropdowns (their options render outside our container)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -102,7 +105,10 @@ const ContextSettings = ({
         }
         showSuccess("Setting saved");
       } catch (err: unknown) {
-        showError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to save setting");
+        showError(
+          (err as { response?: { data?: { error?: string } } })?.response?.data
+            ?.error || "Failed to save setting"
+        );
       } finally {
         setSaving(false);
       }
@@ -137,13 +143,21 @@ const ContextSettings = ({
         disabled={!hasSettings}
         className="px-2.5 h-[34px] rounded-lg transition-colors flex items-center justify-center"
         style={{
-          backgroundColor: isOpen ? "var(--accent-primary)" : "var(--bg-secondary)",
+          backgroundColor: isOpen
+            ? "var(--accent-primary)"
+            : "var(--bg-secondary)",
           border: "1px solid var(--border-color)",
-          color: isOpen ? "white" : hasSettings ? "var(--text-secondary)" : "var(--text-muted)",
+          color: isOpen
+            ? "white"
+            : hasSettings
+              ? "var(--text-secondary)"
+              : "var(--text-muted)",
           opacity: hasSettings ? 1 : 0.5,
           cursor: hasSettings ? "pointer" : "not-allowed",
         }}
-        title={hasSettings ? "View settings" : "No view-specific settings available"}
+        title={
+          hasSettings ? "View settings" : "No view-specific settings available"
+        }
         aria-label="View settings"
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -191,7 +205,9 @@ const ContextSettings = ({
                     <select
                       id={`context-${setting.key}`}
                       value={String(currentValues[setting.key] || "")}
-                      onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                      onChange={(e) =>
+                        handleSettingChange(setting.key, e.target.value)
+                      }
                       disabled={saving}
                       className="w-full px-2 py-1.5 rounded text-sm"
                       style={{
@@ -218,7 +234,9 @@ const ContextSettings = ({
                       id={`context-${setting.key}`}
                       type="checkbox"
                       checked={!!currentValues[setting.key]}
-                      onChange={(e) => handleSettingChange(setting.key, e.target.checked)}
+                      onChange={(e) =>
+                        handleSettingChange(setting.key, e.target.checked)
+                      }
                       disabled={saving}
                       className="w-4 h-4"
                       style={{ accentColor: "var(--accent-primary)" }}
@@ -230,7 +248,8 @@ const ContextSettings = ({
                       {setting.label}
                       {setting.toggleLabel && (
                         <span style={{ color: "var(--text-muted)" }}>
-                          {" "}({setting.toggleLabel})
+                          {" "}
+                          ({setting.toggleLabel})
                         </span>
                       )}
                     </span>
@@ -253,7 +272,9 @@ const ContextSettings = ({
                 </h4>
                 <div className="space-y-2">
                   {/* Default View Mode dropdown */}
-                  {(getAvailableSettings(entityType) as string[]).includes("defaultViewMode") && (
+                  {(getAvailableSettings(entityType) as string[]).includes(
+                    "defaultViewMode"
+                  ) && (
                     <div>
                       <label
                         htmlFor="context-defaultViewMode"
@@ -265,7 +286,12 @@ const ContextSettings = ({
                       <select
                         id="context-defaultViewMode"
                         value={String(cardSettings?.defaultViewMode || "grid")}
-                        onChange={(e) => handleCardSettingChange("defaultViewMode", e.target.value)}
+                        onChange={(e) =>
+                          handleCardSettingChange(
+                            "defaultViewMode",
+                            e.target.value
+                          )
+                        }
                         className="w-full px-2 py-1.5 rounded text-sm"
                         style={{
                           backgroundColor: "var(--bg-secondary)",
@@ -273,7 +299,12 @@ const ContextSettings = ({
                           color: "var(--text-primary)",
                         }}
                       >
-                        {(getViewModes(entityType!) as Array<{ id: string; label: string }>).map((mode) => (
+                        {(
+                          getViewModes(entityType!) as Array<{
+                            id: string;
+                            label: string;
+                          }>
+                        ).map((mode) => (
                           <option key={mode.id} value={mode.id}>
                             {mode.label}
                           </option>
@@ -282,23 +313,30 @@ const ContextSettings = ({
                     </div>
                   )}
                   {/* Default Density - shown for Grid or Wall view modes */}
-                  {(cardSettings?.defaultViewMode === "grid" || cardSettings?.defaultViewMode === "wall") && (
+                  {(cardSettings?.defaultViewMode === "grid" ||
+                    cardSettings?.defaultViewMode === "wall") && (
                     <div className="mt-2">
                       <label
                         className="block text-xs font-medium mb-1"
                         style={{ color: "var(--text-secondary)" }}
                       >
-                        {cardSettings?.defaultViewMode === "grid" ? "Default Grid Density" : "Default Wall Size"}
+                        {cardSettings?.defaultViewMode === "grid"
+                          ? "Default Grid Density"
+                          : "Default Wall Size"}
                       </label>
                       <ZoomSlider
                         value={
                           cardSettings?.defaultViewMode === "grid"
-                            ? String(cardSettings?.defaultGridDensity || "medium")
+                            ? String(
+                                cardSettings?.defaultGridDensity || "medium"
+                              )
                             : String(cardSettings?.defaultWallZoom || "medium")
                         }
                         onChange={(density) =>
                           handleCardSettingChange(
-                            cardSettings?.defaultViewMode === "grid" ? "defaultGridDensity" : "defaultWallZoom",
+                            cardSettings?.defaultViewMode === "grid"
+                              ? "defaultGridDensity"
+                              : "defaultWallZoom",
                             density
                           )
                         }
@@ -307,18 +345,43 @@ const ContextSettings = ({
                   )}
                   {/* Toggle settings */}
                   {(getAvailableSettings(entityType!) as string[])
-                    .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom", "showDescriptionOnDetail"].includes(key))
+                    .filter(
+                      (key) =>
+                        ![
+                          "defaultViewMode",
+                          "defaultGridDensity",
+                          "defaultWallZoom",
+                          "showDescriptionOnDetail",
+                        ].includes(key)
+                    )
                     .map((settingKey) => (
-                      <label key={settingKey} className="flex items-center cursor-pointer">
+                      <label
+                        key={settingKey}
+                        className="flex items-center cursor-pointer"
+                      >
                         <input
                           type="checkbox"
-                          checked={Boolean((cardSettings as Record<string, unknown> | null)?.[settingKey] ?? true)}
-                          onChange={(e) => handleCardSettingChange(settingKey, e.target.checked)}
+                          checked={Boolean(
+                            (cardSettings as Record<string, unknown> | null)?.[
+                              settingKey
+                            ] ?? true
+                          )}
+                          onChange={(e) =>
+                            handleCardSettingChange(
+                              settingKey,
+                              e.target.checked
+                            )
+                          }
                           className="w-4 h-4"
                           style={{ accentColor: "var(--accent-primary)" }}
                         />
-                        <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                          {SETTING_LABELS[settingKey as keyof typeof SETTING_LABELS] || settingKey}
+                        <span
+                          className="ml-2 text-sm"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {SETTING_LABELS[
+                            settingKey as keyof typeof SETTING_LABELS
+                          ] || settingKey}
                         </span>
                       </label>
                     ))}

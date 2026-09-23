@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import ZoomSlider from "../ui/ZoomSlider";
 import {
   ENTITY_DISPLAY_CONFIG,
-  getEntityTypes,
-  getAvailableSettings,
-  getViewModes,
-  SETTING_LABELS,
   SETTING_DESCRIPTIONS,
+  SETTING_LABELS,
+  getAvailableSettings,
+  getEntityTypes,
+  getViewModes,
 } from "../../config/entityDisplayConfig";
-import { showSuccess, showError } from "../../utils/toast";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { showError, showSuccess } from "../../utils/toast";
+import ZoomSlider from "../ui/ZoomSlider";
 
 interface ToggleProps {
   label: string;
@@ -53,7 +53,13 @@ interface DropdownProps {
   description?: string;
 }
 
-const Dropdown = ({ label, value, options, onChange, description }: DropdownProps) => (
+const Dropdown = ({
+  label,
+  value,
+  options,
+  onChange,
+  description,
+}: DropdownProps) => (
   <div className="flex flex-col gap-1">
     <label className="flex items-center justify-between gap-3">
       <div>
@@ -92,7 +98,10 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
   const { getSettings, updateSettings } = useCardDisplaySettings();
   const settings = getSettings(entityType) as Record<string, string | boolean>;
   const availableSettings = getAvailableSettings(entityType) as string[];
-  const viewModes = getViewModes(entityType) as Array<{ id: string; label: string }>;
+  const viewModes = getViewModes(entityType) as Array<{
+    id: string;
+    label: string;
+  }>;
 
   const handleChange = async (key: string, value: string | boolean) => {
     try {
@@ -117,21 +126,26 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
         )}
 
         {/* Default Density - shown for Grid or Wall view modes */}
-        {(settings.defaultViewMode === "grid" || settings.defaultViewMode === "wall") && (
+        {(settings.defaultViewMode === "grid" ||
+          settings.defaultViewMode === "wall") && (
           <div className="mt-2">
             <label className="flex items-center justify-between gap-3">
               <span style={{ color: "var(--text-primary)" }}>
-                {settings.defaultViewMode === "grid" ? "Default Grid Density" : "Default Wall Size"}
+                {settings.defaultViewMode === "grid"
+                  ? "Default Grid Density"
+                  : "Default Wall Size"}
               </span>
               <ZoomSlider
                 value={
                   settings.defaultViewMode === "grid"
-                    ? ((settings.defaultGridDensity as string) || "medium")
-                    : ((settings.defaultWallZoom as string) || "medium")
+                    ? (settings.defaultGridDensity as string) || "medium"
+                    : (settings.defaultWallZoom as string) || "medium"
                 }
                 onChange={(density) =>
                   handleChange(
-                    settings.defaultViewMode === "grid" ? "defaultGridDensity" : "defaultWallZoom",
+                    settings.defaultViewMode === "grid"
+                      ? "defaultGridDensity"
+                      : "defaultWallZoom",
                     density
                   )
                 }
@@ -142,14 +156,23 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
 
         {/* Toggle settings */}
         {availableSettings
-          .filter((key: string) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
+          .filter(
+            (key: string) =>
+              ![
+                "defaultViewMode",
+                "defaultGridDensity",
+                "defaultWallZoom",
+              ].includes(key)
+          )
           .map((settingKey: string) => (
             <Toggle
               key={settingKey}
               label={(SETTING_LABELS as Record<string, string>)[settingKey]}
               checked={settings[settingKey] as boolean}
               onChange={(v) => handleChange(settingKey, v)}
-              description={(SETTING_DESCRIPTIONS as Record<string, string>)[settingKey]}
+              description={
+                (SETTING_DESCRIPTIONS as Record<string, string>)[settingKey]
+              }
             />
           ))}
       </div>
@@ -176,7 +199,9 @@ const CardDisplaySettings = () => {
       {/* Accordion-style entity sections */}
       <div className="space-y-2">
         {entityTypes.map((entityType) => {
-          const config = (ENTITY_DISPLAY_CONFIG as Record<string, { label: string }>)[entityType];
+          const config = (
+            ENTITY_DISPLAY_CONFIG as Record<string, { label: string }>
+          )[entityType];
           return (
             <div
               key={entityType}
@@ -188,7 +213,9 @@ const CardDisplaySettings = () => {
             >
               <button
                 onClick={() =>
-                  setExpandedEntity(expandedEntity === entityType ? null : entityType)
+                  setExpandedEntity(
+                    expandedEntity === entityType ? null : entityType
+                  )
                 }
                 className="w-full px-4 py-3 flex justify-between items-center"
                 style={{ color: "var(--text-primary)" }}

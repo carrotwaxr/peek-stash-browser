@@ -1,11 +1,6 @@
 import { forwardRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronRight,
-  Heart,
-  ExternalLink,
-  Droplets,
-} from "lucide-react";
+import { ChevronRight, Droplets, ExternalLink, Heart } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
@@ -109,7 +104,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     const handleDoubleClick = useCallback(
       (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+          state: { fromPageTitle: "Tags" },
+        });
       },
       [navigate, tag, hasMultipleInstances]
     );
@@ -117,7 +114,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     const handleNavigateClick = useCallback(
       (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+          state: { fromPageTitle: "Tags" },
+        });
       },
       [navigate, tag, hasMultipleInstances]
     );
@@ -126,7 +125,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
       (e: React.KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
+          navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+            state: { fromPageTitle: "Tags" },
+          });
         }
       },
       [navigate, tag, hasMultipleInstances]
@@ -157,9 +158,7 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
           `}
           style={{
             marginLeft: `${depth * 24}px`,
-            backgroundColor: isFocused
-              ? "var(--bg-tertiary)"
-              : "transparent",
+            backgroundColor: isFocused ? "var(--bg-tertiary)" : "transparent",
           }}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
@@ -223,9 +222,14 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
               >
                 <ENTITY_ICONS.scene
                   size={16}
-                  style={{ color: hueify("var(--accent-secondary)", "lighter") }}
+                  style={{
+                    color: hueify("var(--accent-secondary)", "lighter"),
+                  }}
                 />
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {tag.scene_count}
                 </span>
               </div>
@@ -241,7 +245,10 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
                   size={16}
                   style={{ color: hueify("var(--status-success)", "lighter") }}
                 />
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {tag.image_count}
                 </span>
               </div>
@@ -257,29 +264,33 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
                   size={16}
                   style={{ color: "var(--accent-primary)" }}
                 />
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {tag.performer_count}
                 </span>
               </div>
             )}
 
             {/* Rating badge - metallic medal style */}
-            {(tag.rating100 ?? 0) > 0 && (() => {
-              const ratingStyle = getRatingStyle(tag.rating100);
-              if (!ratingStyle) return null;
-              return (
-                <span
-                  className="text-xs px-2 py-0.5 rounded font-bold"
-                  style={{
-                    background: ratingStyle.background,
-                    color: ratingStyle.color,
-                  }}
-                  title={`Rating: ${(tag.rating100! / 10).toFixed(1)}`}
-                >
-                  {(tag.rating100! / 10).toFixed(1)}
-                </span>
-              );
-            })()}
+            {(tag.rating100 ?? 0) > 0 &&
+              (() => {
+                const ratingStyle = getRatingStyle(tag.rating100);
+                if (!ratingStyle) return null;
+                return (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded font-bold"
+                    style={{
+                      background: ratingStyle.background,
+                      color: ratingStyle.color,
+                    }}
+                    title={`Rating: ${(tag.rating100! / 10).toFixed(1)}`}
+                  >
+                    {(tag.rating100! / 10).toFixed(1)}
+                  </span>
+                );
+              })()}
 
             {/* O-Counter - droplets icon with info color */}
             {(tag.o_counter ?? 0) > 0 && (
@@ -287,11 +298,11 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
                 className="flex items-center gap-1"
                 title={`O-Counter: ${tag.o_counter}`}
               >
-                <Droplets
-                  size={16}
-                  style={{ color: "var(--status-info)" }}
-                />
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                <Droplets size={16} style={{ color: "var(--status-info)" }} />
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {tag.o_counter}
                 </span>
               </div>

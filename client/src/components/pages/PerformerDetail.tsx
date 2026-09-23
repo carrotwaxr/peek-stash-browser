@@ -1,17 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import type { NormalizedImage } from "@peek/shared-types";
+import type { TagRef } from "@peek/shared-types";
+import { ArrowLeft } from "lucide-react";
+import { libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions";
-import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
+import {
+  formatHeight,
+  formatLength,
+  formatWeight,
+} from "../../utils/unitConversions";
+import { GalleryGrid, GroupGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   FavoriteButton,
@@ -25,15 +32,14 @@ import {
   TabNavigation,
   TagChips,
 } from "../ui/index";
-import { GalleryGrid, GroupGrid } from "../grids/index";
-import ViewInStashButton from "../ui/ViewInStashButton";
-import type { TagRef } from "@peek/shared-types";
 
 const PerformerDetail = () => {
   const { performerId } = useParams<{ performerId: string }>();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [performer, setPerformer] = useState<Record<string, unknown> | null>(null);
+  const [performer, setPerformer] = useState<Record<string, unknown> | null>(
+    null
+  );
   const [rating, setRating] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -49,15 +55,32 @@ const PerformerDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: 'scenes', label: 'Scenes', count: (performer?.scene_count as number) || 0 },
-    { id: 'galleries', label: 'Galleries', count: (performer?.gallery_count as number) || 0 },
-    { id: 'images', label: 'Images', count: (performer?.image_count as number) || 0 },
-    { id: 'groups', label: 'Collections', count: (performer?.group_count as number) || 0 },
+    {
+      id: "scenes",
+      label: "Scenes",
+      count: (performer?.scene_count as number) || 0,
+    },
+    {
+      id: "galleries",
+      label: "Galleries",
+      count: (performer?.gallery_count as number) || 0,
+    },
+    {
+      id: "images",
+      label: "Images",
+      count: (performer?.image_count as number) || 0,
+    },
+    {
+      id: "groups",
+      label: "Collections",
+      count: (performer?.group_count as number) || 0,
+    },
   ];
-  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+  const effectiveDefaultTab =
+    contentTabs.find((t) => t.count > 0)?.id || "scenes";
 
   // Get active tab from URL or default to first tab with content
-  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
+  const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // Set page title to performer name
   usePageTitle((performer?.name as string) || "Performer");
@@ -66,7 +89,10 @@ const PerformerDetail = () => {
     const fetchPerformer = async () => {
       try {
         setIsLoading(true);
-        const performerData = await libraryApi.findPerformerById(performerId!, instanceId) as Record<string, unknown> | null;
+        const performerData = (await libraryApi.findPerformerById(
+          performerId!,
+          instanceId
+        )) as Record<string, unknown> | null;
         setPerformer(performerData);
         setRating(performerData?.rating as number | null);
         setIsFavorite((performerData?.favorite as boolean) || false);
@@ -83,17 +109,29 @@ const PerformerDetail = () => {
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("performer", performerId!, newRating, instanceId);
+      await libraryApi.updateRating(
+        "performer",
+        performerId!,
+        newRating,
+        instanceId
+      );
     } catch (error) {
       console.error("Failed to update rating:", error);
-      setRating((performer as Record<string, unknown>)?.rating as number | null); // Revert on error
+      setRating(
+        (performer as Record<string, unknown>)?.rating as number | null
+      ); // Revert on error
     }
   };
 
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("performer", performerId!, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        "performer",
+        performerId!,
+        newValue,
+        instanceId
+      );
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((performer?.favorite as boolean) || false); // Revert on error
@@ -105,11 +143,12 @@ const PerformerDetail = () => {
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
-   
+
   useRatingHotkeys({
     enabled: !isLoading && !!performer,
     setRating: handleRatingChange,
-    toggleFavorite });
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (
@@ -149,7 +188,10 @@ const PerformerDetail = () => {
                       size="large"
                     />
                   )}
-                  <ViewInStashButton stashUrl={(performer?.stashUrl as string) || ""} size={24} />
+                  <ViewInStashButton
+                    stashUrl={(performer?.stashUrl as string) || ""}
+                    size={24}
+                  />
                 </div>
               ) as unknown as string
             }
@@ -195,8 +237,11 @@ const PerformerDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {contentTabs.every(t => t.count === 0) ? (
-            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+          {contentTabs.every((t) => t.count === 0) ? (
+            <div
+              className="py-16 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
               This performer has no content in Peek
             </div>
           ) : (
@@ -207,44 +252,62 @@ const PerformerDetail = () => {
               />
 
               {/* Tab Content */}
-              {activeTab === 'scenes' && (
+              {activeTab === "scenes" && (
                 <SceneSearch
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
                       value: [makeCompositeKey(performerId!, instanceId!)],
-                      modifier: "INCLUDES" } }}
+                      modifier: "INCLUDES",
+                    },
+                  }}
                   permanentFiltersMetadata={{
-                    performers: [{ id: makeCompositeKey(performerId!, instanceId!), name: performer?.name as string }] }}
+                    performers: [
+                      {
+                        id: makeCompositeKey(performerId!, instanceId!),
+                        name: performer?.name as string,
+                      },
+                    ],
+                  }}
                   subtitle={undefined}
                   title={`Scenes featuring ${performer?.name as string}`}
                   fromPageTitle={(performer?.name as string) || "Performer"}
                 />
               )}
 
-              {activeTab === 'galleries' && (
+              {activeTab === "galleries" && (
                 <GalleryGrid
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
                         value: [makeCompositeKey(performerId!, instanceId!)],
-                        modifier: "INCLUDES" } } }}
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No galleries found for ${performer?.name as string}`}
                 />
               )}
 
-              {activeTab === 'images' && (
-                <ImagesTab performerId={performerId} instanceId={instanceId} performerName={performer?.name as string | undefined} />
+              {activeTab === "images" && (
+                <ImagesTab
+                  performerId={performerId}
+                  instanceId={instanceId}
+                  performerName={performer?.name as string | undefined}
+                />
               )}
 
-              {activeTab === 'groups' && (
+              {activeTab === "groups" && (
                 <GroupGrid
                   lockedFilters={{
                     group_filter: {
                       performers: {
                         value: [makeCompositeKey(performerId!, instanceId!)],
-                        modifier: "INCLUDES" } } }}
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${performer?.name as string}`}
                 />
@@ -290,7 +353,13 @@ interface StatFieldProps {
   isActive?: boolean;
 }
 
-const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: StatFieldProps) => {
+const StatField = ({
+  label,
+  value,
+  valueColor = "var(--text-primary)",
+  onClick,
+  isActive,
+}: StatFieldProps) => {
   if (!value && value !== 0) return null;
 
   const clickable = onClick && Number(value) > 0;
@@ -305,8 +374,9 @@ const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, 
           className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
           style={{
             color: valueColor,
-            cursor: isActive ? 'default' : 'pointer',
-            textDecoration: isActive ? 'underline' : 'none' }}
+            cursor: isActive ? "default" : "pointer",
+            textDecoration: isActive ? "underline" : "none",
+          }}
         >
           {value}
         </button>
@@ -346,7 +416,8 @@ const Card = ({ children, title }: CardProps) => {
     <div
       className="p-4 rounded-lg p-6 mb-6"
       style={{
-        backgroundColor: "var(--bg-card)" }}
+        backgroundColor: "var(--bg-card)",
+      }}
     >
       {title && (
         <h2
@@ -385,7 +456,9 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
     return age;
   };
 
-  const age = performer?.birthdate ? getAge(performer.birthdate as string) : null;
+  const age = performer?.birthdate
+    ? getAge(performer.birthdate as string)
+    : null;
 
   return (
     <Card title="Details">
@@ -395,7 +468,8 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
           className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "2px solid var(--accent-primary)" }}
+            borderBottom: "2px solid var(--accent-primary)",
+          }}
         >
           Personal Information
         </h3>
@@ -417,9 +491,18 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
                 : null
             }
           />
-          <DetailField label="Career" value={performer?.career_length as string | undefined} />
-          <DetailField label="Country" value={performer?.country as string | undefined} />
-          <DetailField label="Ethnicity" value={performer?.ethnicity as string | undefined} />
+          <DetailField
+            label="Career"
+            value={performer?.career_length as string | undefined}
+          />
+          <DetailField
+            label="Country"
+            value={performer?.country as string | undefined}
+          />
+          <DetailField
+            label="Ethnicity"
+            value={performer?.ethnicity as string | undefined}
+          />
         </div>
       </div>
 
@@ -429,19 +512,28 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
           className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "2px solid var(--accent-primary)" }}
+            borderBottom: "2px solid var(--accent-primary)",
+          }}
         >
           Physical Attributes
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DetailField label="Eye Color" value={performer?.eye_color as string | undefined} />
-          <DetailField label="Hair Color" value={performer?.hair_color as string | undefined} />
+          <DetailField
+            label="Eye Color"
+            value={performer?.eye_color as string | undefined}
+          />
+          <DetailField
+            label="Hair Color"
+            value={performer?.hair_color as string | undefined}
+          />
           <DetailField
             label="Height"
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.height_cm ? formatHeight(performer.height_cm as number, unitPreference) : null
+                : performer?.height_cm
+                  ? formatHeight(performer.height_cm as number, unitPreference)
+                  : null
             }
           />
           <DetailField
@@ -449,20 +541,36 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.weight ? formatWeight(performer.weight as number, unitPreference) : null
+                : performer?.weight
+                  ? formatWeight(performer.weight as number, unitPreference)
+                  : null
             }
           />
-          <DetailField label="Measurements" value={performer?.measurements as string | undefined} />
-          <DetailField label="Fake Tits" value={performer?.fake_tits as string | undefined} />
+          <DetailField
+            label="Measurements"
+            value={performer?.measurements as string | undefined}
+          />
+          <DetailField
+            label="Fake Tits"
+            value={performer?.fake_tits as string | undefined}
+          />
           <DetailField
             label="Penis Length"
             value={
               isLoadingUnits
                 ? "..."
-                : performer?.penis_length ? formatLength(performer.penis_length as number, unitPreference) : null
+                : performer?.penis_length
+                  ? formatLength(
+                      performer.penis_length as number,
+                      unitPreference
+                    )
+                  : null
             }
           />
-          <DetailField label="Circumcised" value={performer?.circumcised as string | undefined} />
+          <DetailField
+            label="Circumcised"
+            value={performer?.circumcised as string | undefined}
+          />
         </div>
       </div>
 
@@ -473,13 +581,20 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
             style={{
               color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)" }}
+              borderBottom: "2px solid var(--accent-primary)",
+            }}
           >
             Body Modifications
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DetailField label="Tattoos" value={performer?.tattoos as string | undefined} />
-            <DetailField label="Piercings" value={performer?.piercings as string | undefined} />
+            <DetailField
+              label="Tattoos"
+              value={performer?.tattoos as string | undefined}
+            />
+            <DetailField
+              label="Piercings"
+              value={performer?.piercings as string | undefined}
+            />
           </div>
         </div>
       )}
@@ -491,7 +606,8 @@ const PerformerDetails = ({ performer }: PerformerDetailsProps) => {
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
             style={{
               color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)" }}
+              borderBottom: "2px solid var(--accent-primary)",
+            }}
           >
             Other
           </h3>
@@ -512,26 +628,33 @@ interface PerformerStatsProps {
   performerId: string;
 }
 
-const PerformerStats = ({ performer, performerId: _performerId }: PerformerStatsProps) => {  
+const PerformerStats = ({
+  performer,
+  performerId: _performerId,
+}: PerformerStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'scenes';
+  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === 'scenes') {
-      newParams.delete('tab');
+    if (tabId === "scenes") {
+      newParams.delete("tab");
     } else {
-      newParams.set('tab', tabId);
+      newParams.set("tab", tabId);
     }
     setSearchParams(newParams);
     // Scroll to content area
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
   // Calculate O-Count percentage
   const oCountPercentage =
     performer?.scene_count && performer?.o_counter
-      ? (((performer.o_counter as number) / (performer.scene_count as number)) * 100).toFixed(1)
+      ? (
+          ((performer.o_counter as number) /
+            (performer.scene_count as number)) *
+          100
+        ).toFixed(1)
       : null;
 
   // Cap the progress bar width at 100% but show actual percentage
@@ -547,8 +670,8 @@ const PerformerStats = ({ performer, performerId: _performerId }: PerformerStats
           label="Scenes:"
           value={(performer?.scene_count as number) || 0}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('scenes')}
-          isActive={activeTab === 'scenes'}
+          onClick={() => handleTabSwitch("scenes")}
+          isActive={activeTab === "scenes"}
         />
         <StatField
           label="O-Count:"
@@ -559,22 +682,22 @@ const PerformerStats = ({ performer, performerId: _performerId }: PerformerStats
           label="Galleries:"
           value={(performer?.gallery_count as number) || 0}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('galleries')}
-          isActive={activeTab === 'galleries'}
+          onClick={() => handleTabSwitch("galleries")}
+          isActive={activeTab === "galleries"}
         />
         <StatField
           label="Images:"
           value={(performer?.image_count as number) || 0}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('images')}
-          isActive={activeTab === 'images'}
+          onClick={() => handleTabSwitch("images")}
+          isActive={activeTab === "images"}
         />
         <StatField
           label="Collections:"
           value={(performer?.group_count as number) || 0}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('groups')}
-          isActive={activeTab === 'groups'}
+          onClick={() => handleTabSwitch("groups")}
+          isActive={activeTab === "groups"}
         />
       </div>
 
@@ -603,7 +726,8 @@ const PerformerStats = ({ performer, performerId: _performerId }: PerformerStats
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${performer!.rating100 as number}%`,
-                backgroundColor: "var(--accent-primary)" }}
+                backgroundColor: "var(--accent-primary)",
+              }}
             />
           </div>
         </div>
@@ -634,11 +758,13 @@ const PerformerStats = ({ performer, performerId: _performerId }: PerformerStats
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${oCountBarWidth}%`,
-                backgroundColor: "var(--accent-primary)" }}
+                backgroundColor: "var(--accent-primary)",
+              }}
             />
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-            {performer?.o_counter as React.ReactNode} O-Counts in {performer?.scene_count as React.ReactNode} scenes
+            {performer?.o_counter as React.ReactNode} O-Counts in{" "}
+            {performer?.scene_count as React.ReactNode} scenes
           </div>
         </div>
       )}
@@ -658,7 +784,8 @@ const PerformerImage = ({ performer }: PerformerImageProps) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "7/10",
         width: "100%",
-        maxHeight: "50vh" }}
+        maxHeight: "50vh",
+      }}
     >
       {performer?.image_path ? (
         <img
@@ -667,7 +794,8 @@ const PerformerImage = ({ performer }: PerformerImageProps) => {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain" }}
+            objectFit: "contain",
+          }}
         />
       ) : (
         <svg
@@ -703,7 +831,8 @@ const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
   const hasTags = (tags?.length ?? 0) > 0;
   const showDetails = settings?.showDescriptionOnDetail !== false;
 
-  if (!hasLinks && !hasTags && !(performer?.details && showDetails)) return null;
+  if (!hasLinks && !hasTags && !(performer?.details && showDetails))
+    return null;
 
   return (
     <>
@@ -713,7 +842,9 @@ const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
           <div className="flex flex-wrap gap-2">
             {!!performer?.url && <SectionLink url={performer.url as string} />}
             {!!performer?.twitter && (
-              <SectionLink url={`https://twitter.com/${performer.twitter as string}`} />
+              <SectionLink
+                url={`https://twitter.com/${performer.twitter as string}`}
+              />
             )}
             {!!performer?.instagram && (
               <SectionLink
@@ -756,26 +887,33 @@ interface ImagesTabProps {
   performerName: string | undefined;
 }
 
-const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) => {
+const ImagesTab = ({
+  performerId,
+  instanceId,
+  performerName,
+}: ImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page') || '1', 10) || 1;
+  const urlPage = parseInt(searchParams.get("page") || "1", 10) || 1;
 
-  const handleImagePageChange = useCallback((newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(newPage));
-    }
-    // Preserve tab param
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
+  const handleImagePageChange = useCallback(
+    (newPage: number) => {
+      const params = new URLSearchParams(searchParams);
+      if (newPage === 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(newPage));
+      }
+      // Preserve tab param
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams]
+  );
 
   const fetchImages = useCallback(
     async (page: number, perPage: number) => {
-      const data = await libraryApi.findImages({
+      const data = (await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
@@ -783,7 +921,7 @@ const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) =
             modifier: "INCLUDES",
           },
         },
-      }) as { findImages?: { images?: NormalizedImage[]; count?: number } };
+      })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
         images: data.findImages?.images || [],
         count: data.findImages?.count || 0,
@@ -792,12 +930,13 @@ const ImagesTab = ({ performerId, instanceId, performerName }: ImagesTabProps) =
     [performerId, instanceId]
   );
 
-  const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination<NormalizedImage>({
-    fetchImages,
-    dependencies: [performerId, instanceId],
-    externalPage: urlPage,
-    onExternalPageChange: handleImagePageChange,
-  });
+  const { images, totalCount, isLoading, lightbox, setImages } =
+    useImagesPagination<NormalizedImage>({
+      fetchImages,
+      dependencies: [performerId, instanceId],
+      externalPage: urlPage,
+      onExternalPageChange: handleImagePageChange,
+    });
 
   return (
     <PaginatedImageGrid

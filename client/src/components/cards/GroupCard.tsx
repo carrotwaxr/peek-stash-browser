@@ -1,15 +1,18 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedGroup } from "@peek/shared-types";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
+import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
 interface Props {
-  group: NormalizedGroup & { sub_group_count?: number; description?: string | null };
+  group: NormalizedGroup & {
+    sub_group_count?: number;
+    description?: string | null;
+  };
   fromPageTitle?: string;
   tabIndex?: number;
   onHideSuccess?: (entityId: string, entityType: string) => void;
@@ -34,23 +37,44 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         parts.push(group.date);
       }
 
-      return parts.length > 0 ? parts.join(' • ') : null;
+      return parts.length > 0 ? parts.join(" • ") : null;
     })();
 
     const indicators = useMemo(() => {
-      const tagsTooltip = getIndicatorBehavior('group', 'tags') === 'rich' &&
+      const tagsTooltip = getIndicatorBehavior("group", "tags") === "rich" &&
         group.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" parentInstanceId={group.instanceId} />
+          <TooltipEntityGrid
+            entityType="tag"
+            entities={group.tags}
+            title="Tags"
+            parentInstanceId={group.instanceId}
+          />
         );
 
-      const performersTooltip = getIndicatorBehavior('group', 'performers') === 'rich' &&
+      const performersTooltip = getIndicatorBehavior("group", "performers") ===
+        "rich" &&
         (group.performers?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" parentInstanceId={group.instanceId} />
+          <TooltipEntityGrid
+            entityType="performer"
+            entities={group.performers}
+            title="Performers"
+            parentInstanceId={group.instanceId}
+          />
         );
 
-      const galleriesTooltip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior("group", "galleries") ===
+        "rich" &&
         (group.galleries?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={group.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={group.instanceId} />
+          <TooltipEntityGrid
+            entityType="gallery"
+            entities={
+              group.galleries as React.ComponentProps<
+                typeof TooltipEntityGrid
+              >["entities"]
+            }
+            title="Galleries"
+            parentInstanceId={group.instanceId}
+          />
         );
 
       return [
@@ -59,7 +83,14 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           count: group.scene_count,
           onClick:
             group.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/scenes?groupIds=${group.id}`,
+                      group,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -67,7 +98,14 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
           count: group.sub_group_count,
           onClick:
             (group.sub_group_count ?? 0) > 0
-              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/collections?groupIds=${group.id}`,
+                      group,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -89,7 +127,9 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
     }, [group, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
-    const indicatorsToShow = groupSettings.showRelationshipIndicators ? indicators : [];
+    const indicatorsToShow = groupSettings.showRelationshipIndicators
+      ? indicators
+      : [];
 
     return (
       <BaseCard
@@ -99,11 +139,15 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
         title={group.name}
         subtitle={subtitle}
         description={group.description}
-        linkTo={getEntityPath('group', group, hasMultipleInstances)}
+        linkTo={getEntityPath("group", group, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard as boolean | undefined }}
+        displayPreferences={{
+          showDescription: groupSettings.showDescriptionOnCard as
+            | boolean
+            | undefined,
+        }}
         ratingControlsProps={{
           entityId: group.id,
           instanceId: group.instanceId,

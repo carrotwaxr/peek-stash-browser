@@ -4,9 +4,15 @@
  * Tests the performer filtering implementation in controllers/library/performers.ts
  * Uses mock data to validate filter behavior without database dependency
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedPerformer, PeekPerformerFilter } from "../../types/index.js";
-import { applyPerformerFilters, parseCareerLength } from "../../controllers/library/performers.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  applyPerformerFilters,
+  parseCareerLength,
+} from "../../controllers/library/performers.js";
+import type {
+  NormalizedPerformer,
+  PeekPerformerFilter,
+} from "../../types/index.js";
 import {
   createMockPerformer,
   createMockPerformers,
@@ -37,7 +43,11 @@ describe("Performer Filters", () => {
     });
 
     it("should filter performers by multiple IDs", async () => {
-      const targetIds = [mockPerformers[0].id, mockPerformers[5].id, mockPerformers[10].id];
+      const targetIds = [
+        mockPerformers[0].id,
+        mockPerformers[5].id,
+        mockPerformers[10].id,
+      ];
       const filter: PeekPerformerFilter = {
         ids: { value: targetIds, modifier: "INCLUDES" },
       };
@@ -644,13 +654,18 @@ describe("Performer Filters", () => {
     });
 
     it("should handle performers with null ratings correctly", async () => {
-      const performersWithNullRatings = mockPerformers.filter((p) => !p.rating100);
+      const performersWithNullRatings = mockPerformers.filter(
+        (p) => !p.rating100
+      );
 
       const filter: PeekPerformerFilter = {
         rating100: { value: 0, modifier: "GREATER_THAN" },
       };
 
-      const result = await applyPerformerFilters(performersWithNullRatings, filter);
+      const result = await applyPerformerFilters(
+        performersWithNullRatings,
+        filter
+      );
 
       // Performers with null ratings should be treated as 0
       expect(result.length).toBe(0);
@@ -666,7 +681,10 @@ describe("Performer Filters", () => {
         scene_count: { value: 0, modifier: "EQUALS" },
       };
 
-      const result = await applyPerformerFilters([performerWithZeroScenes], filter);
+      const result = await applyPerformerFilters(
+        [performerWithZeroScenes],
+        filter
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].scene_count).toBe(0);
@@ -798,8 +816,8 @@ describe("Career Length Filter", () => {
     const performers = [
       createMockPerformer({ id: "p1", career_length: "2015-present" }), // ~9-10 years
       createMockPerformer({ id: "p2", career_length: "2022-present" }), // ~2-3 years
-      createMockPerformer({ id: "p3", career_length: "5 years" }),      // 5 years
-      createMockPerformer({ id: "p4", career_length: null }),           // null - excluded
+      createMockPerformer({ id: "p3", career_length: "5 years" }), // 5 years
+      createMockPerformer({ id: "p4", career_length: null }), // null - excluded
     ];
 
     const filter: PeekPerformerFilter = {
@@ -810,17 +828,17 @@ describe("Career Length Filter", () => {
 
     // Should include p1 (9-10 years > 4) and p3 (5 years > 4)
     expect(result.length).toBeGreaterThanOrEqual(2);
-    expect(result.find(p => p.id === "p1")).toBeDefined();
-    expect(result.find(p => p.id === "p3")).toBeDefined();
+    expect(result.find((p) => p.id === "p1")).toBeDefined();
+    expect(result.find((p) => p.id === "p3")).toBeDefined();
     // Should exclude p4 (null career_length)
-    expect(result.find(p => p.id === "p4")).toBeUndefined();
+    expect(result.find((p) => p.id === "p4")).toBeUndefined();
   });
 
   it("should filter performers by career_length with LESS_THAN modifier", async () => {
     const performers = [
       createMockPerformer({ id: "p1", career_length: "2015-present" }), // ~9-10 years
       createMockPerformer({ id: "p2", career_length: "2022-present" }), // ~2-3 years
-      createMockPerformer({ id: "p3", career_length: "1 year" }),       // 1 year
+      createMockPerformer({ id: "p3", career_length: "1 year" }), // 1 year
     ];
 
     const filter: PeekPerformerFilter = {
@@ -830,10 +848,10 @@ describe("Career Length Filter", () => {
     const result = await applyPerformerFilters(performers, filter);
 
     // Should include p2 and p3 (both < 5 years)
-    expect(result.find(p => p.id === "p2")).toBeDefined();
-    expect(result.find(p => p.id === "p3")).toBeDefined();
+    expect(result.find((p) => p.id === "p2")).toBeDefined();
+    expect(result.find((p) => p.id === "p3")).toBeDefined();
     // Should exclude p1 (9-10 years)
-    expect(result.find(p => p.id === "p1")).toBeUndefined();
+    expect(result.find((p) => p.id === "p1")).toBeUndefined();
   });
 
   it("should filter performers by career_length with BETWEEN modifier (both bounds)", async () => {
@@ -852,8 +870,8 @@ describe("Career Length Filter", () => {
 
     // Should include p1 (10 years) and p2 (5 years) - both between 3-12
     expect(result).toHaveLength(2);
-    expect(result.find(p => p.id === "p1")).toBeDefined();
-    expect(result.find(p => p.id === "p2")).toBeDefined();
+    expect(result.find((p) => p.id === "p1")).toBeDefined();
+    expect(result.find((p) => p.id === "p2")).toBeDefined();
   });
 
   it("should filter performers by career_length with BETWEEN modifier (max only)", async () => {
@@ -871,8 +889,8 @@ describe("Career Length Filter", () => {
 
     // Should include p2 (2 years) and p3 (1 year) - both <= 3
     expect(result).toHaveLength(2);
-    expect(result.find(p => p.id === "p2")).toBeDefined();
-    expect(result.find(p => p.id === "p3")).toBeDefined();
+    expect(result.find((p) => p.id === "p2")).toBeDefined();
+    expect(result.find((p) => p.id === "p3")).toBeDefined();
   });
 
   it("should exclude performers with unparseable career_length", async () => {

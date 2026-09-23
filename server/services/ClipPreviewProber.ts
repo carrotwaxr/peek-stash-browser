@@ -106,7 +106,10 @@ export class ClipPreviewProber {
         );
 
         req.on("error", (err) => {
-          logger.debug("Preview size check failed", { url, error: err.message });
+          logger.debug("Preview size check failed", {
+            url,
+            error: err.message,
+          });
           resolve(null);
         });
 
@@ -152,7 +155,10 @@ export class ClipPreviewProber {
             res.on("data", (chunk: Buffer) => chunks.push(chunk));
             res.on("end", () => {
               const content = Buffer.concat(chunks);
-              const hash = crypto.createHash("md5").update(content).digest("hex");
+              const hash = crypto
+                .createHash("md5")
+                .update(content)
+                .digest("hex");
               // If hash matches placeholder, it's NOT generated
               // If hash doesn't match, it's a real preview that happens to be 1199 bytes
               const isGenerated = hash !== PLACEHOLDER_MD5;
@@ -160,7 +166,7 @@ export class ClipPreviewProber {
                 url,
                 size: content.length,
                 hash,
-                isGenerated
+                isGenerated,
               });
               resolve(isGenerated);
             });
@@ -169,7 +175,10 @@ export class ClipPreviewProber {
         );
 
         req.on("error", (err) => {
-          logger.debug("Placeholder verification failed", { url, error: err.message });
+          logger.debug("Placeholder verification failed", {
+            url,
+            error: err.message,
+          });
           resolve(false);
         });
 
@@ -180,7 +189,10 @@ export class ClipPreviewProber {
 
         req.end();
       } catch (err) {
-        logger.debug("Placeholder verification error", { url, error: String(err) });
+        logger.debug("Placeholder verification error", {
+          url,
+          error: String(err),
+        });
         resolve(false);
       }
     });

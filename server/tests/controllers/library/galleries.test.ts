@@ -6,7 +6,21 @@
  * Note: mergeGalleriesWithUserData and mergeImagesWithUserData are private
  * and tested indirectly through the handlers.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyGalleryFilters,
+  findGalleries,
+  findGalleriesMinimal,
+  findGalleryById,
+  getGalleryImages,
+} from "../../../controllers/library/galleries.js";
+// --- Imports ---
+
+import prisma from "../../../prisma/singleton.js";
+import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { createMockGallery } from "../../helpers/mockDataGenerators.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -54,9 +68,7 @@ vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  expandStudioIds: vi
-    .fn()
-    .mockImplementation((ids) => Promise.resolve(ids)),
+  expandStudioIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
   expandTagIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
 }));
 
@@ -83,9 +95,10 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi
-    .fn()
-    .mockImplementation((field) => ({ sortField: field, randomSeed: undefined })),
+  parseRandomSort: vi.fn().mockImplementation((field) => ({
+    sortField: field,
+    randomSeed: undefined,
+  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -93,21 +106,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     .fn()
     .mockImplementation((_type, id) => `http://stash/galleries/${id}`),
 }));
-
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
-import {
-  applyGalleryFilters,
-  findGalleries,
-  findGalleryById,
-  findGalleriesMinimal,
-  getGalleryImages,
-} from "../../../controllers/library/galleries.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
-import { createMockGallery } from "../../helpers/mockDataGenerators.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -283,19 +281,13 @@ describe("Galleries Controller", () => {
 
   describe("findGalleries", () => {
     it("returns galleries from query builder on happy path", async () => {
-      const galleries = [
-        createMockGallery({ id: "g1", title: "TestGallery" }),
-      ];
+      const galleries = [createMockGallery({ id: "g1", title: "TestGallery" })];
       mockGalleryQueryBuilder.execute.mockResolvedValue({
         galleries,
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, gallery_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findGalleries(req, res);
@@ -330,9 +322,7 @@ describe("Galleries Controller", () => {
     });
 
     it("returns 500 when query builder throws", async () => {
-      mockGalleryQueryBuilder.execute.mockRejectedValue(
-        new Error("DB error")
-      );
+      mockGalleryQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = mockReq({ filter: {} }, {}, defaultUser);
       const res = mockRes();
@@ -620,12 +610,7 @@ describe("Galleries Controller", () => {
         },
       ] as any);
 
-      const req = mockReq(
-        {},
-        { galleryId: "g1" },
-        defaultUser,
-        {}
-      );
+      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {});
       const res = mockRes();
 
       await getGalleryImages(req, res);
@@ -673,12 +658,10 @@ describe("Galleries Controller", () => {
         },
       ] as any);
 
-      const req = mockReq(
-        {},
-        { galleryId: "g1" },
-        defaultUser,
-        { page: "1", per_page: "20" }
-      );
+      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {
+        page: "1",
+        per_page: "20",
+      });
       const res = mockRes();
 
       await getGalleryImages(req, res);
@@ -695,12 +678,7 @@ describe("Galleries Controller", () => {
         new Error("gallery error")
       );
 
-      const req = mockReq(
-        {},
-        { galleryId: "g1" },
-        defaultUser,
-        {}
-      );
+      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {});
       const res = mockRes();
 
       await getGalleryImages(req, res);

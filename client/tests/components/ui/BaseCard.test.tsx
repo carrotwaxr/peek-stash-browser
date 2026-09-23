@@ -1,11 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { BaseCard, type BaseCardProps } from "../../../src/components/ui/BaseCard";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import {
+  BaseCard,
+  type BaseCardProps,
+} from "../../../src/components/ui/BaseCard";
 
 // Cast for createElement usage since BaseCard is a forwardRef component
- 
+
 const BaseCardComponent = BaseCard as any;
 
 describe("BaseCard", () => {
@@ -83,7 +86,9 @@ describe("BaseCard", () => {
   });
 
   it("calls renderOverlay slot when provided", () => {
-    const renderOverlay = vi.fn(() => createElement("div", {}, "Custom Overlay"));
+    const renderOverlay = vi.fn(() =>
+      createElement("div", {}, "Custom Overlay")
+    );
     const element = createElement(BaseCardComponent, {
       ...defaultProps,
       renderOverlay,
@@ -281,6 +286,8 @@ describe("BaseCard menu placement logic", () => {
       ratingControlsProps,
     });
     // showMenu should be undefined in props, but BaseCard logic defaults it to true
-    expect((element.props.ratingControlsProps as any)?.showMenu).toBeUndefined();
+    expect(
+      (element.props.ratingControlsProps as any)?.showMenu
+    ).toBeUndefined();
   });
 });

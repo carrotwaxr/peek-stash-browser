@@ -56,13 +56,19 @@ const PlaylistStatusCard = () => {
     containerRef: mdScrollRef,
     containerElRef: mdScrollElRef,
     setCurrentItemRef: setMdCurrentRef,
-  } = useScrollToCurrentItem(currentIndex, { direction: "horizontal", delay: 150 });
+  } = useScrollToCurrentItem(currentIndex, {
+    direction: "horizontal",
+    delay: 150,
+  });
 
   const {
     containerRef: smScrollRef,
     containerElRef: smScrollElRef,
     setCurrentItemRef: setSmCurrentRef,
-  } = useScrollToCurrentItem(currentIndex, { direction: "horizontal", delay: 150 });
+  } = useScrollToCurrentItem(currentIndex, {
+    direction: "horizontal",
+    delay: 150,
+  });
 
   // Drag-to-scroll state
   const isDragging = useRef(false);
@@ -278,13 +284,9 @@ const PlaylistStatusCard = () => {
                     : "var(--text-secondary)",
                   border: "1px solid var(--border-color)",
                 }}
-                title={
-                  playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
-                }
+                title={playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
                 aria-label={
-                  playlist.autoplayNext
-                    ? "Disable autoplay"
-                    : "Enable autoplay"
+                  playlist.autoplayNext ? "Disable autoplay" : "Enable autoplay"
                 }
               >
                 <PlayCircle size={16} />
@@ -491,8 +493,7 @@ const PlaylistStatusCard = () => {
                     size="sm"
                     className="px-2 py-1.5 text-sm"
                     icon={<List size={14} />}
-                  >
-                  </Button>
+                  ></Button>
                 )}
               </div>
             </div>
@@ -563,7 +564,9 @@ const PlaylistStatusCard = () => {
                           : "1px solid var(--border-color)",
                         opacity: isCurrent ? 1 : 0.6,
                       }}
-                      title={getSceneTitle((scene as Record<string, unknown>) ?? null)}
+                      title={getSceneTitle(
+                        (scene as Record<string, unknown>) ?? null
+                      )}
                     >
                       {scene?.paths?.screenshot ? (
                         <img
@@ -626,7 +629,9 @@ const PlaylistStatusCard = () => {
                           : "1px solid var(--border-color)",
                         opacity: isCurrent ? 1 : 0.6,
                       }}
-                      title={getSceneTitle((scene as Record<string, unknown>) ?? null)}
+                      title={getSceneTitle(
+                        (scene as Record<string, unknown>) ?? null
+                      )}
                     >
                       {scene?.paths?.screenshot ? (
                         <img

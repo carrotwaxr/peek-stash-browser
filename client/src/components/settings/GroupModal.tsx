@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { Users, X, Plus } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
+import {
+  addGroupMember,
+  createGroup,
+  getGroup,
+  removeGroupMember,
+  updateGroup,
+} from "../../api";
 import { Button, Paper } from "../ui/index";
-import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember } from "../../api";
 
 interface GroupData {
   id: number;
@@ -29,7 +35,13 @@ interface Props {
 /**
  * GroupModal - Create or Edit a user group
  */
-const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) => {
+const GroupModal = ({
+  group,
+  onClose,
+  onSave,
+  users = [],
+  onMessage,
+}: Props) => {
   const isEditMode = !!group;
 
   // Form state
@@ -69,7 +81,9 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       setDescription((groupData.description as string) || "");
       setCanShare((groupData.canShare as boolean) ?? false);
       setCanDownloadFiles((groupData.canDownloadFiles as boolean) ?? false);
-      setCanDownloadPlaylists((groupData.canDownloadPlaylists as boolean) ?? false);
+      setCanDownloadPlaylists(
+        (groupData.canDownloadPlaylists as boolean) ?? false
+      );
       setMembers((groupData.members as Array<{ user: UserItem }>) || []);
     } catch (err) {
       setError((err as Error).message || "Failed to load group details");
@@ -101,7 +115,10 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       }
       setSelectedUserId("");
     } catch (err) {
-      setError((err as Error).message || `Failed to add ${addedUser?.username || "member"}`);
+      setError(
+        (err as Error).message ||
+          `Failed to add ${addedUser?.username || "member"}`
+      );
     }
   };
 
@@ -110,9 +127,14 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
     try {
       await removeGroupMember(String(group!.id), String(userId));
       setMembers((prev) => prev.filter((m) => m.user.id !== userId));
-      onMessage?.(`Removed ${removedMember?.user?.username || "member"} from group`);
+      onMessage?.(
+        `Removed ${removedMember?.user?.username || "member"} from group`
+      );
     } catch (err) {
-      setError((err as Error).message || `Failed to remove ${removedMember?.user?.username || "member"}`);
+      setError(
+        (err as Error).message ||
+          `Failed to remove ${removedMember?.user?.username || "member"}`
+      );
     }
   };
 
@@ -153,7 +175,10 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
         onClose(true);
       }
     } catch (err) {
-      setError((err as Error).message || `Failed to ${isEditMode ? "update" : "create"} group`);
+      setError(
+        (err as Error).message ||
+          `Failed to ${isEditMode ? "update" : "create"} group`
+      );
     } finally {
       setLoading(false);
     }
@@ -176,7 +201,10 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
       >
         <Paper.Header>
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
+            <Users
+              className="w-5 h-5"
+              style={{ color: "var(--text-secondary)" }}
+            />
             <Paper.Title>{modalTitle}</Paper.Title>
           </div>
         </Paper.Header>
@@ -207,7 +235,10 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                       borderTopColor: "transparent",
                     }}
                   ></div>
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     Loading group details...
                   </p>
                 </div>
@@ -301,7 +332,8 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                             className="text-xs mt-0.5"
                             style={{ color: "var(--text-muted)" }}
                           >
-                            Members can share playlists with other users and groups
+                            Members can share playlists with other users and
+                            groups
                           </p>
                         </div>
                       </label>
@@ -311,7 +343,9 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                         <input
                           type="checkbox"
                           checked={canDownloadFiles}
-                          onChange={(e) => setCanDownloadFiles(e.target.checked)}
+                          onChange={(e) =>
+                            setCanDownloadFiles(e.target.checked)
+                          }
                           className="w-4 h-4 rounded cursor-pointer mt-0.5"
                           style={{ accentColor: "var(--primary-color)" }}
                         />
@@ -336,7 +370,9 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                         <input
                           type="checkbox"
                           checked={canDownloadPlaylists}
-                          onChange={(e) => setCanDownloadPlaylists(e.target.checked)}
+                          onChange={(e) =>
+                            setCanDownloadPlaylists(e.target.checked)
+                          }
                           className="w-4 h-4 rounded cursor-pointer mt-0.5"
                           style={{ accentColor: "var(--primary-color)" }}
                         />
@@ -384,7 +420,8 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                             <option value="">Select a user to add...</option>
                             {availableUsers.map((user) => (
                               <option key={user.id} value={user.id}>
-                                {user.username} {user.role === "ADMIN" ? "(Admin)" : ""}
+                                {user.username}{" "}
+                                {user.role === "ADMIN" ? "(Admin)" : ""}
                               </option>
                             ))}
                           </select>
@@ -409,7 +446,8 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                             color: "var(--text-muted)",
                           }}
                         >
-                          No members yet. Select a user above to add them to this group.
+                          No members yet. Select a user above to add them to
+                          this group.
                         </p>
                       ) : (
                         <div
@@ -436,7 +474,8 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                                   <span
                                     className="ml-2 text-xs px-2 py-0.5 rounded"
                                     style={{
-                                      backgroundColor: "rgba(59, 130, 246, 0.2)",
+                                      backgroundColor:
+                                        "rgba(59, 130, 246, 0.2)",
                                       color: "rgb(59, 130, 246)",
                                     }}
                                   >
@@ -446,7 +485,9 @@ const GroupModal = ({ group, onClose, onSave, users = [], onMessage }: Props) =>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleRemoveMember(member.user.id)}
+                                onClick={() =>
+                                  handleRemoveMember(member.user.id)
+                                }
                                 className="p-1 rounded hover:bg-opacity-80 transition-colors"
                                 style={{ color: "var(--text-muted)" }}
                                 title="Remove from group"

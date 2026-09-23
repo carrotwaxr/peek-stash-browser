@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { TestClient, adminClient } from "../helpers/testClient.js";
-import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { UserStatsResponse } from "../../types/api/index.js";
+import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TestClient, adminClient } from "../helpers/testClient.js";
 
 describe("User Stats API Integration Tests", () => {
   beforeAll(async () => {
@@ -10,7 +10,8 @@ describe("User Stats API Integration Tests", () => {
 
   describe("GET /api/user-stats", () => {
     it("should return user stats for authenticated user", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
@@ -73,7 +74,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should return non-negative counts for library stats", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
       expect(response.data.library.sceneCount).toBeGreaterThanOrEqual(0);
@@ -85,18 +87,24 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should return non-negative values for engagement stats", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
       expect(response.data.engagement.totalWatchTime).toBeGreaterThanOrEqual(0);
       expect(response.data.engagement.totalPlayCount).toBeGreaterThanOrEqual(0);
       expect(response.data.engagement.totalOCount).toBeGreaterThanOrEqual(0);
-      expect(response.data.engagement.totalImagesViewed).toBeGreaterThanOrEqual(0);
-      expect(response.data.engagement.uniqueScenesWatched).toBeGreaterThanOrEqual(0);
+      expect(response.data.engagement.totalImagesViewed).toBeGreaterThanOrEqual(
+        0
+      );
+      expect(
+        response.data.engagement.uniqueScenesWatched
+      ).toBeGreaterThanOrEqual(0);
     });
 
     it("should return at most 5 items in top lists", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
       expect(response.data.topScenes.length).toBeLessThanOrEqual(5);
@@ -106,7 +114,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should have proper structure for top scene items", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
 
@@ -124,7 +133,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should have proper structure for top performer items", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
 
@@ -142,7 +152,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should have proper structure for top studio items", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
 
@@ -160,7 +171,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should have proper structure for top tag items", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
 
@@ -178,7 +190,8 @@ describe("User Stats API Integration Tests", () => {
     });
 
     it("should proxy all image URLs (security check)", async () => {
-      const response = await adminClient.get<UserStatsResponse>("/api/user-stats");
+      const response =
+        await adminClient.get<UserStatsResponse>("/api/user-stats");
 
       expect(response.ok).toBe(true);
 

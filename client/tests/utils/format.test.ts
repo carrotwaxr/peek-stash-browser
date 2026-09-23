@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  formatDurationHumanReadable,
-  getFilenameFromPath,
+  formatBitRate,
   formatDuration,
   formatDurationCompact,
+  formatDurationHumanReadable,
   formatFileSize,
-  formatBitRate,
-  getSceneTitle,
-  getSceneDescription,
   formatResolution,
+  getFilenameFromPath,
+  getSceneDescription,
+  getSceneTitle,
 } from "../../src/utils/format";
 
 describe("format utilities", () => {
@@ -227,7 +227,9 @@ describe("format utilities", () => {
     });
 
     it("returns 'Unknown Scene' when files exist but no basename", () => {
-      expect(getSceneTitle({ title: "", files: [{ path: "/foo" }] })).toBe("Unknown Scene");
+      expect(getSceneTitle({ title: "", files: [{ path: "/foo" }] })).toBe(
+        "Unknown Scene"
+      );
     });
   });
 
@@ -246,11 +248,15 @@ describe("format utilities", () => {
     });
 
     it("returns trimmed details", () => {
-      expect(getSceneDescription({ details: "  Some description  " })).toBe("Some description");
+      expect(getSceneDescription({ details: "  Some description  " })).toBe(
+        "Some description"
+      );
     });
 
     it("returns details as-is when already trimmed", () => {
-      expect(getSceneDescription({ details: "Clean description" })).toBe("Clean description");
+      expect(getSceneDescription({ details: "Clean description" })).toBe(
+        "Clean description"
+      );
     });
   });
 
@@ -345,12 +351,16 @@ describe("format utilities", () => {
 
     it("handles includeDays=false with minutes", () => {
       // 1 day + 0 hours + 30 minutes
-      expect(formatDurationHumanReadable(88200, { includeDays: false })).toBe("24h 30m");
+      expect(formatDurationHumanReadable(88200, { includeDays: false })).toBe(
+        "24h 30m"
+      );
     });
 
     it("handles includeDays=false with no remaining minutes", () => {
       // 2 days exactly = 172800 seconds
-      expect(formatDurationHumanReadable(172800, { includeDays: false })).toBe("48h");
+      expect(formatDurationHumanReadable(172800, { includeDays: false })).toBe(
+        "48h"
+      );
     });
   });
 });

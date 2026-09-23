@@ -7,8 +7,7 @@
  *
  * This middleware also handles time offset for transcoded streams that use the offset property.
  */
-
-import videojs from 'video.js';
+import videojs from "video.js";
 
 // Delay before loading new source after setting currentTime (matches Stash)
 const LOAD_DELAY = 200;
@@ -32,7 +31,10 @@ function offsetMiddleware(player: any) {
       const { cues } = tracks[i];
       if (cues) {
         for (let j = 0; j < cues.length; j++) {
-          const cue = cues[j] as TextTrackCue & { _startTime?: number; _endTime?: number };
+          const cue = cues[j] as TextTrackCue & {
+            _startTime?: number;
+            _endTime?: number;
+          };
           if (cue._startTime === undefined || cue._endTime === undefined) {
             continue;
           }
@@ -46,18 +48,18 @@ function offsetMiddleware(player: any) {
   function loadSource(seconds: number) {
     // Add ?start=X parameter to source URL
     const srcUrl = new URL(source.src, window.location.origin);
-    srcUrl.searchParams.set('start', seconds.toString());
+    srcUrl.searchParams.set("start", seconds.toString());
     source.src = srcUrl.toString();
 
     const poster = player.poster();
     const playbackRate = tech.playbackRate();
     seeking = tech.paused() ? 1 : 2;
 
-    player.poster('');
+    player.poster("");
     tech.setSource(source);
     tech.setPlaybackRate(playbackRate);
 
-    tech.one('canplay', () => {
+    tech.one("canplay", () => {
       player.poster(poster);
       if (seeking === 1 || tech.scrubbing?.()) {
         tech.pause();
@@ -65,9 +67,9 @@ function offsetMiddleware(player: any) {
       seeking = 0;
     });
 
-    tech.trigger('timeupdate');
-    tech.trigger('pause');
-    tech.trigger('seeking');
+    tech.trigger("timeupdate");
+    tech.trigger("pause");
+    tech.trigger("seeking");
     tech.play();
   }
 
@@ -157,11 +159,11 @@ function offsetMiddleware(player: any) {
         seeking = 2;
         return videojs.middleware.TERMINATOR;
       }
-    }
+    },
   };
 }
 
 // Register middleware for all sources
-videojs.use('*', offsetMiddleware);
+videojs.use("*", offsetMiddleware);
 
 export default offsetMiddleware;

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import ClipCard from "../../../src/components/cards/ClipCard";
 import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext";
 
@@ -18,7 +18,11 @@ const mockClip = {
   isGenerated: true,
   primaryTag: { id: "tag-1", name: "Action", color: "#ff0000" },
   tags: [],
-  scene: { id: "scene-1", title: "Test Scene", pathScreenshot: "/screenshot.jpg" },
+  scene: {
+    id: "scene-1",
+    title: "Test Scene",
+    pathScreenshot: "/screenshot.jpg",
+  },
 };
 
 const renderWithProviders = (ui: React.ReactElement) => {

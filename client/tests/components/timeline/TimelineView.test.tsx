@@ -1,6 +1,7 @@
 // client/tests/components/timeline/TimelineView.test.jsx
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import TimelineView from "../../../src/components/timeline/TimelineView";
 
 // Mock the useTimelineState hook
 const mockUseTimelineState = vi.fn();
@@ -16,7 +17,7 @@ vi.mock("../../../src/hooks/useMediaQuery", () => ({
 
 // Mock TimelineMobileSheet with expand/collapse support
 vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
-  default: ({ isOpen, selectedPeriod, itemCount, children }: any) => (
+  default: ({ isOpen, selectedPeriod, itemCount, children }: any) =>
     isOpen ? (
       <div data-testid="timeline-mobile-sheet">
         {selectedPeriod && (
@@ -25,8 +26,7 @@ vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
         <span data-testid="mobile-sheet-count">{itemCount}</span>
         <div data-testid="mobile-sheet-children">{children}</div>
       </div>
-    ) : null
-  ),
+    ) : null,
 }));
 
 // Mock TimelineControls to simplify testing
@@ -34,7 +34,10 @@ vi.mock("../../../src/components/timeline/TimelineControls", () => ({
   default: ({ zoomLevel, onZoomLevelChange }: any) => (
     <div data-testid="timeline-controls">
       <span data-testid="current-zoom">{zoomLevel}</span>
-      <button onClick={() => onZoomLevelChange("years")} data-testid="zoom-button">
+      <button
+        onClick={() => onZoomLevelChange("years")}
+        data-testid="zoom-button"
+      >
         Change Zoom
       </button>
     </div>
@@ -53,8 +56,6 @@ vi.mock("../../../src/components/timeline/TimelineStrip", () => ({
     </div>
   ),
 }));
-
-import TimelineView from "../../../src/components/timeline/TimelineView";
 
 describe("TimelineView", () => {
   const defaultHookReturn = {
@@ -135,7 +136,11 @@ describe("TimelineView", () => {
 
     it("passes initialPeriod to useTimelineState when provided", () => {
       render(
-        <TimelineView {...defaultProps} entityType="scene" initialPeriod={"2024-03" as any} />
+        <TimelineView
+          {...defaultProps}
+          entityType="scene"
+          initialPeriod={"2024-03" as any}
+        />
       );
 
       expect(mockUseTimelineState).toHaveBeenCalledWith({
@@ -148,7 +153,11 @@ describe("TimelineView", () => {
 
     it("sets autoSelectRecent to false when initialPeriod is provided", () => {
       render(
-        <TimelineView {...defaultProps} entityType="image" initialPeriod={"2024-W15" as any} />
+        <TimelineView
+          {...defaultProps}
+          entityType="image"
+          initialPeriod={"2024-W15" as any}
+        />
       );
 
       expect(mockUseTimelineState).toHaveBeenCalledWith(
@@ -287,7 +296,11 @@ describe("TimelineView", () => {
       });
 
       render(
-        <TimelineView {...defaultProps} items={mockItems} renderItem={renderItem} />
+        <TimelineView
+          {...defaultProps}
+          items={mockItems}
+          renderItem={renderItem}
+        />
       );
 
       expect(renderItem).toHaveBeenCalledTimes(3);
@@ -484,24 +497,30 @@ describe("TimelineView", () => {
       mockUseMediaQuery.mockReturnValue(false);
       render(<TimelineView {...defaultProps} />);
 
-      expect(screen.queryByTestId("timeline-mobile-sheet")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("timeline-mobile-sheet")
+      ).not.toBeInTheDocument();
     });
 
     it("renders timeline controls inside mobile sheet", () => {
       render(<TimelineView {...defaultProps} />);
 
       const sheetChildren = screen.getByTestId("mobile-sheet-children");
-      expect(sheetChildren).toContainElement(screen.getByTestId("timeline-controls"));
+      expect(sheetChildren).toContainElement(
+        screen.getByTestId("timeline-controls")
+      );
     });
 
     it("renders timeline strip inside mobile sheet", () => {
       render(<TimelineView {...defaultProps} />);
 
       const sheetChildren = screen.getByTestId("mobile-sheet-children");
-      expect(sheetChildren).toContainElement(screen.getByTestId("timeline-strip"));
+      expect(sheetChildren).toContainElement(
+        screen.getByTestId("timeline-strip")
+      );
     });
 
-    it('shows mobile-friendly empty message when no period selected', () => {
+    it("shows mobile-friendly empty message when no period selected", () => {
       mockUseTimelineState.mockReturnValue({
         ...defaultHookReturn,
         selectedPeriod: null,
@@ -553,7 +572,10 @@ describe("TimelineView", () => {
       });
 
       render(
-        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange} />
+        <TimelineView
+          {...defaultProps}
+          onDateFilterChange={onDateFilterChange}
+        />
       );
 
       expect(onDateFilterChange).toHaveBeenCalledWith({
@@ -571,7 +593,10 @@ describe("TimelineView", () => {
       });
 
       render(
-        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange} />
+        <TimelineView
+          {...defaultProps}
+          onDateFilterChange={onDateFilterChange}
+        />
       );
 
       // No notification needed for null state - parent already knows no filter is active
@@ -613,7 +638,10 @@ describe("TimelineView", () => {
       });
 
       const { unmount } = render(
-        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange1} />
+        <TimelineView
+          {...defaultProps}
+          onDateFilterChange={onDateFilterChange1}
+        />
       );
 
       expect(onDateFilterChange1).toHaveBeenCalledWith({
@@ -635,7 +663,10 @@ describe("TimelineView", () => {
       });
 
       render(
-        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange2} />
+        <TimelineView
+          {...defaultProps}
+          onDateFilterChange={onDateFilterChange2}
+        />
       );
 
       expect(onDateFilterChange2).toHaveBeenCalledWith({

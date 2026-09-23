@@ -22,9 +22,14 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: AuthUser | null;
-  login: (credentials: { username: string; password: string }) => Promise<LoginResult>;
+  login: (credentials: {
+    username: string;
+    password: string;
+  }) => Promise<LoginResult>;
   logout: () => Promise<void>;
   updateUser: (partialUser: Partial<AuthUser>) => void;
 }
 
-export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+export const AuthContext = createContext<AuthContextValue | undefined>(
+  undefined
+);

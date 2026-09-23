@@ -1,7 +1,7 @@
 // client/tests/components/timeline/TimelineStrip.test.jsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TimelineStrip from "../../../src/components/timeline/TimelineStrip";
 
 describe("TimelineStrip", () => {
@@ -85,7 +85,9 @@ describe("TimelineStrip", () => {
     it('shows "No dated content available" when distribution is empty', () => {
       render(<TimelineStrip {...defaultProps} distribution={[]} />);
 
-      expect(screen.getByText("No dated content available")).toBeInTheDocument();
+      expect(
+        screen.getByText("No dated content available")
+      ).toBeInTheDocument();
     });
 
     it("does not render listbox when distribution is empty", () => {

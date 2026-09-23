@@ -8,7 +8,6 @@
  * - Users with UserStashInstance records see only those selected instances
  * - Disabled instances are never shown regardless of user selection
  */
-
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
@@ -24,14 +23,16 @@ import { logger } from "../utils/logger.js";
  * @param userId - The user ID
  * @returns Array of instance IDs the user should see content from
  */
-export async function getUserAllowedInstanceIds(userId: number): Promise<string[]> {
+export async function getUserAllowedInstanceIds(
+  userId: number
+): Promise<string[]> {
   try {
     // Get all enabled instances
     const enabledInstances = await prisma.stashInstance.findMany({
       where: { enabled: true },
       select: { id: true },
     });
-    const enabledIds = new Set(enabledInstances.map(i => i.id));
+    const enabledIds = new Set(enabledInstances.map((i) => i.id));
 
     // Get user's instance selections
     const userSelections = await prisma.userStashInstance.findMany({
@@ -46,8 +47,8 @@ export async function getUserAllowedInstanceIds(userId: number): Promise<string[
 
     // Filter user selections to only enabled instances
     const allowedIds = userSelections
-      .map(s => s.instanceId)
-      .filter(id => enabledIds.has(id));
+      .map((s) => s.instanceId)
+      .filter((id) => enabledIds.has(id));
 
     return allowedIds;
   } catch (error) {
@@ -85,4 +86,3 @@ export function buildInstanceFilterClause(
     params: allowedInstanceIds,
   };
 }
-

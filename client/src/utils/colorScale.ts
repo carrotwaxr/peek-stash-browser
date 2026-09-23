@@ -106,7 +106,10 @@ export function adjustLightness(hex: string, amount: number): string {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Text color scale
  */
-export function generateTextScale(baseColor: string, mode = "dark"): Record<string, string> {
+export function generateTextScale(
+  baseColor: string,
+  mode = "dark"
+): Record<string, string> {
   if (mode === "dark") {
     // Dark mode: start white, go darker
     return {
@@ -130,7 +133,10 @@ export function generateTextScale(baseColor: string, mode = "dark"): Record<stri
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Shadow definitions
  */
-export function generateShadows(accentColor: string, mode = "dark"): Record<string, string> {
+export function generateShadows(
+  accentColor: string,
+  mode = "dark"
+): Record<string, string> {
   // Extract RGB from hex for rgba shadows
   const hex = accentColor.replace(/^#/, "");
   const r = parseInt(hex.substr(0, 2), 16);
@@ -187,7 +193,9 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
  * @param {Object} status - Status colors { success, error, info, warning }
  * @returns {Object} Complete status color definitions
  */
-export function generateStatusColors(status: Record<string, string>): Record<string, string> {
+export function generateStatusColors(
+  status: Record<string, string>
+): Record<string, string> {
   const colors: Record<string, string> = {};
 
   // Generate for each status type
@@ -210,7 +218,10 @@ export function generateStatusColors(status: Record<string, string>): Record<str
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Toast color definitions
  */
-export function generateToastColors(status: Record<string, string>, mode = "dark"): Record<string, string> {
+export function generateToastColors(
+  status: Record<string, string>,
+  mode = "dark"
+): Record<string, string> {
   const colors: Record<string, string> = {};
 
   // Generate for each status type

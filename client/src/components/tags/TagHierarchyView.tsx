@@ -1,12 +1,12 @@
 // client/src/components/tags/TagHierarchyView.jsx
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronsDownUp as LucideChevronsDownUp,
   ChevronsUpDown as LucideChevronsUpDown,
 } from "lucide-react";
 import { buildTagTree } from "../../utils/buildTagTree";
-import TagTreeNode from "./TagTreeNode";
 import Button from "../ui/Button";
+import TagTreeNode from "./TagTreeNode";
 
 /**
  * Hierarchy view for tags - displays tags as an expandable tree.
@@ -27,7 +27,13 @@ interface TagHierarchyViewProps {
   sortDirection?: string;
 }
 
-const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", sortDirection = "ASC" }: TagHierarchyViewProps) => {
+const TagHierarchyView = ({
+  tags,
+  isLoading,
+  searchQuery,
+  sortField = "name",
+  sortDirection = "ASC",
+}: TagHierarchyViewProps) => {
   // Track which nodes are expanded (by tag id)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // Track focused node for keyboard navigation
@@ -38,7 +44,12 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
 
   // Build tree structure from flat tags, filtered by search query and sorted
   const tree = useMemo(
-    () => buildTagTree(tags, { filterQuery: searchQuery, sortField, sortDirection }),
+    () =>
+      buildTagTree(tags, {
+        filterQuery: searchQuery,
+        sortField,
+        sortDirection,
+      }),
     [tags, searchQuery, sortField, sortDirection]
   );
 
@@ -61,7 +72,9 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
     const traverse = (node: Record<string, unknown>, depth = 0) => {
       nodes.push({ ...node, depth });
       if (expandedIds.has(node.id as string) && node.children) {
-        (node.children as Record<string, unknown>[]).forEach((child: Record<string, unknown>) => traverse(child, depth + 1));
+        (node.children as Record<string, unknown>[]).forEach(
+          (child: Record<string, unknown>) => traverse(child, depth + 1)
+        );
       }
     };
     tree.forEach((root) => traverse(root));
@@ -70,9 +83,15 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
 
   // Initialize: expand first level (only on first load, not after Collapse All)
   useEffect(() => {
-    if (tree.length > 0 && expandedIds.size === 0 && !hasInitializedRef.current) {
+    if (
+      tree.length > 0 &&
+      expandedIds.size === 0 &&
+      !hasInitializedRef.current
+    ) {
       hasInitializedRef.current = true;
-      const rootIds = new Set<string>(tree.map((t: Record<string, unknown>) => t.id as string));
+      const rootIds = new Set<string>(
+        tree.map((t: Record<string, unknown>) => t.id as string)
+      );
       setExpandedIds(rootIds);
     }
   }, [tree, expandedIds.size]);
@@ -82,15 +101,20 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
     if (searchQuery && tree.length > 0) {
       // Find all ancestor IDs that need to be expanded to show matches
       const idsToExpand = new Set<string>();
-      const findAncestors = (node: Record<string, unknown>, ancestors: string[] = []) => {
-        const matches =
-          (node.name as string | undefined)?.toLowerCase().includes(searchQuery.toLowerCase());
+      const findAncestors = (
+        node: Record<string, unknown>,
+        ancestors: string[] = []
+      ) => {
+        const matches = (node.name as string | undefined)
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase());
         if (matches) {
           ancestors.forEach((id: string) => idsToExpand.add(id));
         }
         if (node.children) {
-          (node.children as Record<string, unknown>[]).forEach((child: Record<string, unknown>) =>
-            findAncestors(child, [...ancestors, node.id as string])
+          (node.children as Record<string, unknown>[]).forEach(
+            (child: Record<string, unknown>) =>
+              findAncestors(child, [...ancestors, node.id as string])
           );
         }
       };
@@ -130,7 +154,9 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
     (e: React.KeyboardEvent) => {
       if (!focusedId || visibleNodes.length === 0) return;
 
-      const currentIndex = visibleNodes.findIndex((n) => (n.id as string) === focusedId);
+      const currentIndex = visibleNodes.findIndex(
+        (n) => (n.id as string) === focusedId
+      );
       if (currentIndex === -1) return;
 
       const currentNode = visibleNodes[currentIndex];
@@ -168,7 +194,9 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
             handleToggle(currentNode.id as string);
           } else {
             // Find parent and focus it
-            const parentId = tags.find((t: TagItem) => t.id === (currentNode.id as string))?.parents?.[0]?.id;
+            const parentId = tags.find(
+              (t: TagItem) => t.id === (currentNode.id as string)
+            )?.parents?.[0]?.id;
             if (parentId) {
               setFocusedId(parentId);
             }
@@ -218,10 +246,7 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
 
   if (tree.length === 0) {
     return (
-      <div
-        className="text-center py-12"
-        style={{ color: "var(--text-muted)" }}
-      >
+      <div className="text-center py-12" style={{ color: "var(--text-muted)" }}>
         No tags found
       </div>
     );
@@ -262,7 +287,11 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
         {tree.map((rootTag: Record<string, unknown>) => (
           <TagTreeNode
             key={rootTag.id as string}
-            tag={rootTag as unknown as React.ComponentProps<typeof TagTreeNode>["tag"]}
+            tag={
+              rootTag as unknown as React.ComponentProps<
+                typeof TagTreeNode
+              >["tag"]
+            }
             depth={0}
             isExpanded={expandedIds.has(rootTag.id as string)}
             expandedIds={expandedIds}

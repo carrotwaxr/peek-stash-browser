@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, Server } from "lucide-react";
+import { Check, Copy, Server } from "lucide-react";
 import { userSetupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
 import { Button } from "../ui/index";
@@ -29,7 +29,12 @@ const UserSetupModal = ({ onComplete }: Props) => {
   useEffect(() => {
     const fetchSetupStatus = async () => {
       try {
-        const data = await userSetupApi.getSetupStatus() as { needsSetup: boolean; instances: StashInstance[]; recoveryKey?: string; instanceCount?: number };
+        const data = (await userSetupApi.getSetupStatus()) as {
+          needsSetup: boolean;
+          instances: StashInstance[];
+          recoveryKey?: string;
+          instanceCount?: number;
+        };
         const { recoveryKey: key, instances: inst, instanceCount } = data;
 
         setRecoveryKey(key || "");
@@ -93,8 +98,10 @@ const UserSetupModal = ({ onComplete }: Props) => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center"
-           style={{ backgroundColor: "var(--bg-primary)" }}>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ backgroundColor: "var(--bg-primary)" }}
+      >
         <div className="text-lg" style={{ color: "var(--text-primary)" }}>
           Loading...
         </div>
@@ -103,25 +110,34 @@ const UserSetupModal = ({ onComplete }: Props) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-         style={{ backgroundColor: "var(--bg-primary)" }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "var(--bg-primary)" }}
+    >
       <div className="max-w-lg w-full space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}>
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
             Welcome to Peek
           </h1>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Let's get you set up
-          </p>
+          <p style={{ color: "var(--text-secondary)" }}>Let's get you set up</p>
         </div>
 
         {/* Error state - show retry if we failed to load data */}
         {error && !recoveryKey && (
-          <div className="p-6 rounded-lg border text-center"
-               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-            <p className="mb-4" style={{ color: "#ef4444" }}>{error}</p>
+          <div
+            className="p-6 rounded-lg border text-center"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <p className="mb-4" style={{ color: "#ef4444" }}>
+              {error}
+            </p>
             <Button
               variant="secondary"
               onClick={() => window.location.reload()}
@@ -133,8 +149,13 @@ const UserSetupModal = ({ onComplete }: Props) => {
 
         {/* Error during submit - show above form */}
         {error && recoveryKey && (
-          <div className="p-4 rounded border-l-4"
-               style={{ backgroundColor: "var(--bg-card)", borderColor: "#ef4444" }}>
+          <div
+            className="p-4 rounded border-l-4"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderColor: "#ef4444",
+            }}
+          >
             <p style={{ color: "#ef4444" }}>{error}</p>
           </div>
         )}
@@ -142,20 +163,35 @@ const UserSetupModal = ({ onComplete }: Props) => {
         {/* Recovery Key Section - only show if we have data */}
         {recoveryKey && (
           <>
-            <div className="p-6 rounded-lg border"
-                 style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-              <h2 className="text-lg font-semibold mb-2"
-                  style={{ color: "var(--text-primary)" }}>
+            <div
+              className="p-6 rounded-lg border"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <h2
+                className="text-lg font-semibold mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Your Recovery Key
               </h2>
-              <p className="text-sm mb-4"
-                 style={{ color: "var(--text-secondary)" }}>
-                Save this somewhere safe - you'll need it if you forget your password
+              <p
+                className="text-sm mb-4"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Save this somewhere safe - you'll need it if you forget your
+                password
               </p>
 
               <div className="flex items-center gap-2">
-                <code className="flex-1 p-3 rounded font-mono text-sm break-all"
-                      style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}>
+                <code
+                  className="flex-1 p-3 rounded font-mono text-sm break-all"
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                  }}
+                >
                   {recoveryKey}
                 </code>
                 <Button
@@ -171,17 +207,26 @@ const UserSetupModal = ({ onComplete }: Props) => {
 
             {/* Instance Selection Section */}
             {showInstanceSelection && (
-              <div className="p-6 rounded-lg border"
-                   style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+              <div
+                className="p-6 rounded-lg border"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                }}
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <Server size={20} style={{ color: "var(--text-primary)" }} />
-                  <h2 className="text-lg font-semibold"
-                      style={{ color: "var(--text-primary)" }}>
+                  <h2
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     Content Sources
                   </h2>
                 </div>
-                <p className="text-sm mb-4"
-                   style={{ color: "var(--text-secondary)" }}>
+                <p
+                  className="text-sm mb-4"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Select which Stash servers to see content from
                 </p>
 
@@ -200,13 +245,17 @@ const UserSetupModal = ({ onComplete }: Props) => {
                         style={{ accentColor: "var(--accent-primary)" }}
                       />
                       <div>
-                        <div className="font-medium"
-                             style={{ color: "var(--text-primary)" }}>
+                        <div
+                          className="font-medium"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           {instance.name}
                         </div>
                         {instance.description && (
-                          <div className="text-sm"
-                               style={{ color: "var(--text-secondary)" }}>
+                          <div
+                            className="text-sm"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
                             {instance.description}
                           </div>
                         )}

@@ -1,23 +1,31 @@
 /* eslint-disable react-refresh/only-export-components */
 // This file exports both components and utility functions by design
-
 import { Link } from "react-router-dom";
 import { Heart } from "lucide-react";
+import {
+  getEntityPath as _getEntityPath,
+  getScenePathWithTime as _getScenePathWithTime,
+} from "../../utils/entityLinks";
 import RatingBadge from "../ui/RatingBadge";
 import MultiValueCell from "./MultiValueCell";
 import {
+  calculateAge,
+  formatDate,
   formatDuration,
   formatFileSize,
-  formatDate,
-  calculateAge,
 } from "./formatters";
-import { getEntityPath as _getEntityPath, getScenePathWithTime as _getScenePathWithTime } from "../../utils/entityLinks";
 
 // Wrappers that default `hasMultipleInstances` to false
-const getEntityPath = (type: string, entity: Parameters<typeof _getEntityPath>[1], hasMultipleInstances?: boolean) =>
-  _getEntityPath(type, entity, hasMultipleInstances ?? false);
-const getScenePathWithTime = (entity: Parameters<typeof _getScenePathWithTime>[0], time: Parameters<typeof _getScenePathWithTime>[1], hasMultipleInstances?: boolean) =>
-  _getScenePathWithTime(entity, time, hasMultipleInstances ?? false);
+const getEntityPath = (
+  type: string,
+  entity: Parameters<typeof _getEntityPath>[1],
+  hasMultipleInstances?: boolean
+) => _getEntityPath(type, entity, hasMultipleInstances ?? false);
+const getScenePathWithTime = (
+  entity: Parameters<typeof _getScenePathWithTime>[0],
+  time: Parameters<typeof _getScenePathWithTime>[1],
+  hasMultipleInstances?: boolean
+) => _getScenePathWithTime(entity, time, hasMultipleInstances ?? false);
 
 // ============================================================================
 // Cell Components
@@ -62,10 +70,22 @@ export const FavoriteCell = ({ favorite }: FavoriteCellProps) => {
 /**
  * Get thumbnail dimensions based on entity type
  */
-const getThumbnailDimensions = (entityType: string | undefined): { width: string; height: string } => {
+const getThumbnailDimensions = (
+  entityType: string | undefined
+): { width: string; height: string } => {
   const normalizedType = entityType?.toLowerCase();
   // Portrait entities (2/3 aspect ratio)
-  if (normalizedType && ["performer", "performers", "gallery", "galleries", "group", "groups"].includes(normalizedType)) {
+  if (
+    normalizedType &&
+    [
+      "performer",
+      "performers",
+      "gallery",
+      "galleries",
+      "group",
+      "groups",
+    ].includes(normalizedType)
+  ) {
     return { width: "w-10", height: "h-14" };
   }
   // Square for images (variable aspect ratio)
@@ -86,7 +106,12 @@ interface ThumbnailCellProps {
 /**
  * ThumbnailCell - Small image thumbnail with optional link
  */
-export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }: ThumbnailCellProps) => {
+export const ThumbnailCell = ({
+  src,
+  alt = "",
+  linkTo,
+  entityType,
+}: ThumbnailCellProps) => {
   const { width, height } = getThumbnailDimensions(entityType);
   const sizeClasses = `${width} ${height}`;
 
@@ -96,7 +121,9 @@ export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }: ThumbnailCe
         className={`${sizeClasses} rounded flex items-center justify-center`}
         style={{ backgroundColor: "var(--bg-secondary)" }}
       >
-        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>No image</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+          No image
+        </span>
       </div>
     );
   }
@@ -160,19 +187,19 @@ interface TruncatedTextCellProps {
 /**
  * TruncatedTextCell - Text with truncation and title for full content
  */
-const TruncatedTextCell = ({ text, maxLength = 50 }: TruncatedTextCellProps) => {
+const TruncatedTextCell = ({
+  text,
+  maxLength = 50,
+}: TruncatedTextCellProps) => {
   if (!text) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
 
-  const truncated = text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+  const truncated =
+    text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 
   return (
-    <span
-      title={text}
-      className="block truncate"
-      style={{ maxWidth: "200px" }}
-    >
+    <span title={text} className="block truncate" style={{ maxWidth: "200px" }}>
       {truncated}
     </span>
   );
@@ -197,9 +224,11 @@ const SimpleValueCell = ({ value }: SimpleValueCellProps) => {
 // Entity-Specific Cell Renderers
 // ============================================================================
 
- 
 type Entity = Record<string, any>;
-type RendererFn = (entity: Entity, options?: CellRendererOptions) => React.ReactNode;
+type RendererFn = (
+  entity: Entity,
+  options?: CellRendererOptions
+) => React.ReactNode;
 type RendererMap = Record<string, RendererFn>;
 
 /**
@@ -207,30 +236,45 @@ type RendererMap = Record<string, RendererFn>;
  */
 const sceneRenderers: RendererMap = {
   title: (scene, options = {}) => (
-    <LinkCell text={scene.title || `Scene ${scene.id}`} linkTo={getEntityPath('scene', scene, options.hasMultipleInstances)} />
+    <LinkCell
+      text={scene.title || `Scene ${scene.id}`}
+      linkTo={getEntityPath("scene", scene, options.hasMultipleInstances)}
+    />
   ),
   preview: (scene, options = {}) => (
     <ThumbnailCell
       src={scene.paths?.screenshot || scene.image_path}
       alt={scene.title}
-      linkTo={getEntityPath('scene', scene, options.hasMultipleInstances)}
+      linkTo={getEntityPath("scene", scene, options.hasMultipleInstances)}
       entityType="scene"
     />
   ),
   date: (scene) => formatDate(scene.date),
-  duration: (scene) => formatDuration(scene.files?.[0]?.duration || scene.file?.duration || scene.duration),
+  duration: (scene) =>
+    formatDuration(
+      scene.files?.[0]?.duration || scene.file?.duration || scene.duration
+    ),
   rating: (scene) => <RatingCell rating={scene.rating100 ?? scene.rating} />,
   studio: (scene, options = {}) => {
     if (!scene.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={scene.studio.name} linkTo={getEntityPath('studio', scene.studio, options.hasMultipleInstances)} />;
+    return (
+      <LinkCell
+        text={scene.studio.name}
+        linkTo={getEntityPath(
+          "studio",
+          scene.studio,
+          options.hasMultipleInstances
+        )}
+      />
+    );
   },
   performers: (scene, options = {}) => {
     const items = (scene.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
-      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
+      linkTo: getEntityPath("performer", p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -238,7 +282,7 @@ const sceneRenderers: RendererMap = {
     const items = (scene.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
-      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
+      linkTo: getEntityPath("tag", t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -246,7 +290,8 @@ const sceneRenderers: RendererMap = {
     const height = scene.file?.height || scene.files?.[0]?.height;
     return height ? `${height}p` : "-";
   },
-  filesize: (scene) => formatFileSize(scene.file?.size || scene.files?.[0]?.size),
+  filesize: (scene) =>
+    formatFileSize(scene.file?.size || scene.files?.[0]?.size),
   play_count: (scene) => <SimpleValueCell value={scene.play_count} />,
   o_counter: (scene) => <SimpleValueCell value={scene.o_counter} />,
   path: (scene) => {
@@ -261,13 +306,24 @@ const sceneRenderers: RendererMap = {
  */
 const performerRenderers: RendererMap = {
   name: (performer, options = {}) => (
-    <LinkCell text={performer.name} linkTo={getEntityPath('performer', performer, options.hasMultipleInstances)} />
+    <LinkCell
+      text={performer.name}
+      linkTo={getEntityPath(
+        "performer",
+        performer,
+        options.hasMultipleInstances
+      )}
+    />
   ),
   image: (performer, options = {}) => (
     <ThumbnailCell
       src={performer.image_path}
       alt={performer.name}
-      linkTo={getEntityPath('performer', performer, options.hasMultipleInstances)}
+      linkTo={getEntityPath(
+        "performer",
+        performer,
+        options.hasMultipleInstances
+      )}
       entityType="performer"
     />
   ),
@@ -278,10 +334,16 @@ const performerRenderers: RendererMap = {
   gender: (performer) => <SimpleValueCell value={performer.gender} />,
   country: (performer) => <SimpleValueCell value={performer.country} />,
   ethnicity: (performer) => <SimpleValueCell value={performer.ethnicity} />,
-  rating: (performer) => <RatingCell rating={performer.rating100 ?? performer.rating} />,
+  rating: (performer) => (
+    <RatingCell rating={performer.rating100 ?? performer.rating} />
+  ),
   favorite: (performer) => <FavoriteCell favorite={performer.favorite} />,
-  age: (performer) => <SimpleValueCell value={calculateAge(performer.birthdate)} />,
-  scenes_count: (performer) => <SimpleValueCell value={performer.scene_count} />,
+  age: (performer) => (
+    <SimpleValueCell value={calculateAge(performer.birthdate)} />
+  ),
+  scenes_count: (performer) => (
+    <SimpleValueCell value={performer.scene_count} />
+  ),
   o_counter: (performer) => <SimpleValueCell value={performer.o_counter} />,
 };
 
@@ -301,7 +363,9 @@ const StudioLogoCell = ({ src, alt = "", linkTo }: StudioLogoCellProps) => {
         className="w-28 h-12 rounded flex items-center justify-center"
         style={{ backgroundColor: "var(--bg-secondary)" }}
       >
-        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>No image</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>
+          No image
+        </span>
       </div>
     );
   }
@@ -340,13 +404,16 @@ const StudioLogoCell = ({ src, alt = "", linkTo }: StudioLogoCellProps) => {
  */
 const studioRenderers: RendererMap = {
   name: (studio, options = {}) => (
-    <LinkCell text={studio.name} linkTo={getEntityPath('studio', studio, options.hasMultipleInstances)} />
+    <LinkCell
+      text={studio.name}
+      linkTo={getEntityPath("studio", studio, options.hasMultipleInstances)}
+    />
   ),
   image: (studio, options = {}) => (
     <StudioLogoCell
       src={studio.image_path}
       alt={studio.name}
-      linkTo={getEntityPath('studio', studio, options.hasMultipleInstances)}
+      linkTo={getEntityPath("studio", studio, options.hasMultipleInstances)}
     />
   ),
   rating: (studio) => <RatingCell rating={studio.rating100 ?? studio.rating} />,
@@ -357,12 +424,18 @@ const studioRenderers: RendererMap = {
     return (
       <LinkCell
         text={studio.parent_studio.name}
-        linkTo={getEntityPath('studio', studio.parent_studio, options.hasMultipleInstances)}
+        linkTo={getEntityPath(
+          "studio",
+          studio.parent_studio,
+          options.hasMultipleInstances
+        )}
       />
     );
   },
   scenes_count: (studio) => <SimpleValueCell value={studio.scene_count} />,
-  child_count: (studio) => <SimpleValueCell value={studio.child_studios?.length} />,
+  child_count: (studio) => (
+    <SimpleValueCell value={studio.child_studios?.length} />
+  ),
 };
 
 /**
@@ -370,12 +443,17 @@ const studioRenderers: RendererMap = {
  * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const tagRenderers: RendererMap = {
-  name: (tag, options = {}) => <LinkCell text={tag.name} linkTo={getEntityPath('tag', tag, options.hasMultipleInstances)} />,
+  name: (tag, options = {}) => (
+    <LinkCell
+      text={tag.name}
+      linkTo={getEntityPath("tag", tag, options.hasMultipleInstances)}
+    />
+  ),
   image: (tag, options = {}) => (
     <ThumbnailCell
       src={tag.image_path}
       alt={tag.name}
-      linkTo={getEntityPath('tag', tag, options.hasMultipleInstances)}
+      linkTo={getEntityPath("tag", tag, options.hasMultipleInstances)}
       entityType="tag"
     />
   ),
@@ -394,30 +472,41 @@ const galleryRenderers: RendererMap = {
   title: (gallery, options = {}) => (
     <LinkCell
       text={gallery.title || `Gallery ${gallery.id}`}
-      linkTo={getEntityPath('gallery', gallery, options.hasMultipleInstances)}
+      linkTo={getEntityPath("gallery", gallery, options.hasMultipleInstances)}
     />
   ),
   cover: (gallery, options = {}) => (
     <ThumbnailCell
       src={gallery.cover}
       alt={gallery.title}
-      linkTo={getEntityPath('gallery', gallery, options.hasMultipleInstances)}
+      linkTo={getEntityPath("gallery", gallery, options.hasMultipleInstances)}
       entityType="gallery"
     />
   ),
   date: (gallery) => formatDate(gallery.date),
-  rating: (gallery) => <RatingCell rating={gallery.rating100 ?? gallery.rating} />,
+  rating: (gallery) => (
+    <RatingCell rating={gallery.rating100 ?? gallery.rating} />
+  ),
   studio: (gallery, options = {}) => {
     if (!gallery.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={gallery.studio.name} linkTo={getEntityPath('studio', gallery.studio, options.hasMultipleInstances)} />;
+    return (
+      <LinkCell
+        text={gallery.studio.name}
+        linkTo={getEntityPath(
+          "studio",
+          gallery.studio,
+          options.hasMultipleInstances
+        )}
+      />
+    );
   },
   performers: (gallery, options = {}) => {
     const items = (gallery.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
-      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
+      linkTo: getEntityPath("performer", p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -425,7 +514,7 @@ const galleryRenderers: RendererMap = {
     const items = (gallery.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
-      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
+      linkTo: getEntityPath("tag", t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -443,15 +532,17 @@ const galleryRenderers: RendererMap = {
 const imageRenderers: RendererMap = {
   title: (image, options = {}) => (
     <LinkCell
-      text={image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`}
-      linkTo={getEntityPath('image', image, options.hasMultipleInstances)}
+      text={
+        image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`
+      }
+      linkTo={getEntityPath("image", image, options.hasMultipleInstances)}
     />
   ),
   image: (image, options = {}) => (
     <ThumbnailCell
       src={image.paths?.thumbnail || image.image_path}
       alt={image.title}
-      linkTo={getEntityPath('image', image, options.hasMultipleInstances)}
+      linkTo={getEntityPath("image", image, options.hasMultipleInstances)}
       entityType="image"
     />
   ),
@@ -460,13 +551,22 @@ const imageRenderers: RendererMap = {
     if (!image.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={image.studio.name} linkTo={getEntityPath('studio', image.studio, options.hasMultipleInstances)} />;
+    return (
+      <LinkCell
+        text={image.studio.name}
+        linkTo={getEntityPath(
+          "studio",
+          image.studio,
+          options.hasMultipleInstances
+        )}
+      />
+    );
   },
   performers: (image, options = {}) => {
     const items = (image.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
-      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
+      linkTo: getEntityPath("performer", p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -474,11 +574,12 @@ const imageRenderers: RendererMap = {
     const items = (image.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
-      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
+      linkTo: getEntityPath("tag", t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
-  filesize: (image) => formatFileSize(image.file?.size || image.visual_files?.[0]?.size),
+  filesize: (image) =>
+    formatFileSize(image.file?.size || image.visual_files?.[0]?.size),
   resolution: (image) => {
     const height = image.file?.height || image.visual_files?.[0]?.height;
     const width = image.file?.width || image.visual_files?.[0]?.width;
@@ -499,13 +600,16 @@ const imageRenderers: RendererMap = {
  */
 const groupRenderers: RendererMap = {
   name: (group, options = {}) => (
-    <LinkCell text={group.name} linkTo={getEntityPath('group', group, options.hasMultipleInstances)} />
+    <LinkCell
+      text={group.name}
+      linkTo={getEntityPath("group", group, options.hasMultipleInstances)}
+    />
   ),
   image: (group, options = {}) => (
     <ThumbnailCell
       src={group.front_image_path}
       alt={group.name}
-      linkTo={getEntityPath('group', group, options.hasMultipleInstances)}
+      linkTo={getEntityPath("group", group, options.hasMultipleInstances)}
       entityType="group"
     />
   ),
@@ -514,7 +618,16 @@ const groupRenderers: RendererMap = {
     if (!group.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={group.studio.name} linkTo={getEntityPath('studio', group.studio, options.hasMultipleInstances)} />;
+    return (
+      <LinkCell
+        text={group.studio.name}
+        linkTo={getEntityPath(
+          "studio",
+          group.studio,
+          options.hasMultipleInstances
+        )}
+      />
+    );
   },
   date: (group) => formatDate(group.date),
   duration: (group) => formatDuration(group.duration),
@@ -525,7 +638,7 @@ const groupRenderers: RendererMap = {
     const items = (group.performers || []).map((p: Entity) => ({
       id: p.id,
       name: p.name,
-      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
+      linkTo: getEntityPath("performer", p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -533,7 +646,7 @@ const groupRenderers: RendererMap = {
     const items = (group.tags || []).map((t: Entity) => ({
       id: t.id,
       name: t.name,
-      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
+      linkTo: getEntityPath("tag", t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -554,7 +667,7 @@ const TagLinkCell = ({ tag, hasMultipleInstances }: TagLinkCellProps) => {
 
   return (
     <Link
-      to={getEntityPath('tag', tag, hasMultipleInstances)}
+      to={getEntityPath("tag", tag, hasMultipleInstances)}
       className="hover:underline"
       style={{ color: "var(--accent-secondary)" }}
     >
@@ -571,7 +684,11 @@ const clipRenderers: RendererMap = {
   title: (clip, options = {}) => (
     <LinkCell
       text={clip.title || "Untitled"}
-      linkTo={getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, options.hasMultipleInstances)}
+      linkTo={getScenePathWithTime(
+        { id: clip.sceneId, instanceId: clip.instanceId },
+        clip.seconds,
+        options.hasMultipleInstances
+      )}
     />
   ),
   thumbnail: (clip, options = {}) => {
@@ -583,7 +700,11 @@ const clipRenderers: RendererMap = {
       <ThumbnailCell
         src={src}
         alt={clip.title}
-        linkTo={getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, options.hasMultipleInstances)}
+        linkTo={getScenePathWithTime(
+          { id: clip.sceneId, instanceId: clip.instanceId },
+          clip.seconds,
+          options.hasMultipleInstances
+        )}
         entityType="scene"
       />
     );
@@ -595,11 +716,20 @@ const clipRenderers: RendererMap = {
     return (
       <LinkCell
         text={clip.scene.title || `Scene ${clip.sceneId}`}
-        linkTo={getEntityPath('scene', { id: clip.sceneId, instanceId: clip.instanceId }, options.hasMultipleInstances)}
+        linkTo={getEntityPath(
+          "scene",
+          { id: clip.sceneId, instanceId: clip.instanceId },
+          options.hasMultipleInstances
+        )}
       />
     );
   },
-  primary_tag: (clip, options = {}) => <TagLinkCell tag={clip.primaryTag} hasMultipleInstances={options.hasMultipleInstances || false} />,
+  primary_tag: (clip, options = {}) => (
+    <TagLinkCell
+      tag={clip.primaryTag}
+      hasMultipleInstances={options.hasMultipleInstances || false}
+    />
+  ),
   start_time: (clip) => formatDuration(clip.seconds),
   duration: (clip) => {
     if (clip.endSeconds && clip.seconds) {
@@ -611,7 +741,14 @@ const clipRenderers: RendererMap = {
     const items = (clip.tags || []).map((t: Entity) => ({
       id: t.tag?.id || t.id,
       name: t.tag?.name || t.name,
-      linkTo: getEntityPath('tag', { id: t.tag?.id || t.id, instanceId: t.tag?.instanceId || t.instanceId }, options.hasMultipleInstances),
+      linkTo: getEntityPath(
+        "tag",
+        {
+          id: t.tag?.id || t.id,
+          instanceId: t.tag?.instanceId || t.instanceId,
+        },
+        options.hasMultipleInstances
+      ),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -650,7 +787,11 @@ interface CellRendererOptions {
 /**
  * Get a cell renderer function for a specific column and entity type
  */
-export const getCellRenderer = (columnId: string, entityType: string, options: CellRendererOptions = {}) => {
+export const getCellRenderer = (
+  columnId: string,
+  entityType: string,
+  options: CellRendererOptions = {}
+) => {
   const normalizedType = entityType?.toLowerCase();
   const renderers = entityRenderers[normalizedType];
   if (!renderers) {

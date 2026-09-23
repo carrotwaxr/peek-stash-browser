@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { TestClient, adminClient } from "../helpers/testClient.js";
 
 describe("Hidden Entities Bulk API Integration Tests", () => {
   let testUserId: number;
@@ -80,7 +80,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(400);
-      expect(response.data.error).toContain("entities must be a non-empty array");
+      expect(response.data.error).toContain(
+        "entities must be a non-empty array"
+      );
     });
 
     it("should validate that entities array is not empty", async () => {
@@ -91,13 +93,13 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(400);
-      expect(response.data.error).toContain("entities must be a non-empty array");
+      expect(response.data.error).toContain(
+        "entities must be a non-empty array"
+      );
     });
 
     it("should validate entity type", async () => {
-      const entities = [
-        { entityType: "invalid_type", entityId: "test-1" },
-      ];
+      const entities = [{ entityType: "invalid_type", entityId: "test-1" }];
 
       const response = await testUserClient.post<{ error: string }>(
         "/api/user/hidden-entities/bulk",
@@ -144,9 +146,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
     it("should require authentication", async () => {
       const unauthClient = new TestClient();
-      const entities = [
-        { entityType: "scene", entityId: "test-scene-unauth" },
-      ];
+      const entities = [{ entityType: "scene", entityId: "test-scene-unauth" }];
 
       const response = await unauthClient.post(
         "/api/user/hidden-entities/bulk",

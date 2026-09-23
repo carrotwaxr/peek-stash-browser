@@ -13,14 +13,15 @@
  *
  * IMPORTANT: Production Stash tests are READ-ONLY. No modifications allowed.
  */
-
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { adminClient, guestClient } from "../helpers/testClient.js";
 
 // Production Stash credentials from env (the "main" Stash, not the test one)
-const PRODUCTION_STASH_URL = process.env.STASH_URL_ORIGINAL || "http://10.0.0.4:6969/graphql";
-const PRODUCTION_STASH_API_KEY = process.env.STASH_API_KEY_ORIGINAL || process.env.STASH_API_KEY;
+const PRODUCTION_STASH_URL =
+  process.env.STASH_URL_ORIGINAL || "http://10.0.0.4:6969/graphql";
+const PRODUCTION_STASH_API_KEY =
+  process.env.STASH_API_KEY_ORIGINAL || process.env.STASH_API_KEY;
 
 interface StashInstance {
   id: string;
@@ -63,10 +64,17 @@ describe("Multi-Instance Support", () => {
     if (existingProduction) {
       productionInstanceId = existingProduction.id;
       hasMultipleInstances = true;
-      console.log("[Multi-Instance Tests] Production instance already configured");
-    } else if (PRODUCTION_STASH_API_KEY && PRODUCTION_STASH_URL !== process.env.STASH_URL) {
+      console.log(
+        "[Multi-Instance Tests] Production instance already configured"
+      );
+    } else if (
+      PRODUCTION_STASH_API_KEY &&
+      PRODUCTION_STASH_URL !== process.env.STASH_URL
+    ) {
       // Add production Stash as second instance (READ ONLY - we just sync from it)
-      console.log("[Multi-Instance Tests] Adding production Stash as second instance...");
+      console.log(
+        "[Multi-Instance Tests] Adding production Stash as second instance..."
+      );
 
       const addResponse = await adminClient.post<{
         success: boolean;
@@ -83,7 +91,9 @@ describe("Multi-Instance Support", () => {
       if (addResponse.ok) {
         productionInstanceId = addResponse.data.instance.id;
         hasMultipleInstances = true;
-        console.log("[Multi-Instance Tests] Production instance added, waiting for sync...");
+        console.log(
+          "[Multi-Instance Tests] Production instance added, waiting for sync..."
+        );
 
         // Wait for sync to complete (poll for up to 2 minutes)
         const maxWait = 120000;
@@ -107,10 +117,15 @@ describe("Multi-Instance Support", () => {
         }
 
         if (!syncComplete) {
-          console.log("[Multi-Instance Tests] Warning: Sync may not be complete");
+          console.log(
+            "[Multi-Instance Tests] Warning: Sync may not be complete"
+          );
         }
       } else {
-        console.log("[Multi-Instance Tests] Could not add production instance:", addResponse.data);
+        console.log(
+          "[Multi-Instance Tests] Could not add production instance:",
+          addResponse.data
+        );
       }
     }
 
@@ -132,15 +147,20 @@ describe("Multi-Instance Support", () => {
       const prodScenesResponse = await adminClient.post<{
         findScenes: { count: number };
       }>("/api/library/scenes", { filter: { per_page: 1 } });
-      productionInstanceSceneCount = prodScenesResponse.data?.findScenes?.count || 0;
+      productionInstanceSceneCount =
+        prodScenesResponse.data?.findScenes?.count || 0;
 
       // Reset to all instances
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [],
       });
 
-      console.log(`[Multi-Instance Tests] Test instance: ${testInstanceSceneCount} scenes`);
-      console.log(`[Multi-Instance Tests] Production instance: ${productionInstanceSceneCount} scenes`);
+      console.log(
+        `[Multi-Instance Tests] Test instance: ${testInstanceSceneCount} scenes`
+      );
+      console.log(
+        `[Multi-Instance Tests] Production instance: ${productionInstanceSceneCount} scenes`
+      );
     }
   });
 
@@ -191,7 +211,9 @@ describe("Multi-Instance Support", () => {
 
     it("instance list contains expected fields", async () => {
       const response = await adminClient.get<{
-        instances: Array<StashInstance & { createdAt: string; updatedAt: string }>;
+        instances: Array<
+          StashInstance & { createdAt: string; updatedAt: string }
+        >;
       }>("/api/setup/stash-instances");
 
       expect(response.ok).toBe(true);
@@ -255,15 +277,26 @@ describe("Multi-Instance Support", () => {
     });
 
     it("unauthenticated user cannot access instance selection", async () => {
-      expect((await guestClient.get("/api/user/stash-instances")).status).toBe(401);
-      expect((await guestClient.put("/api/user/stash-instances", { instanceIds: [] })).status).toBe(401);
+      expect((await guestClient.get("/api/user/stash-instances")).status).toBe(
+        401
+      );
+      expect(
+        (
+          await guestClient.put("/api/user/stash-instances", {
+            instanceIds: [],
+          })
+        ).status
+      ).toBe(401);
     });
   });
 
   describe("Entity Queries Work With Instance Infrastructure", () => {
     it("scenes can be queried successfully", async () => {
       const response = await adminClient.post<{
-        findScenes: { count: number; scenes: Array<{ id: string; title: string }> };
+        findScenes: {
+          count: number;
+          scenes: Array<{ id: string; title: string }>;
+        };
       }>("/api/library/scenes", { filter: { per_page: 5 } });
 
       expect(response.ok).toBe(true);
@@ -309,13 +342,18 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", {
         filter: { per_page: 10 },
         scene_filter: {
-          performers: { value: [TEST_ENTITIES.performerWithScenes], modifier: "INCLUDES" },
+          performers: {
+            value: [TEST_ENTITIES.performerWithScenes],
+            modifier: "INCLUDES",
+          },
         },
       });
 
       expect(response.ok).toBe(true);
       for (const scene of response.data.findScenes.scenes) {
-        expect(scene.performers.map((p) => p.id)).toContain(TEST_ENTITIES.performerWithScenes);
+        expect(scene.performers.map((p) => p.id)).toContain(
+          TEST_ENTITIES.performerWithScenes
+        );
       }
     });
 
@@ -325,7 +363,10 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", {
         filter: { per_page: 10 },
         scene_filter: {
-          tags: { value: [TEST_ENTITIES.tagWithEntities], modifier: "INCLUDES" },
+          tags: {
+            value: [TEST_ENTITIES.tagWithEntities],
+            modifier: "INCLUDES",
+          },
         },
       });
 
@@ -342,7 +383,10 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", {
         filter: { per_page: 10 },
         scene_filter: {
-          studios: { value: [TEST_ENTITIES.studioWithScenes], modifier: "INCLUDES" },
+          studios: {
+            value: [TEST_ENTITIES.studioWithScenes],
+            modifier: "INCLUDES",
+          },
         },
       });
 
@@ -426,7 +470,9 @@ describe("Multi-Instance Support", () => {
 
       expect(response.ok).toBe(true);
       // Test instance has far fewer scenes than production
-      expect(response.data.findScenes.count).toBeLessThan(productionInstanceSceneCount);
+      expect(response.data.findScenes.count).toBeLessThan(
+        productionInstanceSceneCount
+      );
 
       // Reset
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
@@ -450,7 +496,9 @@ describe("Multi-Instance Support", () => {
       expect(response.ok).toBe(true);
       // Production has many more scenes than test instance
       // Allow some variance due to sync timing
-      expect(response.data.findScenes.count).toBeGreaterThan(testInstanceSceneCount * 10);
+      expect(response.data.findScenes.count).toBeGreaterThan(
+        testInstanceSceneCount * 10
+      );
 
       // Reset
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
@@ -504,12 +552,17 @@ describe("Multi-Instance Support", () => {
       expect(prodResponse.ok).toBe(true);
 
       // The scene lists should be different (different content in each instance)
-      const testTitles = testResponse.data.findScenes.scenes.map((s) => s.title);
-      const prodTitles = prodResponse.data.findScenes.scenes.map((s) => s.title);
+      const testTitles = testResponse.data.findScenes.scenes.map(
+        (s) => s.title
+      );
+      const prodTitles = prodResponse.data.findScenes.scenes.map(
+        (s) => s.title
+      );
 
       // At least one title should be different (instances have different content)
-      const allSame = testTitles.every((t) => prodTitles.includes(t)) &&
-                      prodTitles.every((t) => testTitles.includes(t));
+      const allSame =
+        testTitles.every((t) => prodTitles.includes(t)) &&
+        prodTitles.every((t) => testTitles.includes(t));
 
       // It's unlikely both instances have exactly the same 5 scenes
       // This test verifies that switching instances actually changes what you see
@@ -589,10 +642,9 @@ describe("Multi-Instance Support", () => {
         "/api/library/scenes",
         { filter: { per_page: 1 } }
       );
-      const query2 = await adminClient.post<{ findPerformers: { count: number } }>(
-        "/api/library/performers",
-        { filter: { per_page: 1 } }
-      );
+      const query2 = await adminClient.post<{
+        findPerformers: { count: number };
+      }>("/api/library/performers", { filter: { per_page: 1 } });
       const query3 = await adminClient.post<{ findTags: { count: number } }>(
         "/api/library/tags",
         { filter: { per_page: 1 } }
@@ -603,7 +655,9 @@ describe("Multi-Instance Support", () => {
       expect(query3.ok).toBe(true);
 
       // All should reflect test instance only (small count compared to production)
-      expect(query1.data.findScenes.count).toBeLessThan(productionInstanceSceneCount);
+      expect(query1.data.findScenes.count).toBeLessThan(
+        productionInstanceSceneCount
+      );
 
       // Reset
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
@@ -629,7 +683,10 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", {
         filter: { per_page: 50 },
         scene_filter: {
-          performers: { value: [TEST_ENTITIES.performerWithScenes], modifier: "INCLUDES" },
+          performers: {
+            value: [TEST_ENTITIES.performerWithScenes],
+            modifier: "INCLUDES",
+          },
         },
       });
 
@@ -638,7 +695,9 @@ describe("Multi-Instance Support", () => {
       // Results should only be from test instance (the performer is from test instance)
       // This verifies that junction table queries correctly match instance IDs
       for (const scene of response.data.findScenes.scenes) {
-        expect(scene.performers.map((p) => p.id)).toContain(TEST_ENTITIES.performerWithScenes);
+        expect(scene.performers.map((p) => p.id)).toContain(
+          TEST_ENTITIES.performerWithScenes
+        );
       }
     });
 
@@ -655,13 +714,18 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", {
         filter: { per_page: 50 },
         scene_filter: {
-          tags: { value: [TEST_ENTITIES.tagWithEntities], modifier: "INCLUDES" },
+          tags: {
+            value: [TEST_ENTITIES.tagWithEntities],
+            modifier: "INCLUDES",
+          },
         },
       });
 
       expect(response.ok).toBe(true);
       // The tag is from test instance, so only test instance scenes should match
-      expect(response.data.findScenes.count).toBeLessThanOrEqual(testInstanceSceneCount);
+      expect(response.data.findScenes.count).toBeLessThanOrEqual(
+        testInstanceSceneCount
+      );
     });
   });
 });

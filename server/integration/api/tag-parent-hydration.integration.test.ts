@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Tag Parent Name Hydration Integration Tests
@@ -29,15 +29,18 @@ describe("Tag Parent Name Hydration", () => {
 
   it("hydrates parent tag names (not empty strings) in list view", async () => {
     // Find tags that have parents
-    const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-      filter: { per_page: 100 },
-      tag_filter: {
-        parent_count: {
-          value: 0,
-          modifier: "GREATER_THAN",
+    const response = await adminClient.post<FindTagsResponse>(
+      "/api/library/tags",
+      {
+        filter: { per_page: 100 },
+        tag_filter: {
+          parent_count: {
+            value: 0,
+            modifier: "GREATER_THAN",
+          },
         },
-      },
-    });
+      }
+    );
 
     expect(response.ok).toBe(true);
     expect(response.data.findTags.count).toBeGreaterThan(0);
@@ -62,15 +65,18 @@ describe("Tag Parent Name Hydration", () => {
 
   it("hydrates parent tag names on single-tag detail request", async () => {
     // First find a tag that has parents
-    const listResponse = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-      filter: { per_page: 100 },
-      tag_filter: {
-        parent_count: {
-          value: 0,
-          modifier: "GREATER_THAN",
+    const listResponse = await adminClient.post<FindTagsResponse>(
+      "/api/library/tags",
+      {
+        filter: { per_page: 100 },
+        tag_filter: {
+          parent_count: {
+            value: 0,
+            modifier: "GREATER_THAN",
+          },
         },
-      },
-    });
+      }
+    );
 
     expect(listResponse.ok).toBe(true);
     const tagWithParents = listResponse.data.findTags.tags.find(
@@ -79,9 +85,12 @@ describe("Tag Parent Name Hydration", () => {
     expect(tagWithParents).toBeDefined();
 
     // Now request this specific tag by ID (single-tag detail request path)
-    const detailResponse = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-      ids: [tagWithParents!.id],
-    });
+    const detailResponse = await adminClient.post<FindTagsResponse>(
+      "/api/library/tags",
+      {
+        ids: [tagWithParents!.id],
+      }
+    );
 
     expect(detailResponse.ok).toBe(true);
     expect(detailResponse.data.findTags.tags).toHaveLength(1);

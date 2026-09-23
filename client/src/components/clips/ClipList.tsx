@@ -10,7 +10,11 @@ interface Props {
 /**
  * ClipList - Displays clips for a scene with toggle for ungenerated
  */
-export default function ClipList({ clips, onClipClick, loading = false }: Props) {
+export default function ClipList({
+  clips,
+  onClipClick,
+  loading = false,
+}: Props) {
   const [showUngenerated, setShowUngenerated] = useState(false);
 
   const filteredClips = showUngenerated
@@ -35,7 +39,10 @@ export default function ClipList({ clips, onClipClick, loading = false }: Props)
 
   if (clips.length === 0) {
     return (
-      <div className="text-center py-8" style={{ color: "var(--text-secondary)" }}>
+      <div
+        className="text-center py-8"
+        style={{ color: "var(--text-secondary)" }}
+      >
         No clips available for this scene
       </div>
     );
@@ -65,11 +72,7 @@ export default function ClipList({ clips, onClipClick, loading = false }: Props)
       {/* Clip grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {filteredClips.map((clip: Clip) => (
-          <ClipCard
-            key={clip.id}
-            clip={clip}
-            onClick={onClipClick}
-          />
+          <ClipCard key={clip.id} clip={clip} onClick={onClipClick} />
         ))}
       </div>
     </div>

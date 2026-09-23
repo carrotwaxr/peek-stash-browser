@@ -1,38 +1,27 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as LucideIcons from "lucide-react";
 import { LucideEyeOff, LucidePlus } from "lucide-react";
+import { apiGet, libraryApi } from "../../api";
+import { ApiError } from "../../api/client";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
 } from "../../constants/carousels";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useAuth } from "../../hooks/useAuth";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries";
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { apiGet, libraryApi } from "../../api";
-import { ApiError } from "../../api/client";
 import {
-  carouselRulesToFilterState,
-  SCENE_FILTER_OPTIONS,
   type FilterOption,
+  SCENE_FILTER_OPTIONS,
+  carouselRulesToFilterState,
 } from "../../utils/filterConfig";
 import { buildSearchParams } from "../../utils/urlParams";
-import type { NormalizedScene } from "@peek/shared-types";
-
-interface CarouselDef {
-  type: string;
-  id?: string;
-  prefId: string;
-  title: string;
-  iconComponent: React.ElementType;
-  iconProps: Record<string, any>;
-  fetchKey?: string;
-  isSpecial?: boolean;
-}
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -44,6 +33,17 @@ import {
   PageLayout,
   SceneCarousel,
 } from "../ui/index";
+
+interface CarouselDef {
+  type: string;
+  id?: string;
+  prefId: string;
+  title: string;
+  iconComponent: React.ElementType;
+  iconProps: Record<string, any>;
+  fetchKey?: string;
+  isSpecial?: boolean;
+}
 
 const SCENES_PER_CAROUSEL = 12;
 
@@ -70,7 +70,11 @@ const getSeeMoreUrl = (fetchKey: string): string | null => {
 /**
  * Build a "See More" URL for a custom carousel from its rules
  */
-const buildCustomCarouselUrl = (rules: Record<string, unknown> | null | undefined, sort: string | undefined, direction: string | undefined): string => {
+const buildCustomCarouselUrl = (
+  rules: Record<string, unknown> | null | undefined,
+  sort: string | undefined,
+  direction: string | undefined
+): string => {
   if (!rules || typeof rules !== "object") {
     return "/scenes";
   }
@@ -104,9 +108,13 @@ const Home = () => {
   const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
   const [carouselPreferences, setCarouselPreferences] = useState<any[]>([]);
-  const [customCarousels, setCustomCarousels] = useState<Record<string, unknown>[]>([]);
+  const [customCarousels, setCustomCarousels] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
-  const [selectedScenes, setSelectedScenes] = useState<Record<string, unknown>[]>([]);
+  const [selectedScenes, setSelectedScenes] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initMessage, setInitMessage] = useState<string | null>(null);
   const { user } = useAuth();
@@ -115,7 +123,7 @@ const Home = () => {
     const loadData = async () => {
       try {
         // Load user preferences
-        const data = await apiGet("/user/settings") as Record<string, any>;
+        const data = (await apiGet("/user/settings")) as Record<string, any>;
         const prefs = migrateCarouselPreferences(
           data.settings.carouselPreferences
         );
@@ -123,7 +131,10 @@ const Home = () => {
 
         // Load custom carousels
         try {
-          const { carousels } = await libraryApi.getCarousels() as Record<string, any>;
+          const { carousels } = (await libraryApi.getCarousels()) as Record<
+            string,
+            any
+          >;
           setCustomCarousels(carousels || []);
         } catch (err) {
           console.error("Failed to load custom carousels:", err);
@@ -138,33 +149,34 @@ const Home = () => {
 
     loadData();
     // Re-fetch when navigating to homepage (location.key changes on each navigation)
-     
   }, [location.key]);
 
-  const createSceneClickHandler = (scenes: Record<string, unknown>[], carouselTitle: string) => (scene: Record<string, unknown>) => {
-    const currentIndex = scenes.findIndex((s) => s.id === scene.id);
+  const createSceneClickHandler =
+    (scenes: Record<string, unknown>[], carouselTitle: string) =>
+    (scene: Record<string, unknown>) => {
+      const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
-      state: {
-        scene,
-        fromPageTitle: "Home",
-        playlist: {
-          id: "virtual-carousel",
-          name: carouselTitle,
-          shuffle: false,
-          repeat: "none",
-          scenes: scenes.map((s, idx) => ({
-            sceneId: s.id,
-            instanceId: s.instanceId,
-            scene: s,
-            position: idx,
-          })),
-          currentIndex: currentIndex >= 0 ? currentIndex : 0,
+      navigate(getEntityPath("scene", scene, hasMultipleInstances), {
+        state: {
+          scene,
+          fromPageTitle: "Home",
+          playlist: {
+            id: "virtual-carousel",
+            name: carouselTitle,
+            shuffle: false,
+            repeat: "none",
+            scenes: scenes.map((s, idx) => ({
+              sceneId: s.id,
+              instanceId: s.instanceId,
+              scene: s,
+              position: idx,
+            })),
+            currentIndex: currentIndex >= 0 ? currentIndex : 0,
+          },
         },
-      },
-    });
-    return true; // Prevent fallback navigation in SceneCard
-  };
+      });
+      return true; // Prevent fallback navigation in SceneCard
+    };
 
   const handleToggleSelect = (scene: Record<string, unknown>) => {
     setSelectedScenes((prev) => {
@@ -182,7 +194,13 @@ const Home = () => {
   };
 
   // Bulk hide action
-  const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
+  const {
+    hideDialogOpen,
+    isHiding,
+    handleHideClick,
+    handleHideConfirm,
+    closeHideDialog,
+  } = useHideBulkAction({
     selectedScenes: selectedScenes as { id: string | number }[],
     onComplete: handleClearSelection,
   });
@@ -207,14 +225,20 @@ const Home = () => {
         const carouselId = (pref.id as string).replace("custom-", "");
         const customCarousel = customCarousels.find((c) => c.id === carouselId);
         if (customCarousel) {
-          const IconComponent = (LucideIcons as Record<string, any>)[customCarousel.icon as string] || LucideIcons.Film;
+          const IconComponent =
+            (LucideIcons as Record<string, any>)[
+              customCarousel.icon as string
+            ] || LucideIcons.Film;
           return {
             type: "custom",
             id: carouselId,
             prefId: pref.id as string,
             title: customCarousel.title as string,
             iconComponent: IconComponent,
-            iconProps: { className: "w-6 h-6", style: { color: "var(--accent-primary)" } },
+            iconProps: {
+              className: "w-6 h-6",
+              style: { color: "var(--accent-primary)" },
+            },
           } as CarouselDef;
         }
         return null; // Custom carousel not found
@@ -274,14 +298,22 @@ const Home = () => {
       {activeCarousels.map((carousel) => {
         // Render custom carousel
         if (carousel.type === "custom") {
-          const { id, title, iconComponent: IconComponent, iconProps } = carousel;
+          const {
+            id,
+            title,
+            iconComponent: IconComponent,
+            iconProps,
+          } = carousel;
           const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
           return (
             <CustomCarousel
               key={carousel.prefId}
               carouselId={id!}
-              carousel={customCarousels.find((c) => c.id === id) || ({} as Record<string, unknown>)}
+              carousel={
+                customCarousels.find((c) => c.id === id) ||
+                ({} as Record<string, unknown>)
+              }
               title={title}
               icon={icon}
               createSceneClickHandler={createSceneClickHandler}
@@ -308,7 +340,11 @@ const Home = () => {
             <ContinueWatchingCarousel
               key={fetchKey}
               selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-              onToggleSelect={handleToggleSelect as unknown as (scene: NormalizedScene) => void}
+              onToggleSelect={
+                handleToggleSelect as unknown as (
+                  scene: NormalizedScene
+                ) => void
+              }
               onInitializing={handleInitializing}
             />
           );
@@ -353,12 +389,14 @@ const Home = () => {
                 <AddToPlaylistButton
                   sceneIds={selectedScenes.map((s) => String(s.id))}
                   buttonText={
-                    (<span>
-                      <span className="hidden sm:inline">
-                        Add {selectedScenes.length} to Playlist
+                    (
+                      <span>
+                        <span className="hidden sm:inline">
+                          Add {selectedScenes.length} to Playlist
+                        </span>
+                        <span className="sm:hidden">Add to Playlist</span>
                       </span>
-                      <span className="sm:hidden">Add to Playlist</span>
-                    </span>) as unknown as string
+                    ) as unknown as string
                   }
                   icon={<LucidePlus className="w-4 h-4" />}
                   dropdownPosition="above"
@@ -387,7 +425,10 @@ interface HomeCarouselProps {
   title: string;
   icon: React.ReactNode;
   fetchKey: string;
-  createSceneClickHandler: (scenes: Record<string, unknown>[], title: string) => (scene: Record<string, unknown>) => void;
+  createSceneClickHandler: (
+    scenes: Record<string, unknown>[],
+    title: string
+  ) => (scene: Record<string, unknown>) => void;
   carouselQueries: Record<string, () => Promise<unknown>>;
   selectedScenes: Record<string, unknown>[];
   onToggleSelect: (scene: Record<string, unknown>) => void;
@@ -407,7 +448,10 @@ const HomeCarousel = ({
   const [retryCount, setRetryCount] = useState(0);
   const queryClient = useQueryClient();
   const fetchFunction = carouselQueries[fetchKey];
-  const queryKey = useMemo(() => ["homeCarousel", fetchKey] as const, [fetchKey]);
+  const queryKey = useMemo(
+    () => ["homeCarousel", fetchKey] as const,
+    [fetchKey]
+  );
   const {
     data: scenes,
     isLoading: loading,
@@ -439,7 +483,15 @@ const HomeCarousel = ({
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
     }
-  }, [error, errorAny, queryClient, queryKey, retryCount, onInitializing, title]);
+  }, [
+    error,
+    errorAny,
+    queryClient,
+    queryKey,
+    retryCount,
+    onInitializing,
+    title,
+  ]);
 
   // Silently skip failed carousels (non-initialization errors only)
   if (errorAny && !errorAny.isInitializing) {
@@ -457,9 +509,16 @@ const HomeCarousel = ({
       title={title}
       titleIcon={icon}
       scenes={(scenes || []) as unknown as NormalizedScene[]}
-      onSceneClick={createSceneClickHandler((scenes || []) as Record<string, unknown>[], title) as unknown as (scene: NormalizedScene) => boolean | void}
+      onSceneClick={
+        createSceneClickHandler(
+          (scenes || []) as Record<string, unknown>[],
+          title
+        ) as unknown as (scene: NormalizedScene) => boolean | void
+      }
       selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-      onToggleSelect={onToggleSelect as unknown as (scene: NormalizedScene) => void}
+      onToggleSelect={
+        onToggleSelect as unknown as (scene: NormalizedScene) => void
+      }
       seeMoreUrl={getSeeMoreUrl(fetchKey) || undefined}
     />
   );
@@ -474,7 +533,10 @@ interface CustomCarouselProps {
   carousel: Record<string, unknown>;
   title: string;
   icon: React.ReactNode;
-  createSceneClickHandler: (scenes: Record<string, unknown>[], title: string) => (scene: Record<string, unknown>) => void;
+  createSceneClickHandler: (
+    scenes: Record<string, unknown>[],
+    title: string
+  ) => (scene: Record<string, unknown>) => void;
   selectedScenes: Record<string, unknown>[];
   onToggleSelect: (scene: Record<string, unknown>) => void;
   onInitializing: (value: boolean) => void;
@@ -498,7 +560,9 @@ const CustomCarousel = ({
   const fetchCarousel = useCallback(async () => {
     setLoading(true);
     try {
-      const { scenes: fetchedScenes } = await libraryApi.executeCarousel(carouselId) as Record<string, any>;
+      const { scenes: fetchedScenes } = (await libraryApi.executeCarousel(
+        carouselId
+      )) as Record<string, any>;
       setScenes(fetchedScenes || []);
       setError(null);
       onInitializing(false);
@@ -560,12 +624,22 @@ const CustomCarousel = ({
       title={title}
       titleIcon={icon}
       scenes={scenes as unknown as NormalizedScene[]}
-      onSceneClick={createSceneClickHandler(scenes, title) as unknown as (scene: NormalizedScene) => boolean | void}
+      onSceneClick={
+        createSceneClickHandler(scenes, title) as unknown as (
+          scene: NormalizedScene
+        ) => boolean | void
+      }
       selectedScenes={selectedScenes as unknown as NormalizedScene[]}
-      onToggleSelect={onToggleSelect as unknown as (scene: NormalizedScene) => void}
+      onToggleSelect={
+        onToggleSelect as unknown as (scene: NormalizedScene) => void
+      }
       seeMoreUrl={
         carousel
-          ? buildCustomCarouselUrl(carousel.rules as Record<string, unknown>, carousel.sort as string, carousel.direction as string)
+          ? buildCustomCarouselUrl(
+              carousel.rules as Record<string, unknown>,
+              carousel.sort as string,
+              carousel.direction as string
+            )
           : undefined
       }
     />

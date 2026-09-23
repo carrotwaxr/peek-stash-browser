@@ -6,7 +6,15 @@
  * Covers query param parsing, comma-split arrays, random sort integration,
  * pagination math, not-found handling, and error cases.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getClipById,
+  getClips,
+  getClipsForScene,
+} from "../../controllers/clips.js";
+import { clipService } from "../../services/ClipService.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/ClipService.js", () => ({
@@ -25,11 +33,6 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { clipService } from "../../services/ClipService.js";
-import { parseRandomSort } from "../../utils/seededRandom.js";
-import { getClips, getClipById, getClipsForScene } from "../../controllers/clips.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
-
 const mockClipService = vi.mocked(clipService);
 const mockParseRandomSort = vi.mocked(parseRandomSort);
 
@@ -38,7 +41,10 @@ const USER = { id: 1, username: "testuser", role: "USER" };
 describe("Clips Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockParseRandomSort.mockReturnValue({ sortField: "stashCreatedAt", randomSeed: undefined });
+    mockParseRandomSort.mockReturnValue({
+      sortField: "stashCreatedAt",
+      randomSeed: undefined,
+    });
   });
 
   // ─── getClips ─────────────────────────────────────────────────────────────
@@ -75,7 +81,10 @@ describe("Clips Controller", () => {
     });
 
     it("passes all query params through to the service", async () => {
-      mockParseRandomSort.mockReturnValue({ sortField: "title", randomSeed: undefined });
+      mockParseRandomSort.mockReturnValue({
+        sortField: "title",
+        randomSeed: undefined,
+      });
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
       const req = mockReq({}, {}, USER, {
@@ -139,7 +148,10 @@ describe("Clips Controller", () => {
     });
 
     it("passes randomSeed from parseRandomSort to the service", async () => {
-      mockParseRandomSort.mockReturnValue({ sortField: "random", randomSeed: 42 });
+      mockParseRandomSort.mockReturnValue({
+        sortField: "random",
+        randomSeed: 42,
+      });
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
       const req = mockReq({}, {}, USER, { sortBy: "random" });
@@ -257,7 +269,9 @@ describe("Clips Controller", () => {
     it("passes includeUngenerated=true when query param is set", async () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
-      const req = mockReq({}, { id: "scene-1" }, USER, { includeUngenerated: "true" });
+      const req = mockReq({}, { id: "scene-1" }, USER, {
+        includeUngenerated: "true",
+      });
       const res = mockRes();
 
       await getClipsForScene(req, res);
@@ -273,7 +287,9 @@ describe("Clips Controller", () => {
     it("wraps instanceId in an array when provided", async () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
-      const req = mockReq({}, { id: "scene-1" }, USER, { instanceId: "inst-1" });
+      const req = mockReq({}, { id: "scene-1" }, USER, {
+        instanceId: "inst-1",
+      });
       const res = mockRes();
 
       await getClipsForScene(req, res);

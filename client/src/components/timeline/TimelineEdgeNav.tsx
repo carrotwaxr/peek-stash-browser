@@ -10,10 +10,7 @@ interface Props {
  * Edge fade overlays for the timeline strip.
  * Simple gradient fade to indicate scrollable content (no buttons or labels).
  */
-function TimelineEdgeNav({
-  side,
-  visible,
-}: Props) {
+function TimelineEdgeNav({ side, visible }: Props) {
   if (!visible) return null;
 
   const isLeft = side === "left";

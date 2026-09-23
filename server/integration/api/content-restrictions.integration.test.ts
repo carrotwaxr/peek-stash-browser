@@ -1,6 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { TestClient, adminClient, selectTestInstanceOnly, selectAllInstances, selectTestInstanceForClient, selectAllInstancesForClient } from "../helpers/testClient.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import {
+  TestClient,
+  adminClient,
+  selectAllInstances,
+  selectAllInstancesForClient,
+  selectTestInstanceForClient,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 describe("Content Restrictions Integration Tests", () => {
   let testUserId: number;

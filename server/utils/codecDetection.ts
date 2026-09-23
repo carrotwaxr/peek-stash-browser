@@ -18,22 +18,12 @@ const STREAMABLE_VIDEO_CODECS = new Set([
 /**
  * Browser-compatible audio codecs
  */
-const STREAMABLE_AUDIO_CODECS = new Set([
-  "aac",
-  "mp3",
-  "opus",
-  "vorbis",
-]);
+const STREAMABLE_AUDIO_CODECS = new Set(["aac", "mp3", "opus", "vorbis"]);
 
 /**
  * Containers that browsers can directly stream via HTML5 video
  */
-const STREAMABLE_CONTAINERS = new Set([
-  "mp4",
-  "m4v",
-  "mov",
-  "webm",
-]);
+const STREAMABLE_CONTAINERS = new Set(["mp4", "m4v", "mov", "webm"]);
 
 export interface StreamabilityResult {
   isStreamable: boolean;
@@ -54,17 +44,29 @@ function normalizeCodec(codec: string | undefined | null): string {
   const normalized = codec.toLowerCase().replace(/[.\s_-]/g, "");
 
   // Handle common variations
-  if (normalized.startsWith("h264") || normalized === "avc" || normalized === "avc1") {
+  if (
+    normalized.startsWith("h264") ||
+    normalized === "avc" ||
+    normalized === "avc1"
+  ) {
     return "h264";
   }
-  if (normalized.startsWith("h265") || normalized === "hevc" || normalized === "hvc1") {
+  if (
+    normalized.startsWith("h265") ||
+    normalized === "hevc" ||
+    normalized === "hvc1"
+  ) {
     return "hevc";
   }
   if (normalized.startsWith("aac")) {
     return "aac";
   }
   // Only normalize MPEG audio codecs to mp3, not video codecs like mpeg4
-  if (normalized === "mpeg" || normalized.includes("mpegaudio") || normalized.includes("mp3")) {
+  if (
+    normalized === "mpeg" ||
+    normalized.includes("mpegaudio") ||
+    normalized.includes("mp3")
+  ) {
     return "mp3";
   }
 

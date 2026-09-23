@@ -13,7 +13,10 @@ import type { RequestUser } from "../../middleware/auth.js";
 export interface TypedRequest<
   TBody = unknown,
   TParams extends Record<string, string> = Record<string, string>,
-  TQuery extends Record<string, string | string[] | undefined> = Record<string, string | undefined>
+  TQuery extends Record<string, string | string[] | undefined> = Record<
+    string,
+    string | undefined
+  >,
 > extends Request {
   body: TBody;
   params: TParams;
@@ -28,7 +31,10 @@ export interface TypedRequest<
 export interface TypedAuthRequest<
   TBody = unknown,
   TParams extends Record<string, string> = Record<string, string>,
-  TQuery extends Record<string, string | string[] | undefined> = Record<string, string | undefined>
+  TQuery extends Record<string, string | string[] | undefined> = Record<
+    string,
+    string | undefined
+  >,
 > extends TypedRequest<TBody, TParams, TQuery> {
   user: RequestUser;
 }

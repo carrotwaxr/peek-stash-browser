@@ -8,8 +8,10 @@
  * - Current user restrictions
  * - Close/cancel behavior
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// Import component after mocks
+import UserEditModal from "../../../src/components/settings/UserEditModal";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const {
@@ -34,9 +36,6 @@ vi.mock("../../../src/api", () => ({
   getUserPermissions: mockGetUserPermissions,
   updateUserPermissionOverrides: mockUpdateUserPermissionOverrides,
 }));
-
-// Import component after mocks
-import UserEditModal from "../../../src/components/settings/UserEditModal";
 
 describe("UserEditModal", () => {
   const mockUser = {
@@ -82,7 +81,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -99,7 +97,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -116,7 +113,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -134,7 +130,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -151,12 +146,13 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
       expect(
-        screen.getByText("No groups available. Create a group first to assign users.")
+        screen.getByText(
+          "No groups available. Create a group first to assign users."
+        )
       ).toBeInTheDocument();
     });
 
@@ -172,7 +168,6 @@ describe("UserEditModal", () => {
           onClose={vi.fn()}
           onSave={vi.fn()}
           onMessage={onMessage}
-
         />
       );
 
@@ -206,7 +201,6 @@ describe("UserEditModal", () => {
           onClose={vi.fn()}
           onSave={vi.fn()}
           onMessage={onMessage}
-
         />
       );
 
@@ -238,7 +232,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -255,14 +248,15 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
       // Wait for permissions to load, then check for default labels
       // There are two permissions with "default" source in mockPermissions
       await waitFor(() => {
-        const defaultLabels = screen.getAllByText("Default (no groups grant this)");
+        const defaultLabels = screen.getAllByText(
+          "Default (no groups grant this)"
+        );
         expect(defaultLabels.length).toBeGreaterThanOrEqual(1);
       });
     });
@@ -278,7 +272,9 @@ describe("UserEditModal", () => {
           canDownloadPlaylists: "default",
         },
       };
-      mockGetUserPermissions.mockResolvedValue({ permissions: overriddenPermissions });
+      mockGetUserPermissions.mockResolvedValue({
+        permissions: overriddenPermissions,
+      });
 
       render(
         <UserEditModal
@@ -287,12 +283,13 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
       await waitFor(() => {
-        expect(screen.getByText(/Overridden \(user-level\)/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/Overridden \(user-level\)/)
+        ).toBeInTheDocument();
       });
     });
 
@@ -307,7 +304,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -324,7 +320,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -341,7 +336,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -359,7 +353,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={onClose}
           onSave={vi.fn()}
-
         />
       );
 
@@ -376,7 +369,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={onClose}
           onSave={vi.fn()}
-
         />
       );
 
@@ -393,7 +385,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -411,7 +402,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 
@@ -428,7 +418,6 @@ describe("UserEditModal", () => {
           currentUser={mockCurrentUser}
           onClose={vi.fn()}
           onSave={vi.fn()}
-
         />
       );
 

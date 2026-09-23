@@ -6,7 +6,15 @@
  */
 
 // Core HTTP client
-export { apiFetch, apiGet, apiPost, apiPut, apiDelete, ApiError, REDIRECT_STORAGE_KEY } from "./client";
+export {
+  apiFetch,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+  ApiError,
+  REDIRECT_STORAGE_KEY,
+} from "./client";
 
 // Library (entity search)
 export { libraryApi, commonFilters, filterHelpers } from "./library";
@@ -27,7 +35,12 @@ export {
 export { setupApi, userSetupApi } from "./setup";
 
 // Playlists
-export { getSharedPlaylists, getPlaylistShares, updatePlaylistShares, duplicatePlaylist } from "./playlists";
+export {
+  getSharedPlaylists,
+  getPlaylistShares,
+  updatePlaylistShares,
+  duplicatePlaylist,
+} from "./playlists";
 
 // Admin (groups, permissions, recovery)
 export {

@@ -4,7 +4,24 @@
  * Tests mergeStudiosWithUserData, applyStudioFilters (sync), findStudios,
  * findStudiosMinimal, and updateStudio.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyStudioFilters,
+  findStudios,
+  findStudiosMinimal,
+  mergeStudiosWithUserData,
+  updateStudio,
+} from "../../../controllers/library/studios.js";
+// --- Imports ---
+
+import prisma from "../../../prisma/singleton.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
+import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
+import { userStatsService } from "../../../services/UserStatsService.js";
+import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
+import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -66,9 +83,10 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi
-    .fn()
-    .mockImplementation((field) => ({ sortField: field, randomSeed: undefined })),
+  parseRandomSort: vi.fn().mockImplementation((field) => ({
+    sortField: field,
+    randomSeed: undefined,
+  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -76,24 +94,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     .fn()
     .mockImplementation((_type, id) => `http://stash/studios/${id}`),
 }));
-
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
-import {
-  mergeStudiosWithUserData,
-  applyStudioFilters,
-  findStudios,
-  findStudiosMinimal,
-  updateStudio,
-} from "../../../controllers/library/studios.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
-import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -385,11 +385,7 @@ describe("Studios Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, studio_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, studio_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findStudios(req, res);
@@ -424,9 +420,7 @@ describe("Studios Controller", () => {
     });
 
     it("returns 500 when query builder throws", async () => {
-      mockStudioQueryBuilder.execute.mockRejectedValue(
-        new Error("DB error")
-      );
+      mockStudioQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = mockReq({ filter: {} }, {}, defaultUser);
       const res = mockRes();
@@ -531,11 +525,7 @@ describe("Studios Controller", () => {
       ];
       mockStashEntityService.getAllStudios.mockResolvedValue(studios);
 
-      const req = mockReq(
-        { filter: { per_page: 2 } },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: { per_page: 2 } }, {}, defaultUser);
       const res = mockRes();
 
       await findStudiosMinimal(req, res);

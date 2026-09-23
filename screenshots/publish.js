@@ -10,37 +10,39 @@
  *   npm run screenshots:publish
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const FormData = require('form-data');
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+const FormData = require("form-data");
 
 // Load configuration
-const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+const configPath = path.join(__dirname, "config.json");
+const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
 // Load version from package.json
-const packagePath = path.join(__dirname, '..', 'client', 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+const packagePath = path.join(__dirname, "..", "client", "package.json");
+const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
 const version = packageJson.version;
 
 // Screenshot directory
-const screenshotDir = path.join(__dirname, 'output', version);
+const screenshotDir = path.join(__dirname, "output", version);
 
 /**
  * Check if screenshots exist
  */
 function checkScreenshotsExist() {
   if (!fs.existsSync(screenshotDir)) {
-    console.error('❌ Screenshots not found!');
+    console.error("❌ Screenshots not found!");
     console.error(`📁 Expected location: ${screenshotDir}`);
-    console.error('\n💡 Run `npm run screenshots` first to capture screenshots.');
+    console.error(
+      "\n💡 Run `npm run screenshots` first to capture screenshots."
+    );
     process.exit(1);
   }
 
-  const files = fs.readdirSync(screenshotDir).filter((f) => f.endsWith('.png'));
+  const files = fs.readdirSync(screenshotDir).filter((f) => f.endsWith(".png"));
   if (files.length === 0) {
-    console.error('❌ No screenshots found!');
+    console.error("❌ No screenshots found!");
     console.error(`📁 Directory: ${screenshotDir}`);
     process.exit(1);
   }
@@ -57,34 +59,36 @@ async function uploadImageBatch(fileBatch, viewport) {
 
     // Add images to form (ImageChest accepts up to 20)
     fileBatch.forEach(({ filePath, fileName }) => {
-      form.append('images[]', fs.createReadStream(filePath), fileName);
+      form.append("images[]", fs.createReadStream(filePath), fileName);
     });
 
     // Post settings - viewport-specific title
-    const viewportTitle = viewport.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    form.append('title', `Peek Stash Browser v${version} - ${viewportTitle}`);
-    form.append('nsfw', 'true');
-    form.append('privacy', 'public');
+    const viewportTitle = viewport
+      .replace("-", " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+    form.append("title", `Peek Stash Browser v${version} - ${viewportTitle}`);
+    form.append("nsfw", "true");
+    form.append("privacy", "public");
 
     const options = {
-      hostname: 'api.imgchest.com',
+      hostname: "api.imgchest.com",
       port: 443,
-      path: '/v1/post',
-      method: 'POST',
+      path: "/v1/post",
+      method: "POST",
       headers: {
         ...form.getHeaders(),
-        'Authorization': `Bearer ${config.imagechest.apiToken}`,
+        Authorization: `Bearer ${config.imagechest.apiToken}`,
       },
     };
 
     const req = https.request(options, (res) => {
-      let data = '';
+      let data = "";
 
-      res.on('data', (chunk) => {
+      res.on("data", (chunk) => {
         data += chunk;
       });
 
-      res.on('end', () => {
+      res.on("end", () => {
         try {
           const response = JSON.parse(data);
           // ImageChest response structure: { data: { images: [...], id: '...', ... } }
@@ -92,7 +96,7 @@ async function uploadImageBatch(fileBatch, viewport) {
             // Extract URLs for each uploaded image and post metadata
             const imageUrls = response.data.images.map((img, index) => ({
               fileName: img.original_name || fileBatch[index].fileName,
-              url: img.link
+              url: img.link,
             }));
 
             // Include post metadata in response
@@ -100,7 +104,7 @@ async function uploadImageBatch(fileBatch, viewport) {
               images: imageUrls,
               postId: response.data.id,
               postUrl: `https://imgchest.com/p/${response.data.id}`,
-              imageCount: response.data.image_count
+              imageCount: response.data.image_count,
             };
 
             resolve(result);
@@ -113,7 +117,7 @@ async function uploadImageBatch(fileBatch, viewport) {
       });
     });
 
-    req.on('error', reject);
+    req.on("error", reject);
 
     form.pipe(req);
   });
@@ -126,11 +130,11 @@ async function uploadAllScreenshots(files) {
   console.log(`📤 Uploading ${files.length} screenshots to ImageChest...`);
 
   // Define viewport order for organizing posts
-  const viewportOrder = ['mobile', 'tablet', 'tablet-landscape', 'desktop'];
+  const viewportOrder = ["mobile", "tablet", "tablet-landscape", "desktop"];
 
   // Group files by viewport
   const filesByViewport = {};
-  files.forEach(file => {
+  files.forEach((file) => {
     const parsed = parseFileName(file);
     if (!parsed) return;
 
@@ -142,7 +146,7 @@ async function uploadAllScreenshots(files) {
 
   // Create batches: one per viewport, sorted by page name
   const batches = [];
-  viewportOrder.forEach(viewport => {
+  viewportOrder.forEach((viewport) => {
     if (filesByViewport[viewport]) {
       // Sort files within viewport by page name
       const sortedViewportFiles = filesByViewport[viewport].sort((a, b) => {
@@ -153,10 +157,10 @@ async function uploadAllScreenshots(files) {
 
       batches.push({
         viewport,
-        files: sortedViewportFiles.map(file => ({
+        files: sortedViewportFiles.map((file) => ({
           filePath: path.join(screenshotDir, file),
-          fileName: file
-        }))
+          fileName: file,
+        })),
       });
     }
   });
@@ -168,7 +172,9 @@ async function uploadAllScreenshots(files) {
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
-    const viewportName = batch.viewport.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const viewportName = batch.viewport
+      .replace("-", " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
     console.log(`\n📦 ${viewportName} (${batch.files.length} files)`);
 
     let retryCount = 0;
@@ -181,7 +187,9 @@ async function uploadAllScreenshots(files) {
           console.log(`  🔄 Retry ${retryCount}/${maxRetries}...`);
         }
 
-        batch.files.forEach(({ fileName }) => console.log(`  📤 Uploading: ${fileName}`));
+        batch.files.forEach(({ fileName }) =>
+          console.log(`  📤 Uploading: ${fileName}`)
+        );
         const result = await uploadImageBatch(batch.files, batch.viewport);
 
         // Track post information
@@ -189,10 +197,12 @@ async function uploadAllScreenshots(files) {
           viewport: viewportName,
           postId: result.postId,
           postUrl: result.postUrl,
-          imageCount: result.imageCount
+          imageCount: result.imageCount,
         });
 
-        console.log(`  📁 Post created: ${result.postUrl} (${result.imageCount} images)`);
+        console.log(
+          `  📁 Post created: ${result.postUrl} (${result.imageCount} images)`
+        );
 
         result.images.forEach(({ fileName, url }) => {
           console.log(`  ✅ Uploaded: ${fileName}`);
@@ -205,17 +215,20 @@ async function uploadAllScreenshots(files) {
         // Rate limit: 60 requests/min, so wait 1 second between batches to be safe
         if (i < batches.length - 1) {
           console.log(`  ⏳ Waiting 1s before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
-        console.error(`  ❌ Batch ${i + 1} attempt ${retryCount + 1} failed:`, error.message);
+        console.error(
+          `  ❌ Batch ${i + 1} attempt ${retryCount + 1} failed:`,
+          error.message
+        );
         retryCount++;
 
         if (retryCount <= maxRetries) {
           // Wait before retrying (exponential backoff: 2s, 4s)
           const waitTime = 2000 * retryCount;
           console.log(`  ⏳ Waiting ${waitTime / 1000}s before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
         } else {
           failCount += batch.length;
         }
@@ -223,10 +236,12 @@ async function uploadAllScreenshots(files) {
     }
   }
 
-  console.log(`\n📊 Upload summary: ${successCount} succeeded, ${failCount} failed`);
+  console.log(
+    `\n📊 Upload summary: ${successCount} succeeded, ${failCount} failed`
+  );
 
   if (uploadedImages.length === 0) {
-    console.error('❌ No images uploaded successfully!');
+    console.error("❌ No images uploaded successfully!");
     process.exit(1);
   }
 
@@ -444,7 +459,7 @@ function generateGalleryHTML(uploadedImages) {
     .map(
       ([pageName, viewports]) => `
   <div class="page-section">
-    <h2 class="page-title">${pageName.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</h2>
+    <h2 class="page-title">${pageName.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</h2>
     <p class="page-description">${getPageDescription(pageName)}</p>
 
     <div class="viewport-grid">
@@ -457,7 +472,7 @@ function generateGalleryHTML(uploadedImages) {
           ${Object.keys(themes)
             .map(
               (theme, idx) => `
-          <button class="theme-tab ${idx === 0 ? 'active' : ''}"
+          <button class="theme-tab ${idx === 0 ? "active" : ""}"
                   data-viewport="${viewport}"
                   data-theme="${theme}"
                   data-page="${pageName}">
@@ -465,12 +480,12 @@ function generateGalleryHTML(uploadedImages) {
           </button>
           `
             )
-            .join('')}
+            .join("")}
         </div>
         ${Object.entries(themes)
           .map(
             ([theme, url], idx) => `
-        <div class="screenshot-container ${idx === 0 ? 'active' : ''}"
+        <div class="screenshot-container ${idx === 0 ? "active" : ""}"
              data-viewport="${viewport}"
              data-theme="${theme}"
              data-page="${pageName}">
@@ -478,16 +493,16 @@ function generateGalleryHTML(uploadedImages) {
         </div>
         `
           )
-          .join('')}
+          .join("")}
       </div>
       `
         )
-        .join('')}
+        .join("")}
     </div>
   </div>
   `
     )
-    .join('')}
+    .join("")}
 
   <div class="lightbox" id="lightbox" onclick="closeLightbox()">
     <span class="lightbox-close">&times;</span>
@@ -541,10 +556,10 @@ function generateGalleryHTML(uploadedImages) {
  * Save gallery HTML locally (ImageChest doesn't support HTML uploads)
  */
 function saveGalleryHTML(html) {
-  console.log('💾 Saving gallery page locally...');
+  console.log("💾 Saving gallery page locally...");
 
-  const localGalleryPath = path.join(screenshotDir, 'gallery.html');
-  fs.writeFileSync(localGalleryPath, html, 'utf-8');
+  const localGalleryPath = path.join(screenshotDir, "gallery.html");
+  fs.writeFileSync(localGalleryPath, html, "utf-8");
   console.log(`✅ Gallery saved: ${localGalleryPath}`);
 
   return localGalleryPath;
@@ -554,7 +569,7 @@ function saveGalleryHTML(html) {
  * Main publish function
  */
 async function publishScreenshots() {
-  console.log('🚀 Starting screenshot publishing...');
+  console.log("🚀 Starting screenshot publishing...");
   console.log(`📦 Version: ${version}`);
 
   // Check if screenshots exist
@@ -565,24 +580,29 @@ async function publishScreenshots() {
     const { images: uploadedImages, posts } = await uploadAllScreenshots(files);
 
     // Generate gallery HTML
-    console.log('\n🎨 Generating gallery page...');
+    console.log("\n🎨 Generating gallery page...");
     const galleryHTML = generateGalleryHTML(uploadedImages);
 
     // Save gallery HTML locally
     const localGalleryPath = saveGalleryHTML(galleryHTML);
 
-    console.log('\n✨ Publishing complete!');
+    console.log("\n✨ Publishing complete!");
     console.log(`\n📸 Total images uploaded: ${uploadedImages.length}`);
     console.log(`📂 Gallery HTML: ${localGalleryPath}`);
     console.log(`\n📁 ImageChest Posts Created (${posts.length}):`);
     posts.forEach((post) => {
-      console.log(`   ${post.viewport}: ${post.postUrl} (${post.imageCount} images)`);
+      console.log(
+        `   ${post.viewport}: ${post.postUrl} (${post.imageCount} images)`
+      );
     });
-    console.log('\n💡 All images are hosted on ImageChest with public visibility.');
-    console.log('💡 Open gallery.html locally to view the complete gallery with all screenshots.');
-
+    console.log(
+      "\n💡 All images are hosted on ImageChest with public visibility."
+    );
+    console.log(
+      "💡 Open gallery.html locally to view the complete gallery with all screenshots."
+    );
   } catch (error) {
-    console.error('\n❌ Publishing failed:', error);
+    console.error("\n❌ Publishing failed:", error);
     process.exit(1);
   }
 }

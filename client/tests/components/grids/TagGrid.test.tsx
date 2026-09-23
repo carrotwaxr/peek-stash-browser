@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TagGrid } from "../../../src/components/grids/index";
 
 describe("TagGrid", () => {
@@ -36,7 +36,9 @@ describe("TagGrid", () => {
     const element = TagGrid({});
     const mockTag = { id: "1", name: "Test Tag" };
 
-    const renderedCard = element.props.renderItem(mockTag, 0, { onHideSuccess: () => {} });
+    const renderedCard = element.props.renderItem(mockTag, 0, {
+      onHideSuccess: () => {},
+    });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.tag).toEqual(mockTag);

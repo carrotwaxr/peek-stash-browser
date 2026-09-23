@@ -6,7 +6,15 @@
  * - recordImageView (lightbox view tracking)
  * - getImageViewHistory (single image history retrieval)
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getImageViewHistory,
+  incrementImageOCounter,
+  recordImageView,
+} from "../../controllers/imageViewHistory.js";
+import prisma from "../../prisma/singleton.js";
+import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock Prisma - hoisted before imports
 vi.mock("../../prisma/singleton.js", () => ({
@@ -29,15 +37,6 @@ vi.mock("../../utils/entityInstanceId.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import {
-  incrementImageOCounter,
-  recordImageView,
-  getImageViewHistory,
-} from "../../controllers/imageViewHistory.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
@@ -67,7 +66,9 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await incrementImageOCounter(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody()).toEqual({ error: "Missing required field: imageId" });
+      expect(res._getBody()).toEqual({
+        error: "Missing required field: imageId",
+      });
     });
 
     it("returns 401 when user is not found in database", async () => {
@@ -79,7 +80,10 @@ describe("Image View History Controller", () => {
     });
 
     it("creates new record with oCount=1 when no history exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
       mockPrisma.imageViewHistory.create.mockResolvedValue({
         id: 1,
@@ -114,7 +118,10 @@ describe("Image View History Controller", () => {
 
     it("increments oCount on existing record", async () => {
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -140,7 +147,10 @@ describe("Image View History Controller", () => {
     });
 
     it("uses instanceId from request body when provided", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
       mockPrisma.imageViewHistory.create.mockResolvedValue({
         id: 1,
@@ -148,7 +158,11 @@ describe("Image View History Controller", () => {
         oHistory: [],
       } as any);
 
-      const req = mockReq({ imageId: "img-1", instanceId: "custom-instance" }, {}, USER);
+      const req = mockReq(
+        { imageId: "img-1", instanceId: "custom-instance" },
+        {},
+        USER
+      );
       const res = mockRes();
       await incrementImageOCounter(req, res);
 
@@ -165,7 +179,10 @@ describe("Image View History Controller", () => {
     });
 
     it("falls back to getEntityInstanceId when instanceId not in body", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
       mockPrisma.imageViewHistory.create.mockResolvedValue({
         id: 1,
@@ -182,7 +199,10 @@ describe("Image View History Controller", () => {
 
     it("logs warning when user has syncToStash enabled", async () => {
       const { logger } = await import("../../utils/logger.js");
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: true } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: true,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
       mockPrisma.imageViewHistory.create.mockResolvedValue({
         id: 1,
@@ -199,11 +219,17 @@ describe("Image View History Controller", () => {
     });
 
     it("handles oHistory stored as JSON string", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as any);
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
         id: 1,
         oCount: 2,
-        oHistory: JSON.stringify(["2024-01-01T00:00:00.000Z", "2024-01-02T00:00:00.000Z"]),
+        oHistory: JSON.stringify([
+          "2024-01-01T00:00:00.000Z",
+          "2024-01-02T00:00:00.000Z",
+        ]),
       } as any);
       mockPrisma.imageViewHistory.update.mockResolvedValue({
         id: 1,
@@ -220,7 +246,9 @@ describe("Image View History Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.user.findUnique.mockRejectedValue(new Error("DB connection lost"));
+      mockPrisma.user.findUnique.mockRejectedValue(
+        new Error("DB connection lost")
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -248,7 +276,9 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await recordImageView(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody()).toEqual({ error: "Missing required field: imageId" });
+      expect(res._getBody()).toEqual({
+        error: "Missing required field: imageId",
+      });
     });
 
     it("creates new view record with viewCount=1 when no history exists", async () => {
@@ -342,7 +372,9 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await getImageViewHistory(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody()).toEqual({ error: "Missing required parameter: imageId" });
+      expect(res._getBody()).toEqual({
+        error: "Missing required parameter: imageId",
+      });
     });
 
     it("returns exists:false when no history found", async () => {
@@ -369,7 +401,11 @@ describe("Image View History Controller", () => {
         viewCount: 10,
         viewHistory: ["2024-06-15T12:00:00.000Z"],
         oCount: 3,
-        oHistory: ["2024-06-10T08:00:00.000Z", "2024-06-12T08:00:00.000Z", "2024-06-14T08:00:00.000Z"],
+        oHistory: [
+          "2024-06-10T08:00:00.000Z",
+          "2024-06-12T08:00:00.000Z",
+          "2024-06-14T08:00:00.000Z",
+        ],
         lastViewedAt: lastViewed,
       } as any);
 
@@ -390,7 +426,10 @@ describe("Image View History Controller", () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
         id: 1,
         viewCount: 2,
-        viewHistory: JSON.stringify(["2024-01-01T00:00:00.000Z", "2024-01-02T00:00:00.000Z"]),
+        viewHistory: JSON.stringify([
+          "2024-01-01T00:00:00.000Z",
+          "2024-01-02T00:00:00.000Z",
+        ]),
         oCount: 1,
         oHistory: JSON.stringify(["2024-01-01T12:00:00.000Z"]),
         lastViewedAt: new Date("2024-01-02"),
@@ -411,7 +450,9 @@ describe("Image View History Controller", () => {
     it("uses instanceId from query param when provided", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
 
-      const req = mockReq({}, { imageId: "img-1" }, USER, { instanceId: "query-instance" });
+      const req = mockReq({}, { imageId: "img-1" }, USER, {
+        instanceId: "query-instance",
+      });
       const res = mockRes();
       await getImageViewHistory(req, res);
 

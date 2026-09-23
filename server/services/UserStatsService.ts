@@ -1,9 +1,9 @@
 import prisma from "../prisma/singleton.js";
+import type { NormalizedScene } from "../types/index.js";
+import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { groupIdsByInstance } from "../utils/instanceUtils.js";
-import type { NormalizedScene } from "../types/index.js";
 
 // Separator for composite map keys (entityId + instanceId).
 // Using a character that won't appear in UUIDs or Stash numeric IDs.
@@ -153,7 +153,10 @@ class UserStatsService {
   ): Promise<void> {
     try {
       // Get scene from cache to find all related entities
-      const scene = await stashEntityService.getScene(sceneId, instanceId || stashInstanceManager.getDefaultConfig().id);
+      const scene = await stashEntityService.getScene(
+        sceneId,
+        instanceId || stashInstanceManager.getDefaultConfig().id
+      );
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
         return;
@@ -201,7 +204,13 @@ class UserStatsService {
       if (scene.tags && scene.tags.length > 0) {
         await Promise.all(
           scene.tags.map((tag) =>
-            this.updateTagStats(userId, tag.id, oCountDelta, playCountDelta, resolvedInstanceId)
+            this.updateTagStats(
+              userId,
+              tag.id,
+              oCountDelta,
+              playCountDelta,
+              resolvedInstanceId
+            )
           )
         );
       }
@@ -397,13 +406,17 @@ class UserStatsService {
       );
       const scenes: NormalizedScene[] = [];
       for (const [instId, ids] of scenesByInstance) {
-        scenes.push(...await stashEntityService.getScenesByIdsWithRelations(ids, instId));
+        scenes.push(
+          ...(await stashEntityService.getScenesByIdsWithRelations(ids, instId))
+        );
       }
       // Use composite key (id + instanceId) to avoid cross-instance collisions
-      const sceneMap = new Map(scenes.map((s) => [`${s.id}\0${s.instanceId || ''}`, s]));
+      const sceneMap = new Map(
+        scenes.map((s) => [`${s.id}\0${s.instanceId || ""}`, s])
+      );
 
       for (const wh of watchHistory) {
-        const scene = sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ''}`);
+        const scene = sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ""}`);
         if (!scene) continue;
 
         // Get instanceId from the watch history record
@@ -417,9 +430,13 @@ class UserStatsService {
           ? (wh.playHistory as string[])
           : (JSON.parse((wh.playHistory as string) || "[]") as string[]);
 
-        const lastPlayEntry = playHistory.length > 0 ? playHistory[playHistory.length - 1] : undefined;
+        const lastPlayEntry =
+          playHistory.length > 0
+            ? playHistory[playHistory.length - 1]
+            : undefined;
         const lastPlayedAt = lastPlayEntry ? new Date(lastPlayEntry) : null;
-        const lastOEntry = oHistory.length > 0 ? oHistory[oHistory.length - 1] : undefined;
+        const lastOEntry =
+          oHistory.length > 0 ? oHistory[oHistory.length - 1] : undefined;
         const lastOAt = lastOEntry ? new Date(lastOEntry) : null;
 
         // Aggregate performers (using composite key: performerId + instanceId)
@@ -481,35 +498,31 @@ class UserStatsService {
       await Promise.all([
         // Performers
         prisma.userPerformerStats.createMany({
-          data: Array.from(performerStatsMap.entries()).map(
-            ([key, stats]) => {
-              const [performerId, instanceId] = key.split(KEY_SEP);
-              return {
-                userId,
-                instanceId: instanceId || "",
-                performerId: performerId ?? "",
-                oCounter: stats.oCounter,
-                playCount: stats.playCount,
-                lastPlayedAt: stats.lastPlayedAt,
-                lastOAt: stats.lastOAt,
-              };
-            }
-          ),
+          data: Array.from(performerStatsMap.entries()).map(([key, stats]) => {
+            const [performerId, instanceId] = key.split(KEY_SEP);
+            return {
+              userId,
+              instanceId: instanceId || "",
+              performerId: performerId ?? "",
+              oCounter: stats.oCounter,
+              playCount: stats.playCount,
+              lastPlayedAt: stats.lastPlayedAt,
+              lastOAt: stats.lastOAt,
+            };
+          }),
         }),
         // Studios
         prisma.userStudioStats.createMany({
-          data: Array.from(studioStatsMap.entries()).map(
-            ([key, stats]) => {
-              const [studioId, instanceId] = key.split(KEY_SEP);
-              return {
-                userId,
-                instanceId: instanceId || "",
-                studioId: studioId ?? "",
-                oCounter: stats.oCounter,
-                playCount: stats.playCount,
-              };
-            }
-          ),
+          data: Array.from(studioStatsMap.entries()).map(([key, stats]) => {
+            const [studioId, instanceId] = key.split(KEY_SEP);
+            return {
+              userId,
+              instanceId: instanceId || "",
+              studioId: studioId ?? "",
+              oCounter: stats.oCounter,
+              playCount: stats.playCount,
+            };
+          }),
         }),
         // Tags
         prisma.userTagStats.createMany({

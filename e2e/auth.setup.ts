@@ -1,4 +1,4 @@
-import { test as setup, expect, request } from "@playwright/test";
+import { expect, request, test as setup } from "@playwright/test";
 
 const AUTH_FILE = "e2e/.auth/user.json";
 
@@ -29,8 +29,8 @@ setup("authenticate", async ({ page, baseURL }) => {
       const body = await loginResponse.text();
       throw new Error(
         `API login failed (${loginResponse.status()}): ${body}\n` +
-        `Credentials: ${username} / ${"*".repeat(password.length)}\n` +
-        `Set E2E_USERNAME and E2E_PASSWORD environment variables for your dev instance.`
+          `Credentials: ${username} / ${"*".repeat(password.length)}\n` +
+          `Set E2E_USERNAME and E2E_PASSWORD environment variables for your dev instance.`
       );
     }
 
@@ -41,12 +41,14 @@ setup("authenticate", async ({ page, baseURL }) => {
     if (tokenMatch) {
       // Inject the auth cookie into the browser context
       const url = new URL(baseURL!);
-      await page.context().addCookies([{
-        name: "token",
-        value: tokenMatch[1],
-        domain: url.hostname,
-        path: "/",
-      }]);
+      await page.context().addCookies([
+        {
+          name: "token",
+          value: tokenMatch[1],
+          domain: url.hostname,
+          path: "/",
+        },
+      ]);
     }
 
     // Complete first-login setup if needed (dismisses UserSetupModal overlay)
@@ -66,7 +68,9 @@ setup("authenticate", async ({ page, baseURL }) => {
 
   // Verify we're authenticated by checking for a navigation element
   // that only renders for logged-in users.
-  await expect(page.getByRole("navigation").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("navigation").first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Save the storage state (cookies + localStorage) for other tests.
   await page.context().storageState({ path: AUTH_FILE });

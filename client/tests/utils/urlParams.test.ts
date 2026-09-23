@@ -3,8 +3,11 @@
  * Focuses on the singular-to-plural param mapping with instance support
  * for card indicator click navigation.
  */
-import { describe, it, expect } from "vitest";
-import { buildSearchParams as _buildSearchParams, parseSearchParams } from "@/utils/urlParams";
+import { describe, expect, it } from "vitest";
+import {
+  buildSearchParams as _buildSearchParams,
+  parseSearchParams,
+} from "@/utils/urlParams";
 
 // Wrapper with defaults for optional params to avoid repeating them in every test
 const buildSearchParams = (params: Record<string, any>) =>
@@ -76,7 +79,10 @@ describe("parseSearchParams", () => {
     it("parses multi-select comma-separated values", () => {
       const params = new URLSearchParams("performerIds=82:server-1,5:server-2");
       const result = parseSearchParams(params, mockFilterOptions);
-      expect(result.filters.performerIds).toEqual(["82:server-1", "5:server-2"]);
+      expect(result.filters.performerIds).toEqual([
+        "82:server-1",
+        "5:server-2",
+      ]);
     });
 
     it("parses single-select value", () => {
@@ -187,8 +193,19 @@ describe("buildSearchParams", () => {
 
 describe("parseSearchParams - additional filter types", () => {
   const extendedFilterOptions = [
-    { key: "performerIds", type: "searchable-select", multi: true, modifierKey: "performerIdsModifier", hierarchyKey: "performerIdsDepth" },
-    { key: "tagIds", type: "searchable-select", multi: true, modifierKey: "tagIdsModifier" },
+    {
+      key: "performerIds",
+      type: "searchable-select",
+      multi: true,
+      modifierKey: "performerIdsModifier",
+      hierarchyKey: "performerIdsDepth",
+    },
+    {
+      key: "tagIds",
+      type: "searchable-select",
+      multi: true,
+      modifierKey: "tagIdsModifier",
+    },
     { key: "studioId", type: "searchable-select", multi: false },
     { key: "groupIds", type: "searchable-select", multi: true },
     { key: "galleryIds", type: "searchable-select", multi: true },
@@ -230,9 +247,14 @@ describe("parseSearchParams - additional filter types", () => {
   });
 
   it("parses date-range filter with both start and end", () => {
-    const params = new URLSearchParams("date_start=2024-01-01&date_end=2024-12-31");
+    const params = new URLSearchParams(
+      "date_start=2024-01-01&date_end=2024-12-31"
+    );
     const result = parseSearchParams(params, extendedFilterOptions);
-    expect(result.filters.date).toEqual({ start: "2024-01-01", end: "2024-12-31" });
+    expect(result.filters.date).toEqual({
+      start: "2024-01-01",
+      end: "2024-12-31",
+    });
   });
 
   it("parses date-range filter with only start", () => {
@@ -260,7 +282,9 @@ describe("parseSearchParams - additional filter types", () => {
   });
 
   it("parses modifier key for searchable-select", () => {
-    const params = new URLSearchParams("performerIds=1,2&performerIdsModifier=INCLUDES_ALL");
+    const params = new URLSearchParams(
+      "performerIds=1,2&performerIdsModifier=INCLUDES_ALL"
+    );
     const result = parseSearchParams(params, extendedFilterOptions);
     expect(result.filters.performerIds).toEqual(["1", "2"]);
     expect(result.filters.performerIdsModifier).toBe("INCLUDES_ALL");
@@ -331,7 +355,13 @@ describe("buildSearchParams - additional serialization", () => {
     { key: "date", type: "date-range" },
     { key: "orientation", type: "select" },
     { key: "title", type: "text" },
-    { key: "performerIds", type: "searchable-select", multi: true, modifierKey: "performerIdsModifier", hierarchyKey: "performerIdsDepth" },
+    {
+      key: "performerIds",
+      type: "searchable-select",
+      multi: true,
+      modifierKey: "performerIdsModifier",
+      hierarchyKey: "performerIdsDepth",
+    },
   ];
 
   it("serializes checkbox filter", () => {
@@ -421,7 +451,10 @@ describe("buildSearchParams - additional serialization", () => {
       sortDirection: "",
       currentPage: 1,
       perPage: 24,
-      filters: { performerIds: ["1", "2"], performerIdsModifier: "INCLUDES_ALL" },
+      filters: {
+        performerIds: ["1", "2"],
+        performerIdsModifier: "INCLUDES_ALL",
+      },
       filterOptions: extendedFilterOptions,
     });
     expect(params.get("performerIds")).toBe("1,2");

@@ -3,10 +3,13 @@
  *
  * Tests the tag filters in controllers/library/tags.ts
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyTagFilters } from "../../controllers/library/tags.js";
-import { createMockTag, createMockTags } from "../helpers/mockDataGenerators.js";
+import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import {
+  createMockTag,
+  createMockTags,
+} from "../helpers/mockDataGenerators.js";
 
 describe("Tag Filters", () => {
   let mockTags: NormalizedTag[];

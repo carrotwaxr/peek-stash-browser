@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
+import { apiDelete, apiGet, apiPost, apiPut } from "../api";
+import { showError, showSuccess } from "../utils/toast";
 import { useAuth } from "./useAuth";
-import { apiPost, apiPut, apiDelete, apiGet } from "../api";
-import { showSuccess, showError } from "../utils/toast";
 
 /**
  * Hook for managing hidden entities
@@ -19,7 +19,17 @@ export const useHiddenEntities = () => {
    * @param {boolean} params.skipConfirmation - Skip confirmation dialog
    */
   const hideEntity = useCallback(
-    async ({ entityType, entityId, entityName, skipConfirmation = false }: { entityType: string; entityId: string; entityName: string; skipConfirmation?: boolean }) => {
+    async ({
+      entityType,
+      entityId,
+      entityName,
+      skipConfirmation = false,
+    }: {
+      entityType: string;
+      entityId: string;
+      entityName: string;
+      skipConfirmation?: boolean;
+    }) => {
       setIsHiding(true);
       try {
         await apiPost("/user/hidden-entities", {
@@ -60,10 +70,19 @@ export const useHiddenEntities = () => {
    * @returns {Object} Result with successCount and failCount
    */
   const hideEntities = useCallback(
-    async ({ entities, skipConfirmation = false }: { entities: Array<{ entityType: string; entityId: string }>; skipConfirmation?: boolean }) => {
+    async ({
+      entities,
+      skipConfirmation = false,
+    }: {
+      entities: Array<{ entityType: string; entityId: string }>;
+      skipConfirmation?: boolean;
+    }) => {
       setIsHiding(true);
       try {
-        const response = await apiPost<{ successCount: number; failCount: number }>("/user/hidden-entities/bulk", {
+        const response = await apiPost<{
+          successCount: number;
+          failCount: number;
+        }>("/user/hidden-entities/bulk", {
           entities,
         });
 
@@ -98,7 +117,15 @@ export const useHiddenEntities = () => {
    * Unhide (restore) an entity
    */
   const unhideEntity = useCallback(
-    async ({ entityType, entityId, entityName }: { entityType: string; entityId: string; entityName: string }) => {
+    async ({
+      entityType,
+      entityId,
+      entityName,
+    }: {
+      entityType: string;
+      entityId: string;
+      entityName: string;
+    }) => {
       try {
         await apiDelete(`/user/hidden-entities/${entityType}/${entityId}`);
         showSuccess(`${entityName} has been restored`);
@@ -122,7 +149,9 @@ export const useHiddenEntities = () => {
       const endpoint = entityType
         ? `/user/hidden-entities?entityType=${entityType}`
         : "/user/hidden-entities";
-      const response = await apiGet<{ hiddenEntities: Array<{ entityType: string; entityId: string }> }>(endpoint);
+      const response = await apiGet<{
+        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+      }>(endpoint);
       return response.hiddenEntities;
     } catch (error) {
       console.error("Failed to get hidden entities:", error);

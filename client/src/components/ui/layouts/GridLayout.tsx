@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
-import { getGridClasses } from '../../../constants/grids';
+import { type ReactNode } from "react";
+import { getGridClasses } from "../../../constants/grids";
 
 interface Props {
   entityType: string;
@@ -23,7 +23,7 @@ export const GridLayout = ({
   className = "",
 }: Props) => {
   // Determine grid type based on entity
-  const gridType = entityType === 'scene' ? 'scene' : 'standard';
+  const gridType = entityType === "scene" ? "scene" : "standard";
   const gridClasses = getGridClasses(gridType, density);
 
   // Default skeleton renderer
@@ -32,7 +32,7 @@ export const GridLayout = ({
       className="rounded-lg animate-pulse"
       style={{
         backgroundColor: "var(--bg-tertiary)",
-        height: entityType === 'scene' ? "20rem" : "24rem",
+        height: entityType === "scene" ? "20rem" : "24rem",
       }}
     />
   );

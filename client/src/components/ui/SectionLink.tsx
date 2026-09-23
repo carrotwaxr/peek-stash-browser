@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getSiteInfo, getDomainFromUrl } from "../../utils/siteInfo";
+import { getDomainFromUrl, getSiteInfo } from "../../utils/siteInfo";
 
 interface Props {
   url: string;

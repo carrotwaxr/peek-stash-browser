@@ -50,9 +50,17 @@ const WallItem = ({
 
   // Compute link path with multi-instance support
   // Clips are special: they link to scene with timestamp
-  const linkPath = entityType === "clip"
-    ? getScenePathWithTime({ id: item.sceneId as string, instanceId: item.instanceId as string | undefined } as Record<string, unknown>, (item.seconds as number | undefined) ?? 0, hasMultipleInstances)
-    : getEntityPath(entityType, item, hasMultipleInstances);
+  const linkPath =
+    entityType === "clip"
+      ? getScenePathWithTime(
+          {
+            id: item.sceneId as string,
+            instanceId: item.instanceId as string | undefined,
+          } as Record<string, unknown>,
+          (item.seconds as number | undefined) ?? 0,
+          hasMultipleInstances
+        )
+      : getEntityPath(entityType, item, hasMultipleInstances);
 
   // Intersection Observer for autoplay mode
   useEffect(() => {
@@ -182,10 +190,7 @@ const WallItem = ({
         className="absolute bottom-0 left-0 right-0 p-4 transition-opacity duration-300"
         style={{ opacity: showOverlay ? 1 : 0 }}
       >
-        <h3
-          className="text-sm font-medium truncate"
-          style={{ color: "white" }}
-        >
+        <h3 className="text-sm font-medium truncate" style={{ color: "white" }}>
           {title}
         </h3>
         {subtitle && (

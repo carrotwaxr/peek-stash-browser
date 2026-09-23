@@ -1,16 +1,17 @@
 import { type ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { apiGet } from "../../api";
+import { migrateNavPreferences } from "../../constants/navigation";
+import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
+import useScrollRestoration from "../../hooks/useScrollRestoration";
+import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 
 interface Props {
   children: ReactNode;
 }
-import { migrateNavPreferences } from "../../constants/navigation";
+
 type NavPreference = ReturnType<typeof migrateNavPreferences>[number];
-import { useGlobalNavigation } from "../../hooks/useGlobalNavigation";
-import useScrollRestoration from "../../hooks/useScrollRestoration";
-import { apiGet } from "../../api";
-import Sidebar from "./Sidebar";
-import TopBar from "./TopBar";
 
 /**
  * GlobalLayout - Top-level layout with sidebar navigation
@@ -26,9 +27,13 @@ const GlobalLayout = ({ children }: Props) => {
   useEffect(() => {
     const loadNavPreferences = async () => {
       try {
-        const response = await apiGet("/user/settings") as { settings: Record<string, unknown> };
+        const response = (await apiGet("/user/settings")) as {
+          settings: Record<string, unknown>;
+        };
         const { settings } = response;
-        const migratedPrefs = migrateNavPreferences(settings.navPreferences as NavPreference[]);
+        const migratedPrefs = migrateNavPreferences(
+          settings.navPreferences as NavPreference[]
+        );
         setNavPreferences(migratedPrefs);
       } catch (error) {
         console.error("Failed to load navigation preferences:", error);
@@ -46,7 +51,13 @@ const GlobalLayout = ({ children }: Props) => {
   return (
     <div className="layout-container min-h-screen">
       {/* Sidebar navigation - hidden on mobile, visible lg+ */}
-      <Sidebar navPreferences={navPreferences as unknown as Parameters<typeof Sidebar>[0]['navPreferences']} />
+      <Sidebar
+        navPreferences={
+          navPreferences as unknown as Parameters<
+            typeof Sidebar
+          >[0]["navPreferences"]
+        }
+      />
 
       {/* Top bar - mobile only (logo, hamburger menu) */}
       <TopBar navPreferences={navPreferences} />

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { GroupGrid } from "../../../src/components/grids/index";
 
 describe("GroupGrid", () => {
@@ -36,7 +36,9 @@ describe("GroupGrid", () => {
     const element = GroupGrid({});
     const mockGroup = { id: "1", name: "Test Collection" };
 
-    const renderedCard = element.props.renderItem(mockGroup, 0, { onHideSuccess: () => {} });
+    const renderedCard = element.props.renderItem(mockGroup, 0, {
+      onHideSuccess: () => {},
+    });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.group).toEqual(mockGroup);

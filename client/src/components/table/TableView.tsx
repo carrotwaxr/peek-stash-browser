@@ -1,7 +1,13 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useConfig } from "../../contexts/ConfigContext";
 import TableHeader from "./TableHeader";
 import { getCellRenderer } from "./cellRenderers";
-import { useConfig } from "../../contexts/ConfigContext";
 
 interface ColumnDef {
   id: string;
@@ -43,7 +49,11 @@ const TableView = ({
   const { hasMultipleInstances } = useConfig();
 
   // Context menu state: { columnId, x, y } or null
-  const [contextMenu, setContextMenu] = useState<{ columnId: string; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    columnId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Scroll state for showing/hiding the scroll hint
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +62,8 @@ const TableView = ({
   const checkScrollState = useCallback(() => {
     const el = scrollContainerRef.current;
     if (el) {
-      const hasMoreToScroll = el.scrollWidth > el.clientWidth &&
+      const hasMoreToScroll =
+        el.scrollWidth > el.clientWidth &&
         el.scrollLeft < el.scrollWidth - el.clientWidth - 1;
       setCanScrollRight(hasMoreToScroll);
     }
@@ -75,7 +86,10 @@ const TableView = ({
    * Handle right-click on column header
    * Opens context menu for non-mandatory columns
    */
-  const handleColumnContextMenu = (columnId: string, event: React.MouseEvent) => {
+  const handleColumnContextMenu = (
+    columnId: string,
+    event: React.MouseEvent
+  ) => {
     event.preventDefault();
     setContextMenu({
       columnId,
@@ -111,7 +125,8 @@ const TableView = ({
         <tr
           key={`skeleton-${i}`}
           style={{
-            backgroundColor: i % 2 === 1 ? "var(--bg-secondary)" : "transparent",
+            backgroundColor:
+              i % 2 === 1 ? "var(--bg-secondary)" : "transparent",
             borderBottom: "1px solid var(--border-color)",
           }}
         >
@@ -153,13 +168,16 @@ const TableView = ({
         key={(item.id as React.Key) || index}
         className="transition-colors hover:bg-[var(--bg-card)]"
         style={{
-          backgroundColor: index % 2 === 1 ? "var(--bg-secondary)" : "transparent",
+          backgroundColor:
+            index % 2 === 1 ? "var(--bg-secondary)" : "transparent",
           borderBottom: "1px solid var(--border-color)",
         }}
       >
         {columnsPopover && <td className="w-10 px-2 py-2" />}
         {columns.map((column) => {
-          const renderer = getCellRenderer(column.id, entityType, { hasMultipleInstances });
+          const renderer = getCellRenderer(column.id, entityType, {
+            hasMultipleInstances,
+          });
           const hasMaxWidth = column.width?.startsWith("max-w");
           return (
             <td
@@ -196,17 +214,15 @@ const TableView = ({
         className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
       >
         <table className="table-fixed min-w-full">
-        <TableHeader
-          columns={columns}
-          sort={sort}
-          onSort={onSort}
-          onColumnContextMenu={handleColumnContextMenu}
-          entityType={entityType}
-          columnsPopover={columnsPopover}
-        />
-        <tbody>
-          {isLoading ? renderSkeletonRows() : renderRows()}
-        </tbody>
+          <TableHeader
+            columns={columns}
+            sort={sort}
+            onSort={onSort}
+            onColumnContextMenu={handleColumnContextMenu}
+            entityType={entityType}
+            columnsPopover={columnsPopover}
+          />
+          <tbody>{isLoading ? renderSkeletonRows() : renderRows()}</tbody>
         </table>
       </div>
 
@@ -214,10 +230,7 @@ const TableView = ({
       {contextMenu && (
         <>
           {/* Backdrop to close menu on click */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={closeContextMenu}
-          />
+          <div className="fixed inset-0 z-40" onClick={closeContextMenu} />
           {/* Menu */}
           <div
             className="fixed z-50 rounded-lg shadow-lg min-w-[120px]"

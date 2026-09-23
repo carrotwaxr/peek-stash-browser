@@ -1,7 +1,7 @@
 // client/tests/hooks/useFilterState.viewMode.test.jsx
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API calls
@@ -43,10 +43,11 @@ describe("useFilterState - view mode persistence", () => {
     const Wrapper = createWrapper(["/?view=folder"]);
 
     const { result } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 
@@ -63,10 +64,11 @@ describe("useFilterState - view mode persistence", () => {
     const Wrapper = createWrapper(["/"]);
 
     const { result } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 
@@ -81,10 +83,11 @@ describe("useFilterState - view mode persistence", () => {
     const Wrapper = createWrapper(["/?view=folder"]);
 
     const { result } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 
@@ -102,10 +105,11 @@ describe("useFilterState - view mode persistence", () => {
 
     // First mount
     const { result, unmount } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 
@@ -120,10 +124,11 @@ describe("useFilterState - view mode persistence", () => {
 
     // Remount with same URL (simulating browser back)
     const { result: result2 } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 
@@ -139,10 +144,11 @@ describe("useFilterState - view mode persistence", () => {
     const Wrapper = createWrapper(["/?view=folder"]);
 
     const { result } = renderHook(
-      () => useFilterState({
-        artifactType: "gallery",
-        defaultViewMode: "grid",
-      }),
+      () =>
+        useFilterState({
+          artifactType: "gallery",
+          defaultViewMode: "grid",
+        }),
       { wrapper: Wrapper }
     );
 

@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { formatRelativeTime } from "../../utils/date";
-import { getSceneTitle } from "../../utils/format";
 import { useConfig } from "../../contexts/ConfigContext";
+import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
+import { getSceneTitle } from "../../utils/format";
 
 interface Props {
   scene: NormalizedScene;
@@ -71,8 +71,10 @@ const SceneTitle = ({
         // Also check if video is fullscreen
         const isFullscreen =
           document.fullscreenElement ||
-          (document as unknown as Record<string, unknown>).webkitFullscreenElement ||
-          (document as unknown as Record<string, unknown>).mozFullScreenElement ||
+          (document as unknown as Record<string, unknown>)
+            .webkitFullscreenElement ||
+          (document as unknown as Record<string, unknown>)
+            .mozFullScreenElement ||
           (document as unknown as Record<string, unknown>).msFullscreenElement;
         if (isFullscreen) {
           sessionStorage.setItem("videoPlayerFullscreen", "true");
@@ -98,7 +100,7 @@ const SceneTitle = ({
   return (
     <div>
       <Link
-        to={getEntityPath('scene', scene, hasMultipleInstances)}
+        to={getEntityPath("scene", scene, hasMultipleInstances)}
         state={linkState}
         onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}

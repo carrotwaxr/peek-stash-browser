@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import Button from "./Button";
 import SceneCard from "./SceneCard";
 import SkeletonSceneCard from "./SkeletonSceneCard";
-import type { NormalizedScene } from "@peek/shared-types";
 
 interface Props {
   title: string;

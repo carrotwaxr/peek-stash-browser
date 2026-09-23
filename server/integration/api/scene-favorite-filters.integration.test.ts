@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Scene Favorite Filters Integration Tests
@@ -33,10 +33,13 @@ describe("Scene Favorite Filters", () => {
 
   describe("favorite filter", () => {
     it("returns only favorite scenes when favorite=true", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: { favorite: true },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { favorite: true },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -49,10 +52,13 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("returns only non-favorite scenes when favorite=false", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: { favorite: false },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { favorite: false },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -64,19 +70,28 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("returns different counts for favorite vs non-favorite", async () => {
-      const favResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-        scene_filter: { favorite: true },
-      });
+      const favResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: { favorite: true },
+        }
+      );
 
-      const nonFavResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-        scene_filter: { favorite: false },
-      });
+      const nonFavResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: { favorite: false },
+        }
+      );
 
-      const allResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-      });
+      const allResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+        }
+      );
 
       expect(favResponse.ok).toBe(true);
       expect(nonFavResponse.ok).toBe(true);
@@ -93,10 +108,13 @@ describe("Scene Favorite Filters", () => {
 
   describe("performer_favorite filter", () => {
     it("returns scenes with favorite performers when performer_favorite=true", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: { performer_favorite: true },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { performer_favorite: true },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -107,14 +125,20 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("returns fewer scenes than total when filtering by performer_favorite", async () => {
-      const filteredResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-        scene_filter: { performer_favorite: true },
-      });
+      const filteredResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: { performer_favorite: true },
+        }
+      );
 
-      const allResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-      });
+      const allResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+        }
+      );
 
       expect(filteredResponse.ok).toBe(true);
       expect(allResponse.ok).toBe(true);
@@ -128,10 +152,13 @@ describe("Scene Favorite Filters", () => {
 
   describe("studio_favorite filter", () => {
     it("returns scenes from favorite studios when studio_favorite=true", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: { studio_favorite: true },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { studio_favorite: true },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -141,14 +168,20 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("returns fewer scenes than total when filtering by studio_favorite", async () => {
-      const filteredResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-        scene_filter: { studio_favorite: true },
-      });
+      const filteredResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: { studio_favorite: true },
+        }
+      );
 
-      const allResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-      });
+      const allResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+        }
+      );
 
       expect(filteredResponse.ok).toBe(true);
       expect(allResponse.ok).toBe(true);
@@ -161,10 +194,13 @@ describe("Scene Favorite Filters", () => {
 
   describe("tag_favorite filter", () => {
     it("returns scenes with favorite tags when tag_favorite=true", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: { tag_favorite: true },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: { tag_favorite: true },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -174,14 +210,20 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("returns fewer scenes than total when filtering by tag_favorite", async () => {
-      const filteredResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-        scene_filter: { tag_favorite: true },
-      });
+      const filteredResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: { tag_favorite: true },
+        }
+      );
 
-      const allResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-      });
+      const allResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+        }
+      );
 
       expect(filteredResponse.ok).toBe(true);
       expect(allResponse.ok).toBe(true);
@@ -194,13 +236,16 @@ describe("Scene Favorite Filters", () => {
 
   describe("combined favorite filters", () => {
     it("can combine favorite with performer_favorite", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          favorite: true,
-          performer_favorite: true,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            favorite: true,
+            performer_favorite: true,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -212,15 +257,18 @@ describe("Scene Favorite Filters", () => {
     });
 
     it("can combine all favorite filters", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          favorite: true,
-          performer_favorite: true,
-          studio_favorite: true,
-          tag_favorite: true,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            favorite: true,
+            performer_favorite: true,
+            studio_favorite: true,
+            tag_favorite: true,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();

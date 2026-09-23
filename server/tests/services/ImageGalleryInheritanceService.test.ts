@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
 
@@ -38,22 +38,40 @@ describe("ImageGalleryInheritanceService", () => {
     it("should inherit studio from gallery when image has none", async () => {
       // Create studio
       await prisma.stashStudio.create({
-        data: { id: `${PREFIX}studio-1`, stashInstanceId: INSTANCE_ID, name: "Test Studio" },
+        data: {
+          id: `${PREFIX}studio-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Studio",
+        },
       });
 
       // Create gallery with studio
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "Test Gallery", studioId: `${PREFIX}studio-1` },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Gallery",
+          studioId: `${PREFIX}studio-1`,
+        },
       });
 
       // Create image without studio
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+        },
       });
 
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -70,24 +88,47 @@ describe("ImageGalleryInheritanceService", () => {
       // Create two studios
       await prisma.stashStudio.createMany({
         data: [
-          { id: `${PREFIX}studio-1`, stashInstanceId: INSTANCE_ID, name: "Gallery Studio" },
-          { id: `${PREFIX}studio-2`, stashInstanceId: INSTANCE_ID, name: "Image Studio" },
+          {
+            id: `${PREFIX}studio-1`,
+            stashInstanceId: INSTANCE_ID,
+            name: "Gallery Studio",
+          },
+          {
+            id: `${PREFIX}studio-2`,
+            stashInstanceId: INSTANCE_ID,
+            name: "Image Studio",
+          },
         ],
       });
 
       // Create gallery with studio-1
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "Test Gallery", studioId: `${PREFIX}studio-1` },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Gallery",
+          studioId: `${PREFIX}studio-1`,
+        },
       });
 
       // Create image with its own studio-2
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image", studioId: `${PREFIX}studio-2` },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+          studioId: `${PREFIX}studio-2`,
+        },
       });
 
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -103,25 +144,47 @@ describe("ImageGalleryInheritanceService", () => {
     it("should inherit performers from gallery when image has none", async () => {
       // Create performer
       await prisma.stashPerformer.create({
-        data: { id: `${PREFIX}performer-1`, stashInstanceId: INSTANCE_ID, name: "Test Performer" },
+        data: {
+          id: `${PREFIX}performer-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Performer",
+        },
       });
 
       // Create gallery and link performer
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "Test Gallery" },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Gallery",
+        },
       });
       await prisma.galleryPerformer.create({
-        data: { galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID },
+        data: {
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+        },
       });
 
       // Create image without performers
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+        },
       });
 
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -138,25 +201,47 @@ describe("ImageGalleryInheritanceService", () => {
     it("should inherit tags from gallery when image has none", async () => {
       // Create tag
       await prisma.stashTag.create({
-        data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Test Tag" },
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Tag",
+        },
       });
 
       // Create gallery and link tag
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "Test Gallery" },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Gallery",
+        },
       });
       await prisma.galleryTag.create({
-        data: { galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID },
+        data: {
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
       });
 
       // Create image without tags
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+        },
       });
 
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -174,30 +259,61 @@ describe("ImageGalleryInheritanceService", () => {
       // Create two performers
       await prisma.stashPerformer.createMany({
         data: [
-          { id: `${PREFIX}performer-1`, stashInstanceId: INSTANCE_ID, name: "Gallery Performer" },
-          { id: `${PREFIX}performer-2`, stashInstanceId: INSTANCE_ID, name: "Image Performer" },
+          {
+            id: `${PREFIX}performer-1`,
+            stashInstanceId: INSTANCE_ID,
+            name: "Gallery Performer",
+          },
+          {
+            id: `${PREFIX}performer-2`,
+            stashInstanceId: INSTANCE_ID,
+            name: "Image Performer",
+          },
         ],
       });
 
       // Create gallery with performer-1
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "Test Gallery" },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Gallery",
+        },
       });
       await prisma.galleryPerformer.create({
-        data: { galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID },
+        data: {
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+        },
       });
 
       // Create image with performer-2
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+        },
       });
       await prisma.imagePerformer.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-2`, performerInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          performerId: `${PREFIX}performer-2`,
+          performerInstanceId: INSTANCE_ID,
+        },
       });
 
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -215,30 +331,62 @@ describe("ImageGalleryInheritanceService", () => {
       // Create two studios
       await prisma.stashStudio.createMany({
         data: [
-          { id: `${PREFIX}studio-1`, stashInstanceId: INSTANCE_ID, name: "First Gallery Studio" },
-          { id: `${PREFIX}studio-2`, stashInstanceId: INSTANCE_ID, name: "Second Gallery Studio" },
+          {
+            id: `${PREFIX}studio-1`,
+            stashInstanceId: INSTANCE_ID,
+            name: "First Gallery Studio",
+          },
+          {
+            id: `${PREFIX}studio-2`,
+            stashInstanceId: INSTANCE_ID,
+            name: "Second Gallery Studio",
+          },
         ],
       });
 
       // Create two galleries
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-1`, stashInstanceId: INSTANCE_ID, title: "First Gallery", studioId: `${PREFIX}studio-1` },
+        data: {
+          id: `${PREFIX}gallery-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "First Gallery",
+          studioId: `${PREFIX}studio-1`,
+        },
       });
       await prisma.stashGallery.create({
-        data: { id: `${PREFIX}gallery-2`, stashInstanceId: INSTANCE_ID, title: "Second Gallery", studioId: `${PREFIX}studio-2` },
+        data: {
+          id: `${PREFIX}gallery-2`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Second Gallery",
+          studioId: `${PREFIX}studio-2`,
+        },
       });
 
       // Create image without studio
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Test Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Image",
+        },
       });
 
       // Link image to both galleries (gallery-1 first)
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-1`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-1`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
       await prisma.imageGallery.create({
-        data: { imageId: `${PREFIX}image-1`, imageInstanceId: INSTANCE_ID, galleryId: `${PREFIX}gallery-2`, galleryInstanceId: INSTANCE_ID },
+        data: {
+          imageId: `${PREFIX}image-1`,
+          imageInstanceId: INSTANCE_ID,
+          galleryId: `${PREFIX}gallery-2`,
+          galleryInstanceId: INSTANCE_ID,
+        },
       });
 
       // Apply inheritance
@@ -254,7 +402,11 @@ describe("ImageGalleryInheritanceService", () => {
     it("should handle image not in any gallery (no inheritance)", async () => {
       // Create image without gallery
       await prisma.stashImage.create({
-        data: { id: `${PREFIX}image-1`, stashInstanceId: INSTANCE_ID, title: "Standalone Image" },
+        data: {
+          id: `${PREFIX}image-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Standalone Image",
+        },
       });
 
       // Apply inheritance (should not fail)

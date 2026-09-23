@@ -4,19 +4,36 @@
  * Builds parameterized SQL queries for performer filtering, sorting, and pagination.
  * Eliminates the need to load all performers into memory.
  */
-import type { PeekPerformerFilter, NormalizedPerformer, TagRef, GroupRef, GalleryRef, StudioRef } from "../types/index.js";
-import type { PerformerQueryRow } from "../types/internal/queryRows.js";
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import { expandTagIds } from "../utils/hierarchyUtils.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { KEY_SEP } from "./UserStatsService.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../prisma/singleton.js";
+import type {
+  GalleryRef,
+  GroupRef,
+  NormalizedPerformer,
+  PeekPerformerFilter,
+  StudioRef,
+  TagRef,
+} from "../types/index.js";
+import type { PerformerQueryRow } from "../types/internal/queryRows.js";
+import { expandTagIds } from "../utils/hierarchyUtils.js";
+import { logger } from "../utils/logger.js";
+import {
+  type FilterClause,
+  buildDateFilter,
+  buildFavoriteFilter,
+  buildJunctionFilter,
+  buildNumericFilter,
+  buildTextFilter,
+  parseCompositeFilterValues,
+} from "../utils/sqlFilterBuilders.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { KEY_SEP } from "./UserStatsService.js";
 
 /** Deduplicate composite key objects by id+stashInstanceId */
-function dedupeKeys(items: { id: string; stashInstanceId: string }[]): { id: string; stashInstanceId: string }[] {
+function dedupeKeys(
+  items: { id: string; stashInstanceId: string }[]
+): { id: string; stashInstanceId: string }[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const key = `${item.id}:${item.stashInstanceId}`;
@@ -106,7 +123,9 @@ class PerformerQueryBuilder {
   /**
    * Build instance filter clause for multi-instance support
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -121,7 +140,9 @@ class PerformerQueryBuilder {
    * Build filter for a specific instance ID (for disambiguation on detail pages)
    * This is different from allowedInstanceIds - it filters to exactly one instance.
    */
-  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+  private buildSpecificInstanceFilter(
+    instanceId: string | undefined
+  ): FilterClause {
     if (!instanceId) {
       return { sql: "", params: [] };
     }
@@ -135,14 +156,20 @@ class PerformerQueryBuilder {
    * Build ID filter clause
    */
   private buildIdFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | string[] | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | string[]
+      | undefined
+      | null
   ): FilterClause {
     const ids = Array.isArray(filter) ? filter : filter?.value;
     if (!ids || ids.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const modifier = Array.isArray(filter) ? "INCLUDES" : filter?.modifier || "INCLUDES";
+    const modifier = Array.isArray(filter)
+      ? "INCLUDES"
+      : filter?.modifier || "INCLUDES";
     const placeholders = ids.map(() => "?").join(", ");
 
     switch (modifier) {
@@ -159,7 +186,10 @@ class PerformerQueryBuilder {
    * Build gender filter clause
    */
   private buildGenderFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -171,7 +201,10 @@ class PerformerQueryBuilder {
       case "EQUALS":
         return { sql: "UPPER(p.gender) = UPPER(?)", params: [value] };
       case "NOT_EQUALS":
-        return { sql: "(p.gender IS NULL OR UPPER(p.gender) != UPPER(?))", params: [value] };
+        return {
+          sql: "(p.gender IS NULL OR UPPER(p.gender) != UPPER(?))",
+          params: [value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -181,7 +214,14 @@ class PerformerQueryBuilder {
    * Build tag filter clause
    */
   private async buildTagFilterWithHierarchy(
-    filter: { value?: string[] | null; modifier?: string | null; depth?: number | null } | undefined | null
+    filter:
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
+      | undefined
+      | null
   ): Promise<FilterClause> {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -189,7 +229,7 @@ class PerformerQueryBuilder {
 
     // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const { modifier, depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -198,8 +238,14 @@ class PerformerQueryBuilder {
     }
 
     return buildJunctionFilter(
-      coerceEntityRefs(ids), "PerformerTag", "performerId", "performerInstanceId",
-      "tagId", "tagInstanceId", "p", modifier || "INCLUDES"
+      coerceEntityRefs(ids),
+      "PerformerTag",
+      "performerId",
+      "performerInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "p",
+      modifier || "INCLUDES"
     );
   }
 
@@ -208,7 +254,10 @@ class PerformerQueryBuilder {
    * Performers appear in scenes from specific studios
    */
   private buildStudioFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -217,7 +266,7 @@ class PerformerQueryBuilder {
     const { modifier = "INCLUDES" } = filter;
     // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    const ids = parsed.map(p => p.id);
+    const ids = parsed.map((p) => p.id);
     const placeholders = ids.map(() => "?").join(", ");
 
     switch (modifier) {
@@ -255,7 +304,10 @@ class PerformerQueryBuilder {
    * Filter performers by specific scenes they appear in
    */
   private buildScenesFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -308,7 +360,10 @@ class PerformerQueryBuilder {
    * Performers appear in scenes from specific groups
    */
   private buildGroupFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -351,7 +406,10 @@ class PerformerQueryBuilder {
    * Build enum filter clause (for eye_color, ethnicity, hair_color, fake_tits)
    */
   private buildEnumFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null,
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null,
     column: string
   ): FilterClause {
     if (!filter || !filter.value) {
@@ -364,7 +422,10 @@ class PerformerQueryBuilder {
       case "EQUALS":
         return { sql: `UPPER(${column}) = UPPER(?)`, params: [value] };
       case "NOT_EQUALS":
-        return { sql: `(${column} IS NULL OR UPPER(${column}) != UPPER(?))`, params: [value] };
+        return {
+          sql: `(${column} IS NULL OR UPPER(${column}) != UPPER(?))`,
+          params: [value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -374,7 +435,14 @@ class PerformerQueryBuilder {
    * Build birth year filter clause
    */
   private buildBirthYearFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null
+    filter:
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || filter.value === undefined || filter.value === null) {
       return { sql: "", params: [] };
@@ -386,18 +454,36 @@ class PerformerQueryBuilder {
 
     switch (modifier) {
       case "EQUALS":
-        return { sql: `(p.birthdate IS NOT NULL AND ${yearExpr} = ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${yearExpr} = ?)`,
+          params: [value],
+        };
       case "NOT_EQUALS":
-        return { sql: `(p.birthdate IS NULL OR ${yearExpr} != ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NULL OR ${yearExpr} != ?)`,
+          params: [value],
+        };
       case "GREATER_THAN":
-        return { sql: `(p.birthdate IS NOT NULL AND ${yearExpr} > ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${yearExpr} > ?)`,
+          params: [value],
+        };
       case "LESS_THAN":
-        return { sql: `(p.birthdate IS NOT NULL AND ${yearExpr} < ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${yearExpr} < ?)`,
+          params: [value],
+        };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `(p.birthdate IS NOT NULL AND ${yearExpr} BETWEEN ? AND ?)`, params: [value, value2] };
+          return {
+            sql: `(p.birthdate IS NOT NULL AND ${yearExpr} BETWEEN ? AND ?)`,
+            params: [value, value2],
+          };
         }
-        return { sql: `(p.birthdate IS NOT NULL AND ${yearExpr} >= ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${yearExpr} >= ?)`,
+          params: [value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -407,7 +493,14 @@ class PerformerQueryBuilder {
    * Build death year filter clause
    */
   private buildDeathYearFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null
+    filter:
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || filter.value === undefined || filter.value === null) {
       return { sql: "", params: [] };
@@ -418,18 +511,36 @@ class PerformerQueryBuilder {
 
     switch (modifier) {
       case "EQUALS":
-        return { sql: `(p.deathDate IS NOT NULL AND ${yearExpr} = ?)`, params: [value] };
+        return {
+          sql: `(p.deathDate IS NOT NULL AND ${yearExpr} = ?)`,
+          params: [value],
+        };
       case "NOT_EQUALS":
-        return { sql: `(p.deathDate IS NULL OR ${yearExpr} != ?)`, params: [value] };
+        return {
+          sql: `(p.deathDate IS NULL OR ${yearExpr} != ?)`,
+          params: [value],
+        };
       case "GREATER_THAN":
-        return { sql: `(p.deathDate IS NOT NULL AND ${yearExpr} > ?)`, params: [value] };
+        return {
+          sql: `(p.deathDate IS NOT NULL AND ${yearExpr} > ?)`,
+          params: [value],
+        };
       case "LESS_THAN":
-        return { sql: `(p.deathDate IS NOT NULL AND ${yearExpr} < ?)`, params: [value] };
+        return {
+          sql: `(p.deathDate IS NOT NULL AND ${yearExpr} < ?)`,
+          params: [value],
+        };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `(p.deathDate IS NOT NULL AND ${yearExpr} BETWEEN ? AND ?)`, params: [value, value2] };
+          return {
+            sql: `(p.deathDate IS NOT NULL AND ${yearExpr} BETWEEN ? AND ?)`,
+            params: [value, value2],
+          };
         }
-        return { sql: `(p.deathDate IS NOT NULL AND ${yearExpr} >= ?)`, params: [value] };
+        return {
+          sql: `(p.deathDate IS NOT NULL AND ${yearExpr} >= ?)`,
+          params: [value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -439,7 +550,14 @@ class PerformerQueryBuilder {
    * Build age filter clause (calculated from birthdate)
    */
   private buildAgeFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null
+    filter:
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || filter.value === undefined || filter.value === null) {
       return { sql: "", params: [] };
@@ -447,22 +565,41 @@ class PerformerQueryBuilder {
 
     const { value, value2, modifier = "EQUALS" } = filter;
     // Calculate age: (current date - birthdate) in years
-    const ageExpr = "CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER)";
+    const ageExpr =
+      "CAST((julianday(date('now')) - julianday(p.birthdate)) / 365.25 AS INTEGER)";
 
     switch (modifier) {
       case "EQUALS":
-        return { sql: `(p.birthdate IS NOT NULL AND ${ageExpr} = ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${ageExpr} = ?)`,
+          params: [value],
+        };
       case "NOT_EQUALS":
-        return { sql: `(p.birthdate IS NULL OR ${ageExpr} != ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NULL OR ${ageExpr} != ?)`,
+          params: [value],
+        };
       case "GREATER_THAN":
-        return { sql: `(p.birthdate IS NOT NULL AND ${ageExpr} > ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${ageExpr} > ?)`,
+          params: [value],
+        };
       case "LESS_THAN":
-        return { sql: `(p.birthdate IS NOT NULL AND ${ageExpr} < ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${ageExpr} < ?)`,
+          params: [value],
+        };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `(p.birthdate IS NOT NULL AND ${ageExpr} BETWEEN ? AND ?)`, params: [value, value2] };
+          return {
+            sql: `(p.birthdate IS NOT NULL AND ${ageExpr} BETWEEN ? AND ?)`,
+            params: [value, value2],
+          };
         }
-        return { sql: `(p.birthdate IS NOT NULL AND ${ageExpr} >= ?)`, params: [value] };
+        return {
+          sql: `(p.birthdate IS NOT NULL AND ${ageExpr} >= ?)`,
+          params: [value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -486,7 +623,11 @@ class PerformerQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
+  private buildSortClause(
+    sort: string,
+    direction: "ASC" | "DESC",
+    randomSeed?: number
+  ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
     const seed = randomSeed || 12345;
 
@@ -530,7 +671,17 @@ class PerformerQueryBuilder {
 
   async execute(options: PerformerQueryOptions): Promise<PerformerQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters, searchQuery, randomSeed } = options;
+    const {
+      userId,
+      page,
+      perPage,
+      applyExclusions = true,
+      allowedInstanceIds,
+      specificInstanceId,
+      filters,
+      searchQuery,
+      randomSeed,
+    } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -546,7 +697,8 @@ class PerformerQueryBuilder {
 
     // Specific instance filter (for disambiguation on detail pages)
     if (specificInstanceId) {
-      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      const specificFilter =
+        this.buildSpecificInstanceFilter(specificInstanceId);
       if (specificFilter.sql) {
         whereClauses.push(specificFilter);
       }
@@ -614,7 +766,10 @@ class PerformerQueryBuilder {
 
     // Rating filter
     if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
+      const ratingFilter = buildNumericFilter(
+        filters.rating100,
+        "COALESCE(r.rating, 0)"
+      );
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
@@ -622,7 +777,10 @@ class PerformerQueryBuilder {
 
     // O counter filter
     if (filters?.o_counter) {
-      const oCounterFilter = buildNumericFilter(filters.o_counter, "COALESCE(s.oCounter, 0)");
+      const oCounterFilter = buildNumericFilter(
+        filters.o_counter,
+        "COALESCE(s.oCounter, 0)"
+      );
       if (oCounterFilter.sql) {
         whereClauses.push(oCounterFilter);
       }
@@ -630,7 +788,10 @@ class PerformerQueryBuilder {
 
     // Play count filter
     if (filters?.play_count) {
-      const playCountFilter = buildNumericFilter(filters.play_count, "COALESCE(s.playCount, 0)");
+      const playCountFilter = buildNumericFilter(
+        filters.play_count,
+        "COALESCE(s.playCount, 0)"
+      );
       if (playCountFilter.sql) {
         whereClauses.push(playCountFilter);
       }
@@ -638,7 +799,10 @@ class PerformerQueryBuilder {
 
     // Scene count filter
     if (filters?.scene_count) {
-      const sceneCountFilter = buildNumericFilter(filters.scene_count, "COALESCE(p.sceneCount, 0)");
+      const sceneCountFilter = buildNumericFilter(
+        filters.scene_count,
+        "COALESCE(p.sceneCount, 0)"
+      );
       if (sceneCountFilter.sql) {
         whereClauses.push(sceneCountFilter);
       }
@@ -647,7 +811,9 @@ class PerformerQueryBuilder {
     // Text filters
     if (filters?.name) {
       // Name filter searches name and aliases
-      const nameFilter = buildTextFilter(filters.name, "p.name", ["p.aliasList"]);
+      const nameFilter = buildTextFilter(filters.name, "p.name", [
+        "p.aliasList",
+      ]);
       if (nameFilter.sql) {
         whereClauses.push(nameFilter);
       }
@@ -675,7 +841,10 @@ class PerformerQueryBuilder {
     }
 
     if (filters?.measurements) {
-      const measurementsFilter = buildTextFilter(filters.measurements, "p.measurements");
+      const measurementsFilter = buildTextFilter(
+        filters.measurements,
+        "p.measurements"
+      );
       if (measurementsFilter.sql) {
         whereClauses.push(measurementsFilter);
       }
@@ -683,14 +852,20 @@ class PerformerQueryBuilder {
 
     // Physical attribute filters
     if (filters?.height) {
-      const heightFilter = buildNumericFilter(filters.height, "COALESCE(p.heightCm, 0)");
+      const heightFilter = buildNumericFilter(
+        filters.height,
+        "COALESCE(p.heightCm, 0)"
+      );
       if (heightFilter.sql) {
         whereClauses.push(heightFilter);
       }
     }
 
     if (filters?.weight) {
-      const weightFilter = buildNumericFilter(filters.weight, "COALESCE(p.weightKg, 0)");
+      const weightFilter = buildNumericFilter(
+        filters.weight,
+        "COALESCE(p.weightKg, 0)"
+      );
       if (weightFilter.sql) {
         whereClauses.push(weightFilter);
       }
@@ -699,7 +874,10 @@ class PerformerQueryBuilder {
     if (filters?.penis_length) {
       // Note: penis_length isn't in the schema, but keeping for API compatibility
       // This will just not match anything until the field is added
-      const penisLengthFilter = buildNumericFilter(filters.penis_length, "COALESCE(p.penisLength, 0)");
+      const penisLengthFilter = buildNumericFilter(
+        filters.penis_length,
+        "COALESCE(p.penisLength, 0)"
+      );
       if (penisLengthFilter.sql) {
         whereClauses.push(penisLengthFilter);
       }
@@ -707,28 +885,40 @@ class PerformerQueryBuilder {
 
     // Enum filters
     if (filters?.eye_color) {
-      const eyeColorFilter = this.buildEnumFilter(filters.eye_color, "p.eyeColor");
+      const eyeColorFilter = this.buildEnumFilter(
+        filters.eye_color,
+        "p.eyeColor"
+      );
       if (eyeColorFilter.sql) {
         whereClauses.push(eyeColorFilter);
       }
     }
 
     if (filters?.ethnicity) {
-      const ethnicityFilter = this.buildEnumFilter(filters.ethnicity, "p.ethnicity");
+      const ethnicityFilter = this.buildEnumFilter(
+        filters.ethnicity,
+        "p.ethnicity"
+      );
       if (ethnicityFilter.sql) {
         whereClauses.push(ethnicityFilter);
       }
     }
 
     if (filters?.hair_color) {
-      const hairColorFilter = this.buildEnumFilter(filters.hair_color, "p.hairColor");
+      const hairColorFilter = this.buildEnumFilter(
+        filters.hair_color,
+        "p.hairColor"
+      );
       if (hairColorFilter.sql) {
         whereClauses.push(hairColorFilter);
       }
     }
 
     if (filters?.fake_tits) {
-      const fakeTitsFilter = this.buildEnumFilter(filters.fake_tits, "p.fakeTits");
+      const fakeTitsFilter = this.buildEnumFilter(
+        filters.fake_tits,
+        "p.fakeTits"
+      );
       if (fakeTitsFilter.sql) {
         whereClauses.push(fakeTitsFilter);
       }
@@ -766,32 +956,48 @@ class PerformerQueryBuilder {
     }
 
     if (filters?.death_date) {
-      const deathDateFilter = buildDateFilter(filters.death_date, "p.deathDate");
+      const deathDateFilter = buildDateFilter(
+        filters.death_date,
+        "p.deathDate"
+      );
       if (deathDateFilter.sql) {
         whereClauses.push(deathDateFilter);
       }
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at, "p.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(
+        filters.created_at,
+        "p.stashCreatedAt"
+      );
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at, "p.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(
+        filters.updated_at,
+        "p.stashUpdatedAt"
+      );
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
     }
 
     // Combine WHERE clauses
-    const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+    const whereSQL = whereClauses
+      .map((c) => c.sql)
+      .filter(Boolean)
+      .join(" AND ");
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
+    const sortClause = this.buildSortClause(
+      options.sort,
+      options.sortDirection,
+      randomSeed
+    );
 
     // Build full query
     const offset = (page - 1) * perPage;
@@ -815,7 +1021,10 @@ class PerformerQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<PerformerQueryRow[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<PerformerQueryRow[]>(
+      sql,
+      ...params
+    );
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -836,14 +1045,20 @@ class PerformerQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...countParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...countParams
+      );
       total = Number(countResult[0]?.total || 0);
     } else {
       // Fast path: count without JOINs
       const baseWhereClauses = whereClauses.filter(
         (c) => !c.sql.includes("r.") && !c.sql.includes("s.")
       );
-      const baseWhereSQL = baseWhereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+      const baseWhereSQL = baseWhereClauses
+        .map((c) => c.sql)
+        .filter(Boolean)
+        .join(" AND ");
       const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
 
       const countSql = `
@@ -851,7 +1066,10 @@ class PerformerQueryBuilder {
         FROM StashPerformer p
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...baseWhereParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...baseWhereParams
+      );
       total = Number(countResult[0]?.total || 0);
     }
     const countMs = Date.now() - countStart;
@@ -945,57 +1163,83 @@ class PerformerQueryBuilder {
     }));
 
     // Load all junctions in parallel
-    const [tagJunctions, scenePerformers, galleryPerformers] = await Promise.all([
-      prisma.performerTag.findMany({
-        where: { OR: performerWhereClause },
-      }),
-      // Get scenes this performer appears in to derive groups, studios
-      prisma.scenePerformer.findMany({
-        where: { OR: performerWhereClause },
-        select: { performerId: true, performerInstanceId: true, sceneId: true, sceneInstanceId: true },
-      }),
-      // Get galleries this performer appears in directly
-      prisma.galleryPerformer.findMany({
-        where: { OR: performerWhereClause },
-        select: { performerId: true, performerInstanceId: true, galleryId: true, galleryInstanceId: true },
-      }),
-    ]);
+    const [tagJunctions, scenePerformers, galleryPerformers] =
+      await Promise.all([
+        prisma.performerTag.findMany({
+          where: { OR: performerWhereClause },
+        }),
+        // Get scenes this performer appears in to derive groups, studios
+        prisma.scenePerformer.findMany({
+          where: { OR: performerWhereClause },
+          select: {
+            performerId: true,
+            performerInstanceId: true,
+            sceneId: true,
+            sceneInstanceId: true,
+          },
+        }),
+        // Get galleries this performer appears in directly
+        prisma.galleryPerformer.findMany({
+          where: { OR: performerWhereClause },
+          select: {
+            performerId: true,
+            performerInstanceId: true,
+            galleryId: true,
+            galleryInstanceId: true,
+          },
+        }),
+      ]);
 
     // Get scene IDs and instance IDs for this performer
     const sceneIds = [...new Set(scenePerformers.map((sp) => sp.sceneId))];
-    const sceneInstanceIds = [...new Set(scenePerformers.map((sp) => sp.sceneInstanceId))];
+    const sceneInstanceIds = [
+      ...new Set(scenePerformers.map((sp) => sp.sceneInstanceId)),
+    ];
 
     // Load related entities from scenes (with instanceId constraints)
     const [sceneGroups, sceneGalleries, scenes] = await Promise.all([
       sceneIds.length > 0
         ? prisma.sceneGroup.findMany({
-            where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
+            where: {
+              sceneId: { in: sceneIds },
+              sceneInstanceId: { in: sceneInstanceIds },
+            },
             select: { sceneId: true, groupId: true, groupInstanceId: true },
           })
         : [],
       sceneIds.length > 0
         ? prisma.sceneGallery.findMany({
-            where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
+            where: {
+              sceneId: { in: sceneIds },
+              sceneInstanceId: { in: sceneInstanceIds },
+            },
             select: { sceneId: true, galleryId: true, galleryInstanceId: true },
           })
         : [],
       sceneIds.length > 0
         ? prisma.stashScene.findMany({
-            where: { id: { in: sceneIds }, stashInstanceId: { in: sceneInstanceIds } },
+            where: {
+              id: { in: sceneIds },
+              stashInstanceId: { in: sceneInstanceIds },
+            },
             select: { id: true, stashInstanceId: true, studioId: true },
           })
         : [],
     ]);
 
     // Build composite key OR conditions for entity lookups (prevents cross-instance data leakage)
-    const tagOrConditions = dedupeKeys(tagJunctions.map((j) => ({
-      id: j.tagId,
-      stashInstanceId: j.tagInstanceId,
-    })));
-    const groupOrConditions = dedupeKeys(sceneGroups.map((sg) => ({
-      id: sg.groupId,
-      stashInstanceId: sg.groupInstanceId,
-    })));
+    const tagOrConditions = dedupeKeys(
+      tagJunctions.map((j) => ({
+        id: j.tagId,
+        stashInstanceId: j.tagInstanceId,
+      }))
+    );
+    const groupOrConditions = dedupeKeys(
+      sceneGroups.map((sg) => ({
+        id: sg.groupId,
+        stashInstanceId: sg.groupInstanceId,
+      }))
+    );
     // Galleries come from direct performer-gallery association (galleryPerformers)
     // plus any scene-gallery associations (sceneGalleries)
     const galleryOrConditions = dedupeKeys([
@@ -1008,8 +1252,13 @@ class PerformerQueryBuilder {
         stashInstanceId: sg.galleryInstanceId,
       })),
     ]);
-    const studioOrConditions = dedupeKeys(scenes
-      .flatMap((s) => s.studioId ? [{ id: s.studioId, stashInstanceId: s.stashInstanceId }] : []));
+    const studioOrConditions = dedupeKeys(
+      scenes.flatMap((s) =>
+        s.studioId
+          ? [{ id: s.studioId, stashInstanceId: s.stashInstanceId }]
+          : []
+      )
+    );
 
     // Load all entities in parallel using composite key lookups
     const [tags, groups, galleries, studios] = await Promise.all([
@@ -1028,37 +1277,64 @@ class PerformerQueryBuilder {
     ]);
 
     // Build lookup maps keyed by composite id:instanceId (prevents cross-instance collisions)
-    const tagsByKey = new Map<string, TagRef>(tags.map((t) => [`${t.id}:${t.stashInstanceId}`, {
-      id: t.id,
-      instanceId: t.stashInstanceId,
-      name: t.name,
-      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
-      favorite: t.favorite,
-    }]));
+    const tagsByKey = new Map<string, TagRef>(
+      tags.map((t) => [
+        `${t.id}:${t.stashInstanceId}`,
+        {
+          id: t.id,
+          instanceId: t.stashInstanceId,
+          name: t.name,
+          image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
+          favorite: t.favorite,
+        },
+      ])
+    );
 
-    const groupsByKey = new Map<string, GroupRef>(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
-      id: g.id,
-      instanceId: g.stashInstanceId,
-      name: g.name,
-      front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
-      back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
-    }]));
+    const groupsByKey = new Map<string, GroupRef>(
+      groups.map((g) => [
+        `${g.id}:${g.stashInstanceId}`,
+        {
+          id: g.id,
+          instanceId: g.stashInstanceId,
+          name: g.name,
+          front_image_path: this.transformUrl(
+            g.frontImagePath,
+            g.stashInstanceId
+          ),
+          back_image_path: this.transformUrl(
+            g.backImagePath,
+            g.stashInstanceId
+          ),
+        },
+      ])
+    );
 
-    const galleriesByKey = new Map<string, GalleryRef>(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
-      id: g.id,
-      instanceId: g.stashInstanceId,
-      title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-      cover: this.transformUrl(g.coverPath, g.stashInstanceId),
-    }]));
+    const galleriesByKey = new Map<string, GalleryRef>(
+      galleries.map((g) => [
+        `${g.id}:${g.stashInstanceId}`,
+        {
+          id: g.id,
+          instanceId: g.stashInstanceId,
+          title:
+            g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
+          cover: this.transformUrl(g.coverPath, g.stashInstanceId),
+        },
+      ])
+    );
 
-    const studiosByKey = new Map<string, StudioRef>(studios.map((s) => [`${s.id}:${s.stashInstanceId}`, {
-      id: s.id,
-      instanceId: s.stashInstanceId,
-      name: s.name,
-      image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
-      favorite: s.favorite,
-      parent_studio: s.parentId ? { id: s.parentId } : null,
-    }]));
+    const studiosByKey = new Map<string, StudioRef>(
+      studios.map((s) => [
+        `${s.id}:${s.stashInstanceId}`,
+        {
+          id: s.id,
+          instanceId: s.stashInstanceId,
+          name: s.name,
+          image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
+          favorite: s.favorite,
+          parent_studio: s.parentId ? { id: s.parentId } : null,
+        },
+      ])
+    );
 
     // Build performer -> scene mapping (keyed by composite performerId\0instanceId)
     const scenesByPerformer = new Map<string, Set<string>>();
@@ -1086,7 +1362,8 @@ class PerformerQueryBuilder {
 
     const studioByScene = new Map<string, string>();
     for (const s of scenes) {
-      if (s.studioId) studioByScene.set(s.id, `${s.studioId}:${s.stashInstanceId}`);
+      if (s.studioId)
+        studioByScene.set(s.id, `${s.studioId}:${s.stashInstanceId}`);
     }
 
     // Build performer -> tags map (keyed by composite performerId\0instanceId)
@@ -1115,23 +1392,32 @@ class PerformerQueryBuilder {
       performer.tags = tagsByPerformer.get(performerKey) || [];
 
       // Derive groups and studios from performer's scenes
-      const performerSceneIds = scenesByPerformer.get(performerKey) || new Set();
+      const performerSceneIds =
+        scenesByPerformer.get(performerKey) || new Set();
 
       const performerGroupKeys = new Set<string>();
       const performerStudioKeys = new Set<string>();
 
       for (const sceneId of performerSceneIds) {
-        for (const gkey of groupsByScene.get(sceneId) || []) performerGroupKeys.add(gkey);
+        for (const gkey of groupsByScene.get(sceneId) || [])
+          performerGroupKeys.add(gkey);
         const skey = studioByScene.get(sceneId);
         if (skey) performerStudioKeys.add(skey);
       }
 
       // Galleries come from direct GalleryPerformer association
-      const performerGalleryKeys = galleriesByPerformer.get(performerKey) || new Set();
+      const performerGalleryKeys =
+        galleriesByPerformer.get(performerKey) || new Set();
 
-      performer.groups = [...performerGroupKeys].map((key) => groupsByKey.get(key)).filter((g): g is GroupRef => !!g);
-      performer.galleries = [...performerGalleryKeys].map((key) => galleriesByKey.get(key)).filter((g): g is GalleryRef => !!g);
-      performer.studios = [...performerStudioKeys].map((key) => studiosByKey.get(key)).filter((s): s is StudioRef => !!s);
+      performer.groups = [...performerGroupKeys]
+        .map((key) => groupsByKey.get(key))
+        .filter((g): g is GroupRef => !!g);
+      performer.galleries = [...performerGalleryKeys]
+        .map((key) => galleriesByKey.get(key))
+        .filter((g): g is GalleryRef => !!g);
+      performer.studios = [...performerStudioKeys]
+        .map((key) => studiosByKey.get(key))
+        .filter((s): s is StudioRef => !!s);
     }
   }
 
@@ -1140,7 +1426,10 @@ class PerformerQueryBuilder {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {

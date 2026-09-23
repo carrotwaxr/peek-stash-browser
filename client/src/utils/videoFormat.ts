@@ -43,7 +43,11 @@ const codecSupportCache = new Map();
  * @param {string} audioCodec - Audio codec name
  * @returns {boolean}
  */
-function testCodecSupport(container: string, videoCodec: string, audioCodec: string) {
+function testCodecSupport(
+  container: string,
+  videoCodec: string,
+  audioCodec: string
+) {
   const cacheKey = `${container}/${videoCodec}/${audioCodec}`;
 
   if (codecSupportCache.has(cacheKey)) {
@@ -102,13 +106,21 @@ export function canDirectPlayVideo(file: VideoFile | null) {
     };
   }
 
-  const { format, video_codec, audio_codec } = file as { format?: string; video_codec?: string; audio_codec?: string };
+  const { format, video_codec, audio_codec } = file as {
+    format?: string;
+    video_codec?: string;
+    audio_codec?: string;
+  };
 
   // Always allow common web formats - let the browser decide
   const commonFormats = ["mp4", "webm", "mov"];
   if (format && commonFormats.includes(format.toLowerCase())) {
     // Test actual codec support
-    const supported = testCodecSupport(format, video_codec || "", audio_codec || "");
+    const supported = testCodecSupport(
+      format,
+      video_codec || "",
+      audio_codec || ""
+    );
 
     if (supported) {
       return {

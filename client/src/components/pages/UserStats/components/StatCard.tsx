@@ -1,5 +1,4 @@
 // client/src/components/pages/UserStats/components/StatCard.tsx
-
 import { type ReactNode } from "react";
 import { Paper } from "../../../ui/index";
 

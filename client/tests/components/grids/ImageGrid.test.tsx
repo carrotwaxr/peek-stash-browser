@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ImageGrid } from "../../../src/components/grids/index";
 
 describe("ImageGrid", () => {
@@ -36,7 +36,9 @@ describe("ImageGrid", () => {
     const element = ImageGrid({});
     const mockImage = { id: "1", title: "Test Image" };
 
-    const renderedCard = element.props.renderItem(mockImage, 0, { onHideSuccess: () => {} });
+    const renderedCard = element.props.renderItem(mockImage, 0, {
+      onHideSuccess: () => {},
+    });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.image).toEqual(mockImage);

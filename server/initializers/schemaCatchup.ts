@@ -28,9 +28,8 @@
  * confident no one is running ancient versions. The catchup logic is idempotent and
  * safe to run on already-current databases (it just no-ops).
  */
-
 import { exec } from "child_process";
-import { existsSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "fs";
 import path from "path";
 import { promisify } from "util";
 import { logger } from "../utils/logger.js";
@@ -46,7 +45,9 @@ async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
   const tmpFile = path.join(TMP_DIR, `sql_${Date.now()}.sql`);
   try {
     writeFileSync(tmpFile, sql);
-    const { stdout } = await execAsync(`sqlite3 "${dbPath}" < "${tmpFile}" 2>/dev/null || true`);
+    const { stdout } = await execAsync(
+      `sqlite3 "${dbPath}" < "${tmpFile}" 2>/dev/null || true`
+    );
     return stdout.trim();
   } finally {
     try {
@@ -60,7 +61,10 @@ async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
 /**
  * Check if a table exists in the SQLite database
  */
-async function tableExists(dbPath: string, tableName: string): Promise<boolean> {
+async function tableExists(
+  dbPath: string,
+  tableName: string
+): Promise<boolean> {
   const result = await sqliteQuery(
     dbPath,
     `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='${tableName}';`
@@ -71,7 +75,11 @@ async function tableExists(dbPath: string, tableName: string): Promise<boolean> 
 /**
  * Check if a column exists in a table
  */
-async function columnExists(dbPath: string, tableName: string, columnName: string): Promise<boolean> {
+async function columnExists(
+  dbPath: string,
+  tableName: string,
+  columnName: string
+): Promise<boolean> {
   const result = await sqliteQuery(
     dbPath,
     `SELECT COUNT(*) FROM pragma_table_info('${tableName}') WHERE name='${columnName}';`
@@ -82,7 +90,11 @@ async function columnExists(dbPath: string, tableName: string, columnName: strin
 /**
  * Execute SQL statements, logging any errors but not failing
  */
-async function executeSql(dbPath: string, sql: string, description: string): Promise<boolean> {
+async function executeSql(
+  dbPath: string,
+  sql: string,
+  description: string
+): Promise<boolean> {
   try {
     await sqliteQuery(dbPath, sql);
     return true;
@@ -232,7 +244,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "UserHiddenEntity_userId_entityType_entityId_k
   }
 
   if (!(await columnExists(dbPath, "User", "hideConfirmationDisabled"))) {
-    logger.info("Adding missing column: User.hideConfirmationDisabled (v1.6.0)");
+    logger.info(
+      "Adding missing column: User.hideConfirmationDisabled (v1.6.0)"
+    );
     await executeSql(
       dbPath,
       `ALTER TABLE "User" ADD COLUMN "hideConfirmationDisabled" BOOLEAN NOT NULL DEFAULT false;`,
@@ -307,7 +321,9 @@ export async function runSchemaCatchup(dbPath: string): Promise<void> {
 
   if (!hasMigrationTable && hasUserTable) {
     // Scenario: Old database created with db push (v1.x users)
-    logger.info("Detected legacy database without migration history - running schema catchup");
+    logger.info(
+      "Detected legacy database without migration history - running schema catchup"
+    );
 
     await createMissingTablesAndColumns(dbPath);
 
@@ -316,7 +332,9 @@ export async function runSchemaCatchup(dbPath: string): Promise<void> {
     await execAsync("npx prisma migrate resolve --applied 0_baseline");
 
     logger.info("Marking add_user_carousel migration as applied");
-    await execAsync("npx prisma migrate resolve --applied 20251126202944_add_user_carousel");
+    await execAsync(
+      "npx prisma migrate resolve --applied 20251126202944_add_user_carousel"
+    );
 
     logger.info("Schema catchup complete for legacy database");
   } else if (hasMigrationTable) {
@@ -333,9 +351,16 @@ export async function runSchemaCatchup(dbPath: string): Promise<void> {
     await createMissingTablesAndColumns(dbPath);
 
     // If UserCarousel migration wasn't applied but we just created the table, mark it as applied
-    if (userCarouselMigrationApplied !== "1" && (await tableExists(dbPath, "UserCarousel"))) {
-      logger.info("Marking add_user_carousel migration as applied (table already exists)");
-      await execAsync("npx prisma migrate resolve --applied 20251126202944_add_user_carousel");
+    if (
+      userCarouselMigrationApplied !== "1" &&
+      (await tableExists(dbPath, "UserCarousel"))
+    ) {
+      logger.info(
+        "Marking add_user_carousel migration as applied (table already exists)"
+      );
+      await execAsync(
+        "npx prisma migrate resolve --applied 20251126202944_add_user_carousel"
+      );
     }
 
     logger.info("Schema catchup check complete");

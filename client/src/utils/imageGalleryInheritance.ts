@@ -49,7 +49,10 @@ interface ImageObject {
   urls?: string[];
 }
 
-function mergeEntitiesById(primary: Entity[] = [], inherited: Entity[] = []): Entity[] {
+function mergeEntitiesById(
+  primary: Entity[] = [],
+  inherited: Entity[] = []
+): Entity[] {
   const seen = new Set<string>();
   const result: Entity[] = [];
 
@@ -168,7 +171,10 @@ function getInheritedPhotographer(galleries: Gallery[] = []): string | null {
  * @param {Array} galleries - Array of gallery objects
  * @returns {Array} Merged array of unique URLs
  */
-function mergeUrls(imageUrls: string[] = [], galleries: Gallery[] = []): string[] {
+function mergeUrls(
+  imageUrls: string[] = [],
+  galleries: Gallery[] = []
+): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
 
@@ -208,7 +214,9 @@ function mergeUrls(imageUrls: string[] = [], galleries: Gallery[] = []): string[
  * @param {Object} image - Image object with optional galleries array
  * @returns {Object} Object containing effective metadata fields
  */
-export function getEffectiveImageMetadata(image: ImageObject | null | undefined) {
+export function getEffectiveImageMetadata(
+  image: ImageObject | null | undefined
+) {
   if (!image) {
     return {
       effectivePerformers: [],
@@ -245,7 +253,8 @@ export function getEffectiveImageMetadata(image: ImageObject | null | undefined)
   const effectiveDetails = image.details || getInheritedDetails(galleries);
 
   // Photographer: prefer image's own, fallback to gallery's
-  const effectivePhotographer = image.photographer || getInheritedPhotographer(galleries);
+  const effectivePhotographer =
+    image.photographer || getInheritedPhotographer(galleries);
 
   // URLs: merge image URLs with gallery URLs
   const effectiveUrls = mergeUrls(image.urls || [], galleries);
@@ -268,7 +277,9 @@ export function getEffectiveImageMetadata(image: ImageObject | null | undefined)
  * @param {Object} image - Image object
  * @returns {Object} Image with added effective* fields
  */
-export function enrichImageWithInheritedMetadata(image: ImageObject | null | undefined) {
+export function enrichImageWithInheritedMetadata(
+  image: ImageObject | null | undefined
+) {
   if (!image) return image;
 
   const {

@@ -2,15 +2,15 @@ import express from "express";
 import {
   createFirstAdmin,
   createFirstStashInstance,
+  createStashInstance,
+  deleteStashInstance,
+  // Multi-instance management
+  getAllStashInstances,
   getSetupStatus,
   getStashInstance,
   resetSetup,
   testStashConnection,
-  // Multi-instance management
-  getAllStashInstances,
-  createStashInstance,
   updateStashInstance,
-  deleteStashInstance,
 } from "../controllers/setup.js";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 
@@ -27,9 +27,24 @@ router.post("/reset", resetSetup);
 router.get("/stash-instance", authenticate, getStashInstance);
 
 // Multi-instance management (admin only)
-router.get("/stash-instances", authenticate, requireAdmin, getAllStashInstances);
+router.get(
+  "/stash-instances",
+  authenticate,
+  requireAdmin,
+  getAllStashInstances
+);
 router.post("/stash-instance", authenticate, requireAdmin, createStashInstance);
-router.put("/stash-instance/:id", authenticate, requireAdmin, updateStashInstance);
-router.delete("/stash-instance/:id", authenticate, requireAdmin, deleteStashInstance);
+router.put(
+  "/stash-instance/:id",
+  authenticate,
+  requireAdmin,
+  updateStashInstance
+);
+router.delete(
+  "/stash-instance/:id",
+  authenticate,
+  requireAdmin,
+  deleteStashInstance
+);
 
 export default router;

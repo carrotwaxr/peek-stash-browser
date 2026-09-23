@@ -1,18 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "src/main.jsx"
-  ],
-  "project": [
-    "src/**/*.{js,jsx,ts,tsx}"
-  ],
+  "entry": ["src/main.jsx"],
+  "project": ["src/**/*.{js,jsx,ts,tsx}"],
   "ignore": [
     "dist/**",
     "node_modules/**",
     "**/*.test.{js,jsx,ts,tsx}",
     "**/*.spec.{js,jsx,ts,tsx}"
   ],
-  "ignoreDependencies": [
-    "@trivago/prettier-plugin-sort-imports"
-  ]
+  "ignoreDependencies": ["@trivago/prettier-plugin-sort-imports"]
 }

@@ -8,23 +8,38 @@ import TableColumnSettings from "../TableColumnSettings";
 const CustomizationTab = () => {
   const [loading, setLoading] = useState(true);
   const { unitPreference, setUnitPreference } = useUnitPreference();
-  const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
+  const [preferredPreviewQuality, setPreferredPreviewQuality] =
+    useState("sprite");
   const [wallPlayback, setWallPlayback] = useState("autoplay");
-  const [lightboxDoubleTapAction, setLightboxDoubleTapAction] = useState("favorite");
-  const [tableColumnDefaults, setTableColumnDefaults] = useState<Record<string, { visible: string[]; order: string[] }>>({});
+  const [lightboxDoubleTapAction, setLightboxDoubleTapAction] =
+    useState("favorite");
+  const [tableColumnDefaults, setTableColumnDefaults] = useState<
+    Record<string, { visible: string[]; order: string[] }>
+  >({});
 
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const data = await apiGet<{ settings: Record<string, unknown> }>("/user/settings");
+        const data = await apiGet<{ settings: Record<string, unknown> }>(
+          "/user/settings"
+        );
         const { settings } = data;
 
-        setPreferredPreviewQuality((settings.preferredPreviewQuality as string) || "sprite");
+        setPreferredPreviewQuality(
+          (settings.preferredPreviewQuality as string) || "sprite"
+        );
         setWallPlayback((settings.wallPlayback as string) || "autoplay");
-        setLightboxDoubleTapAction((settings.lightboxDoubleTapAction as string) || "favorite");
-        setTableColumnDefaults((settings.tableColumnDefaults as Record<string, { visible: string[]; order: string[] }>) || {});
+        setLightboxDoubleTapAction(
+          (settings.lightboxDoubleTapAction as string) || "favorite"
+        );
+        setTableColumnDefaults(
+          (settings.tableColumnDefaults as Record<
+            string,
+            { visible: string[]; order: string[] }
+          >) || {}
+        );
       } catch {
         showError("Failed to load customization settings");
       } finally {
@@ -54,7 +69,9 @@ const CustomizationTab = () => {
     }
   };
 
-  const saveTableColumnDefaults = async (newDefaults: Record<string, { visible: string[]; order: string[] }>) => {
+  const saveTableColumnDefaults = async (
+    newDefaults: Record<string, { visible: string[]; order: string[] }>
+  ) => {
     try {
       await apiPut("/user/settings", {
         tableColumnDefaults: newDefaults,
@@ -108,7 +125,9 @@ const CustomizationTab = () => {
             <select
               id="preferredPreviewQuality"
               value={preferredPreviewQuality}
-              onChange={(e) => saveViewPreference("preferredPreviewQuality", e.target.value)}
+              onChange={(e) =>
+                saveViewPreference("preferredPreviewQuality", e.target.value)
+              }
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",
@@ -121,8 +140,8 @@ const CustomizationTab = () => {
               <option value="mp4">High Quality - MP4 Video</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Quality of preview animations shown when hovering over scene cards. Low
-              quality (sprite) uses less bandwidth.
+              Quality of preview animations shown when hovering over scene
+              cards. Low quality (sprite) uses less bandwidth.
             </p>
           </div>
 
@@ -138,7 +157,9 @@ const CustomizationTab = () => {
             <select
               id="wallPlayback"
               value={wallPlayback}
-              onChange={(e) => saveViewPreference("wallPlayback", e.target.value)}
+              onChange={(e) =>
+                saveViewPreference("wallPlayback", e.target.value)
+              }
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",
@@ -151,9 +172,9 @@ const CustomizationTab = () => {
               <option value="static">Static Thumbnails</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Controls how scene previews behave in Wall view. Autoplay plays all visible
-              previews simultaneously. Hover only plays when you mouse over. Static shows
-              thumbnails only.
+              Controls how scene previews behave in Wall view. Autoplay plays
+              all visible previews simultaneously. Hover only plays when you
+              mouse over. Static shows thumbnails only.
             </p>
           </div>
 
@@ -169,7 +190,9 @@ const CustomizationTab = () => {
             <select
               id="unitPreference"
               value={unitPreference}
-              onChange={(e) => (setUnitPreference as (v: string) => void)(e.target.value)}
+              onChange={(e) =>
+                (setUnitPreference as (v: string) => void)(e.target.value)
+              }
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",
@@ -181,8 +204,8 @@ const CustomizationTab = () => {
               <option value="imperial">Imperial (ft/in, lbs)</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Display performer height, weight, and measurements in your preferred unit
-              system.
+              Display performer height, weight, and measurements in your
+              preferred unit system.
             </p>
           </div>
 
@@ -198,7 +221,9 @@ const CustomizationTab = () => {
             <select
               id="lightboxDoubleTapAction"
               value={lightboxDoubleTapAction}
-              onChange={(e) => saveViewPreference("lightboxDoubleTapAction", e.target.value)}
+              onChange={(e) =>
+                saveViewPreference("lightboxDoubleTapAction", e.target.value)
+              }
               className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-secondary)",
@@ -211,8 +236,8 @@ const CustomizationTab = () => {
               <option value="fullscreen">Toggle Fullscreen</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Action performed when double-tapping (mobile) or double-clicking (desktop) an
-              image in the lightbox.
+              Action performed when double-tapping (mobile) or double-clicking
+              (desktop) an image in the lightbox.
             </p>
           </div>
         </div>

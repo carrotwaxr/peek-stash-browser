@@ -1,5 +1,16 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+// ---------------------------------------------------------------------------
+// Imports (after mocks are registered)
+// ---------------------------------------------------------------------------
+
+import { useConfig } from "@/contexts/ConfigContext";
+import {
+  ScenePlayerProvider,
+  useScenePlayer,
+} from "@/contexts/ScenePlayerContext";
+import { getEntityPath } from "@/utils/entityLinks";
 
 // ---------------------------------------------------------------------------
 // Mocks (must be defined before imports that use them)
@@ -17,18 +28,6 @@ vi.mock("@/contexts/ConfigContext", () => ({
 vi.mock("@/utils/entityLinks", () => ({
   getEntityPath: vi.fn(() => "/scene/123"),
 }));
-
-// ---------------------------------------------------------------------------
-// Imports (after mocks are registered)
-// ---------------------------------------------------------------------------
-
-import { useConfig } from "@/contexts/ConfigContext";
-import { getEntityPath } from "@/utils/entityLinks";
-import {
-  ScenePlayerProvider,
-  useScenePlayer,
-} from "@/contexts/ScenePlayerContext";
-import type { Mock } from "vitest";
 
 const getEntityPathMock = getEntityPath as unknown as Mock;
 const useConfigMock = useConfig as unknown as Mock;
@@ -64,7 +63,9 @@ function createWrapper(props = {}) {
   const merged = { ...defaults, ...props };
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <ScenePlayerProvider {...(merged as any)}>{children}</ScenePlayerProvider>;
+    return (
+      <ScenePlayerProvider {...(merged as any)}>{children}</ScenePlayerProvider>
+    );
   };
 }
 
@@ -252,7 +253,9 @@ describe("ScenePlayerContext", () => {
 
       expect(result.current.scene).toBeNull();
       expect(result.current.sceneError).toBeTruthy();
-      expect((result.current.sceneError as Error).message).toBe("Scene not found");
+      expect((result.current.sceneError as Error).message).toBe(
+        "Scene not found"
+      );
     });
 
     it("dispatches LOAD_SCENE_ERROR on API network failure", async () => {

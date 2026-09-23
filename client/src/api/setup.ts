@@ -1,25 +1,36 @@
 /**
  * Setup API — initial setup wizard and user setup endpoints.
  */
-import { apiGet, apiPost } from "./client";
 import type {
-  GetSetupStatusResponse,
   CreateFirstAdminResponse,
-  TestStashConnectionResponse,
   CreateFirstStashInstanceResponse,
+  GetSetupStatusResponse,
   ResetSetupResponse,
+  TestStashConnectionResponse,
 } from "@peek/shared-types";
+import { apiGet, apiPost } from "./client";
 
 export const setupApi = {
   getSetupStatus: () => apiGet<GetSetupStatusResponse>("/setup/status"),
 
   createFirstAdmin: (username: string, password: string) =>
-    apiPost<CreateFirstAdminResponse>("/setup/create-admin", { username, password }),
+    apiPost<CreateFirstAdminResponse>("/setup/create-admin", {
+      username,
+      password,
+    }),
 
   testStashConnection: (url: string, apiKey: string) =>
-    apiPost<TestStashConnectionResponse>("/setup/test-stash-connection", { url, apiKey }),
+    apiPost<TestStashConnectionResponse>("/setup/test-stash-connection", {
+      url,
+      apiKey,
+    }),
 
-  createFirstStashInstance: (url: string, apiKey: string, name = "Default", uiUrl?: string) =>
+  createFirstStashInstance: (
+    url: string,
+    apiKey: string,
+    name = "Default",
+    uiUrl?: string
+  ) =>
     apiPost<CreateFirstStashInstanceResponse>("/setup/create-stash-instance", {
       url,
       uiUrl: uiUrl || null,
@@ -32,8 +43,14 @@ export const setupApi = {
 
 export const userSetupApi = {
   getSetupStatus: () =>
-    apiGet<{ needsSetup: boolean; instances: Array<{ id: string; name: string }> }>("/user/setup-status"),
+    apiGet<{
+      needsSetup: boolean;
+      instances: Array<{ id: string; name: string }>;
+    }>("/user/setup-status"),
 
   completeSetup: (selectedInstanceIds: string[]) =>
-    apiPost<{ success: boolean; user: Record<string, unknown> }>("/user/complete-setup", { selectedInstanceIds }),
+    apiPost<{ success: boolean; user: Record<string, unknown> }>(
+      "/user/complete-setup",
+      { selectedInstanceIds }
+    ),
 };

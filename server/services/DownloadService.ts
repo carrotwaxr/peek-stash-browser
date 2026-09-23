@@ -1,5 +1,5 @@
+import type { Download, DownloadStatus, DownloadType } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import type { Download, DownloadType, DownloadStatus } from "@prisma/client";
 
 /** 24 hours in milliseconds for download expiry */
 const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -268,9 +268,7 @@ export class DownloadService {
     }
 
     // Remove or replace invalid characters for filenames
-    return name
-      .trim()
-      .replace(/[<>:"/\\|?*]/g, "_");
+    return name.trim().replace(/[<>:"/\\|?*]/g, "_");
   }
 }
 

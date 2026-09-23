@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  isVideoStreamable,
   isSceneStreamable,
+  isVideoStreamable,
 } from "../../utils/codecDetection.js";
 
 describe("Codec Detection - isVideoStreamable", () => {
@@ -87,7 +87,9 @@ describe("Codec Detection - isVideoStreamable", () => {
       const result = isVideoStreamable("h264", "aac", "/path/to/video.mkv");
 
       expect(result.isStreamable).toBe(false);
-      expect(result.reasons).toContain("Container 'mkv' not browser-compatible");
+      expect(result.reasons).toContain(
+        "Container 'mkv' not browser-compatible"
+      );
     });
 
     it("should detect missing video codec", () => {
@@ -102,7 +104,9 @@ describe("Codec Detection - isVideoStreamable", () => {
 
       expect(result.isStreamable).toBe(false);
       expect(result.reasons).toHaveLength(3);
-      expect(result.reasons).toContain("Container 'mkv' not browser-compatible");
+      expect(result.reasons).toContain(
+        "Container 'mkv' not browser-compatible"
+      );
       expect(result.reasons).toContain(
         "Video codec 'mpeg4' not browser-compatible"
       );
@@ -153,7 +157,11 @@ describe("Codec Detection - isVideoStreamable", () => {
     });
 
     it("should normalize MPEG audio to mp3", () => {
-      const result = isVideoStreamable("h264", "mpeg audio", "/path/to/video.mp4");
+      const result = isVideoStreamable(
+        "h264",
+        "mpeg audio",
+        "/path/to/video.mp4"
+      );
 
       expect(result.audioCodec).toBe("mp3");
     });
@@ -169,7 +177,11 @@ describe("Codec Detection - isVideoStreamable", () => {
 
   describe("Edge cases", () => {
     it("should handle undefined codecs", () => {
-      const result = isVideoStreamable(undefined, undefined, "/path/to/video.mp4");
+      const result = isVideoStreamable(
+        undefined,
+        undefined,
+        "/path/to/video.mp4"
+      );
 
       expect(result.isStreamable).toBe(false);
       expect(result.reasons).toContain("Video codec not detected");
@@ -361,7 +373,9 @@ describe("Codec Detection - isSceneStreamable", () => {
       const result = isSceneStreamable(scene);
 
       expect(result.isStreamable).toBe(false);
-      expect(result.reasons).toContain("Container 'mkv' not browser-compatible");
+      expect(result.reasons).toContain(
+        "Container 'mkv' not browser-compatible"
+      );
     });
   });
 });

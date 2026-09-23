@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
-import { libraryApi, type LibrarySearchParams } from "../library";
 
-export function useSceneList(params: LibrarySearchParams | null, instanceId?: string) {
+export function useSceneList(
+  params: LibrarySearchParams | null,
+  instanceId?: string
+) {
   return useQuery({
-    queryKey: queryKeys.scenes.list(instanceId, (params ?? {}) as Record<string, unknown>),
+    queryKey: queryKeys.scenes.list(
+      instanceId,
+      (params ?? {}) as Record<string, unknown>
+    ),
     queryFn: ({ signal }) => libraryApi.findScenes(params!, signal),
     enabled: params !== null,
   });

@@ -1,6 +1,6 @@
+import type { Response } from "express";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
-import type { Response } from "express";
 import { logger } from "./logger.js";
 
 /**
@@ -21,7 +21,7 @@ export async function pipeResponseToClient(
   fetchResponse: globalThis.Response,
   res: Response,
   label: string,
-  headersToForward?: string[],
+  headersToForward?: string[]
 ): Promise<void> {
   // Forward headers if requested
   if (headersToForward) {
@@ -39,7 +39,7 @@ export async function pipeResponseToClient(
   }
 
   const nodeStream = Readable.fromWeb(
-    fetchResponse.body as import("stream/web").ReadableStream,
+    fetchResponse.body as import("stream/web").ReadableStream
   );
 
   try {
@@ -69,6 +69,10 @@ function isExpectedDisconnectError(err: unknown): boolean {
   if (err.name === "AbortError") return true;
   // ERR_STREAM_PREMATURE_CLOSE is thrown by pipeline() when the writable
   // (Express response) is destroyed before the readable is done
-  if ("code" in err && (err as NodeJS.ErrnoException).code === "ERR_STREAM_PREMATURE_CLOSE") return true;
+  if (
+    "code" in err &&
+    (err as NodeJS.ErrnoException).code === "ERR_STREAM_PREMATURE_CLOSE"
+  )
+    return true;
   return false;
 }

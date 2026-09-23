@@ -1,17 +1,17 @@
 import prisma from "../prisma/singleton.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
   ApiErrorResponse,
+  GetImageViewHistoryParams,
+  GetImageViewHistoryResponse,
   IncrementImageOCounterRequest,
   IncrementImageOCounterResponse,
   RecordImageViewRequest,
   RecordImageViewResponse,
-  GetImageViewHistoryParams,
-  GetImageViewHistoryResponse,
+  TypedAuthRequest,
+  TypedResponse,
 } from "../types/api/index.js";
-import { logger } from "../utils/logger.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Increment O counter for an image
@@ -40,7 +40,7 @@ export async function incrementImageOCounter(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('image', imageId),
+        : getEntityInstanceId("image", imageId),
     ]);
 
     if (!user) {
@@ -68,9 +68,11 @@ export async function incrementImageOCounter(
         },
       });
     } else {
-      const oHistory = (Array.isArray(viewHistory.oHistory)
-        ? viewHistory.oHistory
-        : JSON.parse((viewHistory.oHistory as string) || "[]")) as string[];
+      const oHistory = (
+        Array.isArray(viewHistory.oHistory)
+          ? viewHistory.oHistory
+          : JSON.parse((viewHistory.oHistory as string) || "[]")
+      ) as string[];
 
       viewHistory = await prisma.imageViewHistory.update({
         where: { id: viewHistory.id },
@@ -122,7 +124,8 @@ export async function recordImageView(
     }
 
     // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
-    const instanceId = requestInstanceId || await getEntityInstanceId('image', imageId);
+    const instanceId =
+      requestInstanceId || (await getEntityInstanceId("image", imageId));
 
     const now = new Date();
 
@@ -145,15 +148,20 @@ export async function recordImageView(
         },
       });
     } else {
-      const existingViewHistory = (Array.isArray(viewHistory.viewHistory)
-        ? viewHistory.viewHistory
-        : JSON.parse((viewHistory.viewHistory as string) || "[]")) as string[];
+      const existingViewHistory = (
+        Array.isArray(viewHistory.viewHistory)
+          ? viewHistory.viewHistory
+          : JSON.parse((viewHistory.viewHistory as string) || "[]")
+      ) as string[];
 
       viewHistory = await prisma.imageViewHistory.update({
         where: { id: viewHistory.id },
         data: {
           viewCount: viewHistory.viewCount + 1,
-          viewHistory: JSON.stringify([...existingViewHistory, now.toISOString()]),
+          viewHistory: JSON.stringify([
+            ...existingViewHistory,
+            now.toISOString(),
+          ]),
           lastViewedAt: now,
         },
       });
@@ -187,11 +195,14 @@ export async function getImageViewHistory(
     }
 
     if (!imageId) {
-      return res.status(400).json({ error: "Missing required parameter: imageId" });
+      return res
+        .status(400)
+        .json({ error: "Missing required parameter: imageId" });
     }
 
     // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
-    const instanceId = requestInstanceId || await getEntityInstanceId('image', imageId);
+    const instanceId =
+      requestInstanceId || (await getEntityInstanceId("image", imageId));
 
     const viewHistory = await prisma.imageViewHistory.findUnique({
       where: { userId_instanceId_imageId: { userId, instanceId, imageId } },

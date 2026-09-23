@@ -19,9 +19,14 @@ interface WatchHistoryData {
   [key: string]: unknown;
 }
 
-export function useWatchHistory(sceneId: string, _playerRef = { current: null }) {
+export function useWatchHistory(
+  sceneId: string,
+  _playerRef = { current: null }
+) {
   const { isAuthenticated } = useAuth();
-  const [watchHistory, setWatchHistory] = useState<WatchHistoryData | null>(null);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryData | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +49,9 @@ export function useWatchHistory(sceneId: string, _playerRef = { current: null })
       setWatchHistory(data);
     } catch (err) {
       console.error("Error fetching watch history:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch watch history");
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch watch history"
+      );
     } finally {
       setLoading(false);
     }
@@ -103,11 +110,15 @@ export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
         inProgress: inProgress.toString(),
       });
 
-      const response = await apiGet<{ watchHistory?: WatchHistoryData[] }>(`/watch-history?${queryParams}`);
+      const response = await apiGet<{ watchHistory?: WatchHistoryData[] }>(
+        `/watch-history?${queryParams}`
+      );
       setData(response.watchHistory || []);
     } catch (err) {
       console.error("Error fetching all watch history:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch watch history");
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch watch history"
+      );
     } finally {
       setLoading(false);
     }

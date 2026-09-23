@@ -62,7 +62,13 @@ const paperVariants = cva(
  * Base Paper component - reusable card/surface container
  * Provides consistent bg-card styling with optional padding variants
  */
-const Paper = ({ padding = "none", className, style, children, ...props }: PaperProps) => {
+const Paper = ({
+  padding = "none",
+  className,
+  style,
+  children,
+  ...props
+}: PaperProps) => {
   return (
     <div
       className={clsx(paperVariants({ padding }), className)}
@@ -96,7 +102,12 @@ Paper.Title = ({ children, className, style, ...props }: PaperTitleProps) => (
  * Paper.Subtitle - Semantic subtitle component
  * Can be used inside Paper.Header or standalone in custom layouts
  */
-Paper.Subtitle = ({ children, className, style, ...props }: PaperSubtitleProps) => (
+Paper.Subtitle = ({
+  children,
+  className,
+  style,
+  ...props
+}: PaperSubtitleProps) => (
   <p
     className={clsx("text-sm", className)}
     style={{ color: "var(--text-secondary)", ...style }}
@@ -110,7 +121,14 @@ Paper.Subtitle = ({ children, className, style, ...props }: PaperSubtitleProps) 
  * Paper.Header - Standard header section with border-bottom
  * Accepts title/subtitle props for convenience or custom children
  */
-Paper.Header = ({ title, subtitle, children, className, style, ...props }: PaperHeaderProps) => (
+Paper.Header = ({
+  title,
+  subtitle,
+  children,
+  className,
+  style,
+  ...props
+}: PaperHeaderProps) => (
   <div
     className={clsx("px-6 py-4 border-b", className)}
     style={{ borderColor: "var(--border-color)", ...style }}
@@ -126,7 +144,12 @@ Paper.Header = ({ title, subtitle, children, className, style, ...props }: Paper
  * Paper.Body - Content area with padding
  * Supports same padding variants as base Paper
  */
-Paper.Body = ({ padding = "md", className, children, ...props }: PaperBodyProps) => {
+Paper.Body = ({
+  padding = "md",
+  className,
+  children,
+  ...props
+}: PaperBodyProps) => {
   const paddingClasses = {
     none: "",
     sm: "p-3",

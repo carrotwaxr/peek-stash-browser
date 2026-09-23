@@ -4,11 +4,11 @@
  * Common wrappers and utilities for testing React components and hooks.
  * Provides context providers and helper functions used across tests.
  */
-import { render } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render } from "@testing-library/react";
 import { vi } from "vitest";
-import type { ReactNode } from "react";
 
 // ============================================================================
 // Query Client Wrapper
@@ -112,13 +112,25 @@ export const createMockApi = () => ({
   apiPatch: vi.fn().mockResolvedValue({}),
   apiDelete: vi.fn().mockResolvedValue({}),
   libraryApi: {
-    findScenes: vi.fn().mockResolvedValue({ findScenes: { count: 0, scenes: [] } }),
-    findPerformers: vi.fn().mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
-    findStudios: vi.fn().mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
+    findScenes: vi
+      .fn()
+      .mockResolvedValue({ findScenes: { count: 0, scenes: [] } }),
+    findPerformers: vi
+      .fn()
+      .mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
+    findStudios: vi
+      .fn()
+      .mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
     findTags: vi.fn().mockResolvedValue({ findTags: { count: 0, tags: [] } }),
-    findGroups: vi.fn().mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
-    findGalleries: vi.fn().mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
-    findImages: vi.fn().mockResolvedValue({ findImages: { count: 0, images: [] } }),
+    findGroups: vi
+      .fn()
+      .mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
+    findGalleries: vi
+      .fn()
+      .mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
+    findImages: vi
+      .fn()
+      .mockResolvedValue({ findImages: { count: 0, images: [] } }),
     getScene: vi.fn().mockResolvedValue(null),
     updateRating: vi.fn().mockResolvedValue({}),
     updateFavorite: vi.fn().mockResolvedValue({}),
@@ -159,7 +171,11 @@ export const setupPresetMocks = (
  * @param {string} key - Key to simulate (e.g., "ArrowRight", "Enter")
  * @param {object} options - Additional event options
  */
-export const simulateKeyDown = (element: HTMLElement, key: string, options = {}) => {
+export const simulateKeyDown = (
+  element: HTMLElement,
+  key: string,
+  options = {}
+) => {
   const event = new KeyboardEvent("keydown", {
     key,
     bubbles: true,
@@ -192,7 +208,10 @@ export const simulateClick = (element: HTMLElement) => {
  * @param {number} timeout - Max time to wait in ms
  * @returns {Promise<void>}
  */
-export const waitForCondition = async (condition: () => boolean, timeout = 1000) => {
+export const waitForCondition = async (
+  condition: () => boolean,
+  timeout = 1000
+) => {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {

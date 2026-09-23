@@ -11,21 +11,21 @@
  *   npm run screenshots
  */
 
-const { chromium } = require('playwright');
-const fs = require('fs');
-const path = require('path');
+const { chromium } = require("playwright");
+const fs = require("fs");
+const path = require("path");
 
 // Load configuration
-const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+const configPath = path.join(__dirname, "config.json");
+const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
 // Load version from package.json
-const packagePath = path.join(__dirname, '..', 'client', 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+const packagePath = path.join(__dirname, "..", "client", "package.json");
+const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
 const version = packageJson.version;
 
 // Output directory
-const outputDir = path.join(__dirname, 'output', version);
+const outputDir = path.join(__dirname, "output", version);
 
 /**
  * Ensure output directory exists
@@ -41,7 +41,7 @@ function ensureOutputDir() {
  * Login to Peek
  */
 async function login(page) {
-  console.log('🔐 Logging in...');
+  console.log("🔐 Logging in...");
 
   await page.goto(`${config.baseUrl}/`);
   await page.fill('input[name="username"]', config.loginCredentials.username);
@@ -50,16 +50,16 @@ async function login(page) {
   // Click submit and wait for navigation
   await Promise.all([
     page.waitForNavigation({ timeout: 15000 }),
-    page.click('button[type="submit"]')
+    page.click('button[type="submit"]'),
   ]);
 
   // Check if login succeeded
   const currentUrl = page.url();
-  if (currentUrl.includes('/login')) {
+  if (currentUrl.includes("/login")) {
     throw new Error(`Login failed. Still on login page. Check credentials.`);
   }
 
-  console.log('✅ Logged in successfully');
+  console.log("✅ Logged in successfully");
 }
 
 /**
@@ -79,28 +79,31 @@ function resolvePagePath(pageConfig) {
 
   // Replace dynamic segments with actual IDs from config
   if (pageConfig.sceneId) {
-    resolvedPath = resolvedPath.replace('{sceneId}', pageConfig.sceneId);
+    resolvedPath = resolvedPath.replace("{sceneId}", pageConfig.sceneId);
   }
   if (pageConfig.performerId) {
-    resolvedPath = resolvedPath.replace('{performerId}', pageConfig.performerId);
+    resolvedPath = resolvedPath.replace(
+      "{performerId}",
+      pageConfig.performerId
+    );
   }
   if (pageConfig.studioId) {
-    resolvedPath = resolvedPath.replace('{studioId}', pageConfig.studioId);
+    resolvedPath = resolvedPath.replace("{studioId}", pageConfig.studioId);
   }
   if (pageConfig.tagId) {
-    resolvedPath = resolvedPath.replace('{tagId}', pageConfig.tagId);
+    resolvedPath = resolvedPath.replace("{tagId}", pageConfig.tagId);
   }
   if (pageConfig.galleryId) {
-    resolvedPath = resolvedPath.replace('{galleryId}', pageConfig.galleryId);
+    resolvedPath = resolvedPath.replace("{galleryId}", pageConfig.galleryId);
   }
   if (pageConfig.groupId) {
-    resolvedPath = resolvedPath.replace('{groupId}', pageConfig.groupId);
+    resolvedPath = resolvedPath.replace("{groupId}", pageConfig.groupId);
   }
   if (pageConfig.imageId) {
-    resolvedPath = resolvedPath.replace('{imageId}', pageConfig.imageId);
+    resolvedPath = resolvedPath.replace("{imageId}", pageConfig.imageId);
   }
   if (pageConfig.playlistId) {
-    resolvedPath = resolvedPath.replace('{playlistId}', pageConfig.playlistId);
+    resolvedPath = resolvedPath.replace("{playlistId}", pageConfig.playlistId);
   }
 
   return resolvedPath;
@@ -113,18 +116,22 @@ async function executeInteractions(page, interactions) {
   if (!interactions || interactions.length === 0) return;
 
   for (const interaction of interactions) {
-    console.log(`  → Interaction: ${interaction.action} on ${interaction.selector}`);
+    console.log(
+      `  → Interaction: ${interaction.action} on ${interaction.selector}`
+    );
 
     switch (interaction.action) {
-      case 'click':
+      case "click":
         await page.click(interaction.selector);
         break;
-      case 'hover':
+      case "hover":
         await page.hover(interaction.selector);
         break;
-      case 'scroll':
+      case "scroll":
         await page.evaluate((selector) => {
-          document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth' });
+          document
+            .querySelector(selector)
+            ?.scrollIntoView({ behavior: "smooth" });
         }, interaction.selector);
         break;
     }
@@ -138,7 +145,13 @@ async function executeInteractions(page, interactions) {
 /**
  * Capture screenshot for a specific page/viewport/theme combination
  */
-async function captureScreenshot(page, pageConfig, viewportName, viewport, theme) {
+async function captureScreenshot(
+  page,
+  pageConfig,
+  viewportName,
+  viewport,
+  theme
+) {
   const pageName = pageConfig.name;
   const fileName = `${pageName}_${viewportName}_${theme}.png`;
   const filePath = path.join(outputDir, fileName);
@@ -153,8 +166,10 @@ async function captureScreenshot(page, pageConfig, viewportName, viewport, theme
     const resolvedPath = resolvePagePath(pageConfig);
 
     // Skip page if IDs are not configured
-    if (resolvedPath.includes('{') && resolvedPath.includes('}')) {
-      console.log(`  ⚠️  Skipping ${pageName}: ID not configured in config.json`);
+    if (resolvedPath.includes("{") && resolvedPath.includes("}")) {
+      console.log(
+        `  ⚠️  Skipping ${pageName}: ID not configured in config.json`
+      );
       return;
     }
 
@@ -163,7 +178,9 @@ async function captureScreenshot(page, pageConfig, viewportName, viewport, theme
     // Wait for page-specific selector
     if (pageConfig.waitForSelector) {
       try {
-        await page.waitForSelector(pageConfig.waitForSelector, { timeout: 10000 });
+        await page.waitForSelector(pageConfig.waitForSelector, {
+          timeout: 10000,
+        });
       } catch (err) {
         console.log(`  ⚠️  Selector not found: ${pageConfig.waitForSelector}`);
       }
@@ -180,7 +197,7 @@ async function captureScreenshot(page, pageConfig, viewportName, viewport, theme
     }
 
     // Wait for network to be idle
-    await page.waitForLoadState('networkidle', { timeout: 60000 });
+    await page.waitForLoadState("networkidle", { timeout: 60000 });
 
     // Take screenshot
     await page.screenshot({
@@ -198,7 +215,7 @@ async function captureScreenshot(page, pageConfig, viewportName, viewport, theme
  * Main capture function
  */
 async function captureScreenshots() {
-  console.log('🚀 Starting screenshot capture...');
+  console.log("🚀 Starting screenshot capture...");
   console.log(`📦 Version: ${version}`);
   console.log(`🌐 Base URL: ${config.baseUrl}`);
 
@@ -228,24 +245,33 @@ async function captureScreenshots() {
 
       // Iterate through pages
       for (const pageConfig of config.pages) {
-        console.log(`\n📄 Page: ${pageConfig.name} (${pageConfig.description})`);
+        console.log(
+          `\n📄 Page: ${pageConfig.name} (${pageConfig.description})`
+        );
 
         // Iterate through viewports
-        for (const [viewportName, viewport] of Object.entries(config.viewports)) {
-          await captureScreenshot(page, pageConfig, viewportName, viewport, theme);
+        for (const [viewportName, viewport] of Object.entries(
+          config.viewports
+        )) {
+          await captureScreenshot(
+            page,
+            pageConfig,
+            viewportName,
+            viewport,
+            theme
+          );
         }
       }
     }
 
-    console.log('\n✨ Screenshot capture complete!');
+    console.log("\n✨ Screenshot capture complete!");
     console.log(`📁 Screenshots saved to: ${outputDir}`);
 
     // Count total screenshots
     const files = fs.readdirSync(outputDir);
     console.log(`📊 Total screenshots: ${files.length}`);
-
   } catch (error) {
-    console.error('❌ Fatal error:', error);
+    console.error("❌ Fatal error:", error);
     process.exit(1);
   } finally {
     await browser.close();

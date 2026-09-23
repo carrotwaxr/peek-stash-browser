@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import ForgotPasswordPage from "../../../src/components/pages/ForgotPasswordPage";
 
 const mockForgotPasswordInit = vi.fn();
 const mockForgotPasswordReset = vi.fn();
@@ -9,8 +10,6 @@ vi.mock("../../../src/api", () => ({
   forgotPasswordInit: (...args: unknown[]) => mockForgotPasswordInit(...args),
   forgotPasswordReset: (...args: unknown[]) => mockForgotPasswordReset(...args),
 }));
-
-import ForgotPasswordPage from "../../../src/components/pages/ForgotPasswordPage";
 
 const renderPage = () => {
   return render(
@@ -28,18 +27,24 @@ describe("ForgotPasswordPage", () => {
   it("renders username form initially", () => {
     renderPage();
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue" })
+    ).toBeInTheDocument();
   });
 
   it("shows error when user has no recovery key", async () => {
     mockForgotPasswordInit.mockResolvedValue({ hasRecoveryKey: false });
     renderPage();
 
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "testuser" } });
+    fireEvent.change(screen.getByLabelText("Username"), {
+      target: { value: "testuser" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/does not have a recovery key/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/does not have a recovery key/)
+      ).toBeInTheDocument();
     });
   });
 
@@ -47,7 +52,9 @@ describe("ForgotPasswordPage", () => {
     mockForgotPasswordInit.mockResolvedValue({ hasRecoveryKey: true });
     renderPage();
 
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "testuser" } });
+    fireEvent.change(screen.getByLabelText("Username"), {
+      target: { value: "testuser" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
@@ -61,7 +68,9 @@ describe("ForgotPasswordPage", () => {
     renderPage();
 
     // Step 1
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "testuser" } });
+    fireEvent.change(screen.getByLabelText("Username"), {
+      target: { value: "testuser" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
@@ -69,9 +78,15 @@ describe("ForgotPasswordPage", () => {
     });
 
     // Step 2
-    fireEvent.change(screen.getByLabelText("Recovery Key"), { target: { value: "ABCD-1234" } });
-    fireEvent.change(screen.getByLabelText("New Password"), { target: { value: "newpassword123" } });
-    fireEvent.change(screen.getByLabelText("Confirm New Password"), { target: { value: "newpassword123" } });
+    fireEvent.change(screen.getByLabelText("Recovery Key"), {
+      target: { value: "ABCD-1234" },
+    });
+    fireEvent.change(screen.getByLabelText("New Password"), {
+      target: { value: "newpassword123" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm New Password"), {
+      target: { value: "newpassword123" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Reset Password" }));
 
     await waitFor(() => {

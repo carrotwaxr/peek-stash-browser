@@ -31,7 +31,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     status: number,
-    data: Record<string, unknown> = {},
+    data: Record<string, unknown> = {}
   ) {
     super(message);
     this.name = "ApiError";
@@ -46,7 +46,7 @@ export class ApiError extends Error {
  */
 export async function apiFetch<T = unknown>(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -80,14 +80,14 @@ export async function apiFetch<T = unknown>(
         `[API] Auth failure: ${response.status} on ${endpoint}`,
         `| error: ${(errorData?.error as string) || "unknown"}`,
         `| cookie present: ${document.cookie.length > 0}`,
-        `| page: ${window.location.pathname}`,
+        `| page: ${window.location.pathname}`
       );
 
       if (isSilentEndpoint) {
         throw new ApiError(
           (errorData?.error as string) || `Auth failure on ${endpoint}`,
           response.status,
-          errorData,
+          errorData
         );
       }
 
@@ -97,7 +97,7 @@ export async function apiFetch<T = unknown>(
         throw new ApiError(
           (errorData?.error as string) || `Auth failure on ${endpoint}`,
           response.status,
-          errorData,
+          errorData
         );
       }
 
@@ -115,21 +115,24 @@ export async function apiFetch<T = unknown>(
         (errorData.message as string) ||
         `HTTP error! status: ${response.status}`,
       response.status,
-      errorData,
+      errorData
     );
   }
 
   return (await response.json()) as T;
 }
 
-export function apiGet<T = unknown>(endpoint: string, signal?: AbortSignal): Promise<T> {
+export function apiGet<T = unknown>(
+  endpoint: string,
+  signal?: AbortSignal
+): Promise<T> {
   return apiFetch<T>(endpoint, { method: "GET", signal });
 }
 
 export function apiPost<T = unknown>(
   endpoint: string,
   data?: unknown,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<T> {
   return apiFetch<T>(endpoint, {
     method: "POST",
@@ -140,7 +143,7 @@ export function apiPost<T = unknown>(
 
 export function apiPut<T = unknown>(
   endpoint: string,
-  data?: unknown,
+  data?: unknown
 ): Promise<T> {
   return apiFetch<T>(endpoint, {
     method: "PUT",

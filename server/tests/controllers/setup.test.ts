@@ -5,7 +5,20 @@
  * connection testing, reset) and multi-instance CRUD operations. Focuses on
  * the safety guards that protect public endpoints and destructive operations.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createFirstAdmin,
+  createFirstStashInstance,
+  createStashInstance,
+  deleteStashInstance,
+  getAllStashInstances,
+  getSetupStatus,
+  resetSetup,
+  testStashConnection,
+  updateStashInstance,
+} from "../../controllers/setup.js";
+import prisma from "../../prisma/singleton.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -72,20 +85,6 @@ vi.mock("bcryptjs", () => ({
     hash: vi.fn().mockResolvedValue("hashed-password"),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import {
-  getSetupStatus,
-  createFirstAdmin,
-  testStashConnection,
-  createFirstStashInstance,
-  resetSetup,
-  getAllStashInstances,
-  createStashInstance,
-  updateStashInstance,
-  deleteStashInstance,
-} from "../../controllers/setup.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -242,10 +241,13 @@ describe("Setup Controller", () => {
 
     it("returns friendly message for connection refused", async () => {
       const { StashClient } = await import("../../graphql/StashClient.js");
-      vi.mocked(StashClient).mockImplementationOnce(() => ({
-        configuration: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-        version: vi.fn(),
-      } as any));
+      vi.mocked(StashClient).mockImplementationOnce(
+        () =>
+          ({
+            configuration: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+            version: vi.fn(),
+          }) as any
+      );
 
       const res = mockRes();
       await testStashConnection(
@@ -259,10 +261,15 @@ describe("Setup Controller", () => {
 
     it("returns friendly message for host not found", async () => {
       const { StashClient } = await import("../../graphql/StashClient.js");
-      vi.mocked(StashClient).mockImplementationOnce(() => ({
-        configuration: vi.fn().mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
-        version: vi.fn(),
-      } as any));
+      vi.mocked(StashClient).mockImplementationOnce(
+        () =>
+          ({
+            configuration: vi
+              .fn()
+              .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
+            version: vi.fn(),
+          }) as any
+      );
 
       const res = mockRes();
       await testStashConnection(
@@ -330,10 +337,7 @@ describe("Setup Controller", () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
 
       const res = mockRes();
-      await createFirstStashInstance(
-        mockReq({ apiKey: "test-key" }),
-        res
-      );
+      await createFirstStashInstance(mockReq({ apiKey: "test-key" }), res);
 
       expect(res.status).toHaveBeenCalledWith(400);
     });

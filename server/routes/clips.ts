@@ -1,5 +1,5 @@
 import express from "express";
-import { getClips, getClipById } from "../controllers/clips.js";
+import { getClipById, getClips } from "../controllers/clips.js";
 import { authenticate, requireCacheReady } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 

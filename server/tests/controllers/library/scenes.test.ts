@@ -1,10 +1,35 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// ---------------------------------------------------------------------------
+// Imports — after all vi.mock() calls
+// ---------------------------------------------------------------------------
+
+import {
+  addStreamabilityInfo,
+  applyExpensiveSceneFilters,
+  applyQuickSceneFilters,
+  findScenes,
+  findSimilarScenes,
+  getRecommendedScenes,
+  mergeScenesWithUserData,
+  sortScenes,
+  updateScene,
+} from "../../../controllers/library/scenes.js";
+import prisma from "../../../prisma/singleton.js";
+import {
+  countUserCriteria,
+  hasAnyCriteria,
+} from "../../../services/RecommendationScoringService.js";
+import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
+import { isSceneStreamable } from "../../../utils/codecDetection.js";
+import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import {
-  createMockScene,
   createMockPerformer,
-  createMockTag,
+  createMockScene,
   createMockStudio,
+  createMockTag,
 } from "../../helpers/mockDataGenerators.js";
 
 // ---------------------------------------------------------------------------
@@ -115,11 +140,9 @@ vi.mock("../../../utils/hierarchyUtils.js", () => ({
 }));
 
 vi.mock("../../../utils/sqlFilterBuilders.js", () => ({
-  parseCompositeFilterValues: vi
-    .fn()
-    .mockImplementation((ids: string[]) => ({
-      parsed: ids.map((id: string) => ({ id, instanceId: undefined })),
-    })),
+  parseCompositeFilterValues: vi.fn().mockImplementation((ids: string[]) => ({
+    parsed: ids.map((id: string) => ({ id, instanceId: undefined })),
+  })),
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
@@ -165,36 +188,8 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi
-    .fn()
-    .mockImplementation((ids: string[]) => ids),
+  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
-
-// ---------------------------------------------------------------------------
-// Imports — after all vi.mock() calls
-// ---------------------------------------------------------------------------
-
-import {
-  addStreamabilityInfo,
-  applyQuickSceneFilters,
-  applyExpensiveSceneFilters,
-  sortScenes,
-  mergeScenesWithUserData,
-  findScenes,
-  updateScene,
-  findSimilarScenes,
-  getRecommendedScenes,
-} from "../../../controllers/library/scenes.js";
-import prisma from "../../../prisma/singleton.js";
-import { isSceneStreamable } from "../../../utils/codecDetection.js";
-import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
-import {
-  hasAnyCriteria,
-  countUserCriteria,
-} from "../../../services/RecommendationScoringService.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
@@ -260,10 +255,7 @@ describe("addStreamabilityInfo", () => {
         reasons: ["Unsupported codec"],
       });
 
-    const scenes = [
-      createMockScene({ id: "a" }),
-      createMockScene({ id: "b" }),
-    ];
+    const scenes = [createMockScene({ id: "a" }), createMockScene({ id: "b" })];
     const result = addStreamabilityInfo(scenes);
 
     expect(result[0]!.isStreamable).toBe(true);
@@ -408,13 +400,36 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "s1",
-        groups: [{ id: "g1", instanceId: "default", name: "G1", front_image_path: null, back_image_path: null, scene_index: 0 }] as any,
+        groups: [
+          {
+            id: "g1",
+            instanceId: "default",
+            name: "G1",
+            front_image_path: null,
+            back_image_path: null,
+            scene_index: 0,
+          },
+        ] as any,
       }),
       createMockScene({
         id: "s2",
         groups: [
-          { id: "g1", instanceId: "default", name: "G1", front_image_path: null, back_image_path: null, scene_index: 0 },
-          { id: "g2", instanceId: "default", name: "G2", front_image_path: null, back_image_path: null, scene_index: 1 },
+          {
+            id: "g1",
+            instanceId: "default",
+            name: "G1",
+            front_image_path: null,
+            back_image_path: null,
+            scene_index: 0,
+          },
+          {
+            id: "g2",
+            instanceId: "default",
+            name: "G2",
+            front_image_path: null,
+            back_image_path: null,
+            scene_index: 1,
+          },
         ] as any,
       }),
       createMockScene({ id: "s3", groups: [] }),
@@ -446,15 +461,51 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "low",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 1_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 1_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "mid",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "high",
-        files: [{ path: "/c.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 10_000_000, size: 100 }],
+        files: [
+          {
+            path: "/c.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 10_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -491,11 +542,35 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "short",
-        files: [{ path: "/a.mp4", duration: 60, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 60,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "long",
-        files: [{ path: "/b.mp4", duration: 3600, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -534,8 +609,18 @@ describe("applyQuickSceneFilters", () => {
 
   describe("performer_count filter", () => {
     const scenes = [
-      createMockScene({ id: "solo", performers: [createMockPerformer({ id: "p1" })] }),
-      createMockScene({ id: "trio", performers: [createMockPerformer({ id: "p1" }), createMockPerformer({ id: "p2" }), createMockPerformer({ id: "p3" })] }),
+      createMockScene({
+        id: "solo",
+        performers: [createMockPerformer({ id: "p1" })],
+      }),
+      createMockScene({
+        id: "trio",
+        performers: [
+          createMockPerformer({ id: "p1" }),
+          createMockPerformer({ id: "p2" }),
+          createMockPerformer({ id: "p3" }),
+        ],
+      }),
     ];
 
     it("EQUALS filters by exact performer count", async () => {
@@ -550,11 +635,35 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "30fps",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "60fps",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 60, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 60,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -570,15 +679,51 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "landscape",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "portrait",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1080, height: 1920, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1080,
+            height: 1920,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "square",
-        files: [{ path: "/c.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1080, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/c.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1080,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -608,15 +753,51 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "720p",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1280, height: 720, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "1080p",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "4k",
-        files: [{ path: "/c.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 3840, height: 2160, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/c.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 3840,
+            height: 2160,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -682,11 +863,35 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "h264",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "hevc",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "hevc", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "hevc",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -702,11 +907,35 @@ describe("applyQuickSceneFilters", () => {
     const scenes = [
       createMockScene({
         id: "aac",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "opus",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "opus", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "opus",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
 
@@ -852,7 +1081,10 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("GREATER_THAN: excludes null and old dates", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        last_played_at: { modifier: "GREATER_THAN", value: "2025-01-01T00:00:00Z" },
+        last_played_at: {
+          modifier: "GREATER_THAN",
+          value: "2025-01-01T00:00:00Z",
+        },
       } as any);
       expect(result.map((s) => s.id)).toEqual(["recent"]);
     });
@@ -1003,11 +1235,35 @@ describe("sortScenes", () => {
     const scenes = [
       createMockScene({
         id: "low",
-        files: [{ path: "/a.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 1_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 1_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "high",
-        files: [{ path: "/b.mp4", duration: 100, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 10_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 100,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 10_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
     const result = sortScenes(scenes, "bitrate", "DESC");
@@ -1018,11 +1274,35 @@ describe("sortScenes", () => {
     const scenes = [
       createMockScene({
         id: "short",
-        files: [{ path: "/a.mp4", duration: 60, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/a.mp4",
+            duration: 60,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
       createMockScene({
         id: "long",
-        files: [{ path: "/b.mp4", duration: 7200, video_codec: "h264", audio_codec: "aac", width: 1920, height: 1080, frame_rate: 30, bit_rate: 5_000_000, size: 100 }],
+        files: [
+          {
+            path: "/b.mp4",
+            duration: 7200,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 5_000_000,
+            size: 100,
+          },
+        ],
       }),
     ];
     const result = sortScenes(scenes, "duration", "ASC");
@@ -1056,7 +1336,11 @@ describe("sortScenes", () => {
       }),
       createMockScene({
         id: "many",
-        tags: [createMockTag({ id: "t1" }), createMockTag({ id: "t2" }), createMockTag({ id: "t3" })],
+        tags: [
+          createMockTag({ id: "t1" }),
+          createMockTag({ id: "t2" }),
+          createMockTag({ id: "t3" }),
+        ],
       }),
     ];
     const result = sortScenes(scenes, "tag_count", "ASC");
@@ -1077,12 +1361,30 @@ describe("sortScenes", () => {
       createMockScene({
         id: "s1",
         title: "First",
-        groups: [{ id: "g1", instanceId: "default", name: "G1", front_image_path: null, back_image_path: null, scene_index: 2 }] as any,
+        groups: [
+          {
+            id: "g1",
+            instanceId: "default",
+            name: "G1",
+            front_image_path: null,
+            back_image_path: null,
+            scene_index: 2,
+          },
+        ] as any,
       }),
       createMockScene({
         id: "s2",
         title: "Second",
-        groups: [{ id: "g1", instanceId: "default", name: "G1", front_image_path: null, back_image_path: null, scene_index: 0 }] as any,
+        groups: [
+          {
+            id: "g1",
+            instanceId: "default",
+            name: "G1",
+            front_image_path: null,
+            back_image_path: null,
+            scene_index: 0,
+          },
+        ] as any,
       }),
     ];
     const result = sortScenes(scenes, "scene_index", "ASC", 0 as any);
@@ -1196,9 +1498,7 @@ describe("mergeScenesWithUserData", () => {
 
   it("updates nested studio favorite", async () => {
     const studio = createMockStudio({ id: "st1", instanceId: "inst1" });
-    const scenes = [
-      createMockScene({ id: "s1", instanceId: "inst1", studio }),
-    ];
+    const scenes = [createMockScene({ id: "s1", instanceId: "inst1", studio })];
     mockPrisma.watchHistory.findMany.mockResolvedValue([]);
     mockPrisma.sceneRating.findMany.mockResolvedValue([]);
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
@@ -1302,8 +1602,16 @@ describe("findScenes", () => {
   });
 
   it("returns 400 for ambiguous single-ID lookup", async () => {
-    const s1 = createMockScene({ id: "42", instanceId: "inst-a", title: "Scene A" });
-    const s2 = createMockScene({ id: "42", instanceId: "inst-b", title: "Scene B" });
+    const s1 = createMockScene({
+      id: "42",
+      instanceId: "inst-a",
+      title: "Scene A",
+    });
+    const s2 = createMockScene({
+      id: "42",
+      instanceId: "inst-b",
+      title: "Scene B",
+    });
     mockSceneQueryBuilder.execute.mockResolvedValue({
       scenes: [s1, s2],
       total: 2,
@@ -1363,7 +1671,9 @@ describe("updateScene", () => {
 
   it("returns 500 when sceneUpdate returns null", async () => {
     mockGetEntityInstanceId.mockResolvedValue("default");
-    const mockStash = { sceneUpdate: vi.fn().mockResolvedValue({ sceneUpdate: null }) };
+    const mockStash = {
+      sceneUpdate: vi.fn().mockResolvedValue({ sceneUpdate: null }),
+    };
     mockStashInstanceManager.get.mockReturnValue(mockStash as any);
 
     const req = mockReq(
@@ -1413,11 +1723,7 @@ describe("updateScene", () => {
   it("returns 500 on unexpected error", async () => {
     mockGetEntityInstanceId.mockRejectedValue(new Error("DB crash"));
 
-    const req = mockReq(
-      { title: "x" },
-      { id: "123" },
-      { id: 1, role: "USER" }
-    );
+    const req = mockReq({ title: "x" }, { id: "123" }, { id: 1, role: "USER" });
     const res = mockRes();
 
     await updateScene(req, res);
@@ -1440,7 +1746,12 @@ describe("findSimilarScenes", () => {
   it("returns empty result when no candidates found", async () => {
     mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
 
-    const req = mockReq({}, { id: "s1" }, { id: 1, role: "USER" }, { page: "1" });
+    const req = mockReq(
+      {},
+      { id: "s1" },
+      { id: 1, role: "USER" },
+      { page: "1" }
+    );
     const res = mockRes();
 
     await findSimilarScenes(req, res);
@@ -1456,7 +1767,9 @@ describe("findSimilarScenes", () => {
       { sceneId: "c1", weight: 10, date: "2025-01-01" },
       { sceneId: "c2", weight: 8, date: "2025-01-02" },
     ];
-    mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue(candidates);
+    mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue(
+      candidates
+    );
 
     const scene1 = createMockScene({ id: "c1" });
     const scene2 = createMockScene({ id: "c2" });
@@ -1465,7 +1778,12 @@ describe("findSimilarScenes", () => {
       total: 2,
     });
 
-    const req = mockReq({}, { id: "s1" }, { id: 1, role: "USER" }, { page: "1" });
+    const req = mockReq(
+      {},
+      { id: "s1" },
+      { id: 1, role: "USER" },
+      { page: "1" }
+    );
     const res = mockRes();
 
     await findSimilarScenes(req, res);
@@ -1482,7 +1800,12 @@ describe("findSimilarScenes", () => {
       new Error("DB error")
     );
 
-    const req = mockReq({}, { id: "s1" }, { id: 1, role: "USER" }, { page: "1" });
+    const req = mockReq(
+      {},
+      { id: "s1" },
+      { id: 1, role: "USER" },
+      { page: "1" }
+    );
     const res = mockRes();
 
     await findSimilarScenes(req, res);
@@ -1517,9 +1840,7 @@ describe("getRecommendedScenes", () => {
 
   it("returns 500 on unexpected error", async () => {
     // Force an error by making prisma throw
-    mockPrisma.performerRating.findMany.mockRejectedValue(
-      new Error("DB down")
-    );
+    mockPrisma.performerRating.findMany.mockRejectedValue(new Error("DB down"));
 
     const req = mockReq({}, {}, { id: 1, role: "USER" }, { page: "1" });
     const res = mockRes();

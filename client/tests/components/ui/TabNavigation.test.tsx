@@ -7,14 +7,19 @@
  * - Pagination param clearing on tab switch
  * - Loading states
  */
+import { MemoryRouter } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import TabNavigation, { TAB_COUNT_LOADING } from "../../../src/components/ui/TabNavigation";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import TabNavigation, {
+  TAB_COUNT_LOADING,
+} from "../../../src/components/ui/TabNavigation";
 
 // We need to test URL updates, so we'll use a wrapper component
-const TabNavigationTestWrapper = ({ initialRoute = "/", ...props }: { initialRoute?: string } & React.ComponentProps<typeof TabNavigation>) => {
+const TabNavigationTestWrapper = ({
+  initialRoute = "/",
+  ...props
+}: { initialRoute?: string } & React.ComponentProps<typeof TabNavigation>) => {
   return (
     <MemoryRouter initialEntries={[initialRoute]}>
       <TabNavigation {...props} />
@@ -36,10 +41,7 @@ describe("TabNavigation", () => {
   describe("Rendering", () => {
     it("renders all visible tabs", () => {
       render(
-        <TabNavigationTestWrapper
-          tabs={defaultTabs}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={defaultTabs} defaultTab="scenes" />
       );
 
       expect(screen.getByText("Scenes")).toBeInTheDocument();
@@ -49,10 +51,7 @@ describe("TabNavigation", () => {
 
     it("shows count badges for each tab", () => {
       render(
-        <TabNavigationTestWrapper
-          tabs={defaultTabs}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={defaultTabs} defaultTab="scenes" />
       );
 
       expect(screen.getByText("50")).toBeInTheDocument();
@@ -62,10 +61,7 @@ describe("TabNavigation", () => {
 
     it("marks active tab with aria-current", () => {
       render(
-        <TabNavigationTestWrapper
-          tabs={defaultTabs}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={defaultTabs} defaultTab="scenes" />
       );
 
       const scenesTab = screen.getByText("Scenes").closest("button");
@@ -77,10 +73,7 @@ describe("TabNavigation", () => {
 
     it("disables active tab button", () => {
       render(
-        <TabNavigationTestWrapper
-          tabs={defaultTabs}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={defaultTabs} defaultTab="scenes" />
       );
 
       const scenesTab = screen.getByText("Scenes").closest("button");
@@ -97,10 +90,7 @@ describe("TabNavigation", () => {
       ];
 
       render(
-        <TabNavigationTestWrapper
-          tabs={tabsWithZero}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={tabsWithZero} defaultTab="scenes" />
       );
 
       expect(screen.getByText("Scenes")).toBeInTheDocument();
@@ -115,10 +105,7 @@ describe("TabNavigation", () => {
       ];
 
       render(
-        <TabNavigationTestWrapper
-          tabs={tabsWithLoading}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={tabsWithLoading} defaultTab="scenes" />
       );
 
       // Tab should be visible
@@ -136,10 +123,7 @@ describe("TabNavigation", () => {
       ];
 
       const { container } = render(
-        <TabNavigationTestWrapper
-          tabs={allZeroTabs}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={allZeroTabs} defaultTab="scenes" />
       );
 
       expect(container.firstChild).toBeNull();
@@ -152,10 +136,7 @@ describe("TabNavigation", () => {
       ];
 
       const { container } = render(
-        <TabNavigationTestWrapper
-          tabs={singleTab}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={singleTab} defaultTab="scenes" />
       );
 
       expect(container.firstChild).toBeNull();
@@ -270,10 +251,7 @@ describe("TabNavigation", () => {
 
     it("handles empty tabs array", () => {
       const { container } = render(
-        <TabNavigationTestWrapper
-          tabs={[]}
-          defaultTab="scenes"
-        />
+        <TabNavigationTestWrapper tabs={[]} defaultTab="scenes" />
       );
 
       expect(container.firstChild).toBeNull();

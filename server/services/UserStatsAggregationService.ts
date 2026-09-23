@@ -10,8 +10,19 @@
  * - Engagement rate: raw engagement / library presence
  * - Percentile: rank among all entities user has engaged with (100 = top)
  */
-
 import prisma from "../prisma/singleton.js";
+import type {
+  EngagementStats,
+  HighlightImage,
+  HighlightPerformer,
+  HighlightScene,
+  LibraryStats,
+  TopPerformer,
+  TopScene,
+  TopStudio,
+  TopTag,
+  UserStatsResponse,
+} from "../types/api/index.js";
 
 /**
  * Valid sort options for top lists
@@ -24,18 +35,6 @@ export type TopListSortBy = "engagement" | "oCount" | "playCount";
 export interface UserStatsOptions {
   sortBy?: TopListSortBy;
 }
-import type {
-  UserStatsResponse,
-  LibraryStats,
-  EngagementStats,
-  TopScene,
-  TopPerformer,
-  TopStudio,
-  TopTag,
-  HighlightScene,
-  HighlightImage,
-  HighlightPerformer,
-} from "../types/api/index.js";
 
 /**
  * Transform a Stash URL/path to a proxy URL
@@ -43,7 +42,10 @@ import type {
  * @param urlOrPath - The URL or path to transform
  * @param instanceId - Optional Stash instance ID for multi-instance routing
  */
-export function transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+export function transformUrl(
+  urlOrPath: string | null,
+  instanceId?: string | null
+): string | null {
   if (!urlOrPath) return null;
 
   // If it's already a proxy URL, return as-is
@@ -83,7 +85,10 @@ class UserStatsAggregationService {
    * @param userId - The user ID
    * @param options - Optional parameters for customization
    */
-  async getUserStats(userId: number, options: UserStatsOptions = {}): Promise<UserStatsResponse> {
+  async getUserStats(
+    userId: number,
+    options: UserStatsOptions = {}
+  ): Promise<UserStatsResponse> {
     const { sortBy = "engagement" } = options;
 
     const [
@@ -208,7 +213,9 @@ class UserStatsAggregationService {
   /**
    * Map sortBy option to Prisma orderBy field
    */
-  private getSortField(sortBy: TopListSortBy): "percentileRank" | "oCount" | "playCount" {
+  private getSortField(
+    sortBy: TopListSortBy
+  ): "percentileRank" | "oCount" | "playCount" {
     switch (sortBy) {
       case "oCount":
         return "oCount";
@@ -223,7 +230,11 @@ class UserStatsAggregationService {
   /**
    * Get top scenes by the specified sort order from pre-computed rankings
    */
-  private async getTopScenes(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopScene[]> {
+  private async getTopScenes(
+    userId: number,
+    limit: number,
+    sortBy: TopListSortBy = "engagement"
+  ): Promise<TopScene[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "scene" },
@@ -236,7 +247,13 @@ class UserStatsAggregationService {
     // Fetch scene details including stashInstanceId for proxy routing
     const scenes = await prisma.stashScene.findMany({
       where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
+      select: {
+        id: true,
+        title: true,
+        filePath: true,
+        pathScreenshot: true,
+        stashInstanceId: true,
+      },
     });
 
     const sceneMap = new Map(scenes.map((s) => [s.id, s]));
@@ -247,7 +264,10 @@ class UserStatsAggregationService {
         id: r.entityId,
         title: scene?.title ?? null,
         filePath: scene?.filePath ?? null,
-        imageUrl: transformUrl(scene?.pathScreenshot ?? null, scene?.stashInstanceId),
+        imageUrl: transformUrl(
+          scene?.pathScreenshot ?? null,
+          scene?.stashInstanceId
+        ),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -259,7 +279,11 @@ class UserStatsAggregationService {
   /**
    * Get top performers by the specified sort order from pre-computed rankings
    */
-  private async getTopPerformers(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopPerformer[]> {
+  private async getTopPerformers(
+    userId: number,
+    limit: number,
+    sortBy: TopListSortBy = "engagement"
+  ): Promise<TopPerformer[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "performer" },
@@ -282,7 +306,10 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: performer?.name ?? "Unknown",
-        imageUrl: transformUrl(performer?.imagePath ?? null, performer?.stashInstanceId),
+        imageUrl: transformUrl(
+          performer?.imagePath ?? null,
+          performer?.stashInstanceId
+        ),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -294,7 +321,11 @@ class UserStatsAggregationService {
   /**
    * Get top studios by the specified sort order from pre-computed rankings
    */
-  private async getTopStudios(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopStudio[]> {
+  private async getTopStudios(
+    userId: number,
+    limit: number,
+    sortBy: TopListSortBy = "engagement"
+  ): Promise<TopStudio[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "studio" },
@@ -317,7 +348,10 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: studio?.name ?? "Unknown",
-        imageUrl: transformUrl(studio?.imagePath ?? null, studio?.stashInstanceId),
+        imageUrl: transformUrl(
+          studio?.imagePath ?? null,
+          studio?.stashInstanceId
+        ),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -329,7 +363,11 @@ class UserStatsAggregationService {
   /**
    * Get top tags by the specified sort order from pre-computed rankings
    */
-  private async getTopTags(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopTag[]> {
+  private async getTopTags(
+    userId: number,
+    limit: number,
+    sortBy: TopListSortBy = "engagement"
+  ): Promise<TopTag[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "tag" },
@@ -394,7 +432,13 @@ class UserStatsAggregationService {
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const scene = await prisma.stashScene.findFirst({
       where: { id: topResult.sceneId },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
+      select: {
+        id: true,
+        title: true,
+        filePath: true,
+        pathScreenshot: true,
+        stashInstanceId: true,
+      },
     });
 
     if (!scene) return null;
@@ -441,7 +485,13 @@ class UserStatsAggregationService {
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const image = await prisma.stashImage.findFirst({
       where: { id: topResult.imageId },
-      select: { id: true, title: true, filePath: true, pathThumbnail: true, stashInstanceId: true },
+      select: {
+        id: true,
+        title: true,
+        filePath: true,
+        pathThumbnail: true,
+        stashInstanceId: true,
+      },
     });
 
     if (!image) return null;
@@ -486,7 +536,13 @@ class UserStatsAggregationService {
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const scene = await prisma.stashScene.findFirst({
       where: { id: topResult.sceneId },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
+      select: {
+        id: true,
+        title: true,
+        filePath: true,
+        pathScreenshot: true,
+        stashInstanceId: true,
+      },
     });
 
     if (!scene) return null;

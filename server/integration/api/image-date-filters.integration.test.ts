@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Image Date Filters Integration Tests
@@ -35,15 +35,18 @@ describe("Image Date Filters", () => {
 
   describe("date filter (image date)", () => {
     it("filters images by date GREATER_THAN", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            value: "2020-01-01",
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              value: "2020-01-01",
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -58,15 +61,18 @@ describe("Image Date Filters", () => {
     });
 
     it("filters images by date LESS_THAN", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            value: "2025-01-01",
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              value: "2025-01-01",
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -74,16 +80,19 @@ describe("Image Date Filters", () => {
     });
 
     it("filters images by date BETWEEN", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            value: "2022-01-01",
-            value2: "2022-12-31",
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              value: "2022-01-01",
+              value2: "2022-12-31",
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -101,16 +110,19 @@ describe("Image Date Filters", () => {
     });
 
     it("filters images by date NOT_BETWEEN", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            value: "2022-01-01",
-            value2: "2022-12-31",
-            modifier: "NOT_BETWEEN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              value: "2022-01-01",
+              value2: "2022-12-31",
+              modifier: "NOT_BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -118,14 +130,17 @@ describe("Image Date Filters", () => {
     });
 
     it("filters images by date IS_NULL", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            modifier: "IS_NULL",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              modifier: "IS_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -137,14 +152,17 @@ describe("Image Date Filters", () => {
     });
 
     it("filters images by date NOT_NULL", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            modifier: "NOT_NULL",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              modifier: "NOT_NULL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -179,7 +197,9 @@ describe("Image Date Filters", () => {
 
       // If there are no images with null dates, skip this test
       if (imagesWithNullDates === 0) {
-        console.log("Skipping NULL date exclusion test - no images with NULL dates in test data");
+        console.log(
+          "Skipping NULL date exclusion test - no images with NULL dates in test data"
+        );
         return;
       }
 
@@ -215,15 +235,18 @@ describe("Image Date Filters", () => {
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       const dateStr = oneYearAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          created_at: {
-            value: dateStr,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            created_at: {
+              value: dateStr,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -235,16 +258,19 @@ describe("Image Date Filters", () => {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const today = new Date();
 
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          created_at: {
-            value: sixMonthsAgo.toISOString().split("T")[0],
-            value2: today.toISOString().split("T")[0],
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            created_at: {
+              value: sixMonthsAgo.toISOString().split("T")[0],
+              value2: today.toISOString().split("T")[0],
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -257,15 +283,18 @@ describe("Image Date Filters", () => {
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const dateStr = oneMonthAgo.toISOString().split("T")[0];
 
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          updated_at: {
-            value: dateStr,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            updated_at: {
+              value: dateStr,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -276,16 +305,19 @@ describe("Image Date Filters", () => {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       const today = new Date();
 
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          updated_at: {
-            value: threeMonthsAgo.toISOString().split("T")[0],
-            value2: today.toISOString().split("T")[0],
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            updated_at: {
+              value: threeMonthsAgo.toISOString().split("T")[0],
+              value2: today.toISOString().split("T")[0],
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();
@@ -294,19 +326,22 @@ describe("Image Date Filters", () => {
 
   describe("combined date filters", () => {
     it("can combine date with created_at filter", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        filter: { per_page: 50 },
-        image_filter: {
-          date: {
-            value: "2021-01-01",
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          filter: { per_page: 50 },
+          image_filter: {
+            date: {
+              value: "2021-01-01",
+              modifier: "GREATER_THAN",
+            },
+            created_at: {
+              value: "2022-01-01",
+              modifier: "GREATER_THAN",
+            },
           },
-          created_at: {
-            value: "2022-01-01",
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();

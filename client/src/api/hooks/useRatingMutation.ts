@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "../queryKeys";
 import { libraryApi } from "../library";
+import { queryKeys } from "../queryKeys";
 
 interface UpdateRatingParams {
   entityType: string;
@@ -13,7 +13,12 @@ export function useUpdateRating() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ entityType, entityId, rating, instanceId = null }: UpdateRatingParams) =>
+    mutationFn: ({
+      entityType,
+      entityId,
+      rating,
+      instanceId = null,
+    }: UpdateRatingParams) =>
       libraryApi.updateRating(entityType, entityId, rating, instanceId),
     onSuccess: (_data, { entityType }) => {
       // Invalidate entity list queries to refresh ratings

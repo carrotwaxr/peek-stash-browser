@@ -5,7 +5,12 @@
  * instances a user can see content from. Critical for multi-instance setups
  * where users may have selective access.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import {
+  buildInstanceFilterClause,
+  getUserAllowedInstanceIds,
+} from "../../services/UserInstanceService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -30,14 +35,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-
 const mockPrisma = vi.mocked(prisma);
-
-import {
-  getUserAllowedInstanceIds,
-  buildInstanceFilterClause,
-} from "../../services/UserInstanceService.js";
 
 describe("UserInstanceService", () => {
   beforeEach(() => {

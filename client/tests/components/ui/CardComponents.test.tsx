@@ -1,13 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { CardOverlay, CardImage, CardDescription, CardTitle } from "../../../src/components/ui/CardComponents";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import {
+  CardDescription,
+  CardImage,
+  CardOverlay,
+  CardTitle,
+} from "../../../src/components/ui/CardComponents";
 
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
     const element = CardOverlay({
       position: "bottom-left",
-      children: "Test Content"
+      children: "Test Content",
     });
 
     // Check that the component renders with children
@@ -18,7 +23,7 @@ describe("CardOverlay", () => {
   it("applies correct position classes for bottom-left", () => {
     const element = CardOverlay({
       position: "bottom-left",
-      children: "Content"
+      children: "Content",
     });
 
     expect(element.props.className).toContain("absolute");
@@ -29,7 +34,7 @@ describe("CardOverlay", () => {
   it("applies correct position classes for top-left", () => {
     const element = CardOverlay({
       position: "top-left",
-      children: "Content"
+      children: "Content",
     });
 
     expect(element.props.className).toContain("absolute");
@@ -40,7 +45,7 @@ describe("CardOverlay", () => {
   it("applies correct position classes for bottom-right", () => {
     const element = CardOverlay({
       position: "bottom-right",
-      children: "Content"
+      children: "Content",
     });
 
     expect(element.props.className).toContain("absolute");
@@ -51,7 +56,7 @@ describe("CardOverlay", () => {
   it("applies correct position classes for full", () => {
     const element = CardOverlay({
       position: "full",
-      children: "Content"
+      children: "Content",
     });
 
     expect(element.props.className).toContain("absolute");
@@ -62,7 +67,7 @@ describe("CardOverlay", () => {
     const element = CardOverlay({
       position: "bottom-left",
       children: "Content",
-      className: "custom-class"
+      className: "custom-class",
     });
 
     expect(element.props.className).toContain("custom-class");

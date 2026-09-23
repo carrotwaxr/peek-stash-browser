@@ -1,21 +1,22 @@
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../../prisma/singleton.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
+  FindGalleriesMinimalRequest,
+  FindGalleriesMinimalResponse,
   FindGalleriesRequest,
   FindGalleriesResponse,
   GetGalleryImagesQuery,
   GetGalleryImagesResponse,
-  FindGalleriesMinimalRequest,
-  FindGalleriesMinimalResponse,
-  ApiErrorResponse,
-  AmbiguousLookupResponse,
+  TypedAuthRequest,
+  TypedResponse,
 } from "../../types/api/index.js";
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
-import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   NormalizedGallery,
   NormalizedPerformer,
@@ -23,7 +24,6 @@ import {
   PeekGalleryFilter,
 } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -64,10 +64,18 @@ async function mergeGalleriesWithUserData(
 /**
  * Merge images with user rating/favorite data
  */
-async function mergeImagesWithUserData<T extends { id: string; instanceId?: string | null }>(
+async function mergeImagesWithUserData<
+  T extends { id: string; instanceId?: string | null },
+>(
   images: T[],
   userId: number
-): Promise<(T & { rating?: number | null; rating100?: number | null; favorite?: boolean })[]> {
+): Promise<
+  (T & {
+    rating?: number | null;
+    rating100?: number | null;
+    favorite?: boolean;
+  })[]
+> {
   const ratings = await prisma.imageRating.findMany({ where: { userId } });
 
   const KEY_SEP = "\0";
@@ -209,7 +217,9 @@ export async function applyGalleryFilters(
  */
 export const findGalleries = async (
   req: TypedAuthRequest<FindGalleriesRequest>,
-  res: TypedResponse<FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse>
+  res: TypedResponse<
+    FindGalleriesResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   try {
     const startTime = Date.now();
@@ -227,7 +237,10 @@ export const findGalleries = async (
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
+    const { sortField, randomSeed } = parseRandomSort(
+      sortFieldRaw,
+      requestingUser.id
+    );
 
     // Merge root-level ids with gallery_filter
     const normalizedIds = ids
@@ -239,7 +252,9 @@ export const findGalleries = async (
     };
 
     // Extract specific instance ID for disambiguation (from gallery_filter.instance_id)
-    const specificInstanceId = gallery_filter?.instance_id as string | undefined;
+    const specificInstanceId = gallery_filter?.instance_id as
+      | string
+      | undefined;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -260,16 +275,21 @@ export const findGalleries = async (
     });
 
     // Check for ambiguous results on single-ID lookups
-    if (ids && ids.length === 1 && !specificInstanceId && galleries.length > 1) {
+    if (
+      ids &&
+      ids.length === 1 &&
+      !specificInstanceId &&
+      galleries.length > 1
+    ) {
       logger.warn("Ambiguous gallery lookup", {
         id: ids[0],
         matchCount: galleries.length,
-        instances: galleries.map(g => g.instanceId),
+        instances: galleries.map((g) => g.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple galleries found with ID ${ids[0]}. Specify instance_id parameter.`,
-        matches: galleries.map(g => ({
+        matches: galleries.map((g) => ({
           id: g.id,
           title: g.title,
           instanceId: g.instanceId,
@@ -280,8 +300,12 @@ export const findGalleries = async (
     // For single-entity requests (detail pages), get gallery with computed counts
     let paginatedGalleries = galleries;
     if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
-      const existingGallery = paginatedGalleries[0] as (typeof paginatedGalleries)[number];
-      const galleryWithCounts = await stashEntityService.getGallery(ids[0] as string, existingGallery.instanceId);
+      const existingGallery =
+        paginatedGalleries[0] as (typeof paginatedGalleries)[number];
+      const galleryWithCounts = await stashEntityService.getGallery(
+        ids[0] as string,
+        existingGallery.instanceId
+      );
       if (galleryWithCounts) {
         paginatedGalleries = [
           {
@@ -300,7 +324,11 @@ export const findGalleries = async (
     // Add stashUrl to each gallery
     const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
       ...gallery,
-      stashUrl: buildStashEntityUrl("gallery", gallery.id, gallery.instanceId || undefined),
+      stashUrl: buildStashEntityUrl(
+        "gallery",
+        gallery.id,
+        gallery.instanceId || undefined
+      ),
     }));
 
     logger.info("findGalleries completed", {
@@ -339,7 +367,9 @@ export const findGalleryById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    const galleryInstanceId = (req.query.instanceId as string | undefined) || stashInstanceManager.getDefaultConfig().id;
+    const galleryInstanceId =
+      (req.query.instanceId as string | undefined) ||
+      stashInstanceManager.getDefaultConfig().id;
     const gallery = await stashEntityService.getGallery(id, galleryInstanceId);
 
     if (!gallery) {
@@ -358,7 +388,10 @@ export const findGalleryById = async (
     const galleryInstId = gallery.instanceId || galleryInstanceId;
     if (mergedGallery.performers && mergedGallery.performers.length > 0) {
       const performerIds = mergedGallery.performers.map((p) => p.id);
-      const cachedPerformers = await stashEntityService.getPerformersByIds(performerIds, galleryInstId);
+      const cachedPerformers = await stashEntityService.getPerformersByIds(
+        performerIds,
+        galleryInstId
+      );
       const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
 
       mergedGallery.performers = mergedGallery.performers.map((performer) => {
@@ -381,7 +414,10 @@ export const findGalleryById = async (
 
     // Hydrate studio with full cached data
     if (mergedGallery.studio && mergedGallery.studio.id) {
-      const cachedStudio = await stashEntityService.getStudio(mergedGallery.studio.id, galleryInstId);
+      const cachedStudio = await stashEntityService.getStudio(
+        mergedGallery.studio.id,
+        galleryInstId
+      );
       if (cachedStudio) {
         // Type assertion: Gallery.studio typed as Studio, but we hydrate with NormalizedStudio
         mergedGallery.studio =
@@ -397,7 +433,10 @@ export const findGalleryById = async (
     // Hydrate tags with full cached data
     if (mergedGallery.tags && mergedGallery.tags.length > 0) {
       const tagIds = mergedGallery.tags.map((t) => t.id);
-      const cachedTags = await stashEntityService.getTagsByIds(tagIds, galleryInstId);
+      const cachedTags = await stashEntityService.getTagsByIds(
+        tagIds,
+        galleryInstId
+      );
       const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
 
       mergedGallery.tags = mergedGallery.tags.map((tag) => {
@@ -469,7 +508,8 @@ export const findGalleriesMinimal = async (
       const { min_image_count } = count_filter;
       galleries = galleries.filter((g) => {
         const conditions: boolean[] = [];
-        if (min_image_count !== undefined) conditions.push(g.image_count >= min_image_count);
+        if (min_image_count !== undefined)
+          conditions.push(g.image_count >= min_image_count);
         return conditions.length === 0 || conditions.some((c) => c);
       });
     }
@@ -522,7 +562,9 @@ export const getGalleryImages = async (
   try {
     const { galleryId } = req.params;
     const userId = req.user?.id;
-    const instanceId = (req.query.instance as string | undefined) || stashInstanceManager.getDefaultConfig().id;
+    const instanceId =
+      (req.query.instance as string | undefined) ||
+      stashInstanceManager.getDefaultConfig().id;
 
     // Pagination parameters (optional - defaults to loading all for backwards compat)
     const page = parseInt(req.query.page as string) || 1;
@@ -546,9 +588,8 @@ export const getGalleryImages = async (
     };
 
     // Get total count for pagination metadata
-    const totalCount = perPage > 0
-      ? await prisma.stashImage.count({ where: whereClause })
-      : 0;
+    const totalCount =
+      perPage > 0 ? await prisma.stashImage.count({ where: whereClause }) : 0;
 
     // Query images from local database filtered by gallery
     // PERFORMANCE: Uses pagination when per_page is specified to avoid loading huge galleries
@@ -571,8 +612,10 @@ export const getGalleryImages = async (
       let hydratedPerformers: NormalizedPerformer[] = [];
       if (gallery.performers && gallery.performers.length > 0) {
         const performerIds = gallery.performers.map((p) => p.id);
-        const cachedPerformers =
-          await stashEntityService.getPerformersByIds(performerIds, instanceId || gallery.instanceId);
+        const cachedPerformers = await stashEntityService.getPerformersByIds(
+          performerIds,
+          instanceId || gallery.instanceId
+        );
         const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
         hydratedPerformers = gallery.performers.map((performer) => {
           const cachedPerformer = performerMap.get(performer.id);
@@ -584,7 +627,10 @@ export const getGalleryImages = async (
       let hydratedTags: NormalizedTag[] = [];
       if (gallery.tags && gallery.tags.length > 0) {
         const tagIds = gallery.tags.map((t) => t.id);
-        const cachedTags = await stashEntityService.getTagsByIds(tagIds, instanceId || gallery.instanceId);
+        const cachedTags = await stashEntityService.getTagsByIds(
+          tagIds,
+          instanceId || gallery.instanceId
+        );
         const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
         hydratedTags = gallery.tags.map((tag) => {
           const cachedTag = tagMap.get(tag.id);
@@ -595,7 +641,10 @@ export const getGalleryImages = async (
       // Hydrate gallery studio with full cached data (gallery.studio only has id)
       let hydratedStudio = null;
       if (gallery.studio?.id) {
-        const cachedStudio = await stashEntityService.getStudio(gallery.studio.id, instanceId || gallery.instanceId);
+        const cachedStudio = await stashEntityService.getStudio(
+          gallery.studio.id,
+          instanceId || gallery.instanceId
+        );
         hydratedStudio = cachedStudio || gallery.studio;
       }
 

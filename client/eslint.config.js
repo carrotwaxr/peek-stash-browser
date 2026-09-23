@@ -1,45 +1,45 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import { defineConfig, globalIgnores } from "eslint/config";
+import globals from "globals";
+import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage']),
+  globalIgnores(["dist", "coverage"]),
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      reactRefresh.configs.vite,
-    ],
+    files: ["**/*.{ts,tsx}"],
+    extends: [js.configs.recommended, reactRefresh.configs.vite],
     plugins: {
-      'react-hooks': reactHooks,
-      '@typescript-eslint': tseslint.plugin,
+      "react-hooks": reactHooks,
+      "@typescript-eslint": tseslint.plugin,
     },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
       parser: tseslint.parser,
       parserOptions: {
-        ecmaVersion: 'latest',
+        ecmaVersion: "latest",
         ecmaFeatures: { jsx: true },
-        sourceType: 'module',
+        sourceType: "module",
       },
     },
     rules: {
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       // tsc handles undefined checks natively
-      'no-undef': 'off',
+      "no-undef": "off",
       // Use TS-aware no-unused-vars
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', {
-        varsIgnorePattern: '^[A-Z_]',
-        argsIgnorePattern: '^_',
-        destructuredArrayIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_',
-      }],
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          varsIgnorePattern: "^[A-Z_]",
+          argsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
-])
+]);

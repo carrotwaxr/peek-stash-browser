@@ -13,7 +13,10 @@ interface UseCardKeyboardNavOptions {
   onCustomAction?: () => void;
 }
 
-export const useCardKeyboardNav = ({ linkTo, onCustomAction }: UseCardKeyboardNavOptions) => {
+export const useCardKeyboardNav = ({
+  linkTo,
+  onCustomAction,
+}: UseCardKeyboardNavOptions) => {
   const navigate = useNavigate();
 
   const onKeyDown = useCallback(

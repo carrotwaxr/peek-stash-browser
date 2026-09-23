@@ -1,8 +1,8 @@
+import type { NormalizedImage } from "@peek/shared-types";
 import { getImageTitle } from "../../utils/imageGalleryInheritance";
 import { LazyImage } from "./CardComponents";
 import Lightbox from "./Lightbox";
 import Pagination from "./Pagination";
-import type { NormalizedImage } from "@peek/shared-types";
 
 interface LightboxState {
   currentPage: number;
@@ -44,7 +44,9 @@ const PaginatedImageGrid = ({
   const renderGridContent = () => {
     if (isLoading) {
       return (
-        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 ${className}`}>
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 ${className}`}
+        >
           {[...Array(12)].map((_, index) => (
             <div
               key={index}
@@ -82,12 +84,17 @@ const PaginatedImageGrid = ({
           </div>
         )}
 
-        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 ${className}`}>
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 ${className}`}
+        >
           {images.map((image, index) => (
             <LazyImage
               key={image.id}
               src={image.paths?.thumbnail}
-              alt={getImageTitle(image as Parameters<typeof getImageTitle>[0]) || `Image ${index + 1}`}
+              alt={
+                getImageTitle(image as Parameters<typeof getImageTitle>[0]) ||
+                `Image ${index + 1}`
+              }
               className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
               style={{
                 backgroundColor: "var(--bg-secondary)",

@@ -30,12 +30,14 @@ function TimelineControls({
         value={zoomLevel}
         onChange={(e) => onZoomLevelChange(e.target.value)}
         className={`px-2 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 ${className}`}
-        style={{
-          backgroundColor: "var(--bg-secondary)",
-          color: "var(--text-primary)",
-          border: "1px solid var(--border-color)",
-          "--tw-ring-color": "var(--accent-primary)",
-        } as React.CSSProperties}
+        style={
+          {
+            backgroundColor: "var(--bg-secondary)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-color)",
+            "--tw-ring-color": "var(--accent-primary)",
+          } as React.CSSProperties
+        }
         aria-label="Timeline zoom level"
       >
         {zoomLevels.map((level) => (
@@ -61,13 +63,14 @@ function TimelineControls({
           type="button"
           onClick={() => onZoomLevelChange(level)}
           className="px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-md last:rounded-r-md focus:outline-none focus:ring-2 focus:ring-inset"
-          style={{
-            backgroundColor:
-              zoomLevel === level ? "var(--accent-primary)" : "transparent",
-            color:
-              zoomLevel === level ? "white" : "var(--text-secondary)",
-            "--tw-ring-color": "var(--accent-primary)",
-          } as React.CSSProperties}
+          style={
+            {
+              backgroundColor:
+                zoomLevel === level ? "var(--accent-primary)" : "transparent",
+              color: zoomLevel === level ? "white" : "var(--text-secondary)",
+              "--tw-ring-color": "var(--accent-primary)",
+            } as React.CSSProperties
+          }
           aria-pressed={zoomLevel === level}
         >
           {ZOOM_LABELS[level] || level}

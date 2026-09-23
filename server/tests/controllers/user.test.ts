@@ -5,7 +5,25 @@
  * regenerateRecoveryKey, adminResetPassword, adminRegenerateRecoveryKey,
  * getAllUsers, createUser, deleteUser, updateUserRole.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import bcrypt from "bcryptjs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  adminRegenerateRecoveryKey,
+  adminResetPassword,
+  changePassword,
+  createUser,
+  deleteUser,
+  getAllUsers,
+  getRecoveryKey,
+  getUserSettings,
+  regenerateRecoveryKey,
+  updateUserRole,
+  updateUserSettings,
+} from "../../controllers/user.js";
+import prisma from "../../prisma/singleton.js";
+import { validatePassword } from "../../utils/passwordValidation.js";
+import { formatRecoveryKey } from "../../utils/recoveryKey.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -55,25 +73,6 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import bcrypt from "bcryptjs";
-import { validatePassword } from "../../utils/passwordValidation.js";
-import { formatRecoveryKey } from "../../utils/recoveryKey.js";
-import {
-  getUserSettings,
-  updateUserSettings,
-  changePassword,
-  getRecoveryKey,
-  regenerateRecoveryKey,
-  adminResetPassword,
-  adminRegenerateRecoveryKey,
-  getAllUsers,
-  createUser,
-  deleteUser,
-  updateUserRole,
-} from "../../controllers/user.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockBcrypt = vi.mocked(bcrypt);
@@ -138,7 +137,10 @@ describe("User Controller", () => {
       expect(body.settings.unitPreference).toBe("metric"); // default
       expect(body.settings.wallPlayback).toBe("autoplay"); // default
       expect(body.settings.lightboxDoubleTapAction).toBe("favorite"); // default
-      expect(body.settings.landingPagePreference).toEqual({ pages: ["home"], randomize: false }); // default
+      expect(body.settings.landingPagePreference).toEqual({
+        pages: ["home"],
+        randomize: false,
+      }); // default
       expect(body.settings.carouselPreferences).toBeInstanceOf(Array); // default carousel prefs
       expect(body.settings.carouselPreferences.length).toBeGreaterThan(0);
     });
@@ -344,7 +346,12 @@ describe("User Controller", () => {
 
     it("rejects invalid landing page key", async () => {
       const req = mockReq(
-        { landingPagePreference: { pages: ["home", "invalid-page"], randomize: false } },
+        {
+          landingPagePreference: {
+            pages: ["home", "invalid-page"],
+            randomize: false,
+          },
+        },
         {},
         USER
       );
@@ -376,7 +383,11 @@ describe("User Controller", () => {
 
   describe("changePassword", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({ currentPassword: "old", newPassword: "New1pass" }, {}, {} as any);
+      const req = mockReq(
+        { currentPassword: "old", newPassword: "New1pass" },
+        {},
+        {} as any
+      );
       const res = mockRes();
       await changePassword(req, res);
       expect(res._getStatus()).toBe(401);
@@ -391,8 +402,15 @@ describe("User Controller", () => {
     });
 
     it("returns 400 when new password fails validation", async () => {
-      mockValidatePassword.mockReturnValue({ valid: false, errors: ["Too short"] });
-      const req = mockReq({ currentPassword: "old", newPassword: "bad" }, {}, USER);
+      mockValidatePassword.mockReturnValue({
+        valid: false,
+        errors: ["Too short"],
+      });
+      const req = mockReq(
+        { currentPassword: "old", newPassword: "bad" },
+        {},
+        USER
+      );
       const res = mockRes();
       await changePassword(req, res);
       expect(res._getStatus()).toBe(400);
@@ -402,7 +420,11 @@ describe("User Controller", () => {
     it("returns 404 when user not found", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const req = mockReq({ currentPassword: "old", newPassword: "NewPass1" }, {}, USER);
+      const req = mockReq(
+        { currentPassword: "old", newPassword: "NewPass1" },
+        {},
+        USER
+      );
       const res = mockRes();
       await changePassword(req, res);
       expect(res._getStatus()).toBe(404);
@@ -410,9 +432,16 @@ describe("User Controller", () => {
 
     it("returns 401 when current password is incorrect", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 2, password: "hashed" } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        password: "hashed",
+      } as any);
       mockBcrypt.compare.mockResolvedValue(false as any);
-      const req = mockReq({ currentPassword: "wrong", newPassword: "NewPass1" }, {}, USER);
+      const req = mockReq(
+        { currentPassword: "wrong", newPassword: "NewPass1" },
+        {},
+        USER
+      );
       const res = mockRes();
       await changePassword(req, res);
       expect(res._getStatus()).toBe(401);
@@ -421,10 +450,17 @@ describe("User Controller", () => {
 
     it("changes password successfully", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 2, password: "hashed" } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        password: "hashed",
+      } as any);
       mockBcrypt.compare.mockResolvedValue(true as any);
       mockPrisma.user.update.mockResolvedValue({} as any);
-      const req = mockReq({ currentPassword: "OldPass1", newPassword: "NewPass1" }, {}, USER);
+      const req = mockReq(
+        { currentPassword: "OldPass1", newPassword: "NewPass1" },
+        {},
+        USER
+      );
       const res = mockRes();
       await changePassword(req, res);
       expect(res._getBody().success).toBe(true);
@@ -457,7 +493,9 @@ describe("User Controller", () => {
     });
 
     it("returns formatted recovery key", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ recoveryKey: "ABCD1234EFGH5678" } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        recoveryKey: "ABCD1234EFGH5678",
+      } as any);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
@@ -465,7 +503,9 @@ describe("User Controller", () => {
     });
 
     it("returns null when no recovery key exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ recoveryKey: null } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        recoveryKey: null,
+      } as any);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
@@ -509,7 +549,11 @@ describe("User Controller", () => {
     });
 
     it("returns 400 for invalid user ID", async () => {
-      const req = mockReq({ newPassword: "NewPass1" }, { userId: "abc" }, ADMIN);
+      const req = mockReq(
+        { newPassword: "NewPass1" },
+        { userId: "abc" },
+        ADMIN
+      );
       const res = mockRes();
       await adminResetPassword(req, res);
       expect(res._getStatus()).toBe(400);
@@ -650,7 +694,11 @@ describe("User Controller", () => {
 
     it("returns 409 when username already exists", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 5 } as any);
-      const req = mockReq({ username: "existing", password: "Pass123" }, {}, ADMIN);
+      const req = mockReq(
+        { username: "existing", password: "Pass123" },
+        {},
+        ADMIN
+      );
       const res = mockRes();
       await createUser(req, res);
       expect(res._getStatus()).toBe(409);

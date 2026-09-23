@@ -1,4 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import http from "http";
+import https from "https";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// =============================================================================
+// Imports (after mocks)
+// =============================================================================
+
+import {
+  proxyClipPreview,
+  proxyImage,
+  proxyScenePreview,
+  proxySceneWebp,
+  proxyStashMedia,
+} from "../../controllers/proxy.js";
+import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 
 // =============================================================================
 // Mocks (must be before imports)
@@ -39,22 +54,6 @@ vi.mock("https", () => {
     Agent: vi.fn(() => ({ keepAlive: true })),
   };
 });
-
-// =============================================================================
-// Imports (after mocks)
-// =============================================================================
-
-import {
-  proxyScenePreview,
-  proxySceneWebp,
-  proxyStashMedia,
-  proxyClipPreview,
-  proxyImage,
-} from "../../controllers/proxy.js";
-import prisma from "../../prisma/singleton.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import http from "http";
-import https from "https";
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
@@ -223,7 +222,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/abc/sprite?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -240,7 +239,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/abc/sprite?t=123&apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
   });
@@ -307,7 +306,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/scene-42/preview?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -367,7 +366,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/scene-7/webp?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
   });
@@ -436,7 +435,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/1/stream?start=10&end=30&apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -456,7 +455,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/scene/1/screenshot?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
   });
@@ -557,7 +556,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/image/1/thumbnail?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -581,7 +580,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).toHaveBeenCalledWith(
         "http://stash:9999/image/2/preview?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -605,7 +604,7 @@ describe("Proxy Controller", () => {
       expect(mockHttpsGet).toHaveBeenCalledWith(
         "https://stash-cdn.example.com/image/3/full?apikey=test-api-key",
         expect.any(Object),
-        expect.any(Function),
+        expect.any(Function)
       );
     });
 
@@ -662,7 +661,7 @@ describe("Proxy Controller", () => {
         expect(mockHttpGet).toHaveBeenCalledWith(
           `http://stash:9999${expectedPath}?apikey=test-api-key`,
           expect.any(Object),
-          expect.any(Function),
+          expect.any(Function)
         );
       }
     });
@@ -744,10 +743,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       // Single dots are fine, colons without // are fine
-      const safePaths = [
-        "/scene/file.name.mp4",
-        "/image/path/to/file",
-      ];
+      const safePaths = ["/scene/file.name.mp4", "/image/path/to/file"];
 
       for (const path of safePaths) {
         vi.clearAllMocks();

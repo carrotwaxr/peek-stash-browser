@@ -1,16 +1,16 @@
 import { Router } from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
-import { authenticated } from "../utils/routeHelpers.js";
 import {
+  addMember,
+  createGroup,
+  deleteGroup,
   getAllGroups,
   getGroup,
-  createGroup,
-  updateGroup,
-  deleteGroup,
-  addMember,
-  removeMember,
   getUserGroups,
+  removeMember,
+  updateGroup,
 } from "../controllers/groups.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = Router();
 
@@ -28,6 +28,10 @@ router.delete("/:id", requireAdmin, authenticated(deleteGroup));
 
 // Membership management (admin only)
 router.post("/:id/members", requireAdmin, authenticated(addMember));
-router.delete("/:id/members/:userId", requireAdmin, authenticated(removeMember));
+router.delete(
+  "/:id/members/:userId",
+  requireAdmin,
+  authenticated(removeMember)
+);
 
 export default router;

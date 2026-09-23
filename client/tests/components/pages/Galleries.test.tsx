@@ -1,6 +1,8 @@
 import React from "react";
-import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/api/client";
+import Galleries from "@/components/pages/Galleries";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Mock react-router-dom
@@ -68,7 +70,11 @@ vi.mock("@/api/client", () => ({
     isInitializing = false;
     status: number;
     data: Record<string, unknown>;
-    constructor(message: string, status = 500, data: Record<string, unknown> = {}) {
+    constructor(
+      message: string,
+      status = 500,
+      data: Record<string, unknown> = {}
+    ) {
       super(message);
       this.status = status;
       this.data = data;
@@ -82,14 +88,16 @@ vi.mock("@/api", () => ({}));
 vi.mock("@/components/cards/index", () => ({
   GalleryCard: (props: Record<string, unknown>) => (
     <div data-testid="gallery-card">
-      {
-        (props.gallery as Record<string, unknown>)?.title as string
-      }
+      {(props.gallery as Record<string, unknown>)?.title as string}
     </div>
   ),
 }));
 vi.mock("@/components/ui/index", () => ({
-  SearchControls: ({ children, onQueryChange, ...props }: Record<string, unknown>) => {
+  SearchControls: ({
+    children,
+    onQueryChange,
+    ...props
+  }: Record<string, unknown>) => {
     // Call onQueryChange once on mount to set queryParams (simulates SearchControls behavior)
     const calledRef = React.useRef(false);
     React.useEffect(() => {
@@ -99,7 +107,10 @@ vi.mock("@/components/ui/index", () => ({
       }
     }, [onQueryChange]);
     return (
-      <div data-testid="search-controls" data-artifact-type={props.artifactType}>
+      <div
+        data-testid="search-controls"
+        data-artifact-type={props.artifactType}
+      >
         {typeof children === "function"
           ? (children as Function)({
               viewMode: "grid",
@@ -146,9 +157,6 @@ vi.mock("@/components/table/index", () => ({
   TableView: () => <div data-testid="table-view" />,
   ColumnConfigPopover: () => <div data-testid="column-config" />,
 }));
-
-import Galleries from "@/components/pages/Galleries";
-import { ApiError } from "@/api/client";
 
 describe("Galleries", () => {
   beforeEach(() => {

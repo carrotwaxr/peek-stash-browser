@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Studio Filters Integration Tests
@@ -43,12 +43,15 @@ describe("Studio Filters", () => {
 
   describe("favorite filter", () => {
     it("filters favorite studios", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          favorite: true,
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            favorite: true,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -59,12 +62,15 @@ describe("Studio Filters", () => {
     });
 
     it("filters non-favorite studios", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          favorite: false,
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            favorite: false,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -73,30 +79,36 @@ describe("Studio Filters", () => {
 
   describe("tags filter", () => {
     it("filters studios by tag with INCLUDES", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters studios by tag with EXCLUDES", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -105,46 +117,55 @@ describe("Studio Filters", () => {
 
   describe("rating100 filter", () => {
     it("filters by rating GREATER_THAN", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          rating100: {
-            value: 70,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            rating100: {
+              value: 70,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters by rating LESS_THAN", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          rating100: {
-            value: 50,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            rating100: {
+              value: 50,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters by rating BETWEEN", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          rating100: {
-            value: 50,
-            value2: 80,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            rating100: {
+              value: 50,
+              value2: 80,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -153,30 +174,36 @@ describe("Studio Filters", () => {
 
   describe("o_counter filter", () => {
     it("filters by o_counter GREATER_THAN", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters by o_counter EQUALS zero", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -185,30 +212,36 @@ describe("Studio Filters", () => {
 
   describe("play_count filter", () => {
     it("filters by play_count GREATER_THAN (watched studios)", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          play_count: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            play_count: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters by play_count EQUALS zero (unwatched studios)", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          play_count: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            play_count: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -217,46 +250,55 @@ describe("Studio Filters", () => {
 
   describe("scene_count filter", () => {
     it("filters studios with many scenes", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          scene_count: {
-            value: 10,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            scene_count: {
+              value: 10,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters studios with few scenes", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          scene_count: {
-            value: 5,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            scene_count: {
+              value: 5,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("filters studios with scene_count BETWEEN", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          scene_count: {
-            value: 5,
-            value2: 50,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            scene_count: {
+              value: 5,
+              value2: 50,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -265,15 +307,18 @@ describe("Studio Filters", () => {
 
   describe("name filter", () => {
     it("filters studios by name text search", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          name: {
-            value: "a",
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            name: {
+              value: "a",
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -282,12 +327,15 @@ describe("Studio Filters", () => {
 
   describe("text search (q parameter)", () => {
     it("searches studios by name", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 50,
-          q: "a",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 50,
+            q: "a",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -296,16 +344,19 @@ describe("Studio Filters", () => {
 
   describe("combined filters", () => {
     it("combines favorite and scene_count filters", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          favorite: true,
-          scene_count: {
-            value: 5,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            favorite: true,
+            scene_count: {
+              value: 5,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -316,19 +367,22 @@ describe("Studio Filters", () => {
     });
 
     it("combines rating and tags filters", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: { per_page: 50 },
-        studio_filter: {
-          rating100: {
-            value: 60,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: { per_page: 50 },
+          studio_filter: {
+            rating100: {
+              value: 60,
+              modifier: "GREATER_THAN",
+            },
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -337,39 +391,48 @@ describe("Studio Filters", () => {
 
   describe("sorting", () => {
     it("sorts studios by name ASC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 50,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 50,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("sorts studios by scene_count DESC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 50,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 50,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
     });
 
     it("sorts studios by rating100 DESC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 50,
-          sort: "rating100",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 50,
+            sort: "rating100",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -378,13 +441,18 @@ describe("Studio Filters", () => {
 
   describe("studio by ID", () => {
     it("returns studio by ID with details", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        ids: [TEST_ENTITIES.studioWithScenes],
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          ids: [TEST_ENTITIES.studioWithScenes],
+        }
+      );
 
       expect(response.ok).toBe(true);
       // With multi-instance, same ID can exist in multiple instances
-      expect(response.data.findStudios.studios.length).toBeGreaterThanOrEqual(1);
+      expect(response.data.findStudios.studios.length).toBeGreaterThanOrEqual(
+        1
+      );
       // Verify at least one result has the expected ID
       const matchingStudio = response.data.findStudios.studios.find(
         (s) => s.id === TEST_ENTITIES.studioWithScenes

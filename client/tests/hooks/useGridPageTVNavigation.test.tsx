@@ -1,11 +1,11 @@
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createRouterWrapper } from "@tests/testUtils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { useGridPageTVNavigation } from "@/hooks/useGridPageTVNavigation";
+import { useSpatialNavigation } from "@/hooks/useSpatialNavigation";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useTVNavigation } from "@/hooks/useTVNavigation";
-import { useSpatialNavigation } from "@/hooks/useSpatialNavigation";
-import { createRouterWrapper } from "@tests/testUtils";
 
 // ─── Mock dependencies ───────────────────────────────────────────────────
 
@@ -185,10 +185,9 @@ describe("useGridPageTVNavigation", () => {
   it("passes items and columns to useSpatialNavigation", () => {
     const items = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
-    renderHook(
-      () => useGridPageTVNavigation({ items, columns: 4 }),
-      { wrapper }
-    );
+    renderHook(() => useGridPageTVNavigation({ items, columns: 4 }), {
+      wrapper,
+    });
 
     expect(mockUseSpatialNavigation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,14 +222,17 @@ describe("useGridPageTVNavigation", () => {
   // ─── Zones configuration ───────────────────────────────────────────────
 
   it("passes correct zones array to useTVNavigation", () => {
-    renderHook(
-      () => useGridPageTVNavigation({ items: [] }),
-      { wrapper }
-    );
+    renderHook(() => useGridPageTVNavigation({ items: [] }), { wrapper });
 
     expect(mockUseTVNavigation).toHaveBeenCalledWith(
       expect.objectContaining({
-        zones: ["search", "topPagination", "grid", "bottomPagination", "mainNav"],
+        zones: [
+          "search",
+          "topPagination",
+          "grid",
+          "bottomPagination",
+          "mainNav",
+        ],
         initialZone: "grid",
       })
     );

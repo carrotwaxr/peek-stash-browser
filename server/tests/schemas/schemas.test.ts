@@ -3,32 +3,32 @@
  *
  * Verify Zod schemas accept valid data and reject invalid data.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
-  SceneSchema,
-  PerformerSchema,
-  TagSchema,
-  StudioSchema,
-  GallerySchema,
-  ImageSchema,
-  GroupSchema,
-  PerformerRefSchema,
-  StudioRefSchema,
-  TagRefSchema,
-  GroupRefSchema,
-  GalleryRefSchema,
   ApiErrorResponseSchema,
   ApiSuccessResponseSchema,
   CacheNotReadyResponseSchema,
+  GalleryRefSchema,
+  GallerySchema,
+  GroupRefSchema,
+  GroupSchema,
+  ImageSchema,
   PaginationMetaSchema,
+  PerformerRefSchema,
+  PerformerSchema,
+  SceneSchema,
+  StudioRefSchema,
+  StudioSchema,
+  TagRefSchema,
+  TagSchema,
 } from "../../schemas/index.js";
+import { logger } from "../../utils/logger.js";
 import {
-  validateResponse,
   safeValidateResponse,
   validateArrayResponse,
+  validateResponse,
 } from "../../utils/schemaValidation.js";
-import { logger } from "../../utils/logger.js";
 
 describe("Reference Schemas", () => {
   describe("PerformerRefSchema", () => {
@@ -559,7 +559,14 @@ describe("Entity Schemas", () => {
         preview: null,
         image: "/api/proxy/stash?path=/image/1",
       },
-      files: [{ path: "/path/to/image.jpg", size: 1000000, width: 1920, height: 1080 }],
+      files: [
+        {
+          path: "/path/to/image.jpg",
+          size: 1000000,
+          width: 1920,
+          height: 1080,
+        },
+      ],
       visual_files: [{ width: 1920, height: 1080 }],
       studio: { id: "1", name: "Studio", image_path: null },
       performers: [],
@@ -603,7 +610,15 @@ describe("Entity Schemas", () => {
     it("validates image with galleries", () => {
       const imageWithGalleries = {
         ...validImage,
-        galleries: [{ id: "g1", instanceId: "instance-1", title: "Gallery 1", cover: null, image_count: 10 }],
+        galleries: [
+          {
+            id: "g1",
+            instanceId: "instance-1",
+            title: "Gallery 1",
+            cover: null,
+            image_count: 10,
+          },
+        ],
       };
       expect(() => ImageSchema.parse(imageWithGalleries)).not.toThrow();
     });

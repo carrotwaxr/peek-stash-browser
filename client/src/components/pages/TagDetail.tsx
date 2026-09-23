@@ -1,16 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import type { NormalizedImage } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useConfig } from "../../contexts/ConfigContext";
-import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
+import {
+  GalleryGrid,
+  GroupGrid,
+  PerformerGrid,
+  StudioGrid,
+} from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   FavoriteButton,
@@ -22,9 +30,6 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index";
-import { GalleryGrid, GroupGrid, PerformerGrid, StudioGrid } from "../grids/index";
-import ViewInStashButton from "../ui/ViewInStashButton";
-import type { NormalizedImage } from "@peek/shared-types";
 
 interface EntityRef {
   id: string;
@@ -56,35 +61,54 @@ const TagDetail = () => {
   const instanceId = searchParams.get("instance");
 
   // Include sub-tags toggle state (from URL param or default false)
-  const includeSubTags = searchParams.get('includeSubTags') === 'true';
+  const includeSubTags = searchParams.get("includeSubTags") === "true";
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: 'scenes', label: 'Scenes', count: (tag?.scene_count as number) || 0 },
-    { id: 'galleries', label: 'Galleries', count: (tag?.gallery_count as number) || 0 },
-    { id: 'images', label: 'Images', count: (tag?.image_count as number) || 0 },
-    { id: 'performers', label: 'Performers', count: (tag?.performer_count as number) || 0 },
-    { id: 'studios', label: 'Studios', count: (tag?.studio_count as number) || 0 },
-    { id: 'groups', label: 'Collections', count: (tag?.group_count as number) || 0 },
+    { id: "scenes", label: "Scenes", count: (tag?.scene_count as number) || 0 },
+    {
+      id: "galleries",
+      label: "Galleries",
+      count: (tag?.gallery_count as number) || 0,
+    },
+    { id: "images", label: "Images", count: (tag?.image_count as number) || 0 },
+    {
+      id: "performers",
+      label: "Performers",
+      count: (tag?.performer_count as number) || 0,
+    },
+    {
+      id: "studios",
+      label: "Studios",
+      count: (tag?.studio_count as number) || 0,
+    },
+    {
+      id: "groups",
+      label: "Collections",
+      count: (tag?.group_count as number) || 0,
+    },
   ];
-  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+  const effectiveDefaultTab =
+    contentTabs.find((t) => t.count > 0)?.id || "scenes";
 
   // Get active tab from URL or default to first tab with content
-  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
+  const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // Handler for toggling include sub-tags
   const handleIncludeSubTagsChange = (checked: boolean) => {
     const newParams = new URLSearchParams(searchParams);
     if (checked) {
-      newParams.set('includeSubTags', 'true');
+      newParams.set("includeSubTags", "true");
     } else {
-      newParams.delete('includeSubTags');
+      newParams.delete("includeSubTags");
     }
     setSearchParams(newParams);
   };
 
   // Check if tag has children (for showing toggle)
-  const hasChildren = !!(tag?.children && (tag.children as EntityRef[]).length > 0);
+  const hasChildren = !!(
+    tag?.children && (tag.children as EntityRef[]).length > 0
+  );
 
   // Set page title to tag name
   usePageTitle((tag?.name as string) || "Tag");
@@ -93,10 +117,20 @@ const TagDetail = () => {
     const fetchTag = async () => {
       try {
         setIsLoading(true);
-        const tagData = await libraryApi.findTagById(tagId!, instanceId!) as Record<string, unknown> | null;
+        const tagData = (await libraryApi.findTagById(
+          tagId!,
+          instanceId!
+        )) as Record<string, unknown> | null;
         setTag(tagData);
-        setRating((tagData as Record<string, unknown> | null)?.rating as number | null ?? null);
-        setIsFavorite(((tagData as Record<string, unknown> | null)?.favorite as boolean) || false);
+        setRating(
+          ((tagData as Record<string, unknown> | null)?.rating as
+            | number
+            | null) ?? null
+        );
+        setIsFavorite(
+          ((tagData as Record<string, unknown> | null)?.favorite as boolean) ||
+            false
+        );
       } catch {
         // Error loading tag - will show loading spinner
       } finally {
@@ -210,7 +244,10 @@ const TagDetail = () => {
                       size="large"
                     />
                   )}
-                  <ViewInStashButton stashUrl={tag?.stashUrl as string} size={24} />
+                  <ViewInStashButton
+                    stashUrl={tag?.stashUrl as string}
+                    size={24}
+                  />
                 </div>
               ) as unknown as string
             }
@@ -287,8 +324,11 @@ const TagDetail = () => {
             </div>
           )}
 
-          {contentTabs.every(t => t.count === 0) ? (
-            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+          {contentTabs.every((t) => t.count === 0) ? (
+            <div
+              className="py-16 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
               This tag has no content in Peek
             </div>
           ) : (
@@ -299,7 +339,7 @@ const TagDetail = () => {
               />
 
               {/* Tab Content */}
-              {activeTab === 'scenes' && (
+              {activeTab === "scenes" && (
                 <SceneSearch
                   key={`scenes-${includeSubTags}`}
                   context="scene_tag"
@@ -311,14 +351,19 @@ const TagDetail = () => {
                     },
                   }}
                   permanentFiltersMetadata={{
-                    tags: [{ id: makeCompositeKey(tagId!, instanceId), name: (tag?.name as string) || "Unknown Tag" }],
+                    tags: [
+                      {
+                        id: makeCompositeKey(tagId!, instanceId),
+                        name: (tag?.name as string) || "Unknown Tag",
+                      },
+                    ],
                   }}
                   title={`Scenes tagged with ${(tag?.name as string) || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
                   fromPageTitle={(tag?.name as string) || "Tag"}
                 />
               )}
 
-              {activeTab === 'galleries' && (
+              {activeTab === "galleries" && (
                 <GalleryGrid
                   key={`galleries-${includeSubTags}`}
                   lockedFilters={{
@@ -335,11 +380,16 @@ const TagDetail = () => {
                 />
               )}
 
-              {activeTab === 'images' && (
-                <ImagesTab tagId={tagId} instanceId={instanceId} tagName={tag?.name as string | undefined} includeSubTags={includeSubTags} />
+              {activeTab === "images" && (
+                <ImagesTab
+                  tagId={tagId}
+                  instanceId={instanceId}
+                  tagName={tag?.name as string | undefined}
+                  includeSubTags={includeSubTags}
+                />
               )}
 
-              {activeTab === 'performers' && (
+              {activeTab === "performers" && (
                 <PerformerGrid
                   lockedFilters={{
                     performer_filter: {
@@ -354,7 +404,7 @@ const TagDetail = () => {
                 />
               )}
 
-              {activeTab === 'studios' && (
+              {activeTab === "studios" && (
                 <StudioGrid
                   lockedFilters={{
                     studio_filter: {
@@ -369,7 +419,7 @@ const TagDetail = () => {
                 />
               )}
 
-              {activeTab === 'groups' && (
+              {activeTab === "groups" && (
                 <GroupGrid
                   lockedFilters={{
                     group_filter: {
@@ -467,20 +517,32 @@ interface TagStatsProps {
 
 const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'scenes';
+  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === 'scenes') {
-      newParams.delete('tab');
+    if (tabId === "scenes") {
+      newParams.delete("tab");
     } else {
-      newParams.set('tab', tabId);
+      newParams.set("tab", tabId);
     }
     setSearchParams(newParams);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
-  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
+  const StatField = ({
+    label,
+    value,
+    valueColor = "var(--text-primary)",
+    onClick,
+    isActive,
+  }: {
+    label: string;
+    value: string | number | null | undefined;
+    valueColor?: string;
+    onClick?: () => void;
+    isActive?: boolean;
+  }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && Number(value) > 0;
@@ -495,8 +557,8 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
             className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
             style={{
               color: valueColor,
-              cursor: isActive ? 'default' : 'pointer',
-              textDecoration: isActive ? 'underline' : 'none',
+              cursor: isActive ? "default" : "pointer",
+              textDecoration: isActive ? "underline" : "none",
             }}
           >
             {value}
@@ -517,8 +579,8 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
           label="Scenes:"
           value={tag?.scene_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('scenes')}
-          isActive={activeTab === 'scenes'}
+          onClick={() => handleTabSwitch("scenes")}
+          isActive={activeTab === "scenes"}
         />
         <StatField
           label="Markers:"
@@ -529,36 +591,36 @@ const TagStats = ({ tag, tagId: _tagId }: TagStatsProps) => {
           label="Images:"
           value={tag?.image_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('images')}
-          isActive={activeTab === 'images'}
+          onClick={() => handleTabSwitch("images")}
+          isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
           value={tag?.gallery_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('galleries')}
-          isActive={activeTab === 'galleries'}
+          onClick={() => handleTabSwitch("galleries")}
+          isActive={activeTab === "galleries"}
         />
         <StatField
           label="Performers:"
           value={tag?.performer_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('performers')}
-          isActive={activeTab === 'performers'}
+          onClick={() => handleTabSwitch("performers")}
+          isActive={activeTab === "performers"}
         />
         <StatField
           label="Studios:"
           value={tag?.studio_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('studios')}
-          isActive={activeTab === 'studios'}
+          onClick={() => handleTabSwitch("studios")}
+          isActive={activeTab === "studios"}
         />
         <StatField
           label="Collections:"
           value={tag?.group_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('groups')}
-          isActive={activeTab === 'groups'}
+          onClick={() => handleTabSwitch("groups")}
+          isActive={activeTab === "groups"}
         />
       </div>
     </Card>
@@ -586,7 +648,7 @@ const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
               return (
                 <Link
                   key={parent.id}
-                  to={getEntityPath('tag', parent, hasMultipleInstances)}
+                  to={getEntityPath("tag", parent, hasMultipleInstances)}
                   className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                   style={{
                     backgroundColor: `hsl(${hue}, 70%, 45%)`,
@@ -610,7 +672,7 @@ const TagDetails = ({ tag, hasMultipleInstances }: TagDetailsProps) => {
               return (
                 <Link
                   key={child.id}
-                  to={getEntityPath('tag', child, hasMultipleInstances)}
+                  to={getEntityPath("tag", child, hasMultipleInstances)}
                   className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                   style={{
                     backgroundColor: `hsl(${hue}, 70%, 45%)`,
@@ -636,26 +698,34 @@ interface TagImagesTabProps {
   includeSubTags?: boolean;
 }
 
-const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagImagesTabProps) => {
+const ImagesTab = ({
+  tagId,
+  instanceId,
+  tagName,
+  includeSubTags = false,
+}: TagImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
+  const urlPage = parseInt(searchParams.get("page") || "1") || 1;
 
-  const handleImagePageChange = useCallback((newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(newPage));
-    }
-    // Preserve tab param
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
+  const handleImagePageChange = useCallback(
+    (newPage: number) => {
+      const params = new URLSearchParams(searchParams);
+      if (newPage === 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(newPage));
+      }
+      // Preserve tab param
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams]
+  );
 
   const fetchImages = useCallback(
     async (page: number, perPage: number) => {
-      const data = await libraryApi.findImages({
+      const data = (await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {
           tags: {
@@ -664,7 +734,7 @@ const ImagesTab = ({ tagId, instanceId, tagName, includeSubTags = false }: TagIm
             ...(includeSubTags && { depth: -1 }),
           },
         },
-      }) as { findImages?: { images?: NormalizedImage[]; count?: number } };
+      })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
         images: data.findImages?.images || [],
         count: data.findImages?.count || 0,

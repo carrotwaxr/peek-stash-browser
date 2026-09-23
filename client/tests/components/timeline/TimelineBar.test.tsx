@@ -1,7 +1,7 @@
 // client/tests/components/timeline/TimelineBar.test.jsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TimelineBar from "../../../src/components/timeline/TimelineBar";
 
 describe("TimelineBar", () => {
@@ -244,9 +244,7 @@ describe("TimelineBar", () => {
 
   describe("Aria Label Content", () => {
     it("includes label and count in aria-label", () => {
-      render(
-        <TimelineBar {...defaultProps} label="January 2024" count={15} />
-      );
+      render(<TimelineBar {...defaultProps} label="January 2024" count={15} />);
 
       const bar = screen.getByRole("option");
       expect(bar).toHaveAttribute("aria-label", "January 2024: 15 items");

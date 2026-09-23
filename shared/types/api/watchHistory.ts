@@ -123,8 +123,10 @@ export interface IncrementOCounterResponse {
  * GET /api/watch-history
  * Get all watch history for current user (Continue Watching carousel)
  */
-export interface GetAllWatchHistoryQuery
-  extends Record<string, string | undefined> {
+export interface GetAllWatchHistoryQuery extends Record<
+  string,
+  string | undefined
+> {
   limit?: string;
   inProgress?: string;
 }

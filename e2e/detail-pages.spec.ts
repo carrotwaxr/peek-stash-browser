@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for entity detail pages.
@@ -22,9 +22,9 @@ test.describe("Detail Pages", () => {
 
     if (hasPerformers) {
       await performerLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       expect(page.url()).toContain("/performer/");
     }
     // If no performers, test passes gracefully
@@ -43,9 +43,9 @@ test.describe("Detail Pages", () => {
 
     if (hasStudios) {
       await studioLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       expect(page.url()).toContain("/studio/");
     }
   });
@@ -63,9 +63,9 @@ test.describe("Detail Pages", () => {
 
     if (hasTags) {
       await tagLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       expect(page.url()).toContain("/tag/");
     }
   });
@@ -83,9 +83,9 @@ test.describe("Detail Pages", () => {
 
     if (hasGalleries) {
       await galleryLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       expect(page.url()).toContain("/gallery/");
     }
   });
@@ -103,9 +103,9 @@ test.describe("Detail Pages", () => {
 
     if (hasGroups) {
       await groupLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       expect(page.url()).toContain("/collection/");
     }
   });
@@ -136,9 +136,9 @@ test.describe("Detail Pages", () => {
     if (await tagLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const href = await tagLink.getAttribute("href");
       await tagLink.click();
-      await expect(
-        page.getByRole("heading", { level: 1 }).first()
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10_000 }
+      );
       // URL should match the link href
       if (href) {
         expect(page.url()).toContain(href);
@@ -183,12 +183,7 @@ test.describe("Detail Pages", () => {
     page,
   }) => {
     // These should not crash even with invalid IDs
-    const detailPaths = [
-      "/performer/1",
-      "/studio/1",
-      "/tag/1",
-      "/gallery/1",
-    ];
+    const detailPaths = ["/performer/1", "/studio/1", "/tag/1", "/gallery/1"];
 
     for (const path of detailPaths) {
       await page.goto(path);

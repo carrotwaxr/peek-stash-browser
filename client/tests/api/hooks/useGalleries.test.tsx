@@ -1,7 +1,12 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  useGalleryDetail,
+  useGalleryList,
+} from "../../../src/api/hooks/useGalleries";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -14,12 +19,10 @@ vi.mock("../../../src/api/queryKeys", () => ({
   queryKeys: {
     galleries: {
       all: () => ["galleries"],
-      list: (instanceId: string | undefined, params: Record<string, unknown>) => [
-        "galleries",
-        instanceId,
-        "list",
-        params,
-      ],
+      list: (
+        instanceId: string | undefined,
+        params: Record<string, unknown>
+      ) => ["galleries", instanceId, "list", params],
       detail: (instanceId: string | undefined, id: string) => [
         "galleries",
         instanceId,
@@ -29,12 +32,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import {
-  useGalleryList,
-  useGalleryDetail,
-} from "../../../src/api/hooks/useGalleries";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -60,7 +57,9 @@ describe("useGalleryList", () => {
 
   it("fires query with correct params", async () => {
     const mockData = { galleries: [], total: 0 };
-    (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useGalleryList(params), {
@@ -69,18 +68,24 @@ describe("useGalleryList", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
-    expect(libraryApi.findGalleries).toHaveBeenCalledWith(params, expect.any(AbortSignal));
+    expect(libraryApi.findGalleries).toHaveBeenCalledWith(
+      params,
+      expect.any(AbortSignal)
+    );
   });
 
   it("passes signal to queryFn", async () => {
     const mockData = { galleries: [], total: 0 };
-    (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useGalleryList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findGalleries).toHaveBeenCalled());
-    const callArgs = (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (libraryApi.findGalleries as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 });
@@ -119,11 +124,17 @@ describe("useGalleryDetail", () => {
       mockGallery
     );
 
-    const { result } = renderHook(() => useGalleryDetail("gallery-1", "instance-5"), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useGalleryDetail("gallery-1", "instance-5"),
+      {
+        wrapper: createWrapper(),
+      }
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findGalleryById).toHaveBeenCalledWith("gallery-1", "instance-5");
+    expect(libraryApi.findGalleryById).toHaveBeenCalledWith(
+      "gallery-1",
+      "instance-5"
+    );
   });
 });

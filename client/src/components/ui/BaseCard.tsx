@@ -1,7 +1,13 @@
-import { forwardRef, type ReactNode, type CSSProperties, type MouseEvent, type FocusEvent } from "react";
-import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
-import { useCardSelection } from "../../hooks/useCardSelection";
+import {
+  type CSSProperties,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+  forwardRef,
+} from "react";
 import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav";
+import { useCardSelection } from "../../hooks/useCardSelection";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import {
   CardContainer,
   CardDescription,
@@ -146,15 +152,18 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
     // Keyboard navigation hook
     const { onKeyDown } = useCardKeyboardNav({
       linkTo,
-      onCustomAction: selectionMode ? () => onToggleSelect?.(entity) : undefined,
+      onCustomAction: selectionMode
+        ? () => onToggleSelect?.(entity)
+        : undefined,
     });
 
     // Merge display preferences with explicit props (props take precedence)
     // When hideDescription is explicitly true, respect it
     // Otherwise, check displayPreferences.showDescription (default: true)
-    const shouldShowDescription = hideDescription === true
-      ? false
-      : (displayPreferences.showDescription ?? true);
+    const shouldShowDescription =
+      hideDescription === true
+        ? false
+        : (displayPreferences.showDescription ?? true);
 
     // Selection styling
     const selectionStyle = isSelected
@@ -198,7 +207,9 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
         {/* Title Section - navigable when linkTo provided */}
         <CardTitle
           title={title}
-          subtitle={hideSubtitle ? null : (typeof subtitle === 'string' ? subtitle : null)}
+          subtitle={
+            hideSubtitle ? null : typeof subtitle === "string" ? subtitle : null
+          }
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
           linkState={linkState}
@@ -225,23 +236,32 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
         */}
         {(() => {
           // Extract settings from ratingControlsProps
-          const hasRatingControls = ratingControlsProps && (
-            ratingControlsProps.showRating ||
-            ratingControlsProps.showFavorite ||
-            ratingControlsProps.showOCounter
-          );
+          const hasRatingControls =
+            ratingControlsProps &&
+            (ratingControlsProps.showRating ||
+              ratingControlsProps.showFavorite ||
+              ratingControlsProps.showOCounter);
           const showMenu = ratingControlsProps?.showMenu ?? true;
           const hasIndicators = indicators.length > 0;
 
           // Build menu component for indicators row (when needed)
-          const menuForIndicators = !hasRatingControls && showMenu && ratingControlsProps ? (
-            <EntityMenu
-              entityType={ratingControlsProps.entityType || entityType}
-              entityId={ratingControlsProps.entityId}
-              entityName={ratingControlsProps.entityTitle ?? ""}
-              onHide={ratingControlsProps.onHideClick as ((payload: { entityType: string; entityId: string; entityName: string }) => void) | undefined}
-            />
-          ) : null;
+          const menuForIndicators =
+            !hasRatingControls && showMenu && ratingControlsProps ? (
+              <EntityMenu
+                entityType={ratingControlsProps.entityType || entityType}
+                entityId={ratingControlsProps.entityId}
+                entityName={ratingControlsProps.entityTitle ?? ""}
+                onHide={
+                  ratingControlsProps.onHideClick as
+                    | ((payload: {
+                        entityType: string;
+                        entityId: string;
+                        entityName: string;
+                      }) => void)
+                    | undefined
+                }
+              />
+            ) : null;
 
           return (
             <>
@@ -265,7 +285,11 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
                   initialOCounter={ratingControlsProps.initialOCounter ?? 0}
                   onHideSuccess={ratingControlsProps.onHideSuccess}
                   onOCounterChange={ratingControlsProps.onOCounterChange}
-                  onRatingChange={ratingControlsProps.onRatingChange as ((entityId: string, rating: number | null) => void) | undefined}
+                  onRatingChange={
+                    ratingControlsProps.onRatingChange as
+                      | ((entityId: string, rating: number | null) => void)
+                      | undefined
+                  }
                   onFavoriteChange={ratingControlsProps.onFavoriteChange}
                   showRating={ratingControlsProps.showRating}
                   showFavorite={ratingControlsProps.showFavorite}
@@ -275,14 +299,17 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
               )}
 
               {/* Standalone menu row - only if no indicators and no rating controls but menu enabled */}
-              {!hasIndicators && !hasRatingControls && showMenu && ratingControlsProps && (
-                <CardMenuRow
-                  entityType={ratingControlsProps.entityType || entityType}
-                  entityId={ratingControlsProps.entityId}
-                  entityTitle={ratingControlsProps.entityTitle}
-                  onHideSuccess={ratingControlsProps.onHideSuccess}
-                />
-              )}
+              {!hasIndicators &&
+                !hasRatingControls &&
+                showMenu &&
+                ratingControlsProps && (
+                  <CardMenuRow
+                    entityType={ratingControlsProps.entityType || entityType}
+                    entityId={ratingControlsProps.entityId}
+                    entityTitle={ratingControlsProps.entityTitle}
+                    onHideSuccess={ratingControlsProps.onHideSuccess}
+                  />
+                )}
             </>
           );
         })()}

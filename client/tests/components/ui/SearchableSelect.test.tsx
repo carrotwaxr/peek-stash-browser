@@ -6,8 +6,10 @@
  * passes instance_id in the entity-specific filter to avoid ambiguous
  * lookups on multi-instance setups.
  */
-import { render, waitFor, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { fireEvent, render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// Import after mocks are set up
+import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
 // --- Hoisted mocks (available before vi.mock factory runs) ---
 
@@ -61,9 +63,6 @@ vi.mock("../../../src/api", () => ({
   },
 }));
 
-// Import after mocks are set up
-import SearchableSelect from "../../../src/components/ui/SearchableSelect";
-
 // --- Helpers ---
 
 /** Default empty response for find* API methods */
@@ -106,7 +105,9 @@ describe("SearchableSelect fetchItemsByIds", () => {
 
   it("passes instance filter when resolving composite key values", async () => {
     mockFindTags.mockResolvedValue(
-      makeTagsResponse([{ id: "82", instanceId: "instance-abc", name: "Outdoor" }])
+      makeTagsResponse([
+        { id: "82", instanceId: "instance-abc", name: "Outdoor" },
+      ])
     );
 
     render(
@@ -303,7 +304,9 @@ describe("SearchableSelect fetchItemsByIds", () => {
 
   it("works with galleries entity type and instance filter", async () => {
     mockFindGalleries.mockResolvedValue(
-      makeGalleriesResponse([{ id: "10", instanceId: "inst-g", name: "Gallery X" }])
+      makeGalleriesResponse([
+        { id: "10", instanceId: "inst-g", name: "Gallery X" },
+      ])
     );
 
     render(
@@ -331,9 +334,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
       .mockResolvedValueOnce(
         makeTagsResponse([{ id: "82", instanceId: "inst-1", name: "Tag A" }])
       )
-      .mockResolvedValueOnce(
-        makeTagsResponse([{ id: "99", name: "Tag C" }])
-      );
+      .mockResolvedValueOnce(makeTagsResponse([{ id: "99", name: "Tag C" }]));
 
     render(
       <SearchableSelect
@@ -471,9 +472,7 @@ describe("SearchableSelect loadOptions guard", () => {
   });
 
   it("does not throw and returns empty results for unsupported entity type", async () => {
-    const consoleSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { container } = render(
       <SearchableSelect

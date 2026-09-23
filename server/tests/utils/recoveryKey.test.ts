@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { generateRecoveryKey, formatRecoveryKey, normalizeRecoveryKey } from "../../utils/recoveryKey.js";
+import { describe, expect, it } from "vitest";
+import {
+  formatRecoveryKey,
+  generateRecoveryKey,
+  normalizeRecoveryKey,
+} from "../../utils/recoveryKey.js";
 
 describe("recoveryKey utils", () => {
   describe("generateRecoveryKey", () => {

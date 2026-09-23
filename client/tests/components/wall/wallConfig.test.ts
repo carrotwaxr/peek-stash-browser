@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  wallConfig,
-  ZOOM_LEVELS,
-  DEFAULT_ZOOM,
   DEFAULT_VIEW_MODE,
+  DEFAULT_ZOOM,
+  ZOOM_LEVELS,
+  wallConfig,
 } from "../../../src/components/wall/wallConfig";
 
 describe("wallConfig", () => {
@@ -63,7 +63,11 @@ describe("wallConfig", () => {
     });
 
     it("returns null for preview URL (galleries have no preview)", () => {
-      expect((config.getPreviewUrl as (...args: unknown[]) => unknown)({ cover: "/cover.jpg" })).toBeNull();
+      expect(
+        (config.getPreviewUrl as (...args: unknown[]) => unknown)({
+          cover: "/cover.jpg",
+        })
+      ).toBeNull();
     });
 
     it("calculates aspect ratio from cover dimensions", () => {
@@ -73,7 +77,9 @@ describe("wallConfig", () => {
 
     it("returns 1 (square) aspect ratio when no dimensions", () => {
       expect(config.getAspectRatio({})).toBe(1);
-      expect(config.getAspectRatio({ coverWidth: null, coverHeight: null })).toBe(1);
+      expect(
+        config.getAspectRatio({ coverWidth: null, coverHeight: null })
+      ).toBe(1);
       expect(config.getAspectRatio({ coverWidth: 100 })).toBe(1); // Missing height
       expect(config.getAspectRatio({ coverHeight: 100 })).toBe(1); // Missing width
     });
@@ -124,7 +130,9 @@ describe("wallConfig", () => {
     });
 
     it("returns null for preview URL (images have no preview)", () => {
-      expect((config.getPreviewUrl as (...args: unknown[]) => unknown)({})).toBeNull();
+      expect(
+        (config.getPreviewUrl as (...args: unknown[]) => unknown)({})
+      ).toBeNull();
     });
 
     it("calculates aspect ratio from dimensions", () => {
@@ -138,9 +146,9 @@ describe("wallConfig", () => {
 
     it("returns title with fallback to filename", () => {
       expect(config.getTitle({ title: "Test Image" })).toBe("Test Image");
-      expect(
-        config.getTitle({ files: [{ basename: "photo.jpg" }] })
-      ).toBe("photo.jpg");
+      expect(config.getTitle({ files: [{ basename: "photo.jpg" }] })).toBe(
+        "photo.jpg"
+      );
       expect(config.getTitle({})).toBe("Untitled");
     });
 
@@ -188,8 +196,14 @@ describe("wallConfig", () => {
     it("returns default 16:9 aspect ratio when no scene dimensions", () => {
       expect(config.getAspectRatio({})).toBeCloseTo(16 / 9, 2);
       expect(config.getAspectRatio({ scene: {} })).toBeCloseTo(16 / 9, 2);
-      expect(config.getAspectRatio({ scene: { files: [] } })).toBeCloseTo(16 / 9, 2);
-      expect(config.getAspectRatio({ scene: { files: [{}] } })).toBeCloseTo(16 / 9, 2);
+      expect(config.getAspectRatio({ scene: { files: [] } })).toBeCloseTo(
+        16 / 9,
+        2
+      );
+      expect(config.getAspectRatio({ scene: { files: [{}] } })).toBeCloseTo(
+        16 / 9,
+        2
+      );
     });
 
     it("returns title or fallback", () => {
@@ -198,7 +212,10 @@ describe("wallConfig", () => {
     });
 
     it("builds subtitle from scene title and primary tag", () => {
-      const clip = { scene: { title: "Scene 1" }, primaryTag: { name: "Action" } };
+      const clip = {
+        scene: { title: "Scene 1" },
+        primaryTag: { name: "Action" },
+      };
       expect(config.getSubtitle(clip)).toBe("Scene 1 • Action");
     });
 

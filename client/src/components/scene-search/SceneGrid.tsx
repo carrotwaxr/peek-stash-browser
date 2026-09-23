@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { LucideCheckSquare, LucideSquare, LucideEyeOff, LucidePlus } from "lucide-react";
 import type { NormalizedScene } from "@peek/shared-types";
+import {
+  LucideCheckSquare,
+  LucideEyeOff,
+  LucidePlus,
+  LucideSquare,
+} from "lucide-react";
 import { getGridClasses } from "../../constants/grids";
 import { useGridColumns } from "../../hooks/useGridColumns";
 import { useHideBulkAction } from "../../hooks/useHideBulkAction";
@@ -88,17 +93,27 @@ const SceneGrid = ({
   };
 
   // Bulk hide action
-  const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
+  const {
+    hideDialogOpen,
+    isHiding,
+    handleHideClick,
+    handleHideConfirm,
+    closeHideDialog,
+  } = useHideBulkAction({
     selectedScenes,
     onComplete: handleClearSelection,
-    onHideSuccess: onHideSuccess as ((id: string | number, entityType: string) => void) | undefined,
+    onHideSuccess: onHideSuccess as
+      | ((id: string | number, entityType: string) => void)
+      | undefined,
   });
 
   // Set initial focus when grid loads and zone is active (only in TV mode)
   useEffect(() => {
     if (tvGridZoneActive && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
-      const firstFocusable = gridRef.current.querySelector('[tabindex="0"]') as HTMLElement | null;
+      const firstFocusable = gridRef.current.querySelector(
+        '[tabindex="0"]'
+      ) as HTMLElement | null;
       if (firstFocusable) {
         firstFocusable.focus();
       }
@@ -177,7 +192,11 @@ const SceneGrid = ({
             <SceneCard
               key={scene.id}
               scene={scene}
-              onClick={selectedScenes.length === 0 && onSceneClick ? () => onSceneClick(scene) : undefined}
+              onClick={
+                selectedScenes.length === 0 && onSceneClick
+                  ? () => onSceneClick(scene)
+                  : undefined
+              }
               onHideSuccess={onHideSuccess}
               fromPageTitle={fromPageTitle}
               isSelected={selectedScenes.some((s) => s.id === scene.id)}

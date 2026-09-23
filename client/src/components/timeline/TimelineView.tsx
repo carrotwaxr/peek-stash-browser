@@ -1,12 +1,20 @@
 // client/src/components/timeline/TimelineView.tsx
-import { memo, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
-import TimelineControls from "./TimelineControls";
-import TimelineStrip from "./TimelineStrip";
-import TimelineMobileSheet from "./TimelineMobileSheet";
-import { useTimelineState, parsePeriodToDateRange } from "./useTimelineState";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
+import {
+  type ReactNode,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getGridClasses } from "../../constants/grids";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import LoadingSpinner from "../ui/LoadingSpinner";
+import TimelineControls from "./TimelineControls";
+import TimelineMobileSheet from "./TimelineMobileSheet";
+import TimelineStrip from "./TimelineStrip";
+import { parsePeriodToDateRange, useTimelineState } from "./useTimelineState";
 
 interface DateFilterRange {
   start: string;
@@ -15,7 +23,9 @@ interface DateFilterRange {
 
 interface RenderItemOptions {
   onItemClick?: (item: Record<string, unknown>) => void;
-  dateFilter: { date: { value: string; value2: string; modifier: string } } | null;
+  dateFilter: {
+    date: { value: string; value2: string; modifier: string };
+  } | null;
 }
 
 interface TimelineFilters {
@@ -35,7 +45,11 @@ interface VisibleRange {
 interface Props {
   entityType: string;
   items?: Record<string, unknown>[];
-  renderItem: (item: Record<string, unknown>, index: number, options: RenderItemOptions) => ReactNode;
+  renderItem: (
+    item: Record<string, unknown>,
+    index: number,
+    options: RenderItemOptions
+  ) => ReactNode;
   onItemClick?: (item: Record<string, unknown>) => void;
   onDateFilterChange?: (range: DateFilterRange | null) => void;
   onPeriodChange?: (period: string | null) => void;
@@ -70,7 +84,12 @@ function TimelineView({
     maxCount,
     isLoading: distributionLoading,
     ZOOM_LEVELS,
-  } = useTimelineState({ entityType, autoSelectRecent: !initialPeriod, initialPeriod, filters });
+  } = useTimelineState({
+    entityType,
+    autoSelectRecent: !initialPeriod,
+    initialPeriod,
+    filters,
+  });
 
   // Detect mobile devices for responsive layout
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -98,27 +117,39 @@ function TimelineView({
 
   // Notify parent of auto-selected period (initial load only)
   useEffect(() => {
-    if (!hasNotifiedAutoSelectRef.current && selectedPeriod && onDateFilterChange) {
+    if (
+      !hasNotifiedAutoSelectRef.current &&
+      selectedPeriod &&
+      onDateFilterChange
+    ) {
       hasNotifiedAutoSelectRef.current = true;
-      onDateFilterChange({ start: selectedPeriod.start, end: selectedPeriod.end });
+      onDateFilterChange({
+        start: selectedPeriod.start,
+        end: selectedPeriod.end,
+      });
     }
   }, [selectedPeriod, onDateFilterChange]);
 
   // Wrap selectPeriod to notify parent directly on user interaction
-  const handleSelectPeriod = useCallback((period: string) => {
-    selectPeriod(period);
-    hasNotifiedAutoSelectRef.current = true; // Mark as handled
-    // selectPeriod toggles: clicking same period deselects
-    const willDeselect = selectedPeriod?.period === period;
-    if (onDateFilterChange) {
-      if (willDeselect) {
-        onDateFilterChange(null);
-      } else {
-        const range = parsePeriodToDateRange(period, zoomLevel);
-        onDateFilterChange(range ? { start: range.start, end: range.end } : null);
+  const handleSelectPeriod = useCallback(
+    (period: string) => {
+      selectPeriod(period);
+      hasNotifiedAutoSelectRef.current = true; // Mark as handled
+      // selectPeriod toggles: clicking same period deselects
+      const willDeselect = selectedPeriod?.period === period;
+      if (onDateFilterChange) {
+        if (willDeselect) {
+          onDateFilterChange(null);
+        } else {
+          const range = parsePeriodToDateRange(period, zoomLevel);
+          onDateFilterChange(
+            range ? { start: range.start, end: range.end } : null
+          );
+        }
       }
-    }
-  }, [selectPeriod, selectedPeriod, zoomLevel, onDateFilterChange]);
+    },
+    [selectPeriod, selectedPeriod, zoomLevel, onDateFilterChange]
+  );
 
   // Sync period to URL separately - only when period actually changes from user action
   // Uses ref for callback to avoid infinite loop from callback identity changes
@@ -173,7 +204,12 @@ function TimelineView({
             <>
               <span style={{ color: "var(--text-tertiary)" }}>|</span>
               <span>
-                <span className="font-medium" style={{ color: "var(--accent-primary)" }}>Selected:</span>{" "}
+                <span
+                  className="font-medium"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  Selected:
+                </span>{" "}
                 {selectedPeriod.label}
               </span>
             </>
@@ -194,7 +230,9 @@ function TimelineView({
         distribution={distribution}
         maxCount={maxCount}
         zoomLevel={zoomLevel}
-        selectedPeriod={selectedPeriod as { period: string; count: number } | null}
+        selectedPeriod={
+          selectedPeriod as { period: string; count: number } | null
+        }
         onSelectPeriod={handleSelectPeriod}
         onVisibleRangeChange={handleVisibleRangeChange}
       />

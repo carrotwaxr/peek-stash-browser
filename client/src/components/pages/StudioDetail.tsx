@@ -1,19 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  Link,
-  useParams,
-  useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import type { NormalizedImage, TagRef } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useImagesPagination } from "../../hooks/useImagesPagination";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useConfig } from "../../contexts/ConfigContext";
-import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { getEntityPath } from "../../utils/entityLinks";
+import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   FavoriteButton,
@@ -25,9 +25,6 @@ import {
   TabNavigation,
   TagChips,
 } from "../ui/index";
-import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index";
-import ViewInStashButton from "../ui/ViewInStashButton";
-import type { TagRef, NormalizedImage } from "@peek/shared-types";
 
 interface EntityRef {
   id: string;
@@ -68,13 +65,34 @@ const StudioDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: "scenes", label: "Scenes", count: (studio?.scene_count as number) || 0 },
-    { id: "galleries", label: "Galleries", count: (studio?.gallery_count as number) || 0 },
-    { id: "images", label: "Images", count: (studio?.image_count as number) || 0 },
-    { id: "performers", label: "Performers", count: (studio?.performer_count as number) || 0 },
-    { id: "groups", label: "Collections", count: (studio?.group_count as number) || 0 },
+    {
+      id: "scenes",
+      label: "Scenes",
+      count: (studio?.scene_count as number) || 0,
+    },
+    {
+      id: "galleries",
+      label: "Galleries",
+      count: (studio?.gallery_count as number) || 0,
+    },
+    {
+      id: "images",
+      label: "Images",
+      count: (studio?.image_count as number) || 0,
+    },
+    {
+      id: "performers",
+      label: "Performers",
+      count: (studio?.performer_count as number) || 0,
+    },
+    {
+      id: "groups",
+      label: "Collections",
+      count: (studio?.group_count as number) || 0,
+    },
   ];
-  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || "scenes";
+  const effectiveDefaultTab =
+    contentTabs.find((t) => t.count > 0)?.id || "scenes";
 
   // Get active tab from URL or default to first tab with content
   const activeTab = searchParams.get("tab") || effectiveDefaultTab;
@@ -91,7 +109,9 @@ const StudioDetail = () => {
   };
 
   // Check if studio has children (for showing toggle)
-  const childStudios = studio?.child_studios as Record<string, unknown>[] | undefined;
+  const childStudios = studio?.child_studios as
+    | Record<string, unknown>[]
+    | undefined;
   const hasChildren = childStudios && childStudios.length > 0;
 
   // Set page title to studio name
@@ -101,7 +121,10 @@ const StudioDetail = () => {
     const fetchStudio = async () => {
       try {
         setIsLoading(true);
-        const studioData = await libraryApi.findStudioById(studioId!, instanceId) as Record<string, unknown> | null;
+        const studioData = (await libraryApi.findStudioById(
+          studioId!,
+          instanceId
+        )) as Record<string, unknown> | null;
         setStudio(studioData);
         setRating(studioData?.rating as number | null);
         setIsFavorite((studioData?.favorite as boolean) || false);
@@ -128,7 +151,12 @@ const StudioDetail = () => {
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("studio", studioId!, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        "studio",
+        studioId!,
+        newValue,
+        instanceId
+      );
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((studio?.favorite as boolean) || false);
@@ -140,11 +168,12 @@ const StudioDetail = () => {
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
-   
+
   useRatingHotkeys({
     enabled: !isLoading && !!studio,
     setRating: handleRatingChange,
-    toggleFavorite });
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (
@@ -175,7 +204,9 @@ const StudioDetail = () => {
             title={
               (
                 <div className="flex gap-4 items-center">
-                  <span>{(studio?.name as string) || `Studio ${studioId}`}</span>
+                  <span>
+                    {(studio?.name as string) || `Studio ${studioId}`}
+                  </span>
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
@@ -183,7 +214,10 @@ const StudioDetail = () => {
                       size="large"
                     />
                   )}
-                  <ViewInStashButton stashUrl={studio?.stashUrl as string} size={24} />
+                  <ViewInStashButton
+                    stashUrl={studio?.stashUrl as string}
+                    size={24}
+                  />
                 </div>
               ) as unknown as string
             }
@@ -231,7 +265,11 @@ const StudioDetail = () => {
         {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
         <div className="space-y-6 mb-8">
           <StudioStats studio={studio} studioId={studioId} />
-          <StudioDetails studio={studio} settings={settings} hasMultipleInstances={hasMultipleInstances} />
+          <StudioDetails
+            studio={studio}
+            settings={settings}
+            hasMultipleInstances={hasMultipleInstances}
+          />
         </div>
 
         {/* Tabbed Content Section */}
@@ -249,20 +287,25 @@ const StudioDetail = () => {
                   className="w-4 h-4 rounded border-2 cursor-pointer"
                   style={{
                     borderColor: "var(--border-color)",
-                    accentColor: "var(--accent-primary)" }}
+                    accentColor: "var(--accent-primary)",
+                  }}
                 />
                 <span
                   className="text-sm font-medium"
                   style={{ color: "var(--text-primary)" }}
                 >
-                  Include sub-studios ({(studio!.child_studios as EntityRef[]).length})
+                  Include sub-studios (
+                  {(studio!.child_studios as EntityRef[]).length})
                 </span>
               </label>
             </div>
           )}
 
-          {contentTabs.every(t => t.count === 0) ? (
-            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+          {contentTabs.every((t) => t.count === 0) ? (
+            <div
+              className="py-16 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
               This studio has no content in Peek
             </div>
           ) : (
@@ -281,11 +324,17 @@ const StudioDetail = () => {
                     studios: {
                       value: [makeCompositeKey(studioId!, instanceId)],
                       modifier: "INCLUDES",
-                      ...(includeSubStudios && { depth: -1 }) } }}
+                      ...(includeSubStudios && { depth: -1 }),
+                    },
+                  }}
                   permanentFiltersMetadata={{
                     studios: [
-                      { id: makeCompositeKey(studioId!, instanceId), name: studio?.name || "Unknown Studio" },
-                    ] }}
+                      {
+                        id: makeCompositeKey(studioId!, instanceId),
+                        name: studio?.name || "Unknown Studio",
+                      },
+                    ],
+                  }}
                   title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
                   fromPageTitle={(studio?.name as string) || "Studio"}
                 />
@@ -299,7 +348,10 @@ const StudioDetail = () => {
                       studios: {
                         value: [makeCompositeKey(studioId!, instanceId)],
                         modifier: "INCLUDES",
-                        ...(includeSubStudios && { depth: -1 }) } } }}
+                        ...(includeSubStudios && { depth: -1 }),
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No galleries found for ${studio?.name}`}
                 />
@@ -320,7 +372,10 @@ const StudioDetail = () => {
                     performer_filter: {
                       studios: {
                         value: [makeCompositeKey(studioId!, instanceId)],
-                        modifier: "INCLUDES" } } }}
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No performers found for ${studio?.name}`}
                 />
@@ -332,7 +387,10 @@ const StudioDetail = () => {
                     group_filter: {
                       studios: {
                         value: [makeCompositeKey(studioId!, instanceId)],
-                        modifier: "INCLUDES" } } }}
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No collections found for ${studio?.name}`}
                 />
@@ -357,7 +415,8 @@ const Card = ({ title, children }: CardProps) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)" }}
+        borderColor: "var(--border-color)",
+      }}
     >
       {title && (
         <h3
@@ -385,7 +444,8 @@ const StudioImage = ({ studio }: StudioImageProps) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "1/1",
         width: "100%",
-        maxHeight: "50vh" }}
+        maxHeight: "50vh",
+      }}
     >
       {studio?.image_path ? (
         <img
@@ -394,7 +454,8 @@ const StudioImage = ({ studio }: StudioImageProps) => {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain" }}
+            objectFit: "contain",
+          }}
         />
       ) : (
         <svg
@@ -416,7 +477,7 @@ interface StudioStatsProps {
   studioId: string | undefined;
 }
 
-const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {  
+const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "scenes";
 
@@ -436,7 +497,14 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
     value,
     valueColor = "var(--text-primary)",
     onClick,
-    isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
+    isActive,
+  }: {
+    label: string;
+    value: string | number | null | undefined;
+    valueColor?: string;
+    onClick?: () => void;
+    isActive?: boolean;
+  }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && Number(value) > 0;
@@ -452,7 +520,8 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
             style={{
               color: valueColor,
               cursor: isActive ? "default" : "pointer",
-              textDecoration: isActive ? "underline" : "none" }}
+              textDecoration: isActive ? "underline" : "none",
+            }}
           >
             {value}
           </button>
@@ -492,7 +561,8 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${studio!.rating100}%`,
-                backgroundColor: "var(--accent-primary)" }}
+                backgroundColor: "var(--accent-primary)",
+              }}
             />
           </div>
         </div>
@@ -547,7 +617,11 @@ interface StudioDetailsProps {
   hasMultipleInstances: boolean;
 }
 
-const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetailsProps) => {
+const StudioDetails = ({
+  studio,
+  settings,
+  hasMultipleInstances,
+}: StudioDetailsProps) => {
   const showDetails = settings?.showDescriptionOnDetail !== false;
 
   return (
@@ -593,34 +667,42 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
       {(studio?.parent_studio as EntityRef | undefined)?.id && (
         <Card title="Parent Studio">
           <Link
-            to={getEntityPath('studio', studio!.parent_studio as EntityRef, hasMultipleInstances)}
+            to={getEntityPath(
+              "studio",
+              studio!.parent_studio as EntityRef,
+              hasMultipleInstances
+            )}
             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: "var(--accent-primary)",
-              color: "white" }}
+              color: "white",
+            }}
           >
-            {(studio!.parent_studio as EntityRef).name || `Studio ${(studio!.parent_studio as EntityRef).id}`}
+            {(studio!.parent_studio as EntityRef).name ||
+              `Studio ${(studio!.parent_studio as EntityRef).id}`}
           </Link>
         </Card>
       )}
 
-      {studio?.child_studios && (studio.child_studios as EntityRef[]).length > 0 && (
-        <Card title="Child Studios">
-          <div className="flex flex-wrap gap-2">
-            {(studio.child_studios as EntityRef[]).map((child: EntityRef) => (
-              <Link
-                key={child.id}
-                to={getEntityPath('studio', child, hasMultipleInstances)}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                style={{
-                  color: "var(--text-primary)" }}
-              >
-                {child.name}
-              </Link>
-            ))}
-          </div>
-        </Card>
-      )}
+      {studio?.child_studios &&
+        (studio.child_studios as EntityRef[]).length > 0 && (
+          <Card title="Child Studios">
+            <div className="flex flex-wrap gap-2">
+              {(studio.child_studios as EntityRef[]).map((child: EntityRef) => (
+                <Link
+                  key={child.id}
+                  to={getEntityPath("studio", child, hasMultipleInstances)}
+                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {child.name}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
       {studio?.tags && (studio.tags as TagRef[]).length > 0 && (
         <Card title="Tags">
@@ -647,36 +729,38 @@ const StudioDetails = ({ studio, settings, hasMultipleInstances }: StudioDetails
       {studio?.stash_ids && (studio.stash_ids as StashId[]).length > 0 && (
         <Card title="StashDB Links">
           <div className="space-y-2">
-            {(studio.stash_ids as StashId[]).map((stashId: StashId, index: number) => (
-              <a
-                key={index}
-                href={`${stashId.endpoint.replace("/graphql", "")}/studios/${
-                  stashId.stash_id
-                }`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center text-sm hover:underline transition-colors"
-                style={{ color: "var(--accent-primary)" }}
-              >
-                {stashId.endpoint.includes("stashdb.org")
-                  ? "StashDB"
-                  : "External"}
-                : {stashId.stash_id.substring(0, 8)}...
-                <svg
-                  className="w-3 h-3 ml-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            {(studio.stash_ids as StashId[]).map(
+              (stashId: StashId, index: number) => (
+                <a
+                  key={index}
+                  href={`${stashId.endpoint.replace("/graphql", "")}/studios/${
+                    stashId.stash_id
+                  }`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center text-sm hover:underline transition-colors"
+                  style={{ color: "var(--accent-primary)" }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
-            ))}
+                  {stashId.endpoint.includes("stashdb.org")
+                    ? "StashDB"
+                    : "External"}
+                  : {stashId.stash_id.substring(0, 8)}...
+                  <svg
+                    className="w-3 h-3 ml-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
+              )
+            )}
           </div>
         </Card>
       )}
@@ -692,26 +776,34 @@ interface StudioImagesTabProps {
   includeSubStudios?: boolean;
 }
 
-const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false }: StudioImagesTabProps) => {
+const ImagesTab = ({
+  studioId,
+  instanceId,
+  studioName,
+  includeSubStudios = false,
+}: StudioImagesTabProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-based page state for image pagination
-  const urlPage = parseInt(searchParams.get('page') || '1') || 1;
+  const urlPage = parseInt(searchParams.get("page") || "1") || 1;
 
-  const handleImagePageChange = useCallback((newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (newPage === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(newPage));
-    }
-    // Preserve tab param
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
+  const handleImagePageChange = useCallback(
+    (newPage: number) => {
+      const params = new URLSearchParams(searchParams);
+      if (newPage === 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(newPage));
+      }
+      // Preserve tab param
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams]
+  );
 
   const fetchImages = useCallback(
     async (page: number, perPage: number) => {
-      const data = await libraryApi.findImages({
+      const data = (await libraryApi.findImages({
         filter: { page, per_page: perPage },
         image_filter: {
           studios: {
@@ -720,7 +812,7 @@ const ImagesTab = ({ studioId, instanceId, studioName, includeSubStudios = false
             ...(includeSubStudios && { depth: -1 }),
           },
         },
-      }) as { findImages?: { images?: NormalizedImage[]; count?: number } };
+      })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
         images: data.findImages?.images || [],
         count: data.findImages?.count || 0,

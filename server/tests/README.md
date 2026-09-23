@@ -39,6 +39,7 @@ npm run test:ui
 ### Scene Filters (✅ Complete)
 
 **Quick Filters (61 tests total):**
+
 - ID filtering
 - Performer filtering (INCLUDES, INCLUDES_ALL, EXCLUDES)
 - Tag filtering with squashing (scene + performer + studio tags)
@@ -53,6 +54,7 @@ npm run test:ui
 **Status**: ✅ 30/31 tests passing (1 known bug documented)
 
 **Expensive Filters (30 tests total):**
+
 - Favorite filtering
 - Rating filtering (rating100)
 - O counter filtering
@@ -69,6 +71,7 @@ npm run test:ui
 ### Other Entities (🚧 Future Work)
 
 Additional filter test suites to be created:
+
 - Performer filters
 - Studio filters
 - Tag filters
@@ -78,17 +81,20 @@ Additional filter test suites to be created:
 ## Bugs Found
 
 ### Bug #1: Empty Array Filter Values (FOUND)
+
 **Severity**: Medium
 **Status**: Documented in BUGS_FOUND.md
 **Test**: `sceneFilters.test.ts` - "should handle empty arrays in filter values"
 
 Empty filter arrays return `[]` instead of returning all results. This affects:
+
 - `performers` filter
 - `tags` filter
 - `studios` filter
 - `groups` filter
 
 **Fix Required**: Add length check before applying array-based filters:
+
 ```typescript
 if (!performerIds || performerIds.length === 0) return filtered;
 ```
@@ -98,6 +104,7 @@ if (!performerIds || performerIds.length === 0) return filtered;
 The `helpers/mockDataGenerators.ts` file provides utilities for creating realistic test data:
 
 ### Individual Entity Creators
+
 - `createMockScene()` - Create a single scene with all fields
 - `createMockPerformer()` - Create a single performer
 - `createMockStudio()` - Create a single studio
@@ -106,6 +113,7 @@ The `helpers/mockDataGenerators.ts` file provides utilities for creating realist
 - `createMockGallery()` - Create a single gallery
 
 ### Batch Entity Creators
+
 - `createMockScenes(count, performers, studios, tags, groups)` - Create multiple related scenes
 - `createMockPerformers(count)` - Create multiple performers with variety
 - `createMockStudios(count)` - Create multiple studios
@@ -114,6 +122,7 @@ The `helpers/mockDataGenerators.ts` file provides utilities for creating realist
 - `createMockGalleries(count)` - Create multiple galleries
 
 All mock data follows the TypeScript types from `server/types/entities.ts` and includes realistic:
+
 - Relationships between entities (scenes have performers, studios, tags, groups)
 - User-specific data (favorites, ratings, play counts, O counters)
 - Temporal data (dates offset by days/hours)
@@ -122,14 +131,18 @@ All mock data follows the TypeScript types from `server/types/entities.ts` and i
 ## Testing Philosophy
 
 ### Test-Driven Development (TDD)
+
 These tests were written to:
+
 1. **Identify existing bugs** before they reach users
 2. **Document expected behavior** through executable specifications
 3. **Enable safe refactoring** by catching regressions early
 4. **Serve as living documentation** of filter behavior
 
 ### Test Naming Convention
+
 Tests use descriptive names that explain both the scenario and expected outcome:
+
 ```typescript
 it("should filter scenes by studio with EXCLUDES modifier", () => { ... });
 it("should handle scenes without studio when EXCLUDES modifier is used", () => { ... });
@@ -137,7 +150,9 @@ it("should exclude scenes with null last_played_at when filter is applied", () =
 ```
 
 ### Test Organization
+
 Tests are grouped by feature/filter type for easy navigation:
+
 ```typescript
 describe("Scene Filters - Quick Filters", () => {
   describe("Performer Filter", () => {
@@ -151,10 +166,12 @@ describe("Scene Filters - Quick Filters", () => {
 ## Coverage Goals
 
 Current coverage:
+
 - **Scene Filters**: ~95% coverage (61 tests)
 - **Overall Server**: TBD (run `npm run test:coverage`)
 
 Target coverage:
+
 - All entity filter logic: 90%+
 - Critical user-facing features: 100%
 

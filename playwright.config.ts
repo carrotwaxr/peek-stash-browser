@@ -1,5 +1,5 @@
-import { readFileSync, existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync, readFileSync } from "node:fs";
 
 /**
  * Playwright E2E test configuration for Peek Stash Browser.
@@ -51,7 +51,9 @@ export default defineConfig({
   expect: { timeout: 5_000 },
 
   use: {
-    baseURL: process.env.E2E_BASE_URL || (isCI ? "http://localhost:5173" : "http://localhost:6969"),
+    baseURL:
+      process.env.E2E_BASE_URL ||
+      (isCI ? "http://localhost:5173" : "http://localhost:6969"),
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
 

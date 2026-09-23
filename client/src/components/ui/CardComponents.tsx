@@ -1,17 +1,25 @@
 /* eslint-disable react-refresh/only-export-components */
-import { forwardRef, useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
-import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { libraryApi } from "../../api";
+import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { CardCountIndicators } from "./CardCountIndicators";
 import EntityMenu from "./EntityMenu";
+import { ExpandableDescription } from "./ExpandableDescription";
 import FavoriteButton from "./FavoriteButton";
 import HideConfirmationDialog from "./HideConfirmationDialog";
+import MarqueeText from "./MarqueeText";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
-import { ExpandableDescription } from "./ExpandableDescription";
-import MarqueeText from "./MarqueeText";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -77,7 +85,7 @@ CardContainer.displayName = "CardContainer";
  * @param {Object} [props.style] - Additional inline styles
  * @param {Function} [props.onClick] - Click handler
  * @param {string} [props.linkTo] - Navigation link URL
-  * @param {string} [props.fromPageTitle] - Page title for back navigation context
+ * @param {string} [props.fromPageTitle] - Page title for back navigation context
  * @param {Function} [props.onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 interface CardImageProps {
@@ -112,7 +120,9 @@ export const CardImage = ({
   onClickOverride,
 }: CardImageProps) => {
   const [lazyRef, isVisible] = useLazyLoad();
-  const ref = lazyRef as React.RefObject<HTMLAnchorElement & HTMLDivElement | null>;
+  const ref = lazyRef as React.RefObject<
+    (HTMLAnchorElement & HTMLDivElement) | null
+  >;
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
@@ -154,22 +164,38 @@ export const CardImage = ({
     const icons = {
       performer: (
         <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+            clipRule="evenodd"
+          />
         </svg>
       ),
       scene: (
         <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-2H7v4h6v-4zm2 0h1V9h-1v2zm1-4V5h-1v2h1zM5 5v2H4V5h1zm0 4H4v2h1V9zm-1 4h1v2H4v-2z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-2H7v4h6v-4zm2 0h1V9h-1v2zm1-4V5h-1v2h1zM5 5v2H4V5h1zm0 4H4v2h1V9zm-1 4h1v2H4v-2z"
+            clipRule="evenodd"
+          />
         </svg>
       ),
       gallery: (
         <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+            clipRule="evenodd"
+          />
         </svg>
       ),
       default: (
         <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+            clipRule="evenodd"
+          />
         </svg>
       ),
     };
@@ -195,8 +221,8 @@ export const CardImage = ({
             />
           )}
           {/* Actual media - only render when visible for lazy loading */}
-          {isVisible && (
-            isVideo ? (
+          {isVisible &&
+            (isVideo ? (
               <video
                 src={src}
                 autoPlay
@@ -222,14 +248,13 @@ export const CardImage = ({
                 onLoad={() => setIsLoaded(true)}
                 onError={handleImageError}
               />
-            )
-          )}
+            ))}
         </>
       )}
     </>
   );
 
-  const containerClasses = `w-full mb-3 overflow-hidden rounded-lg relative ${linkTo ? 'cursor-pointer' : ''} ${className}`;
+  const containerClasses = `w-full mb-3 overflow-hidden rounded-lg relative ${linkTo ? "cursor-pointer" : ""} ${className}`;
   const containerStyle = {
     aspectRatio,
     backgroundColor: "var(--bg-secondary)",
@@ -273,7 +298,9 @@ export const CardImage = ({
  * Hook for true lazy loading via IntersectionObserver
  * Returns [ref, shouldLoad] - attach ref to container, use shouldLoad to conditionally set src
  */
-export const useLazyLoad = (rootMargin = "200px"): [React.RefObject<HTMLElement | null>, boolean] => {
+export const useLazyLoad = (
+  rootMargin = "200px"
+): [React.RefObject<HTMLElement | null>, boolean] => {
   const ref = useRef<HTMLElement | null>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
 
@@ -323,8 +350,17 @@ interface LazyImageProps {
   onClick?: (event: React.MouseEvent) => void;
 }
 
-export const LazyImage = ({ src, alt, className, style, onClick }: LazyImageProps) => {
-  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement | null>, boolean];
+export const LazyImage = ({
+  src,
+  alt,
+  className,
+  style,
+  onClick,
+}: LazyImageProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [
+    React.RefObject<HTMLDivElement | null>,
+    boolean,
+  ];
 
   return (
     <div ref={ref} className={className} style={style} onClick={onClick}>
@@ -351,8 +387,15 @@ interface CardDefaultImageProps {
   entityType?: string;
 }
 
-export const CardDefaultImage = ({ src, alt, entityType }: CardDefaultImageProps) => {
-  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement | null>, boolean];
+export const CardDefaultImage = ({
+  src,
+  alt,
+  entityType,
+}: CardDefaultImageProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [
+    React.RefObject<HTMLDivElement | null>,
+    boolean,
+  ];
 
   return (
     <div
@@ -382,13 +425,17 @@ interface CardOverlayProps {
   className?: string;
 }
 
-export const CardOverlay = ({ position = "bottom-left", children, className = "" }: CardOverlayProps) => {
+export const CardOverlay = ({
+  position = "bottom-left",
+  children,
+  className = "",
+}: CardOverlayProps) => {
   const positionClasses = {
     "top-left": "absolute top-0 left-0",
     "top-right": "absolute top-0 right-0",
     "bottom-left": "absolute bottom-0 left-0",
     "bottom-right": "absolute bottom-0 right-0",
-    "full": "absolute inset-0",
+    full: "absolute inset-0",
   };
 
   return (
@@ -476,18 +523,19 @@ export const CardTitle = ({
     </MarqueeText>
   ) : null;
 
-  const subtitleContent = linkTo && subtitleElement ? (
-    <Link
-      to={linkTo}
-      state={{ fromPageTitle, ...linkState }}
-      className="block cursor-pointer"
-      onClick={onClickOverride}
-    >
-      {subtitleElement}
-    </Link>
-  ) : (
-    subtitleElement
-  );
+  const subtitleContent =
+    linkTo && subtitleElement ? (
+      <Link
+        to={linkTo}
+        state={{ fromPageTitle, ...linkState }}
+        className="block cursor-pointer"
+        onClick={onClickOverride}
+      >
+        {subtitleElement}
+      </Link>
+    ) : (
+      subtitleElement
+    );
 
   return (
     <div className="w-full text-center mb-2">
@@ -507,7 +555,10 @@ interface CardDescriptionProps {
   maxLines?: number;
 }
 
-export const CardDescription = ({ description, maxLines = 3 }: CardDescriptionProps) => {
+export const CardDescription = ({
+  description,
+  maxLines = 3,
+}: CardDescriptionProps) => {
   return (
     <ExpandableDescription description={description} maxLines={maxLines} />
   );
@@ -530,7 +581,10 @@ interface CardIndicatorsProps {
   menuComponent?: ReactNode;
 }
 
-export const CardIndicators = ({ indicators, menuComponent }: CardIndicatorsProps) => {
+export const CardIndicators = ({
+  indicators,
+  menuComponent,
+}: CardIndicatorsProps) => {
   const hasIndicators = indicators && indicators.length > 0;
 
   // Don't render anything if no indicators and no menu
@@ -541,12 +595,18 @@ export const CardIndicators = ({ indicators, menuComponent }: CardIndicatorsProp
   return (
     <div className="my-2 w-full flex items-center">
       <div className="flex-1">
-        {hasIndicators && <CardCountIndicators indicators={indicators as Parameters<typeof CardCountIndicators>[0]['indicators']} />}
+        {hasIndicators && (
+          <CardCountIndicators
+            indicators={
+              indicators as Parameters<
+                typeof CardCountIndicators
+              >[0]["indicators"]
+            }
+          />
+        )}
       </div>
       {menuComponent && (
-        <div className="flex-shrink-0 ml-2">
-          {menuComponent}
-        </div>
+        <div className="flex-shrink-0 ml-2">{menuComponent}</div>
       )}
     </div>
   );
@@ -570,7 +630,12 @@ interface HideInfo {
   skipConfirmation?: boolean;
 }
 
-export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }: CardMenuRowProps) => {
+export const CardMenuRow = ({
+  entityType,
+  entityId,
+  entityTitle,
+  onHideSuccess,
+}: CardMenuRowProps) => {
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
   const [pendingHide, setPendingHide] = useState<HideInfo | null>(null);
   const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
@@ -706,7 +771,12 @@ export const CardRatingRow = ({
   const handleRatingSave = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating(entityType, entityId, newRating, instanceId);
+      await libraryApi.updateRating(
+        entityType,
+        entityId,
+        newRating,
+        instanceId
+      );
       // Notify parent of the change
       onRatingChange?.(entityId, newRating);
     } catch (error) {
@@ -718,7 +788,12 @@ export const CardRatingRow = ({
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite(entityType, entityId, newValue, instanceId);
+      await libraryApi.updateFavorite(
+        entityType,
+        entityId,
+        newValue,
+        instanceId
+      );
       // Notify parent of the change
       onFavoriteChange?.(entityId, newValue);
     } catch (error) {

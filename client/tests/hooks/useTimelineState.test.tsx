@@ -1,14 +1,13 @@
 // client/tests/hooks/useTimelineState.test.jsx
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { apiGet } from "../../src/api";
 import { useTimelineState } from "../../src/components/timeline/useTimelineState";
 
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
-
-import { apiGet } from "../../src/api";
-import type { Mock } from "vitest";
 
 const apiGetMock = apiGet as unknown as Mock;
 
@@ -53,7 +52,9 @@ describe("useTimelineState", () => {
         expect(result.current.distribution).toEqual(mockDistribution);
       });
 
-      expect(apiGet).toHaveBeenCalledWith("/timeline/scene/distribution?granularity=months");
+      expect(apiGet).toHaveBeenCalledWith(
+        "/timeline/scene/distribution?granularity=months"
+      );
     });
   });
 
@@ -76,14 +77,18 @@ describe("useTimelineState", () => {
       expect(result.current.zoomLevel).toBe("years");
 
       await waitFor(() => {
-        expect(apiGet).toHaveBeenCalledWith("/timeline/scene/distribution?granularity=years");
+        expect(apiGet).toHaveBeenCalledWith(
+          "/timeline/scene/distribution?granularity=years"
+        );
       });
     });
   });
 
   describe("period selection", () => {
     it("selects a period and calculates date range", async () => {
-      apiGetMock.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
+      apiGetMock.mockResolvedValue({
+        distribution: [{ period: "2024-03", count: 47 }],
+      });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })
@@ -106,7 +111,9 @@ describe("useTimelineState", () => {
     });
 
     it("clears selection when selecting same period", async () => {
-      apiGetMock.mockResolvedValue({ distribution: [{ period: "2024-03", count: 47 }] });
+      apiGetMock.mockResolvedValue({
+        distribution: [{ period: "2024-03", count: 47 }],
+      });
 
       const { result } = renderHook(() =>
         useTimelineState({ entityType: "scene" })

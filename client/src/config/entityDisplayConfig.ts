@@ -251,9 +251,7 @@ export const ENTITY_DISPLAY_CONFIG = {
   },
   clip: {
     label: "Clip",
-    viewModes: [
-      { id: "grid", label: "Grid" },
-    ],
+    viewModes: [{ id: "grid", label: "Grid" }],
     defaultSettings: {
       defaultViewMode: "grid",
       defaultGridDensity: "medium",
@@ -289,21 +287,33 @@ export const getEntityTypes = () => Object.keys(ENTITY_DISPLAY_CONFIG);
  * Get default settings for an entity type
  */
 export const getDefaultSettings = (entityType: string) => {
-  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.defaultSettings || {};
+  return (
+    (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[
+      entityType
+    ]?.defaultSettings || {}
+  );
 };
 
 /**
  * Get available view modes for an entity type
  */
 export const getViewModes = (entityType: string) => {
-  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.viewModes || [{ id: "grid", label: "Grid" }];
+  return (
+    (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[
+      entityType
+    ]?.viewModes || [{ id: "grid", label: "Grid" }]
+  );
 };
 
 /**
  * Get available settings for an entity type (for UI rendering)
  */
 export const getAvailableSettings = (entityType: string) => {
-  return (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[entityType]?.availableSettings || [];
+  return (
+    (ENTITY_DISPLAY_CONFIG as Record<string, Record<string, unknown>>)[
+      entityType
+    ]?.availableSettings || []
+  );
 };
 
 /**

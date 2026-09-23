@@ -8,7 +8,9 @@
  * The actual count logic is handled by the database, so we're primarily
  * testing that the service calls the correct Prisma methods.
  */
-import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
+import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../services/../prisma/singleton.js";
+import { entityImageCountService } from "../../services/EntityImageCountService.js";
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -30,9 +32,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     $executeRaw: vi.fn().mockResolvedValue(0),
   },
 }));
-
-import prisma from "../../services/../prisma/singleton.js";
-import { entityImageCountService } from "../../services/EntityImageCountService.js";
 
 const getMock = (fn: unknown): Mock => fn as Mock;
 

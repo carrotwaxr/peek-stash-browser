@@ -4,12 +4,12 @@
  * Tests that filter builder functions correctly transform UI filter values
  * into the GraphQL filter format expected by the backend
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  buildSceneFilter,
   buildGalleryFilter,
   buildImageFilter,
   buildPerformerFilter,
+  buildSceneFilter,
 } from "../../src/utils/filterConfig";
 
 describe("buildSceneFilter", () => {

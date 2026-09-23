@@ -2,9 +2,9 @@
  * Hook for fetching user stats via TanStack Query.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "./useAuth";
 import { apiGet } from "../api";
 import { queryKeys } from "../api/queryKeys";
+import { useAuth } from "./useAuth";
 
 type TopListSortBy = "engagement" | "oCount" | "playCount";
 
@@ -12,7 +12,9 @@ interface UseUserStatsOptions {
   sortBy?: TopListSortBy;
 }
 
-export function useUserStats({ sortBy = "engagement" }: UseUserStatsOptions = {}) {
+export function useUserStats({
+  sortBy = "engagement",
+}: UseUserStatsOptions = {}) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
@@ -24,7 +26,9 @@ export function useUserStats({ sortBy = "engagement" }: UseUserStatsOptions = {}
         params.set("sortBy", sortBy);
       }
       const queryString = params.toString();
-      const endpoint = queryString ? `/user-stats?${queryString}` : "/user-stats";
+      const endpoint = queryString
+        ? `/user-stats?${queryString}`
+        : "/user-stats";
       return apiGet(endpoint);
     },
     enabled: isAuthenticated,
