@@ -1770,9 +1770,6 @@ class StashSyncService extends EventEmitter {
           // computes the delete-set; reconciliation and the soft-delete writes happen outside,
           // after the safety threshold check below.
           const sceneBatchSize = 500;
-          const instanceFilter = stashInstanceId
-            ? `stashInstanceId = '${stashInstanceId}'`
-            : `stashInstanceId IS NULL`;
           const scenesToDelete = await prisma.$transaction(
             async (tx) => {
               await tx.$executeRawUnsafe(
@@ -1780,12 +1777,13 @@ class StashSyncService extends EventEmitter {
               );
               await tx.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
 
+              // Stash ids and the instance id are bound, never spliced into SQL text.
               for (let i = 0; i < stashIds.length; i += sceneBatchSize) {
                 const batch = stashIds.slice(i, i + sceneBatchSize);
                 if (batch.length > 0) {
-                  const values = batch.map((id) => `('${id}')`).join(",");
                   await tx.$executeRawUnsafe(
-                    `INSERT OR IGNORE INTO _stash_scene_ids (id) VALUES ${values}`
+                    `INSERT OR IGNORE INTO _stash_scene_ids (id) SELECT value FROM json_each(?)`,
+                    JSON.stringify(batch)
                   );
                 }
               }
@@ -1796,8 +1794,9 @@ class StashSyncService extends EventEmitter {
               >(
                 `SELECT id, phash FROM StashScene
                  WHERE deletedAt IS NULL
-                 AND ${instanceFilter}
-                 AND id NOT IN (SELECT id FROM _stash_scene_ids)`
+                 AND stashInstanceId = ?
+                 AND id NOT IN (SELECT id FROM _stash_scene_ids)`,
+                stashInstanceId
               );
 
               await tx.$executeRawUnsafe(

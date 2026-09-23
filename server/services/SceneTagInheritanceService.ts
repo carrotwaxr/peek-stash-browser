@@ -247,24 +247,20 @@ class SceneTagInheritanceService {
 
     // Bulk update using raw SQL for performance
     // SQLite doesn't support UPDATE FROM, so we use CASE expressions
-    // Use composite key (id, stashInstanceId) for multi-instance correctness
-    // Note: IDs come from our database (Stash UUIDs), not user input
+    // Each CASE arm and the WHERE match the (id, stashInstanceId) pair, so two
+    // instances sharing a scene id keep their own tags. Every value is bound.
     if (updates.length > 0) {
       const cases = updates
-        .map(
-          (u) =>
-            `WHEN '${u.id}' THEN '${u.inheritedTagIds.replace(/'/g, "''")}'`
-        )
+        .map(() => "WHEN id = ? AND stashInstanceId = ? THEN ?")
         .join(" ");
-      const idInstancePairs = updates
-        .map((u) => `('${u.id}', '${u.instanceId}')`)
-        .join(",");
-
-      await prisma.$executeRawUnsafe(`
-        UPDATE StashScene
-        SET inheritedTagIds = CASE id ${cases} END
-        WHERE (id, stashInstanceId) IN (${idInstancePairs})
-      `);
+      const pairs = updates.map(() => "(?, ?)").join(", ");
+      await prisma.$executeRawUnsafe(
+        `UPDATE StashScene
+         SET inheritedTagIds = CASE ${cases} END
+         WHERE (id, stashInstanceId) IN (VALUES ${pairs})`,
+        ...updates.flatMap((u) => [u.id, u.instanceId, u.inheritedTagIds]),
+        ...updates.flatMap((u) => [u.id, u.instanceId])
+      );
     }
   }
 }

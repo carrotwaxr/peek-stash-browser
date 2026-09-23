@@ -2659,3 +2659,73 @@ describe("error handling", () => {
     ).rejects.toThrow("DB read error");
   });
 });
+
+describe("hidden and restricted ids never reach SQL text", () => {
+  const HOSTILE = "x') OR 1=1 OR je.value IN ('y";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default empty responses for cascade-related queries
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashScene.findMany.mockResolvedValue([]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+    mockPrisma.performerTag.findMany.mockResolvedValue([]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([]);
+    mockPrisma.groupTag.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
+    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
+    mockPrisma.$queryRaw.mockResolvedValue([]);
+    // Mock $executeRaw for temp table operations
+    mockPrisma.$executeRaw.mockResolvedValue(undefined);
+    // Default count responses for entity stats
+    mockPrisma.stashScene.count.mockResolvedValue(0);
+    mockPrisma.stashPerformer.count.mockResolvedValue(0);
+    mockPrisma.stashStudio.count.mockResolvedValue(0);
+    mockPrisma.stashTag.count.mockResolvedValue(0);
+    mockPrisma.stashGroup.count.mockResolvedValue(0);
+    mockPrisma.stashGallery.count.mockResolvedValue(0);
+    mockPrisma.stashImage.count.mockResolvedValue(0);
+    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+    // Earlier tests reassign $queryRawUnsafe; start from a fresh mock.
+    mockPrisma.$queryRawUnsafe = vi.fn().mockResolvedValue([]);
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+  });
+
+  it("binds global tag ids as one JSON parameter in the inherited-tag cascade", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "" },
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const call = mockPrisma.$queryRawUnsafe.mock.calls.find((c: any[]) =>
+      String(c[0]).includes("json_each(s.inheritedTagIds)")
+    );
+    expect(call).toBeDefined();
+    const [sql, ...params] = call!;
+    expect(sql).toContain("IN (SELECT value FROM json_each(?))");
+    expect(sql).not.toContain(HOSTILE);
+    expect(params).toContain(JSON.stringify([HOSTILE]));
+  });
+
+  it("binds scoped tag ids as one JSON parameter in the inherited-tag cascade", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "instB" },
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const call = mockPrisma.$queryRaw.mock.calls.find((c: any[]) =>
+      (c[0] as string[]).join("?").includes("json_each(s.inheritedTagIds)")
+    );
+    expect(call).toBeDefined();
+    expect(call!.slice(1)).toEqual(["instB", JSON.stringify([HOSTILE])]);
+  });
+});

@@ -131,3 +131,76 @@ describeWithDb("StashSyncService.cleanupDeletedEntities (integration)", () => {
     expect(new Set(alive)).toEqual(new Set(SCENE_IDS));
   });
 });
+
+// Instance and Stash ids with quotes: both must be bound, never spliced into
+// the cleanup SQL (item 4, SYNC-23).
+const QUOTED_INSTANCE = "cleanup-it-o'brien";
+
+async function clearQuotedScenes(): Promise<void> {
+  await prisma.stashScene.deleteMany({
+    where: { stashInstanceId: QUOTED_INSTANCE },
+  });
+}
+
+describeWithDb(
+  "StashSyncService.cleanupDeletedEntities with quoted ids (integration)",
+  () => {
+    let keepSet: string[] = [];
+
+    beforeEach(async () => {
+      await clearQuotedScenes();
+      await prisma.stashScene.createMany({
+        data: SCENE_IDS.map((id) => ({ id, stashInstanceId: QUOTED_INSTANCE })),
+      });
+
+      const realGetStashClient = (
+        stashSyncService as unknown as {
+          getStashClient: (id?: string) => unknown;
+        }
+      ).getStashClient.bind(stashSyncService);
+
+      vi.spyOn(
+        stashSyncService as unknown as {
+          getStashClient: (id?: string) => unknown;
+        },
+        "getStashClient"
+      ).mockImplementation((id?: string) => {
+        if (id !== QUOTED_INSTANCE) return realGetStashClient(id);
+        return {
+          findSceneIDs: async () => ({
+            findScenes: {
+              scenes: keepSet.map((sceneId) => ({ id: sceneId })),
+              count: keepSet.length,
+            },
+          }),
+        };
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    afterAll(async () => {
+      await clearQuotedScenes();
+    });
+
+    it("soft-deletes exactly the missing scenes when the instance id and a Stash id contain quotes", async () => {
+      keepSet = ["1", "2", "3", "4", "5", "6", "7", "it's-gone"];
+
+      const deletedCount = await (
+        stashSyncService as unknown as {
+          cleanupDeletedEntities: (t: string, id: string) => Promise<number>;
+        }
+      ).cleanupDeletedEntities("scene", QUOTED_INSTANCE);
+
+      expect(deletedCount).toBe(3);
+      const rows = await prisma.stashScene.findMany({
+        where: { stashInstanceId: QUOTED_INSTANCE },
+        select: { id: true, deletedAt: true },
+      });
+      const deleted = rows.filter((r) => r.deletedAt !== null).map((r) => r.id);
+      expect(new Set(deleted)).toEqual(new Set(["8", "9", "10"]));
+    });
+  }
+);

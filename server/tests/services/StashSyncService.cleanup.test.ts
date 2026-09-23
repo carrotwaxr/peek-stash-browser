@@ -546,5 +546,38 @@ describe("StashSyncService Cleanup", () => {
         )
       ).toBe(true);
     });
+
+    it("binds the instance id and Stash ids instead of splicing them into the cleanup SQL", async () => {
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }, { id: "x'y" }], count: 2 },
+      });
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
+
+      await (stashSyncService as any).cleanupDeletedEntities(
+        "scene",
+        "inst-'q"
+      );
+
+      const execCalls = vi.mocked(prisma.$executeRawUnsafe).mock.calls;
+      const queryCalls = vi.mocked(prisma.$queryRawUnsafe).mock.calls;
+      for (const call of [...execCalls, ...queryCalls]) {
+        const sql = String(call[0]);
+        expect(sql).not.toContain("inst-'q");
+        expect(sql).not.toContain("x'y");
+      }
+
+      const insertCall = execCalls.find((c) =>
+        /INSERT OR IGNORE INTO _stash_scene_ids/.test(String(c[0]))
+      );
+      expect(insertCall).toBeDefined();
+      expect(insertCall!.slice(1)).toEqual([JSON.stringify(["1", "x'y"])]);
+
+      const selectCall = queryCalls.find((c) =>
+        String(c[0]).includes("SELECT id, phash")
+      );
+      expect(selectCall).toBeDefined();
+      expect(String(selectCall![0])).toContain("stashInstanceId = ?");
+      expect(selectCall!.slice(1)).toEqual(["inst-'q"]);
+    });
   });
 });

@@ -2270,6 +2270,68 @@ export const deleteUserRestrictions = async (
   }
 };
 
+const HIDEABLE_ENTITY_TYPES = [
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "group",
+  "gallery",
+  "image",
+] as const;
+
+/**
+ * Validate one hide target from a request body. Hidden ids are stored and
+ * later reach exclusion queries, so only numeric Stash ids are accepted.
+ */
+async function validateHideTarget(target: {
+  entityType?: unknown;
+  entityId?: unknown;
+  instanceId?: unknown;
+}): Promise<
+  | { ok: true; entityType: EntityType; entityId: string; instanceId: string }
+  | { ok: false; error: string }
+> {
+  const { entityType, entityId, instanceId } = target;
+
+  if (!entityType || !entityId) {
+    return { ok: false, error: "entityType and entityId are required" };
+  }
+
+  if (typeof entityType !== "string") {
+    return { ok: false, error: `Invalid entity type: ${typeof entityType}` };
+  }
+  if (!(HIDEABLE_ENTITY_TYPES as readonly string[]).includes(entityType)) {
+    return { ok: false, error: `Invalid entity type: ${entityType}` };
+  }
+
+  if (typeof entityId !== "string" || !/^\d+$/.test(entityId)) {
+    return {
+      ok: false,
+      error: "Invalid entityId: expected a numeric Stash id",
+    };
+  }
+
+  // Validate instanceId if provided
+  if (instanceId !== undefined && instanceId !== null && instanceId !== "") {
+    if (typeof instanceId !== "string") {
+      return { ok: false, error: "Invalid instanceId" };
+    }
+    const { stashInstanceManager } =
+      await import("../services/StashInstanceManager.js");
+    if (!stashInstanceManager.getConfig(instanceId)) {
+      return { ok: false, error: "Invalid instanceId" };
+    }
+  }
+
+  return {
+    ok: true,
+    entityType: entityType as EntityType,
+    entityId,
+    instanceId: typeof instanceId === "string" ? instanceId : "",
+  };
+}
+
 /**
  * Hide an entity for the current user
  */
@@ -2284,36 +2346,9 @@ export const hideEntity = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { entityType, entityId, instanceId } = req.body;
-
-    if (!entityType || !entityId) {
-      return res
-        .status(400)
-        .json({ error: "Entity type and entity ID are required" });
-    }
-
-    // Validate entity type
-    const validTypes = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-    ];
-    if (!validTypes.includes(entityType)) {
-      return res.status(400).json({ error: "Invalid entity type" });
-    }
-
-    // Validate instanceId if provided
-    if (instanceId) {
-      const { stashInstanceManager } =
-        await import("../services/StashInstanceManager.js");
-      const instance = stashInstanceManager.getConfig(instanceId);
-      if (!instance) {
-        return res.status(400).json({ error: "Invalid instanceId" });
-      }
+    const target = await validateHideTarget(req.body);
+    if (!target.ok) {
+      return res.status(400).json({ error: target.error });
     }
 
     // Import service
@@ -2322,9 +2357,9 @@ export const hideEntity = async (
 
     await userHiddenEntityService.hideEntity(
       userId,
-      entityType as EntityType,
-      entityId,
-      instanceId ?? ""
+      target.entityType,
+      target.entityId,
+      target.instanceId
     );
 
     res.json({ success: true, message: "Entity hidden successfully" });
@@ -2569,28 +2604,20 @@ export const hideEntities = async (
         .json({ error: "entities must be a non-empty array" });
     }
 
-    // Validate entity types
-    const validTypes = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-    ];
-
-    for (const entity of entities) {
-      if (!entity.entityType || !entity.entityId) {
+    // Validate every entity before hiding any
+    const targets: Array<{
+      entityType: EntityType;
+      entityId: string;
+      instanceId: string;
+    }> = [];
+    for (const [i, entity] of entities.entries()) {
+      const target = await validateHideTarget(entity);
+      if (!target.ok) {
         return res
           .status(400)
-          .json({ error: "Each entity must have entityType and entityId" });
+          .json({ error: `entities[${i}]: ${target.error}` });
       }
-      if (!validTypes.includes(entity.entityType)) {
-        return res
-          .status(400)
-          .json({ error: `Invalid entity type: ${entity.entityType}` });
-      }
+      targets.push(target);
     }
 
     // Import service
@@ -2601,18 +2628,18 @@ export const hideEntities = async (
     let successCount = 0;
     let failCount = 0;
 
-    for (const entity of entities) {
+    for (const target of targets) {
       try {
         await userHiddenEntityService.hideEntity(
           userId,
-          entity.entityType as EntityType,
-          entity.entityId,
-          entity.instanceId ?? ""
+          target.entityType,
+          target.entityId,
+          target.instanceId
         );
         successCount++;
       } catch (error) {
         failCount++;
-        logger.error(`Failed to hide ${entity.entityType} ${entity.entityId}`, {
+        logger.error(`Failed to hide ${target.entityType} ${target.entityId}`, {
           error: error instanceof Error ? error.message : "Unknown error",
         });
       }
