@@ -212,45 +212,84 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       }
     );
 
+    it("rejects an INCLUDE list with no ids", async () => {
+      // A Show-only list with nothing in it is a mistake, not "hide everything"
+      const restrictions = [
+        {
+          entityType: "tags",
+          mode: "INCLUDE",
+          entityIds: [],
+          restrictEmpty: false,
+        },
+      ];
+
+      const setResponse = await adminClient.put<{
+        success?: boolean;
+        error?: string;
+      }>(`/api/user/${testUserId}/restrictions`, { restrictions });
+
+      expect(setResponse.status).toBe(400);
+      expect(setResponse.data.error).toMatch(/non-empty/);
+    });
+
     it(
-      "should handle INCLUDE mode with empty list (exclude all)",
+      "accepts INCLUDE and EXCLUDE rows for the same type",
       { timeout: 30_000 },
       async () => {
-        // Set INCLUDE mode with empty list - this should exclude ALL tags
         const restrictions = [
-          {
-            entityType: "tags",
-            mode: "INCLUDE",
-            entityIds: [],
-            restrictEmpty: false,
-          },
+          { entityType: "tags", mode: "INCLUDE", entityIds: [tag1Id] },
+          { entityType: "tags", mode: "EXCLUDE", entityIds: [tag2Id] },
         ];
 
         const setResponse = await adminClient.put<{
           success: boolean;
-          restrictions: Array<unknown>;
+          restrictions: Array<{
+            entityType: string;
+            mode: string;
+            restrictEmpty: boolean;
+          }>;
         }>(`/api/user/${testUserId}/restrictions`, { restrictions });
 
         expect(setResponse.ok).toBe(true);
-
-        // Trigger exclusion recomputation
-        await adminClient.post(`/api/exclusions/recompute/${testUserId}`);
-
-        // Query tags as test user - should see no tags
-        const userTagsResponse = await testUserClient.post<FindTagsResponse>(
-          "/api/library/tags",
-          {
-            filter: { per_page: 1000 },
-          }
+        expect(setResponse.data.success).toBe(true);
+        // The PUT response carries the two saved rows, one per mode, with the
+        // owner-decision defaults for restrictEmpty
+        expect(setResponse.data.restrictions).toHaveLength(2);
+        const byMode = new Map(
+          setResponse.data.restrictions.map((r) => [r.mode, r])
         );
+        expect(byMode.get("INCLUDE")?.entityType).toBe("tags");
+        expect(byMode.get("INCLUDE")?.restrictEmpty).toBe(true);
+        expect(byMode.get("EXCLUDE")?.entityType).toBe("tags");
+        expect(byMode.get("EXCLUDE")?.restrictEmpty).toBe(false);
 
-        expect(userTagsResponse.ok).toBe(true);
-
-        // With INCLUDE mode and empty list, ALL tags should be excluded
-        // If the bug exists, NO tags would be excluded (getAllEntityIds returns [])
-        expect(userTagsResponse.data.findTags.tags.length).toBe(0);
-        expect(userTagsResponse.data.findTags.count).toBe(0);
+        const saved = await adminClient.get<{
+          restrictions: Array<{ mode: string }>;
+        }>(`/api/user/${testUserId}/restrictions`);
+        expect(saved.data.restrictions).toHaveLength(2);
       }
     );
+
+    it("rejects restrictions for an admin target", async () => {
+      const usersResponse = await adminClient.get<{
+        users: Array<{ id: number; username: string }>;
+      }>("/api/user/all");
+      const admin = usersResponse.data.users.find(
+        (u) => u.username === TEST_ADMIN.username
+      );
+      expect(admin).toBeDefined();
+
+      const setResponse = await adminClient.put<{ error?: string }>(
+        `/api/user/${admin!.id}/restrictions`,
+        {
+          restrictions: [
+            { entityType: "tags", mode: "EXCLUDE", entityIds: [tag1Id] },
+          ],
+        }
+      );
+
+      expect(setResponse.status).toBe(400);
+      expect(setResponse.data.error).toMatch(/administrators/);
+    });
   });
 });

@@ -1,10 +1,29 @@
+/**
+ * Unit tests for ExclusionComputationService (item 13).
+ *
+ * The compute is raw SQL end to end: resolution (recursive CTE for tag and
+ * studio descendants), inversion, cascades, content rules and the empty phase
+ * all go through $queryRawUnsafe with bound JSON, and the closures and
+ * exclusion sets live in TEMP tables filled through $executeRawUnsafe. These
+ * tests route $queryRawUnsafe by table name (never by call order) and assert
+ * on the rows the write phase receives.
+ *
+ * The compute runs on the single-connection compute client and the write
+ * swap on the main client; both are the one mocked prisma here, so fakeRaw
+ * routes the compute's queries whichever client issues them.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import prisma from "../../services/../prisma/singleton.js";
+import {
+  disconnectComputeClient,
+  getComputeClient,
+} from "../../prisma/computeClient.js";
+import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 
 // Mock UserInstanceService before importing service
 vi.mock("../../services/UserInstanceService.js", () => ({
-  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["test-instance-1"]),
+  getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["A"]),
   buildInstanceFilterClause: vi
     .fn()
     .mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
@@ -21,6 +40,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     $queryRaw: vi.fn(),
     $queryRawUnsafe: vi.fn().mockResolvedValue([]),
     $executeRaw: vi.fn(),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     userExcludedEntity: {
       deleteMany: vi.fn(),
       createMany: vi.fn(),
@@ -39,69 +59,184 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
     user: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
     },
-    // Cascade-related models
-    scenePerformer: {
-      findMany: vi.fn(),
-    },
-    stashScene: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-    stashPerformer: {
-      count: vi.fn(),
-    },
-    stashStudio: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-    },
-    stashTag: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-    },
-    stashGroup: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-    },
-    stashGallery: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-    },
-    stashImage: {
-      count: vi.fn(),
-    },
-    stashClip: {
-      count: vi.fn(),
-    },
-    sceneTag: {
-      findMany: vi.fn(),
-    },
-    performerTag: {
-      findMany: vi.fn(),
-    },
-    studioTag: {
-      findMany: vi.fn(),
-    },
-    groupTag: {
-      findMany: vi.fn(),
-    },
-    sceneGroup: {
-      findMany: vi.fn(),
-    },
-    sceneGallery: {
-      findMany: vi.fn(),
-    },
-    imageGallery: {
-      findMany: vi.fn(),
-    },
+    // Only the stats phase uses Prisma delegates on entity tables (counts);
+    // resolution, cascades, content rules and the empty phase are raw SQL.
+    stashScene: { count: vi.fn() },
+    stashPerformer: { count: vi.fn() },
+    stashStudio: { count: vi.fn() },
+    stashTag: { count: vi.fn() },
+    stashGroup: { count: vi.fn() },
+    stashGallery: { count: vi.fn() },
+    stashImage: { count: vi.fn() },
+    stashClip: { count: vi.fn() },
   },
 }));
 
+// The compute client resolves to the same mocked prisma
+vi.mock("../../prisma/computeClient.js", async () => {
+  const { default: mocked } = await import("../../prisma/singleton.js");
+  return {
+    getComputeClient: vi.fn(async () => mocked),
+    disconnectComputeClient: vi.fn(async () => undefined),
+  };
+});
+
 const mockPrisma = prisma as any;
+const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
+
+/** Route $queryRawUnsafe by SQL shape; unmatched queries return no rows. */
+function fakeRaw(routes: Array<[RegExp, unknown[]]>) {
+  mockPrisma.$queryRawUnsafe.mockImplementation(async (sql: string) => {
+    const hit = routes.find(([re]) => re.test(sql));
+    return hit ? hit[1] : [];
+  });
+}
+
+/** Every $queryRawUnsafe call as [sql, ...params]. */
+function rawCalls(): Array<[string, ...unknown[]]> {
+  return mockPrisma.$queryRawUnsafe.mock.calls as Array<[string, ...unknown[]]>;
+}
+
+/** Every $executeRawUnsafe call as [sql, ...params] (temp-table fills). */
+function execCalls(): Array<[string, ...unknown[]]> {
+  return mockPrisma.$executeRawUnsafe.mock.calls as Array<
+    [string, ...unknown[]]
+  >;
+}
+
+function queriesMatching(re: RegExp) {
+  return rawCalls().filter((c) => re.test(String(c[0])));
+}
+
+/** Rows handed to the write phase (createMany payloads, flattened). */
+function createdRows(): Array<{
+  userId: number;
+  entityType: string;
+  entityId: string;
+  instanceId: string;
+  reason: string;
+}> {
+  return mockPrisma.userExcludedEntity.createMany.mock.calls.flatMap(
+    (c: any) => c[0].data || []
+  );
+}
+
+function rowKeys(rows: ReturnType<typeof createdRows>): Set<string> {
+  return new Set(
+    rows.map(
+      (r) => `${r.entityType}:${r.entityId}@${r.instanceId ?? ""}:${r.reason}`
+    )
+  );
+}
+
+/** Upsert payloads from addHiddenEntity as the same keys. */
+function upsertKeys(): Set<string> {
+  return new Set(
+    mockPrisma.userExcludedEntity.upsert.mock.calls.map((c: any) => {
+      const w = c[0].where.userId_entityType_entityId_instanceId;
+      return `${w.entityType}:${w.entityId}@${w.instanceId}:${c[0].create.reason}`;
+    })
+  );
+}
+
+/** Default mocks for a full, empty recompute of a USER on instance A. */
+function setupPipeline(allowed: string[] = ["A"]) {
+  vi.clearAllMocks();
+  mockAllowedInstances.mockResolvedValue(allowed);
+  mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+  mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+  mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+  mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+  mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
+  mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
+  mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
+  mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+  mockPrisma.$queryRaw.mockResolvedValue([]);
+  mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  mockPrisma.$executeRaw.mockResolvedValue(undefined);
+  mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+  for (const model of [
+    "stashScene",
+    "stashPerformer",
+    "stashStudio",
+    "stashTag",
+    "stashGroup",
+    "stashGallery",
+    "stashImage",
+    "stashClip",
+  ]) {
+    mockPrisma[model].count.mockResolvedValue(0);
+  }
+  mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+    return callback(mockPrisma);
+  });
+}
+
+function restriction(
+  entityType: string,
+  mode: string,
+  entityIds: string[],
+  restrictEmpty = false
+) {
+  return {
+    userId: 1,
+    entityType,
+    mode,
+    entityIds: JSON.stringify(entityIds),
+    restrictEmpty,
+  };
+}
+
+// Route shapes (by table name, never by call order)
+const RESOLVE_TAG = /CROSS JOIN StashTag t ON/;
+const RESOLVE_STUDIO = /CROSS JOIN StashStudio t ON/;
+const RESOLVE_GROUP = /CROSS JOIN StashGroup t ON/;
+const RESOLVE_GALLERY = /CROSS JOIN StashGallery t ON/;
+const RESOLVE_PERFORMER = /CROSS JOIN StashPerformer t ON/;
+const RESOLVE_SCENE = /CROSS JOIN StashScene t ON/;
+const RESOLVE_IMAGE = /CROSS JOIN StashImage t ON/;
+const INVERT_TAG =
+  /FROM StashTag t[\s\S]*NOT EXISTS \(SELECT 1 FROM _peek_refs/;
+const INVERT_GALLERY =
+  /FROM StashGallery t[\s\S]*NOT EXISTS \(SELECT 1 FROM _peek_refs/;
+const INVERT_STUDIO =
+  /FROM StashStudio t[\s\S]*NOT EXISTS \(SELECT 1 FROM _peek_refs/;
+const EDGE_SCENE_TAG = /FROM SceneTag j/;
+const EDGE_SCENE_PERFORMER = /FROM ScenePerformer j/;
+const EDGE_GALLERY_TAG = /FROM GalleryTag j/;
+const EDGE_IMAGE_TAG = /FROM ImageTag j/;
+const EDGE_CLIP_TAG = /FROM ClipTag j/;
+const EDGE_CLIP_PRIMARY = /FROM StashClip x/;
+const EDGE_GALLERY_PERFORMER = /FROM GalleryPerformer j/;
+const EDGE_IMAGE_PERFORMER = /FROM ImagePerformer j/;
+const EDGE_STUDIO_SCENE =
+  /FROM StashScene x[\s\S]*JOIN _peek_refs r ON r\.id = x\.studioId/;
+const EDGE_STUDIO_GALLERY =
+  /FROM StashGallery x[\s\S]*JOIN _peek_refs r ON r\.id = x\.studioId/;
+const EDGE_STUDIO_IMAGE =
+  /FROM StashImage x[\s\S]*JOIN _peek_refs r ON r\.id = x\.studioId/;
+const EDGE_INHERITED =
+  /FROM StashScene s[\s\S]*AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/;
+const CONTENT_TAG_SCENE =
+  /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag st/;
+const CONTENT_GALLERY_SCENE = /FROM StashScene x[\s\S]*SceneGallery/;
+const CONTENT_GALLERY_IMAGE = /FROM StashImage x[\s\S]*ImageGallery/;
+const CONTENT_STUDIO =
+  /x\.studioId IS NULL OR NOT EXISTS \(SELECT 1 FROM _peek_refs/;
+const EMPTY_GALLERY = /FROM StashGallery g/;
+const EMPTY_PERFORMER = /FROM StashPerformer p/;
+const EMPTY_STUDIO = /FROM StashStudio st/;
+const EMPTY_GROUP = /FROM StashGroup g/;
+const EMPTY_TAG = /FROM StashTag t[\s\S]*FROM GalleryTag gt/;
 
 describe("ExclusionComputationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
   describe("recomputeForUser", () => {
@@ -224,8 +359,9 @@ describe("ExclusionComputationService", () => {
       // Wait for all to complete
       await Promise.all([first, second, third, fourth, fifth]);
 
-      // With coalescing: at most 2 recomputes (the running one + one queued)
-      // Without coalescing: would be 5 (each caller starts its own)
+      // With coalescing: at most 2 recomputes (the running one + one queued).
+      // Each recompute opens one transaction, the write swap (the compute
+      // runs on the compute client). Without coalescing there would be 5.
       expect(computeCount).toBe(2);
     });
 
@@ -281,7 +417,8 @@ describe("ExclusionComputationService", () => {
 
       await Promise.all([first, second]);
 
-      // Verify sequencing: first must complete before second starts
+      // Verify sequencing: the first recompute must complete before the
+      // second one starts.
       expect(executionOrder).toEqual(["start-1", "end-1", "start-2", "end-2"]);
     });
 
@@ -331,6 +468,114 @@ describe("ExclusionComputationService", () => {
       expect(user1Count).toBe(1);
       expect(user2Count).toBe(1);
     });
+
+    it("never interleaves two users' compute phases on the compute connection", async () => {
+      // The TEMP table names are shared on the one compute connection, so
+      // user 21's compute must wait until user 20's has ended its snapshot.
+      setupPipeline();
+      const events: string[] = [];
+      let releaseFirst!: () => void;
+      const firstBlocker = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
+        if (sql === "BEGIN" || sql === "ROLLBACK") events.push(sql);
+        return 0;
+      });
+      mockPrisma.userContentRestriction.findMany.mockImplementation(
+        async (args: any) => {
+          events.push(`rules-${args.where.userId}`);
+          if (args.where.userId === 20) await firstBlocker;
+          return [];
+        }
+      );
+
+      const first = exclusionComputationService.recomputeForUser(20);
+      const second = exclusionComputationService.recomputeForUser(21);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // User 20 is parked inside its compute; user 21 has issued nothing
+      expect(events).toEqual(["BEGIN", "rules-20"]);
+
+      releaseFirst();
+      await Promise.all([first, second]);
+
+      expect(events).toEqual([
+        "BEGIN",
+        "rules-20",
+        "ROLLBACK",
+        "BEGIN",
+        "rules-21",
+        "ROLLBACK",
+      ]);
+    });
+
+    it("computes in a deferred BEGIN on the compute client; only the write swap is a Prisma transaction", async () => {
+      setupPipeline();
+      const events: string[] = [];
+      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
+        events.push(sql === "BEGIN" || sql === "ROLLBACK" ? sql : "exec");
+        return 0;
+      });
+      mockPrisma.$queryRawUnsafe.mockImplementation(async () => {
+        events.push("query");
+        return [];
+      });
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        events.push("transaction");
+        return callback(mockPrisma);
+      });
+
+      await exclusionComputationService.recomputeForUser(1);
+
+      expect(getComputeClient).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      // A bare BEGIN is deferred; IMMEDIATE would take the write lock
+      expect(events[0]).toBe("BEGIN");
+      const end = events.indexOf("ROLLBACK");
+      const compute = events.slice(1, end);
+      expect(compute).toContain("query");
+      expect(compute).not.toContain("transaction");
+      expect(events.indexOf("transaction")).toBeGreaterThan(end);
+    });
+
+    it("a failed compute ends its snapshot and frees the connection", async () => {
+      setupPipeline();
+      mockPrisma.userHiddenEntity.findMany.mockRejectedValueOnce(
+        new Error("DB read error")
+      );
+
+      await expect(
+        exclusionComputationService.recomputeForUser(30)
+      ).rejects.toThrow("DB read error");
+
+      const sqls = execCalls().map(([sql]) => sql);
+      expect(sqls[0]).toBe("BEGIN");
+      expect(sqls[sqls.length - 1]).toBe("ROLLBACK");
+      expect(sqls.some((sql) => /DROP TABLE IF EXISTS _peek_/.test(sql))).toBe(
+        true
+      );
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(disconnectComputeClient).not.toHaveBeenCalled();
+
+      // The next recompute gets the connection
+      await exclusionComputationService.recomputeForUser(31);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("a snapshot that cannot be ended drops the compute connection", async () => {
+      setupPipeline();
+      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
+        if (sql === "ROLLBACK") throw new Error("cannot rollback");
+        return 0;
+      });
+
+      // The computed rows are still written
+      await exclusionComputationService.recomputeForUser(1);
+
+      expect(disconnectComputeClient).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.userExcludedEntity.deleteMany).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("recomputeAllUsers", () => {
@@ -359,70 +604,40 @@ describe("ExclusionComputationService", () => {
 });
 
 describe("computeDirectExclusions", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default empty responses for cascade-related queries
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    // Mock $executeRaw for temp table operations
-    mockPrisma.$executeRaw.mockResolvedValue(undefined);
-    // Default count responses for entity stats
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-  });
+  beforeEach(() => setupPipeline());
 
   it("should process UserContentRestriction EXCLUDE mode", async () => {
-    // Setup: user has restriction excluding specific tags
+    // Legacy bare ids resolve on the allowed instances before they are stored
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "tags",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["tag1", "tag2"]),
-      },
+      restriction("tags", "EXCLUDE", ["tag1", "tag2"]),
     ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // Mock transaction to execute callback
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [
+        RESOLVE_TAG,
+        [
+          { id: "tag1", instanceId: "A" },
+          { id: "tag2", instanceId: "A" },
+        ],
+      ],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    // Verify createMany was called with the excluded tags
     expect(mockPrisma.userExcludedEntity.createMany).toHaveBeenCalled();
-    const createCall =
-      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
-    expect(createCall.data).toEqual(
+    expect(createdRows()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           userId: 1,
           entityType: "tag",
           entityId: "tag1",
+          instanceId: "A",
           reason: "restricted",
         }),
         expect.objectContaining({
           userId: 1,
           entityType: "tag",
           entityId: "tag2",
+          instanceId: "A",
           reason: "restricted",
         }),
       ])
@@ -430,428 +645,565 @@ describe("computeDirectExclusions", () => {
   });
 
   it("should process UserHiddenEntity records", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1" },
-      { userId: 1, entityType: "scene", entityId: "scene1" },
+      { userId: 1, entityType: "performer", entityId: "perf1", instanceId: "" },
+      { userId: 1, entityType: "scene", entityId: "scene1", instanceId: "" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "scene1", instanceId: "A" }]],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    expect(mockPrisma.userExcludedEntity.createMany).toHaveBeenCalled();
-    const createCall =
-      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
-    expect(createCall.data).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          userId: 1,
-          entityType: "performer",
-          entityId: "perf1",
-          reason: "hidden",
-        }),
-        expect.objectContaining({
-          userId: 1,
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "hidden",
-        }),
+    // The stored hide keeps its "" instance; the resolved copy carries A.
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "performer:perf1@:hidden",
+        "performer:perf1@A:hidden",
+        "scene:scene1@:hidden",
+        "scene:scene1@A:hidden",
       ])
     );
   });
 
   it("should delete existing exclusions before creating new ones", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "scene", entityId: "scene1" },
+      { userId: 1, entityType: "scene", entityId: "scene1", instanceId: "A" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 5 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
+    fakeRaw([[RESOLVE_SCENE, [{ id: "scene1", instanceId: "A" }]]]);
+    const order: string[] = [];
+    mockPrisma.userExcludedEntity.deleteMany.mockImplementation(async () => {
+      order.push("delete");
+      return { count: 1 };
+    });
+    mockPrisma.userExcludedEntity.createMany.mockImplementation(async () => {
+      order.push("create");
+      return { count: 1 };
     });
 
     await exclusionComputationService.recomputeForUser(1);
 
-    // Verify deleteMany was called first with userId filter
     expect(mockPrisma.userExcludedEntity.deleteMany).toHaveBeenCalledWith({
       where: { userId: 1 },
     });
+    expect(order).toEqual(["delete", "create"]);
   });
 
   it("should skip createMany when no exclusions computed", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
     await exclusionComputationService.recomputeForUser(1);
 
-    // deleteMany should still be called to clear any existing
     expect(mockPrisma.userExcludedEntity.deleteMany).toHaveBeenCalled();
-    // createMany should not be called if no exclusions
     expect(mockPrisma.userExcludedEntity.createMany).not.toHaveBeenCalled();
   });
 
   it("should combine restrictions and hidden entities", async () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "studios",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["studio1"]),
-      },
+      restriction("groups", "EXCLUDE", ["g1:A"]),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1" },
+      { userId: 1, entityType: "scene", entityId: "s9", instanceId: "A" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [RESOLVE_GROUP, [{ id: "g1", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "s9", instanceId: "A" }]],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const createCall =
-      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
-    expect(createCall.data).toHaveLength(2);
-    expect(createCall.data).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
-          entityType: "performer",
-          entityId: "perf1",
-          reason: "hidden",
-        }),
-      ])
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["group:g1@A:restricted", "scene:s9@A:hidden"])
     );
+  });
+
+  it("a missing user computes nothing", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    await exclusionComputationService.recomputeForUser(42);
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.userExcludedEntity.deleteMany).not.toHaveBeenCalled();
   });
 });
 
-describe("computeCascadeExclusions", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default empty responses for cascade-related queries
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    // Default count responses for entity stats
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-  });
+describe("resolution of listed ids (Rules 2 and 8)", () => {
+  beforeEach(() => setupPipeline());
 
-  it("should cascade performer exclusion to their scenes", async () => {
-    // Setup: performer1 is hidden (direct exclusion)
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1" },
-    ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // Performer has two scenes
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", performerId: "perf1" },
-      { sceneId: "scene2", performerId: "perf1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify scenes were cascade-excluded
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "performer",
-          entityId: "perf1",
-          reason: "hidden",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene2",
-          reason: "cascade",
-        }),
-      ])
-    );
-  });
-
-  it("should cascade studio exclusion to their scenes", async () => {
+  it("resolves a listed tag to its descendants on the same instance with one recursive CTE", async () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "studios",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["studio1"]),
-      },
+      restriction("tags", "EXCLUDE", ["471:A"]),
     ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // Studio has two scenes
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", studioId: "studio1" },
-      { id: "scene2", studioId: "studio1" },
+    fakeRaw([
+      [
+        RESOLVE_TAG,
+        [
+          { id: "471", instanceId: "A" },
+          { id: "480", instanceId: "A" },
+        ],
+      ],
     ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
+    const recursive = queriesMatching(/WITH RECURSIVE/);
+    expect(recursive).toHaveLength(1);
+    const [sql, ...params] = recursive[0];
+    expect(sql).toContain("json_each(COALESCE(c.parentIds, '[]'))");
+    expect(sql).toContain("CROSS JOIN StashTag t ON");
+    // Bare ids, allowed instances and scoped refs are bound, never spliced
+    expect(params[0]).toBe(JSON.stringify([]));
+    expect(params).toContain("A");
+    expect(params).toContain(JSON.stringify([{ id: "471", iid: "A" }]));
 
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene2",
-          reason: "cascade",
-        }),
-      ])
-    );
-  });
-
-  it("should cascade tag exclusion to scenes, performers, studios, and groups", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "tags",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["tag1"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 5 });
-
-    // Tag directly on a scene
-    mockPrisma.sceneTag.findMany.mockResolvedValue([
-      { sceneId: "scene1", tagId: "tag1" },
-    ]);
-
-    // Tag inherited by another scene (via $queryRawUnsafe for global inherited tag path)
-    mockPrisma.$queryRawUnsafe = vi
-      .fn()
-      .mockResolvedValueOnce([{ id: "scene2" }]) // inherited tag query
-      .mockResolvedValue([]); // empty exclusion queries
-
-    // Tag on a performer
-    mockPrisma.performerTag.findMany.mockResolvedValue([
-      { performerId: "perf1", tagId: "tag1" },
-    ]);
-
-    // Tag on a studio
-    mockPrisma.studioTag.findMany.mockResolvedValue([
-      { studioId: "studio1", tagId: "tag1" },
-    ]);
-
-    // Tag on a group
-    mockPrisma.groupTag.findMany.mockResolvedValue([
-      { groupId: "group1", tagId: "tag1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    expect(allData).toEqual(
+    expect(createdRows()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           entityType: "tag",
-          entityId: "tag1",
+          entityId: "471",
+          instanceId: "A",
           reason: "restricted",
         }),
         expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene2",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "performer",
-          entityId: "perf1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "group",
-          entityId: "group1",
-          reason: "cascade",
+          entityType: "tag",
+          entityId: "480",
+          instanceId: "A",
+          reason: "restricted",
         }),
       ])
     );
   });
 
-  it("should cascade group exclusion to their scenes", async () => {
+  it("resolves a listed studio through parentId", async () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "groups",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["group1"]),
-      },
+      restriction("studios", "EXCLUDE", ["1:A"]),
     ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // Group has scenes
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1", groupId: "group1" },
-      { sceneId: "scene2", groupId: "group1" },
+    fakeRaw([
+      [
+        RESOLVE_STUDIO,
+        [
+          { id: "1", instanceId: "A" },
+          { id: "3", instanceId: "A" },
+        ],
+      ],
     ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
+    const recursive = queriesMatching(/WITH RECURSIVE/);
+    expect(recursive).toHaveLength(1);
+    expect(recursive[0][0]).toContain(
+      "c.parentId = p.id AND c.stashInstanceId = p.inst"
+    );
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["studio:1@A:restricted", "studio:3@A:restricted"])
+    );
+  });
 
-    expect(allData).toEqual(
+  it("resolves groups and galleries without expansion", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("groups", "EXCLUDE", ["5:A"]),
+      restriction("galleries", "EXCLUDE", ["g1:A"]),
+    ]);
+    fakeRaw([
+      [RESOLVE_GROUP, [{ id: "5", instanceId: "A" }]],
+      [RESOLVE_GALLERY, [{ id: "g1", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(queriesMatching(/WITH RECURSIVE/)).toHaveLength(0);
+    expect(queriesMatching(RESOLVE_GROUP)).toHaveLength(1);
+    expect(queriesMatching(RESOLVE_GALLERY)).toHaveLength(1);
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["group:5@A:restricted", "gallery:g1@A:restricted"])
+    );
+  });
+
+  it("a bare listed id resolves to one ref per allowed instance", async () => {
+    setupPipeline(["A", "B"]);
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("groups", "EXCLUDE", ["5"]),
+    ]);
+    fakeRaw([
+      [
+        RESOLVE_GROUP,
+        [
+          { id: "5", instanceId: "A" },
+          { id: "5", instanceId: "B" },
+        ],
+      ],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const [, ...params] = queriesMatching(RESOLVE_GROUP)[0];
+    expect(params[0]).toBe(JSON.stringify(["5"]));
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["group:5@A:restricted", "group:5@B:restricted"])
+    );
+    expect(createdRows().some((r) => r.instanceId === "")).toBe(false);
+  });
+});
+
+describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
+  beforeEach(() => setupPipeline());
+
+  it("INCLUDE tags: inverted tags are not cascade sources", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], true),
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "1", instanceId: "A" }]],
+      [
+        INVERT_TAG,
+        [
+          { id: "2", instanceId: "A" },
+          { id: "3", instanceId: "A" },
+        ],
+      ],
+      [EDGE_SCENE_TAG, [{ id: "s2", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(createdRows()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          entityType: "group",
-          entityId: "group1",
+          entityType: "tag",
+          entityId: "2",
+          instanceId: "A",
           reason: "restricted",
         }),
         expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
+          entityType: "tag",
+          entityId: "3",
+          instanceId: "A",
+          reason: "restricted",
         }),
+      ])
+    );
+    // No cascade from the inversion: the SceneTag edge is never queried
+    expect(queriesMatching(EDGE_SCENE_TAG)).toHaveLength(0);
+    expect(createdRows().some((r) => r.reason === "cascade")).toBe(false);
+  });
+
+  it("INCLUDE tags: descendants of an included tag are neither inverted nor hidden", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], true),
+    ]);
+    fakeRaw([
+      [
+        RESOLVE_TAG,
+        [
+          { id: "1", instanceId: "A" },
+          { id: "9", instanceId: "A" },
+        ],
+      ],
+      [INVERT_TAG, [{ id: "2", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    // The closure (1 and its child 9) is what the inversion is bound with
+    const fill = execCalls().find(
+      ([sql, param]) =>
+        /INSERT OR IGNORE INTO _peek_refs/.test(sql) &&
+        String(param).includes('"9"')
+    );
+    expect(fill).toBeDefined();
+    expect(fill![1]).toBe(
+      JSON.stringify([
+        { id: "1", iid: "A" },
+        { id: "9", iid: "A" },
+      ])
+    );
+    expect(createdRows().some((r) => r.entityId === "9")).toBe(false);
+    expect(createdRows().some((r) => r.entityId === "1")).toBe(false);
+  });
+
+  it("INCLUDE tags: content query binds the closure and the restrictEmpty flag", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], true),
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "1", instanceId: "A" }]],
+      [CONTENT_TAG_SCENE, [{ id: "s3", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const content = queriesMatching(CONTENT_TAG_SCENE);
+    expect(content).toHaveLength(1);
+    const [sql, ...params] = content[0];
+    expect(sql).toContain("FROM StashScene s");
+    expect(sql).toContain("json_each(COALESCE(s.inheritedTagIds");
+    expect(sql).toContain("JOIN _peek_refs r");
+    expect(params[params.length - 1]).toBe(1);
+    expect(createdRows()).toEqual(
+      expect.arrayContaining([
+        {
+          userId: 1,
+          entityType: "scene",
+          entityId: "s3",
+          instanceId: "A",
+          reason: "restricted",
+        },
+      ])
+    );
+  });
+
+  it("INCLUDE tags: restrictEmpty off binds 0", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], false),
+    ]);
+    fakeRaw([[RESOLVE_TAG, [{ id: "1", instanceId: "A" }]]]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const [, ...params] = queriesMatching(CONTENT_TAG_SCENE)[0];
+    expect(params[params.length - 1]).toBe(0);
+  });
+
+  it("INCLUDE galleries: images and scenes are checked, galleries are inverted", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("galleries", "INCLUDE", ["g1:A"], true),
+    ]);
+    fakeRaw([
+      [RESOLVE_GALLERY, [{ id: "g1", instanceId: "A" }]],
+      [INVERT_GALLERY, [{ id: "g2", instanceId: "A" }]],
+      [CONTENT_GALLERY_SCENE, [{ id: "s7", instanceId: "A" }]],
+      [CONTENT_GALLERY_IMAGE, [{ id: "i3", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(queriesMatching(CONTENT_GALLERY_SCENE)).toHaveLength(1);
+    expect(queriesMatching(CONTENT_GALLERY_IMAGE)).toHaveLength(1);
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "gallery:g2@A:restricted",
+        "scene:s7@A:restricted",
+        "image:i3@A:restricted",
+      ])
+    );
+  });
+
+  it("INCLUDE studios: NULL studio is hidden only when restrictEmpty", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("studios", "INCLUDE", ["1:A"], false),
+    ]);
+    fakeRaw([
+      [RESOLVE_STUDIO, [{ id: "1", instanceId: "A" }]],
+      [INVERT_STUDIO, [{ id: "2", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const studioContent = queriesMatching(CONTENT_STUDIO);
+    // scenes, galleries and images
+    expect(studioContent).toHaveLength(3);
+    for (const [sql, ...params] of studioContent) {
+      expect(sql).toContain(
+        "x.studioId IS NULL OR NOT EXISTS (SELECT 1 FROM _peek_refs"
+      );
+      expect(sql).toContain("(? = 1 OR x.studioId IS NOT NULL)");
+      expect(params[params.length - 1]).toBe(0);
+    }
+    expect(studioContent.some(([sql]) => /FROM StashScene x/.test(sql))).toBe(
+      true
+    );
+    expect(
+      studioContent.some(
+        ([sql]) =>
+          /FROM StashGallery x/.test(sql) && sql.includes("x.studioInstanceId")
+      )
+    ).toBe(true);
+    expect(
+      studioContent.some(
+        ([sql]) =>
+          /FROM StashImage x/.test(sql) && sql.includes("x.studioInstanceId")
+      )
+    ).toBe(true);
+  });
+
+  it("EXCLUDE with restrictEmpty issues the no-item query", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"], true),
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [
+        /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag st WHERE/,
+        [{ id: "s4", instanceId: "A" }],
+      ],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const noItem = queriesMatching(
+      /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag st WHERE/
+    );
+    expect(noItem).toHaveLength(1);
+    expect(noItem[0][0]).not.toContain("_peek_refs");
+    expect(noItem[0][0]).toContain(
+      "NOT EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')))"
+    );
+    expect(createdRows()).toEqual(
+      expect.arrayContaining([
         expect.objectContaining({
           entityType: "scene",
-          entityId: "scene2",
-          reason: "cascade",
+          entityId: "s4",
+          instanceId: "A",
+          reason: "restricted",
+        }),
+        expect.objectContaining({
+          entityType: "tag",
+          entityId: "2",
+          instanceId: "A",
+          reason: "restricted",
         }),
       ])
     );
   });
 
-  it("should cascade gallery exclusion to scenes and images", async () => {
+  it("EXCLUDE without restrictEmpty issues no content query", async () => {
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "galleries",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["gallery1"]),
-      },
+      restriction("tags", "EXCLUDE", ["2:A"], false),
     ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // Gallery linked to scenes
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([
-      { sceneId: "scene1", galleryId: "gallery1" },
-    ]);
-
-    // Gallery has images
-    mockPrisma.imageGallery.findMany.mockResolvedValue([
-      { imageId: "image1", galleryId: "gallery1" },
-      { imageId: "image2", galleryId: "gallery1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([[RESOLVE_TAG, [{ id: "2", instanceId: "A" }]]]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
+    expect(queriesMatching(CONTENT_TAG_SCENE)).toHaveLength(0);
+    expect(
+      queriesMatching(
+        /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag/
+      )
+    ).toHaveLength(0);
+  });
 
-    expect(allData).toEqual(
+  it("restrictEmpty is the OR of a type's rows", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], false),
+      restriction("tags", "EXCLUDE", ["2:A"], true),
+    ]);
+    fakeRaw([[RESOLVE_TAG, [{ id: "1", instanceId: "A" }]]]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const content = queriesMatching(CONTENT_TAG_SCENE);
+    expect(content).toHaveLength(1);
+    const [, ...params] = content[0];
+    expect(params[params.length - 1]).toBe(1);
+  });
+});
+
+describe("cascades (Rule 3)", () => {
+  beforeEach(() => setupPipeline());
+
+  it("tag exclusion cascades to galleries, images and clips", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"]),
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [EDGE_GALLERY_TAG, [{ id: "g2", instanceId: "A" }]],
+      [EDGE_IMAGE_TAG, [{ id: "i2", instanceId: "A" }]],
+      [EDGE_CLIP_TAG, [{ id: "c1", instanceId: "A" }]],
+      [EDGE_CLIP_PRIMARY, [{ id: "c9", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "tag:2@A:restricted",
+        "gallery:g2@A:cascade",
+        "image:i2@A:cascade",
+        "clip:c1@A:cascade",
+        "clip:c9@A:cascade",
+      ])
+    );
+    // The closure is bound into the temp refs table, and the primary-tag edge
+    // joins it on the clip's own tag columns
+    expect(queriesMatching(EDGE_CLIP_PRIMARY)[0][0]).toContain(
+      "r.id = x.primaryTagId AND r.inst = x.primaryTagInstanceId"
+    );
+  });
+
+  it("studio exclusion cascades to scenes, galleries and images", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("studios", "EXCLUDE", ["1:A"]),
+    ]);
+    fakeRaw([
+      [RESOLVE_STUDIO, [{ id: "1", instanceId: "A" }]],
+      [EDGE_STUDIO_SCENE, [{ id: "s1", instanceId: "A" }]],
+      [EDGE_STUDIO_GALLERY, [{ id: "g1", instanceId: "A" }]],
+      [EDGE_STUDIO_IMAGE, [{ id: "i7", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "studio:1@A:restricted",
+        "scene:s1@A:cascade",
+        "gallery:g1@A:cascade",
+        "image:i7@A:cascade",
+      ])
+    );
+    expect(queriesMatching(EDGE_STUDIO_GALLERY)[0][0]).toContain(
+      "r.inst = x.studioInstanceId"
+    );
+    expect(queriesMatching(EDGE_STUDIO_SCENE)[0][0]).toContain(
+      "r.inst = x.stashInstanceId"
+    );
+  });
+
+  it("performer hide cascades to scenes, galleries and images", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_PERFORMER, [{ id: "p1", instanceId: "A" }]],
+      [EDGE_SCENE_PERFORMER, [{ id: "s1", instanceId: "A" }]],
+      [EDGE_GALLERY_PERFORMER, [{ id: "g1", instanceId: "A" }]],
+      [EDGE_IMAGE_PERFORMER, [{ id: "i1", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "performer:p1@A:hidden",
+        "scene:s1@A:cascade",
+        "gallery:g1@A:cascade",
+        "image:i1@A:cascade",
+      ])
+    );
+  });
+
+  it("tag exclusion cascades through inherited tags with the closure bound", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"]),
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [EDGE_INHERITED, [{ id: "s5", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(queriesMatching(EDGE_INHERITED)).toHaveLength(1);
+    expect(queriesMatching(EDGE_INHERITED)[0][0]).toContain(
+      "JOIN _peek_refs r ON r.id = it.value AND r.inst = s.stashInstanceId"
+    );
+    expect(createdRows()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          entityType: "gallery",
-          entityId: "gallery1",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
           entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "image",
-          entityId: "image1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "image",
-          entityId: "image2",
+          entityId: "s5",
+          instanceId: "A",
           reason: "cascade",
         }),
       ])
@@ -859,1035 +1211,426 @@ describe("computeCascadeExclusions", () => {
   });
 
   it("should not duplicate cascade exclusions from multiple sources", async () => {
-    // Scene excluded via both performer and studio
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"]),
+    ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1" },
-      { userId: 1, entityType: "studio", entityId: "studio1" },
+      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // Same scene linked to both
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", performerId: "perf1" },
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [RESOLVE_PERFORMER, [{ id: "p1", instanceId: "A" }]],
+      [EDGE_SCENE_TAG, [{ id: "s1", instanceId: "A" }]],
+      [EDGE_SCENE_PERFORMER, [{ id: "s1", instanceId: "A" }]],
     ]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", studioId: "studio1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    // Scene should only appear once due to deduplication
-    const sceneExclusions = allData.filter(
-      (e: any) => e.entityType === "scene" && e.entityId === "scene1"
+    const sceneRows = createdRows().filter(
+      (r) => r.entityType === "scene" && r.entityId === "s1"
     );
-    expect(sceneExclusions).toHaveLength(1);
-    expect(sceneExclusions[0].reason).toBe("cascade");
+    expect(sceneRows).toHaveLength(1);
+    expect(sceneRows[0].reason).toBe("cascade");
   });
 
   it("should handle empty cascade results gracefully", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("groups", "EXCLUDE", ["5:A"]),
+    ]);
+    fakeRaw([[RESOLVE_GROUP, [{ id: "5", instanceId: "A" }]]]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(new Set(["group:5@A:restricted"]));
+  });
+
+  it("a hide with an empty instance cascades on every allowed instance", async () => {
+    setupPipeline(["A", "B"]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1" },
+      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    // Performer has no scenes
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [
+        RESOLVE_PERFORMER,
+        [
+          { id: "p1", instanceId: "A" },
+          { id: "p1", instanceId: "B" },
+        ],
+      ],
+      [
+        EDGE_SCENE_PERFORMER,
+        [
+          { id: "s1", instanceId: "A" },
+          { id: "s2", instanceId: "B" },
+        ],
+      ],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    // Only the direct exclusion should exist
-    expect(allData).toHaveLength(1);
-    expect(allData[0]).toEqual(
-      expect.objectContaining({
-        entityType: "performer",
-        entityId: "perf1",
-        reason: "hidden",
-      })
-    );
-  });
-});
-
-describe("composite key parsing in restrictions (#412)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default empty responses for cascade-related queries
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.$executeRaw.mockResolvedValue(undefined);
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.stashClip.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-  });
-
-  it("should parse composite keys in EXCLUDE mode and cascade group to scenes", async () => {
-    // Bug #412: frontend sends composite keys ("groupId:instanceId") but
-    // the exclusion service treated the whole string as entityId, causing
-    // cascade queries to fail (groupId "6:inst1" never matches groupId "6")
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "groups",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["6:inst1"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // SceneGroup junction has scenes for group "6" in instance "inst1"
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "inst1" },
-      { sceneId: "scene2", sceneInstanceId: "inst1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify the cascade query used the bare groupId, not the composite key
-    const sceneGroupCalls = mockPrisma.sceneGroup.findMany.mock.calls;
-    expect(sceneGroupCalls.length).toBeGreaterThan(0);
-    const lastCall = sceneGroupCalls[sceneGroupCalls.length - 1][0];
-    // The query should use the scoped path (groupId + groupInstanceId), not "6:inst1" as groupId
-    // Also includes instance filter on target side
-    expect(lastCall.where).toEqual({
-      OR: [{ groupId: "6", groupInstanceId: "inst1" }],
-      sceneInstanceId: { in: ["test-instance-1"] },
-    });
-
-    // Verify exclusions include the group (with parsed ID) and cascade scenes
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "group",
-          entityId: "6",
-          instanceId: "inst1",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene2",
-          reason: "cascade",
-        }),
+    const [, ...resolveParams] = queriesMatching(RESOLVE_PERFORMER)[0];
+    expect(resolveParams[0]).toBe(JSON.stringify(["p1"]));
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "performer:p1@:hidden",
+        "performer:p1@A:hidden",
+        "performer:p1@B:hidden",
+        "scene:s1@A:cascade",
+        "scene:s2@B:cascade",
       ])
     );
-  });
-
-  it("should handle bare IDs (no instance) in EXCLUDE mode", async () => {
-    // Single-instance setups may send bare IDs without instanceId
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "groups",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["6"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1" },
-      { sceneId: "scene2" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Bare ID should go into globalIds path (no instance scoping for source, but target filtered)
-    const sceneGroupCalls = mockPrisma.sceneGroup.findMany.mock.calls;
-    expect(sceneGroupCalls.length).toBeGreaterThan(0);
-    const lastCall = sceneGroupCalls[sceneGroupCalls.length - 1][0];
-    expect(lastCall.where).toEqual({
-      groupId: { in: ["6"] },
-      sceneInstanceId: { in: ["test-instance-1"] },
-    });
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "group",
-          entityId: "6",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
-      ])
+    // The cascade source is the resolved (scoped) set
+    const fill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-  });
-
-  it("should parse composite keys in INCLUDE mode correctly", async () => {
-    // INCLUDE mode: exclude everything NOT in the list
-    // Bug: composite key "6:inst1" never matched bare IDs from getAllEntityIds
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "groups",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["6:inst1"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // Database has groups "5", "6", and "7" (all on same instance)
-    mockPrisma.stashGroup.findMany.mockResolvedValue([
-      { id: "5", stashInstanceId: "inst1" },
-      { id: "6", stashInstanceId: "inst1" },
-      { id: "7", stashInstanceId: "inst1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    // Groups "5" and "7" should be excluded (not in include list)
-    // Group "6" should NOT be excluded (it's the included one)
-    const groupExclusions = allData.filter(
-      (e: any) => e.entityType === "group" && e.reason === "restricted"
-    );
-    const excludedGroupIds = groupExclusions.map((e: any) => e.entityId);
-    expect(excludedGroupIds).toContain("5");
-    expect(excludedGroupIds).toContain("7");
-    expect(excludedGroupIds).not.toContain("6");
-  });
-
-  it("should parse composite keys for studio EXCLUDE with cascade", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "studios",
-        mode: "EXCLUDE",
-        entityIds: JSON.stringify(["studio1:inst1"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // Studio has scenes (scoped query path)
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", stashInstanceId: "inst1" },
-    ]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify the studio cascade used scoped query (studioId + stashInstanceId)
-    const sceneCalls = mockPrisma.stashScene.findMany.mock.calls;
-    expect(sceneCalls.length).toBeGreaterThan(0);
-    const lastCall = sceneCalls[sceneCalls.length - 1][0];
-    expect(lastCall.where).toEqual(
-      expect.objectContaining({
-        OR: [{ studioId: "studio1", stashInstanceId: "inst1" }],
-      })
-    );
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          instanceId: "inst1",
-          reason: "restricted",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          reason: "cascade",
-        }),
+    expect(fill![1]).toBe(
+      JSON.stringify([
+        { id: "p1", iid: "A" },
+        { id: "p1", iid: "B" },
       ])
     );
   });
 });
 
 describe("computeEmptyExclusions", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default empty responses for cascade-related queries
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    // Default count responses for entity stats
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-  });
+  beforeEach(() => setupPipeline());
 
   it("should exclude galleries with no visible images", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries for empty exclusions (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1: galleries - return empty galleries
-        case 1:
-          return Promise.resolve([
-            { galleryId: "gallery1", imageId: null },
-            { galleryId: "gallery2", imageId: null },
-          ]);
-        // Query 2-5: other entities have visible content
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [
+        EMPTY_GALLERY,
+        [
+          { galleryId: "gallery1", instanceId: "A" },
+          { galleryId: "gallery2", instanceId: "A" },
+        ],
+      ],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "gallery",
-          entityId: "gallery1",
-          reason: "empty",
-        }),
-        expect.objectContaining({
-          entityType: "gallery",
-          entityId: "gallery2",
-          reason: "empty",
-        }),
-      ])
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["gallery:gallery1@A:empty", "gallery:gallery2@A:empty"])
     );
   });
 
-  it("should exclude performers with no visible scenes AND no visible images", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1: galleries - none empty
-        case 1:
-          return Promise.resolve([]);
-        // Query 2: performers - return empty performer
-        case 2:
-          return Promise.resolve([
-            { performerId: "performer1", sceneId: null, imageId: null },
-          ]);
-        // Query 3-5: other entities have visible content
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+  it("empty-phase rows carry the entity's instance", async () => {
+    fakeRaw([
+      [EMPTY_GALLERY, [{ galleryId: "g1", instanceId: "B" }]],
+      [EMPTY_PERFORMER, [{ performerId: "p1", instanceId: "B" }]],
+      [EMPTY_STUDIO, [{ studioId: "st1", instanceId: "B" }]],
+      [EMPTY_GROUP, [{ groupId: "gr1", instanceId: "B" }]],
+      [EMPTY_TAG, [{ tagId: "t1", instanceId: "B" }]],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "performer",
-          entityId: "performer1",
-          reason: "empty",
-        }),
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([
+        "gallery:g1@B:empty",
+        "performer:p1@B:empty",
+        "studio:st1@B:empty",
+        "group:gr1@B:empty",
+        "tag:t1@B:empty",
       ])
     );
-  });
-
-  it("should exclude studios with no visible scenes AND no visible images", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1-2: galleries and performers - none empty
-        case 1:
-          return Promise.resolve([]);
-        case 2:
-          return Promise.resolve([]);
-        // Query 3: studios - return empty studio
-        case 3:
-          return Promise.resolve([
-            { studioId: "studio1", sceneId: null, imageId: null },
-          ]);
-        // Query 4-5: other entities have visible content
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          reason: "empty",
-        }),
-      ])
-    );
-  });
-
-  it("should exclude groups with no visible scenes", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1-3: galleries, performers, studios - none empty
-        case 1:
-          return Promise.resolve([]);
-        case 2:
-          return Promise.resolve([]);
-        case 3:
-          return Promise.resolve([]);
-        // Query 4: groups - return empty group
-        case 4:
-          return Promise.resolve([{ groupId: "group1", sceneId: null }]);
-        // Query 5: tags have visible content
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "group",
-          entityId: "group1",
-          reason: "empty",
-        }),
-      ])
-    );
-  });
-
-  it("should exclude tags not attached to any visible entity", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1-4: galleries, performers, studios, groups - none empty
-        case 1:
-          return Promise.resolve([]);
-        case 2:
-          return Promise.resolve([]);
-        case 3:
-          return Promise.resolve([]);
-        case 4:
-          return Promise.resolve([]);
-        // Query 5: tags - return empty tag
-        case 5:
-          return Promise.resolve([
-            {
-              tagId: "tag1",
-              sceneId: null,
-              performerId: null,
-              studioId: null,
-              groupId: null,
-            },
-          ]);
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "tag",
-          entityId: "tag1",
-          reason: "empty",
-        }),
-      ])
-    );
-  });
-
-  it("should not exclude entities that have visible content", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock raw queries - now uses $queryRawUnsafe, returns empty arrays
-    // when entities have visible content (they are NOT empty)
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // createMany should not be called when no exclusions
-    expect(mockPrisma.userExcludedEntity.createMany).not.toHaveBeenCalled();
+    expect(createdRows().some((r) => r.instanceId === "")).toBe(false);
   });
 
   it("should consider already excluded content when determining if entity is empty", async () => {
-    // Scenario: gallery has images but they're all excluded
-    // Hidden image -> gallery becomes empty
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    // A hidden gallery and a hidden image are loaded into the temp exclusion
+    // sets the empty queries probe (indexed lookups, never a JSON rescan).
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "image", entityId: "image1" },
+      { userId: 1, entityType: "gallery", entityId: "g9", instanceId: "A" },
+      { userId: 1, entityType: "image", entityId: "i9", instanceId: "A" },
+      { userId: 1, entityType: "scene", entityId: "s9", instanceId: "" },
     ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // No cascades from image hiding in our model
-
-    // Mock $queryRawUnsafe to return proper results for each query type
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1: galleries with images - gallery1 has image1 (which is excluded)
-        case 1:
-          return Promise.resolve([
-            { galleryId: "gallery1", imageId: "image1" },
-          ]);
-        // Query 2: performers with content - performer has visible scene
-        case 2:
-          return Promise.resolve([
-            { performerId: "performer1", sceneId: "scene1", imageId: null },
-          ]);
-        // Query 3: studios with content - studio has visible scene
-        case 3:
-          return Promise.resolve([
-            { studioId: "studio1", sceneId: "scene1", imageId: null },
-          ]);
-        // Query 4: groups with scenes - group has visible scene
-        case 4:
-          return Promise.resolve([{ groupId: "group1", sceneId: "scene1" }]);
-        // Query 5: tags with entities - tag has visible content
-        case 5:
-          return Promise.resolve([
-            {
-              tagId: "tag1",
-              sceneId: "scene1",
-              performerId: null,
-              studioId: null,
-              groupId: null,
-            },
-          ]);
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [RESOLVE_GALLERY, [{ id: "g9", instanceId: "A" }]],
+      [RESOLVE_IMAGE, [{ id: "i9", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "s9", instanceId: "A" }]],
+      [EDGE_IMAGE_TAG, []],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
-
-    // Should have: image (hidden), gallery (empty - its only image is excluded)
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "image",
-          entityId: "image1",
-          reason: "hidden",
-        }),
-        expect.objectContaining({
-          entityType: "gallery",
-          entityId: "gallery1",
-          reason: "empty",
-        }),
-      ])
+    const galleryFill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_ex_gallery/.test(sql)
     );
+    expect(galleryFill).toBeDefined();
+    expect(galleryFill![1]).toBe(JSON.stringify([{ id: "g9", iid: "A" }]));
+    const imageFill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_ex_image/.test(sql)
+    );
+    expect(imageFill![1]).toBe(JSON.stringify([{ id: "i9", iid: "A" }]));
+    // The "" scene hide reaches every allowed instance through its per-instance copy
+    const sceneFill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_ex_scene/.test(sql)
+    );
+    expect(sceneFill![1]).toBe(JSON.stringify([{ id: "s9", iid: "A" }]));
+    // The empty queries probe the temp sets, not a bound JSON array
+    for (const [sql] of queriesMatching(
+      /FROM Stash(Gallery g|Performer p|Studio st|Group g|Tag t)/
+    )) {
+      expect(sql).not.toContain("json_extract(je.value");
+      expect(sql).toMatch(/_peek_ex_/);
+    }
+  });
+
+  it("empty-tag query counts gallery and image tags", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "gallery", entityId: "g9", instanceId: "A" },
+      { userId: 1, entityType: "image", entityId: "i9", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_GALLERY, [{ id: "g9", instanceId: "A" }]],
+      [RESOLVE_IMAGE, [{ id: "i9", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const tagQuery = queriesMatching(EMPTY_TAG);
+    expect(tagQuery).toHaveLength(1);
+    const [sql] = tagQuery[0];
+    expect(sql).toContain("FROM GalleryTag gt");
+    expect(sql).toContain("FROM ImageTag it");
+    expect(sql).toContain("FROM _peek_ex_gallery");
+    expect(sql).toContain("FROM _peek_ex_image");
+    expect(
+      execCalls().some(
+        ([s, p]) =>
+          /INSERT OR IGNORE INTO _peek_ex_gallery/.test(s) &&
+          String(p).includes('"g9"')
+      )
+    ).toBe(true);
+    expect(
+      execCalls().some(
+        ([s, p]) =>
+          /INSERT OR IGNORE INTO _peek_ex_image/.test(s) &&
+          String(p).includes('"i9"')
+      )
+    ).toBe(true);
+  });
+
+  it("empty-tag exemption needs a child tag on the same instance", async () => {
+    await exclusionComputationService.recomputeForUser(1);
+
+    const [sql] = queriesMatching(EMPTY_TAG)[0];
+    expect(sql).toContain("json_each(COALESCE(child.parentIds, '[]'))");
+    expect(sql).toContain("child.stashInstanceId = t.stashInstanceId");
+    expect(sql).not.toContain("LIKE");
   });
 
   it("should handle multiple empty entity types in one pass", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-
-    // Mock different results for each entity type query (now uses $queryRawUnsafe)
-    let queryCallCount = 0;
-    mockPrisma.$queryRawUnsafe = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1: galleries - return gallery with no images
-        case 1:
-          return Promise.resolve([{ galleryId: "gallery1", imageId: null }]);
-        // Query 2: performers - return performer with no content
-        case 2:
-          return Promise.resolve([
-            { performerId: "performer1", sceneId: null, imageId: null },
-          ]);
-        // Query 3: studios - return studio with no content
-        case 3:
-          return Promise.resolve([
-            { studioId: "studio1", sceneId: null, imageId: null },
-          ]);
-        // Query 4: groups - return group with no scenes
-        case 4:
-          return Promise.resolve([{ groupId: "group1", sceneId: null }]);
-        // Query 5: tags - return tag with no visible entities
-        case 5:
-          return Promise.resolve([
-            {
-              tagId: "tag1",
-              sceneId: null,
-              performerId: null,
-              studioId: null,
-              groupId: null,
-            },
-          ]);
-        default:
-          return Promise.resolve([]);
-      }
-    });
-
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 5 });
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    fakeRaw([
+      [EMPTY_GALLERY, [{ galleryId: "g1", instanceId: "A" }]],
+      [EMPTY_PERFORMER, [{ performerId: "p1", instanceId: "A" }]],
+      [EMPTY_STUDIO, [{ studioId: "st1", instanceId: "A" }]],
+      [EMPTY_GROUP, [{ groupId: "gr1", instanceId: "A" }]],
+      [EMPTY_TAG, [{ tagId: "t1", instanceId: "A" }]],
+    ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data || []);
+    expect(createdRows().filter((r) => r.reason === "empty")).toHaveLength(5);
+    // Temp tables are dropped at the end of the compute
+    expect(
+      execCalls().filter(([sql]) => /DROP TABLE IF EXISTS _peek_/.test(sql))
+        .length
+    ).toBeGreaterThanOrEqual(7);
+  });
 
-    expect(allData).toHaveLength(5);
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "gallery",
-          entityId: "gallery1",
-          reason: "empty",
-        }),
-        expect.objectContaining({
-          entityType: "performer",
-          entityId: "performer1",
-          reason: "empty",
-        }),
-        expect.objectContaining({
-          entityType: "studio",
-          entityId: "studio1",
-          reason: "empty",
-        }),
-        expect.objectContaining({
-          entityType: "group",
-          entityId: "group1",
-          reason: "empty",
-        }),
-        expect.objectContaining({
-          entityType: "tag",
-          entityId: "tag1",
-          reason: "empty",
-        }),
-      ])
+  it("should not exclude entities that have visible content", async () => {
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(mockPrisma.userExcludedEntity.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("admins (Rule 7)", () => {
+  beforeEach(() => setupPipeline());
+
+  it("admin: restriction rows are ignored, hides still cascade, no empty phase", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "ADMIN" });
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "INCLUDE", ["1:A"], true),
+    ]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "1", instanceId: "A" }]],
+      [INVERT_TAG, [{ id: "2", instanceId: "A" }]],
+      [RESOLVE_PERFORMER, [{ id: "p1", instanceId: "A" }]],
+      [EDGE_SCENE_PERFORMER, [{ id: "s1", instanceId: "A" }]],
+      [EMPTY_GALLERY, [{ galleryId: "g1", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(mockPrisma.userContentRestriction.findMany).not.toHaveBeenCalled();
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["performer:p1@A:hidden", "scene:s1@A:cascade"])
     );
+    expect(createdRows().some((r) => r.reason === "restricted")).toBe(false);
+    expect(createdRows().some((r) => r.reason === "empty")).toBe(false);
+    expect(queriesMatching(EMPTY_GALLERY)).toHaveLength(0);
   });
 });
 
 describe("addHiddenEntity", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => setupPipeline());
 
-  it("should add hidden exclusion and cascade to related scenes for performer", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({
-      id: 1,
-      userId: 1,
-      entityType: "performer",
-      entityId: "perf1",
-      reason: "hidden",
-    });
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", performerId: "perf1" },
-      { sceneId: "scene2", performerId: "perf1" },
+  it("addHiddenEntity uses the shared edges", async () => {
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [EDGE_GALLERY_TAG, [{ id: "g2", instanceId: "A" }]],
     ]);
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
 
-    await exclusionComputationService.addHiddenEntity(1, "performer", "perf1");
+    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "A");
 
-    // Verify upsert was called with correct parameters
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           userId_entityType_entityId_instanceId: {
             userId: 1,
-            entityType: "performer",
-            entityId: "perf1",
-            instanceId: "",
+            entityType: "tag",
+            entityId: "2",
+            instanceId: "A",
           },
         },
-        create: expect.objectContaining({ reason: "hidden", instanceId: "" }),
+        create: expect.objectContaining({ reason: "hidden", instanceId: "A" }),
         update: expect.objectContaining({ reason: "hidden" }),
       })
     );
-
-    // Verify cascade exclusions were created via upsert (SQLite doesn't support skipDuplicates)
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           userId_entityType_entityId_instanceId: {
             userId: 1,
-            entityType: "scene",
-            entityId: "scene1",
-            instanceId: "",
+            entityType: "gallery",
+            entityId: "g2",
+            instanceId: "A",
           },
         },
-        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
+        create: expect.objectContaining({
+          entityType: "gallery",
+          entityId: "g2",
+          instanceId: "A",
+          reason: "cascade",
+        }),
         update: {},
       })
     );
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "scene2",
-            instanceId: "",
-          },
-        },
-        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
-        update: {},
-      })
+    // Hides of a tag expand to descendants through the same recursive resolve
+    expect(queriesMatching(RESOLVE_TAG)[0][0]).toContain("WITH RECURSIVE");
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("hiding a tag writes hidden rows for its descendants", async () => {
+    setupPipeline(["A", "B"]);
+    fakeRaw([
+      [
+        RESOLVE_TAG,
+        [
+          { id: "2", instanceId: "A" },
+          { id: "7", instanceId: "A" },
+        ],
+      ],
+      [EDGE_SCENE_TAG, [{ id: "s7", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "A");
+
+    expect(upsertKeys()).toEqual(
+      new Set(["tag:2@A:hidden", "tag:7@A:hidden", "scene:s7@A:cascade"])
     );
-  });
-
-  it("should add hidden exclusion and cascade to scenes for studio", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", stashInstanceId: "inst1", studioId: "studio1" },
-    ]);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.addHiddenEntity(1, "studio", "studio1");
-
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "studio",
-            entityId: "studio1",
-            instanceId: "",
-          },
-        },
-      })
+    // The cascade source carries both tags, and nothing lands on instance B
+    const fill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-    expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
-      where: { studioId: "studio1", deletedAt: null },
-      select: { id: true, stashInstanceId: true },
-    });
-    // Cascades now use upsert (SQLite compatibility)
-    // 1 hidden + 1 cascade scene = 2 upserts
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(2);
-  });
-
-  it("should add hidden exclusion and cascade for tag to scenes, performers, studios, and groups", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneTag.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "inst1", tagId: "tag1" },
-    ]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "scene2" }]); // inherited tag scene
-    mockPrisma.performerTag.findMany.mockResolvedValue([
-      { performerId: "perf1", performerInstanceId: "inst1", tagId: "tag1" },
-    ]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([
-      { studioId: "studio1", studioInstanceId: "inst1", tagId: "tag1" },
-    ]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([
-      { groupId: "group1", groupInstanceId: "inst1", tagId: "tag1" },
-    ]);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.addHiddenEntity(1, "tag", "tag1");
-
-    expect(mockPrisma.sceneTag.findMany).toHaveBeenCalledWith({
-      where: { tagId: "tag1" },
-      select: { sceneId: true, sceneInstanceId: true },
-    });
-    expect(mockPrisma.performerTag.findMany).toHaveBeenCalledWith({
-      where: { tagId: "tag1" },
-      select: { performerId: true, performerInstanceId: true },
-    });
-    expect(mockPrisma.studioTag.findMany).toHaveBeenCalledWith({
-      where: { tagId: "tag1" },
-      select: { studioId: true, studioInstanceId: true },
-    });
-    expect(mockPrisma.groupTag.findMany).toHaveBeenCalledWith({
-      where: { tagId: "tag1" },
-      select: { groupId: true, groupInstanceId: true },
-    });
-
-    // Cascades now use upsert (SQLite compatibility)
-    // 1 hidden tag + 2 scenes + 1 performer + 1 studio + 1 group = 6 upserts
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(6);
-  });
-
-  it("should add hidden exclusion and cascade for group to scenes", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "inst1", groupId: "group1" },
-      { sceneId: "scene2", sceneInstanceId: "inst1", groupId: "group1" },
-    ]);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.addHiddenEntity(1, "group", "group1");
-
-    expect(mockPrisma.sceneGroup.findMany).toHaveBeenCalledWith({
-      where: { groupId: "group1" },
-      select: { sceneId: true, sceneInstanceId: true },
-    });
-    // Cascades now use upsert instead of createMany (SQLite compatibility)
-    // 1 upsert for the hidden entity + 2 upserts for cascade scenes
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(3);
-  });
-
-  it("should add hidden exclusion and cascade for gallery to scenes and images", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "inst1", galleryId: "gallery1" },
-    ]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([
-      { imageId: "image1", imageInstanceId: "inst1", galleryId: "gallery1" },
-      { imageId: "image2", imageInstanceId: "inst1", galleryId: "gallery1" },
-    ]);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.addHiddenEntity(1, "gallery", "gallery1");
-
-    expect(mockPrisma.sceneGallery.findMany).toHaveBeenCalledWith({
-      where: { galleryId: "gallery1" },
-      select: { sceneId: true, sceneInstanceId: true },
-    });
-    expect(mockPrisma.imageGallery.findMany).toHaveBeenCalledWith({
-      where: { galleryId: "gallery1" },
-      select: { imageId: true, imageInstanceId: true },
-    });
-
-    // Cascades now use upsert instead of createMany (SQLite compatibility)
-    // 1 upsert for hidden + 1 scene + 2 images = 4 upserts
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(4);
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "scene1",
-            instanceId: "",
-          },
-        },
-      })
+    expect(fill![1]).toBe(
+      JSON.stringify([
+        { id: "2", iid: "A" },
+        { id: "7", iid: "A" },
+      ])
     );
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "image",
-            entityId: "image1",
-            instanceId: "",
-          },
-        },
-      })
-    );
+    expect([...upsertKeys()].some((k) => k.includes("@B:"))).toBe(false);
   });
 
-  it("should only call upsert once when there are no cascade exclusions", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]); // No scenes for this performer
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+  it("should only upsert the stored row when there are no descendants or cascades", async () => {
+    fakeRaw([[RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]]]);
 
     await exclusionComputationService.addHiddenEntity(
       1,
       "performer",
-      "perf-no-scenes"
+      "perf1",
+      "A"
     );
 
-    // Only one upsert call for the direct hidden entity, no cascade upserts
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(1);
+    expect(upsertKeys()).toEqual(new Set(["performer:perf1@A:hidden"]));
   });
 
-  it("should use upsert for cascade exclusions to handle duplicates", async () => {
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "inst1", performerId: "perf1" },
+  it("should scope performer cascade to the given instance", async () => {
+    setupPipeline(["A", "B"]);
+    fakeRaw([
+      [RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]],
+      [EDGE_SCENE_PERFORMER, [{ id: "scene1", instanceId: "A" }]],
     ]);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
 
-    await exclusionComputationService.addHiddenEntity(1, "performer", "perf1");
-
-    // Should use upsert for cascade exclusions (SQLite doesn't support skipDuplicates)
-    // First call is for the direct hidden entity, second is for the cascade
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(2);
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "scene1",
-            instanceId: "",
-          },
-        },
-        create: expect.objectContaining({ reason: "cascade", instanceId: "" }),
-        update: {},
-      })
+    await exclusionComputationService.addHiddenEntity(
+      1,
+      "performer",
+      "perf1",
+      "A"
     );
+
+    expect(upsertKeys()).toEqual(
+      new Set(["performer:perf1@A:hidden", "scene:scene1@A:cascade"])
+    );
+    const fill = execCalls().find(([sql]) =>
+      /INSERT OR IGNORE INTO _peek_refs/.test(sql)
+    );
+    expect(fill![1]).toBe(JSON.stringify([{ id: "perf1", iid: "A" }]));
+  });
+
+  it("a full recompute and addHiddenEntity write the same rows for the same hide", async () => {
+    setupPipeline(["A", "B"]);
+    const routes: Array<[RegExp, unknown[]]> = [
+      [
+        RESOLVE_TAG,
+        [
+          { id: "2", instanceId: "A" },
+          { id: "7", instanceId: "A" },
+          { id: "2", instanceId: "B" },
+        ],
+      ],
+      [EDGE_GALLERY_TAG, [{ id: "g2", instanceId: "A" }]],
+    ];
+    fakeRaw(routes);
+
+    await exclusionComputationService.addHiddenEntity(1, "tag", "2", "");
+    const fromHide = upsertKeys();
+
+    setupPipeline(["A", "B"]);
+    fakeRaw(routes);
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "ADMIN" });
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "tag", entityId: "2", instanceId: "" },
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+    const fromRecompute = rowKeys(createdRows());
+
+    const expected = new Set([
+      "tag:2@:hidden",
+      "tag:2@A:hidden",
+      "tag:7@A:hidden",
+      "tag:2@B:hidden",
+      "gallery:g2@A:cascade",
+    ]);
+    expect(fromHide).toEqual(expected);
+    expect(fromRecompute).toEqual(expected);
   });
 });
 
@@ -1895,11 +1638,13 @@ describe("removeHiddenEntity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Setup mocks for recomputeForUser which will be called async
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
     mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -1976,6 +1721,7 @@ describe("recomputeAllUsers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default mocks for a successful recompute pipeline
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
@@ -1983,6 +1729,7 @@ describe("recomputeAllUsers", () => {
     mockPrisma.userEntityStats.upsert.mockResolvedValue({});
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
     mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -1991,15 +1738,6 @@ describe("recomputeAllUsers", () => {
     mockPrisma.stashGallery.count.mockResolvedValue(0);
     mockPrisma.stashImage.count.mockResolvedValue(0);
     mockPrisma.stashClip.count.mockResolvedValue(0);
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
     });
@@ -2017,8 +1755,10 @@ describe("recomputeAllUsers", () => {
     expect(result.success).toBe(3);
     expect(result.failed).toBe(0);
     expect(result.errors).toEqual([]);
-    // Transaction called once per user
+    // One transaction per user, the write swap (the compute runs on the
+    // compute client, outside any Prisma transaction)
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.userExcludedEntity.deleteMany).toHaveBeenCalledTimes(3);
   });
 
   it("should continue processing other users when one fails", async () => {
@@ -2059,583 +1799,15 @@ describe("recomputeAllUsers", () => {
   });
 });
 
-describe("instance-scoped cascades", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.stashClip.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-  });
-
-  it("should cascade scoped performer exclusion using OR clause with instanceId", async () => {
-    // Performer hidden with specific instanceId should cascade via the scoped path
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "performer",
-        entityId: "perf1",
-        instanceId: "instA",
-      },
-    ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "instA" },
-    ]);
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify the scoped path was used (OR clause with performerId + performerInstanceId)
-    // Also includes instance filter on target side
-    const spCalls = mockPrisma.scenePerformer.findMany.mock.calls;
-    expect(spCalls.length).toBeGreaterThan(0);
-    const lastCall = spCalls[spCalls.length - 1][0];
-    expect(lastCall.where).toEqual({
-      OR: [{ performerId: "perf1", performerInstanceId: "instA" }],
-      sceneInstanceId: { in: ["test-instance-1"] },
-    });
-
-    // Verify cascade scene carries the instanceId
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          instanceId: "instA",
-          reason: "cascade",
-        }),
-      ])
-    );
-  });
-
-  it("should cascade scoped tag exclusion to scenes via junction with instanceId", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "tag", entityId: "tag1", instanceId: "instB" },
-    ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // SceneTag junction returns scenes for the scoped tag
-    mockPrisma.sceneTag.findMany.mockResolvedValue([
-      { sceneId: "scene5", sceneInstanceId: "instB" },
-    ]);
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify the scoped path was used for sceneTag, with instance filter on target side
-    const stCalls = mockPrisma.sceneTag.findMany.mock.calls;
-    expect(stCalls.length).toBeGreaterThan(0);
-    const lastCall = stCalls[stCalls.length - 1][0];
-    expect(lastCall.where).toEqual({
-      OR: [{ tagId: "tag1", tagInstanceId: "instB" }],
-      sceneInstanceId: { in: ["test-instance-1"] },
-    });
-  });
-
-  it("should cascade mixed global and scoped exclusions correctly", async () => {
-    // Mix of global (from restriction) and scoped (from hidden) performer exclusions
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "performer",
-        entityId: "perfGlobal",
-        instanceId: "",
-      },
-      {
-        userId: 1,
-        entityType: "performer",
-        entityId: "perfScoped",
-        instanceId: "instA",
-      },
-    ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 4 });
-
-    // Global query returns scenes for perfGlobal
-    // Scoped query returns scenes for perfScoped in instA
-    let callCount = 0;
-    mockPrisma.scenePerformer.findMany.mockImplementation(async (args: any) => {
-      callCount++;
-      if (args.where.performerId) {
-        // Global path: { performerId: { in: ["perfGlobal"] } }
-        return [{ sceneId: "scene-global", performerId: "perfGlobal" }];
-      }
-      if (args.where.OR) {
-        // Scoped path: { OR: [{ performerId: "perfScoped", performerInstanceId: "instA" }] }
-        return [{ sceneId: "scene-scoped", sceneInstanceId: "instA" }];
-      }
-      return [];
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Both global and scoped cascade queries should have been called
-    expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledTimes(2);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    // Global cascade should produce scene with empty instanceId
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene-global",
-          instanceId: "",
-          reason: "cascade",
-        }),
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene-scoped",
-          instanceId: "instA",
-          reason: "cascade",
-        }),
-      ])
-    );
-  });
-
-  it("should cascade scoped studio exclusion to scenes with instance filtering", async () => {
-    // Studio exclusions use direct column (not junction), different code path
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "studio",
-        entityId: "studio1",
-        instanceId: "instA",
-      },
-    ]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", stashInstanceId: "instA" },
-    ]);
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    // Verify the scoped studio path uses OR with studioId + stashInstanceId
-    const sceneCalls = mockPrisma.stashScene.findMany.mock.calls;
-    expect(sceneCalls.length).toBeGreaterThan(0);
-    const lastCall = sceneCalls[sceneCalls.length - 1][0];
-    expect(lastCall.where).toEqual(
-      expect.objectContaining({
-        OR: [{ studioId: "studio1", stashInstanceId: "instA" }],
-      })
-    );
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-    expect(allData).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          entityType: "scene",
-          entityId: "scene1",
-          instanceId: "instA",
-          reason: "cascade",
-        }),
-      ])
-    );
-  });
-});
-
-describe("addHiddenEntity with instanceId scoping", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-  });
-
-  it("should scope performer cascade to specific instance when instanceId provided", async () => {
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "instA" },
-    ]);
-
-    await exclusionComputationService.addHiddenEntity(
-      1,
-      "performer",
-      "perf1",
-      "instA"
-    );
-
-    // Direct exclusion should carry the instanceId
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "performer",
-            entityId: "perf1",
-            instanceId: "instA",
-          },
-        },
-      })
-    );
-
-    // Cascade query should be scoped to the instance
-    expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledWith({
-      where: { performerId: "perf1", performerInstanceId: "instA" },
-      select: { sceneId: true, sceneInstanceId: true },
-    });
-
-    // Cascade scene should carry the instanceId
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "scene1",
-            instanceId: "instA",
-          },
-        },
-      })
-    );
-  });
-
-  it("should scope group cascade to specific instance when instanceId provided", async () => {
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([
-      { sceneId: "scene1", sceneInstanceId: "instB" },
-    ]);
-
-    await exclusionComputationService.addHiddenEntity(
-      1,
-      "group",
-      "group1",
-      "instB"
-    );
-
-    expect(mockPrisma.sceneGroup.findMany).toHaveBeenCalledWith({
-      where: { groupId: "group1", groupInstanceId: "instB" },
-      select: { sceneId: true, sceneInstanceId: true },
-    });
-
-    expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_entityType_entityId_instanceId: {
-            userId: 1,
-            entityType: "scene",
-            entityId: "scene1",
-            instanceId: "instB",
-          },
-        },
-      })
-    );
-  });
-
-  it("should scope studio cascade to specific instance when instanceId provided", async () => {
-    mockPrisma.stashScene.findMany.mockResolvedValue([
-      { id: "scene1", stashInstanceId: "instA" },
-    ]);
-
-    await exclusionComputationService.addHiddenEntity(
-      1,
-      "studio",
-      "studio1",
-      "instA"
-    );
-
-    expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
-      where: { studioId: "studio1", stashInstanceId: "instA", deletedAt: null },
-      select: { id: true, stashInstanceId: true },
-    });
-  });
-});
-
-describe("INCLUDE mode for non-group entity types", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.$executeRaw.mockResolvedValue(undefined);
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.stashClip.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-  });
-
-  it("should process INCLUDE mode for tags — excludes all tags not in list", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "tags",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["tag2:instA"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    // getAllEntityIdsWithInstance returns all tags with instance info
-    mockPrisma.stashTag = {
-      ...mockPrisma.stashTag,
-      findMany: vi.fn().mockResolvedValue([
-        { id: "tag1", stashInstanceId: "instA" },
-        { id: "tag2", stashInstanceId: "instA" },
-        { id: "tag3", stashInstanceId: "instA" },
-      ]),
-    };
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    // tag1 and tag3 should be excluded (not in include list)
-    // tag2 should NOT be excluded (it's included via composite key "tag2:instA")
-    const tagExclusions = allData.filter(
-      (e: any) => e.entityType === "tag" && e.reason === "restricted"
-    );
-    const excludedTagIds = tagExclusions.map((e: any) => e.entityId);
-    expect(excludedTagIds).toContain("tag1");
-    expect(excludedTagIds).toContain("tag3");
-    expect(excludedTagIds).not.toContain("tag2");
-  });
-
-  it("should process INCLUDE mode for studios — excludes all studios not in list", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "studios",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["studioA"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
-
-    mockPrisma.stashStudio = {
-      ...mockPrisma.stashStudio,
-      findMany: vi.fn().mockResolvedValue([
-        { id: "studioA", stashInstanceId: "instA" },
-        { id: "studioB", stashInstanceId: "instA" },
-        { id: "studioC", stashInstanceId: "instA" },
-      ]),
-    };
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    const studioExclusions = allData.filter(
-      (e: any) => e.entityType === "studio" && e.reason === "restricted"
-    );
-    const excludedStudioIds = studioExclusions.map((e: any) => e.entityId);
-    expect(excludedStudioIds).toContain("studioB");
-    expect(excludedStudioIds).toContain("studioC");
-    expect(excludedStudioIds).not.toContain("studioA");
-  });
-
-  it("should process INCLUDE mode for galleries", async () => {
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "galleries",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["gal1:instA", "gal2"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.stashGallery = {
-      ...mockPrisma.stashGallery,
-      findMany: vi.fn().mockResolvedValue([
-        { id: "gal1", stashInstanceId: "instA" },
-        { id: "gal2", stashInstanceId: "instA" },
-        { id: "gal3", stashInstanceId: "instA" },
-      ]),
-    };
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    const galleryExclusions = allData.filter(
-      (e: any) => e.entityType === "gallery" && e.reason === "restricted"
-    );
-    const excludedGalleryIds = galleryExclusions.map((e: any) => e.entityId);
-    // gal1 (from "gal1:instA") and gal2 (bare) are included
-    expect(excludedGalleryIds).toContain("gal3");
-    expect(excludedGalleryIds).not.toContain("gal1");
-    expect(excludedGalleryIds).not.toContain("gal2");
-  });
-
-  it("should distinguish same bare ID across different instances in INCLUDE mode", async () => {
-    // Multi-instance bug: tag "6" exists on both instA and instB.
-    // User includes only "6:instA". Tag "6:instB" should be EXCLUDED.
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "tags",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["6:instA"]),
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 3 });
-
-    // getAllEntityIds returns tags from BOTH instances — same bare ID "6"
-    mockPrisma.stashTag = {
-      ...mockPrisma.stashTag,
-      findMany: vi.fn().mockResolvedValue([
-        { id: "6", stashInstanceId: "instA" },
-        { id: "6", stashInstanceId: "instB" },
-        { id: "7", stashInstanceId: "instA" },
-      ]),
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    const tagExclusions = allData.filter(
-      (e: any) => e.entityType === "tag" && e.reason === "restricted"
-    );
-
-    // Tag "6" from instA should NOT be excluded (it's in the include list)
-    expect(tagExclusions).not.toContainEqual(
-      expect.objectContaining({ entityId: "6", instanceId: "instA" })
-    );
-
-    // Tag "6" from instB SHOULD be excluded (not in the include list)
-    expect(tagExclusions).toContainEqual(
-      expect.objectContaining({ entityId: "6", instanceId: "instB" })
-    );
-
-    // Tag "7" from instA SHOULD be excluded (not in the include list)
-    expect(tagExclusions).toContainEqual(
-      expect.objectContaining({ entityId: "7", instanceId: "instA" })
-    );
-  });
-
-  it("should include bare IDs globally across all instances in INCLUDE mode", async () => {
-    // When a bare ID (no instanceId) is in the include list,
-    // it should include that entity from ALL instances.
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-      {
-        userId: 1,
-        entityType: "groups",
-        mode: "INCLUDE",
-        entityIds: JSON.stringify(["6"]), // bare ID — no instance qualifier
-      },
-    ]);
-    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
-
-    mockPrisma.stashGroup = {
-      ...mockPrisma.stashGroup,
-      findMany: vi.fn().mockResolvedValue([
-        { id: "6", stashInstanceId: "instA" },
-        { id: "6", stashInstanceId: "instB" },
-        { id: "7", stashInstanceId: "instA" },
-      ]),
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-
-    await exclusionComputationService.recomputeForUser(1);
-
-    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
-    const allData = calls.flatMap((c: any) => c[0].data);
-
-    const groupExclusions = allData.filter(
-      (e: any) => e.entityType === "group" && e.reason === "restricted"
-    );
-
-    // Group "6" from BOTH instances should NOT be excluded (bare ID = global include)
-    expect(groupExclusions).not.toContainEqual(
-      expect.objectContaining({ entityId: "6", instanceId: "instA" })
-    );
-    expect(groupExclusions).not.toContainEqual(
-      expect.objectContaining({ entityId: "6", instanceId: "instB" })
-    );
-
-    // Group "7" SHOULD be excluded
-    expect(groupExclusions).toContainEqual(
-      expect.objectContaining({ entityId: "7" })
-    );
-  });
-});
-
 describe("error handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
   });
 
   it("should propagate transaction errors from recomputeForUser", async () => {
@@ -2662,70 +1834,44 @@ describe("error handling", () => {
 
 describe("hidden and restricted ids never reach SQL text", () => {
   const HOSTILE = "x') OR 1=1 OR je.value IN ('y";
+  const HOSTILE_LISTED = "9') OR 1=1 --";
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default empty responses for cascade-related queries
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
-    mockPrisma.stashScene.findMany.mockResolvedValue([]);
-    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
-    mockPrisma.performerTag.findMany.mockResolvedValue([]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
-    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
-    mockPrisma.$queryRaw.mockResolvedValue([]);
-    // Mock $executeRaw for temp table operations
-    mockPrisma.$executeRaw.mockResolvedValue(undefined);
-    // Default count responses for entity stats
-    mockPrisma.stashScene.count.mockResolvedValue(0);
-    mockPrisma.stashPerformer.count.mockResolvedValue(0);
-    mockPrisma.stashStudio.count.mockResolvedValue(0);
-    mockPrisma.stashTag.count.mockResolvedValue(0);
-    mockPrisma.stashGroup.count.mockResolvedValue(0);
-    mockPrisma.stashGallery.count.mockResolvedValue(0);
-    mockPrisma.stashImage.count.mockResolvedValue(0);
-    mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-    // Earlier tests reassign $queryRawUnsafe; start from a fresh mock.
-    mockPrisma.$queryRawUnsafe = vi.fn().mockResolvedValue([]);
-    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
-    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
-    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
-  });
+  beforeEach(() => setupPipeline());
 
-  it("binds global tag ids as one JSON parameter in the inherited-tag cascade", async () => {
+  it("binds a hostile hidden id and a hostile listed id as JSON parameters", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
       { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "" },
+    ]);
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", [`${HOSTILE_LISTED}:A`]),
     ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const call = mockPrisma.$queryRawUnsafe.mock.calls.find((c: any[]) =>
-      String(c[0]).includes("json_each(s.inheritedTagIds)")
+    const allSql = [...rawCalls(), ...execCalls()].map((c) => String(c[0]));
+    expect(allSql.length).toBeGreaterThan(0);
+    for (const sql of allSql) {
+      expect(sql).not.toContain(HOSTILE);
+      expect(sql).not.toContain(HOSTILE_LISTED);
+    }
+    const resolves = queriesMatching(RESOLVE_TAG);
+    expect(resolves.length).toBeGreaterThanOrEqual(2);
+    const allParams = resolves.flatMap(([, ...params]) => params.map(String));
+    expect(allParams).toContain(JSON.stringify([HOSTILE]));
+    expect(allParams).toContain(
+      JSON.stringify([{ id: HOSTILE_LISTED, iid: "A" }])
     );
-    expect(call).toBeDefined();
-    const [sql, ...params] = call!;
-    expect(sql).toContain("IN (SELECT value FROM json_each(?))");
-    expect(sql).not.toContain(HOSTILE);
-    expect(params).toContain(JSON.stringify([HOSTILE]));
   });
 
-  it("binds scoped tag ids as one JSON parameter in the inherited-tag cascade", async () => {
+  it("a hostile id that matches nothing hides nothing beyond the stored row", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
       { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "instB" },
     ]);
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const call = mockPrisma.$queryRaw.mock.calls.find((c: any[]) =>
-      (c[0] as string[]).join("?").includes("json_each(s.inheritedTagIds)")
+    expect(rowKeys(createdRows())).toEqual(
+      new Set([`tag:${HOSTILE}@instB:hidden`])
     );
-    expect(call).toBeDefined();
-    expect(call!.slice(1)).toEqual(["instB", JSON.stringify([HOSTILE])]);
   });
 });

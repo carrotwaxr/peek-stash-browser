@@ -95,7 +95,9 @@ class ClipQueryBuilder {
   `.trim();
 
   /**
-   * Build FROM clause with exclusion JOIN
+   * Build FROM clause with the exclusion JOINs: a clip is hidden when its
+   * scene has a row ('scene') or the clip itself has one ('clip', written
+   * when one of its tags is excluded or hidden).
    */
   private buildFromClause(userId: number): { sql: string; params: number[] } {
     return {
@@ -104,8 +106,9 @@ class ClipQueryBuilder {
         INNER JOIN StashScene s ON c.sceneId = s.id AND c.sceneInstanceId = s.stashInstanceId
         LEFT JOIN StashTag pt ON c.primaryTagId = pt.id AND c.primaryTagInstanceId = pt.stashInstanceId
         LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = c.sceneId AND (e.instanceId = '' OR e.instanceId = c.sceneInstanceId)
+        LEFT JOIN UserExcludedEntity ec ON ec.userId = ? AND ec.entityType = 'clip' AND ec.entityId = c.id AND (ec.instanceId = '' OR ec.instanceId = c.stashInstanceId)
       `.trim(),
-      params: [userId],
+      params: [userId, userId],
     };
   }
 
@@ -114,7 +117,7 @@ class ClipQueryBuilder {
    */
   private buildBaseWhere(): FilterClause {
     return {
-      sql: "c.deletedAt IS NULL AND s.deletedAt IS NULL AND e.id IS NULL",
+      sql: "c.deletedAt IS NULL AND s.deletedAt IS NULL AND e.id IS NULL AND ec.id IS NULL",
       params: [],
     };
   }

@@ -18,10 +18,12 @@ import {
   getRecoveryKey,
   getUserSettings,
   regenerateRecoveryKey,
+  updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
 import { formatRecoveryKey } from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
@@ -35,6 +37,11 @@ vi.mock("../../prisma/singleton.js", () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+    },
+    userContentRestriction: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -77,6 +84,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma);
+const mockExclusions = vi.mocked(exclusionComputationService);
 const mockBcrypt = vi.mocked(bcrypt);
 const mockValidatePassword = vi.mocked(validatePassword);
 
@@ -891,6 +899,243 @@ describe("User Controller", () => {
       await updateUserRole(req, res);
       expect(res._getBody().success).toBe(true);
       expect(res._getBody().user.role).toBe("ADMIN");
+    });
+
+    it("recomputes exclusions after a role change", async () => {
+      // Promotion drops restricted/empty rows; demotion applies the kept rows again
+      const order: string[] = [];
+      mockPrisma.user.update.mockImplementation(async () => {
+        order.push("update");
+        return {
+          id: 3,
+          username: "user3",
+          role: "USER",
+          updatedAt: new Date(),
+        } as any;
+      });
+      mockExclusions.recomputeForUser.mockImplementation(async () => {
+        order.push("recompute");
+      });
+      const req = mockReq({ role: "USER" }, { userId: "3" }, ADMIN);
+      const res = mockRes();
+      await updateUserRole(req, res);
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledWith(3);
+      expect(order).toEqual(["update", "recompute"]);
+      expect(res._getBody().success).toBe(true);
+    });
+  });
+
+  // ─── updateUserRestrictions ───
+
+  describe("updateUserRestrictions", () => {
+    const TARGET = { id: 3, username: "user3", role: "USER" };
+    const tagRule = (mode: string, ids: unknown[] = ["1:A"]) => ({
+      entityType: "tags",
+      mode,
+      entityIds: ids,
+    });
+
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue(TARGET as any);
+      mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
+        count: 0,
+      } as any);
+      mockPrisma.userContentRestriction.createMany.mockResolvedValue({
+        count: 1,
+      } as any);
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([] as any);
+      mockExclusions.recomputeForUser.mockResolvedValue(undefined);
+    });
+
+    it("returns 403 when non-admin", async () => {
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE")] },
+        { userId: "3" },
+        USER
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(403);
+    });
+
+    it("400 when the target is an admin", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...TARGET,
+        role: "ADMIN",
+      } as any);
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE")] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody().error).toMatch(/administrators/);
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
+    });
+
+    it("404 when the target does not exist", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE")] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(404);
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
+    });
+
+    it("400 on a duplicate (entityType, mode) pair", async () => {
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE"), tagRule("EXCLUDE", ["2:A"])] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
+    });
+
+    it("400 on an empty entityIds list", async () => {
+      const req = mockReq(
+        { restrictions: [tagRule("INCLUDE", [])] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(
+        mockPrisma.userContentRestriction.deleteMany
+      ).not.toHaveBeenCalled();
+    });
+
+    it("400 on a malformed id", async () => {
+      for (const bad of [["abc"], ["1:"], [5], ["1:A", "x:y:"]]) {
+        vi.clearAllMocks();
+        mockPrisma.user.findUnique.mockResolvedValue(TARGET as any);
+        const req = mockReq(
+          { restrictions: [tagRule("EXCLUDE", bad)] },
+          { userId: "3" },
+          ADMIN
+        );
+        const res = mockRes();
+        await updateUserRestrictions(req, res);
+        expect(res._getStatus()).toBe(400);
+        expect(
+          mockPrisma.userContentRestriction.deleteMany
+        ).not.toHaveBeenCalled();
+      }
+    });
+
+    it("400 on a non-boolean restrictEmpty", async () => {
+      const req = mockReq(
+        { restrictions: [{ ...tagRule("EXCLUDE"), restrictEmpty: "yes" }] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(400);
+    });
+
+    it("defaults restrictEmpty to true for INCLUDE and false for EXCLUDE when omitted", async () => {
+      const req = mockReq(
+        {
+          restrictions: [
+            tagRule("INCLUDE"),
+            { entityType: "studios", mode: "EXCLUDE", entityIds: ["7:A"] },
+          ],
+        },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      expect(res._getStatus()).toBe(200);
+      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
+        .data as Array<Record<string, unknown>>;
+      expect(data).toEqual([
+        {
+          userId: 3,
+          entityType: "tags",
+          mode: "INCLUDE",
+          entityIds: JSON.stringify(["1:A"]),
+          restrictEmpty: true,
+        },
+        {
+          userId: 3,
+          entityType: "studios",
+          mode: "EXCLUDE",
+          entityIds: JSON.stringify(["7:A"]),
+          restrictEmpty: false,
+        },
+      ]);
+    });
+
+    it("keeps an explicit restrictEmpty value", async () => {
+      const req = mockReq(
+        { restrictions: [{ ...tagRule("INCLUDE"), restrictEmpty: false }] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
+        .data as Array<Record<string, unknown>>;
+      expect(data[0].restrictEmpty).toBe(false);
+    });
+
+    it("stores an INCLUDE and an EXCLUDE row for the same type and recomputes", async () => {
+      const saved = [
+        { id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" },
+        { id: 11, userId: 3, entityType: "tags", mode: "EXCLUDE" },
+      ];
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue(
+        saved as any
+      );
+      const req = mockReq(
+        {
+          restrictions: [
+            { ...tagRule("INCLUDE"), restrictEmpty: true },
+            { ...tagRule("EXCLUDE", ["2:A"]), restrictEmpty: true },
+          ],
+        },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockPrisma.userContentRestriction.deleteMany).toHaveBeenCalledWith(
+        {
+          where: { userId: 3 },
+        }
+      );
+      expect(
+        mockPrisma.userContentRestriction.createMany
+      ).toHaveBeenCalledTimes(1);
+      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
+        .data as Array<Record<string, unknown>>;
+      expect(data.map((r) => r.mode)).toEqual(["INCLUDE", "EXCLUDE"]);
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledTimes(1);
+      expect(mockExclusions.recomputeForUser).toHaveBeenCalledWith(3);
+      expect(mockPrisma.userContentRestriction.findMany).toHaveBeenCalledWith({
+        where: { userId: 3 },
+      });
+      expect(res._getBody().success).toBe(true);
+      expect(res._getBody().restrictions).toEqual(saved);
     });
   });
 });

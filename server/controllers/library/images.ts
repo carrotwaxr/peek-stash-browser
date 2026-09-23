@@ -109,7 +109,6 @@ export const findImages = async (
   const startTime = Date.now();
   try {
     const userId = req.user?.id;
-    const requestingUser = req.user;
     const { filter, image_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "title";
@@ -215,8 +214,8 @@ export const findImages = async (
       };
     }
 
-    // Admins skip exclusions
-    const applyExclusions = requestingUser?.role !== "ADMIN";
+    // Exclusions apply to every user; an admin's rows hold only their own hides
+    const applyExclusions = true;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);

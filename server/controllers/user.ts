@@ -6,6 +6,13 @@ import { exclusionComputationService } from "../services/ExclusionComputationSer
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import type { EntityType } from "../services/UserHiddenEntityService.js";
+import {
+  RESTRICTABLE_ENTITY_TYPES,
+  RESTRICTION_MODES,
+  type RestrictionMode,
+  defaultRestrictEmpty,
+  restrictionsApplyTo,
+} from "../services/exclusionPolicy.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type {
@@ -937,6 +944,10 @@ export const updateUserRole = async (
         updatedAt: true,
       },
     });
+
+    // Restrictions apply by role (item 13): promotion drops the restricted
+    // and empty rows, demotion applies the kept restriction rows again.
+    await exclusionComputationService.recomputeForUser(userIdInt);
 
     res.json({ success: true, user: updatedUser });
   } catch (error) {
@@ -2195,54 +2206,108 @@ export const updateUserRestrictions = async (
     }
 
     const targetUserId = parseInt(userId);
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    // Restrictions apply to non-admin accounts only (item 13)
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { role: true },
+    });
+    if (!target) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!restrictionsApplyTo(target.role)) {
+      return res
+        .status(400)
+        .json({ error: "Content restrictions do not apply to administrators" });
+    }
 
     // Validate input
     if (!Array.isArray(restrictions)) {
       return res.status(400).json({ error: "Restrictions must be an array" });
     }
 
-    // Validate each restriction
-    for (const r of restrictions) {
-      if (!["groups", "tags", "studios", "galleries"].includes(r.entityType)) {
+    // Validate each restriction: one row per (type, mode), a non-empty list of
+    // "id" or "id:instanceId" strings, and an optional boolean restrictEmpty
+    const seenPairs = new Set<string>();
+    const rows: Array<{
+      userId: number;
+      entityType: string;
+      mode: RestrictionMode;
+      entityIds: string;
+      restrictEmpty: boolean;
+    }> = [];
+    for (const r of restrictions as UserRestriction[]) {
+      if (
+        !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
+      ) {
         return res
           .status(400)
-          .json({ error: `Invalid entity type: ${r.entityType}` });
+          .json({ error: `Invalid entity type: ${String(r.entityType)}` });
       }
-      if (!["INCLUDE", "EXCLUDE"].includes(r.mode)) {
-        return res.status(400).json({ error: `Invalid mode: ${r.mode}` });
+      if (!(RESTRICTION_MODES as readonly string[]).includes(r.mode)) {
+        return res
+          .status(400)
+          .json({ error: `Invalid mode: ${String(r.mode)}` });
       }
-      if (!Array.isArray(r.entityIds)) {
-        return res.status(400).json({ error: "entityIds must be an array" });
+      const mode = r.mode as RestrictionMode;
+      const pair = `${r.entityType}:${mode}`;
+      if (seenPairs.has(pair)) {
+        return res.status(400).json({
+          error: `Only one ${mode} list is allowed for ${r.entityType}`,
+        });
       }
+      seenPairs.add(pair);
+      if (!Array.isArray(r.entityIds) || r.entityIds.length === 0) {
+        return res.status(400).json({
+          error: `entityIds for ${r.entityType} ${mode} must be a non-empty array`,
+        });
+      }
+      for (const id of r.entityIds) {
+        if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
+          return res.status(400).json({
+            error: `Invalid entity id in ${r.entityType} ${mode}: ${String(id)}`,
+          });
+        }
+      }
+      if (
+        r.restrictEmpty !== undefined &&
+        typeof r.restrictEmpty !== "boolean"
+      ) {
+        return res
+          .status(400)
+          .json({ error: "restrictEmpty must be a boolean when present" });
+      }
+      rows.push({
+        userId: targetUserId,
+        entityType: r.entityType,
+        mode,
+        entityIds: JSON.stringify(r.entityIds),
+        restrictEmpty: r.restrictEmpty ?? defaultRestrictEmpty(mode),
+      });
     }
 
-    // Delete existing restrictions
+    // Replace the stored rows (item 29 makes this atomic)
     await prisma.userContentRestriction.deleteMany({
       where: { userId: targetUserId },
     });
-
-    // Create new restrictions
-    const created = await Promise.all(
-      restrictions.map((r: UserRestriction) =>
-        prisma.userContentRestriction.create({
-          data: {
-            userId: targetUserId,
-            entityType: r.entityType,
-            mode: r.mode,
-            entityIds: JSON.stringify(r.entityIds),
-            restrictEmpty: r.restrictEmpty || false,
-          },
-        })
-      )
-    );
+    if (rows.length > 0) {
+      await prisma.userContentRestriction.createMany({ data: rows });
+    }
 
     // Recompute exclusions for this user after restriction change
     await exclusionComputationService.recomputeForUser(targetUserId);
 
+    const saved = await prisma.userContentRestriction.findMany({
+      where: { userId: targetUserId },
+    });
+
     res.json({
       success: true,
       message: "Content restrictions updated successfully",
-      restrictions: created,
+      restrictions: saved,
     });
   } catch (error) {
     logger.error("Error updating user restrictions", {

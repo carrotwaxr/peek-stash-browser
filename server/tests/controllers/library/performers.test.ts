@@ -650,7 +650,8 @@ describe("findPerformersMinimal", () => {
     expect(res._getBody().performers[0].id).toBe("p1");
   });
 
-  it("skips exclusion filtering for admin users", async () => {
+  it("applies exclusion filtering for admin users", async () => {
+    // An admin's rows hold only their own hides and cascades (item 13)
     vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue([
       createMockPerformer({ id: "p1" }),
     ]);
@@ -660,7 +661,11 @@ describe("findPerformersMinimal", () => {
 
     await findPerformersMinimal(req, res);
 
-    expect(entityExclusionHelper.filterExcluded).not.toHaveBeenCalled();
+    expect(entityExclusionHelper.filterExcluded).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      "performer"
+    );
     expect(res._getStatus()).toBe(200);
   });
 

@@ -393,6 +393,46 @@ describe("UserEditModal", () => {
     });
   });
 
+  describe("Content Restrictions Section", () => {
+    it("does not offer Manage Restrictions for admin accounts", async () => {
+      render(
+        <UserEditModal
+          user={{ id: 3, username: "otheradmin", role: "ADMIN" }}
+          groups={mockGroups}
+          currentUser={mockCurrentUser}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+
+      expect(
+        screen.getByText(/do not apply to administrators/)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Manage Restrictions/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers Manage Restrictions for user accounts", async () => {
+      render(
+        <UserEditModal
+          user={mockUser}
+          groups={mockGroups}
+          currentUser={mockCurrentUser}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+
+      expect(
+        screen.getByRole("button", { name: /Manage Restrictions/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/do not apply to administrators/)
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("Role Selection", () => {
     it("shows role dropdown", () => {
       render(

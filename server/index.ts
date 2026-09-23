@@ -9,6 +9,7 @@ import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
+import { disconnectComputeClient } from "./prisma/computeClient.js";
 import prisma, { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
@@ -84,7 +85,7 @@ main().catch(async (e) => {
   logger.error("Fatal error", {
     error: e instanceof Error ? e.message : String(e),
   });
-  await prisma.$disconnect();
+  await Promise.all([prisma.$disconnect(), disconnectComputeClient()]);
   process.exit(1);
 });
 
@@ -92,9 +93,11 @@ main().catch(async (e) => {
 process.on("SIGTERM", () => {
   stashSyncService.abort();
   void prisma.$disconnect();
+  void disconnectComputeClient();
 });
 
 process.on("SIGINT", () => {
   stashSyncService.abort();
   void prisma.$disconnect();
+  void disconnectComputeClient();
 });

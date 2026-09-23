@@ -327,7 +327,8 @@ describe("Images Controller", () => {
       expect(typeof callArgs.randomSeed).toBe("number");
     });
 
-    it("admins skip exclusions", async () => {
+    it("admins apply exclusions too", async () => {
+      // Their rows hold only their own hides and cascades (item 13)
       mockImageQueryBuilder.execute.mockResolvedValue({
         images: [],
         total: 0,
@@ -339,7 +340,7 @@ describe("Images Controller", () => {
       await findImages(req, res);
 
       const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
-      expect(callArgs.applyExclusions).toBe(false);
+      expect(callArgs.applyExclusions).toBe(true);
     });
 
     it("non-admins apply exclusions", async () => {

@@ -187,8 +187,8 @@ export const findPerformers = async (
       | string
       | undefined;
 
-    // Use SQL query builder - admins skip exclusions
-    const applyExclusions = requestingUser?.role !== "ADMIN";
+    // Exclusions apply to every user; an admin's rows hold only their own hides
+    const applyExclusions = true;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -846,16 +846,12 @@ export const findPerformersMinimal = async (
     let performers = await stashEntityService.getAllPerformers();
 
     // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    const requestingUser = req.user;
     const userId = req.user?.id;
-    if (requestingUser?.role !== "ADMIN") {
-      performers = await entityExclusionHelper.filterExcluded(
-        performers,
-        userId,
-        "performer"
-      );
-    }
+    performers = await entityExclusionHelper.filterExcluded(
+      performers,
+      userId,
+      "performer"
+    );
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {

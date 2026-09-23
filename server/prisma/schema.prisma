@@ -386,7 +386,9 @@ model UserContentRestriction {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, entityType])
+  // One row per (user, type, mode): a type can have a Show-only (INCLUDE)
+  // and an Always-hide (EXCLUDE) list at once (item 13).
+  @@unique([userId, entityType, mode])
   @@index([userId])
 }
 
@@ -550,7 +552,7 @@ model UserHiddenEntity {
 model UserExcludedEntity {
   id         Int      @id @default(autoincrement())
   userId     Int
-  entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
+  entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image', 'clip'
   entityId   String   // Stash entity ID
   instanceId String   @default("") // Stash instance ID for multi-instance scoping
 

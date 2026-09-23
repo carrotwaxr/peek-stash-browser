@@ -644,22 +644,32 @@ const UserEditModalContent = ({
                   border: "1px solid var(--border-color)",
                 }}
               >
-                <p
-                  className="text-sm mb-3"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Manage content restrictions for this user. Restrictions
-                  control which content is visible based on collections, tags,
-                  studios, and galleries.
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowContentRestrictionsModal(true)}
-                >
-                  <Lock size={14} className="mr-1" />
-                  Manage Restrictions
-                </Button>
+                {user.role === "ADMIN" ? (
+                  // The saved role decides, not the unsaved dropdown: an admin
+                  // keeps only their own hidden items (item 13)
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Content restrictions do not apply to administrators.
+                  </p>
+                ) : (
+                  <>
+                    <p
+                      className="text-sm mb-3"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Manage content restrictions for this user. Restrictions
+                      control which content is visible based on collections,
+                      tags, studios, and galleries.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowContentRestrictionsModal(true)}
+                    >
+                      <Lock size={14} className="mr-1" />
+                      Manage Restrictions
+                    </Button>
+                  </>
+                )}
               </div>
             </section>
 
