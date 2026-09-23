@@ -27,8 +27,8 @@ Based on which files changed, invoke the corresponding skills to have their guid
 | `server/controllers/**`, `server/routes/**` | `express5-api-patterns`, `api-design-principles` |
 | `server/services/**` (TypeScript) | `typescript-advanced-types` |
 | `server/prisma/**`, migration files | `prisma-sqlite-expert` |
-| `server/graphql/**`, `codegen.yml` | `graphql-patterns` |
-| `Dockerfile*`, `docker-compose*` | `docker-best-practices` |
+| `server/graphql/**`, `codegen.yml` | `stash:stash` |
+| `Dockerfile*`, `docker-compose*` | `homelab:docker-best-practices` |
 | Test files (`**/*.test.*`) | `writing-tests` |
 
 Invoke these skills using the Skill tool before proceeding to the code quality review. You don't need to invoke every skill — only those relevant to the diff.

@@ -91,7 +91,7 @@ When a check fails, invoke the relevant skill for guidance before attempting fix
 | Test failures (writing/fixing tests) | `writing-tests` |
 | TypeScript type errors | `typescript-advanced-types` |
 | Prisma/migration issues | `prisma-sqlite-expert` |
-| Docker build failures | `docker-best-practices` |
+| Docker build failures | `homelab:docker-best-practices` |
 | React/client lint or build errors | `vercel-react-best-practices` |
 | Server lint or runtime errors | `nodejs-backend-patterns` |
 

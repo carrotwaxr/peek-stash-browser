@@ -61,22 +61,11 @@ git log --oneline -10 --format="%h %s (%ar)"
 git stash list
 ```
 
-## Step 2b: Query the Brain
+## Step 2b: Check Memory
 
-Search the MCP memory service for context relevant to the branch topic or planned work:
+Auto-memory for this project is already loaded. Skim it for prior decisions, known gotchas in the area being worked on, and patterns from earlier sessions, and read any memory file it points to that matches the branch topic.
 
-```
-memory_search(query: "<branch-topic-keywords>", limit: 5)
-memory_search(query: "gotchas <area>", limit: 5)
-```
-
-Look for:
-- Prior decisions and their rationale
-- Known gotchas in the area being worked on
-- Patterns established in previous sessions
-- Bug history and recurring issues
-
-Include relevant brain findings in the briefing under a "Brain Context" section.
+Include what's relevant in the briefing under a "Memory Context" section.
 
 ## Step 3: Check Project Health
 
@@ -141,7 +130,7 @@ Map branch topics to relevant skills:
 
 | Topic keywords | Skills to suggest |
 |---------------|-------------------|
-| video, proxy, stream, hls | `express5-api-patterns`, `stash` |
+| video, proxy, stream, hls | `express5-api-patterns`, `stash:stash` |
 | sync, instance, multi | `express5-api-patterns`, `prisma-sqlite-expert` |
 | ui, component, page, layout | `visual-style`, `react-spa-performance` |
 | test, coverage, spec | `writing-tests`, `vitest` |
@@ -149,11 +138,11 @@ Map branch topics to relevant skills:
 | restriction, exclusion, permission | `prisma-sqlite-expert`, `express5-api-patterns` |
 | migration, schema, database | `prisma-sqlite-expert` |
 | playlist, rating, stats | `express5-api-patterns`, `prisma-sqlite-expert` |
-| graphql, codegen, stash-client | `graphql-patterns`, `stash` |
+| graphql, codegen, stash-client | `stash:stash` |
 
 ## What This Skill Does NOT Do
 
 - Does not make decisions about what to work on (that's the human's call)
 - Does not start coding (wait for confirmation)
-- Does not replace `work-ticket` (which handles the full ticket lifecycle)
-- Queries brain for context but does not store new memories (that happens at work completion)
+- Does not replace `/stash:work-ticket` (which handles the full ticket lifecycle)
+- Reads memory for context but does not write new memories

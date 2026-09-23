@@ -78,8 +78,7 @@ These skills contain detailed reference material. Invoke the relevant skill when
 | **Code review** | `self-review` | Quality checklist, invokes relevant skills per diff area |
 | **Releases** | `release-workflow` | Full lifecycle; also `/pre-release`, `/release-stable`, `/release-beta` |
 | **Documentation** | `updating-docs` | MkDocs conventions, doc structure, plan formatting |
-| **GraphQL** | `graphql-patterns` | Stash ecosystem GraphQL, codegen, query patterns |
-| **Stash API** | `stash` | Stash GraphQL API, plugin system, scraper system |
+| **Stash API** | `stash:stash` | Stash GraphQL API, plugin system, scraper system |
 
 ## Development Lifecycle
 
@@ -92,11 +91,11 @@ Run `/start-session` at the beginning of every session. This gathers branch cont
 Follow this chain:
 
 1. **Orient** → `/start-session` (gather context, present briefing, confirm direction)
-2. **Pick up ticket** → invoke `work-ticket` (handles branch creation, plan review, implementation)
+2. **Pick up ticket** → `/stash:work-ticket` (typed; handles branch creation, plan review, implementation)
 3. **Write tests** → invoke `writing-tests` for conventions
-4. **Verify** → `superpowers:verification-before-completion` (evidence before claims)
+4. **Verify** → run the checks and show the output (`/fluffer:code-verify`)
 5. **Self-review** → `self-review` (code quality, invokes relevant best-practice skills)
-6. **Complete** → `superpowers:finishing-a-development-branch` (merge/PR/keep/discard)
+6. **Complete** → finish the branch as `fluffer:git-pr` describes (PR/merge/keep/discard)
 
 ### Lifecycle Gates
 
