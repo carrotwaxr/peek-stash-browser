@@ -25,7 +25,7 @@ paths:
 ## Server integration (`server/integration/`)
 
 - Starts a real server on port 9999 against a real Stash (`STASH_TEST_*`, else `STASH_*`, from the root `.env`), with entity IDs from `fixtures/testEntities.ts`. `FRESH_DB=true` deletes `integration/test.db` first.
-- Global setup logs in `adminClient` from `helpers/testClient.ts`. `selectTestInstanceOnly()` limits a test to the test instance.
+- Each test file logs in `adminClient` (from `helpers/testClient.ts`) in its own `beforeAll`. Global setup runs in a separate process, so its login doesn't carry over; a test that skips the login gets 401s. `selectTestInstanceOnly()` limits a test to the test instance.
 - To test a service against real SQLite without depending on Stash data, seed rows under a made-up `stashInstanceId` and spy on the Stash client; `services/StashSyncService.cleanup.integration.test.ts` shows how.
 
 ## E2E (`e2e/`)

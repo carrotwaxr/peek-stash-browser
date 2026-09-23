@@ -1,6 +1,9 @@
 ---
 paths:
   - "server/prisma/**"
+  - "server/initializers/database.ts"
+  - "server/initializers/schemaCatchup.ts"
+  - "docker/start.sh"
 ---
 
 # Prisma and migrations
@@ -17,15 +20,13 @@ paths:
 
 ## How migrations run
 
-At startup `server/initializers/database.ts` runs `runSchemaCatchup` (repairs databases from the pre-2.0.1 `db push` era), then `prisma migrate deploy`; `docker/start.sh` does the same for the container. Every past release upgrades through this path, so a migration must work on a populated database, not only an empty one.
+- In the container, `docker/start.sh` first marks `0_baseline` as applied for databases from the `db push` era, then runs `prisma migrate deploy`, then starts the server.
+- On startup the server (`server/initializers/database.ts`) runs `runSchemaCatchup`, which adds tables and columns those old databases lack, then `prisma migrate deploy` again. Outside Docker only this second part runs.
+
+Every past release upgrades through this path, so a migration must work on a populated database, not only an empty one.
 
 ## Schema conventions
 
-- A cached Stash entity table has `@@id([id, stashInstanceId])` and `deletedAt DateTime?`, since sync soft-deletes.
+- A cached Stash entity table has `@@id([id, stashInstanceId])` and `deletedAt DateTime?`, since sync soft-deletes. `stashInstanceId` is NOT NULL; an old migration backfilled every NULL.
 - A junction table keys on both IDs and both instances, e.g. `@@id([sceneId, sceneInstanceId, tagId, tagInstanceId])`.
 - Peek's own per-user tables call the column `instanceId`. In the exclusion tables an empty string means every instance.
-
-## Raw SQL
-
-- A TEMP table belongs to one connection, and nothing pins Prisma's pool to one (the comments claiming `connection_limit=1` are wrong). Create, use and drop it inside one interactive `prisma.$transaction` (#526).
-- SQLite can return `5.0000000001` from an integer column, and BigInt from a large one. Wrap counts in `Math.round(Number(x))` before writing them to an `Int` field (#410), and convert BigInt with `Number()` before JSON.

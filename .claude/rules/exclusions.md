@@ -4,8 +4,11 @@ paths:
   - "server/services/EntityExclusionHelper.ts"
   - "server/services/UserHiddenEntityService.ts"
   - "server/routes/exclusions.ts"
+  - "server/controllers/user.ts"
   - "server/tests/**/*xclusion*"
   - "server/integration/**/content-restrictions*"
+  - "server/integration/**/exclusion-application*"
+  - "server/integration/**/hidden-entities*"
 ---
 
 # Content restrictions and exclusions
@@ -21,10 +24,15 @@ paths:
 
 ## Computation
 
-- Phases run direct, then cascade, then empty. Only the final DELETE and INSERT share a transaction, which keeps SQLite's write lock short; keep the computation outside it.
-- Recomputes for one user coalesce to at most two, the running one and one queued (#378). A "skip if one is pending" shortcut loses the admin's latest save.
+- A full recompute runs direct, cascade and empty-entity phases outside any transaction. Then one transaction deletes the old rows, inserts the new ones and updates `UserEntityStats`. Keeping the computation outside keeps SQLite's write lock short.
+- Recomputes for one user coalesce to at most two, the running one and one queued (#431). A "skip if one is pending" shortcut loses the admin's latest save.
 - Cascades follow the junction rows sync writes. A missing junction row is a silent cascade miss, not an error.
-- Sync calls `recomputeAllUsers` after each sync. Saving restrictions and hiding an entity recompute for that user.
+
+## Triggers
+
+- Saving restrictions (`updateUserRestrictions` in `controllers/user.ts`) runs a full recompute for that user.
+- Hiding an entity calls `addHiddenEntity`, which adds that entity and its cascades but skips the empty-entity phase and the stats update. Unhiding queues a full recompute in the background without awaiting it.
+- `fullSync`, `incrementalSync` and `smartIncrementalSync` end with `recomputeAllUsers`. The plugin webhook's `syncSingleEntity` does not.
 
 ## Reading exclusions
 
