@@ -2,7 +2,8 @@
  * EntityAccessService: may this user see this entity?
  *
  * The single read helper for decisions about one id, or a batch of ids, that
- * came in a request: ratings, history writes, downloads and media. The list
+ * came in a request (ratings, history writes, downloads and media) or that a
+ * query builder loads for tooltips (keepVisibleConditions). The list
  * builders keep their LEFT JOIN on UserExcludedEntity, and in-memory reads
  * keep entityExclusionHelper.filterExcluded.
  *
@@ -187,6 +188,26 @@ WHERE ${ACCESS_WHERE}
     ...accessParams(source, userId, entityType)
   );
   return new Set(rows.map((r) => entityRefKey(r.id, r.instanceId)));
+}
+
+/**
+ * The conditions whose (id, stashInstanceId) this user may see, in their
+ * order. For the query builders' relation loaders: filter the composite-key
+ * conditions before the findMany, so tooltips never list an entity the user
+ * can't see. One SQL round trip.
+ */
+export async function keepVisibleConditions<
+  T extends { id: string; stashInstanceId: string },
+>(userId: number, entityType: AccessEntityType, conditions: T[]): Promise<T[]> {
+  if (conditions.length === 0) return conditions;
+  const visible = await getVisibleEntityKeys(
+    userId,
+    entityType,
+    conditions.map((c) => ({ id: c.id, instanceId: c.stashInstanceId }))
+  );
+  return conditions.filter((c) =>
+    visible.has(entityRefKey(c.id, c.stashInstanceId))
+  );
 }
 
 /**

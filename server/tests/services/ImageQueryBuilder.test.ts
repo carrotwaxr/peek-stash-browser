@@ -97,6 +97,23 @@ describe("ImageQueryBuilder", () => {
       expect(result.images).toHaveLength(1);
       expect(result.images[0].id).toBe(testImageIds[0]); // Third image on page 2
     });
+
+    it("returns instanceId on each image", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        allowedInstanceIds: [testInstanceId],
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.images).toHaveLength(3);
+      expect(result.images[0].instanceId).toBe(testInstanceId);
+      for (const image of result.images) {
+        expect(image.instanceId).toBe(testInstanceId);
+      }
+    });
   });
 
   describe("user data filters", () => {

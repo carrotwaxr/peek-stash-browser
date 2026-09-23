@@ -1,20 +1,16 @@
 /**
  * Unit Tests for Images Library Controller
  *
- * Tests findImages and findImageById.
- * Note: mergeImagesWithUserData and transformImageResult are private
- * and tested indirectly through the handlers.
+ * Tests findImages.
+ * Note: transformImageResult is private and tested indirectly through the
+ * handler.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  findImageById,
-  findImages,
-} from "../../../controllers/library/images.js";
+import { findImages } from "../../../controllers/library/images.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 
 // --- Mocks (must come before module import) ---
@@ -26,21 +22,8 @@ vi.mock("../../../prisma/singleton.js", () => ({
   },
 }));
 
-vi.mock("../../../services/StashEntityService.js", () => ({
-  stashEntityService: {
-    getImage: vi.fn(),
-  },
-}));
-
 vi.mock("../../../services/ImageQueryBuilder.js", () => ({
   imageQueryBuilder: { execute: vi.fn() },
-}));
-
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
-  },
 }));
 
 vi.mock("../../../services/UserInstanceService.js", () => ({
@@ -58,7 +41,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma);
-const mockStashEntityService = vi.mocked(stashEntityService);
 const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 
 const defaultUser = { id: 1, role: "USER" };
@@ -81,38 +63,6 @@ function createQueryBuilderImage(overrides: Record<string, unknown> = {}) {
     userLastViewedAt: overrides.userLastViewedAt ?? null,
     stashRating100: overrides.stashRating100 ?? null,
     stashOCounter: overrides.stashOCounter ?? 0,
-    ...overrides,
-  };
-}
-
-/** Helper to create a mock NormalizedImage for findImageById */
-function createMockNormalizedImage(overrides: Record<string, unknown> = {}) {
-  return {
-    id: overrides.id ?? "img1",
-    instanceId: overrides.instanceId ?? "default",
-    title: overrides.title ?? "Test Image",
-    code: null,
-    details: null,
-    photographer: null,
-    date: null,
-    rating100: overrides.rating100 ?? null,
-    o_counter: overrides.o_counter ?? 0,
-    organized: false,
-    paths: {
-      thumbnail: "/api/proxy/image/img1/thumbnail",
-      preview: "/api/proxy/image/img1/preview",
-      image: "/api/proxy/image/img1/image",
-    },
-    width: 800,
-    height: 600,
-    filePath: "/path/img1.jpg",
-    fileSize: 1024,
-    performers: [],
-    tags: [],
-    studio: null,
-    galleries: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -368,86 +318,6 @@ describe("Images Controller", () => {
 
       expect(res._getStatus()).toBe(500);
       expect(res._getBody().error).toBe("Failed to find images");
-    });
-  });
-
-  // ─── findImageById ──────────────────────────────────────────
-
-  describe("findImageById", () => {
-    it("returns image with merged user data on happy path", async () => {
-      const image = createMockNormalizedImage({ id: "img1" });
-      mockStashEntityService.getImage.mockResolvedValue(image as any);
-
-      const req = mockReq({}, { id: "img1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findImageById(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
-      expect(body.id).toBe("img1");
-      expect(body.stashUrl).toBe("http://stash/images/img1");
-    });
-
-    it("returns 404 when image not found", async () => {
-      mockStashEntityService.getImage.mockResolvedValue(null as any);
-
-      const req = mockReq({}, { id: "missing" }, defaultUser, {});
-      const res = mockRes();
-
-      await findImageById(req, res);
-
-      expect(res._getStatus()).toBe(404);
-      expect(res._getBody().error).toBe("Image not found");
-    });
-
-    it("uses instanceId from query parameter", async () => {
-      const image = createMockNormalizedImage({
-        id: "img1",
-        instanceId: "custom-inst",
-      });
-      mockStashEntityService.getImage.mockResolvedValue(image as any);
-
-      const req = mockReq({}, { id: "img1" }, defaultUser, {
-        instanceId: "custom-inst",
-      });
-      const res = mockRes();
-
-      await findImageById(req, res);
-
-      expect(mockStashEntityService.getImage).toHaveBeenCalledWith(
-        "img1",
-        "custom-inst"
-      );
-    });
-
-    it("falls back to default instance when no query param", async () => {
-      const image = createMockNormalizedImage({ id: "img1" });
-      mockStashEntityService.getImage.mockResolvedValue(image as any);
-
-      const req = mockReq({}, { id: "img1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findImageById(req, res);
-
-      expect(mockStashEntityService.getImage).toHaveBeenCalledWith(
-        "img1",
-        "default"
-      );
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getImage.mockRejectedValue(
-        new Error("service fail")
-      );
-
-      const req = mockReq({}, { id: "img1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findImageById(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find image");
     });
   });
 });

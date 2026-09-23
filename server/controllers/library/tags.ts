@@ -104,18 +104,15 @@ export const findTags = async (
     // Extract specific instance ID for disambiguation (from tag_filter.instance_id)
     const specificInstanceId = tag_filter?.instance_id as string | undefined;
 
-    // Exclusions apply to every user; an admin's rows hold only their own hides.
-    // When fetching by specific IDs, skip exclusions (for detail pages)
-    const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
-    const applyExclusions = !isFetchingByIds;
-
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
     const { tags, total } = await tagQueryBuilder.execute({
       userId,
       filters: mergedFilter,
-      applyExclusions,
+      // Exclusions apply to every user, by id too; an admin's rows hold only their own hides.
+      // Parent tags stay visible because the empty phase exempts tags with a child tag on the same instance.
+      applyExclusions: true,
       allowedInstanceIds,
       specificInstanceId,
       sort: sortField,

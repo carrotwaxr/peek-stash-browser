@@ -208,87 +208,6 @@ export interface FindGalleriesResponse {
 }
 
 /**
- * GET /api/library/galleries/:id - Get single gallery
- */
-export interface GetGalleryParams extends Record<string, string> {
-  id: string;
-}
-
-export interface GetGalleryResponse {
-  gallery: NormalizedGallery | null;
-}
-
-/**
- * GET /api/library/galleries/:id/images - Get gallery images
- */
-export interface GetGalleryImagesParams extends Record<string, string> {
-  id: string;
-}
-
-export interface GetGalleryImagesQuery extends Record<
-  string,
-  string | undefined
-> {
-  page?: string;
-  per_page?: string;
-  instance?: string;
-}
-
-/**
- * Gallery image with context for inheritance support
- */
-export interface GalleryImageWithContext {
-  id: string;
-  title?: string | null;
-  code?: string | null;
-  details?: string | null;
-  photographer?: string | null;
-  date?: string | null;
-  paths: {
-    thumbnail: string;
-    preview: string;
-    image: string;
-  };
-  width?: number | null;
-  height?: number | null;
-  rating100?: number | null;
-  o_counter?: number | null;
-  filePath?: string | null;
-  fileSize?: number | null;
-  performers: Array<{ id: string; name: string }>;
-  tags: Array<{ id: string; name: string }>;
-  studio?: { id: string; name: string } | null;
-  stashCreatedAt?: string | null;
-  stashUpdatedAt?: string | null;
-  galleries: Array<{
-    id: string;
-    title?: string | null;
-    date?: string | null;
-    details?: string | null;
-    photographer?: string | null;
-    studio?: NormalizedStudio | null;
-    studioId?: string | null;
-    performers: NormalizedPerformer[];
-    tags: NormalizedTag[];
-    urls?: string[];
-  }>;
-  // User data merged in
-  rating?: number | null;
-  favorite?: boolean;
-}
-
-export interface GetGalleryImagesResponse {
-  images: GalleryImageWithContext[];
-  count: number;
-  pagination?: {
-    page: number;
-    per_page: number;
-    total: number;
-    total_pages: number;
-  };
-}
-
-/**
  * POST /api/library/galleries/minimal - Get minimal gallery data
  */
 export interface FindGalleriesMinimalRequest {
@@ -369,17 +288,6 @@ export interface FindImagesResponse {
     count: number;
     images: NormalizedImage[];
   };
-}
-
-/**
- * GET /api/library/images/:id - Get single image
- */
-export interface GetImageParams extends Record<string, string> {
-  id: string;
-}
-
-export interface GetImageResponse extends NormalizedImage {
-  stashUrl: string;
 }
 
 /**

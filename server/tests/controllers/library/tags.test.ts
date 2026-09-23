@@ -467,6 +467,19 @@ describe("Tags Controller", () => {
         "default"
       );
     });
+
+    it("does not skip exclusions when fetching by ids", async () => {
+      mockTagQueryBuilder.execute.mockResolvedValue({ tags: [], total: 0 });
+
+      const req = mockReq({ ids: ["t1"], tag_filter: {} }, {}, defaultUser);
+      const res = mockRes();
+
+      await findTags(req, res);
+
+      expect(mockTagQueryBuilder.execute).toHaveBeenCalledTimes(1);
+      const call = mockTagQueryBuilder.execute.mock.calls[0][0];
+      expect(call.applyExclusions).not.toBe(false);
+    });
   });
 
   // ─── findTagsMinimal ────────────────────────────────────────

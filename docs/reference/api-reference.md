@@ -1103,22 +1103,6 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 
 ---
 
-### GET /api/library/galleries/:id
-
-**Authentication:** Required
-
-**Controller:** `findGalleryById` in `../../controllers/library/galleries.ts`
-
----
-
-### GET /api/library/galleries/:galleryId/images
-
-**Authentication:** Required
-
-**Controller:** `getGalleryImages` in `../../controllers/library/galleries.ts`
-
----
-
 ### POST /api/library/groups
 
 **Authentication:** Required
@@ -1140,14 +1124,6 @@ Library browsing endpoints for scenes, performers, studios, tags, groups, galler
 **Authentication:** Required
 
 **Controller:** `findImages` in `../../controllers/library/images.ts`
-
----
-
-### GET /api/library/images/:id
-
-**Authentication:** Required
-
-**Controller:** `findImageById` in `../../controllers/library/images.ts`
 
 ---
 

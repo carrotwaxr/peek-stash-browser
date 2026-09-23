@@ -55,11 +55,6 @@ export const queryKeys = {
       ["galleries", instanceId, "list", params] as const,
     detail: (instanceId: string | undefined, id: string) =>
       ["galleries", instanceId, "detail", id] as const,
-    images: (
-      instanceId: string | undefined,
-      galleryId: string,
-      params: Record<string, unknown>
-    ) => ["galleries", instanceId, "images", galleryId, params] as const,
     minimal: (
       instanceId: string | undefined,
       params: Record<string, unknown>

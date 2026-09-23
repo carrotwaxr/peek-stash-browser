@@ -38,6 +38,14 @@ vi.mock("../../utils/titleUtils.js", () => ({
   getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
 }));
 
+// Keep every tooltip relation, so the visibility query doesn't consume the
+// mocked $queryRawUnsafe sequences
+vi.mock("../../services/EntityAccessService.js", () => ({
+  keepVisibleConditions: vi.fn(
+    async (_u: number, _t: string, c: unknown[]) => c
+  ),
+}));
+
 const mockPrisma = vi.mocked(prisma);
 
 describe("StudioQueryBuilder", () => {

@@ -28,6 +28,7 @@ import {
 } from "../utils/sqlFilterBuilders.js";
 import { parseJsonArray } from "../utils/sqlHelpers.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { keepVisibleConditions } from "./EntityAccessService.js";
 import { KEY_SEP } from "./UserStatsService.js";
 
 /** Deduplicate composite key objects by id+stashInstanceId */
@@ -1080,7 +1081,7 @@ class PerformerQueryBuilder {
 
     // Populate relations (tags)
     const relationsStart = Date.now();
-    await this.populateRelations(performers);
+    await this.populateRelations(performers, userId);
     const relationsMs = Date.now() - relationsStart;
 
     logger.info("PerformerQueryBuilder.execute complete", {
@@ -1153,7 +1154,10 @@ class PerformerQueryBuilder {
    * Populate performer relations (tags, groups, galleries, studios)
    * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
    */
-  async populateRelations(performers: NormalizedPerformer[]): Promise<void> {
+  async populateRelations(
+    performers: NormalizedPerformer[],
+    userId: number
+  ): Promise<void> {
     if (performers.length === 0) return;
 
     // Build composite where clause to avoid cross-instance collisions
@@ -1260,19 +1264,37 @@ class PerformerQueryBuilder {
       )
     );
 
+    // Keep only entities this user may see (hidden, restricted, deleted or
+    // on an instance they don't use); the lookups below skip the rest
+    const [
+      visibleTagConditions,
+      visibleGroupConditions,
+      visibleGalleryConditions,
+      visibleStudioConditions,
+    ] = await Promise.all([
+      keepVisibleConditions(userId, "tag", tagOrConditions),
+      keepVisibleConditions(userId, "group", groupOrConditions),
+      keepVisibleConditions(userId, "gallery", galleryOrConditions),
+      keepVisibleConditions(userId, "studio", studioOrConditions),
+    ]);
+
     // Load all entities in parallel using composite key lookups
     const [tags, groups, galleries, studios] = await Promise.all([
-      tagOrConditions.length > 0
-        ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } })
+      visibleTagConditions.length > 0
+        ? prisma.stashTag.findMany({ where: { OR: visibleTagConditions } })
         : [],
-      groupOrConditions.length > 0
-        ? prisma.stashGroup.findMany({ where: { OR: groupOrConditions } })
+      visibleGroupConditions.length > 0
+        ? prisma.stashGroup.findMany({ where: { OR: visibleGroupConditions } })
         : [],
-      galleryOrConditions.length > 0
-        ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } })
+      visibleGalleryConditions.length > 0
+        ? prisma.stashGallery.findMany({
+            where: { OR: visibleGalleryConditions },
+          })
         : [],
-      studioOrConditions.length > 0
-        ? prisma.stashStudio.findMany({ where: { OR: studioOrConditions } })
+      visibleStudioConditions.length > 0
+        ? prisma.stashStudio.findMany({
+            where: { OR: visibleStudioConditions },
+          })
         : [],
     ]);
 

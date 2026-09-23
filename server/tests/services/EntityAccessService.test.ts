@@ -13,6 +13,7 @@ import {
   canUserAccessEntity,
   entityRefKey,
   getVisibleEntityKeys,
+  keepVisibleConditions,
   resolveAccessibleInstanceId,
 } from "../../services/EntityAccessService.js";
 
@@ -205,6 +206,35 @@ describe("EntityAccessService", () => {
         resolveAccessibleInstanceId(7, "scene", "42", undefined)
       ).resolves.toBeNull();
       expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("keepVisibleConditions", () => {
+    it("keeps the conditions whose ref is visible, in order", async () => {
+      mockQuery.mockResolvedValueOnce([{ id: "2", instanceId: "B" }] as never);
+
+      const kept = await keepVisibleConditions(7, "tag", [
+        { id: "1", stashInstanceId: "A" },
+        { id: "2", stashInstanceId: "B" },
+      ]);
+
+      expect(kept).toEqual([{ id: "2", stashInstanceId: "B" }]);
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      expect(call().params).toEqual([
+        JSON.stringify([
+          ["1", "A"],
+          ["2", "B"],
+        ]),
+        7,
+        7,
+        7,
+        "tag",
+      ]);
+    });
+
+    it("returns [] without a query for []", async () => {
+      await expect(keepVisibleConditions(7, "tag", [])).resolves.toEqual([]);
+      expect(mockQuery).not.toHaveBeenCalled();
     });
   });
 });

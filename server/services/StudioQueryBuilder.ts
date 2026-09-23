@@ -27,6 +27,7 @@ import {
   parseCompositeFilterValues,
 } from "../utils/sqlFilterBuilders.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { keepVisibleConditions } from "./EntityAccessService.js";
 
 // Query builder options
 export interface StudioQueryOptions {
@@ -498,7 +499,7 @@ class StudioQueryBuilder {
 
     // Populate relations (tags)
     const relationsStart = Date.now();
-    await this.populateRelations(studios);
+    await this.populateRelations(studios, userId);
     const relationsMs = Date.now() - relationsStart;
 
     logger.info("StudioQueryBuilder.execute complete", {
@@ -556,7 +557,10 @@ class StudioQueryBuilder {
    * Populate studio relations (tags, performers, groups, galleries)
    * Includes minimal data for TooltipEntityGrid
    */
-  async populateRelations(studios: NormalizedStudio[]): Promise<void> {
+  async populateRelations(
+    studios: NormalizedStudio[],
+    userId: number
+  ): Promise<void> {
     if (studios.length === 0) return;
 
     const studioIds = studios.map((s) => s.id);
@@ -575,6 +579,7 @@ class StudioQueryBuilder {
         where: {
           studioId: { in: studioIds },
           stashInstanceId: { in: studioInstanceIds },
+          deletedAt: null,
         },
         select: { id: true, studioId: true, stashInstanceId: true },
       }),
@@ -676,21 +681,37 @@ class StudioQueryBuilder {
       stashInstanceId: k.instanceId,
     }));
 
+    // Keep only entities this user may see (hidden, restricted, deleted or
+    // on an instance they don't use); the junction loops below skip the rest
+    const [
+      visibleTagConditions,
+      visiblePerformerConditions,
+      visibleGroupConditions,
+      visibleGalleryConditions,
+    ] = await Promise.all([
+      keepVisibleConditions(userId, "tag", tagOrConditions),
+      keepVisibleConditions(userId, "performer", performerOrConditions),
+      keepVisibleConditions(userId, "group", groupOrConditions),
+      keepVisibleConditions(userId, "gallery", galleryOrConditions),
+    ]);
+
     // Load all entities in parallel using composite key lookups
     const [tags, performers, groups, galleries] = await Promise.all([
-      tagOrConditions.length > 0
-        ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } })
+      visibleTagConditions.length > 0
+        ? prisma.stashTag.findMany({ where: { OR: visibleTagConditions } })
         : [],
-      performerOrConditions.length > 0
+      visiblePerformerConditions.length > 0
         ? prisma.stashPerformer.findMany({
-            where: { OR: performerOrConditions },
+            where: { OR: visiblePerformerConditions },
           })
         : [],
-      groupOrConditions.length > 0
-        ? prisma.stashGroup.findMany({ where: { OR: groupOrConditions } })
+      visibleGroupConditions.length > 0
+        ? prisma.stashGroup.findMany({ where: { OR: visibleGroupConditions } })
         : [],
-      galleryOrConditions.length > 0
-        ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } })
+      visibleGalleryConditions.length > 0
+        ? prisma.stashGallery.findMany({
+            where: { OR: visibleGalleryConditions },
+          })
         : [],
     ]);
 

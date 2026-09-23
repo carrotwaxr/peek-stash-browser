@@ -38,6 +38,7 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 - The per-entity getters `get<Entity>(id, instanceId)` and most `get<Entity>sByIds` require an instanceId. Many other `StashEntityService` methods (name maps, counts, `getAll*`, cross-entity lookups) ignore instances; check before relying on one.
 - `getEntityInstanceId()` takes a bare id. If the id exists on several instances it returns the alphabetically first `stashInstanceId` and only logs. If it finds nothing, or the lookup throws, it returns the first configured instance. Prefer an instanceId from the request.
 - In-memory maps key on `` `${id}${KEY_SEP}${instanceId}` ``, with `KEY_SEP = "\0"` exported from `UserStatsService`; several controllers redefine it locally.
+- A query that drives from a bound JSON list (`json_each(?)`) into an entity table joins it with `CROSS JOIN`, so SQLite keeps `json_each` as the outer loop and looks each ref up by primary key. A plain `JOIN` can make it scan the table and re-read the JSON for every row (27.7 s for 5,000 refs against 26k scenes; 10 ms with `CROSS JOIN`). Check with `EXPLAIN QUERY PLAN`: `SCAN j`, then `SEARCH x USING ... PRIMARY KEY`.
 
 ## SQLite numbers
 

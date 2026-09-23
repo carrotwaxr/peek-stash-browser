@@ -1,6 +1,8 @@
 /**
  * Library API — entity search and lookup endpoints.
  */
+import type { NormalizedImage } from "@peek/shared-types";
+import { makeCompositeKey } from "../utils/compositeKey";
 import { apiFetch, apiGet, apiPost } from "./client";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -197,23 +199,28 @@ export const libraryApi = {
     return (result?.galleries as unknown[]) || [];
   },
 
-  // Gallery images
-  getGalleryImages: async (
+  // Gallery images: the images search with an instance-aware galleries
+  // filter, so exclusions apply and each image carries the user's own data
+  findGalleryImages: async (
     galleryId: string,
-    {
-      page = 1,
-      per_page = 0,
-      instanceId = null,
-    }: { page?: number; per_page?: number; instanceId?: string | null } = {}
-  ) => {
-    const params = new URLSearchParams();
-    if (page > 1) params.set("page", page.toString());
-    if (per_page > 0) params.set("per_page", per_page.toString());
-    if (instanceId) params.set("instance", instanceId);
-    const queryString = params.toString();
-    return apiGet(
-      `/library/galleries/${galleryId}/images${queryString ? `?${queryString}` : ""}`
-    );
+    instanceId: string | null,
+    { page = 1, perPage = 100 }: { page?: number; perPage?: number } = {}
+  ): Promise<{ images: NormalizedImage[]; count: number }> => {
+    const result = await apiPost<{
+      findImages?: { images?: NormalizedImage[]; count?: number };
+    }>("/library/images", {
+      filter: { page, per_page: perPage, sort: "path", direction: "ASC" },
+      image_filter: {
+        galleries: {
+          value: [makeCompositeKey(galleryId, instanceId)],
+          modifier: "INCLUDES",
+        },
+      },
+    });
+    return {
+      images: result?.findImages?.images ?? [],
+      count: result?.findImages?.count ?? 0,
+    };
   },
 
   // Rating and favorite (delegates to ratings module)

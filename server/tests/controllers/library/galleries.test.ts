@@ -1,18 +1,15 @@
 /**
  * Unit Tests for Galleries Library Controller
  *
- * Tests applyGalleryFilters, findGalleries, findGalleryById,
- * findGalleriesMinimal, and getGalleryImages.
- * Note: mergeGalleriesWithUserData and mergeImagesWithUserData are private
- * and tested indirectly through the handlers.
+ * Tests applyGalleryFilters, findGalleries and findGalleriesMinimal.
+ * Note: mergeGalleriesWithUserData is private and tested indirectly through
+ * the handlers.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyGalleryFilters,
   findGalleries,
   findGalleriesMinimal,
-  findGalleryById,
-  getGalleryImages,
 } from "../../../controllers/library/galleries.js";
 // --- Imports ---
 
@@ -46,13 +43,6 @@ vi.mock("../../../services/GalleryQueryBuilder.js", () => ({
   galleryQueryBuilder: { execute: vi.fn() },
 }));
 
-vi.mock("../../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default" }),
-  },
-}));
-
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
     filterExcluded: vi.fn().mockImplementation((items) => items),
@@ -70,24 +60,6 @@ vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
   expandStudioIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
   expandTagIds: vi.fn().mockImplementation((ids) => Promise.resolve(ids)),
-}));
-
-vi.mock("../../../controllers/library/performers.js", () => ({
-  mergePerformersWithUserData: vi
-    .fn()
-    .mockImplementation((items) => Promise.resolve(items)),
-}));
-
-vi.mock("../../../controllers/library/studios.js", () => ({
-  mergeStudiosWithUserData: vi
-    .fn()
-    .mockImplementation((items) => Promise.resolve(items)),
-}));
-
-vi.mock("../../../controllers/library/tags.js", () => ({
-  mergeTagsWithUserData: vi
-    .fn()
-    .mockImplementation((items) => Promise.resolve(items)),
 }));
 
 vi.mock("../../../utils/logger.js", () => ({
@@ -364,127 +336,6 @@ describe("Galleries Controller", () => {
     });
   });
 
-  // ─── findGalleryById ────────────────────────────────────────
-
-  describe("findGalleryById", () => {
-    it("returns gallery with hydrated data on happy path", async () => {
-      const gallery = createMockGallery({
-        id: "g1",
-        instanceId: "default",
-        performers: [],
-        tags: [],
-        studio: null,
-      });
-      mockStashEntityService.getGallery.mockResolvedValue(gallery as any);
-
-      const req = mockReq({}, { id: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
-      expect(body.id).toBe("g1");
-    });
-
-    it("returns 404 when gallery not found", async () => {
-      mockStashEntityService.getGallery.mockResolvedValue(null as any);
-
-      const req = mockReq({}, { id: "missing" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(404);
-      expect(res._getBody().error).toBe("Gallery not found");
-    });
-
-    it("hydrates performers with cached data", async () => {
-      const gallery = createMockGallery({
-        id: "g1",
-        instanceId: "default",
-        performers: [{ id: "p1", name: "Basic" }] as any,
-        tags: [],
-        studio: null,
-      });
-      mockStashEntityService.getGallery.mockResolvedValue(gallery as any);
-      mockStashEntityService.getPerformersByIds.mockResolvedValue([
-        { id: "p1", name: "Full Performer", image_path: "/img.jpg" },
-      ] as any);
-
-      const req = mockReq({}, { id: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getPerformersByIds).toHaveBeenCalled();
-    });
-
-    it("hydrates studio with cached data", async () => {
-      const gallery = createMockGallery({
-        id: "g1",
-        instanceId: "default",
-        performers: [],
-        tags: [],
-        studio: { id: "s1", name: "Basic" } as any,
-      });
-      mockStashEntityService.getGallery.mockResolvedValue(gallery as any);
-      mockStashEntityService.getStudio.mockResolvedValue({
-        id: "s1",
-        name: "Full Studio",
-        instanceId: "default",
-      } as any);
-
-      const req = mockReq({}, { id: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getStudio).toHaveBeenCalledWith(
-        "s1",
-        "default"
-      );
-    });
-
-    it("hydrates tags with cached data", async () => {
-      const gallery = createMockGallery({
-        id: "g1",
-        instanceId: "default",
-        performers: [],
-        tags: [{ id: "t1", name: "Basic" }] as any,
-        studio: null,
-      });
-      mockStashEntityService.getGallery.mockResolvedValue(gallery as any);
-      mockStashEntityService.getTagsByIds.mockResolvedValue([
-        { id: "t1", name: "Full Tag" },
-      ] as any);
-
-      const req = mockReq({}, { id: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      expect(mockStashEntityService.getTagsByIds).toHaveBeenCalled();
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getGallery.mockRejectedValue(
-        new Error("service fail")
-      );
-
-      const req = mockReq({}, { id: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await findGalleryById(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find gallery");
-    });
-  });
-
   // ─── findGalleriesMinimal ───────────────────────────────────
 
   describe("findGalleriesMinimal", () => {
@@ -578,113 +429,6 @@ describe("Galleries Controller", () => {
       await findGalleriesMinimal(req, res);
 
       expect(res._getStatus()).toBe(500);
-    });
-  });
-
-  // ─── getGalleryImages ───────────────────────────────────────
-
-  describe("getGalleryImages", () => {
-    it("returns images for a gallery on happy path", async () => {
-      mockStashEntityService.getGallery.mockResolvedValue(
-        createMockGallery({ id: "g1" }) as any
-      );
-      mockPrisma.stashImage.findMany.mockResolvedValue([
-        {
-          id: "img1",
-          title: "Image 1",
-          code: null,
-          details: null,
-          photographer: null,
-          date: null,
-          width: 800,
-          height: 600,
-          rating100: null,
-          oCounter: 0,
-          filePath: "/path/img1.jpg",
-          fileSize: BigInt(1024),
-          stashCreatedAt: new Date(),
-          stashUpdatedAt: new Date(),
-          performers: [],
-          tags: [],
-          studio: null,
-        },
-      ] as any);
-
-      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await getGalleryImages(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
-      expect(body.images).toHaveLength(1);
-      expect(body.count).toBe(1);
-    });
-
-    it("returns 401 when userId is missing", async () => {
-      const req = mockReq({}, { galleryId: "g1" }, {}, {});
-      const res = mockRes();
-
-      await getGalleryImages(req, res);
-
-      expect(res._getStatus()).toBe(401);
-      expect(res._getBody().error).toBe("Unauthorized");
-    });
-
-    it("includes pagination metadata when per_page is specified", async () => {
-      mockStashEntityService.getGallery.mockResolvedValue(
-        createMockGallery({ id: "g1" }) as any
-      );
-      mockPrisma.stashImage.count.mockResolvedValue(50);
-      mockPrisma.stashImage.findMany.mockResolvedValue([
-        {
-          id: "img1",
-          title: null,
-          code: null,
-          details: null,
-          photographer: null,
-          date: null,
-          width: 800,
-          height: 600,
-          rating100: null,
-          oCounter: 0,
-          filePath: "/path/img1.jpg",
-          fileSize: null,
-          stashCreatedAt: null,
-          stashUpdatedAt: null,
-          performers: [],
-          tags: [],
-          studio: null,
-        },
-      ] as any);
-
-      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {
-        page: "1",
-        per_page: "20",
-      });
-      const res = mockRes();
-
-      await getGalleryImages(req, res);
-
-      expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
-      expect(body.pagination).toBeDefined();
-      expect(body.pagination.total).toBe(50);
-      expect(body.pagination.per_page).toBe(20);
-    });
-
-    it("returns 500 on error", async () => {
-      mockStashEntityService.getGallery.mockRejectedValue(
-        new Error("gallery error")
-      );
-
-      const req = mockReq({}, { galleryId: "g1" }, defaultUser, {});
-      const res = mockRes();
-
-      await getGalleryImages(req, res);
-
-      expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to fetch gallery images");
     });
   });
 });

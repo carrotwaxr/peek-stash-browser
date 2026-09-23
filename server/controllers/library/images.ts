@@ -1,71 +1,18 @@
-import prisma from "../../prisma/singleton.js";
 import {
   type ImageFilter,
   imageQueryBuilder,
 } from "../../services/ImageQueryBuilder.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
   FindImagesRequest,
   FindImagesResponse,
-  GetImageParams,
-  GetImageResponse,
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
 import type { NormalizedImage } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-
-/**
- * Merge images with user rating/favorite data and O counter
- * Used by findImageById for single image lookups
- */
-async function mergeImagesWithUserData(
-  images: NormalizedImage[],
-  userId: number
-): Promise<NormalizedImage[]> {
-  // Fetch ratings and view history in parallel
-  const [ratings, viewHistories] = await Promise.all([
-    prisma.imageRating.findMany({ where: { userId } }),
-    prisma.imageViewHistory.findMany({ where: { userId } }),
-  ]);
-
-  const KEY_SEP = "\0";
-  const ratingMap = new Map(
-    ratings.map((r) => [
-      `${r.imageId}${KEY_SEP}${r.instanceId || ""}`,
-      {
-        rating: r.rating,
-        rating100: r.rating,
-        favorite: r.favorite,
-      },
-    ])
-  );
-
-  const viewHistoryMap = new Map(
-    viewHistories.map((vh) => [
-      `${vh.imageId}${KEY_SEP}${vh.instanceId || ""}`,
-      {
-        oCounter: vh.oCount,
-        viewCount: vh.viewCount,
-      },
-    ])
-  );
-
-  return images.map((image) => ({
-    ...image,
-    rating: null,
-    rating100: image.rating100 ?? null,
-    favorite: false,
-    oCounter: 0,
-    viewCount: 0,
-    ...ratingMap.get(`${image.id}${KEY_SEP}${image.instanceId || ""}`),
-    ...viewHistoryMap.get(`${image.id}${KEY_SEP}${image.instanceId || ""}`),
-  }));
-}
 
 /**
  * Transform ImageQueryBuilder result to match expected API response format
@@ -265,53 +212,6 @@ export const findImages = async (
     });
     res.status(500).json({
       error: "Failed to find images",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-};
-
-/**
- * Find single image by ID
- */
-export const findImageById = async (
-  req: TypedAuthRequest<unknown, GetImageParams>,
-  res: TypedResponse<GetImageResponse | ApiErrorResponse>
-) => {
-  try {
-    const userId = req.user?.id;
-    const { id } = req.params;
-
-    const imageInstanceId =
-      (req.query.instanceId as string | undefined) ||
-      stashInstanceManager.getDefaultConfig().id;
-    const image = await stashEntityService.getImage(id, imageInstanceId);
-
-    if (!image) {
-      return res.status(404).json({ error: "Image not found" });
-    }
-
-    // Merge with user data
-    const images = await mergeImagesWithUserData([image], userId);
-    const mergedImage = images[0] as (typeof images)[number];
-
-    // Add stashUrl
-    const imageWithStashUrl = {
-      ...mergedImage,
-      stashUrl:
-        buildStashEntityUrl(
-          "image",
-          mergedImage.id,
-          mergedImage.instanceId || imageInstanceId
-        ) || "",
-    };
-
-    res.json(imageWithStashUrl);
-  } catch (error) {
-    logger.error("Error in findImageById", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    res.status(500).json({
-      error: "Failed to find image",
       details: error instanceof Error ? error.message : "Unknown error",
     });
   }
