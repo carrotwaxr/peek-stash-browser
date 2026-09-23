@@ -84,16 +84,7 @@ Expected: Image builds successfully
 
 ## Fixing Failures
 
-When a check fails, invoke the relevant skill for guidance before attempting fixes:
-
-| Failure | Skill to invoke |
-|---|---|
-| Test failures (writing/fixing tests) | `writing-tests` |
-| TypeScript type errors | `typescript-advanced-types` |
-| Prisma/migration issues | `prisma-sqlite-expert` |
-| Docker build failures | `docker-best-practices` |
-| React/client lint or build errors | `vercel-react-best-practices` |
-| Server lint or runtime errors | `nodejs-backend-patterns` |
+When a check fails, find the root cause with `/fluffer:code-debug` before changing code. Test and migration conventions load from `.claude/rules/tests.md` and `.claude/rules/prisma.md` when you open those files. For Docker build failures, use `homelab:docker-best-practices`.
 
 ## After All Checks Pass
 
