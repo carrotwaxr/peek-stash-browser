@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPut } from "../../api";
-import { Paper } from "../ui/index";
 import { useAuth } from "../../hooks/useAuth";
-import { showSuccess, showError } from "../../utils/toast";
+import { showError, showSuccess } from "../../utils/toast";
+import { Paper } from "../ui/index";
 
 const INTERVAL_OPTIONS = [
   { value: 60, label: "Every Hour (Default)" },
@@ -23,7 +23,9 @@ const SyncSettingsSection = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const data = await apiGet<{ settings?: { syncIntervalMinutes?: number } }>("/sync/status");
+        const data = await apiGet<{
+          settings?: { syncIntervalMinutes?: number };
+        }>("/sync/status");
         const minutes = data?.settings?.syncIntervalMinutes;
         if (minutes) setSyncInterval(minutes);
       } catch (err) {
@@ -85,8 +87,8 @@ const SyncSettingsSection = () => {
             ))}
           </select>
           <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            How frequently Peek automatically syncs library data from Stash. Changes take
-            effect immediately.
+            How frequently Peek automatically syncs library data from Stash.
+            Changes take effect immediately.
           </p>
         </div>
       </Paper.Body>

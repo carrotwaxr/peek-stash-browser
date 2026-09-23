@@ -1,5 +1,4 @@
 import videojs from "video.js";
-
 // Import duration middleware (registers via videojs.use)
 import "./durationMiddleware.js";
 
@@ -31,7 +30,12 @@ export const togglePlaybackRateControl = (player: any, show: boolean) => {
  * Adds text tracks via sourceSelector for proper lifecycle management
  * Video.js automatically shows/hides the caption button based on available tracks
  */
-export const setupSubtitles = (player: any, sceneId: string, captions: any[], instanceId?: string) => {
+export const setupSubtitles = (
+  player: any,
+  sceneId: string,
+  captions: any[],
+  instanceId?: string
+) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
 

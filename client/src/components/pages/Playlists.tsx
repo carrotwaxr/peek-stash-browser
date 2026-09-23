@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { apiDelete, apiGet, apiPost, getSharedPlaylists } from "../../api";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { showError, showSuccess } from "../../utils/toast";
-import { apiGet, apiPost, apiDelete, getSharedPlaylists } from "../../api";
 import {
   Button,
   ConfirmDialog,
   PageLayout,
   Paper,
-  TabNavigation,
   TAB_COUNT_LOADING,
+  TabNavigation,
 } from "../ui/index";
 
 interface PlaylistItem {
@@ -29,7 +29,10 @@ interface PlaylistThumbnailGridProps {
 /**
  * Reusable 2x2 thumbnail grid for playlist preview
  */
-const PlaylistThumbnailGrid = ({ items, totalCount }: PlaylistThumbnailGridProps) => {
+const PlaylistThumbnailGrid = ({
+  items,
+  totalCount,
+}: PlaylistThumbnailGridProps) => {
   if (!items || items.length === 0) return null;
 
   return (
@@ -82,8 +85,13 @@ const Playlists = () => {
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [playlistToDelete, setPlaylistToDelete] = useState<Record<string, unknown> | null>(null);
-  const [sharedPlaylists, setSharedPlaylists] = useState<Record<string, unknown>[]>([]);
+  const [playlistToDelete, setPlaylistToDelete] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [sharedPlaylists, setSharedPlaylists] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [loadingShared, setLoadingShared] = useState(false);
   const [sharedLoaded, setSharedLoaded] = useState(false);
 
@@ -99,7 +107,9 @@ const Playlists = () => {
   const loadPlaylists = async () => {
     try {
       setLoading(true);
-      const data = await apiGet<{ playlists: Record<string, unknown>[] }>("/playlists");
+      const data = await apiGet<{ playlists: Record<string, unknown>[] }>(
+        "/playlists"
+      );
       setPlaylists(data.playlists);
     } catch {
       setError("Failed to load playlists");
@@ -177,14 +187,21 @@ const Playlists = () => {
   // Build tab configuration with actual counts
   const tabs = [
     { id: "mine", label: "My Playlists", count: playlists.length },
-    { id: "shared", label: "Shared with Me", count: sharedLoaded ? sharedPlaylists.length : TAB_COUNT_LOADING },
+    {
+      id: "shared",
+      label: "Shared with Me",
+      count: sharedLoaded ? sharedPlaylists.length : TAB_COUNT_LOADING,
+    },
   ];
 
   return (
     <PageLayout>
       {/* Header with New Playlist button */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h1
+          className="text-2xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
           Playlists
         </h1>
         {activeTab === "mine" && (
@@ -219,7 +236,10 @@ const Playlists = () => {
           {/* My Playlists Grid */}
           {playlists.length === 0 ? (
             <div className="text-center py-16">
-              <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-6xl mb-4"
+                style={{ color: "var(--text-muted)" }}
+              >
                 📝
               </div>
               <h3
@@ -235,82 +255,88 @@ const Playlists = () => {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
               {playlists.map((playlist) => {
-                const _count = playlist._count as Record<string, number> | undefined;
+                const _count = playlist._count as
+                  | Record<string, number>
+                  | undefined;
                 return (
-                <Paper key={playlist.id as string}>
-                  <Paper.Body>
-                    <div className="flex gap-4">
-                      <PlaylistThumbnailGrid
-                        items={playlist.items as PlaylistItem[]}
-                        totalCount={_count?.items || 0}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <Link to={`/playlist/${playlist.id as string}`}>
-                          <h3
-                            className="text-lg font-semibold mb-2 hover:underline"
-                            style={{ color: "var(--text-primary)" }}
+                  <Paper key={playlist.id as string}>
+                    <Paper.Body>
+                      <div className="flex gap-4">
+                        <PlaylistThumbnailGrid
+                          items={playlist.items as PlaylistItem[]}
+                          totalCount={_count?.items || 0}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <Link to={`/playlist/${playlist.id as string}`}>
+                            <h3
+                              className="text-lg font-semibold mb-2 hover:underline"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {playlist.name as string}
+                            </h3>
+                          </Link>
+                          {playlist.description ? (
+                            <p
+                              className="text-sm mb-4 line-clamp-2"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {playlist.description as string}
+                            </p>
+                          ) : null}
+                          <div
+                            className="flex items-center justify-between text-sm"
+                            style={{ color: "var(--text-muted)" }}
                           >
-                            {playlist.name as string}
-                          </h3>
-                        </Link>
-                        {playlist.description ? (
-                          <p
-                            className="text-sm mb-4 line-clamp-2"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            {playlist.description as string}
-                          </p>
-                        ) : null}
-                        <div
-                          className="flex items-center justify-between text-sm"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          <span>
-                            {_count?.items || 0}{" "}
-                            {(_count?.items || 0) === 1 ? "video" : "videos"}
-                          </span>
-                          <Button
-                            onClick={() => handleDeleteClick(playlist)}
-                            variant="destructive"
-                            size="sm"
-                            className="px-3 py-1"
-                          >
-                            Delete
-                          </Button>
+                            <span>
+                              {_count?.items || 0}{" "}
+                              {(_count?.items || 0) === 1 ? "video" : "videos"}
+                            </span>
+                            <Button
+                              onClick={() => handleDeleteClick(playlist)}
+                              variant="destructive"
+                              size="sm"
+                              className="px-3 py-1"
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Paper.Body>
-                </Paper>
+                    </Paper.Body>
+                  </Paper>
                 );
               })}
             </div>
           )}
         </>
+      ) : // Shared playlists view
+      loadingShared ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        </div>
+      ) : sharedPlaylists.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+            📤
+          </div>
+          <h3
+            className="text-xl font-medium mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            No shared playlists
+          </h3>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Playlists shared with your groups will appear here
+          </p>
+        </div>
       ) : (
-        // Shared playlists view
-        loadingShared ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-          </div>
-        ) : sharedPlaylists.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-              📤
-            </div>
-            <h3 className="text-xl font-medium mb-2" style={{ color: "var(--text-primary)" }}>
-              No shared playlists
-            </h3>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Playlists shared with your groups will appear here
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
-            {sharedPlaylists.map((playlist) => {
-              const owner = playlist.owner as { username: string } | undefined;
-              const sharedViaGroups = playlist.sharedViaGroups as string[] | undefined;
-              return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
+          {sharedPlaylists.map((playlist) => {
+            const owner = playlist.owner as { username: string } | undefined;
+            const sharedViaGroups = playlist.sharedViaGroups as
+              | string[]
+              | undefined;
+            return (
               <Paper key={playlist.id as string}>
                 <Paper.Body>
                   <div className="flex gap-4">
@@ -327,7 +353,10 @@ const Playlists = () => {
                           {playlist.name as string}
                         </h3>
                       </Link>
-                      <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>
+                      <p
+                        className="text-sm mb-2"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         by {owner?.username}
                       </p>
                       {playlist.description ? (
@@ -343,9 +372,15 @@ const Playlists = () => {
                         style={{ color: "var(--text-muted)" }}
                       >
                         <span>
-                          {playlist.sceneCount as number} {(playlist.sceneCount as number) === 1 ? "video" : "videos"}
+                          {playlist.sceneCount as number}{" "}
+                          {(playlist.sceneCount as number) === 1
+                            ? "video"
+                            : "videos"}
                         </span>
-                        <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                        <span
+                          className="text-xs px-2 py-1 rounded"
+                          style={{ backgroundColor: "var(--bg-tertiary)" }}
+                        >
                           via {sharedViaGroups?.join(", ")}
                         </span>
                       </div>
@@ -353,10 +388,9 @@ const Playlists = () => {
                   </div>
                 </Paper.Body>
               </Paper>
-              );
-            })}
-          </div>
-        )
+            );
+          })}
+        </div>
       )}
 
       {/* Create Playlist Modal */}

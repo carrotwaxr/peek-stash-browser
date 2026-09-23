@@ -5,7 +5,9 @@
  * Critical for verifying that migrations like 002_rebuild_stats_multi_instance
  * execute correctly and handle failures properly.
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -39,9 +41,6 @@ vi.mock("../../services/UserStatsService.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-
 const mockPrisma = vi.mocked(prisma);
 const mockStatsService = vi.mocked(userStatsService);
 
@@ -63,7 +62,11 @@ describe("DataMigrationService", () => {
     it("does nothing when all migrations are already applied", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
-        { id: 2, name: "002_rebuild_stats_multi_instance", appliedAt: new Date() },
+        {
+          id: 2,
+          name: "002_rebuild_stats_multi_instance",
+          appliedAt: new Date(),
+        },
       ] as any);
 
       const { logger } = await import("../../utils/logger.js");
@@ -212,8 +215,16 @@ describe("DataMigrationService", () => {
   describe("getAppliedMigrations", () => {
     it("returns list of applied migrations ordered by date", async () => {
       const migrations = [
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date("2026-01-15") },
-        { id: 2, name: "002_rebuild_stats_multi_instance", appliedAt: new Date("2026-02-11") },
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date("2026-01-15"),
+        },
+        {
+          id: 2,
+          name: "002_rebuild_stats_multi_instance",
+          appliedAt: new Date("2026-02-11"),
+        },
       ];
       mockPrisma.dataMigration.findMany.mockResolvedValue(migrations as any);
 

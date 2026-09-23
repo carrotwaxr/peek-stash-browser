@@ -11,6 +11,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prettier
+        run: npm run format:check
+
   client:
     name: Client Checks
     runs-on: ubuntu-latest

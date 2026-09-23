@@ -1,23 +1,23 @@
+import prisma from "../../prisma/singleton.js";
+import {
+  type ImageFilter,
+  imageQueryBuilder,
+} from "../../services/ImageQueryBuilder.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
+  ApiErrorResponse,
   FindImagesRequest,
   FindImagesResponse,
   GetImageParams,
   GetImageResponse,
-  ApiErrorResponse,
+  TypedAuthRequest,
+  TypedResponse,
 } from "../../types/api/index.js";
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import {
-  imageQueryBuilder,
-  type ImageFilter,
-} from "../../services/ImageQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import type { NormalizedImage } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import type { NormalizedImage } from "../../types/index.js";
 
 /**
  * Merge images with user rating/favorite data and O counter
@@ -238,7 +238,11 @@ export const findImages = async (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- transformImageResult intentionally returns any (dynamic DB row transformer)
     const imagesWithStashUrl = result.images.map((image) => ({
       ...transformImageResult(image),
-      stashUrl: buildStashEntityUrl("image", image.id, image.instanceId || undefined),
+      stashUrl: buildStashEntityUrl(
+        "image",
+        image.id,
+        image.instanceId || undefined
+      ),
     }));
 
     const totalTime = Date.now() - startTime;
@@ -278,7 +282,9 @@ export const findImageById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    const imageInstanceId = (req.query.instanceId as string | undefined) || stashInstanceManager.getDefaultConfig().id;
+    const imageInstanceId =
+      (req.query.instanceId as string | undefined) ||
+      stashInstanceManager.getDefaultConfig().id;
     const image = await stashEntityService.getImage(id, imageInstanceId);
 
     if (!image) {
@@ -292,7 +298,12 @@ export const findImageById = async (
     // Add stashUrl
     const imageWithStashUrl = {
       ...mergedImage,
-      stashUrl: buildStashEntityUrl("image", mergedImage.id, mergedImage.instanceId || imageInstanceId) || "",
+      stashUrl:
+        buildStashEntityUrl(
+          "image",
+          mergedImage.id,
+          mergedImage.instanceId || imageInstanceId
+        ) || "",
     };
 
     res.json(imageWithStashUrl);

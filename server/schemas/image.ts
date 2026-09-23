@@ -4,8 +4,13 @@
  * Zod schemas for image API responses.
  */
 import { z } from "zod";
-import { PerformerRefSchema, StudioRefSchema, TagRefSchema, GalleryRefSchema } from "./refs.js";
 import { ProxyUrlSchema, TimestampSchema } from "./base.js";
+import {
+  GalleryRefSchema,
+  PerformerRefSchema,
+  StudioRefSchema,
+  TagRefSchema,
+} from "./refs.js";
 
 /**
  * Image file info
@@ -46,10 +51,12 @@ export const ImageSchema = z.object({
   files: z.array(ImageFileSchema),
 
   // Visual
-  visual_files: z.array(z.object({
-    width: z.number().nullable(),
-    height: z.number().nullable(),
-  })),
+  visual_files: z.array(
+    z.object({
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+    })
+  ),
 
   // Relationships
   studio: StudioRefSchema.nullable(),

@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { makeCompositeKey, parseCompositeKey } from "../../src/utils/compositeKey";
+import { describe, expect, it } from "vitest";
+import {
+  makeCompositeKey,
+  parseCompositeKey,
+} from "../../src/utils/compositeKey";
 
 describe("compositeKey utilities", () => {
   describe("makeCompositeKey", () => {

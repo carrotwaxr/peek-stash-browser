@@ -3,9 +3,9 @@
  *
  * Tests the studio filters in controllers/library/studios.ts
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyStudioFilters } from "../../controllers/library/studios.js";
+import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import {
   createMockStudio,
   createMockStudios,
@@ -34,7 +34,11 @@ describe("Studio Filters", () => {
     });
 
     it("should filter studios by multiple IDs", () => {
-      const targetIds = [mockStudios[0].id, mockStudios[5].id, mockStudios[10].id];
+      const targetIds = [
+        mockStudios[0].id,
+        mockStudios[5].id,
+        mockStudios[10].id,
+      ];
       const filter: PeekStudioFilter = {
         ids: { value: targetIds, modifier: "INCLUDES" },
       };

@@ -1,7 +1,7 @@
 // client/tests/components/timeline/TimelineMobileSheet.test.jsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TimelineMobileSheet from "../../../src/components/timeline/TimelineMobileSheet";
 
 describe("TimelineMobileSheet", () => {
@@ -215,14 +215,20 @@ describe("TimelineMobileSheet", () => {
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const sheet = screen.getByTestId("timeline-mobile-sheet");
-      expect(sheet).toHaveAttribute("style", expect.stringContaining("background-color"));
+      expect(sheet).toHaveAttribute(
+        "style",
+        expect.stringContaining("background-color")
+      );
     });
 
     it("has style attribute with border top", () => {
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const sheet = screen.getByTestId("timeline-mobile-sheet");
-      expect(sheet).toHaveAttribute("style", expect.stringContaining("border-top"));
+      expect(sheet).toHaveAttribute(
+        "style",
+        expect.stringContaining("border-top")
+      );
     });
 
     it("drag handle has correct styling", () => {

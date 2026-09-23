@@ -74,7 +74,9 @@ interface CarouselPreference {
   order: number;
 }
 
-export const migrateCarouselPreferences = (savedPreferences: CarouselPreference[]) => {
+export const migrateCarouselPreferences = (
+  savedPreferences: CarouselPreference[]
+) => {
   let prefs = savedPreferences;
 
   // If no preferences exist, create defaults
@@ -87,15 +89,23 @@ export const migrateCarouselPreferences = (savedPreferences: CarouselPreference[
   }
 
   // Keep custom carousels (prefixed with "custom-") separate
-  const customPrefs = prefs.filter((pref: CarouselPreference) => isCustomCarousel(pref.id));
-  const hardcodedPrefs = prefs.filter((pref: CarouselPreference) => !isCustomCarousel(pref.id));
+  const customPrefs = prefs.filter((pref: CarouselPreference) =>
+    isCustomCarousel(pref.id)
+  );
+  const hardcodedPrefs = prefs.filter(
+    (pref: CarouselPreference) => !isCustomCarousel(pref.id)
+  );
 
   // Filter out removed hardcoded carousels (barelyLegalScenes, longScenes, highBitrateScenes)
   const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
-  let validHardcoded = hardcodedPrefs.filter((pref: CarouselPreference) => validIds.has(pref.id));
+  let validHardcoded = hardcodedPrefs.filter((pref: CarouselPreference) =>
+    validIds.has(pref.id)
+  );
 
   // Migrate: Add any new hardcoded carousels that don't exist in saved preferences
-  const existingIds = new Set(validHardcoded.map((p: CarouselPreference) => p.id));
+  const existingIds = new Set(
+    validHardcoded.map((p: CarouselPreference) => p.id)
+  );
   const missingCarousels = CAROUSEL_DEFINITIONS.filter(
     (def) => !existingIds.has(def.fetchKey)
   );
@@ -114,8 +124,13 @@ export const migrateCarouselPreferences = (savedPreferences: CarouselPreference[
   prefs = [...validHardcoded, ...customPrefs];
 
   // Re-normalize order values
-  prefs.sort((a: CarouselPreference, b: CarouselPreference) => a.order - b.order);
-  prefs = prefs.map((pref: CarouselPreference, idx: number) => ({ ...pref, order: idx }));
+  prefs.sort(
+    (a: CarouselPreference, b: CarouselPreference) => a.order - b.order
+  );
+  prefs = prefs.map((pref: CarouselPreference, idx: number) => ({
+    ...pref,
+    order: idx,
+  }));
 
   return prefs;
 };

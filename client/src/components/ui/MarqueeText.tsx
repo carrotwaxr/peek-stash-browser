@@ -48,7 +48,8 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e: MediaQueryListEvent) => setHasHoverCapability(e.matches);
+    const handleChange = (e: MediaQueryListEvent) =>
+      setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -58,7 +59,8 @@ const MarqueeText = ({
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
 
-    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    const handleChange = (e: MediaQueryListEvent) =>
+      setPrefersReducedMotion(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
@@ -89,7 +91,8 @@ const MarqueeText = ({
 
   // IntersectionObserver for scroll-based autoplay
   useEffect(() => {
-    if (!autoplayOnScroll || !containerRef.current || hasHoverCapability) return;
+    if (!autoplayOnScroll || !containerRef.current || hasHoverCapability)
+      return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -106,9 +109,10 @@ const MarqueeText = ({
   }, [autoplayOnScroll, hasHoverCapability]);
 
   // Derive animation state at render time instead of via effect
-  const isAnimating = !prefersReducedMotion && isOverflowing && (
-    autoplayOnScroll && !hasHoverCapability ? isInView : isHovering
-  );
+  const isAnimating =
+    !prefersReducedMotion &&
+    isOverflowing &&
+    (autoplayOnScroll && !hasHoverCapability ? isInView : isHovering);
 
   // Calculate animation duration based on overflow amount
   // Target: ~30 pixels/second for comfortable, relaxed reading
@@ -119,10 +123,13 @@ const MarqueeText = ({
 
   // Animation uses keyframes defined in index.css
   // CSS variable --marquee-distance is set per-instance for the scroll amount
-  const animationStyle = isAnimating && isOverflowing ? {
-    animation: `marquee-scroll ${totalDuration}s ease-in-out infinite`,
-    "--marquee-distance": `-${overflowAmount}px`,
-  } : {};
+  const animationStyle =
+    isAnimating && isOverflowing
+      ? {
+          animation: `marquee-scroll ${totalDuration}s ease-in-out infinite`,
+          "--marquee-distance": `-${overflowAmount}px`,
+        }
+      : {};
 
   return (
     <div

@@ -1,7 +1,7 @@
-import { waitFor, act } from "@testing-library/react";
-import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { act, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../src/contexts/AuthContext";
 import { useAuth } from "../../src/hooks/useAuth";
 
@@ -111,7 +111,7 @@ describe("AuthProvider", () => {
       () =>
         new Promise((resolve) => {
           resolveAuth = resolve;
-        }),
+        })
     );
 
     const { result } = renderWithAuth();

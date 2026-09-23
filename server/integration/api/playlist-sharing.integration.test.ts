@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adminClient, guestClient, TestClient } from "../helpers/testClient.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
 
 /**
  * Integration tests for Playlist Sharing API
@@ -117,21 +117,27 @@ describe("Playlist Sharing API", () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
 
     // Create a group WITH canShare permission
-    const groupWithShareResponse = await adminClient.post<GroupResponse>("/api/groups", {
-      name: `Share Enabled Group ${Date.now()}`,
-      description: "Group with sharing enabled",
-      canShare: true,
-    });
+    const groupWithShareResponse = await adminClient.post<GroupResponse>(
+      "/api/groups",
+      {
+        name: `Share Enabled Group ${Date.now()}`,
+        description: "Group with sharing enabled",
+        canShare: true,
+      }
+    );
     expect(groupWithShareResponse.ok).toBe(true);
     groupWithSharePermission = groupWithShareResponse.data.group.id;
     createdGroupIds.push(groupWithSharePermission);
 
     // Create a group WITHOUT canShare permission
-    const groupWithoutShareResponse = await adminClient.post<GroupResponse>("/api/groups", {
-      name: `Share Disabled Group ${Date.now()}`,
-      description: "Group without sharing enabled",
-      canShare: false,
-    });
+    const groupWithoutShareResponse = await adminClient.post<GroupResponse>(
+      "/api/groups",
+      {
+        name: `Share Disabled Group ${Date.now()}`,
+        description: "Group without sharing enabled",
+        canShare: false,
+      }
+    );
     expect(groupWithoutShareResponse.ok).toBe(true);
     groupWithoutSharePermission = groupWithoutShareResponse.data.group.id;
     createdGroupIds.push(groupWithoutSharePermission);
@@ -143,16 +149,22 @@ describe("Playlist Sharing API", () => {
     await adminClient.post(`/api/groups/${groupWithSharePermission}/members`, {
       userId: adminUserId,
     });
-    await adminClient.post(`/api/groups/${groupWithoutSharePermission}/members`, {
-      userId: adminUserId,
-    });
+    await adminClient.post(
+      `/api/groups/${groupWithoutSharePermission}/members`,
+      {
+        userId: adminUserId,
+      }
+    );
 
     // Create a second test user for testing shared access
-    const createUserResponse = await adminClient.post<UserResponse>("/api/user/create", {
-      username: secondUsername,
-      password: secondPassword,
-      role: "USER",
-    });
+    const createUserResponse = await adminClient.post<UserResponse>(
+      "/api/user/create",
+      {
+        username: secondUsername,
+        password: secondPassword,
+        role: "USER",
+      }
+    );
     expect(createUserResponse.ok).toBe(true);
     createdUsernames.push(secondUsername);
 
@@ -161,9 +173,12 @@ describe("Playlist Sharing API", () => {
     await adminClient.post(`/api/groups/${groupWithSharePermission}/members`, {
       userId: secondUserId,
     });
-    await adminClient.post(`/api/groups/${groupWithoutSharePermission}/members`, {
-      userId: secondUserId,
-    });
+    await adminClient.post(
+      `/api/groups/${groupWithoutSharePermission}/members`,
+      {
+        userId: secondUserId,
+      }
+    );
 
     // Login as second user
     secondUserClient = new TestClient();
@@ -193,10 +208,12 @@ describe("Playlist Sharing API", () => {
     for (const username of createdUsernames) {
       try {
         // Find user by username and delete
-        const usersResponse = await adminClient.get<{ users: Array<{ id: number; username: string }> }>(
-          "/api/user/all"
+        const usersResponse = await adminClient.get<{
+          users: Array<{ id: number; username: string }>;
+        }>("/api/user/all");
+        const user = usersResponse.data.users?.find(
+          (u) => u.username === username
         );
-        const user = usersResponse.data.users?.find((u) => u.username === username);
         if (user) {
           await adminClient.delete(`/api/user/${user.id}`);
         }
@@ -212,24 +229,33 @@ describe("Playlist Sharing API", () => {
 
   describe("Authentication", () => {
     it("rejects unauthenticated requests to GET /api/playlists/shared", async () => {
-      const response = await guestClient.get<ErrorResponse>("/api/playlists/shared");
+      const response = await guestClient.get<ErrorResponse>(
+        "/api/playlists/shared"
+      );
       expect(response.status).toBe(401);
     });
 
     it("rejects unauthenticated requests to GET /api/playlists/:id/shares", async () => {
-      const response = await guestClient.get<ErrorResponse>("/api/playlists/1/shares");
+      const response = await guestClient.get<ErrorResponse>(
+        "/api/playlists/1/shares"
+      );
       expect(response.status).toBe(401);
     });
 
     it("rejects unauthenticated requests to PUT /api/playlists/:id/shares", async () => {
-      const response = await guestClient.put<ErrorResponse>("/api/playlists/1/shares", {
-        groupIds: [],
-      });
+      const response = await guestClient.put<ErrorResponse>(
+        "/api/playlists/1/shares",
+        {
+          groupIds: [],
+        }
+      );
       expect(response.status).toBe(401);
     });
 
     it("rejects unauthenticated requests to POST /api/playlists/:id/duplicate", async () => {
-      const response = await guestClient.post<ErrorResponse>("/api/playlists/1/duplicate");
+      const response = await guestClient.post<ErrorResponse>(
+        "/api/playlists/1/duplicate"
+      );
       expect(response.status).toBe(401);
     });
   });
@@ -254,10 +280,13 @@ describe("Playlist Sharing API", () => {
     it("returns playlists shared via user's groups", async () => {
       // Create a playlist as admin
       const playlistName = `Shared Test Playlist ${Date.now()}`;
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: playlistName,
-        description: "Playlist to test sharing",
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: playlistName,
+          description: "Playlist to test sharing",
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -270,12 +299,15 @@ describe("Playlist Sharing API", () => {
       expect(shareResponse.ok).toBe(true);
 
       // Check that second user can see the shared playlist
-      const sharedResponse = await secondUserClient.get<GetSharedPlaylistsResponse>(
-        "/api/playlists/shared"
-      );
+      const sharedResponse =
+        await secondUserClient.get<GetSharedPlaylistsResponse>(
+          "/api/playlists/shared"
+        );
       expect(sharedResponse.ok).toBe(true);
 
-      const sharedPlaylist = sharedResponse.data.playlists.find((p) => p.id === playlistId);
+      const sharedPlaylist = sharedResponse.data.playlists.find(
+        (p) => p.id === playlistId
+      );
       expect(sharedPlaylist).toBeDefined();
       expect(sharedPlaylist?.name).toBe(playlistName);
       expect(sharedPlaylist?.owner.username).toBe(TEST_ADMIN.username);
@@ -284,16 +316,20 @@ describe("Playlist Sharing API", () => {
     it("excludes user's own playlists from shared list", async () => {
       // Create a playlist as second user
       const playlistName = `Own Playlist ${Date.now()}`;
-      const createResponse = await secondUserClient.post<PlaylistResponse>("/api/playlists", {
-        name: playlistName,
-      });
+      const createResponse = await secondUserClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: playlistName,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdPlaylistIds.push(createResponse.data.playlist.id);
 
       // Get shared playlists (should not include own playlist)
-      const sharedResponse = await secondUserClient.get<GetSharedPlaylistsResponse>(
-        "/api/playlists/shared"
-      );
+      const sharedResponse =
+        await secondUserClient.get<GetSharedPlaylistsResponse>(
+          "/api/playlists/shared"
+        );
       expect(sharedResponse.ok).toBe(true);
 
       const ownPlaylist = sharedResponse.data.playlists.find(
@@ -304,25 +340,34 @@ describe("Playlist Sharing API", () => {
 
     it("shows correct group names for shared playlists", async () => {
       // Create and share a playlist
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Group Name Test Playlist ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Group Name Test Playlist ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
 
       // Share with the group
-      await adminClient.put<UpdatePlaylistSharesResponse>(`/api/playlists/${playlistId}/shares`, {
-        groupIds: [groupWithSharePermission],
-      });
+      await adminClient.put<UpdatePlaylistSharesResponse>(
+        `/api/playlists/${playlistId}/shares`,
+        {
+          groupIds: [groupWithSharePermission],
+        }
+      );
 
       // Check shared playlists as second user
-      const sharedResponse = await secondUserClient.get<GetSharedPlaylistsResponse>(
-        "/api/playlists/shared"
-      );
+      const sharedResponse =
+        await secondUserClient.get<GetSharedPlaylistsResponse>(
+          "/api/playlists/shared"
+        );
       expect(sharedResponse.ok).toBe(true);
 
-      const sharedPlaylist = sharedResponse.data.playlists.find((p) => p.id === playlistId);
+      const sharedPlaylist = sharedResponse.data.playlists.find(
+        (p) => p.id === playlistId
+      );
       expect(sharedPlaylist).toBeDefined();
       expect(sharedPlaylist?.sharedViaGroups).toBeDefined();
       expect(Array.isArray(sharedPlaylist?.sharedViaGroups)).toBe(true);
@@ -337,17 +382,23 @@ describe("Playlist Sharing API", () => {
   describe("GET /api/playlists/:id/shares", () => {
     it("returns shares for playlist owner", async () => {
       // Create a playlist
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Get Shares Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Get Shares Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
 
       // Share with a group
-      await adminClient.put<UpdatePlaylistSharesResponse>(`/api/playlists/${playlistId}/shares`, {
-        groupIds: [groupWithSharePermission],
-      });
+      await adminClient.put<UpdatePlaylistSharesResponse>(
+        `/api/playlists/${playlistId}/shares`,
+        {
+          groupIds: [groupWithSharePermission],
+        }
+      );
 
       // Get shares as owner
       const sharesResponse = await adminClient.get<GetPlaylistSharesResponse>(
@@ -358,14 +409,19 @@ describe("Playlist Sharing API", () => {
       expect(sharesResponse.data.shares).toBeDefined();
       expect(Array.isArray(sharesResponse.data.shares)).toBe(true);
       expect(sharesResponse.data.shares.length).toBe(1);
-      expect(sharesResponse.data.shares[0].groupId).toBe(groupWithSharePermission);
+      expect(sharesResponse.data.shares[0].groupId).toBe(
+        groupWithSharePermission
+      );
     });
 
     it("returns 404 for non-owner", async () => {
       // Create a playlist as admin
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Non-Owner Shares Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Non-Owner Shares Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -391,28 +447,37 @@ describe("Playlist Sharing API", () => {
       const noSharePassword = "TestPassword123!";
 
       // Create user
-      const createUserResponse = await adminClient.post<UserResponse>("/api/user/create", {
-        username: noShareUsername,
-        password: noSharePassword,
-        role: "USER",
-      });
+      const createUserResponse = await adminClient.post<UserResponse>(
+        "/api/user/create",
+        {
+          username: noShareUsername,
+          password: noSharePassword,
+          role: "USER",
+        }
+      );
       expect(createUserResponse.ok).toBe(true);
       createdUsernames.push(noShareUsername);
       const noShareUserId = createUserResponse.data.user.id;
 
       // Add only to group without share permission
-      await adminClient.post(`/api/groups/${groupWithoutSharePermission}/members`, {
-        userId: noShareUserId,
-      });
+      await adminClient.post(
+        `/api/groups/${groupWithoutSharePermission}/members`,
+        {
+          userId: noShareUserId,
+        }
+      );
 
       // Login as the no-share user
       const noShareClient = new TestClient();
       await noShareClient.login(noShareUsername, noSharePassword);
 
       // Create a playlist as this user
-      const createPlaylistResponse = await noShareClient.post<PlaylistResponse>("/api/playlists", {
-        name: `No Share Permission Test ${Date.now()}`,
-      });
+      const createPlaylistResponse = await noShareClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `No Share Permission Test ${Date.now()}`,
+        }
+      );
       expect(createPlaylistResponse.ok).toBe(true);
       const playlistId = createPlaylistResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -429,10 +494,13 @@ describe("Playlist Sharing API", () => {
 
     it("only allows sharing with groups user belongs to", async () => {
       // Create a new group that admin doesn't belong to
-      const exclusiveGroupResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Exclusive Group ${Date.now()}`,
-        canShare: true,
-      });
+      const exclusiveGroupResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Exclusive Group ${Date.now()}`,
+          canShare: true,
+        }
+      );
       expect(exclusiveGroupResponse.ok).toBe(true);
       const exclusiveGroupId = exclusiveGroupResponse.data.group.id;
       createdGroupIds.push(exclusiveGroupId);
@@ -440,9 +508,12 @@ describe("Playlist Sharing API", () => {
       // Admin is NOT a member of this group (we didn't add them)
 
       // Create a playlist
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Exclusive Share Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Exclusive Share Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -459,43 +530,54 @@ describe("Playlist Sharing API", () => {
 
     it("replaces existing shares when updating", async () => {
       // Create a second group for this test that admin belongs to
-      const secondGroupResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Second Share Group ${Date.now()}`,
-        canShare: true,
-      });
+      const secondGroupResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Second Share Group ${Date.now()}`,
+          canShare: true,
+        }
+      );
       expect(secondGroupResponse.ok).toBe(true);
       const secondGroupId = secondGroupResponse.data.group.id;
       createdGroupIds.push(secondGroupId);
 
       // Add admin to this group
-      const adminMeResponse = await adminClient.get<UserResponse>("/api/auth/me");
+      const adminMeResponse =
+        await adminClient.get<UserResponse>("/api/auth/me");
       const adminUserId = adminMeResponse.data.user.id;
       await adminClient.post(`/api/groups/${secondGroupId}/members`, {
         userId: adminUserId,
       });
 
       // Create a playlist
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Replace Shares Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Replace Shares Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
 
       // Share with first group
-      const firstShareResponse = await adminClient.put<UpdatePlaylistSharesResponse>(
-        `/api/playlists/${playlistId}/shares`,
-        { groupIds: [groupWithSharePermission] }
-      );
+      const firstShareResponse =
+        await adminClient.put<UpdatePlaylistSharesResponse>(
+          `/api/playlists/${playlistId}/shares`,
+          { groupIds: [groupWithSharePermission] }
+        );
       expect(firstShareResponse.ok).toBe(true);
       expect(firstShareResponse.data.shares.length).toBe(1);
-      expect(firstShareResponse.data.shares[0].groupId).toBe(groupWithSharePermission);
+      expect(firstShareResponse.data.shares[0].groupId).toBe(
+        groupWithSharePermission
+      );
 
       // Now share with second group only (should replace)
-      const secondShareResponse = await adminClient.put<UpdatePlaylistSharesResponse>(
-        `/api/playlists/${playlistId}/shares`,
-        { groupIds: [secondGroupId] }
-      );
+      const secondShareResponse =
+        await adminClient.put<UpdatePlaylistSharesResponse>(
+          `/api/playlists/${playlistId}/shares`,
+          { groupIds: [secondGroupId] }
+        );
       expect(secondShareResponse.ok).toBe(true);
       expect(secondShareResponse.data.shares.length).toBe(1);
       expect(secondShareResponse.data.shares[0].groupId).toBe(secondGroupId);
@@ -511,17 +593,23 @@ describe("Playlist Sharing API", () => {
 
     it("empty groupIds array clears all shares", async () => {
       // Create and share a playlist
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Clear Shares Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Clear Shares Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
 
       // Share with a group
-      await adminClient.put<UpdatePlaylistSharesResponse>(`/api/playlists/${playlistId}/shares`, {
-        groupIds: [groupWithSharePermission],
-      });
+      await adminClient.put<UpdatePlaylistSharesResponse>(
+        `/api/playlists/${playlistId}/shares`,
+        {
+          groupIds: [groupWithSharePermission],
+        }
+      );
 
       // Verify it's shared
       const sharesBefore = await adminClient.get<GetPlaylistSharesResponse>(
@@ -553,10 +641,13 @@ describe("Playlist Sharing API", () => {
     it("allows owner to duplicate their own playlist", async () => {
       // Create a playlist
       const originalName = `Original Playlist ${Date.now()}`;
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: originalName,
-        description: "Original description",
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: originalName,
+          description: "Original description",
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -580,17 +671,23 @@ describe("Playlist Sharing API", () => {
     it("allows shared user to duplicate a shared playlist", async () => {
       // Create a playlist as admin
       const originalName = `Shared to Duplicate ${Date.now()}`;
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: originalName,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: originalName,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
 
       // Share with the group
-      await adminClient.put<UpdatePlaylistSharesResponse>(`/api/playlists/${playlistId}/shares`, {
-        groupIds: [groupWithSharePermission],
-      });
+      await adminClient.put<UpdatePlaylistSharesResponse>(
+        `/api/playlists/${playlistId}/shares`,
+        {
+          groupIds: [groupWithSharePermission],
+        }
+      );
 
       // Duplicate as second user (who has shared access)
       const duplicateResponse = await secondUserClient.post<PlaylistResponse>(
@@ -612,11 +709,14 @@ describe("Playlist Sharing API", () => {
       const noAccessUsername = `no_access_user_${Date.now()}`;
       const noAccessPassword = "TestPassword123!";
 
-      const createUserResponse = await adminClient.post<UserResponse>("/api/user/create", {
-        username: noAccessUsername,
-        password: noAccessPassword,
-        role: "USER",
-      });
+      const createUserResponse = await adminClient.post<UserResponse>(
+        "/api/user/create",
+        {
+          username: noAccessUsername,
+          password: noAccessPassword,
+          role: "USER",
+        }
+      );
       expect(createUserResponse.ok).toBe(true);
       createdUsernames.push(noAccessUsername);
 
@@ -625,9 +725,12 @@ describe("Playlist Sharing API", () => {
       await noAccessClient.login(noAccessUsername, noAccessPassword);
 
       // Create a playlist as admin (not shared)
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `No Access Duplicate Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `No Access Duplicate Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const playlistId = createResponse.data.playlist.id;
       createdPlaylistIds.push(playlistId);
@@ -642,9 +745,12 @@ describe("Playlist Sharing API", () => {
 
     it("duplicated playlist has new ID and owner is the duplicator", async () => {
       // Create a playlist as admin
-      const createResponse = await adminClient.post<PlaylistResponse>("/api/playlists", {
-        name: `Ownership Test ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<PlaylistResponse>(
+        "/api/playlists",
+        {
+          name: `Ownership Test ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const originalPlaylistId = createResponse.data.playlist.id;
       const originalOwnerId = createResponse.data.playlist.userId;
@@ -672,12 +778,14 @@ describe("Playlist Sharing API", () => {
       expect(duplicate.userId).not.toBe(originalOwnerId);
 
       // Verify second user can see it in their playlists
-      const userPlaylistsResponse = await secondUserClient.get<{ playlists: PlaylistData[] }>(
-        "/api/playlists"
-      );
+      const userPlaylistsResponse = await secondUserClient.get<{
+        playlists: PlaylistData[];
+      }>("/api/playlists");
       expect(userPlaylistsResponse.ok).toBe(true);
 
-      const foundDuplicate = userPlaylistsResponse.data.playlists.find((p) => p.id === duplicate.id);
+      const foundDuplicate = userPlaylistsResponse.data.playlists.find(
+        (p) => p.id === duplicate.id
+      );
       expect(foundDuplicate).toBeDefined();
     });
   });

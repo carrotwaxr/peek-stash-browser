@@ -1,6 +1,6 @@
 // client/src/hooks/__tests__/useCardSelection.test.js
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCardSelection } from "../../src/hooks/useCardSelection";
 
 describe("useCardSelection", () => {
@@ -26,7 +26,9 @@ describe("useCardSelection", () => {
 
     // Simulate mousedown
     act(() => {
-      result.current.selectionHandlers.onMouseDown({ target: document.body } as any);
+      result.current.selectionHandlers.onMouseDown({
+        target: document.body,
+      } as any);
     });
 
     // Advance 500ms
@@ -46,7 +48,9 @@ describe("useCardSelection", () => {
     );
 
     act(() => {
-      result.current.selectionHandlers.onMouseDown({ target: document.body } as any);
+      result.current.selectionHandlers.onMouseDown({
+        target: document.body,
+      } as any);
     });
 
     act(() => {
@@ -206,7 +210,9 @@ describe("useCardSelection", () => {
 
     // Simulate long-press: mousedown, wait 500ms for selection to fire
     act(() => {
-      result.current.selectionHandlers.onMouseDown({ target: document.body } as any);
+      result.current.selectionHandlers.onMouseDown({
+        target: document.body,
+      } as any);
     });
 
     act(() => {

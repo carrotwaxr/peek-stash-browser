@@ -165,39 +165,39 @@ a:focus-visible,
 
 /* Default (medium density) - base sizes (close to original) */
 .card-grid-responsive {
-  --card-title-size: 0.9375rem;     /* 15px */
-  --card-subtitle-size: 0.8125rem;  /* 13px */
-  --card-description-size: 0.8125rem;/* 13px */
+  --card-title-size: 0.9375rem; /* 15px */
+  --card-subtitle-size: 0.8125rem; /* 13px */
+  --card-description-size: 0.8125rem; /* 13px */
   --card-indicator-size: 0.6875rem; /* 11px */
-  --card-padding: 0.5rem;           /* p-2 */
-  --card-image-margin: 0.75rem;     /* mb-3 */
-  --card-title-margin: 0.5rem;      /* mb-2 */
+  --card-padding: 0.5rem; /* p-2 */
+  --card-image-margin: 0.75rem; /* mb-3 */
+  --card-title-margin: 0.5rem; /* mb-2 */
   --card-rating-icon-size: 18px;
   --card-rating-gap: 0.5rem;
 }
 
 /* Small density - compact text for more cards */
 .density-small {
-  --card-title-size: 0.8125rem;     /* 13px */
-  --card-subtitle-size: 0.75rem;    /* 12px */
+  --card-title-size: 0.8125rem; /* 13px */
+  --card-subtitle-size: 0.75rem; /* 12px */
   --card-description-size: 0.75rem; /* 12px */
-  --card-indicator-size: 0.625rem;  /* 10px */
-  --card-padding: 0.375rem;         /* smaller padding */
-  --card-image-margin: 0.5rem;      /* mb-2 */
-  --card-title-margin: 0.375rem;    /* smaller margin */
+  --card-indicator-size: 0.625rem; /* 10px */
+  --card-padding: 0.375rem; /* smaller padding */
+  --card-image-margin: 0.5rem; /* mb-2 */
+  --card-title-margin: 0.375rem; /* smaller margin */
   --card-rating-icon-size: 14px;
   --card-rating-gap: 0.25rem;
 }
 
 /* Large density - more readable text for fewer cards */
 .density-large {
-  --card-title-size: 1rem;          /* 16px - text-base (original) */
-  --card-subtitle-size: 0.875rem;   /* 14px - text-sm (original) */
-  --card-description-size: 0.875rem;/* 14px - text-sm (original) */
-  --card-indicator-size: 0.75rem;   /* 12px - text-xs */
-  --card-padding: 0.625rem;         /* slightly more padding */
-  --card-image-margin: 0.875rem;    /* slightly more margin */
-  --card-title-margin: 0.625rem;    /* slightly more margin */
+  --card-title-size: 1rem; /* 16px - text-base (original) */
+  --card-subtitle-size: 0.875rem; /* 14px - text-sm (original) */
+  --card-description-size: 0.875rem; /* 14px - text-sm (original) */
+  --card-indicator-size: 0.75rem; /* 12px - text-xs */
+  --card-padding: 0.625rem; /* slightly more padding */
+  --card-image-margin: 0.875rem; /* slightly more margin */
+  --card-title-margin: 0.625rem; /* slightly more margin */
   --card-rating-icon-size: 20px;
   --card-rating-gap: 0.5rem;
 }
@@ -262,4 +262,3 @@ a:focus-visible,
   padding: 0.125rem 0.375rem;
   min-width: auto;
 }
-

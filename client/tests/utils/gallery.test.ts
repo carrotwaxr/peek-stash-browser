@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { galleryTitle } from "../../src/utils/gallery";
 
 describe("gallery utilities", () => {
@@ -8,9 +8,9 @@ describe("gallery utilities", () => {
     });
 
     it("returns file basename when no title", () => {
-      expect(
-        galleryTitle({ files: [{ basename: "vacation_2024" }] })
-      ).toBe("vacation_2024");
+      expect(galleryTitle({ files: [{ basename: "vacation_2024" }] })).toBe(
+        "vacation_2024"
+      );
     });
 
     it("returns folder path basename when no title and no files", () => {

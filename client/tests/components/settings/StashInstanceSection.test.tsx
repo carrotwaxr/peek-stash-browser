@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import StashInstanceSection from "../../../src/components/settings/StashInstanceSection";
+import { useAuth } from "../../../src/hooks/useAuth";
 
 // Mock useAuth hook
 vi.mock("../../../src/hooks/useAuth", () => ({
@@ -18,8 +19,6 @@ vi.mock("../../../src/api", () => ({
   apiPut: (...args: unknown[]) => mockApiPut(...args),
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),
 }));
-
-import { useAuth } from "../../../src/hooks/useAuth";
 
 describe("StashInstanceSection", () => {
   const mockInstance = {
@@ -39,7 +38,9 @@ describe("StashInstanceSection", () => {
 
   describe("Admin user", () => {
     beforeEach(() => {
-      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
     });
 
     it("loads all instances for admin users", async () => {
@@ -79,8 +80,12 @@ describe("StashInstanceSection", () => {
       fireEvent.click(screen.getByText("Add Instance"));
 
       expect(screen.getByText("Add New Instance")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("My Stash Server")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("http://localhost:9999/graphql")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("My Stash Server")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("http://localhost:9999/graphql")
+      ).toBeInTheDocument();
     });
 
     it("shows edit form when clicking Edit", async () => {
@@ -133,9 +138,12 @@ describe("StashInstanceSection", () => {
       fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
         target: { value: "New Instance" },
       });
-      fireEvent.change(screen.getByPlaceholderText("http://localhost:9999/graphql"), {
-        target: { value: "http://test:9999/graphql" },
-      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        {
+          target: { value: "http://test:9999/graphql" },
+        }
+      );
 
       fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
 
@@ -171,7 +179,12 @@ describe("StashInstanceSection", () => {
       mockApiGet.mockResolvedValue({
         instances: [
           mockInstance,
-          { ...mockInstance, id: "test-instance-2", name: "Second Instance", priority: 1 },
+          {
+            ...mockInstance,
+            id: "test-instance-2",
+            name: "Second Instance",
+            priority: 1,
+          },
         ],
       });
 
@@ -185,7 +198,9 @@ describe("StashInstanceSection", () => {
 
   describe("Non-admin user", () => {
     beforeEach(() => {
-      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "USER" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "USER" },
+      });
     });
 
     it("loads single instance for non-admin users", async () => {
@@ -215,7 +230,9 @@ describe("StashInstanceSection", () => {
 
   describe("Error handling", () => {
     beforeEach(() => {
-      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
     });
 
     it("displays error message on API failure", async () => {
@@ -234,14 +251,18 @@ describe("StashInstanceSection", () => {
       render(<StashInstanceSection />);
 
       await waitFor(() => {
-        expect(screen.getByText("No Stash Instance Configured")).toBeInTheDocument();
+        expect(
+          screen.getByText("No Stash Instance Configured")
+        ).toBeInTheDocument();
       });
     });
   });
 
   describe("Test connection", () => {
     beforeEach(() => {
-      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({ user: { role: "ADMIN" } });
+      (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+        user: { role: "ADMIN" },
+      });
     });
 
     it("tests connection and shows success", async () => {
@@ -256,17 +277,23 @@ describe("StashInstanceSection", () => {
 
       fireEvent.click(screen.getByText("Add Instance"));
 
-      fireEvent.change(screen.getByPlaceholderText("http://localhost:9999/graphql"), {
-        target: { value: "http://test:9999/graphql" },
-      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        {
+          target: { value: "http://test:9999/graphql" },
+        }
+      );
 
       fireEvent.click(screen.getByText("Test Connection"));
 
       await waitFor(() => {
-        expect(mockApiPost).toHaveBeenCalledWith("/setup/test-stash-connection", {
-          url: "http://test:9999/graphql",
-          apiKey: undefined,
-        });
+        expect(mockApiPost).toHaveBeenCalledWith(
+          "/setup/test-stash-connection",
+          {
+            url: "http://test:9999/graphql",
+            apiKey: undefined,
+          }
+        );
       });
     });
   });

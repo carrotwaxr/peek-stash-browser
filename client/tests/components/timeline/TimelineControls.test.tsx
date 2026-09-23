@@ -1,7 +1,7 @@
 // client/tests/components/timeline/TimelineControls.test.jsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TimelineControls from "../../../src/components/timeline/TimelineControls";
 
 describe("TimelineControls", () => {
@@ -84,9 +84,7 @@ describe("TimelineControls", () => {
 
   describe("Custom Props", () => {
     it("applies custom className", () => {
-      render(
-        <TimelineControls {...defaultProps} className="custom-class" />
-      );
+      render(<TimelineControls {...defaultProps} className="custom-class" />);
 
       const group = screen.getByRole("group");
       expect(group).toHaveClass("custom-class");
@@ -94,10 +92,7 @@ describe("TimelineControls", () => {
 
     it("renders subset of zoom levels when provided", () => {
       render(
-        <TimelineControls
-          {...defaultProps}
-          zoomLevels={["years", "months"]}
-        />
+        <TimelineControls {...defaultProps} zoomLevels={["years", "months"]} />
       );
 
       expect(screen.getByText("Years")).toBeInTheDocument();

@@ -17,11 +17,15 @@ type OverrideKey =
   | "canDownloadFilesOverride"
   | "canDownloadPlaylistsOverride";
 
-const PERMISSION_KEYS: { permission: PermissionKey; override: OverrideKey }[] = [
-  { permission: "canShare", override: "canShareOverride" },
-  { permission: "canDownloadFiles", override: "canDownloadFilesOverride" },
-  { permission: "canDownloadPlaylists", override: "canDownloadPlaylistsOverride" },
-];
+const PERMISSION_KEYS: { permission: PermissionKey; override: OverrideKey }[] =
+  [
+    { permission: "canShare", override: "canShareOverride" },
+    { permission: "canDownloadFiles", override: "canDownloadFilesOverride" },
+    {
+      permission: "canDownloadPlaylists",
+      override: "canDownloadPlaylistsOverride",
+    },
+  ];
 
 export async function resolveUserPermissions(
   userId: number

@@ -53,20 +53,20 @@ export function parseRandomSort(
   sortField: string,
   userId: number
 ): { sortField: string; randomSeed?: number } {
-  if (sortField.startsWith('random_')) {
+  if (sortField.startsWith("random_")) {
     const seedStr = sortField.slice(7);
     const parsedSeed = parseInt(seedStr, 10);
     if (!isNaN(parsedSeed)) {
       return {
-        sortField: 'random',
+        sortField: "random",
         randomSeed: parsedSeed % 1e8,
       };
     }
   }
 
-  if (sortField === 'random') {
+  if (sortField === "random") {
     return {
-      sortField: 'random',
+      sortField: "random",
       randomSeed: generateDailySeed(userId),
     };
   }

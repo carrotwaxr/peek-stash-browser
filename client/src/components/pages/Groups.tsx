@@ -1,25 +1,25 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { type LibrarySearchParams } from "../../api";
+import { ApiError } from "../../api/client";
+import { useGroupList } from "../../api/hooks";
 import { getGridClasses } from "../../constants/grids";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
-import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { type LibrarySearchParams } from "../../api";
-import { useGroupList } from "../../api/hooks";
-import { ApiError } from "../../api/client";
 import { GroupCard } from "../cards/index";
+import { ColumnConfigPopover, TableView } from "../table/index";
 import {
-  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
+  SyncProgressBanner,
 } from "../ui/index";
-import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for groups page
 const VIEW_MODES: { id: string; label: string }[] = [
@@ -48,7 +48,9 @@ const Groups = () => {
     getColumnConfig,
   } = useTableColumns("group");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
+    null
+  );
   const { data, isLoading: queryLoading, error } = useGroupList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
@@ -56,14 +58,13 @@ const Groups = () => {
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
+  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
+    setQueryParams(newQuery);
+  }, []);
 
-  const findGroups = (data as Record<string, unknown>)?.findGroups as Record<string, unknown> | undefined;
+  const findGroups = (data as Record<string, unknown>)?.findGroups as
+    | Record<string, unknown>
+    | undefined;
   const currentGroups = (findGroups?.groups as Record<string, unknown>[]) || [];
   const totalCount = (findGroups?.count as number) || 0;
 
@@ -74,19 +75,16 @@ const Groups = () => {
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
-  const {
-    isTVMode,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentGroups,
-    columns,
-    totalPages,
-    onItemSelect: (group) =>
-      navigate(getEntityPath('group', group, hasMultipleInstances), {
-        state: { fromPageTitle: "Collections" },
-      }),
-  });
+  const { isTVMode, searchControlsProps, gridItemProps } =
+    useGridPageTVNavigation({
+      items: currentGroups,
+      columns,
+      totalPages,
+      onItemSelect: (group) =>
+        navigate(getEntityPath("group", group, hasMultipleInstances), {
+          state: { fromPageTitle: "Collections" },
+        }),
+    });
 
   // Initial focus
   useInitialFocus(
@@ -123,7 +121,6 @@ const Groups = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-           
           viewModes={VIEW_MODES}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -137,17 +134,85 @@ const Groups = () => {
           }
           {...searchControlsProps}
         >
-          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
-            isLoading ? (
-              viewMode === "table" ? (
+          {
+            (({
+              viewMode,
+              gridDensity,
+              sortField,
+              sortDirection,
+              onSort,
+            }: {
+              viewMode: string;
+              gridDensity: string;
+              sortField: string;
+              sortDirection: string;
+              onSort: (field: string, direction: "ASC" | "DESC") => void;
+            }) =>
+              isLoading ? (
+                viewMode === "table" ? (
+                  <TableView
+                    items={[]}
+                    columns={
+                      visibleColumns as {
+                        id: string;
+                        label: string;
+                        sortable: boolean;
+                        width: string;
+                        mandatory: boolean;
+                      }[]
+                    }
+                    sort={{
+                      field: sortField,
+                      direction: sortDirection as "ASC" | "DESC",
+                    }}
+                    onSort={onSort}
+                    onHideColumn={hideColumn}
+                    entityType="group"
+                    isLoading={true}
+                    columnsPopover={
+                      <ColumnConfigPopover
+                        allColumns={allColumns}
+                        visibleColumnIds={visibleColumnIds}
+                        columnOrder={columnOrder}
+                        onToggleColumn={toggleColumn}
+                        onMoveColumn={moveColumn}
+                      />
+                    }
+                  />
+                ) : (
+                  <div className={getGridClasses("standard", gridDensity)}>
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg animate-pulse"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          height: "8rem",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : viewMode === "table" ? (
                 <TableView
-                  items={[]}
-                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
+                  items={currentGroups as Record<string, unknown>[]}
+                  columns={
+                    visibleColumns as {
+                      id: string;
+                      label: string;
+                      sortable: boolean;
+                      width: string;
+                      mandatory: boolean;
+                    }[]
+                  }
+                  sort={{
+                    field: sortField,
+                    direction: sortDirection as "ASC" | "DESC",
+                  }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="group"
-                  isLoading={true}
+                  isLoading={false}
                   columnsPopover={
                     <ColumnConfigPopover
                       allColumns={allColumns}
@@ -159,55 +224,33 @@ const Groups = () => {
                   }
                 />
               ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(12)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "8rem",
-                      }}
-                    />
-                  ))}
+                <div
+                  ref={gridRef}
+                  className={getGridClasses("standard", gridDensity)}
+                >
+                  {currentGroups.map(
+                    (group: Record<string, unknown>, index: number) => {
+                      const { tabIndex: _tabIndex, ...restItemProps } =
+                        gridItemProps(index);
+                      return (
+                        <GroupCard
+                          key={group.id as string}
+                          group={
+                            group as unknown as import("@peek/shared-types").NormalizedGroup & {
+                              sub_group_count?: number;
+                              description?: string | null;
+                            }
+                          }
+                          fromPageTitle="Collections"
+                          tabIndex={isTVMode ? _tabIndex : -1}
+                          {...restItemProps}
+                        />
+                      );
+                    }
+                  )}
                 </div>
-              )
-            ) : viewMode === "table" ? (
-              <TableView
-                items={currentGroups as Record<string, unknown>[]}
-                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
-                onSort={onSort}
-                onHideColumn={hideColumn}
-                entityType="group"
-                isLoading={false}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : (
-              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentGroups.map((group: Record<string, unknown>, index: number) => {
-                  const { tabIndex: _tabIndex, ...restItemProps } = gridItemProps(index);
-                  return (
-                    <GroupCard
-                      key={group.id as string}
-                      group={group as unknown as import("@peek/shared-types").NormalizedGroup & { sub_group_count?: number; description?: string | null }}
-                      fromPageTitle="Collections"
-                      tabIndex={isTVMode ? _tabIndex : -1}
-                      {...restItemProps}
-                    />
-                  );
-                })}
-              </div>
-            )
-          ) as unknown as React.ReactNode}
+              )) as unknown as React.ReactNode
+          }
         </SearchControls>
       </div>
     </PageLayout>

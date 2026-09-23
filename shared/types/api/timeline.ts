@@ -14,7 +14,10 @@ export interface GetDateDistributionParams extends Record<string, string> {
   entityType: string;
 }
 
-export interface GetDateDistributionQuery extends Record<string, string | string[] | undefined> {
+export interface GetDateDistributionQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   granularity?: string;
   performerId?: string;
   tagId?: string;

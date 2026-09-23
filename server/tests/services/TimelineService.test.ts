@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TimelineService } from "../../services/TimelineService.js";
 
 vi.mock("../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -12,8 +13,6 @@ vi.mock("../services/StashInstanceManager.js", () => ({
     loadFromDatabase: vi.fn().mockResolvedValue(undefined),
   },
 }));
-
-import { TimelineService } from "../../services/TimelineService.js";
 
 describe("TimelineService", () => {
   describe("getStrftimeFormat", () => {
@@ -46,7 +45,11 @@ describe("TimelineService", () => {
   describe("buildDistributionQuery", () => {
     it("builds SQL with exclusion JOIN for scenes", () => {
       const service = new TimelineService();
-      const { sql, params } = service.buildDistributionQuery("scene", 1, "months");
+      const { sql, params } = service.buildDistributionQuery(
+        "scene",
+        1,
+        "months"
+      );
 
       expect(sql).toContain("SELECT");
       expect(sql).toContain("strftime('%Y-%m', s.date)");

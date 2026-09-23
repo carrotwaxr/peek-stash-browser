@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { showError, showSuccess } from "../utils/toast";
 import { useHiddenEntities } from "./useHiddenEntities";
-import { showSuccess, showError } from "../utils/toast";
 
 /**
  * Hook for bulk hide action with confirmation dialog support
@@ -16,7 +16,11 @@ interface UseHideBulkActionOptions {
   onHideSuccess?: (id: string | number, entityType: string) => void;
 }
 
-export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess }: UseHideBulkActionOptions) => {
+export const useHideBulkAction = ({
+  selectedScenes,
+  onComplete,
+  onHideSuccess,
+}: UseHideBulkActionOptions) => {
   const [hideDialogOpen, setHideDialogOpen] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
   const { hideEntities, hideConfirmationDisabled } = useHiddenEntities();
@@ -50,9 +54,13 @@ export const useHideBulkAction = ({ selectedScenes, onComplete, onHideSuccess }:
         onHideSuccess?.(scene.id, "scene");
       }
       if (result.failCount === 0) {
-        showSuccess(`${result.successCount} scene${result.successCount !== 1 ? "s" : ""} hidden`);
+        showSuccess(
+          `${result.successCount} scene${result.successCount !== 1 ? "s" : ""} hidden`
+        );
       } else {
-        showError(`Hidden ${result.successCount} scene${result.successCount !== 1 ? "s" : ""}, ${result.failCount} failed`);
+        showError(
+          `Hidden ${result.successCount} scene${result.successCount !== 1 ? "s" : ""}, ${result.failCount} failed`
+        );
       }
     } else {
       showError("Failed to hide scenes. Please try again.");

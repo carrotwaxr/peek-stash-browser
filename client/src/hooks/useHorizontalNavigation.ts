@@ -129,11 +129,14 @@ export const useHorizontalNavigation = ({
   }, [enabled, handleKeyDown]);
 
   // Helper to set ref for an item
-  const setItemRef = useCallback((index: number, element: HTMLElement | null) => {
-    if (element) {
-      itemRefs.current[index] = element;
-    }
-  }, []);
+  const setItemRef = useCallback(
+    (index: number, element: HTMLElement | null) => {
+      if (element) {
+        itemRefs.current[index] = element;
+      }
+    },
+    []
+  );
 
   // Helper to check if an index is focused
   const isFocused = useCallback(

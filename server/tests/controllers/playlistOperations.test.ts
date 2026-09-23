@@ -5,7 +5,22 @@
  * controller functions. Covers validation, ownership checks, and the
  * access-control-based duplicate flow.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createPlaylist,
+  deletePlaylist,
+  duplicatePlaylist,
+  getPlaylistShares,
+  updatePlaylist,
+  updatePlaylistShares,
+} from "../../controllers/playlist.js";
+import prisma from "../../prisma/singleton.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
+import {
+  getPlaylistAccess,
+  getUserGroups,
+} from "../../services/PlaylistAccessService.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -69,19 +84,6 @@ vi.mock("../../services/PermissionService.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { getPlaylistAccess, getUserGroups } from "../../services/PlaylistAccessService.js";
-import { resolveUserPermissions } from "../../services/PermissionService.js";
-import {
-  createPlaylist,
-  updatePlaylist,
-  deletePlaylist,
-  duplicatePlaylist,
-  getPlaylistShares,
-  updatePlaylistShares,
-} from "../../controllers/playlist.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
@@ -417,9 +419,7 @@ describe("Playlist Controller Operations", () => {
       await updatePlaylistShares(req, res);
 
       expect(res._getBody()).toEqual({
-        shares: [
-          expect.objectContaining({ groupId: 10, groupName: "Family" }),
-        ],
+        shares: [expect.objectContaining({ groupId: 10, groupName: "Family" })],
       });
     });
 
@@ -447,9 +447,7 @@ describe("Playlist Controller Operations", () => {
         userId: 1,
       } as any);
       mockResolvePermissions.mockResolvedValue({ canShare: true } as any);
-      mockGetUserGroups.mockResolvedValue([
-        { id: 10, name: "Family" },
-      ]);
+      mockGetUserGroups.mockResolvedValue([{ id: 10, name: "Family" }]);
 
       const req = mockReq(
         { groupIds: [10, 99] }, // 99 is not a user's group

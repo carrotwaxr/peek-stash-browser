@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
-import { buildFolderTree, UNTAGGED_FOLDER_ID } from "../../src/utils/buildFolderTree";
+import { describe, expect, it } from "vitest";
+import {
+  UNTAGGED_FOLDER_ID,
+  buildFolderTree,
+} from "../../src/utils/buildFolderTree";
 
 // Helper to create test tags with hierarchy
-const createTag = (id: string, name: string, parents: Array<{ id: string; name: string }> = [], children: Array<{ id: string; name: string }> = []) => ({
+const createTag = (
+  id: string,
+  name: string,
+  parents: Array<{ id: string; name: string }> = [],
+  children: Array<{ id: string; name: string }> = []
+) => ({
   id,
   name,
   parents: parents.map((p) => ({ id: p.id, name: p.name })),
@@ -35,10 +43,7 @@ describe("buildFolderTree - empty/null handling", () => {
 
 describe("buildFolderTree - root level behavior", () => {
   it("shows only root-level tag folders at root (no loose items)", () => {
-    const tags = [
-      createTag("action", "Action"),
-      createTag("comedy", "Comedy"),
-    ];
+    const tags = [createTag("action", "Action"), createTag("comedy", "Comedy")];
     const items = [
       createItem("scene1", ["action"]),
       createItem("scene2", ["comedy"]),
@@ -64,7 +69,9 @@ describe("buildFolderTree - root level behavior", () => {
 
     const result = buildFolderTree(items, tags, []);
 
-    const untaggedFolder = result.folders.find((f) => f.id === UNTAGGED_FOLDER_ID);
+    const untaggedFolder = result.folders.find(
+      (f) => f.id === UNTAGGED_FOLDER_ID
+    );
     expect(untaggedFolder).toBeDefined();
     expect(untaggedFolder!.totalCount).toBe(2);
     expect(result.items).toHaveLength(0);
@@ -82,7 +89,10 @@ describe("buildFolderTree - root level behavior", () => {
 
     // Both folders should appear because comedy has image_count > 0
     expect(result.folders).toHaveLength(2);
-    expect(result.folders.map(f => f.name).sort()).toEqual(["Action", "Comedy"]);
+    expect(result.folders.map((f) => f.name).sort()).toEqual([
+      "Action",
+      "Comedy",
+    ]);
   });
 
   it("uses pre-computed count when no items on current page", () => {
@@ -94,7 +104,7 @@ describe("buildFolderTree - root level behavior", () => {
 
     const result = buildFolderTree(items, tags, []);
 
-    const comedyFolder = result.folders.find(f => f.name === "Comedy");
+    const comedyFolder = result.folders.find((f) => f.name === "Comedy");
     expect(comedyFolder).toBeDefined();
     // Should use pre-computed count since no items on page
     expect(comedyFolder!.totalCount).toBe(50);
@@ -135,8 +145,15 @@ describe("buildFolderTree - root level behavior", () => {
 
   it("items with non-root tags only do NOT appear at root", () => {
     // Tag hierarchy: Genre (root) -> Action (child)
-    const genre = createTag("genre", "Genre", [], [{ id: "action", name: "Action" }]);
-    const action = createTag("action", "Action", [{ id: "genre", name: "Genre" }]);
+    const genre = createTag(
+      "genre",
+      "Genre",
+      [],
+      [{ id: "action", name: "Action" }]
+    );
+    const action = createTag("action", "Action", [
+      { id: "genre", name: "Genre" },
+    ]);
     const tags = [genre, action];
 
     // Item only has child tag, not root tag
@@ -156,7 +173,15 @@ describe("buildFolderTree - inside tag folder (with pre-computed counts)", () =>
   it("shows child folders with pre-computed counts even when no items on current page", () => {
     // Hierarchy: Photo -> Color, B&W
     const photo = {
-      ...createTag("photo", "Photo", [], [{ id: "color", name: "Color" }, { id: "bw", name: "B&W" }]),
+      ...createTag(
+        "photo",
+        "Photo",
+        [],
+        [
+          { id: "color", name: "Color" },
+          { id: "bw", name: "B&W" },
+        ]
+      ),
       image_count: 100,
     };
     const color = {
@@ -176,14 +201,14 @@ describe("buildFolderTree - inside tag folder (with pre-computed counts)", () =>
 
     // Both Color and B&W should appear because B&W has image_count > 0
     expect(result.folders).toHaveLength(2);
-    expect(result.folders.map(f => f.name).sort()).toEqual(["B&W", "Color"]);
+    expect(result.folders.map((f) => f.name).sort()).toEqual(["B&W", "Color"]);
 
     // B&W should use pre-computed count
-    const bwFolder = result.folders.find(f => f.name === "B&W");
+    const bwFolder = result.folders.find((f) => f.name === "B&W");
     expect(bwFolder!.totalCount).toBe(40);
 
     // Color should use item count (more accurate for current page)
-    const colorFolder = result.folders.find(f => f.name === "Color");
+    const colorFolder = result.folders.find((f) => f.name === "Color");
     expect(colorFolder!.totalCount).toBe(1);
   });
 });
@@ -191,8 +216,15 @@ describe("buildFolderTree - inside tag folder (with pre-computed counts)", () =>
 describe("buildFolderTree - inside tag folder", () => {
   it("shows child tag folders and directly-tagged items", () => {
     // Hierarchy: Horror -> Slasher
-    const horror = createTag("horror", "Horror", [], [{ id: "slasher", name: "Slasher" }]);
-    const slasher = createTag("slasher", "Slasher", [{ id: "horror", name: "Horror" }]);
+    const horror = createTag(
+      "horror",
+      "Horror",
+      [],
+      [{ id: "slasher", name: "Slasher" }]
+    );
+    const slasher = createTag("slasher", "Slasher", [
+      { id: "horror", name: "Horror" },
+    ]);
     const tags = [horror, slasher];
 
     const items = [
@@ -215,8 +247,15 @@ describe("buildFolderTree - inside tag folder", () => {
 
   it("item with parent+child tag only appears in child folder", () => {
     // Hierarchy: Horror -> Slasher
-    const horror = createTag("horror", "Horror", [], [{ id: "slasher", name: "Slasher" }]);
-    const slasher = createTag("slasher", "Slasher", [{ id: "horror", name: "Horror" }]);
+    const horror = createTag(
+      "horror",
+      "Horror",
+      [],
+      [{ id: "slasher", name: "Slasher" }]
+    );
+    const slasher = createTag("slasher", "Slasher", [
+      { id: "horror", name: "Horror" },
+    ]);
     const tags = [horror, slasher];
 
     // Scene has both Horror AND Slasher
@@ -232,12 +271,21 @@ describe("buildFolderTree - inside tag folder", () => {
 
   it("item appears in all child folders when it has multiple child tags", () => {
     // Hierarchy: Genre -> [Action, Comedy]
-    const genre = createTag("genre", "Genre", [], [
-      { id: "action", name: "Action" },
-      { id: "comedy", name: "Comedy" },
+    const genre = createTag(
+      "genre",
+      "Genre",
+      [],
+      [
+        { id: "action", name: "Action" },
+        { id: "comedy", name: "Comedy" },
+      ]
+    );
+    const action = createTag("action", "Action", [
+      { id: "genre", name: "Genre" },
     ]);
-    const action = createTag("action", "Action", [{ id: "genre", name: "Genre" }]);
-    const comedy = createTag("comedy", "Comedy", [{ id: "genre", name: "Genre" }]);
+    const comedy = createTag("comedy", "Comedy", [
+      { id: "genre", name: "Genre" },
+    ]);
     const tags = [genre, action, comedy];
 
     // Scene has both Action and Comedy
@@ -255,8 +303,15 @@ describe("buildFolderTree - inside tag folder", () => {
 
   it("item without current tag directly does not appear as loose item", () => {
     // Hierarchy: Horror -> Slasher
-    const horror = createTag("horror", "Horror", [], [{ id: "slasher", name: "Slasher" }]);
-    const slasher = createTag("slasher", "Slasher", [{ id: "horror", name: "Horror" }]);
+    const horror = createTag(
+      "horror",
+      "Horror",
+      [],
+      [{ id: "slasher", name: "Slasher" }]
+    );
+    const slasher = createTag("slasher", "Slasher", [
+      { id: "horror", name: "Horror" },
+    ]);
     const tags = [horror, slasher];
 
     // Scene only has Slasher (child), not Horror directly
@@ -275,9 +330,21 @@ describe("buildFolderTree - inside tag folder", () => {
 describe("buildFolderTree - deep hierarchy", () => {
   it("item only surfaces at exact tag level", () => {
     // 3-level hierarchy: Genre -> Horror -> Slasher
-    const genre = createTag("genre", "Genre", [], [{ id: "horror", name: "Horror" }]);
-    const horror = createTag("horror", "Horror", [{ id: "genre", name: "Genre" }], [{ id: "slasher", name: "Slasher" }]);
-    const slasher = createTag("slasher", "Slasher", [{ id: "horror", name: "Horror" }]);
+    const genre = createTag(
+      "genre",
+      "Genre",
+      [],
+      [{ id: "horror", name: "Horror" }]
+    );
+    const horror = createTag(
+      "horror",
+      "Horror",
+      [{ id: "genre", name: "Genre" }],
+      [{ id: "slasher", name: "Slasher" }]
+    );
+    const slasher = createTag("slasher", "Slasher", [
+      { id: "horror", name: "Horror" },
+    ]);
     const tags = [genre, horror, slasher];
 
     // Scene only has Slasher tag
@@ -302,7 +369,11 @@ describe("buildFolderTree - deep hierarchy", () => {
     expect(horrorResult.items).toHaveLength(0);
 
     // At Slasher level: item appears as loose item (has the tag directly, no children)
-    const slasherResult = buildFolderTree(items, tags, ["genre", "horror", "slasher"]);
+    const slasherResult = buildFolderTree(items, tags, [
+      "genre",
+      "horror",
+      "slasher",
+    ]);
     expect(slasherResult.folders).toHaveLength(0);
     expect(slasherResult.items).toHaveLength(1);
     expect(slasherResult.items[0].id).toBe("scene1");
@@ -311,8 +382,15 @@ describe("buildFolderTree - deep hierarchy", () => {
 
 describe("buildFolderTree - breadcrumbs", () => {
   it("builds correct breadcrumb path", () => {
-    const genre = createTag("genre", "Genre", [], [{ id: "horror", name: "Horror" }]);
-    const horror = createTag("horror", "Horror", [{ id: "genre", name: "Genre" }]);
+    const genre = createTag(
+      "genre",
+      "Genre",
+      [],
+      [{ id: "horror", name: "Horror" }]
+    );
+    const horror = createTag("horror", "Horror", [
+      { id: "genre", name: "Genre" },
+    ]);
     const tags = [genre, horror];
     const items: ReturnType<typeof createItem>[] = [];
 
@@ -331,7 +409,10 @@ describe("buildFolderTree - breadcrumbs", () => {
 
 describe("buildFolderTree - folder thumbnails", () => {
   it("uses tag image_path when available", () => {
-    const tag = { ...createTag("action", "Action"), image_path: "/tag-image.jpg" };
+    const tag = {
+      ...createTag("action", "Action"),
+      image_path: "/tag-image.jpg",
+    };
     const items = [createItem("scene1", ["action"])];
 
     const result = buildFolderTree(items, [tag], []);
@@ -447,10 +528,7 @@ describe("buildFolderTree - untagged items not shown inside folders", () => {
 
 describe("buildFolderTree - multi-tag items at root", () => {
   it("item with multiple root tags appears in both folders", () => {
-    const tags = [
-      createTag("action", "Action"),
-      createTag("comedy", "Comedy"),
-    ];
+    const tags = [createTag("action", "Action"), createTag("comedy", "Comedy")];
     // Scene has both Action and Comedy tags
     const items = [createItem("scene1", ["action", "comedy"])];
 

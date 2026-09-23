@@ -117,7 +117,11 @@ export interface NormalizedScene {
     tags?: Array<{ id: string; name?: string; image_path?: string | null }>;
   } | null;
   // Performers may be PerformerRef (from QueryBuilder) or NormalizedPerformer (from transformSceneWithRelations)
-  performers: Array<PerformerRef & { tags?: Array<{ id: string; name: string; image_path: string | null }> }>;
+  performers: Array<
+    PerformerRef & {
+      tags?: Array<{ id: string; name: string; image_path: string | null }>;
+    }
+  >;
   tags: TagRef[];
   groups: Array<GroupRef & { scene_index?: number | null }>;
   galleries: GalleryRef[];
@@ -324,8 +328,17 @@ export interface NormalizedGallery {
   coverWidth?: number | null;
   coverHeight?: number | null;
   tags: Array<{ id: string; name: string; image_path: string | null }>;
-  performers: Array<{ id: string; name: string; gender: string | null; image_path: string | null }>;
-  scenes: Array<{ id: string; title: string | null; paths: { screenshot: string | null } }>;
+  performers: Array<{
+    id: string;
+    name: string;
+    gender: string | null;
+    image_path: string | null;
+  }>;
+  scenes: Array<{
+    id: string;
+    title: string | null;
+    paths: { screenshot: string | null };
+  }>;
   created_at: string | null;
   updated_at: string | null;
 
@@ -354,9 +367,19 @@ export interface NormalizedImage {
   width: number | null;
   height: number | null;
   fileSize: number | null;
-  files: Array<{ path: string; width: number | null; height: number | null; size: number | null }>;
+  files: Array<{
+    path: string;
+    width: number | null;
+    height: number | null;
+    size: number | null;
+  }>;
   paths: { thumbnail: string; preview: string; image: string };
-  performers: Array<{ id: string; name: string; gender: string | null; image_path: string | null }>;
+  performers: Array<{
+    id: string;
+    name: string;
+    gender: string | null;
+    image_path: string | null;
+  }>;
   tags: Array<{ id: string; name: string }>;
   galleries: Array<{
     id: string;
@@ -368,7 +391,12 @@ export interface NormalizedImage {
     cover: string | null;
     studioId: string | null;
     studio: { id: string; name: string } | null;
-    performers: Array<{ id: string; name: string; gender: string | null; image_path: string | null }>;
+    performers: Array<{
+      id: string;
+      name: string;
+      gender: string | null;
+      image_path: string | null;
+    }>;
     tags: Array<{ id: string; name: string }>;
   }>;
   created_at: string | null;

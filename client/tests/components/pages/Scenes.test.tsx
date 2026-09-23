@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { usePageTitle } from "@/hooks/usePageTitle";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import Scenes from "@/components/pages/Scenes";
 import { useInitialFocus } from "@/hooks/useFocusTrap";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Mock hooks
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
@@ -22,8 +23,6 @@ vi.mock("@/components/scene-search/SceneSearch", () => ({
     </div>
   ),
 }));
-
-import Scenes from "@/components/pages/Scenes";
 
 describe("Scenes", () => {
   beforeEach(() => {

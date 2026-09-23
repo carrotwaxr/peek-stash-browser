@@ -4,8 +4,14 @@
  * Zod schemas for scene API responses.
  */
 import { z } from "zod";
-import { PerformerRefSchema, StudioRefSchema, TagRefSchema, GroupRefSchema, GalleryRefSchema } from "./refs.js";
 import { ProxyUrlSchema, TimestampSchema } from "./base.js";
+import {
+  GalleryRefSchema,
+  GroupRefSchema,
+  PerformerRefSchema,
+  StudioRefSchema,
+  TagRefSchema,
+} from "./refs.js";
 
 /**
  * Scene file information
@@ -107,7 +113,9 @@ export const SceneSchema = z.object({
 
   // Inherited tags
   inheritedTagIds: z.array(z.string()).optional(),
-  inheritedTags: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+  inheritedTags: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .optional(),
 });
 
 /**

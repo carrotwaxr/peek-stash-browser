@@ -4,8 +4,8 @@
  * Zod schemas for group API responses.
  */
 import { z } from "zod";
-import { StudioRefSchema, TagRefSchema } from "./refs.js";
 import { ProxyUrlSchema, TimestampSchema } from "./base.js";
+import { StudioRefSchema, TagRefSchema } from "./refs.js";
 
 /**
  * Full group response
@@ -29,18 +29,22 @@ export const GroupSchema = z.object({
   tags: z.array(TagRefSchema),
 
   // Containing group (if sub-group)
-  containing_groups: z.array(z.object({
-    group: z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-  })),
-  sub_groups: z.array(z.object({
-    group: z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-  })),
+  containing_groups: z.array(
+    z.object({
+      group: z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+    })
+  ),
+  sub_groups: z.array(
+    z.object({
+      group: z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+    })
+  ),
 
   // Counts
   scene_count: z.number().nullable(),

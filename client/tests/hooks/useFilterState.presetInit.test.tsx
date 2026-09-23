@@ -4,18 +4,17 @@
  * Validates that useFilterState correctly loads viewMode and perPage from
  * default presets. This is the data layer that SearchControls depends on.
  */
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { apiGet } from "../../src/api";
+import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API module before importing anything that uses it
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
-
-import { apiGet } from "../../src/api";
-import { useFilterState } from "../../src/hooks/useFilterState";
-import type { Mock } from "vitest";
 
 const apiGetMock = apiGet as unknown as Mock;
 
@@ -60,7 +59,7 @@ describe("useFilterState - preset initialization", () => {
           initialSort: "name",
           defaultViewMode: "grid",
         }),
-      { wrapper: createWrapper(["/"])  }
+      { wrapper: createWrapper(["/"]) }
     );
 
     await waitFor(() => {
@@ -89,7 +88,7 @@ describe("useFilterState - preset initialization", () => {
           initialSort: "name",
           defaultViewMode: "grid",
         }),
-      { wrapper: createWrapper(["/"])  }
+      { wrapper: createWrapper(["/"]) }
     );
 
     await waitFor(() => {
@@ -119,7 +118,9 @@ describe("useFilterState - preset initialization", () => {
         });
       }
       if (url === "/user/default-presets") {
-        return Promise.resolve({ defaults: { scene: "preset-custom-perpage" } });
+        return Promise.resolve({
+          defaults: { scene: "preset-custom-perpage" },
+        });
       }
       return Promise.resolve({});
     });
@@ -131,7 +132,7 @@ describe("useFilterState - preset initialization", () => {
           initialSort: "o_counter",
           defaultViewMode: "grid",
         }),
-      { wrapper: createWrapper(["/"])  }
+      { wrapper: createWrapper(["/"]) }
     );
 
     await waitFor(() => {
@@ -161,7 +162,9 @@ describe("useFilterState - preset initialization", () => {
         });
       }
       if (url === "/user/default-presets") {
-        return Promise.resolve({ defaults: { scene: "preset-custom-perpage" } });
+        return Promise.resolve({
+          defaults: { scene: "preset-custom-perpage" },
+        });
       }
       return Promise.resolve({});
     });
@@ -174,7 +177,7 @@ describe("useFilterState - preset initialization", () => {
           defaultViewMode: "grid",
         }),
       // URL explicitly sets per_page=12 — should take precedence over preset
-      { wrapper: createWrapper(["/?per_page=12"])  }
+      { wrapper: createWrapper(["/?per_page=12"]) }
     );
 
     await waitFor(() => {
@@ -203,7 +206,7 @@ describe("useFilterState - preset initialization", () => {
           initialSort: "o_counter",
           defaultViewMode: "grid",
         }),
-      { wrapper: createWrapper(["/"])  }
+      { wrapper: createWrapper(["/"]) }
     );
 
     await waitFor(() => {
@@ -233,7 +236,9 @@ describe("useFilterState - preset initialization", () => {
         });
       }
       if (url === "/user/default-presets") {
-        return Promise.resolve({ defaults: { scene: "preset-custom-perpage" } });
+        return Promise.resolve({
+          defaults: { scene: "preset-custom-perpage" },
+        });
       }
       return Promise.resolve({});
     });
@@ -247,7 +252,7 @@ describe("useFilterState - preset initialization", () => {
           filterOptions: [{ key: "favorite", type: "checkbox" }],
         }),
       // URL has filter params but no per_page
-      { wrapper: createWrapper(["/?favorite=true"])  }
+      { wrapper: createWrapper(["/?favorite=true"]) }
     );
 
     await waitFor(() => {
@@ -288,7 +293,7 @@ describe("useFilterState - preset initialization", () => {
           initialSort: "name",
           defaultViewMode: "grid",
         }),
-      { wrapper: createWrapper(["/"])  }
+      { wrapper: createWrapper(["/"]) }
     );
 
     await waitFor(() => {

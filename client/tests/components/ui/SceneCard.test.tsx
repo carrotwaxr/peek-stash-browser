@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { createElement } from "react";
+import { describe, expect, it } from "vitest";
 import SceneCard from "../../../src/components/ui/SceneCard";
 
 describe("SceneCard", () => {

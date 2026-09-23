@@ -1,21 +1,21 @@
+import prisma from "../prisma/singleton.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type {
+  ApiErrorResponse,
   TypedAuthRequest,
   TypedResponse,
-  UpdateRatingRequest,
-  UpdateRatingResponse,
-  UpdateSceneRatingParams,
-  UpdatePerformerRatingParams,
-  UpdateStudioRatingParams,
-  UpdateTagRatingParams,
   UpdateGalleryRatingParams,
   UpdateGroupRatingParams,
   UpdateImageRatingParams,
-  ApiErrorResponse,
+  UpdatePerformerRatingParams,
+  UpdateRatingRequest,
+  UpdateRatingResponse,
+  UpdateSceneRatingParams,
+  UpdateStudioRatingParams,
+  UpdateTagRatingParams,
 } from "../types/api/index.js";
-import prisma from "../prisma/singleton.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import { logger } from "../utils/logger.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * IMPORTANT: Rating and Favorite Sync Policy
@@ -85,7 +85,7 @@ export async function updateSceneRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('scene', sceneId),
+        : getEntityInstanceId("scene", sceneId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -107,7 +107,6 @@ export async function updateSceneRating(
     });
 
     logger.info("Scene rating updated", { userId, sceneId, rating, favorite });
-
 
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
@@ -188,7 +187,7 @@ export async function updatePerformerRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('performer', performerId),
+        : getEntityInstanceId("performer", performerId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -215,7 +214,6 @@ export async function updatePerformerRating(
       rating,
       favorite,
     });
-
 
     // Sync to Stash if enabled (performer supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
@@ -297,7 +295,7 @@ export async function updateStudioRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('studio', studioId),
+        : getEntityInstanceId("studio", studioId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -324,7 +322,6 @@ export async function updateStudioRating(
       rating,
       favorite,
     });
-
 
     // Sync to Stash if enabled (studio supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
@@ -406,7 +403,7 @@ export async function updateTagRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('tag', tagId),
+        : getEntityInstanceId("tag", tagId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -428,7 +425,6 @@ export async function updateTagRating(
     });
 
     logger.info("Tag rating updated", { userId, tagId, rating, favorite });
-
 
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
@@ -508,7 +504,7 @@ export async function updateGalleryRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('gallery', galleryId),
+        : getEntityInstanceId("gallery", galleryId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -535,7 +531,6 @@ export async function updateGalleryRating(
       rating,
       favorite,
     });
-
 
     // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
@@ -615,7 +610,7 @@ export async function updateGroupRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('group', groupId),
+        : getEntityInstanceId("group", groupId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -637,7 +632,6 @@ export async function updateGroupRating(
     });
 
     logger.info("Group rating updated", { userId, groupId, rating, favorite });
-
 
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
@@ -717,7 +711,7 @@ export async function updateImageRating(
       }),
       requestInstanceId
         ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId('image', imageId),
+        : getEntityInstanceId("image", imageId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -739,7 +733,6 @@ export async function updateImageRating(
     });
 
     logger.info("Image rating updated", { userId, imageId, rating, favorite });
-
 
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {

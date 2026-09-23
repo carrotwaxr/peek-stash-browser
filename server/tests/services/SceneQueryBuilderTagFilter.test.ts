@@ -6,7 +6,9 @@
  * from the UI but uses them directly in SQL as tagId values, which only
  * store bare IDs ("284"). The filter never matches.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// Import after mocks
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 // Mock prisma (required by SceneQueryBuilder import)
 vi.mock("../../prisma/singleton.js", () => ({
@@ -26,9 +28,6 @@ vi.mock("../../utils/hierarchyUtils.js", () => ({
   expandTagIds: vi.fn(async (ids: string[]) => ids),
   expandStudioIds: vi.fn(async (ids: string[]) => ids),
 }));
-
-// Import after mocks
-import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 // Access private method for unit testing
 const builder = sceneQueryBuilder as any;

@@ -59,8 +59,19 @@ const getSortFn = (sortField: string, sortDirection: string) => {
  * @param {string} options.sortDirection - Sort direction (ASC or DESC)
  * @returns {Array} Array of root tree nodes, each with nested `children` array
  */
-export function buildTagTree(tags: TagNode[], options: { filterQuery?: string; sortField?: string; sortDirection?: string } = {}) {
-  const { filterQuery = "", sortField = "name", sortDirection = "ASC" } = options;
+export function buildTagTree(
+  tags: TagNode[],
+  options: {
+    filterQuery?: string;
+    sortField?: string;
+    sortDirection?: string;
+  } = {}
+) {
+  const {
+    filterQuery = "",
+    sortField = "name",
+    sortDirection = "ASC",
+  } = options;
   if (!tags || tags.length === 0) {
     return [];
   }
@@ -114,7 +125,10 @@ export function buildTagTree(tags: TagNode[], options: { filterQuery?: string; s
   const sortFn = getSortFn(sortField, sortDirection);
 
   // Recursive function to build tree node with children
-  const buildNode = (tagId: string, visitedPath = new Set<string>()): TagNode | null => {
+  const buildNode = (
+    tagId: string,
+    visitedPath = new Set<string>()
+  ): TagNode | null => {
     // Prevent infinite loops from circular references
     if (visitedPath.has(tagId)) return null;
 

@@ -10,7 +10,6 @@
  *   -1: All descendants (infinite depth)
  *   1, 2, 3...: Specific depth levels
  */
-
 import { stashEntityService } from "../services/StashEntityService.js";
 
 /**
@@ -143,7 +142,10 @@ export async function getDescendantStudioIds(
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Array of expanded tag IDs (original + descendants)
  */
-export async function expandTagIds(tagIds: string[], depth: number): Promise<string[]> {
+export async function expandTagIds(
+  tagIds: string[],
+  depth: number
+): Promise<string[]> {
   if (depth === 0 || !tagIds || tagIds.length === 0) {
     return tagIds;
   }
@@ -166,7 +168,10 @@ export async function expandTagIds(tagIds: string[], depth: number): Promise<str
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Array of expanded studio IDs (original + descendants)
  */
-export async function expandStudioIds(studioIds: string[], depth: number): Promise<string[]> {
+export async function expandStudioIds(
+  studioIds: string[],
+  depth: number
+): Promise<string[]> {
   if (depth === 0 || !studioIds || studioIds.length === 0) {
     return studioIds;
   }
@@ -192,9 +197,13 @@ export async function expandStudioIds(studioIds: string[], depth: number): Promi
  * @param tags - Tags to hydrate
  * @returns Tags with hydrated parents and computed children
  */
-export async function hydrateTagRelationships<T extends { id: string; name?: string; parents?: { id: string; name?: string }[] }>(
-  tags: T[]
-): Promise<(T & { children: { id: string; name: string }[] })[]> {
+export async function hydrateTagRelationships<
+  T extends {
+    id: string;
+    name?: string;
+    parents?: { id: string; name?: string }[];
+  },
+>(tags: T[]): Promise<(T & { children: { id: string; name: string }[] })[]> {
   // Fetch ALL tags from cache to build complete name lookup
   // This ensures we can resolve parent names even for single-item requests
   const allTags = await stashEntityService.getAllTags();
@@ -242,12 +251,17 @@ export async function hydrateTagRelationships<T extends { id: string; name?: str
  * @param entities - Entities with tags array of {id} objects
  * @returns Entities with hydrated tags array of {id, name, image_path} objects
  */
-export async function hydrateEntityTags<T extends { tags?: { id: string; name?: string; image_path?: string | null }[] }>(
-  entities: T[]
-): Promise<T[]> {
+export async function hydrateEntityTags<
+  T extends {
+    tags?: { id: string; name?: string; image_path?: string | null }[];
+  },
+>(entities: T[]): Promise<T[]> {
   // Get all tags to build lookup
   const allTags = await stashEntityService.getAllTags();
-  const tagDataMap = new Map<string, { name: string; image_path: string | null }>();
+  const tagDataMap = new Map<
+    string,
+    { name: string; image_path: string | null }
+  >();
   for (const tag of allTags) {
     tagDataMap.set(tag.id, {
       name: tag.name || "Unknown",
@@ -280,7 +294,13 @@ export async function hydrateEntityTags<T extends { tags?: { id: string; name?: 
  * @param studios - Studios to hydrate
  * @returns Studios with hydrated parent_studio and computed child_studios
  */
-export async function hydrateStudioRelationships<T extends { id: string; name?: string; parent_studio?: { id: string; name?: string } | null }>(
+export async function hydrateStudioRelationships<
+  T extends {
+    id: string;
+    name?: string;
+    parent_studio?: { id: string; name?: string } | null;
+  },
+>(
   studios: T[]
 ): Promise<(T & { child_studios: { id: string; name: string }[] })[]> {
   // Fetch ALL studios from cache to build complete name lookup

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Random Sort Integration Tests
@@ -28,12 +28,15 @@ describe("Random Sort", () => {
 
   describe("basic random sort", () => {
     it("returns scenes in random order with random sort", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "random",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "random",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -46,20 +49,26 @@ describe("Random Sort", () => {
       const seed = 12345678;
 
       // First request with seed
-      const response1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       // Second request with same seed
-      const response2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -75,19 +84,25 @@ describe("Random Sort", () => {
       const seed1 = 11111111;
       const seed2 = 99999999;
 
-      const response1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed1}`,
-        },
-      });
+      const response1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed1}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed2}`,
-        },
-      });
+      const response2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed2}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -106,22 +121,28 @@ describe("Random Sort", () => {
       const seed = 55555555;
 
       // Get page 1
-      const page1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 1,
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const page1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 1,
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       // Get page 2
-      const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 2,
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 2,
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
@@ -139,13 +160,16 @@ describe("Random Sort", () => {
       const seed = 77777777;
 
       // Get page 1 first time
-      const page1First = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 1,
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const page1First = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 1,
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       // Get page 2
       await adminClient.post<FindScenesResponse>("/api/library/scenes", {
@@ -157,13 +181,16 @@ describe("Random Sort", () => {
       });
 
       // Get page 1 again
-      const page1Second = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 1,
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-      });
+      const page1Second = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 1,
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(page1First.ok).toBe(true);
       expect(page1Second.ok).toBe(true);
@@ -180,15 +207,18 @@ describe("Random Sort", () => {
     it("random sort works with entity filters", async () => {
       const seed = 33333333;
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-        scene_filter: {
-          favorite: false, // Filter to non-favorites
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+          scene_filter: {
+            favorite: false, // Filter to non-favorites
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -197,25 +227,31 @@ describe("Random Sort", () => {
     it("random sort produces consistent results with filters", async () => {
       const seed = 44444444;
 
-      const response1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-        scene_filter: {
-          favorite: false,
-        },
-      });
+      const response1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+          scene_filter: {
+            favorite: false,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          sort: `random_${seed}`,
-        },
-        scene_filter: {
-          favorite: false,
-        },
-      });
+      const response2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            sort: `random_${seed}`,
+          },
+          scene_filter: {
+            favorite: false,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);

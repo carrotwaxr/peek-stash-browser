@@ -127,7 +127,9 @@ export const getLandingPage = (preference: any, currentPath?: string) => {
         (opt) => opt.path === currentPath
       )?.key;
       if (currentKey) {
-        availablePages = preference.pages.filter((key: string) => key !== currentKey);
+        availablePages = preference.pages.filter(
+          (key: string) => key !== currentKey
+        );
       }
     }
 
@@ -195,7 +197,10 @@ export const migrateNavPreferences = (savedPreferences: NavPreference[]) => {
 
   // Re-normalize order values (ensure sequential 0, 1, 2, ...)
   prefs.sort((a: NavPreference, b: NavPreference) => a.order - b.order);
-  prefs = prefs.map((pref: NavPreference, idx: number) => ({ ...pref, order: idx }));
+  prefs = prefs.map((pref: NavPreference, idx: number) => ({
+    ...pref,
+    order: idx,
+  }));
 
   return prefs;
 };

@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
-import { LayoutRenderer } from './LayoutRenderer';
-import EmptyState from './EmptyState';
-import Pagination from './Pagination';
+import { type ReactNode } from "react";
+import EmptyState from "./EmptyState";
+import { LayoutRenderer } from "./LayoutRenderer";
+import Pagination from "./Pagination";
 
 interface Props {
   entityType: string;
@@ -41,7 +41,7 @@ export const SearchResults = ({
   // const layoutType = preferences.layoutType || 'grid';
 
   // For now, always use grid layout
-  const layoutType = 'grid';
+  const layoutType = "grid";
 
   // Loading state - LayoutRenderer handles skeleton rendering
   if (loading) {

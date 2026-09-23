@@ -1,25 +1,25 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { type LibrarySearchParams } from "../../api";
+import { ApiError } from "../../api/client";
+import { usePerformerList } from "../../api/hooks";
 import { getGridClasses } from "../../constants/grids";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useInitialFocus } from "../../hooks/useFocusTrap";
 import { useGridColumns } from "../../hooks/useGridColumns";
-import { usePageTitle } from "../../hooks/usePageTitle";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation";
+import { usePageTitle } from "../../hooks/usePageTitle";
 import { useTableColumns } from "../../hooks/useTableColumns";
-import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { type LibrarySearchParams } from "../../api";
-import { usePerformerList } from "../../api/hooks";
-import { ApiError } from "../../api/client";
+import { ColumnConfigPopover, TableView } from "../table/index";
 import {
-  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
   PerformerCard,
   SearchControls,
+  SyncProgressBanner,
 } from "../ui/index";
-import { TableView, ColumnConfigPopover } from "../table/index";
 
 // View modes available for performers page
 const VIEW_MODES: { id: string; label: string }[] = [
@@ -48,23 +48,29 @@ const Performers = () => {
     getColumnConfig,
   } = useTableColumns("performer");
 
-  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(null);
-  const { data, isLoading: queryLoading, error } = usePerformerList(queryParams);
+  const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
+    null
+  );
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+  } = usePerformerList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
       : null;
   const isLoading = queryParams === null || queryLoading;
 
-  const handleQueryChange = useCallback(
-    (newQuery: LibrarySearchParams) => {
-      setQueryParams(newQuery);
-    },
-    []
-  );
+  const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
+    setQueryParams(newQuery);
+  }, []);
 
-  const findPerformers = (data as Record<string, unknown>)?.findPerformers as Record<string, unknown> | undefined;
-  const currentPerformers = (findPerformers?.performers as Record<string, unknown>[]) || [];
+  const findPerformers = (data as Record<string, unknown>)?.findPerformers as
+    | Record<string, unknown>
+    | undefined;
+  const currentPerformers =
+    (findPerformers?.performers as Record<string, unknown>[]) || [];
   const totalCount = (findPerformers?.count as number) || 0;
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
@@ -74,20 +80,16 @@ const Performers = () => {
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
-  const {
-    isTVMode,
-    tvNavigation,
-    searchControlsProps,
-    gridItemProps,
-  } = useGridPageTVNavigation({
-    items: currentPerformers,
-    columns,
-    totalPages,
-    onItemSelect: (performer) =>
-      navigate(getEntityPath('performer', performer, hasMultipleInstances), {
-        state: { fromPageTitle: "Performers" },
-      }),
-  });
+  const { isTVMode, tvNavigation, searchControlsProps, gridItemProps } =
+    useGridPageTVNavigation({
+      items: currentPerformers,
+      columns,
+      totalPages,
+      onItemSelect: (performer) =>
+        navigate(getEntityPath("performer", performer, hasMultipleInstances), {
+          state: { fromPageTitle: "Performers" },
+        }),
+    });
 
   // Initial focus
   useInitialFocus(
@@ -144,7 +146,6 @@ const Performers = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
-           
           viewModes={VIEW_MODES}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
@@ -158,17 +159,85 @@ const Performers = () => {
           }
           {...searchControlsProps}
         >
-          {(({ viewMode, gridDensity, sortField, sortDirection, onSort }: { viewMode: string; gridDensity: string; sortField: string; sortDirection: string; onSort: (field: string, direction: "ASC" | "DESC") => void }) =>
-            isLoading ? (
-              viewMode === "table" ? (
+          {
+            (({
+              viewMode,
+              gridDensity,
+              sortField,
+              sortDirection,
+              onSort,
+            }: {
+              viewMode: string;
+              gridDensity: string;
+              sortField: string;
+              sortDirection: string;
+              onSort: (field: string, direction: "ASC" | "DESC") => void;
+            }) =>
+              isLoading ? (
+                viewMode === "table" ? (
+                  <TableView
+                    items={[]}
+                    columns={
+                      visibleColumns as {
+                        id: string;
+                        label: string;
+                        sortable: boolean;
+                        width: string;
+                        mandatory: boolean;
+                      }[]
+                    }
+                    sort={{
+                      field: sortField,
+                      direction: sortDirection as "ASC" | "DESC",
+                    }}
+                    onSort={onSort}
+                    onHideColumn={hideColumn}
+                    entityType="performer"
+                    isLoading={true}
+                    columnsPopover={
+                      <ColumnConfigPopover
+                        allColumns={allColumns}
+                        visibleColumnIds={visibleColumnIds}
+                        columnOrder={columnOrder}
+                        onToggleColumn={toggleColumn}
+                        onMoveColumn={moveColumn}
+                      />
+                    }
+                  />
+                ) : (
+                  <div className={getGridClasses("standard", gridDensity)}>
+                    {[...Array(24)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg animate-pulse"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          height: "20rem",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : viewMode === "table" ? (
                 <TableView
-                  items={[]}
-                  columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                  sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
+                  items={currentPerformers as Record<string, unknown>[]}
+                  columns={
+                    visibleColumns as {
+                      id: string;
+                      label: string;
+                      sortable: boolean;
+                      width: string;
+                      mandatory: boolean;
+                    }[]
+                  }
+                  sort={{
+                    field: sortField,
+                    direction: sortDirection as "ASC" | "DESC",
+                  }}
                   onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="performer"
-                  isLoading={true}
+                  isLoading={false}
                   columnsPopover={
                     <ColumnConfigPopover
                       allColumns={allColumns}
@@ -180,55 +249,29 @@ const Performers = () => {
                   }
                 />
               ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(24)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "20rem",
-                      }}
-                    />
-                  ))}
+                <div
+                  ref={gridRef}
+                  className={getGridClasses("standard", gridDensity)}
+                >
+                  {currentPerformers.map(
+                    (performer: Record<string, unknown>, index: number) => {
+                      const itemProps = gridItemProps(index);
+                      return (
+                        <PerformerCard
+                          key={performer.id as string}
+                          performer={
+                            performer as unknown as import("@peek/shared-types").NormalizedPerformer
+                          }
+                          isTVMode={isTVMode}
+                          fromPageTitle="Performers"
+                          {...itemProps}
+                        />
+                      );
+                    }
+                  )}
                 </div>
-              )
-            ) : viewMode === "table" ? (
-              <TableView
-                items={currentPerformers as Record<string, unknown>[]}
-                columns={visibleColumns as { id: string; label: string; sortable: boolean; width: string; mandatory: boolean }[]}
-                sort={{ field: sortField, direction: sortDirection as "ASC" | "DESC" }}
-                onSort={onSort}
-                onHideColumn={hideColumn}
-                entityType="performer"
-                isLoading={false}
-                columnsPopover={
-                  <ColumnConfigPopover
-                    allColumns={allColumns}
-                    visibleColumnIds={visibleColumnIds}
-                    columnOrder={columnOrder}
-                    onToggleColumn={toggleColumn}
-                    onMoveColumn={moveColumn}
-                  />
-                }
-              />
-            ) : (
-              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
-                {currentPerformers.map((performer: Record<string, unknown>, index: number) => {
-                  const itemProps = gridItemProps(index);
-                  return (
-                    <PerformerCard
-                      key={performer.id as string}
-                      performer={performer as unknown as import("@peek/shared-types").NormalizedPerformer}
-                      isTVMode={isTVMode}
-                      fromPageTitle="Performers"
-                      {...itemProps}
-                    />
-                  );
-                })}
-              </div>
-            )
-          ) as unknown as React.ReactNode}
+              )) as unknown as React.ReactNode
+          }
         </SearchControls>
       </div>
     </PageLayout>

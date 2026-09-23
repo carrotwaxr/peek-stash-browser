@@ -2,7 +2,6 @@
  * Entity-specific configuration for WallView rendering.
  * Keeps WallView and WallItem entity-agnostic.
  */
-
 import { formatDistanceToNow } from "date-fns";
 import { getClipPreviewUrl } from "../../api";
 
@@ -66,7 +65,8 @@ export const wallConfig = {
       }
       return 1; // Default square for images
     },
-    getTitle: (item: any) => item.title || item.files?.[0]?.basename || "Untitled",
+    getTitle: (item: any) =>
+      item.title || item.files?.[0]?.basename || "Untitled",
     getSubtitle: (item: any) => formatResolution(item.width, item.height),
     hasPreview: false,
   },
@@ -79,7 +79,8 @@ export const wallConfig = {
       }
       return null;
     },
-    getPreviewUrl: (item: any) => (item.isGenerated ? getClipPreviewUrl(item.id) : null),
+    getPreviewUrl: (item: any) =>
+      item.isGenerated ? getClipPreviewUrl(item.id) : null,
     getAspectRatio: (item: any) => {
       // Use parent scene's video dimensions
       const file = item.scene?.files?.[0];

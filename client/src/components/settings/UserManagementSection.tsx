@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
-import { Users, Edit2, Trash2, Shield, Download, Share2, Plus } from "lucide-react";
-import { apiPut, getGroups, deleteGroup } from "../../api";
+import {
+  Download,
+  Edit2,
+  Plus,
+  Share2,
+  Shield,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { apiPut, deleteGroup, getGroups } from "../../api";
 import { formatDate } from "../../utils/date";
+import { Button, Paper } from "../ui/index";
 import CreateUserModal from "./CreateUserModal";
 import GroupModal from "./GroupModal";
 import SyncFromStashModal from "./SyncFromStashModal";
 import UserEditModal from "./UserEditModal";
-import { Button, Paper } from "../ui/index";
 
 interface UserItem {
   id: number;
@@ -77,7 +85,11 @@ const UserManagementSection = ({
   };
 
   const handleDeleteGroup = async (group: { id: number; name: string }) => {
-    if (!confirm(`Are you sure you want to delete the group "${group.name}"?\n\nThis will remove the group from all members but will not delete any users.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete the group "${group.name}"?\n\nThis will remove the group from all members but will not delete any users.`
+      )
+    ) {
       return;
     }
 
@@ -99,7 +111,9 @@ const UserManagementSection = ({
   const handleGroupModalSave = () => {
     setShowGroupModal(false);
     setEditingGroup(null);
-    onMessage(editingGroup ? "Group updated successfully" : "Group created successfully");
+    onMessage(
+      editingGroup ? "Group updated successfully" : "Group created successfully"
+    );
     loadGroups();
     onUsersChanged(); // Refresh users to update their group badges
   };
@@ -157,10 +171,7 @@ const UserManagementSection = ({
 
     if (badges.length === 0) {
       return (
-        <span
-          className="text-xs"
-          style={{ color: "var(--text-secondary)" }}
-        >
+        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
           No permissions
         </span>
       );
@@ -169,7 +180,11 @@ const UserManagementSection = ({
     return <div className="flex flex-wrap gap-1">{badges}</div>;
   };
 
-  const toggleSyncToStash = async (userId: number, username: string, currentSyncToStash: boolean | undefined) => {
+  const toggleSyncToStash = async (
+    userId: number,
+    username: string,
+    currentSyncToStash: boolean | undefined
+  ) => {
     const newSyncToStash = !currentSyncToStash;
 
     try {
@@ -224,7 +239,8 @@ const UserManagementSection = ({
                 className="text-sm mb-3"
                 style={{ color: "var(--text-secondary)" }}
               >
-                No groups yet. Create a group to organize users and manage permissions together.
+                No groups yet. Create a group to organize users and manage
+                permissions together.
               </p>
               <Button
                 variant="primary"
@@ -300,7 +316,10 @@ const UserManagementSection = ({
                         style={{ color: "var(--text-primary)" }}
                       >
                         <span className="inline-flex items-center gap-1">
-                          <Users size={14} style={{ color: "var(--text-secondary)" }} />
+                          <Users
+                            size={14}
+                            style={{ color: "var(--text-secondary)" }}
+                          />
                           {group.memberCount ?? 0}
                         </span>
                       </td>

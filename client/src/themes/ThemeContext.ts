@@ -29,4 +29,6 @@ export interface ThemeContextValue {
   refreshCustomThemes: () => Promise<void>;
 }
 
-export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+export const ThemeContext = createContext<ThemeContextValue | undefined>(
+  undefined
+);

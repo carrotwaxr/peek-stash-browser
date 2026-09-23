@@ -1,10 +1,12 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import {
-  useWatchHistory,
-  useAllWatchHistory,
-} from "../../src/hooks/useWatchHistory";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet } from "../../src/api";
 import type { AuthContextValue } from "../../src/contexts/AuthContextProvider";
+import { useAuth } from "../../src/hooks/useAuth";
+import {
+  useAllWatchHistory,
+  useWatchHistory,
+} from "../../src/hooks/useWatchHistory";
 
 vi.mock("../../src/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
@@ -13,9 +15,6 @@ vi.mock("../../src/hooks/useAuth", () => ({
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
-
-import { useAuth } from "../../src/hooks/useAuth";
-import { apiGet } from "../../src/api";
 
 const useAuthMock = useAuth as unknown as Mock;
 const apiGetMock = apiGet as unknown as Mock;
@@ -182,7 +181,9 @@ describe("useAllWatchHistory", () => {
   it("provides refresh function", async () => {
     apiGetMock
       .mockResolvedValueOnce({ watchHistory: [{ sceneId: "1" }] })
-      .mockResolvedValueOnce({ watchHistory: [{ sceneId: "1" }, { sceneId: "2" }] });
+      .mockResolvedValueOnce({
+        watchHistory: [{ sceneId: "1" }, { sceneId: "2" }],
+      });
 
     const { result } = renderHook(() => useAllWatchHistory());
 

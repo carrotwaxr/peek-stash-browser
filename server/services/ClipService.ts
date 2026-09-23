@@ -1,4 +1,8 @@
-import { clipQueryBuilder, ClipQueryOptions as QueryBuilderOptions, ClipWithRelations as RawClipWithRelations } from "./ClipQueryBuilder.js";
+import {
+  ClipQueryOptions as QueryBuilderOptions,
+  ClipWithRelations as RawClipWithRelations,
+  clipQueryBuilder,
+} from "./ClipQueryBuilder.js";
 
 export interface ClipQueryOptions {
   page?: number;
@@ -49,7 +53,10 @@ export class ClipService {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is
@@ -93,7 +100,10 @@ export class ClipService {
       scene: {
         id: scene.id,
         title: scene.title,
-        pathScreenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        pathScreenshot: this.transformUrl(
+          scene.pathScreenshot,
+          scene.stashInstanceId
+        ),
         studioId: scene.studioId,
       },
     };
@@ -108,7 +118,12 @@ export class ClipService {
     includeUngenerated = false,
     allowedInstanceIds?: string[]
   ): Promise<ClipWithRelations[]> {
-    const clips = await clipQueryBuilder.getClipsForScene(sceneId, userId, includeUngenerated, allowedInstanceIds);
+    const clips = await clipQueryBuilder.getClipsForScene(
+      sceneId,
+      userId,
+      includeUngenerated,
+      allowedInstanceIds
+    );
     return clips.map((clip) => this.transformClip(clip));
   }
 
@@ -136,7 +151,10 @@ export class ClipService {
   /**
    * Get a single clip by ID
    */
-  async getClipById(clipId: string, userId: number): Promise<ClipWithRelations | null> {
+  async getClipById(
+    clipId: string,
+    userId: number
+  ): Promise<ClipWithRelations | null> {
     const clip = await clipQueryBuilder.getClipById(clipId, userId);
     if (!clip) return null;
     return this.transformClip(clip);

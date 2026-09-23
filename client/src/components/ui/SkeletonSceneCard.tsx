@@ -16,7 +16,9 @@ const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
   // Determine what to show based on settings
   const showDescription = settings.showDescriptionOnCard as boolean | undefined;
   const showRatingRow =
-    (settings.showRating as boolean) || (settings.showFavorite as boolean) || (settings.showOCounter as boolean);
+    (settings.showRating as boolean) ||
+    (settings.showFavorite as boolean) ||
+    (settings.showOCounter as boolean);
 
   // Match aspect ratio logic from useEntityImageAspectRatio
   const aspectRatio = ["performer", "gallery", "group"].includes(entityType)
@@ -82,10 +84,7 @@ const SkeletonSceneCard = ({ entityType = "scene" }: Props) => {
         )}
 
         {/* Indicators skeleton - matches CardIndicators height */}
-        <div
-          className="flex items-center gap-2"
-          style={{ height: "3.5rem" }}
-        >
+        <div className="flex items-center gap-2" style={{ height: "3.5rem" }}>
           <div
             className="h-6 rounded-full animate-pulse"
             style={{

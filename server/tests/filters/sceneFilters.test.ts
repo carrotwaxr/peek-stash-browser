@@ -4,7 +4,17 @@
  * Tests the scene filtering implementation in controllers/library/scenes.ts
  * Uses mock data to validate filter behavior without database dependency
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { applyQuickSceneFilters } from "../../controllers/library/scenes.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import {
+  createMockGroups,
+  createMockPerformers,
+  createMockScene,
+  createMockScenes,
+  createMockStudios,
+  createMockTags,
+} from "../helpers/mockDataGenerators.js";
 
 // Mock StashInstanceManager to provide a default config for stream URL generation
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -25,17 +35,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     loadFromDatabase: vi.fn().mockResolvedValue(undefined),
   },
 }));
-
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
-import { applyQuickSceneFilters } from "../../controllers/library/scenes.js";
-import {
-  createMockScene,
-  createMockScenes,
-  createMockPerformers,
-  createMockStudios,
-  createMockTags,
-  createMockGroups,
-} from "../helpers/mockDataGenerators.js";
 
 describe("Scene Filters - Quick Filters", () => {
   let mockPerformers: ReturnType<typeof createMockPerformers>;
@@ -1284,9 +1283,9 @@ describe("Scene Filters - Quick Filters", () => {
       result.forEach((scene) => {
         // Check performer
         const scenePerformerIds = scene.performers?.map((p) => p.id) || [];
-        expect(
-          performerIds.some((id) => scenePerformerIds.includes(id))
-        ).toBe(true);
+        expect(performerIds.some((id) => scenePerformerIds.includes(id))).toBe(
+          true
+        );
 
         // Check studio
         expect(scene.studio).toBeTruthy();

@@ -11,7 +11,13 @@ interface Props {
 /**
  * Reusable empty state component
  */
-const EmptyState = ({ icon, title, description, action, className = "" }: Props) => {
+const EmptyState = ({
+  icon,
+  title,
+  description,
+  action,
+  className = "",
+}: Props) => {
   const defaultIcon = (
     <svg
       className="w-16 h-16 mx-auto mb-4"

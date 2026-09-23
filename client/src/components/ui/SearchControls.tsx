@@ -1,13 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LucideArrowDown, LucideArrowUp, type LucideIcon } from "lucide-react";
-import { useTVMode } from "../../hooks/useTVMode";
-import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
-import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext";
 import { useFilterState } from "../../hooks/useFilterState";
+import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
+import { useTVMode } from "../../hooks/useTVMode";
 import {
   CLIP_FILTER_OPTIONS,
   CLIP_SORT_OPTIONS,
+  type FilterOption,
   GALLERY_FILTER_OPTIONS,
   GALLERY_SORT_OPTIONS,
   GROUP_FILTER_OPTIONS,
@@ -32,7 +39,6 @@ import {
   buildSceneFilter,
   buildStudioFilter,
   buildTagFilter,
-  type FilterOption,
 } from "../../utils/filterConfig";
 // Note: parseSearchParams and buildSearchParams now handled by useFilterState hook
 import {
@@ -49,10 +55,16 @@ import {
   ZoomSlider,
 } from "./index";
 
-const buildFilter = (artifactType: string, filters: Record<string, any>, unitPreference: string) => {
+const buildFilter = (
+  artifactType: string,
+  filters: Record<string, any>,
+  unitPreference: string
+) => {
   switch (artifactType) {
     case "performer":
-      return { performer_filter: buildPerformerFilter(filters, unitPreference) };
+      return {
+        performer_filter: buildPerformerFilter(filters, unitPreference),
+      };
     case "studio":
       return { studio_filter: buildStudioFilter(filters) };
     case "tag":
@@ -113,7 +125,9 @@ interface SearchControlsProps {
   initialSort?: string;
   onQueryChange: (query: Record<string, unknown>) => void;
   onPerPageStateChange?: (perPage: number) => void;
-  paginationHandlerRef?: React.MutableRefObject<((page: number) => void) | null>;
+  paginationHandlerRef?: React.MutableRefObject<
+    ((page: number) => void) | null
+  >;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: Record<string, unknown>;
   totalPages: number;
@@ -162,7 +176,9 @@ const SearchControls = ({
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [highlightedFilterKey, setHighlightedFilterKey] = useState<string | null>(null);
+  const [highlightedFilterKey, setHighlightedFilterKey] = useState<
+    string | null
+  >(null);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null); // Ref for top pagination element
   const filterRefs = useRef<Record<string, HTMLElement | null>>({}); // Refs for filter controls (for scroll-to-highlight)
@@ -182,16 +198,19 @@ const SearchControls = ({
   const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
 
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
-  const searchZoneItems = useMemo<{ id: string; name: string }[]>(() => [
-    { id: "search-input", name: "Search" },
-    { id: "sort-control", name: "Sort" },
-    { id: "sort-direction", name: "Direction" },
-    { id: "filters-button", name: "Filters" },
-    { id: "filter-presets", name: "Presets" },
-    { id: "view-mode", name: "View" },
-    { id: "zoom-level", name: "Zoom" },
-    { id: "context-settings", name: "Settings" },
-  ], []);
+  const searchZoneItems = useMemo<{ id: string; name: string }[]>(
+    () => [
+      { id: "search-input", name: "Search" },
+      { id: "sort-control", name: "Sort" },
+      { id: "sort-direction", name: "Direction" },
+      { id: "filters-button", name: "Filters" },
+      { id: "filter-presets", name: "Presets" },
+      { id: "view-mode", name: "View" },
+      { id: "zoom-level", name: "Zoom" },
+      { id: "context-settings", name: "Settings" },
+    ],
+    []
+  );
 
   // Horizontal navigation for search zone
   const searchZoneNav = useHorizontalNavigation({
@@ -199,7 +218,9 @@ const SearchControls = ({
     enabled: isTVMode && tvSearchZoneActive,
     onSelect: (item: { id: string; name: string }) => {
       // Trigger click on the focused element
-      const element = document.querySelector(`[data-tv-search-item="${item.id}"]`);
+      const element = document.querySelector(
+        `[data-tv-search-item="${item.id}"]`
+      );
       if (element) {
         (element as HTMLElement).click();
         // For search input, focus it
@@ -211,10 +232,14 @@ const SearchControls = ({
     },
     onEscapeUp: () => {
       // Let parent handle zone transition
-      window.dispatchEvent(new CustomEvent("tvSearchZoneEscape", { detail: { direction: "up" } }));
+      window.dispatchEvent(
+        new CustomEvent("tvSearchZoneEscape", { detail: { direction: "up" } })
+      );
     },
     onEscapeDown: () => {
-      window.dispatchEvent(new CustomEvent("tvSearchZoneEscape", { detail: { direction: "down" } }));
+      window.dispatchEvent(
+        new CustomEvent("tvSearchZoneEscape", { detail: { direction: "down" } })
+      );
     },
   });
 
@@ -277,7 +302,9 @@ const SearchControls = ({
   }, [artifactType, unitPreference]);
 
   // Track collapsed state for each filter section
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<string, boolean>
+  >(() => {
     const initial: Record<string, boolean> = {};
     filterOptions.forEach((opt) => {
       if (opt.type === "section-header" && opt.collapsible) {
@@ -342,7 +369,7 @@ const SearchControls = ({
   const getSortWithSeed = useCallback((sort: string) => {
     // Normalize: treat both "random" and "random_*" as random sort
     // (latter can happen if saved in preset, though we try to avoid it)
-    const isRandomSort = sort === 'random' || sort.startsWith('random_');
+    const isRandomSort = sort === "random" || sort.startsWith("random_");
 
     if (isRandomSort) {
       if (randomSeedRef.current === -1) {
@@ -363,12 +390,18 @@ const SearchControls = ({
   const hasTriggeredInitialQuery = useRef(false);
 
   // Check if permanentFilters are ready (non-empty when deferring is enabled)
-  const permanentFiltersReady = !deferInitialQueryUntilFiltersReady ||
+  const permanentFiltersReady =
+    !deferInitialQueryUntilFiltersReady ||
     Object.keys(permanentFilters).length > 0;
 
   // Effect 1: Fire initial search query when hook is initialized and filters are ready
   useEffect(() => {
-    if (!isInitialized || hasTriggeredInitialQuery.current || !permanentFiltersReady) return;
+    if (
+      !isInitialized ||
+      hasTriggeredInitialQuery.current ||
+      !permanentFiltersReady
+    )
+      return;
     hasTriggeredInitialQuery.current = true;
 
     // Include permanent filters in initial query
@@ -385,7 +418,21 @@ const SearchControls = ({
       ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
     onQueryChange(query);
-  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [
+    isInitialized,
+    permanentFiltersReady,
+    sortDirection,
+    currentPage,
+    perPage,
+    searchText,
+    sortField,
+    filters,
+    permanentFilters,
+    artifactType,
+    unitPreference,
+    onQueryChange,
+    getSortWithSeed,
+  ]);
 
   // Effect 2: Notify parent of initial viewMode and perPage after first query fires
   // Separated from the query effect to isolate concerns — this syncs parent state
@@ -429,7 +476,19 @@ const SearchControls = ({
       };
       onQueryChange(query);
     }
-  }, [isInitialized, permanentFilters, filters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [
+    isInitialized,
+    permanentFilters,
+    filters,
+    sortDirection,
+    perPage,
+    searchText,
+    sortField,
+    artifactType,
+    unitPreference,
+    onQueryChange,
+    getSortWithSeed,
+  ]);
 
   // Clear all filters
   const handleClearFilters = useCallback(() => {
@@ -449,7 +508,18 @@ const SearchControls = ({
     };
 
     onQueryChange(query);
-  }, [clearFiltersAction, permanentFilters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [
+    clearFiltersAction,
+    permanentFilters,
+    sortDirection,
+    perPage,
+    searchText,
+    sortField,
+    artifactType,
+    unitPreference,
+    onQueryChange,
+    getSortWithSeed,
+  ]);
 
   // Handle filter change in panel (editing before submit)
   const handleFilterChange = useCallback((filterKey: string, value: any) => {
@@ -477,7 +547,18 @@ const SearchControls = ({
     };
 
     onQueryChange(query);
-  }, [setFiltersAction, localFilters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [
+    setFiltersAction,
+    localFilters,
+    sortDirection,
+    perPage,
+    searchText,
+    sortField,
+    artifactType,
+    unitPreference,
+    onQueryChange,
+    getSortWithSeed,
+  ]);
 
   // Handle removing a single filter chip
   const handleRemoveFilter = useCallback(
@@ -581,53 +662,84 @@ const SearchControls = ({
           q: searchText,
           sort: getSortWithSeed(preset.sort),
         },
-        ...buildFilter(artifactType, {
-          ...permanentFilters,
-          ...preset.filters,
-        }, unitPreference),
+        ...buildFilter(
+          artifactType,
+          {
+            ...permanentFilters,
+            ...preset.filters,
+          },
+          unitPreference
+        ),
       };
 
       onQueryChange(query);
     },
-    [loadPreset, onPerPageStateChange, onViewModeChange, permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference, getSortWithSeed, resetRandomSeed]
+    [
+      loadPreset,
+      onPerPageStateChange,
+      onViewModeChange,
+      permanentFilters,
+      perPage,
+      searchText,
+      artifactType,
+      onQueryChange,
+      unitPreference,
+      getSortWithSeed,
+      resetRandomSeed,
+    ]
   );
 
-  const handlePageChange = useCallback((page: number) => {
-    setPage(page); // Hook handles URL sync
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setPage(page); // Hook handles URL sync
 
-    // Merge user filters with permanent filters (e.g., folder tag filter)
-    const mergedFilters = { ...permanentFilters, ...filters };
+      // Merge user filters with permanent filters (e.g., folder tag filter)
+      const mergedFilters = { ...permanentFilters, ...filters };
 
-    // Trigger search with new page
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page,
-        per_page: perPage,
-        q: searchText,
-        sort: getSortWithSeed(sortField),
-      },
-      ...buildFilter(artifactType, mergedFilters, unitPreference),
-    };
+      // Trigger search with new page
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page,
+          per_page: perPage,
+          q: searchText,
+          sort: getSortWithSeed(sortField),
+        },
+        ...buildFilter(artifactType, mergedFilters, unitPreference),
+      };
 
-    onQueryChange(query);
+      onQueryChange(query);
 
-    // Scroll to top pagination if it's not in view
-    setTimeout(() => {
-      if (topPaginationRef.current) {
-        const rect = topPaginationRef.current.getBoundingClientRect();
-        const isInView = rect.top >= 0 && rect.bottom <= window.innerHeight;
+      // Scroll to top pagination if it's not in view
+      setTimeout(() => {
+        if (topPaginationRef.current) {
+          const rect = topPaginationRef.current.getBoundingClientRect();
+          const isInView = rect.top >= 0 && rect.bottom <= window.innerHeight;
 
-        // Only scroll if not already in view
-        if (!isInView) {
-          topPaginationRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
+          // Only scroll if not already in view
+          if (!isInView) {
+            topPaginationRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
         }
-      }
-    }, 50);
-  }, [setPage, sortDirection, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+      }, 50);
+    },
+    [
+      setPage,
+      sortDirection,
+      perPage,
+      searchText,
+      sortField,
+      filters,
+      permanentFilters,
+      artifactType,
+      unitPreference,
+      onQueryChange,
+      getSortWithSeed,
+    ]
+  );
 
   // Expose pagination handler to parent via ref (for TV mode PageUp/PageDown)
   useEffect(() => {
@@ -636,88 +748,135 @@ const SearchControls = ({
     }
   }, [paginationHandlerRef, handlePageChange]);
 
-  const handleChangeSearchText = useCallback((searchStr: string) => {
-    if (searchStr === searchText) return; // No change
-    setSearchTextAction(searchStr); // Hook handles URL sync and resets to page 1
+  const handleChangeSearchText = useCallback(
+    (searchStr: string) => {
+      if (searchStr === searchText) return; // No change
+      setSearchTextAction(searchStr); // Hook handles URL sync and resets to page 1
 
-    // Trigger search with new text
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: 1,
-        per_page: perPage,
-        q: searchStr,
-        sort: getSortWithSeed(sortField),
-      },
-      ...buildFilter(artifactType, filters, unitPreference),
-    };
+      // Trigger search with new text
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: 1,
+          per_page: perPage,
+          q: searchStr,
+          sort: getSortWithSeed(sortField),
+        },
+        ...buildFilter(artifactType, filters, unitPreference),
+      };
 
-    onQueryChange(query);
-  }, [searchText, setSearchTextAction, sortDirection, perPage, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+      onQueryChange(query);
+    },
+    [
+      searchText,
+      setSearchTextAction,
+      sortDirection,
+      perPage,
+      sortField,
+      filters,
+      artifactType,
+      unitPreference,
+      onQueryChange,
+      getSortWithSeed,
+    ]
+  );
 
   // Handle sort change
-  const handleSortChange = useCallback((field: string) => {
-    let newSortDirection = "DESC";
-    let newSortField = sortField;
+  const handleSortChange = useCallback(
+    (field: string) => {
+      let newSortDirection = "DESC";
+      let newSortField = sortField;
 
-    // If same field, toggle direction (keep same seed for random)
-    if (field === sortField) {
-      newSortDirection = sortDirection === "ASC" ? "DESC" : "ASC";
-    } else {
-      // New field, default to DESC
-      newSortField = field;
+      // If same field, toggle direction (keep same seed for random)
+      if (field === sortField) {
+        newSortDirection = sortDirection === "ASC" ? "DESC" : "ASC";
+      } else {
+        // New field, default to DESC
+        newSortField = field;
 
-      // Reset random seed when changing TO or FROM random sort
-      // This ensures fresh randomization when switching sort types
-      if (field === 'random' || sortField === 'random') {
-        resetRandomSeed();
+        // Reset random seed when changing TO or FROM random sort
+        // This ensures fresh randomization when switching sort types
+        if (field === "random" || sortField === "random") {
+          resetRandomSeed();
+        }
       }
-    }
-    setSortAction(newSortField, newSortDirection); // Hook handles URL sync
+      setSortAction(newSortField, newSortDirection); // Hook handles URL sync
 
-    // Trigger search with new sort
-    const query = {
-      filter: {
-        direction: newSortDirection,
-        page: currentPage,
-        per_page: perPage,
-        q: searchText,
-        sort: getSortWithSeed(newSortField),
-      },
-      ...buildFilter(artifactType, filters, unitPreference),
-    };
+      // Trigger search with new sort
+      const query = {
+        filter: {
+          direction: newSortDirection,
+          page: currentPage,
+          per_page: perPage,
+          q: searchText,
+          sort: getSortWithSeed(newSortField),
+        },
+        ...buildFilter(artifactType, filters, unitPreference),
+      };
 
-    onQueryChange(query);
-  }, [sortField, sortDirection, setSortAction, resetRandomSeed, currentPage, perPage, searchText, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+      onQueryChange(query);
+    },
+    [
+      sortField,
+      sortDirection,
+      setSortAction,
+      resetRandomSeed,
+      currentPage,
+      perPage,
+      searchText,
+      filters,
+      artifactType,
+      unitPreference,
+      onQueryChange,
+      getSortWithSeed,
+    ]
+  );
 
   const handleToggleFilterPanel = useCallback(() => {
     setIsFilterPanelOpen((prev) => !prev);
   }, []);
 
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPageAction(newPerPage); // Hook handles URL sync and resets to page 1
-    onPerPageStateChange?.(newPerPage);
+  const handlePerPageChange = useCallback(
+    (newPerPage: number) => {
+      setPerPageAction(newPerPage); // Hook handles URL sync and resets to page 1
+      onPerPageStateChange?.(newPerPage);
 
-    // Trigger search with new per page value
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: 1,
-        per_page: newPerPage,
-        q: searchText,
-        sort: getSortWithSeed(sortField),
-      },
-      ...buildFilter(artifactType, filters, unitPreference),
-    };
+      // Trigger search with new per page value
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: 1,
+          per_page: newPerPage,
+          q: searchText,
+          sort: getSortWithSeed(sortField),
+        },
+        ...buildFilter(artifactType, filters, unitPreference),
+      };
 
-    onQueryChange(query);
-  }, [setPerPageAction, onPerPageStateChange, sortDirection, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+      onQueryChange(query);
+    },
+    [
+      setPerPageAction,
+      onPerPageStateChange,
+      sortDirection,
+      searchText,
+      sortField,
+      filters,
+      artifactType,
+      unitPreference,
+      onQueryChange,
+      getSortWithSeed,
+    ]
+  );
 
   // Handle view mode change - notify parent directly instead of via effect
-  const handleViewModeChange = useCallback((newMode: string) => {
-    setViewMode(newMode);
-    onViewModeChange?.(newMode);
-  }, [setViewMode, onViewModeChange]);
+  const handleViewModeChange = useCallback(
+    (newMode: string) => {
+      setViewMode(newMode);
+      onViewModeChange?.(newMode);
+    },
+    [setViewMode, onViewModeChange]
+  );
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -781,7 +940,9 @@ const SearchControls = ({
         <div
           className="flex items-center justify-between px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
           style={{
-            borderBottom: isControlsCollapsed ? "none" : "1px solid var(--border-color)",
+            borderBottom: isControlsCollapsed
+              ? "none"
+              : "1px solid var(--border-color)",
           }}
           onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
         >
@@ -801,190 +962,205 @@ const SearchControls = ({
           <div className="p-3">
             {/* Row 1: Search, Sort, Filters - "What to show" */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
-        {/* Search Input - Flexible width with min-width */}
-        <div
-          data-tv-search-item="search-input"
-          ref={(el) => searchZoneNav.setItemRef(0, el)}
-          className={`w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm ${
-            searchZoneNav.isFocused(0) ? "keyboard-focus" : ""
-          }`}
-        >
-          <SearchInput
-            placeholder="Search..."
-            value={searchText}
-            onSearch={handleChangeSearchText}
-            className="w-full"
-          />
-        </div>
+              {/* Search Input - Flexible width with min-width */}
+              <div
+                data-tv-search-item="search-input"
+                ref={(el) => searchZoneNav.setItemRef(0, el)}
+                className={`w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm ${
+                  searchZoneNav.isFocused(0) ? "keyboard-focus" : ""
+                }`}
+              >
+                <SearchInput
+                  placeholder="Search..."
+                  value={searchText}
+                  onSearch={handleChangeSearchText}
+                  className="w-full"
+                />
+              </div>
 
-        {/* Sort, Filter */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
-          {/* Sort Control - No label, just dropdown + direction button */}
-          <div className="flex items-center gap-1">
-            <div
-              data-tv-search-item="sort-control"
-              ref={(el) => searchZoneNav.setItemRef(1, el)}
-              className={searchZoneNav.isFocused(1) ? "keyboard-focus" : ""}
-            >
-              <SortControl
-                options={sortOptions}
-                value={sortField}
-                onChange={handleSortChange}
-              />
-            </div>
-            <div
-              data-tv-search-item="sort-direction"
-              ref={(el) => searchZoneNav.setItemRef(2, el)}
-              className={searchZoneNav.isFocused(2) ? "keyboard-focus" : ""}
-            >
-              <Button
-                onClick={() => handleSortChange(sortField)}
-                variant="secondary"
-                size="sm"
-                className="py-1"
-                icon={
-                  sortDirection === "ASC" ? (
-                    <LucideArrowUp size={22} />
-                  ) : (
-                    <LucideArrowDown size={22} />
-                  )
-                }
-              />
-            </div>
-          </div>
+              {/* Sort, Filter */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
+                {/* Sort Control - No label, just dropdown + direction button */}
+                <div className="flex items-center gap-1">
+                  <div
+                    data-tv-search-item="sort-control"
+                    ref={(el) => searchZoneNav.setItemRef(1, el)}
+                    className={
+                      searchZoneNav.isFocused(1) ? "keyboard-focus" : ""
+                    }
+                  >
+                    <SortControl
+                      options={sortOptions}
+                      value={sortField}
+                      onChange={handleSortChange}
+                    />
+                  </div>
+                  <div
+                    data-tv-search-item="sort-direction"
+                    ref={(el) => searchZoneNav.setItemRef(2, el)}
+                    className={
+                      searchZoneNav.isFocused(2) ? "keyboard-focus" : ""
+                    }
+                  >
+                    <Button
+                      onClick={() => handleSortChange(sortField)}
+                      variant="secondary"
+                      size="sm"
+                      className="py-1"
+                      icon={
+                        sortDirection === "ASC" ? (
+                          <LucideArrowUp size={22} />
+                        ) : (
+                          <LucideArrowDown size={22} />
+                        )
+                      }
+                    />
+                  </div>
+                </div>
 
-          {/* Filters Toggle Button */}
-          <div
-            data-tv-search-item="filters-button"
-            ref={(el) => searchZoneNav.setItemRef(3, el)}
-            className={searchZoneNav.isFocused(3) ? "keyboard-focus" : ""}
-          >
-            <Button
-              onClick={handleToggleFilterPanel}
-              variant={isFilterPanelOpen ? "primary" : "secondary"}
-              size="sm"
-              className="flex items-center space-x-2 font-medium"
-              icon={
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              }
-            >
-              <span>Filters</span>
-              {hasActiveFilters && !isFilterPanelOpen && (
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full ml-1"
-                  style={{
-                    backgroundColor: "var(--accent-secondary)",
-                    color: "white",
-                  }}
+                {/* Filters Toggle Button */}
+                <div
+                  data-tv-search-item="filters-button"
+                  ref={(el) => searchZoneNav.setItemRef(3, el)}
+                  className={searchZoneNav.isFocused(3) ? "keyboard-focus" : ""}
                 >
-                  {
-                    Object.keys(filters).filter(
-                      (key) =>
-                        (filters as Record<string, any>)[key] !== undefined &&
-                        (filters as Record<string, any>)[key] !== "" &&
-                        (typeof (filters as Record<string, any>)[key] !== "object" ||
-                          Object.values((filters as Record<string, any>)[key]).some(
-                            (v: any) => v !== "" && v !== undefined
-                          ))
-                    ).length
-                  }
-                </span>
+                  <Button
+                    onClick={handleToggleFilterPanel}
+                    variant={isFilterPanelOpen ? "primary" : "secondary"}
+                    size="sm"
+                    className="flex items-center space-x-2 font-medium"
+                    icon={
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    }
+                  >
+                    <span>Filters</span>
+                    {hasActiveFilters && !isFilterPanelOpen && (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full ml-1"
+                        style={{
+                          backgroundColor: "var(--accent-secondary)",
+                          color: "white",
+                        }}
+                      >
+                        {
+                          Object.keys(filters).filter(
+                            (key) =>
+                              (filters as Record<string, any>)[key] !==
+                                undefined &&
+                              (filters as Record<string, any>)[key] !== "" &&
+                              (typeof (filters as Record<string, any>)[key] !==
+                                "object" ||
+                                Object.values(
+                                  (filters as Record<string, any>)[key]
+                                ).some((v: any) => v !== "" && v !== undefined))
+                          ).length
+                        }
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
+              {/* Filter Presets */}
+              <div
+                data-tv-search-item="filter-presets"
+                ref={(el) => searchZoneNav.setItemRef(4, el)}
+                className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
+              >
+                <FilterPresets
+                  artifactType={artifactType}
+                  context={effectiveContext}
+                  currentFilters={filters}
+                  currentSort={sortField}
+                  currentDirection={sortDirection}
+                  currentViewMode={viewMode}
+                  currentZoomLevel={zoomLevel}
+                  currentGridDensity={gridDensity}
+                  currentTableColumns={currentTableColumns}
+                  currentPerPage={perPage}
+                  permanentFilters={permanentFilters}
+                  onLoadPreset={handleLoadPreset}
+                />
+              </div>
+
+              {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
+              {(supportsWallView || viewModes) && (
+                <div
+                  data-tv-search-item="view-mode"
+                  ref={(el) => searchZoneNav.setItemRef(5, el)}
+                  className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
+                >
+                  <ViewModeToggle
+                    modes={viewModes}
+                    value={viewMode}
+                    onChange={handleViewModeChange}
+                  />
+                </div>
               )}
-            </Button>
-          </div>
-        </div>
-      </div>
 
-      {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
-      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
-        {/* Filter Presets */}
-        <div
-          data-tv-search-item="filter-presets"
-          ref={(el) => searchZoneNav.setItemRef(4, el)}
-          className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
-        >
-          <FilterPresets
-            artifactType={artifactType}
-            context={effectiveContext}
-            currentFilters={filters}
-            currentSort={sortField}
-            currentDirection={sortDirection}
-            currentViewMode={viewMode}
-            currentZoomLevel={zoomLevel}
-            currentGridDensity={gridDensity}
-            currentTableColumns={currentTableColumns}
-            currentPerPage={perPage}
-            permanentFilters={permanentFilters}
-            onLoadPreset={handleLoadPreset}
-          />
-        </div>
+              {/* Table Columns Popover - Only shown in table mode */}
+              {viewMode === "table" && tableColumnsPopover && (
+                <div>{tableColumnsPopover}</div>
+              )}
 
-        {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
-        {(supportsWallView || viewModes) && (
-          <div
-            data-tv-search-item="view-mode"
-            ref={(el) => searchZoneNav.setItemRef(5, el)}
-            className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
-          >
-            <ViewModeToggle
-              modes={viewModes}
-              value={viewMode}
-              onChange={handleViewModeChange}
-            />
-          </div>
-        )}
+              {/* Zoom Slider - Only shown in wall mode */}
+              {(supportsWallView || viewModes?.some((m) => m.id === "wall")) &&
+                viewMode === "wall" && (
+                  <div
+                    data-tv-search-item="zoom-level"
+                    ref={(el) => searchZoneNav.setItemRef(6, el)}
+                    className={
+                      searchZoneNav.isFocused(6) ? "keyboard-focus" : ""
+                    }
+                  >
+                    <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
+                  </div>
+                )}
 
-        {/* Table Columns Popover - Only shown in table mode */}
-        {viewMode === "table" && tableColumnsPopover && (
-          <div>{tableColumnsPopover}</div>
-        )}
+              {/* Grid Density Slider - Shown in grid, folder, and timeline modes */}
+              {(viewMode === "grid" ||
+                viewMode === "folder" ||
+                viewMode === "timeline") && (
+                <div
+                  data-tv-search-item="grid-density"
+                  ref={(el) => searchZoneNav.setItemRef(6, el)}
+                  className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
+                >
+                  <ZoomSlider value={gridDensity} onChange={setGridDensity} />
+                </div>
+              )}
 
-        {/* Zoom Slider - Only shown in wall mode */}
-        {(supportsWallView || viewModes?.some(m => m.id === "wall")) && viewMode === "wall" && (
-          <div
-            data-tv-search-item="zoom-level"
-            ref={(el) => searchZoneNav.setItemRef(6, el)}
-            className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
-          >
-            <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
-          </div>
-        )}
-
-        {/* Grid Density Slider - Shown in grid, folder, and timeline modes */}
-        {(viewMode === "grid" || viewMode === "folder" || viewMode === "timeline") && (
-          <div
-            data-tv-search-item="grid-density"
-            ref={(el) => searchZoneNav.setItemRef(6, el)}
-            className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
-          >
-            <ZoomSlider value={gridDensity} onChange={setGridDensity} />
-          </div>
-        )}
-
-        {/* Context Settings Cog */}
-        <div
-          data-tv-search-item="context-settings"
-          ref={(el) => searchZoneNav.setItemRef(7, el)}
-          className={searchZoneNav.isFocused(7) ? "keyboard-focus" : ""}
-        >
-          <ContextSettings
-            entityType={artifactType}
-            settings={contextSettings}
-            currentValues={{ wallPlayback }}
-            onSettingChange={(key: string, value: string | boolean) => {
-              if (key === "wallPlayback" && onWallPlaybackChange) {
-                onWallPlaybackChange(key, value as string);
-              }
-            }}
-          />
-        </div>
-      </div>
+              {/* Context Settings Cog */}
+              <div
+                data-tv-search-item="context-settings"
+                ref={(el) => searchZoneNav.setItemRef(7, el)}
+                className={searchZoneNav.isFocused(7) ? "keyboard-focus" : ""}
+              >
+                <ContextSettings
+                  entityType={artifactType}
+                  settings={contextSettings}
+                  currentValues={{ wallPlayback }}
+                  onSettingChange={(key: string, value: string | boolean) => {
+                    if (key === "wallPlayback" && onWallPlaybackChange) {
+                      onWallPlaybackChange(key, value as string);
+                    }
+                  }}
+                />
+              </div>
+            </div>
 
             {/* Active Filter Chips */}
             <ActiveFilterChips
@@ -1012,14 +1188,18 @@ const SearchControls = ({
             totalPages={totalPages}
             tvActive={isTVMode && tvTopPaginationZoneActive}
             onEscapeUp={() => {
-              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
-                detail: { zone: "top", direction: "up" }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("tvPaginationEscape", {
+                  detail: { zone: "top", direction: "up" },
+                })
+              );
             }}
             onEscapeDown={() => {
-              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
-                detail: { zone: "top", direction: "down" }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("tvPaginationEscape", {
+                  detail: { zone: "top", direction: "down" },
+                })
+              );
             }}
           />
         </div>
@@ -1040,7 +1220,8 @@ const SearchControls = ({
 
           // Render section header
           if (type === "section-header") {
-            const isCollapsed = (collapsedSections as Record<string, boolean>)[key] || false;
+            const isCollapsed =
+              (collapsedSections as Record<string, boolean>)[key] || false;
             const toggleSection = () => {
               setCollapsedSections((prev) => ({
                 ...prev,
@@ -1103,7 +1284,8 @@ const SearchControls = ({
           }
 
           const isInCollapsedSection =
-            currentSectionKey && (collapsedSections as Record<string, boolean>)[currentSectionKey];
+            currentSectionKey &&
+            (collapsedSections as Record<string, boolean>)[currentSectionKey];
 
           if (isInCollapsedSection) {
             return null;
@@ -1129,16 +1311,36 @@ const SearchControls = ({
               isHighlighted={highlightedFilterKey === key}
               onChange={(value: unknown) => handleFilterChange(key, value)}
               value={(localFilters as Record<string, any>)[key] || defaultValue}
-              type={type as "select" | "searchable-select" | "checkbox" | "number" | "text" | "date" | "range" | "imperial-height-range" | "date-range" | "time-range"}
+              type={
+                type as
+                  | "select"
+                  | "searchable-select"
+                  | "checkbox"
+                  | "number"
+                  | "text"
+                  | "date"
+                  | "range"
+                  | "imperial-height-range"
+                  | "date-range"
+                  | "time-range"
+              }
               label={filterProps.label!}
               modifierOptions={modifierOptions}
-              modifierValue={modifierKey ? (localFilters as Record<string, any>)[modifierKey] : defaultModifier}
+              modifierValue={
+                modifierKey
+                  ? (localFilters as Record<string, any>)[modifierKey]
+                  : defaultModifier
+              }
               onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)
               }
               supportsHierarchy={supportsHierarchy}
               hierarchyLabel={hierarchyLabel}
-              hierarchyValue={hierarchyKey ? (localFilters as Record<string, any>)[hierarchyKey] : undefined}
+              hierarchyValue={
+                hierarchyKey
+                  ? (localFilters as Record<string, any>)[hierarchyKey]
+                  : undefined
+              }
               onHierarchyChange={
                 hierarchyKey
                   ? (value: unknown) => handleFilterChange(hierarchyKey, value)
@@ -1151,7 +1353,17 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? (children as Function)({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange, timelinePeriod, setTimelinePeriod })
+        ? (children as Function)({
+            viewMode,
+            zoomLevel,
+            gridDensity,
+            wallPlayback,
+            sortField,
+            sortDirection,
+            onSort: handleSortChange,
+            timelinePeriod,
+            setTimelinePeriod,
+          })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
@@ -1166,14 +1378,18 @@ const SearchControls = ({
             totalPages={totalPages}
             tvActive={isTVMode && tvBottomPaginationZoneActive}
             onEscapeUp={() => {
-              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
-                detail: { zone: "bottom", direction: "up" }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("tvPaginationEscape", {
+                  detail: { zone: "bottom", direction: "up" },
+                })
+              );
             }}
             onEscapeDown={() => {
-              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
-                detail: { zone: "bottom", direction: "down" }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("tvPaginationEscape", {
+                  detail: { zone: "bottom", direction: "down" },
+                })
+              );
             }}
           />
         </div>

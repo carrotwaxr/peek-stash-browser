@@ -42,7 +42,9 @@ class SceneTagInheritanceService {
       }
 
       const duration = Date.now() - startTime;
-      logger.info(`Scene tag inheritance computed in ${duration}ms for ${scenes.length} scenes`);
+      logger.info(
+        `Scene tag inheritance computed in ${duration}ms for ${scenes.length} scenes`
+      );
     } catch (error) {
       logger.error("Failed to compute scene tag inheritance", {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -51,17 +53,23 @@ class SceneTagInheritanceService {
     }
   }
 
-  private async processBatch(scenes: { id: string; stashInstanceId: string; studioId: string | null }[]): Promise<void> {
+  private async processBatch(
+    scenes: { id: string; stashInstanceId: string; studioId: string | null }[]
+  ): Promise<void> {
     const sceneIds = scenes.map((s) => s.id);
     const sceneInstanceIds = [...new Set(scenes.map((s) => s.stashInstanceId))];
 
     // Composite key helper
     const KEY_SEP = "\0";
-    const compositeKey = (id: string, instanceId: string) => `${id}${KEY_SEP}${instanceId}`;
+    const compositeKey = (id: string, instanceId: string) =>
+      `${id}${KEY_SEP}${instanceId}`;
 
     // Get direct tags for all scenes in batch (scoped by instance)
     const directTags = await prisma.sceneTag.findMany({
-      where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
+      where: {
+        sceneId: { in: sceneIds },
+        sceneInstanceId: { in: sceneInstanceIds },
+      },
       select: { sceneId: true, sceneInstanceId: true, tagId: true },
     });
     const directTagsByScene = new Map<string, Set<string>>();
@@ -75,13 +83,28 @@ class SceneTagInheritanceService {
 
     // Get performer tags for all scenes in batch (scoped by instance)
     const scenePerformers = await prisma.scenePerformer.findMany({
-      where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
-      select: { sceneId: true, sceneInstanceId: true, performerId: true, performerInstanceId: true },
+      where: {
+        sceneId: { in: sceneIds },
+        sceneInstanceId: { in: sceneInstanceIds },
+      },
+      select: {
+        sceneId: true,
+        sceneInstanceId: true,
+        performerId: true,
+        performerInstanceId: true,
+      },
     });
-    const performerIds = [...new Set(scenePerformers.map((sp) => sp.performerId))];
-    const performerInstanceIds = [...new Set(scenePerformers.map((sp) => sp.performerInstanceId))];
+    const performerIds = [
+      ...new Set(scenePerformers.map((sp) => sp.performerId)),
+    ];
+    const performerInstanceIds = [
+      ...new Set(scenePerformers.map((sp) => sp.performerInstanceId)),
+    ];
     const performerTags = await prisma.performerTag.findMany({
-      where: { performerId: { in: performerIds }, performerInstanceId: { in: performerInstanceIds } },
+      where: {
+        performerId: { in: performerIds },
+        performerInstanceId: { in: performerInstanceIds },
+      },
       select: { performerId: true, performerInstanceId: true, tagId: true },
     });
     const tagsByPerformer = new Map<string, string[]>();
@@ -94,9 +117,16 @@ class SceneTagInheritanceService {
     }
 
     // Get studio tags (scoped by instance)
-    const studioIds = [...new Set(scenes.filter((s) => s.studioId).map((s) => s.studioId as string))];
+    const studioIds = [
+      ...new Set(
+        scenes.filter((s) => s.studioId).map((s) => s.studioId as string)
+      ),
+    ];
     const studioTags = await prisma.studioTag.findMany({
-      where: { studioId: { in: studioIds }, studioInstanceId: { in: sceneInstanceIds } },
+      where: {
+        studioId: { in: studioIds },
+        studioInstanceId: { in: sceneInstanceIds },
+      },
       select: { studioId: true, studioInstanceId: true, tagId: true },
     });
     const tagsByStudio = new Map<string, string[]>();
@@ -110,13 +140,26 @@ class SceneTagInheritanceService {
 
     // Get group tags for all scenes in batch (scoped by instance)
     const sceneGroups = await prisma.sceneGroup.findMany({
-      where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
-      select: { sceneId: true, sceneInstanceId: true, groupId: true, groupInstanceId: true },
+      where: {
+        sceneId: { in: sceneIds },
+        sceneInstanceId: { in: sceneInstanceIds },
+      },
+      select: {
+        sceneId: true,
+        sceneInstanceId: true,
+        groupId: true,
+        groupInstanceId: true,
+      },
     });
     const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
-    const groupInstanceIds = [...new Set(sceneGroups.map((sg) => sg.groupInstanceId))];
+    const groupInstanceIds = [
+      ...new Set(sceneGroups.map((sg) => sg.groupInstanceId)),
+    ];
     const groupTags = await prisma.groupTag.findMany({
-      where: { groupId: { in: groupIds }, groupInstanceId: { in: groupInstanceIds } },
+      where: {
+        groupId: { in: groupIds },
+        groupInstanceId: { in: groupInstanceIds },
+      },
       select: { groupId: true, groupInstanceId: true, tagId: true },
     });
     const tagsByGroup = new Map<string, string[]>();
@@ -151,7 +194,11 @@ class SceneTagInheritanceService {
     }
 
     // Compute inherited tags for each scene
-    const updates: { id: string; instanceId: string; inheritedTagIds: string }[] = [];
+    const updates: {
+      id: string;
+      instanceId: string;
+      inheritedTagIds: string;
+    }[] = [];
 
     for (const scene of scenes) {
       const sceneKey = compositeKey(scene.id, scene.stashInstanceId);
@@ -204,7 +251,10 @@ class SceneTagInheritanceService {
     // Note: IDs come from our database (Stash UUIDs), not user input
     if (updates.length > 0) {
       const cases = updates
-        .map((u) => `WHEN '${u.id}' THEN '${u.inheritedTagIds.replace(/'/g, "''")}'`)
+        .map(
+          (u) =>
+            `WHEN '${u.id}' THEN '${u.inheritedTagIds.replace(/'/g, "''")}'`
+        )
         .join(" ");
       const idInstancePairs = updates
         .map((u) => `('${u.id}', '${u.instanceId}')`)

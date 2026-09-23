@@ -5,7 +5,12 @@
  * Stash entities. Covers base URL retrieval, entity URL construction
  * for all entity types, and error/edge-case handling.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildStashEntityUrl,
+  getStashBaseUrl,
+  getStashUiUrl,
+} from "../../utils/stashUrl.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetBaseUrl, mockGetUiUrl } = vi.hoisted(() => ({
@@ -20,8 +25,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     getUiUrl: mockGetUiUrl,
   },
 }));
-
-import { getStashBaseUrl, getStashUiUrl, buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 describe("stashUrl", () => {
   beforeEach(() => {
@@ -124,10 +127,7 @@ describe("stashUrl", () => {
       mockGetUiUrl.mockReturnValue(BASE_URL);
 
       // Cast to bypass TypeScript type checking for the test
-      const result = buildStashEntityUrl(
-        "unknown" as unknown as "scene",
-        "42"
-      );
+      const result = buildStashEntityUrl("unknown" as unknown as "scene", "42");
 
       expect(result).toBeNull();
     });

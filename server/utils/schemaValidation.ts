@@ -3,7 +3,7 @@
  *
  * Helpers for validating API responses with Zod schemas.
  */
-import { z, ZodObject, ZodError } from "zod";
+import { ZodError, ZodObject, z } from "zod";
 import { logger } from "./logger.js";
 
 /**
@@ -27,7 +27,7 @@ export function validateResponse<T extends ZodObject>(
   } catch (error) {
     if (error instanceof ZodError) {
       logger.error(`Schema validation failed for ${context}`, {
-        issues: error.issues.map(i => ({
+        issues: error.issues.map((i) => ({
           path: i.path.join("."),
           message: i.message,
           code: i.code,
@@ -81,7 +81,7 @@ export function validateArrayResponse<T extends ZodObject>(
     } catch (error) {
       if (error instanceof ZodError) {
         logger.warn(`Invalid item at index ${i} in ${context}`, {
-          issues: error.issues.map(issue => ({
+          issues: error.issues.map((issue) => ({
             path: issue.path.join("."),
             message: issue.message,
           })),

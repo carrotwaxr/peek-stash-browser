@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /**
  * Sort Options Integration Tests
@@ -102,13 +102,16 @@ describe("Sort Options", () => {
 
   describe("Scene sorting", () => {
     it("sorts scenes by title ASC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "title",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "title",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -122,13 +125,16 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by title DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "title",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "title",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -142,13 +148,16 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by date ASC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "date",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "date",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -162,13 +171,16 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by date DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "date",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "date",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -182,13 +194,16 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by rating DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "rating",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "rating",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -202,13 +217,16 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by created_at DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "created_at",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "created_at",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -222,62 +240,78 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by updated_at DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "updated_at",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "updated_at",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("sorts scenes by play_count DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "play_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "play_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
 
-      const counts = response.data.findScenes.scenes.map((s) => s.play_count || 0);
+      const counts = response.data.findScenes.scenes.map(
+        (s) => s.play_count || 0
+      );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
       }
     });
 
     it("sorts scenes by o_counter DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "o_counter",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "o_counter",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
 
-      const counts = response.data.findScenes.scenes.map((s) => s.o_counter || 0);
+      const counts = response.data.findScenes.scenes.map(
+        (s) => s.o_counter || 0
+      );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
       }
     });
 
     it("sorts scenes by duration DESC", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: "duration",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: "duration",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -286,19 +320,25 @@ describe("Sort Options", () => {
     it("sorts scenes by random with seed", async () => {
       const seed = 12345678;
 
-      const response1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -310,19 +350,25 @@ describe("Sort Options", () => {
     });
 
     it("sorts scenes by random with different seeds returns different order", async () => {
-      const response1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-          sort: "random_11111111",
-        },
-      });
+      const response1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
+            sort: "random_11111111",
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-          sort: "random_99999999",
-        },
-      });
+      const response2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
+            sort: "random_99999999",
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -336,93 +382,117 @@ describe("Sort Options", () => {
 
   describe("Performer sorting", () => {
     it("sorts performers by name ASC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
 
-      const names = response.data.findPerformers.performers.map((p) => p.name.toLowerCase());
+      const names = response.data.findPerformers.performers.map((p) =>
+        p.name.toLowerCase()
+      );
       for (let i = 1; i < names.length; i++) {
         expect(names[i] >= names[i - 1]).toBe(true);
       }
     });
 
     it("sorts performers by name DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "name",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "name",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
 
-      const names = response.data.findPerformers.performers.map((p) => p.name.toLowerCase());
+      const names = response.data.findPerformers.performers.map((p) =>
+        p.name.toLowerCase()
+      );
       for (let i = 1; i < names.length; i++) {
         expect(names[i] <= names[i - 1]).toBe(true);
       }
     });
 
     it("sorts performers by scene_count DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
 
-      const counts = response.data.findPerformers.performers.map((p) => p.scene_count || 0);
+      const counts = response.data.findPerformers.performers.map(
+        (p) => p.scene_count || 0
+      );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
       }
     });
 
     it("sorts performers by rating DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "rating",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "rating",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("sorts performers by created_at DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "created_at",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "created_at",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("sorts performers by birthdate ASC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: "birthdate",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: "birthdate",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -431,19 +501,25 @@ describe("Sort Options", () => {
     it("sorts performers by random with seed", async () => {
       const seed = 22222222;
 
-      const response1 = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -456,49 +532,62 @@ describe("Sort Options", () => {
 
   describe("Studio sorting", () => {
     it("sorts studios by name ASC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 20,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 20,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
 
-      const names = response.data.findStudios.studios.map((s) => s.name.toLowerCase());
+      const names = response.data.findStudios.studios.map((s) =>
+        s.name.toLowerCase()
+      );
       for (let i = 1; i < names.length; i++) {
         expect(names[i] >= names[i - 1]).toBe(true);
       }
     });
 
     it("sorts studios by scene_count DESC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 20,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 20,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
 
-      const counts = response.data.findStudios.studios.map((s) => s.scene_count || 0);
+      const counts = response.data.findStudios.studios.map(
+        (s) => s.scene_count || 0
+      );
       for (let i = 1; i < counts.length; i++) {
         expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
       }
     });
 
     it("sorts studios by rating DESC", async () => {
-      const response = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 20,
-          sort: "rating",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 20,
+            sort: "rating",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findStudios).toBeDefined();
@@ -507,19 +596,25 @@ describe("Sort Options", () => {
     it("sorts studios by random with seed", async () => {
       const seed = 33333333;
 
-      const response1 = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindStudiosResponse>("/api/library/studios", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindStudiosResponse>(
+        "/api/library/studios",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -532,31 +627,39 @@ describe("Sort Options", () => {
 
   describe("Tag sorting", () => {
     it("sorts tags by name ASC", async () => {
-      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 20,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 20,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
 
-      const names = response.data.findTags.tags.map((t) => t.name.toLowerCase());
+      const names = response.data.findTags.tags.map((t) =>
+        t.name.toLowerCase()
+      );
       for (let i = 1; i < names.length; i++) {
         expect(names[i] >= names[i - 1]).toBe(true);
       }
     });
 
     it("sorts tags by scene_count DESC", async () => {
-      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 20,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 20,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
@@ -570,19 +673,25 @@ describe("Sort Options", () => {
     it("sorts tags by random with seed", async () => {
       const seed = 44444444;
 
-      const response1 = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -595,39 +704,48 @@ describe("Sort Options", () => {
 
   describe("Gallery sorting", () => {
     it("sorts galleries by title ASC", async () => {
-      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        filter: {
-          per_page: 20,
-          sort: "title",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          filter: {
+            per_page: 20,
+            sort: "title",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries).toBeDefined();
     });
 
     it("sorts galleries by created_at DESC", async () => {
-      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        filter: {
-          per_page: 20,
-          sort: "created_at",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          filter: {
+            per_page: 20,
+            sort: "created_at",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries).toBeDefined();
     });
 
     it("sorts galleries by rating DESC", async () => {
-      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        filter: {
-          per_page: 20,
-          sort: "rating",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          filter: {
+            per_page: 20,
+            sort: "rating",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries).toBeDefined();
@@ -636,19 +754,25 @@ describe("Sort Options", () => {
     it("sorts galleries by random with seed", async () => {
       const seed = 55555555;
 
-      const response1 = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -661,57 +785,71 @@ describe("Sort Options", () => {
 
   describe("Group sorting", () => {
     it("sorts groups by name ASC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
 
-      const names = response.data.findGroups.groups.map((g) => g.name.toLowerCase());
+      const names = response.data.findGroups.groups.map((g) =>
+        g.name.toLowerCase()
+      );
       for (let i = 1; i < names.length; i++) {
         expect(names[i] >= names[i - 1]).toBe(true);
       }
     });
 
     it("sorts groups by date DESC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: "date",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: "date",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("sorts groups by rating DESC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: "rating",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: "rating",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
     });
 
     it("sorts groups by created_at DESC", async () => {
-      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: "created_at",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: "created_at",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups).toBeDefined();
@@ -720,19 +858,25 @@ describe("Sort Options", () => {
     it("sorts groups by random with seed", async () => {
       const seed = 66666666;
 
-      const response1 = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response1 = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const response2 = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
-        filter: {
-          per_page: 20,
-          sort: `random_${seed}`,
-        },
-      });
+      const response2 = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          filter: {
+            per_page: 20,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(response1.ok).toBe(true);
       expect(response2.ok).toBe(true);
@@ -745,9 +889,12 @@ describe("Sort Options", () => {
 
   describe("Default sorting behavior", () => {
     it("uses default sort when not specified for scenes", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 20 },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 20 },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -755,9 +902,12 @@ describe("Sort Options", () => {
     });
 
     it("uses default sort when not specified for performers", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 20 },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 20 },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { StudioGrid } from "../../../src/components/grids/index";
 
 describe("StudioGrid", () => {
@@ -36,7 +36,9 @@ describe("StudioGrid", () => {
     const element = StudioGrid({});
     const mockStudio = { id: "1", name: "Test Studio" };
 
-    const renderedCard = element.props.renderItem(mockStudio, 0, { onHideSuccess: () => {} });
+    const renderedCard = element.props.renderItem(mockStudio, 0, {
+      onHideSuccess: () => {},
+    });
 
     expect(renderedCard).toBeDefined();
     expect(renderedCard.props.studio).toEqual(mockStudio);

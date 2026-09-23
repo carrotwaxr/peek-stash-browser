@@ -7,9 +7,11 @@
  * Note: These tests are SKIPPED by default to prevent unintended database modifications.
  * Run with: npm test -- --run services/__tests__/StashSyncService.integration.test.ts
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import dotenv from "dotenv";
 import path from "path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+// Import after mocking
+import { StashClient } from "../../graphql/StashClient.js";
 
 // Load environment variables from project root
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
@@ -113,9 +115,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     $queryRaw: vi.fn(),
   },
 }));
-
-// Import after mocking
-import { StashClient } from "../../graphql/StashClient.js";
 
 describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
   let stash: StashClient;
@@ -399,10 +398,16 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
 describe("StashSyncService Integration Tests - Configuration Check", () => {
   it("should report if Stash configuration is available", () => {
     if (!hasStashConfig) {
-      console.log("Stash integration tests SKIPPED - STASH_URL or STASH_API_KEY not configured");
-      console.log("To run integration tests, set STASH_URL and STASH_API_KEY in .env");
+      console.log(
+        "Stash integration tests SKIPPED - STASH_URL or STASH_API_KEY not configured"
+      );
+      console.log(
+        "To run integration tests, set STASH_URL and STASH_API_KEY in .env"
+      );
     } else {
-      console.log("Stash integration tests RUNNING with configured Stash instance");
+      console.log(
+        "Stash integration tests RUNNING with configured Stash instance"
+      );
     }
     expect(true).toBe(true);
   });

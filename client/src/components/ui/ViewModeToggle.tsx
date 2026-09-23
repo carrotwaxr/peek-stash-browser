@@ -1,6 +1,14 @@
+import { useEffect, useRef, useState } from "react";
 import { type LucideIcon } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList, LucideCalendar, LucideFolderOpen, LucideChevronDown } from "lucide-react";
+import {
+  LucideCalendar,
+  LucideChevronDown,
+  LucideFolderOpen,
+  LucideGrid2X2,
+  LucideList,
+  LucideNetwork,
+  LucideSquare,
+} from "lucide-react";
 
 interface ViewMode {
   id: string;
@@ -39,7 +47,12 @@ const MODE_ICONS = {
  * @param {string} value - Currently selected mode id
  * @param {function} onChange - Called with mode id when selection changes
  */
-const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Props) => {
+const ViewModeToggle = ({
+  modes,
+  value = "grid",
+  onChange,
+  className = "",
+}: Props) => {
   // Local state for immediate visual feedback (optimistic update)
   const [localValue, setLocalValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
@@ -53,14 +66,18 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
 
@@ -80,7 +97,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
 
   const handleSelect = (modeId: string) => {
     setLocalValue(modeId); // Immediate visual feedback
-    onChange(modeId);       // Trigger parent update
+    onChange(modeId); // Trigger parent update
     setIsOpen(false);
   };
 
@@ -88,11 +105,15 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
   const effectiveModes = modes
     ? modes.map((mode) => ({
         ...mode,
-        icon: mode.icon || MODE_ICONS[mode.id as keyof typeof MODE_ICONS] || LucideGrid2X2,
+        icon:
+          mode.icon ||
+          MODE_ICONS[mode.id as keyof typeof MODE_ICONS] ||
+          LucideGrid2X2,
       }))
     : DEFAULT_MODES;
 
-  const currentMode = effectiveModes.find((m) => m.id === localValue) || effectiveModes[0];
+  const currentMode =
+    effectiveModes.find((m) => m.id === localValue) || effectiveModes[0];
   const CurrentIcon = currentMode.icon;
 
   return (
@@ -147,8 +168,12 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }: Pro
                 onClick={() => handleSelect(mode.id)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-[var(--bg-tertiary)] text-left"
                 style={{
-                  color: isSelected ? "var(--accent-primary)" : "var(--text-secondary)",
-                  backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent",
+                  color: isSelected
+                    ? "var(--accent-primary)"
+                    : "var(--text-secondary)",
+                  backgroundColor: isSelected
+                    ? "var(--bg-tertiary)"
+                    : "transparent",
                 }}
                 role="option"
                 aria-selected={isSelected}

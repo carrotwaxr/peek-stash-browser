@@ -1,4 +1,7 @@
-interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+interface Props extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "onChange"
+> {
   checked?: boolean;
   onChange?: (checked: boolean) => void;
   disabled?: boolean;

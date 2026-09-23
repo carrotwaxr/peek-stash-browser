@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -9,8 +14,11 @@ import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { makeCompositeKey } from "../../utils/compositeKey";
 import { canDirectPlayVideo } from "../../utils/videoFormat";
+import { GalleryGrid, GroupGrid } from "../grids/index";
 import PlaylistSidebar from "../playlist/PlaylistSidebar";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   ExternalPlayerButton,
@@ -18,12 +26,9 @@ import {
   RecommendedSidebar,
   ScenesLikeThis,
 } from "../ui/index";
-import { GalleryGrid, GroupGrid } from "../grids/index";
 import PlaybackControls from "../video-player/PlaybackControls";
 import VideoPlayer from "../video-player/VideoPlayer";
-import ViewInStashButton from "../ui/ViewInStashButton";
 import SceneDetails from "./SceneDetails";
-import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation";
 
 // Inner component that reads from context
 const SceneContent = () => {
@@ -39,7 +44,10 @@ const SceneContent = () => {
 
   // Set page title to scene title (with fallback to filename)
   const sceneFiles = scene?.files as Array<Record<string, unknown>> | undefined;
-  const displayTitle = (scene?.title as string) || (sceneFiles?.[0]?.basename as string) || "Scene";
+  const displayTitle =
+    (scene?.title as string) ||
+    (sceneFiles?.[0]?.basename as string) ||
+    "Scene";
   usePageTitle(displayTitle);
 
   // Set initial focus to video player when page loads (excluding back button)
@@ -50,9 +58,10 @@ const SceneContent = () => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
   const [searchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'similar';
+  const activeTab = searchParams.get("tab") || "similar";
   // TAB_COUNT_LOADING means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
-  const [similarScenesCount, setSimilarScenesCount] = useState(TAB_COUNT_LOADING);
+  const [similarScenesCount, setSimilarScenesCount] =
+    useState(TAB_COUNT_LOADING);
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -71,7 +80,7 @@ const SceneContent = () => {
 
   // Seek to timestamp from URL query param (e.g., ?t=120 for 2 minutes)
   useEffect(() => {
-    const startTime = searchParams.get('t');
+    const startTime = searchParams.get("t");
     if (startTime && scene?.id) {
       const seconds = parseInt(startTime, 10);
       if (!isNaN(seconds) && seconds > 0) {
@@ -131,7 +140,8 @@ const SceneContent = () => {
               className="text-xl mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              {(sceneError as { message?: string })?.message || "Scene not found"}
+              {(sceneError as { message?: string })?.message ||
+                "Scene not found"}
             </h2>
             <Button onClick={() => navigate("/scenes")} variant="primary">
               Browse Scenes
@@ -165,7 +175,10 @@ const SceneContent = () => {
               instanceId={scene?.instanceId as string}
               title={displayTitle}
             />
-            <ViewInStashButton stashUrl={(scene?.stashUrl as string) || ""} size={20} />
+            <ViewInStashButton
+              stashUrl={(scene?.stashUrl as string) || ""}
+              size={20}
+            />
           </div>
           <h1
             className="text-2xl font-bold line-clamp-2"
@@ -224,12 +237,28 @@ const SceneContent = () => {
           <div className="mt-6">
             <TabNavigation
               tabs={[
-                { id: 'similar', label: 'Similar Scenes', count: similarScenesCount },
+                {
+                  id: "similar",
+                  label: "Similar Scenes",
+                  count: similarScenesCount,
+                },
                 ...((scene.groups as unknown[])?.length > 0
-                  ? [{ id: 'collections', label: 'Collections', count: (scene.groups as unknown[]).length }]
+                  ? [
+                      {
+                        id: "collections",
+                        label: "Collections",
+                        count: (scene.groups as unknown[]).length,
+                      },
+                    ]
                   : []),
                 ...((scene.galleries as unknown[])?.length > 0
-                  ? [{ id: 'galleries', label: 'Galleries', count: (scene.galleries as unknown[]).length }]
+                  ? [
+                      {
+                        id: "galleries",
+                        label: "Galleries",
+                        count: (scene.galleries as unknown[]).length,
+                      },
+                    ]
                   : []),
               ]}
               defaultTab="similar"
@@ -237,22 +266,30 @@ const SceneContent = () => {
             />
 
             {/* Tab Content */}
-            {activeTab === 'similar' && (
+            {activeTab === "similar" && (
               <div className="mt-6">
-                <ScenesLikeThis sceneId={scene.id as string} onCountChange={setSimilarScenesCount} />
+                <ScenesLikeThis
+                  sceneId={scene.id as string}
+                  onCountChange={setSimilarScenesCount}
+                />
               </div>
             )}
 
-            {activeTab === 'collections' && (
+            {activeTab === "collections" && (
               <div className="mt-6">
                 <GroupGrid
                   lockedFilters={{
                     group_filter: {
                       scenes: {
-                        value: [makeCompositeKey(scene.id as string, scene.instanceId as string)],
-                        modifier: "INCLUDES"
-                      }
-                    }
+                        value: [
+                          makeCompositeKey(
+                            scene.id as string,
+                            scene.instanceId as string
+                          ),
+                        ],
+                        modifier: "INCLUDES",
+                      },
+                    },
                   }}
                   hideLockedFilters
                   emptyMessage="No collections found for this scene"
@@ -260,16 +297,21 @@ const SceneContent = () => {
               </div>
             )}
 
-            {activeTab === 'galleries' && (
+            {activeTab === "galleries" && (
               <div className="mt-6">
                 <GalleryGrid
                   lockedFilters={{
                     gallery_filter: {
                       scenes: {
-                        value: [makeCompositeKey(scene.id as string, scene.instanceId as string)],
-                        modifier: "INCLUDES"
-                      }
-                    }
+                        value: [
+                          makeCompositeKey(
+                            scene.id as string,
+                            scene.instanceId as string
+                          ),
+                        ],
+                        modifier: "INCLUDES",
+                      },
+                    },
                   }}
                   hideLockedFilters
                   emptyMessage="No galleries found for this scene"
@@ -290,7 +332,7 @@ const Scene = () => {
 
   // Extract instance ID from URL query params for multi-instance support
   const searchParams = new URLSearchParams(location.search);
-  const instanceId = searchParams.get('instance');
+  const instanceId = searchParams.get("instance");
 
   // Capture location state in a ref to preserve it across re-renders
   // React Router sometimes loses state on initial render, so we store it once it arrives
@@ -323,15 +365,15 @@ const Scene = () => {
       try {
         const parsed = JSON.parse(storedPlaylist);
         // Verify the current scene is actually in this playlist
-        const sceneInPlaylist = (parsed.scenes as Array<{ sceneId: string }>)?.some(
-          (s: { sceneId: string }) => s.sceneId === sceneId
-        );
+        const sceneInPlaylist = (
+          parsed.scenes as Array<{ sceneId: string }>
+        )?.some((s: { sceneId: string }) => s.sceneId === sceneId);
         if (sceneInPlaylist) {
           playlist = parsed;
           // Update currentIndex to match the current scene
-          const currentIndex = (parsed.scenes as Array<{ sceneId: string }>).findIndex(
-            (s: { sceneId: string }) => s.sceneId === sceneId
-          );
+          const currentIndex = (
+            parsed.scenes as Array<{ sceneId: string }>
+          ).findIndex((s: { sceneId: string }) => s.sceneId === sceneId);
           if (currentIndex >= 0) {
             playlist.currentIndex = currentIndex;
           }

@@ -1,10 +1,17 @@
 // client/src/components/folder/FolderView.jsx
-import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids";
 import { buildFolderTree } from "../../utils/buildFolderTree";
-import FolderCard from "./FolderCard";
 import FolderBreadcrumb from "./FolderBreadcrumb";
+import FolderCard from "./FolderCard";
 import FolderTreeSidebar from "./FolderTreeSidebar";
 
 interface TagItem {
@@ -38,7 +45,7 @@ const FolderView = ({
   loading = false,
   emptyMessage = "No items found",
   onFolderPathChange,
-  filters: _filters = null,  
+  filters: _filters = null,
 }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -53,7 +60,8 @@ const FolderView = ({
 
   // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
   useEffect(() => {
-    const currentTagId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+    const currentTagId =
+      currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
     if (currentTagId !== lastNotifiedTagRef.current) {
       lastNotifiedTagRef.current = currentTagId;
       onFolderPathChange?.(currentTagId);
@@ -75,7 +83,8 @@ const FolderView = ({
         return next;
       });
       // Eagerly notify parent (effect will deduplicate via ref)
-      const currentTagId = newPath.length > 0 ? newPath[newPath.length - 1] : null;
+      const currentTagId =
+        newPath.length > 0 ? newPath[newPath.length - 1] : null;
       lastNotifiedTagRef.current = currentTagId;
       onFolderPathChange?.(currentTagId);
     },
@@ -83,7 +92,11 @@ const FolderView = ({
   );
 
   // Build folder tree from items and tags
-  const { folders, items: leafItems, breadcrumbs } = useMemo(
+  const {
+    folders,
+    items: leafItems,
+    breadcrumbs,
+  } = useMemo(
     () => buildFolderTree(items, tags, currentPath),
     [items, tags, currentPath]
   );

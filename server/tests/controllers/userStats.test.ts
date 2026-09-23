@@ -5,7 +5,12 @@
  * (with default fallback), ranking freshness logic (ensureFreshRankings),
  * and error handling.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getUserStats } from "../../controllers/userStats.js";
+import prisma from "../../prisma/singleton.js";
+import rankingComputeService from "../../services/RankingComputeService.js";
+import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/UserStatsAggregationService.js", () => ({
@@ -31,12 +36,6 @@ vi.mock("../../prisma/singleton.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-
-import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
-import rankingComputeService from "../../services/RankingComputeService.js";
-import prisma from "../../prisma/singleton.js";
-import { getUserStats } from "../../controllers/userStats.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockStatsService = vi.mocked(userStatsAggregationService);
 const mockRankingService = vi.mocked(rankingComputeService);
@@ -199,7 +198,9 @@ describe("UserStats Controller", () => {
 
   describe("error handling", () => {
     it("returns 500 when the stats service throws", async () => {
-      mockStatsService.getUserStats.mockRejectedValue(new Error("Service failure"));
+      mockStatsService.getUserStats.mockRejectedValue(
+        new Error("Service failure")
+      );
 
       const req = mockReq({}, {}, USER, {});
       const res = mockRes();

@@ -9,7 +9,9 @@
  * Parse a JSON-encoded array column from SQLite.
  * Returns empty array if the value is null or invalid JSON.
  */
-export function parseJsonArray<T = string>(json: string | null | undefined): T[] {
+export function parseJsonArray<T = string>(
+  json: string | null | undefined
+): T[] {
   if (!json) return [];
   try {
     const parsed: unknown = JSON.parse(json);

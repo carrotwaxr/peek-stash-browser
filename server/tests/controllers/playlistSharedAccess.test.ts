@@ -4,7 +4,11 @@
  * Issue #415: Users with shared access should be able to add scenes
  * to playlists shared with them.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { addSceneToPlaylist } from "../../controllers/playlist.js";
+import prisma from "../../prisma/singleton.js";
+import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -50,11 +54,6 @@ vi.mock("../../services/PermissionService.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
-import { addSceneToPlaylist } from "../../controllers/playlist.js";
-import type { Request, Response } from "express";
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
@@ -139,8 +138,7 @@ describe("addSceneToPlaylist - shared access", () => {
       body: { sceneId: "scene-123" },
       user: { id: 3, username: "stranger", role: "USER" },
     });
-    const { json, status, responseJson, responseStatus } =
-      createMockResponse();
+    const { json, status, responseJson, responseStatus } = createMockResponse();
     const mockRes = { json, status } as unknown as Response;
 
     await addSceneToPlaylist(mockReq as any, mockRes as any);

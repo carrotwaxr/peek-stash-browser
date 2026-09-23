@@ -5,7 +5,20 @@
  * group, image). Covers input validation, auth checks, Prisma upsert logic,
  * sync-to-Stash policy per entity type, and error handling.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  updateGalleryRating,
+  updateGroupRating,
+  updateImageRating,
+  updatePerformerRating,
+  updateSceneRating,
+  updateStudioRating,
+  updateTagRating,
+} from "../../controllers/ratings.js";
+import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -37,20 +50,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 vi.mock("../../utils/entityInstanceId.js", () => ({
   getEntityInstanceId: vi.fn().mockResolvedValue("instance-1"),
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import {
-  updateSceneRating,
-  updatePerformerRating,
-  updateStudioRating,
-  updateTagRating,
-  updateGalleryRating,
-  updateGroupRating,
-  updateImageRating,
-} from "../../controllers/ratings.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
@@ -263,9 +262,18 @@ describe("Ratings Controller", () => {
     });
 
     it("returns success with upserted record", async () => {
-      const upsertResult = { id: 1, instanceId: "instance-1", rating: 85, favorite: true };
+      const upsertResult = {
+        id: 1,
+        instanceId: "instance-1",
+        rating: 85,
+        favorite: true,
+      };
       mockPrisma.sceneRating.upsert.mockResolvedValue(upsertResult as any);
-      const req = mockReq({ rating: 85, favorite: true }, { sceneId: "1" }, USER);
+      const req = mockReq(
+        { rating: 85, favorite: true },
+        { sceneId: "1" },
+        USER
+      );
       const res = mockRes();
       await updateSceneRating(req, res);
 
@@ -289,12 +297,16 @@ describe("Ratings Controller", () => {
     };
 
     beforeEach(() => {
-      mockPrisma.user.findUnique.mockResolvedValue({ syncToStash: true } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        syncToStash: true,
+      } as any);
       mockInstanceManager.getForSync.mockReturnValue(mockStash as any);
     });
 
     it("does not sync when syncToStash is disabled", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ syncToStash: false } as any);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        syncToStash: false,
+      } as any);
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
@@ -353,7 +365,9 @@ describe("Ratings Controller", () => {
     // Performer: syncs both rating AND favorite
     describe("performer sync policy", () => {
       beforeEach(() => {
-        mockPrisma.performerRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.performerRating.upsert.mockResolvedValue(
+          UPSERT_RESULT as any
+        );
       });
 
       it("syncs rating to Stash", async () => {
@@ -377,7 +391,11 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite together", async () => {
-        const req = mockReq({ rating: 95, favorite: true }, { performerId: "10" }, USER);
+        const req = mockReq(
+          { rating: 95, favorite: true },
+          { performerId: "10" },
+          USER
+        );
         const res = mockRes();
         await updatePerformerRating(req, res);
 
@@ -394,7 +412,11 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite", async () => {
-        const req = mockReq({ rating: 80, favorite: true }, { studioId: "5" }, USER);
+        const req = mockReq(
+          { rating: 80, favorite: true },
+          { studioId: "5" },
+          USER
+        );
         const res = mockRes();
         await updateStudioRating(req, res);
 

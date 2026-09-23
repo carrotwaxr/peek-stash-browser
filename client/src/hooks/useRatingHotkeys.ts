@@ -43,7 +43,9 @@ export const useRatingHotkeys = ({
   setRating: (rating: any) => void;
   toggleFavorite?: (() => void) | null;
 }) => {
-  const ratingModeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ratingModeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const inRatingModeRef = useRef(false);
 
   // Map of number keys to rating values (1-5 = 20/40/60/80/100, 0 = null)

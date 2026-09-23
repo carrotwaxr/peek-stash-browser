@@ -420,7 +420,10 @@ export interface UnhideEntityParams extends Record<string, string> {
   entityId: string;
 }
 
-export interface UnhideEntityQuery extends Record<string, string | string[] | undefined> {
+export interface UnhideEntityQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   instanceId?: string;
 }
 
@@ -430,7 +433,10 @@ export interface UnhideEntityResponse {
 }
 
 /** DELETE /api/user/hidden-entities */
-export interface UnhideAllEntitiesQuery extends Record<string, string | string[] | undefined> {
+export interface UnhideAllEntitiesQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   entityType?: string;
 }
 
@@ -441,7 +447,10 @@ export interface UnhideAllEntitiesResponse {
 }
 
 /** GET /api/user/hidden-entities */
-export interface GetHiddenEntitiesQuery extends Record<string, string | string[] | undefined> {
+export interface GetHiddenEntitiesQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   entityType?: string;
 }
 
@@ -525,7 +534,10 @@ export interface AdminResetPasswordResponse {
 }
 
 /** POST /api/users/:userId/regenerate-recovery-key */
-export interface AdminRegenerateRecoveryKeyParams extends Record<string, string> {
+export interface AdminRegenerateRecoveryKeyParams extends Record<
+  string,
+  string
+> {
   userId: string;
 }
 

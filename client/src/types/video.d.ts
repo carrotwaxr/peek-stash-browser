@@ -58,7 +58,10 @@ declare module "crypto-js" {
 
 declare module "videojs-vtt.js" {
   export const WebVTT: {
-    Parser: new (window: Window, decoder: any) => {
+    Parser: new (
+      window: Window,
+      decoder: any
+    ) => {
       oncue: ((cue: any) => void) | null;
       parse(data: any): void;
       flush(): void;

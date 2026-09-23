@@ -45,7 +45,10 @@ const FolderCard = ({ folder, onClick, className = "" }: Props) => {
             style={{ backgroundColor: "var(--bg-tertiary)" }}
           >
             {isUntagged ? (
-              <ENTITY_ICONS.tag size={48} style={{ color: "var(--text-tertiary)" }} />
+              <ENTITY_ICONS.tag
+                size={48}
+                style={{ color: "var(--text-tertiary)" }}
+              />
             ) : (
               <Folder size={48} style={{ color: "var(--text-tertiary)" }} />
             )}

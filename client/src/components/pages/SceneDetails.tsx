@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { NormalizedScene } from "@peek/shared-types";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { getClipsForScene } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getClipsForScene } from "../../api";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import { formatBitRate, formatFileSize } from "../../utils/format";
 import ClipList from "../clips/ClipList";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
-import { formatBitRate, formatFileSize } from "../../utils/format";
-import { getEntityPath } from "../../utils/entityLinks";
 
 interface SceneDetailsProps {
   showDetails: boolean;
@@ -75,7 +75,11 @@ const SceneDetails = ({
       if (!scene?.id) return;
       setClipsLoading(true);
       try {
-        const response = await getClipsForScene(scene.id, scene.instanceId, true) as { clips?: Record<string, unknown>[] };
+        const response = (await getClipsForScene(
+          scene.id,
+          scene.instanceId,
+          true
+        )) as { clips?: Record<string, unknown>[] };
         setClips(response.clips || []);
       } catch (err) {
         console.error("Failed to fetch clips", err);
@@ -141,7 +145,11 @@ const SceneDetails = ({
                         Studio
                       </h3>
                       <Link
-                        to={getEntityPath('studio', scene.studio, hasMultipleInstances)}
+                        to={getEntityPath(
+                          "studio",
+                          scene.studio,
+                          hasMultipleInstances
+                        )}
                         className="text-base hover:underline hover:text-blue-400"
                         style={{ color: "var(--text-primary)" }}
                       >
@@ -235,7 +243,11 @@ const SceneDetails = ({
                       {scene.performers.map((performer) => (
                         <Link
                           key={performer.id}
-                          to={getEntityPath('performer', performer, hasMultipleInstances)}
+                          to={getEntityPath(
+                            "performer",
+                            performer,
+                            hasMultipleInstances
+                          )}
                           className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                         >
                           <LazyThumbnail
@@ -272,7 +284,9 @@ const SceneDetails = ({
                 return allTags.length > 0 ? (
                   <TagChips tags={allTags} />
                 ) : (
-                  <p style={{ color: "var(--text-muted)" }}>No tags for this scene</p>
+                  <p style={{ color: "var(--text-muted)" }}>
+                    No tags for this scene
+                  </p>
                 );
               })()}
             </Paper.Body>
@@ -307,8 +321,14 @@ const SceneDetails = ({
               {showClips && (
                 <Paper.Body>
                   <ClipList
-                    clips={clips as unknown as import("../cards/ClipCard").Clip[]}
-                    onClipClick={handleClipClick as (clip: import("../cards/ClipCard").Clip) => void}
+                    clips={
+                      clips as unknown as import("../cards/ClipCard").Clip[]
+                    }
+                    onClipClick={
+                      handleClipClick as (
+                        clip: import("../cards/ClipCard").Clip
+                      ) => void
+                    }
                     loading={clipsLoading}
                   />
                 </Paper.Body>
@@ -462,7 +482,9 @@ const SceneDetails = ({
                             className="font-medium"
                             style={{ color: "var(--text-primary)" }}
                           >
-                            {firstFile.size ? formatFileSize(firstFile.size) : "Unknown"}
+                            {firstFile.size
+                              ? formatFileSize(firstFile.size)
+                              : "Unknown"}
                           </span>
                         </div>
                       </div>

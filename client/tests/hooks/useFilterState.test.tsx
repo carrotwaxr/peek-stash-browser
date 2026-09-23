@@ -1,15 +1,14 @@
 // tests/hooks/useFilterState.test.jsx
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiGet } from "../../src/api";
 import { useFilterState } from "../../src/hooks/useFilterState";
 
 // Mock the API
 vi.mock("../../src/api", () => ({
   apiGet: vi.fn(),
 }));
-
-import { apiGet } from "../../src/api";
 
 const createWrapper = (initialEntries = ["/"]) => {
   return ({ children }: { children: React.ReactNode }) => (
@@ -27,10 +26,11 @@ describe("useFilterState", () => {
   describe("initialization", () => {
     it("initializes with default values when URL is empty", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          initialSort: "o_counter",
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            initialSort: "o_counter",
+          }),
         { wrapper: createWrapper(["/"]) }
       );
 
@@ -47,13 +47,12 @@ describe("useFilterState", () => {
 
     it("parses filters from URL on mount", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          initialSort: "o_counter",
-          filterOptions: [
-            { key: "favorite", type: "checkbox" },
-          ],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            initialSort: "o_counter",
+            filterOptions: [{ key: "favorite", type: "checkbox" }],
+          }),
         { wrapper: createWrapper(["/?favorite=true&sort=rating&page=2"]) }
       );
 
@@ -73,7 +72,14 @@ describe("useFilterState", () => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {
-              scene: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: { favorite: true } }],
+              scene: [
+                {
+                  id: "preset-1",
+                  sort: "rating",
+                  direction: "ASC",
+                  filters: { favorite: true },
+                },
+              ],
             },
           });
         }
@@ -83,11 +89,12 @@ describe("useFilterState", () => {
       });
 
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          initialSort: "o_counter",
-          filterOptions: [{ key: "favorite", type: "checkbox" }],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            initialSort: "o_counter",
+            filterOptions: [{ key: "favorite", type: "checkbox" }],
+          }),
         { wrapper: createWrapper(["/"]) } // No URL params
       );
 
@@ -106,7 +113,14 @@ describe("useFilterState", () => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {
-              performer: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: { favorite: true } }],
+              performer: [
+                {
+                  id: "preset-1",
+                  sort: "rating",
+                  direction: "ASC",
+                  filters: { favorite: true },
+                },
+              ],
             },
           });
         }
@@ -116,14 +130,15 @@ describe("useFilterState", () => {
       });
 
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "performer",
-          initialSort: "o_counter",
-          filterOptions: [
-            { key: "favorite", type: "checkbox" },
-            { key: "sceneId", type: "searchable-select" },
-          ],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "performer",
+            initialSort: "o_counter",
+            filterOptions: [
+              { key: "favorite", type: "checkbox" },
+              { key: "sceneId", type: "searchable-select" },
+            ],
+          }),
         { wrapper: createWrapper(["/?sceneId=123"]) } // Has filter params
       );
 
@@ -144,7 +159,14 @@ describe("useFilterState", () => {
         if (url === "/user/filter-presets") {
           return Promise.resolve({
             presets: {
-              scene: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: {} }],
+              scene: [
+                {
+                  id: "preset-1",
+                  sort: "rating",
+                  direction: "ASC",
+                  filters: {},
+                },
+              ],
             },
           });
         }
@@ -154,11 +176,12 @@ describe("useFilterState", () => {
       });
 
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          initialSort: "o_counter",
-          filterOptions: [],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            initialSort: "o_counter",
+            filterOptions: [],
+          }),
         { wrapper: createWrapper(["/?sort=date&dir=DESC"]) }
       );
 
@@ -206,10 +229,11 @@ describe("useFilterState", () => {
 
     it("setFilter updates filters and resets page to 1", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          filterOptions: [{ key: "favorite", type: "checkbox" }],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            filterOptions: [{ key: "favorite", type: "checkbox" }],
+          }),
         { wrapper: createWrapper(["/?page=3"]) }
       );
 
@@ -225,10 +249,11 @@ describe("useFilterState", () => {
 
     it("removeFilter removes filter and resets page to 1", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          filterOptions: [{ key: "favorite", type: "checkbox" }],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            filterOptions: [{ key: "favorite", type: "checkbox" }],
+          }),
         { wrapper: createWrapper(["/?favorite=true&page=3"]) }
       );
 
@@ -244,14 +269,15 @@ describe("useFilterState", () => {
 
     it("clearFilters resets all filters but keeps permanent filters", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          permanentFilters: { studioId: "456" },
-          filterOptions: [
-            { key: "favorite", type: "checkbox" },
-            { key: "studioId", type: "searchable-select" },
-          ],
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            permanentFilters: { studioId: "456" },
+            filterOptions: [
+              { key: "favorite", type: "checkbox" },
+              { key: "studioId", type: "searchable-select" },
+            ],
+          }),
         { wrapper: createWrapper(["/?favorite=true"]) }
       );
 
@@ -277,11 +303,12 @@ describe("useFilterState", () => {
 
     it("debounces search text URL updates by 500ms", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          filterOptions: [],
-          syncToUrl: true,
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            filterOptions: [],
+            syncToUrl: true,
+          }),
         { wrapper: createWrapper(["/"]) }
       );
 
@@ -324,11 +351,12 @@ describe("useFilterState", () => {
 
     it("clears pending debounce when typing continues", async () => {
       const { result } = renderHook(
-        () => useFilterState({
-          artifactType: "scene",
-          filterOptions: [],
-          syncToUrl: true,
-        }),
+        () =>
+          useFilterState({
+            artifactType: "scene",
+            filterOptions: [],
+            syncToUrl: true,
+          }),
         { wrapper: createWrapper(["/"]) }
       );
 

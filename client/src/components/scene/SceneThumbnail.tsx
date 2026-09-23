@@ -1,8 +1,5 @@
 import type { NormalizedScene, WatchHistoryData } from "@peek/shared-types";
-import {
-  formatDurationCompact,
-  formatResolution,
-} from "../../utils/format";
+import { formatDurationCompact, formatResolution } from "../../utils/format";
 import { SceneCardPreview } from "../ui/index";
 
 interface Props {

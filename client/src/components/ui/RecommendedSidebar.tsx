@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { apiGet } from "../../api";
-import { getSceneTitle } from "../../utils/format";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
+import { getSceneTitle } from "../../utils/format";
 import { useLazyLoad } from "./CardComponents";
-import type { NormalizedScene } from "@peek/shared-types";
 
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar
@@ -31,9 +31,9 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
         setLoading(true);
         setError(null);
 
-        const data = await apiGet(
-          `/library/scenes/${sceneId}/similar?page=1`,
-        ) as { scenes: NormalizedScene[] };
+        const data = (await apiGet(
+          `/library/scenes/${sceneId}/similar?page=1`
+        )) as { scenes: NormalizedScene[] };
 
         // Only take first 12 scenes for sidebar
         setScenes(data.scenes.slice(0, 12));
@@ -52,12 +52,19 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
 
   const handleSceneClick = (scene: NormalizedScene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
-    navigate(getEntityPath('scene', scene as unknown as Parameters<typeof getEntityPath>[1], hasMultipleInstances), {
-      state: {
-        scene,
-        fromPageTitle: "Recommended",
-      },
-    });
+    navigate(
+      getEntityPath(
+        "scene",
+        scene as unknown as Parameters<typeof getEntityPath>[1],
+        hasMultipleInstances
+      ),
+      {
+        state: {
+          scene,
+          fromPageTitle: "Recommended",
+        },
+      }
+    );
     return true; // Prevent fallback navigation in SceneCard
   };
 
@@ -196,8 +203,15 @@ interface SidebarThumbnailProps {
   duration: number | null | undefined;
 }
 
-const SidebarThumbnail = ({ thumbnail, alt, duration }: SidebarThumbnailProps) => {
-  const [ref, shouldLoad] = useLazyLoad() as [React.RefObject<HTMLDivElement>, boolean];
+const SidebarThumbnail = ({
+  thumbnail,
+  alt,
+  duration,
+}: SidebarThumbnailProps) => {
+  const [ref, shouldLoad] = useLazyLoad() as [
+    React.RefObject<HTMLDivElement>,
+    boolean,
+  ];
 
   return (
     <div
@@ -210,17 +224,10 @@ const SidebarThumbnail = ({ thumbnail, alt, duration }: SidebarThumbnailProps) =
       }}
     >
       {shouldLoad && thumbnail ? (
-        <img
-          src={thumbnail}
-          alt={alt}
-          className="w-full h-full object-cover"
-        />
+        <img src={thumbnail} alt={alt} className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <span
-            className="text-2xl"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <span className="text-2xl" style={{ color: "var(--text-secondary)" }}>
             🎬
           </span>
         </div>

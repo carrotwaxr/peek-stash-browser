@@ -104,21 +104,23 @@ export async function setup() {
   // Initialize the StashInstanceManager - loads Stash config from DB
   // This MUST happen after testSetup creates the Stash instance
   console.log("[Integration Tests] Initializing Stash instance manager...");
-  const { stashInstanceManager } = await import(
-    "../../services/StashInstanceManager.js"
-  );
+  const { stashInstanceManager } =
+    await import("../../services/StashInstanceManager.js");
   await stashInstanceManager.initialize();
 
   // Initialize the cache - starts sync scheduler
   // On subsequent runs, this will do an incremental sync (fast)
   // The initial full sync was done by testSetup on first run
-  console.log("[Integration Tests] Initializing cache (starting sync scheduler)...");
+  console.log(
+    "[Integration Tests] Initializing cache (starting sync scheduler)..."
+  );
   const { initializeCache } = await import("../../initializers/cache.js");
   await initializeCache();
 
   // Wait for any ongoing sync to complete before running tests
   console.log("[Integration Tests] Waiting for sync to complete...");
-  const { stashSyncService } = await import("../../services/StashSyncService.js");
+  const { stashSyncService } =
+    await import("../../services/StashSyncService.js");
   let attempts = 0;
   while (stashSyncService.isSyncing() && attempts < 120) {
     await new Promise((r) => setTimeout(r, 2000));
@@ -151,7 +153,10 @@ export async function setup() {
     const { default: prisma } = await import("../../prisma/singleton.js");
     const originalStderrWrite = process.stderr.write.bind(process.stderr);
     const teardownLog: string[] = [];
-    process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
+    process.stderr.write = ((
+      chunk: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
       teardownLog.push(String(chunk));
       return true;
     }) as typeof process.stderr.write;
@@ -176,10 +181,7 @@ export async function setup() {
   };
 }
 
-async function waitForServer(
-  maxAttempts = 30,
-  delayMs = 500
-): Promise<void> {
+async function waitForServer(maxAttempts = 30, delayMs = 500): Promise<void> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const response = await fetch(`${TEST_CONFIG.baseUrl}/api/health`);

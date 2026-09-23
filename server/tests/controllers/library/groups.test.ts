@@ -5,7 +5,19 @@
  * Note: mergeGroupsWithUserData is private and tested indirectly
  * through findGroupsMinimal.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyGroupFilters,
+  findGroups,
+  findGroupsMinimal,
+} from "../../../controllers/library/groups.js";
+// --- Imports ---
+
+import prisma from "../../../prisma/singleton.js";
+import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -59,9 +71,10 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi
-    .fn()
-    .mockImplementation((field) => ({ sortField: field, randomSeed: undefined })),
+  parseRandomSort: vi.fn().mockImplementation((field) => ({
+    sortField: field,
+    randomSeed: undefined,
+  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
@@ -69,19 +82,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     .fn()
     .mockImplementation((_type, id) => `http://stash/groups/${id}`),
 }));
-
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
-import {
-  applyGroupFilters,
-  findGroups,
-  findGroupsMinimal,
-} from "../../../controllers/library/groups.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
-import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -277,11 +277,7 @@ describe("Groups Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, group_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, group_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findGroups(req, res);
@@ -317,9 +313,7 @@ describe("Groups Controller", () => {
     });
 
     it("returns 500 when query builder throws", async () => {
-      mockGroupQueryBuilder.execute.mockRejectedValue(
-        new Error("DB error")
-      );
+      mockGroupQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = mockReq({ filter: {} }, {}, defaultUser);
       const res = mockRes();
@@ -365,19 +359,13 @@ describe("Groups Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, group_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, group_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findGroups(req, res);
 
       const body = res._getBody();
-      expect(body.findGroups.groups[0].stashUrl).toBe(
-        "http://stash/groups/g1"
-      );
+      expect(body.findGroups.groups[0].stashUrl).toBe("http://stash/groups/g1");
     });
   });
 

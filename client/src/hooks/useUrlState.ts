@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 /**
@@ -15,7 +15,10 @@ interface UseUrlStateOptions {
   ignoreKeys?: string[];
 }
 
-export const useUrlState = ({ defaults = {}, ignoreKeys = [] }: UseUrlStateOptions = {}) => {
+export const useUrlState = ({
+  defaults = {},
+  ignoreKeys = [],
+}: UseUrlStateOptions = {}) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
   const hadUrlParamsRef = useRef(false);
@@ -36,7 +39,9 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] }: UseUrlStateOptio
     return parsed;
   };
 
-  const [values, setValuesState] = useState<Record<string, string | null | undefined>>(() => {
+  const [values, setValuesState] = useState<
+    Record<string, string | null | undefined>
+  >(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
       return getInitialValues();
@@ -44,47 +49,66 @@ export const useUrlState = ({ defaults = {}, ignoreKeys = [] }: UseUrlStateOptio
     return {};
   });
 
-  const setValue = useCallback((key: string, value: string | null | undefined, options: { replace?: boolean } = {}) => {
-    const { replace = false } = options;
+  const setValue = useCallback(
+    (
+      key: string,
+      value: string | null | undefined,
+      options: { replace?: boolean } = {}
+    ) => {
+      const { replace = false } = options;
 
-    // Update internal state
-    setValuesState((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+      // Update internal state
+      setValuesState((prev) => ({
+        ...prev,
+        [key]: value,
+      }));
 
-    // Update URL silently
-    setSearchParams((prevParams) => {
-      const newParams = new URLSearchParams(prevParams);
-      if (value === null || value === undefined || value === "") {
-        newParams.delete(key);
-      } else {
-        newParams.set(key, String(value));
-      }
-      return newParams;
-    }, { replace });
-  }, [setSearchParams]);
+      // Update URL silently
+      setSearchParams(
+        (prevParams) => {
+          const newParams = new URLSearchParams(prevParams);
+          if (value === null || value === undefined || value === "") {
+            newParams.delete(key);
+          } else {
+            newParams.set(key, String(value));
+          }
+          return newParams;
+        },
+        { replace }
+      );
+    },
+    [setSearchParams]
+  );
 
-  const setValues = useCallback((updates: Record<string, string | null | undefined>, options: { replace?: boolean } = {}) => {
-    const { replace = false } = options;
+  const setValues = useCallback(
+    (
+      updates: Record<string, string | null | undefined>,
+      options: { replace?: boolean } = {}
+    ) => {
+      const { replace = false } = options;
 
-    setValuesState((prev) => ({
-      ...prev,
-      ...updates,
-    }));
+      setValuesState((prev) => ({
+        ...prev,
+        ...updates,
+      }));
 
-    setSearchParams((prevParams) => {
-      const newParams = new URLSearchParams(prevParams);
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === "") {
-          newParams.delete(key);
-        } else {
-          newParams.set(key, String(value));
-        }
-      });
-      return newParams;
-    }, { replace });
-  }, [setSearchParams]);
+      setSearchParams(
+        (prevParams) => {
+          const newParams = new URLSearchParams(prevParams);
+          Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === undefined || value === "") {
+              newParams.delete(key);
+            } else {
+              newParams.set(key, String(value));
+            }
+          });
+          return newParams;
+        },
+        { replace }
+      );
+    },
+    [setSearchParams]
+  );
 
   return {
     values,

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TestClient, adminClient } from "../helpers/testClient.js";
 
 describe("Authentication API Integration Tests", () => {
   beforeAll(async () => {
@@ -55,21 +55,30 @@ describe("Authentication API Integration Tests", () => {
       const client = new TestClient();
 
       // Missing both
-      const response1 = await client.post<{ error: string }>("/api/auth/login", {});
+      const response1 = await client.post<{ error: string }>(
+        "/api/auth/login",
+        {}
+      );
       expect(response1.status).toBe(400);
       expect(response1.data.error).toBe("Username and password are required");
 
       // Missing password
-      const response2 = await client.post<{ error: string }>("/api/auth/login", {
-        username: TEST_ADMIN.username,
-      });
+      const response2 = await client.post<{ error: string }>(
+        "/api/auth/login",
+        {
+          username: TEST_ADMIN.username,
+        }
+      );
       expect(response2.status).toBe(400);
       expect(response2.data.error).toBe("Username and password are required");
 
       // Missing username
-      const response3 = await client.post<{ error: string }>("/api/auth/login", {
-        password: TEST_ADMIN.password,
-      });
+      const response3 = await client.post<{ error: string }>(
+        "/api/auth/login",
+        {
+          password: TEST_ADMIN.password,
+        }
+      );
       expect(response3.status).toBe(400);
       expect(response3.data.error).toBe("Username and password are required");
     });
@@ -127,7 +136,9 @@ describe("Authentication API Integration Tests", () => {
       await client.login(TEST_ADMIN.username, TEST_ADMIN.password);
 
       // Verify we're logged in
-      const checkBefore = await client.get<{ authenticated: boolean }>("/api/auth/check");
+      const checkBefore = await client.get<{ authenticated: boolean }>(
+        "/api/auth/check"
+      );
       expect(checkBefore.ok).toBe(true);
 
       // Logout

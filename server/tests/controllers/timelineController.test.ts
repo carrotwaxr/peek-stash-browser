@@ -1,5 +1,7 @@
 // server/tests/controllers/timelineController.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getDateDistribution } from "../../controllers/timelineController.js";
+import { timelineService } from "../../services/TimelineService.js";
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -20,9 +22,6 @@ vi.mock("../../services/TimelineService.js", () => ({
   },
 }));
 
-import { getDateDistribution } from "../../controllers/timelineController.js";
-import { timelineService } from "../../services/TimelineService.js";
-
 describe("timelineController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,7 +33,9 @@ describe("timelineController", () => {
         { period: "2024-01", count: 47 },
         { period: "2024-02", count: 12 },
       ];
-      vi.mocked(timelineService.getDistribution).mockResolvedValue(mockDistribution);
+      vi.mocked(timelineService.getDistribution).mockResolvedValue(
+        mockDistribution
+      );
 
       const req = {
         params: { entityType: "scene" },
@@ -49,7 +50,12 @@ describe("timelineController", () => {
 
       await getDateDistribution(req, res);
 
-      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months", undefined);
+      expect(timelineService.getDistribution).toHaveBeenCalledWith(
+        "scene",
+        1,
+        "months",
+        undefined
+      );
       expect(res.json).toHaveBeenCalledWith({ distribution: mockDistribution });
     });
 
@@ -69,7 +75,12 @@ describe("timelineController", () => {
 
       await getDateDistribution(req, res);
 
-      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months", undefined);
+      expect(timelineService.getDistribution).toHaveBeenCalledWith(
+        "scene",
+        1,
+        "months",
+        undefined
+      );
     });
 
     it("returns 400 for invalid entity type", async () => {
@@ -127,7 +138,9 @@ describe("timelineController", () => {
       await getDateDistribution(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: "Failed to fetch date distribution" });
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Failed to fetch date distribution",
+      });
     });
   });
 });

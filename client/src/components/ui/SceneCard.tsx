@@ -1,20 +1,20 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTVMode } from "../../hooks/useTVMode";
+import type { NormalizedScene } from "@peek/shared-types";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
+import { useTVMode } from "../../hooks/useTVMode";
+import { formatRelativeTime } from "../../utils/date";
+import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
 import {
   formatDurationCompact,
   formatResolution,
   getSceneDescription,
   getSceneTitle,
 } from "../../utils/format";
-import { formatRelativeTime } from "../../utils/date";
-import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
 import BaseCard from "./BaseCard";
 import { SceneCardPreview, TooltipEntityGrid } from "./index";
-import type { NormalizedScene } from "@peek/shared-types";
 
 interface Props {
   scene: NormalizedScene;
@@ -46,7 +46,10 @@ interface Props {
  * @param {boolean} options.showStudio - Whether to show studio name in subtitle
  * @param {boolean} options.showDate - Whether to show date in subtitle
  */
-const buildSceneSubtitle = (scene: NormalizedScene, { showCodeOnCard = true, showStudio = true, showDate = true } = {}) => {
+const buildSceneSubtitle = (
+  scene: NormalizedScene,
+  { showCodeOnCard = true, showStudio = true, showDate = true } = {}
+) => {
   const parts = [];
 
   if (showStudio && scene.studio) {
@@ -64,7 +67,7 @@ const buildSceneSubtitle = (scene: NormalizedScene, { showCodeOnCard = true, sho
     }
   }
 
-  return parts.length > 0 ? parts.join(' • ') : null;
+  return parts.length > 0 ? parts.join(" • ") : null;
 };
 
 /**
@@ -74,11 +77,15 @@ const computeAllTags = (scene: NormalizedScene) => {
   const tagMap = new Map<string, { id: string; name: string }>();
 
   if (scene.tags) {
-    scene.tags.forEach((tag: { id: string; name: string }) => tagMap.set(tag.id, tag));
+    scene.tags.forEach((tag: { id: string; name: string }) =>
+      tagMap.set(tag.id, tag)
+    );
   }
 
   if (scene.inheritedTags) {
-    scene.inheritedTags.forEach((tag: { id: string; name: string }) => tagMap.set(tag.id, tag));
+    scene.inheritedTags.forEach((tag: { id: string; name: string }) =>
+      tagMap.set(tag.id, tag)
+    );
   }
 
   return Array.from(tagMap.values());
@@ -133,7 +140,8 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
 
     // Build indicators using centralized config
     const indicators = useMemo(() => {
-      const performersTooltip = getIndicatorBehavior('scene', 'performers') === 'rich' &&
+      const performersTooltip = getIndicatorBehavior("scene", "performers") ===
+        "rich" &&
         scene.performers?.length > 0 && (
           <TooltipEntityGrid
             entityType="performer"
@@ -143,7 +151,8 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
-      const groupsTooltip = getIndicatorBehavior('scene', 'groups') === 'rich' &&
+      const groupsTooltip = getIndicatorBehavior("scene", "groups") ===
+        "rich" &&
         scene.groups?.length > 0 && (
           <TooltipEntityGrid
             entityType="group"
@@ -153,7 +162,7 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
-      const tagsTooltip = getIndicatorBehavior('scene', 'tags') === 'rich' &&
+      const tagsTooltip = getIndicatorBehavior("scene", "tags") === "rich" &&
         allTags?.length > 0 && (
           <TooltipEntityGrid
             entityType="tag"
@@ -163,11 +172,18 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           />
         );
 
-      const galleriesTooltip = getIndicatorBehavior('scene', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior("scene", "galleries") ===
+        "rich" &&
         scene.galleries?.length > 0 && (
           <TooltipEntityGrid
             entityType="gallery"
-            entities={scene.galleries as unknown as Array<{ id: string; name?: string; title?: string }>}
+            entities={
+              scene.galleries as unknown as Array<{
+                id: string;
+                name?: string;
+                title?: string;
+              }>
+            }
             title="Galleries"
             parentInstanceId={scene.instanceId}
           />
@@ -184,39 +200,77 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
           count: scene.performers?.length,
           tooltipContent: performersTooltip,
           // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
-          onClick: getIndicatorBehavior('scene', 'performers') === 'nav' && scene.performers?.length > 0
-            ? () => navigate(appendInstanceParam(`/performers?sceneId=${scene.id}`, scene, hasMultipleInstances))
-            : undefined,
+          onClick:
+            getIndicatorBehavior("scene", "performers") === "nav" &&
+            scene.performers?.length > 0
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/performers?sceneId=${scene.id}`,
+                      scene,
+                      hasMultipleInstances
+                    )
+                  )
+              : undefined,
         },
         {
           type: "GROUPS",
           count: scene.groups?.length,
           tooltipContent: groupsTooltip,
-          onClick: getIndicatorBehavior('scene', 'groups') === 'nav' && scene.groups?.length > 0
-            ? () => navigate(appendInstanceParam(`/collections?sceneId=${scene.id}`, scene, hasMultipleInstances))
-            : undefined,
+          onClick:
+            getIndicatorBehavior("scene", "groups") === "nav" &&
+            scene.groups?.length > 0
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/collections?sceneId=${scene.id}`,
+                      scene,
+                      hasMultipleInstances
+                    )
+                  )
+              : undefined,
         },
         {
           type: "GALLERIES",
           count: scene.galleries?.length,
           tooltipContent: galleriesTooltip,
-          onClick: getIndicatorBehavior('scene', 'galleries') === 'nav' && scene.galleries?.length > 0
-            ? () => navigate(appendInstanceParam(`/galleries?sceneId=${scene.id}`, scene, hasMultipleInstances))
-            : undefined,
+          onClick:
+            getIndicatorBehavior("scene", "galleries") === "nav" &&
+            scene.galleries?.length > 0
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/galleries?sceneId=${scene.id}`,
+                      scene,
+                      hasMultipleInstances
+                    )
+                  )
+              : undefined,
         },
         {
           type: "TAGS",
           count: allTags?.length,
           tooltipContent: tagsTooltip,
-          onClick: getIndicatorBehavior('scene', 'tags') === 'nav' && allTags?.length > 0
-            ? () => navigate(appendInstanceParam(`/tags?sceneId=${scene.id}`, scene, hasMultipleInstances))
-            : undefined,
+          onClick:
+            getIndicatorBehavior("scene", "tags") === "nav" &&
+            allTags?.length > 0
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/tags?sceneId=${scene.id}`,
+                      scene,
+                      hasMultipleInstances
+                    )
+                  )
+              : undefined,
         },
       ];
     }, [scene, allTags, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
-    const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];
+    const indicatorsToShow = sceneSettings.showRelationshipIndicators
+      ? indicators
+      : [];
 
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -314,39 +368,51 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         entityType="scene"
         entity={scene as unknown as Record<string, unknown>}
-        linkTo={getEntityPath('scene', scene, hasMultipleInstances)}
+        linkTo={getEntityPath("scene", scene, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}
         isSelected={isSelected}
-        onToggleSelect={onToggleSelect as ((entity: Record<string, unknown> | undefined) => void) | undefined}
+        onToggleSelect={
+          onToggleSelect as
+            | ((entity: Record<string, unknown> | undefined) => void)
+            | undefined
+        }
         // Content
         imagePath={scene.paths?.screenshot}
         title={title}
         subtitle={subtitle}
         description={description}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard as boolean }}
-        ratingControlsProps={!hideRatingControls ? {
-          entityType: "scene",
-          entityId: scene.id,
-          instanceId: scene.instanceId,
-          initialRating: scene.rating,
-          initialFavorite: scene.favorite || false,
-          initialOCounter: scene.o_counter,
-          entityTitle: title,
-          onHideSuccess,
-          showRating: sceneSettings.showRating as boolean,
-          showFavorite: sceneSettings.showFavorite as boolean,
-          showOCounter: sceneSettings.showOCounter as boolean,
-          showMenu: sceneSettings.showMenu as boolean,
-        } : undefined}
+        displayPreferences={{
+          showDescription: sceneSettings.showDescriptionOnCard as boolean,
+        }}
+        ratingControlsProps={
+          !hideRatingControls
+            ? {
+                entityType: "scene",
+                entityId: scene.id,
+                instanceId: scene.instanceId,
+                initialRating: scene.rating,
+                initialFavorite: scene.favorite || false,
+                initialOCounter: scene.o_counter,
+                entityTitle: title,
+                onHideSuccess,
+                showRating: sceneSettings.showRating as boolean,
+                showFavorite: sceneSettings.showFavorite as boolean,
+                showOCounter: sceneSettings.showOCounter as boolean,
+                showMenu: sceneSettings.showMenu as boolean,
+              }
+            : undefined
+        }
         // Render slots
         renderOverlay={renderOverlay}
         renderImageContent={renderImageContent}
         // Standard props
         className={className}
-        onClick={onClick as ((e: React.MouseEvent<HTMLDivElement>) => void) | undefined}
+        onClick={
+          onClick as ((e: React.MouseEvent<HTMLDivElement>) => void) | undefined
+        }
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
       />

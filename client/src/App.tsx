@@ -1,21 +1,30 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
+import type { GetSetupStatusResponse } from "@peek/shared-types";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "react-hot-toast";
-import Login from "./components/pages/Login";
+import { queryClient, setupApi } from "./api";
+import {
+  LoginGuard,
+  ProtectedRoute,
+  SetupGuard,
+} from "./components/guards/RouteGuards";
 import ForgotPasswordPage from "./components/pages/ForgotPasswordPage";
+import Login from "./components/pages/Login";
 import SetupWizard from "./components/pages/SetupWizard";
 import { GlobalLayout } from "./components/ui/index";
 import { AuthProvider } from "./contexts/AuthContext";
+import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
 import { ConfigProvider } from "./contexts/ConfigContext";
 import { TVModeProvider } from "./contexts/TVModeProvider";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider";
-import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext";
-import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { setupApi, queryClient } from "./api";
 import { ThemeProvider } from "./themes/ThemeProvider";
-import type { GetSetupStatusResponse } from "@peek/shared-types";
 import "./themes/base.css";
 
 // Lazy load page components for code splitting
@@ -28,9 +37,7 @@ const Tags = lazy(() => import("./components/pages/Tags"));
 const Groups = lazy(() => import("./components/pages/Groups"));
 const Galleries = lazy(() => import("./components/pages/Galleries"));
 const Images = lazy(() => import("./components/pages/Images"));
-const GalleryDetail = lazy(
-  () => import("./components/pages/GalleryDetail")
-);
+const GalleryDetail = lazy(() => import("./components/pages/GalleryDetail"));
 const GroupDetail = lazy(() => import("./components/pages/GroupDetail"));
 const Scene = lazy(() => import("./components/pages/Scene"));
 const PerformerDetail = lazy(
@@ -39,9 +46,7 @@ const PerformerDetail = lazy(
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail"));
 const TagDetail = lazy(() => import("./components/pages/TagDetail"));
 const Playlists = lazy(() => import("./components/pages/Playlists"));
-const PlaylistDetail = lazy(
-  () => import("./components/pages/PlaylistDetail")
-);
+const PlaylistDetail = lazy(() => import("./components/pages/PlaylistDetail"));
 const SettingsPage = lazy(() => import("./components/pages/SettingsPage"));
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory"));
 const UserStats = lazy(() => import("./components/pages/UserStats"));
@@ -63,7 +68,9 @@ const PageLoader = () => (
 
 // Main app component with authentication and routing
 const AppContent = () => {
-  const [setupStatus, setSetupStatus] = useState<GetSetupStatusResponse | null>(null);
+  const [setupStatus, setSetupStatus] = useState<GetSetupStatusResponse | null>(
+    null
+  );
   const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
@@ -74,7 +81,13 @@ const AppContent = () => {
       } catch (error) {
         console.error("Failed to check setup status:", error);
         // If check fails, assume setup is not complete
-        setSetupStatus({ setupComplete: false, hasUsers: false, hasStashInstance: false, userCount: 0, stashInstanceCount: 0 });
+        setSetupStatus({
+          setupComplete: false,
+          hasUsers: false,
+          hasStashInstance: false,
+          userCount: 0,
+          stashInstanceCount: 0,
+        });
       } finally {
         setCheckingSetup(false);
       }
@@ -91,7 +104,13 @@ const AppContent = () => {
   };
 
   // Ensure setupStatus has defaults to prevent null access in guards
-  const safeSetupStatus = setupStatus || { setupComplete: false, hasUsers: false, hasStashInstance: false, userCount: 0, stashInstanceCount: 0 };
+  const safeSetupStatus = setupStatus || {
+    setupComplete: false,
+    hasUsers: false,
+    hasStashInstance: false,
+    userCount: 0,
+    stashInstanceCount: 0,
+  };
 
   return (
     <Router>
@@ -101,7 +120,10 @@ const AppContent = () => {
           <Route
             path="/setup"
             element={
-              <SetupGuard setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <SetupGuard
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <SetupWizard
                   setupStatus={safeSetupStatus}
                   onSetupComplete={handleSetupComplete}
@@ -114,7 +136,10 @@ const AppContent = () => {
           <Route
             path="/login"
             element={
-              <LoginGuard setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <LoginGuard
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <Login />
               </LoginGuard>
             }
@@ -127,7 +152,10 @@ const AppContent = () => {
           <Route
             path="/"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Home />
                 </GlobalLayout>
@@ -137,7 +165,10 @@ const AppContent = () => {
           <Route
             path="/scenes"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Scenes />
                 </GlobalLayout>
@@ -147,7 +178,10 @@ const AppContent = () => {
           <Route
             path="/recommended"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Recommended />
                 </GlobalLayout>
@@ -157,7 +191,10 @@ const AppContent = () => {
           <Route
             path="/performers"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Performers />
                 </GlobalLayout>
@@ -167,7 +204,10 @@ const AppContent = () => {
           <Route
             path="/studios"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Studios />
                 </GlobalLayout>
@@ -177,7 +217,10 @@ const AppContent = () => {
           <Route
             path="/tags"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Tags />
                 </GlobalLayout>
@@ -187,7 +230,10 @@ const AppContent = () => {
           <Route
             path="/collections"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Groups />
                 </GlobalLayout>
@@ -197,7 +243,10 @@ const AppContent = () => {
           <Route
             path="/galleries"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Galleries />
                 </GlobalLayout>
@@ -207,7 +256,10 @@ const AppContent = () => {
           <Route
             path="/images"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Images />
                 </GlobalLayout>
@@ -217,7 +269,10 @@ const AppContent = () => {
           <Route
             path="/gallery/:galleryId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <GalleryDetail />
                 </GlobalLayout>
@@ -227,7 +282,10 @@ const AppContent = () => {
           <Route
             path="/performer/:performerId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <PerformerDetail />
                 </GlobalLayout>
@@ -237,7 +295,10 @@ const AppContent = () => {
           <Route
             path="/studio/:studioId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <StudioDetail />
                 </GlobalLayout>
@@ -247,7 +308,10 @@ const AppContent = () => {
           <Route
             path="/tag/:tagId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <TagDetail />
                 </GlobalLayout>
@@ -257,7 +321,10 @@ const AppContent = () => {
           <Route
             path="/collection/:groupId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <GroupDetail />
                 </GlobalLayout>
@@ -267,7 +334,10 @@ const AppContent = () => {
           <Route
             path="/watch-history"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <WatchHistory />
                 </GlobalLayout>
@@ -277,7 +347,10 @@ const AppContent = () => {
           <Route
             path="/user-stats"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <UserStats />
                 </GlobalLayout>
@@ -287,7 +360,10 @@ const AppContent = () => {
           <Route
             path="/hidden-items"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <HiddenItemsPage />
                 </GlobalLayout>
@@ -297,7 +373,10 @@ const AppContent = () => {
           <Route
             path="/downloads"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Downloads />
                 </GlobalLayout>
@@ -307,7 +386,10 @@ const AppContent = () => {
           <Route
             path="/settings"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <SettingsPage />
                 </GlobalLayout>
@@ -321,12 +403,20 @@ const AppContent = () => {
           />
           <Route
             path="/server-settings"
-            element={<Navigate to="/settings?section=server&tab=user-management" replace />}
+            element={
+              <Navigate
+                to="/settings?section=server&tab=user-management"
+                replace
+              />
+            }
           />
           <Route
             path="/playlists"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Playlists />
                 </GlobalLayout>
@@ -336,7 +426,10 @@ const AppContent = () => {
           <Route
             path="/clips"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Clips />
                 </GlobalLayout>
@@ -346,7 +439,10 @@ const AppContent = () => {
           <Route
             path="/playlist/:playlistId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <PlaylistDetail />
                 </GlobalLayout>
@@ -356,7 +452,10 @@ const AppContent = () => {
           <Route
             path="/scene/:sceneId"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <Scene />
                 </GlobalLayout>
@@ -366,7 +465,10 @@ const AppContent = () => {
           <Route
             path="/settings/carousels/new"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <CarouselBuilder />
                 </GlobalLayout>
@@ -376,7 +478,10 @@ const AppContent = () => {
           <Route
             path="/settings/carousels/:id/edit"
             element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+              <ProtectedRoute
+                setupStatus={safeSetupStatus}
+                checkingSetup={checkingSetup}
+              >
                 <GlobalLayout>
                   <CarouselBuilder />
                 </GlobalLayout>

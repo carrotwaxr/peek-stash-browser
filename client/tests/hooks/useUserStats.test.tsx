@@ -1,5 +1,8 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { apiGet } from "../../src/api";
+import { useAuth } from "../../src/hooks/useAuth";
 import { useUserStats } from "../../src/hooks/useUserStats";
 import { createQueryWrapper } from "../testUtils";
 
@@ -15,10 +18,6 @@ vi.mock("../../src/api", () => ({
     },
   },
 }));
-
-import { useAuth } from "../../src/hooks/useAuth";
-import { apiGet } from "../../src/api";
-import type { Mock } from "vitest";
 
 const useAuthMock = useAuth as unknown as Mock;
 const apiGetMock = apiGet as unknown as Mock;
@@ -68,9 +67,7 @@ describe("useUserStats", () => {
       });
 
       await waitFor(() => {
-        expect(apiGetMock).toHaveBeenCalledWith(
-          "/user-stats?sortBy=playCount",
-        );
+        expect(apiGetMock).toHaveBeenCalledWith("/user-stats?sortBy=playCount");
       });
     });
   });
@@ -155,7 +152,7 @@ describe("useUserStats", () => {
         {
           initialProps: { sortBy: "engagement" },
           wrapper: createQueryWrapper(),
-        },
+        }
       );
 
       await waitFor(() => {

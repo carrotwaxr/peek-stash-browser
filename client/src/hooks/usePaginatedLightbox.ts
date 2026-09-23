@@ -52,7 +52,10 @@ export function usePaginatedLightbox({
   // Prefetch state for adjacent pages
   const [prevPageImages, setPrevPageImages] = useState<any[]>([]);
   const [nextPageImages, setNextPageImages] = useState<any[]>([]);
-  const prefetchingRef = useRef<{ prev: number | null; next: number | null }>({ prev: null, next: null }); // Track which pages are being fetched
+  const prefetchingRef = useRef<{ prev: number | null; next: number | null }>({
+    prev: null,
+    next: null,
+  }); // Track which pages are being fetched
 
   // Track pending page load for lightbox cross-page navigation
   const pendingLightboxNav = useRef<number | null>(null);
@@ -192,7 +195,16 @@ export function usePaginatedLightbox({
           prefetchingRef.current.prev = null;
         });
     }
-  }, [lightboxOpen, trackedIndex, currentPage, totalPages, perPage, fetchPage, nextPageImages.length, prevPageImages.length]);
+  }, [
+    lightboxOpen,
+    trackedIndex,
+    currentPage,
+    totalPages,
+    perPage,
+    fetchPage,
+    nextPageImages.length,
+    prevPageImages.length,
+  ]);
 
   // Compute prefetch images from adjacent pages
   const prefetchImages = [...prevPageImages, ...nextPageImages];

@@ -1,12 +1,15 @@
-import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { AuthContext, type AuthContextValue } from "@/contexts/AuthContextProvider";
+import { describe, expect, it } from "vitest";
+import {
+  AuthContext,
+  type AuthContextValue,
+} from "@/contexts/AuthContextProvider";
 import { useAuth } from "@/hooks/useAuth";
 
 describe("useAuth", () => {
   it("throws when used outside AuthProvider", () => {
     expect(() => renderHook(() => useAuth())).toThrow(
-      "useAuth must be used within an AuthProvider",
+      "useAuth must be used within an AuthProvider"
     );
   });
 

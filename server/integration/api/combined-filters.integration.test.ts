@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Combined Filters Integration Tests
@@ -34,19 +34,22 @@ describe("Combined Filters", () => {
 
   describe("multiple entity filters", () => {
     it("combines performer and studio filters", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -57,42 +60,48 @@ describe("Combined Filters", () => {
     });
 
     it("combines performer, studio, and tag filters", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
-          },
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("combines INCLUDES and EXCLUDES modifiers", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            tags: {
+              value: [TEST_ENTITIES.restrictableTag],
+              modifier: "EXCLUDES",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.restrictableTag],
-            modifier: "EXCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -101,16 +110,19 @@ describe("Combined Filters", () => {
 
   describe("entity filters with boolean filters", () => {
     it("combines performer filter with favorite filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            favorite: true,
           },
-          favorite: true,
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -122,16 +134,19 @@ describe("Combined Filters", () => {
     });
 
     it("combines studio filter with performer_favorite filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            performer_favorite: true,
           },
-          performer_favorite: true,
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -140,19 +155,22 @@ describe("Combined Filters", () => {
 
   describe("entity filters with date filters", () => {
     it("combines performer filter with date filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            date: {
+              value: "2020-01-01",
+              modifier: "GREATER_THAN",
+            },
           },
-          date: {
-            value: "2020-01-01",
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -162,19 +180,22 @@ describe("Combined Filters", () => {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+            created_at: {
+              value: oneYearAgo.toISOString().split("T")[0],
+              modifier: "GREATER_THAN",
+            },
           },
-          created_at: {
-            value: oneYearAgo.toISOString().split("T")[0],
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -183,38 +204,44 @@ describe("Combined Filters", () => {
 
   describe("entity filters with numeric filters", () => {
     it("combines performer filter with rating filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            rating100: {
+              value: 60,
+              modifier: "GREATER_THAN",
+            },
           },
-          rating100: {
-            value: 60,
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("combines studio filter with duration filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            duration: {
+              value: 600, // 10 minutes
+              modifier: "GREATER_THAN",
+            },
           },
-          duration: {
-            value: 600, // 10 minutes
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -223,24 +250,27 @@ describe("Combined Filters", () => {
 
   describe("complex multi-filter queries", () => {
     it("combines 4+ filters successfully", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            favorite: false,
+            date: {
+              value: "2018-01-01",
+              modifier: "GREATER_THAN",
+            },
+            duration: {
+              value: 300, // 5 minutes
+              modifier: "GREATER_THAN",
+            },
           },
-          favorite: false,
-          date: {
-            value: "2018-01-01",
-            modifier: "GREATER_THAN",
-          },
-          duration: {
-            value: 300, // 5 minutes
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -250,28 +280,31 @@ describe("Combined Filters", () => {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+            favorite: false,
+            created_at: {
+              value: oneYearAgo.toISOString().split("T")[0],
+              modifier: "GREATER_THAN",
+            },
+            duration: {
+              value: 120,
+              modifier: "GREATER_THAN",
+            },
           },
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
-          },
-          favorite: false,
-          created_at: {
-            value: oneYearAgo.toISOString().split("T")[0],
-            modifier: "GREATER_THAN",
-          },
-          duration: {
-            value: 120,
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -280,19 +313,22 @@ describe("Combined Filters", () => {
     it("handles empty result set gracefully", async () => {
       // Create an impossible filter combination using rating
       // (no scene has rating > 999)
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+            rating100: {
+              value: 999,
+              modifier: "GREATER_THAN",
+            },
           },
-          rating100: {
-            value: 999,
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       // This should return OK with 0 results
       expect(response.ok).toBe(true);
@@ -303,38 +339,44 @@ describe("Combined Filters", () => {
 
   describe("filter with sorting", () => {
     it("combines filters with custom sort", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-          sort: "duration",
-          direction: "DESC",
-        },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
+            sort: "duration",
+            direction: "DESC",
           },
-        },
-      });
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
 
     it("combines filters with random sort and seed", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-          sort: "random_12345",
-        },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
+            sort: "random_12345",
           },
-          favorite: false,
-        },
-      });
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+            favorite: false,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();

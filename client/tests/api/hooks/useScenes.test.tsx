@@ -1,7 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useSceneDetail, useSceneList } from "../../../src/api/hooks/useScenes";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -14,12 +16,10 @@ vi.mock("../../../src/api/queryKeys", () => ({
   queryKeys: {
     scenes: {
       all: () => ["scenes"],
-      list: (instanceId: string | undefined, params: Record<string, unknown>) => [
-        "scenes",
-        instanceId,
-        "list",
-        params,
-      ],
+      list: (
+        instanceId: string | undefined,
+        params: Record<string, unknown>
+      ) => ["scenes", instanceId, "list", params],
       detail: (instanceId: string | undefined, id: string) => [
         "scenes",
         instanceId,
@@ -29,9 +29,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import { useSceneList, useSceneDetail } from "../../../src/api/hooks/useScenes";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -57,7 +54,9 @@ describe("useSceneList", () => {
 
   it("fires query with correct params", async () => {
     const mockData = { scenes: [], total: 0 };
-    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useSceneList(params), {
@@ -66,24 +65,32 @@ describe("useSceneList", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
-    expect(libraryApi.findScenes).toHaveBeenCalledWith(params, expect.any(AbortSignal));
+    expect(libraryApi.findScenes).toHaveBeenCalledWith(
+      params,
+      expect.any(AbortSignal)
+    );
   });
 
   it("passes signal to queryFn", async () => {
     const mockData = { scenes: [], total: 0 };
-    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useSceneList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findScenes).toHaveBeenCalled());
-    const callArgs = (libraryApi.findScenes as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (libraryApi.findScenes as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 
   it("passes instanceId through to query key", async () => {
     const mockData = { scenes: [], total: 0 };
-    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findScenes as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useSceneList(params, "instance-1"), {
@@ -110,7 +117,9 @@ describe("useSceneDetail", () => {
 
   it("fires query and returns data on success", async () => {
     const mockScene = { id: "scene-1", title: "Test Scene" };
-    (libraryApi.findSceneById as ReturnType<typeof vi.fn>).mockResolvedValue(mockScene);
+    (libraryApi.findSceneById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockScene
+    );
 
     const { result } = renderHook(() => useSceneDetail("scene-1"), {
       wrapper: createWrapper(),
@@ -123,14 +132,22 @@ describe("useSceneDetail", () => {
 
   it("passes instanceId to findSceneById", async () => {
     const mockScene = { id: "scene-1", title: "Test Scene" };
-    (libraryApi.findSceneById as ReturnType<typeof vi.fn>).mockResolvedValue(mockScene);
+    (libraryApi.findSceneById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockScene
+    );
 
-    const { result } = renderHook(() => useSceneDetail("scene-1", "instance-2"), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useSceneDetail("scene-1", "instance-2"),
+      {
+        wrapper: createWrapper(),
+      }
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findSceneById).toHaveBeenCalledWith("scene-1", "instance-2");
+    expect(libraryApi.findSceneById).toHaveBeenCalledWith(
+      "scene-1",
+      "instance-2"
+    );
   });
 
   it("returns error state on failure", async () => {

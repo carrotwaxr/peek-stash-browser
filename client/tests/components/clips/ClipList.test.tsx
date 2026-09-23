@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import ClipList from "../../../src/components/clips/ClipList";
 import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext";
 
@@ -58,7 +58,9 @@ describe("ClipList", () => {
     const { container } = renderWithProviders(
       <ClipList clips={[]} onClipClick={() => {}} loading={true} />
     );
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
+      0
+    );
   });
 
   it("renders clip grid", () => {

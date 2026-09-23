@@ -1,7 +1,10 @@
 import { type CSSProperties } from "react";
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "onLoad" | "onError" | "src"> {
+interface Props extends Omit<
+  React.ImgHTMLAttributes<HTMLImageElement>,
+  "onLoad" | "onError" | "src"
+> {
   src: string | null | undefined;
   alt?: string;
   className?: string;

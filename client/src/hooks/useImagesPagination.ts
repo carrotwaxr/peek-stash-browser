@@ -18,7 +18,10 @@ interface ImageItem {
 }
 
 interface UseImagesPaginationOptions<T extends ImageItem = ImageItem> {
-  fetchImages: (page: number, perPage: number) => Promise<{ images?: T[]; count?: number }>;
+  fetchImages: (
+    page: number,
+    perPage: number
+  ) => Promise<{ images?: T[]; count?: number }>;
   dependencies?: unknown[];
   perPage?: number;
   externalPage: number;
@@ -44,10 +47,13 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
   }, [fetchImages]);
 
   // Fetch function for prefetching adjacent pages
-  const fetchPage = useCallback(async (page: number) => {
-    const result = await fetchImagesRef.current(page, perPage);
-    return { images: result.images || [] };
-  }, [perPage]);
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const result = await fetchImagesRef.current(page, perPage);
+      return { images: result.images || [] };
+    },
+    [perPage]
+  );
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -64,7 +70,10 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
       try {
         setIsLoading(true);
         setError(null);
-        const result = await fetchImagesRef.current(lightbox.currentPage, perPage);
+        const result = await fetchImagesRef.current(
+          lightbox.currentPage,
+          perPage
+        );
         setImages(result.images || []);
         setTotalCount(result.count || 0);
 
@@ -79,7 +88,7 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
     };
 
     loadImages();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lightbox.currentPage, ...dependencies]);
 
   // Wrapper to update images (for lightbox modifications like rating changes)

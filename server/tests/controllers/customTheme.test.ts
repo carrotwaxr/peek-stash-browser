@@ -6,7 +6,17 @@
  * validation (name length, hex colors, ThemeConfig structure), conflict detection,
  * not-found, happy paths, and error handling.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createCustomTheme,
+  deleteCustomTheme,
+  duplicateCustomTheme,
+  getCustomTheme,
+  getUserCustomThemes,
+  updateCustomTheme,
+} from "../../controllers/customTheme.js";
+import prisma from "../../prisma/singleton.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma — BEFORE imports
 vi.mock("../../prisma/singleton.js", () => ({
@@ -25,17 +35,6 @@ vi.mock("../../prisma/singleton.js", () => ({
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import {
-  getUserCustomThemes,
-  getCustomTheme,
-  createCustomTheme,
-  updateCustomTheme,
-  deleteCustomTheme,
-  duplicateCustomTheme,
-} from "../../controllers/customTheme.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -58,7 +57,12 @@ interface ThemeConfig {
 function validThemeConfig(): ThemeConfig {
   return {
     mode: "dark",
-    fonts: { brand: "Inter", heading: "Inter", body: "Inter", mono: "Fira Code" },
+    fonts: {
+      brand: "Inter",
+      heading: "Inter",
+      body: "Inter",
+      mono: "Fira Code",
+    },
     colors: {
       background: "#1a1a2e",
       backgroundSecondary: "#16213e",
@@ -67,7 +71,12 @@ function validThemeConfig(): ThemeConfig {
       border: "#333333",
     },
     accents: { primary: "#e94560", secondary: "#533483" },
-    status: { success: "#00b894", error: "#d63031", info: "#0984e3", warning: "#fdcb6e" },
+    status: {
+      success: "#00b894",
+      error: "#d63031",
+      info: "#0984e3",
+      warning: "#fdcb6e",
+    },
   };
 }
 
@@ -213,13 +222,19 @@ describe("Custom Theme Controller", () => {
 
     it("returns 400 when name exceeds 50 characters", async () => {
       const longName = "A".repeat(51);
-      const req = mockReq({ name: longName, config: validThemeConfig() }, {}, USER);
+      const req = mockReq(
+        { name: longName, config: validThemeConfig() },
+        {},
+        USER
+      );
       const res = mockRes();
       await createCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(400);
       expect(res._getBody()).toEqual(
-        expect.objectContaining({ error: "Theme name must be 50 characters or less" })
+        expect.objectContaining({
+          error: "Theme name must be 50 characters or less",
+        })
       );
     });
 
@@ -389,7 +404,9 @@ describe("Custom Theme Controller", () => {
 
       expect(res._getStatus()).toBe(409);
       expect(res._getBody()).toEqual(
-        expect.objectContaining({ error: "A theme with this name already exists" })
+        expect.objectContaining({
+          error: "A theme with this name already exists",
+        })
       );
     });
 
@@ -409,7 +426,9 @@ describe("Custom Theme Controller", () => {
       await createCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(201);
-      expect(res._getBody()).toEqual(expect.objectContaining({ theme: created }));
+      expect(res._getBody()).toEqual(
+        expect.objectContaining({ theme: created })
+      );
     });
 
     it("returns 500 on database error", async () => {
@@ -481,7 +500,9 @@ describe("Custom Theme Controller", () => {
 
       expect(res._getStatus()).toBe(400);
       expect(res._getBody()).toEqual(
-        expect.objectContaining({ error: "Theme name must be 50 characters or less" })
+        expect.objectContaining({
+          error: "Theme name must be 50 characters or less",
+        })
       );
     });
 
@@ -526,7 +547,9 @@ describe("Custom Theme Controller", () => {
       await updateCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody()).toEqual(expect.objectContaining({ theme: updated }));
+      expect(res._getBody()).toEqual(
+        expect.objectContaining({ theme: updated })
+      );
     });
 
     it("updates config only", async () => {
@@ -542,7 +565,9 @@ describe("Custom Theme Controller", () => {
       await updateCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody()).toEqual(expect.objectContaining({ theme: updated }));
+      expect(res._getBody()).toEqual(
+        expect.objectContaining({ theme: updated })
+      );
     });
 
     it("updates both name and config", async () => {
@@ -564,7 +589,9 @@ describe("Custom Theme Controller", () => {
       await updateCustomTheme(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody()).toEqual(expect.objectContaining({ theme: updated }));
+      expect(res._getBody()).toEqual(
+        expect.objectContaining({ theme: updated })
+      );
     });
 
     it("returns 500 on database error", async () => {
@@ -697,7 +724,9 @@ describe("Custom Theme Controller", () => {
       // 3rd findFirst: "(Copy 2)" doesn't exist → null
       mockPrisma.customTheme.findFirst
         .mockResolvedValueOnce(original as any)
-        .mockResolvedValueOnce(themeRow({ id: 2, name: "Cyberpunk (Copy)" }) as any)
+        .mockResolvedValueOnce(
+          themeRow({ id: 2, name: "Cyberpunk (Copy)" }) as any
+        )
         .mockResolvedValueOnce(null);
       const duplicated = themeRow({ id: 3, name: "Cyberpunk (Copy 2)" });
       mockPrisma.customTheme.create.mockResolvedValue(duplicated as any);
@@ -722,8 +751,12 @@ describe("Custom Theme Controller", () => {
       // 4th findFirst: "(Copy 3)" doesn't exist → null
       mockPrisma.customTheme.findFirst
         .mockResolvedValueOnce(original as any)
-        .mockResolvedValueOnce(themeRow({ id: 2, name: "Cyberpunk (Copy)" }) as any)
-        .mockResolvedValueOnce(themeRow({ id: 3, name: "Cyberpunk (Copy 2)" }) as any)
+        .mockResolvedValueOnce(
+          themeRow({ id: 2, name: "Cyberpunk (Copy)" }) as any
+        )
+        .mockResolvedValueOnce(
+          themeRow({ id: 3, name: "Cyberpunk (Copy 2)" }) as any
+        )
         .mockResolvedValueOnce(null);
       const duplicated = themeRow({ id: 4, name: "Cyberpunk (Copy 3)" });
       mockPrisma.customTheme.create.mockResolvedValue(duplicated as any);

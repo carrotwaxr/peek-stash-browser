@@ -7,7 +7,6 @@
  * Supports both global exclusions (empty instanceId → applies to all instances)
  * and instance-scoped exclusions (specific instanceId → applies only to that instance).
  */
-
 import prisma from "../prisma/singleton.js";
 
 /** Structured exclusion data for instance-aware in-memory filtering */
@@ -75,7 +74,10 @@ class EntityExclusionHelper {
         return false;
       }
       // Check instance-scoped exclusion (if entity has instanceId)
-      if (entity.instanceId && scopedExclusions.has(`${entity.id}:${entity.instanceId}`)) {
+      if (
+        entity.instanceId &&
+        scopedExclusions.has(`${entity.id}:${entity.instanceId}`)
+      ) {
         return false;
       }
       return true;
@@ -193,7 +195,10 @@ class EntityExclusionHelper {
     if (exclusionData.globalIds.has(entityId)) {
       return true;
     }
-    if (entityInstanceId && exclusionData.scopedKeys.has(`${entityId}:${entityInstanceId}`)) {
+    if (
+      entityInstanceId &&
+      exclusionData.scopedKeys.has(`${entityId}:${entityInstanceId}`)
+    ) {
       return true;
     }
     return false;

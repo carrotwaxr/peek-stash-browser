@@ -1,4 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// ---------------------------------------------------------------------------
+// Imports AFTER mocks
+// ---------------------------------------------------------------------------
+
+import {
+  applyPerformerFilters,
+  findPerformers,
+  findPerformersMinimal,
+  mergePerformersWithUserData,
+  parseCareerLength,
+  updatePerformer,
+} from "../../../controllers/library/performers.js";
+import prisma from "../../../prisma/singleton.js";
+import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
+import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
+import { userStatsService } from "../../../services/UserStatsService.js";
+import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
 
@@ -28,7 +47,9 @@ vi.mock("../../../services/StashInstanceManager.js", () => ({
 }));
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
-  entityExclusionHelper: { filterExcluded: vi.fn().mockImplementation((items) => items) },
+  entityExclusionHelper: {
+    filterExcluded: vi.fn().mockImplementation((items) => items),
+  },
 }));
 
 vi.mock("../../../services/PerformerQueryBuilder.js", () => ({
@@ -55,7 +76,9 @@ vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
-  hydrateEntityTags: vi.fn().mockImplementation((items) => Promise.resolve(items)),
+  hydrateEntityTags: vi
+    .fn()
+    .mockImplementation((items) => Promise.resolve(items)),
 }));
 
 vi.mock("../../../utils/logger.js", () => ({
@@ -63,32 +86,17 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field) => ({ sortField: field, randomSeed: undefined })),
+  parseRandomSort: vi.fn().mockImplementation((field) => ({
+    sortField: field,
+    randomSeed: undefined,
+  })),
 }));
 
 vi.mock("../../../utils/stashUrl.js", () => ({
-  buildStashEntityUrl: vi.fn().mockImplementation((_type, id) => `http://stash/performers/${id}`),
+  buildStashEntityUrl: vi
+    .fn()
+    .mockImplementation((_type, id) => `http://stash/performers/${id}`),
 }));
-
-// ---------------------------------------------------------------------------
-// Imports AFTER mocks
-// ---------------------------------------------------------------------------
-
-import {
-  parseCareerLength,
-  mergePerformersWithUserData,
-  applyPerformerFilters,
-  findPerformers,
-  findPerformersMinimal,
-  updatePerformer,
-} from "../../../controllers/library/performers.js";
-import prisma from "../../../prisma/singleton.js";
-import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
-import { userStatsService } from "../../../services/UserStatsService.js";
-import { getEntityInstanceId } from "../../../utils/entityInstanceId.js";
-import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -176,7 +184,13 @@ describe("mergePerformersWithUserData", () => {
     const performer = createMockPerformer({ id: "p1", instanceId: "inst1" });
 
     vi.mocked(prisma.performerRating.findMany).mockResolvedValue([
-      { performerId: "p1", instanceId: "inst1", userId: 1, rating: 80, favorite: true } as any,
+      {
+        performerId: "p1",
+        instanceId: "inst1",
+        userId: 1,
+        rating: 80,
+        favorite: true,
+      } as any,
     ]);
 
     const statsMap = new Map();
@@ -293,8 +307,14 @@ describe("applyPerformerFilters", () => {
   // --- tags ---
   it("filters tags with INCLUDES (any match)", async () => {
     const performers = [
-      createMockPerformer({ id: "t1", tags: [{ id: "tag1", name: "A", image_path: null }] }),
-      createMockPerformer({ id: "t2", tags: [{ id: "tag2", name: "B", image_path: null }] }),
+      createMockPerformer({
+        id: "t1",
+        tags: [{ id: "tag1", name: "A", image_path: null }],
+      }),
+      createMockPerformer({
+        id: "t2",
+        tags: [{ id: "tag2", name: "B", image_path: null }],
+      }),
     ];
     const result = await applyPerformerFilters(performers, {
       tags: { value: ["tag1"], modifier: "INCLUDES" },
@@ -312,7 +332,10 @@ describe("applyPerformerFilters", () => {
           { id: "tag2", name: "B", image_path: null },
         ],
       }),
-      createMockPerformer({ id: "one", tags: [{ id: "tag1", name: "A", image_path: null }] }),
+      createMockPerformer({
+        id: "one",
+        tags: [{ id: "tag1", name: "A", image_path: null }],
+      }),
     ];
     const result = await applyPerformerFilters(performers, {
       tags: { value: ["tag1", "tag2"], modifier: "INCLUDES_ALL" },
@@ -323,7 +346,10 @@ describe("applyPerformerFilters", () => {
 
   it("filters tags with EXCLUDES", async () => {
     const performers = [
-      createMockPerformer({ id: "has", tags: [{ id: "tag1", name: "A", image_path: null }] }),
+      createMockPerformer({
+        id: "has",
+        tags: [{ id: "tag1", name: "A", image_path: null }],
+      }),
       createMockPerformer({ id: "clean", tags: [] }),
     ];
     const result = await applyPerformerFilters(performers, {
@@ -335,7 +361,9 @@ describe("applyPerformerFilters", () => {
 
   // --- studios (async dependency) ---
   it("filters by studios using stashEntityService", async () => {
-    vi.mocked(stashEntityService.getPerformerIdsByStudios).mockResolvedValue(new Set(["p1"]));
+    vi.mocked(stashEntityService.getPerformerIdsByStudios).mockResolvedValue(
+      new Set(["p1"])
+    );
     const performers = [
       createMockPerformer({ id: "p1" }),
       createMockPerformer({ id: "p2" }),
@@ -349,7 +377,9 @@ describe("applyPerformerFilters", () => {
 
   // --- groups (async dependency) ---
   it("filters by groups using stashEntityService", async () => {
-    vi.mocked(stashEntityService.getPerformerIdsByGroups).mockResolvedValue(new Set(["p2"]));
+    vi.mocked(stashEntityService.getPerformerIdsByGroups).mockResolvedValue(
+      new Set(["p2"])
+    );
     const performers = [
       createMockPerformer({ id: "p1" }),
       createMockPerformer({ id: "p2" }),
@@ -524,7 +554,10 @@ describe("applyPerformerFilters", () => {
 describe("findPerformers", () => {
   it("returns paginated performers from query builder", async () => {
     const performers = [createMockPerformer({ id: "p1", name: "Alice" })];
-    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({ performers, total: 1 });
+    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
+      performers,
+      total: 1,
+    });
 
     const req = mockReq(
       { filter: { page: 1, per_page: 20 } },
@@ -539,7 +572,9 @@ describe("findPerformers", () => {
     const body = res._getBody();
     expect(body.findPerformers.count).toBe(1);
     expect(body.findPerformers.performers).toHaveLength(1);
-    expect(body.findPerformers.performers[0].stashUrl).toBe("http://stash/performers/p1");
+    expect(body.findPerformers.performers[0].stashUrl).toBe(
+      "http://stash/performers/p1"
+    );
   });
 
   it("returns 400 for ambiguous single-ID lookup (multiple instances)", async () => {
@@ -547,13 +582,12 @@ describe("findPerformers", () => {
       createMockPerformer({ id: "p1", instanceId: "inst1" }),
       createMockPerformer({ id: "p1", instanceId: "inst2" }),
     ];
-    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({ performers, total: 2 });
+    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
+      performers,
+      total: 2,
+    });
 
-    const req = mockReq(
-      { ids: ["p1"] },
-      {},
-      { id: 1, role: "USER" }
-    );
+    const req = mockReq({ ids: ["p1"] }, {}, { id: 1, role: "USER" });
     const res = mockRes();
 
     await findPerformers(req, res);
@@ -563,7 +597,9 @@ describe("findPerformers", () => {
   });
 
   it("returns 500 when query builder throws", async () => {
-    vi.mocked(performerQueryBuilder.execute).mockRejectedValue(new Error("DB down"));
+    vi.mocked(performerQueryBuilder.execute).mockRejectedValue(
+      new Error("DB down")
+    );
 
     const req = mockReq({}, {}, { id: 1, role: "USER" });
     const res = mockRes();
@@ -571,7 +607,9 @@ describe("findPerformers", () => {
     await findPerformers(req, res);
 
     expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({ error: "Failed to find performers" });
+    expect(res._getBody()).toMatchObject({
+      error: "Failed to find performers",
+    });
   });
 });
 
@@ -581,7 +619,9 @@ describe("findPerformersMinimal", () => {
       createMockPerformer({ id: "p1", name: "Alice" }),
       createMockPerformer({ id: "p2", name: "Bob" }),
     ];
-    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(performers);
+    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(
+      performers
+    );
 
     const req = mockReq(
       { filter: { q: "alice", sort: "name", direction: "ASC" } },
@@ -603,7 +643,9 @@ describe("findPerformersMinimal", () => {
       createMockPerformer({ id: "p1", scene_count: 10 }),
       createMockPerformer({ id: "p2", scene_count: 0 }),
     ];
-    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(performers);
+    vi.mocked(stashEntityService.getAllPerformers).mockResolvedValue(
+      performers
+    );
 
     const req = mockReq(
       { count_filter: { min_scene_count: 5 } },
@@ -634,7 +676,9 @@ describe("findPerformersMinimal", () => {
   });
 
   it("returns 500 when service throws", async () => {
-    vi.mocked(stashEntityService.getAllPerformers).mockRejectedValue(new Error("fail"));
+    vi.mocked(stashEntityService.getAllPerformers).mockRejectedValue(
+      new Error("fail")
+    );
 
     const req = mockReq({}, {}, { id: 1, role: "USER" });
     const res = mockRes();
@@ -642,7 +686,9 @@ describe("findPerformersMinimal", () => {
     await findPerformersMinimal(req, res);
 
     expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({ error: "Failed to find performers" });
+    expect(res._getBody()).toMatchObject({
+      error: "Failed to find performers",
+    });
   });
 });
 
@@ -656,7 +702,11 @@ describe("updatePerformer", () => {
     vi.mocked(getEntityInstanceId).mockResolvedValue("default");
     vi.mocked(stashInstanceManager.get).mockReturnValue(mockStash as any);
 
-    const req = mockReq({ name: "Updated" }, { id: "p1" }, { id: 1, role: "ADMIN" });
+    const req = mockReq(
+      { name: "Updated" },
+      { id: "p1" },
+      { id: 1, role: "ADMIN" }
+    );
     const res = mockRes();
 
     await updatePerformer(req, res);
@@ -678,7 +728,9 @@ describe("updatePerformer", () => {
     await updatePerformer(req, res);
 
     expect(res._getStatus()).toBe(404);
-    expect(res._getBody()).toMatchObject({ error: "Stash instance not found for performer" });
+    expect(res._getBody()).toMatchObject({
+      error: "Stash instance not found for performer",
+    });
   });
 
   it("returns 500 when stash API throws", async () => {
@@ -693,6 +745,8 @@ describe("updatePerformer", () => {
     await updatePerformer(req, res);
 
     expect(res._getStatus()).toBe(500);
-    expect(res._getBody()).toMatchObject({ error: "Failed to update performer" });
+    expect(res._getBody()).toMatchObject({
+      error: "Failed to update performer",
+    });
   });
 });

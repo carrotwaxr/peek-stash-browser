@@ -8,8 +8,8 @@
  */
 import fs from "fs/promises";
 import path from "path";
-import { logger } from "../utils/logger.js";
 import prisma from "../prisma/singleton.js";
+import { logger } from "../utils/logger.js";
 
 const BACKUP_PATTERN = /^peek-stash-browser\.db\.backup-\d{8}-\d{6}$/;
 
@@ -85,7 +85,9 @@ class DatabaseBackupService {
 
     const stat = await fs.stat(backupPath);
 
-    logger.info(`Backup created successfully: ${filename} (${stat.size} bytes)`);
+    logger.info(
+      `Backup created successfully: ${filename} (${stat.size} bytes)`
+    );
 
     return {
       filename,

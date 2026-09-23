@@ -8,7 +8,9 @@
  * - 98% completion reset behavior
  * - NaN handling for invalid durations
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Import after mock
+import TrackActivityPlugin from "../../../src/components/video-player/plugins/track-activity";
 
 // Mock video.js
 const mockPlayer = {
@@ -21,20 +23,18 @@ const mockPlayer = {
 
 vi.mock("video.js", () => ({
   default: {
-    getPlugin: vi.fn(() =>
-      class MockPlugin {
-        player: any;
-        constructor(player: any) {
-          this.player = player;
+    getPlugin: vi.fn(
+      () =>
+        class MockPlugin {
+          player: any;
+          constructor(player: any) {
+            this.player = player;
+          }
         }
-      }
     ),
     registerPlugin: vi.fn(),
   },
 }));
-
-// Import after mock
-import TrackActivityPlugin from "../../../src/components/video-player/plugins/track-activity";
 
 describe("TrackActivityPlugin", () => {
   let plugin: any;

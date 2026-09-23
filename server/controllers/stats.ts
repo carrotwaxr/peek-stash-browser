@@ -3,14 +3,20 @@ import os from "os";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import type { TypedRequest, TypedResponse } from "../types/api/express.js";
-import type { GetStatsResponse, RefreshCacheResponse } from "../types/api/stats.js";
+import type {
+  GetStatsResponse,
+  RefreshCacheResponse,
+} from "../types/api/stats.js";
 import { logger } from "../utils/logger.js";
 
 /**
  * Get comprehensive server statistics
  * Includes system metrics, cache stats, and database size
  */
-export const getStats = async (_req: TypedRequest, res: TypedResponse<GetStatsResponse>) => {
+export const getStats = async (
+  _req: TypedRequest,
+  res: TypedResponse<GetStatsResponse>
+) => {
   try {
     // Get cache stats with fallback
     let cacheStats;
@@ -45,7 +51,17 @@ export const getStats = async (_req: TypedRequest, res: TypedResponse<GetStatsRe
         isInitialized: false,
         isRefreshing: false,
         lastRefreshed: null,
-        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0, clips: 0, ungeneratedClips: 0 },
+        counts: {
+          scenes: 0,
+          performers: 0,
+          studios: 0,
+          tags: 0,
+          galleries: 0,
+          groups: 0,
+          images: 0,
+          clips: 0,
+          ungeneratedClips: 0,
+        },
         estimatedCacheSize: "0 MB",
       };
     }
@@ -153,7 +169,17 @@ export const getStats = async (_req: TypedRequest, res: TypedResponse<GetStatsRe
         isInitialized: false,
         isRefreshing: false,
         lastRefreshed: null,
-        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0, clips: 0, ungeneratedClips: 0 },
+        counts: {
+          scenes: 0,
+          performers: 0,
+          studios: 0,
+          tags: 0,
+          galleries: 0,
+          groups: 0,
+          images: 0,
+          clips: 0,
+          ungeneratedClips: 0,
+        },
         estimatedSize: "0 MB",
       },
       database: { size: "0 B", sizeBytes: 0, path: "" },
@@ -194,7 +220,10 @@ function formatUptime(seconds: number): string {
  * Manually refresh the Stash cache
  * Admin-only endpoint to trigger cache refresh on demand
  */
-export const refreshCache = (_req: TypedRequest, res: TypedResponse<RefreshCacheResponse>) => {
+export const refreshCache = (
+  _req: TypedRequest,
+  res: TypedResponse<RefreshCacheResponse>
+) => {
   try {
     logger.info("Manual cache refresh triggered by admin");
     // Trigger a full sync (non-blocking - runs in background)

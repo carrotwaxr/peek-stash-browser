@@ -100,7 +100,10 @@ export const getSiteInfo = (url: string) => {
   if (urlLower.includes("slayed.com")) {
     return { name: "Slayed", icon: LucideGlobe, color: "#8B0000" };
   }
-  if (urlLower.includes("bellesa.co") || urlLower.includes("bellesafilms.com")) {
+  if (
+    urlLower.includes("bellesa.co") ||
+    urlLower.includes("bellesafilms.com")
+  ) {
     return { name: "Bellesa", icon: LucideGlobe, color: "#FF6B9D" };
   }
   if (urlLower.includes("x-art.com")) {
@@ -113,7 +116,12 @@ export const getSiteInfo = (url: string) => {
   // === Unknown site - extract domain ===
   try {
     const domain = new URL(url).hostname.replace("www.", "");
-    return { name: domain, icon: LucideLink, color: "#95A5A6", useFavicon: true };
+    return {
+      name: domain,
+      icon: LucideLink,
+      color: "#95A5A6",
+      useFavicon: true,
+    };
   } catch {
     return { name: "Link", icon: LucideLink, color: "#95A5A6" };
   }

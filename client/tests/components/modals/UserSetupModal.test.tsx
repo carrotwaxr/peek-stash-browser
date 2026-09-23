@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { userSetupApi } from "../../../src/api";
 import UserSetupModal from "../../../src/components/modals/UserSetupModal";
 
 // Mock the API
@@ -18,10 +19,12 @@ vi.mock("../../../src/hooks/useAuth", () => ({
   }),
 }));
 
-import { userSetupApi } from "../../../src/api";
-
-const mockGetSetupStatus = userSetupApi.getSetupStatus as ReturnType<typeof vi.fn>;
-const mockCompleteSetup = userSetupApi.completeSetup as ReturnType<typeof vi.fn>;
+const mockGetSetupStatus = userSetupApi.getSetupStatus as ReturnType<
+  typeof vi.fn
+>;
+const mockCompleteSetup = userSetupApi.completeSetup as ReturnType<
+  typeof vi.fn
+>;
 
 describe("UserSetupModal", () => {
   beforeEach(() => {

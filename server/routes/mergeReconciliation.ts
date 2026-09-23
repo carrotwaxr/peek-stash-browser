@@ -9,7 +9,11 @@
  * - POST /api/admin/reconcile-all - Auto-reconcile all with exact phash matches
  */
 import express from "express";
-import { authenticate, requireAdmin, type AuthenticatedRequest } from "../middleware/auth.js";
+import {
+  type AuthenticatedRequest,
+  authenticate,
+  requireAdmin,
+} from "../middleware/auth.js";
 import { mergeReconciliationService } from "../services/MergeReconciliationService.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
@@ -27,7 +31,8 @@ router.get(
   "/orphaned-scenes",
   authenticated(async (req, res) => {
     try {
-      const orphans = await mergeReconciliationService.findOrphanedScenesWithActivity();
+      const orphans =
+        await mergeReconciliationService.findOrphanedScenesWithActivity();
       res.json({
         scenes: orphans,
         totalCount: orphans.length,
@@ -50,7 +55,9 @@ router.get(
   authenticated(async (req, res) => {
     try {
       const { id } = req.params;
-      const matches = await mergeReconciliationService.findPhashMatches(id as string);
+      const matches = await mergeReconciliationService.findPhashMatches(
+        id as string
+      );
       res.json({ matches });
     } catch (error) {
       res.status(500).json({
@@ -105,7 +112,9 @@ router.post(
   authenticated(async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await mergeReconciliationService.discardOrphanedData(id as string);
+      const result = await mergeReconciliationService.discardOrphanedData(
+        id as string
+      );
 
       res.json({
         ok: true,
@@ -128,7 +137,8 @@ router.post(
   "/reconcile-all",
   authenticated(async (req: AuthenticatedRequest, res) => {
     try {
-      const orphans = await mergeReconciliationService.findOrphanedScenesWithActivity();
+      const orphans =
+        await mergeReconciliationService.findOrphanedScenesWithActivity();
       let reconciled = 0;
       let skipped = 0;
 
@@ -138,7 +148,9 @@ router.post(
           continue;
         }
 
-        const matches = await mergeReconciliationService.findPhashMatches(orphan.id);
+        const matches = await mergeReconciliationService.findPhashMatches(
+          orphan.id
+        );
         const exactMatch = matches.find((m) => m.similarity === "exact");
 
         if (exactMatch) {

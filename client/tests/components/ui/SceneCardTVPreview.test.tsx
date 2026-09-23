@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+// Import after mocks
+import SceneCard from "../../../src/components/ui/SceneCard";
 
 // Hoisted spies that can be inspected from tests
 const { previewSpy, mockUseTVMode } = vi.hoisted(() => ({
@@ -57,9 +59,6 @@ vi.mock("../../../src/components/ui/SceneCardPreview", () => ({
     return <div data-testid="scene-preview" />;
   },
 }));
-
-// Import after mocks
-import SceneCard from "../../../src/components/ui/SceneCard";
 
 describe("SceneCard (TV Mode) preview activation wiring", () => {
   const scene = {

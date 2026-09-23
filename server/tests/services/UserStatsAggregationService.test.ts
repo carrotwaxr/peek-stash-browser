@@ -3,7 +3,7 @@
  *
  * Tests the transformUrl function for proper URL proxying
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { transformUrl } from "../../services/UserStatsAggregationService.js";
 
 describe("UserStatsAggregationService", () => {
@@ -25,9 +25,7 @@ describe("UserStatsAggregationService", () => {
     it("transforms simple path to proxy URL", () => {
       const path = "/scene/123/screenshot";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
 
     it("transforms full HTTP URL to proxy URL", () => {
@@ -65,41 +63,31 @@ describe("UserStatsAggregationService", () => {
     it("handles path with special characters", () => {
       const path = "/scene/123/screenshot?api_key=secret&t=123";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
 
     it("handles performer image path", () => {
       const path = "/performer/abc-123/image";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
 
     it("handles studio image path", () => {
       const path = "/studio/studio-id/image";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
 
     it("handles tag image path", () => {
       const path = "/tag/tag-id/image";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
 
     it("handles image thumbnail path", () => {
       const path = "/image/img-123/thumbnail";
       const result = transformUrl(path);
-      expect(result).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent(path)}`
-      );
+      expect(result).toBe(`/api/proxy/stash?path=${encodeURIComponent(path)}`);
     });
   });
 });

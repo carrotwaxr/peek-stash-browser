@@ -248,18 +248,22 @@ export function scoreSceneByPreferences(
     }
 
     if (favoritePerformerCount > 0) {
-      baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerCount);
+      baseScore +=
+        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerCount);
     }
     if (highlyRatedPerformerCount > 0) {
-      baseScore += PERFORMER_RATED_WEIGHT * Math.sqrt(highlyRatedPerformerCount);
+      baseScore +=
+        PERFORMER_RATED_WEIGHT * Math.sqrt(highlyRatedPerformerCount);
     }
     if (derivedPerformerWeight > 0) {
       // Apply sqrt to accumulated derived weight, scale by favorite weight
-      baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
+      baseScore +=
+        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
     }
     if (implicitPerformerWeight > 0) {
       // Implicit engagement signal from watch history
-      baseScore += IMPLICIT_PERFORMER_WEIGHT * Math.sqrt(implicitPerformerWeight);
+      baseScore +=
+        IMPLICIT_PERFORMER_WEIGHT * Math.sqrt(implicitPerformerWeight);
     }
   }
 
@@ -341,7 +345,8 @@ export function scoreSceneByPreferences(
     baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(favoriteSceneTagCount);
   }
   if (favoritePerformerTagCount > 0) {
-    baseScore += TAG_PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerTagCount);
+    baseScore +=
+      TAG_PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerTagCount);
   }
   if (favoriteStudioTagCount > 0) {
     baseScore += TAG_STUDIO_FAVORITE_WEIGHT * Math.sqrt(favoriteStudioTagCount);
@@ -376,13 +381,20 @@ export function countUserCriteria(
 ): UserCriteriaCounts {
   return {
     favoritedPerformers: performerRatings.filter((r) => r.favorite).length,
-    ratedPerformers: performerRatings.filter((r) => r.rating !== null && r.rating >= 80).length,
+    ratedPerformers: performerRatings.filter(
+      (r) => r.rating !== null && r.rating >= 80
+    ).length,
     favoritedStudios: studioRatings.filter((r) => r.favorite).length,
-    ratedStudios: studioRatings.filter((r) => r.rating !== null && r.rating >= 80).length,
+    ratedStudios: studioRatings.filter(
+      (r) => r.rating !== null && r.rating >= 80
+    ).length,
     favoritedTags: tagRatings.filter((r) => r.favorite).length,
-    ratedTags: tagRatings.filter((r) => r.rating !== null && r.rating >= 80).length,
+    ratedTags: tagRatings.filter((r) => r.rating !== null && r.rating >= 80)
+      .length,
     favoritedScenes: sceneRatings.filter((r) => r.favorite).length,
-    ratedScenes: sceneRatings.filter((r) => r.rating !== null && r.rating >= SCENE_RATING_FLOOR).length,
+    ratedScenes: sceneRatings.filter(
+      (r) => r.rating !== null && r.rating >= SCENE_RATING_FLOOR
+    ).length,
   };
 }
 
@@ -539,7 +551,9 @@ export function scoreScoringDataByPreferences(
       baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
     }
 
-    const implicitStudio = prefs.implicitStudioWeights?.get(scoringData.studioId);
+    const implicitStudio = prefs.implicitStudioWeights?.get(
+      scoringData.studioId
+    );
     if (implicitStudio) {
       baseScore += IMPLICIT_STUDIO_WEIGHT * Math.sqrt(implicitStudio);
     }

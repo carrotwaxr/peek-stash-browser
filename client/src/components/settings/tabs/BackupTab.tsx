@@ -1,7 +1,7 @@
 // client/src/components/settings/tabs/BackupTab.jsx
-import { useState, useEffect, useCallback } from "react";
-import { apiGet, apiPost, apiDelete } from "../../../api";
+import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { apiDelete, apiGet, apiPost } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
 
@@ -39,7 +39,9 @@ const BackupTab = () => {
   const fetchBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiGet<{ backups: BackupItem[] }>("/admin/database/backups");
+      const data = await apiGet<{ backups: BackupItem[] }>(
+        "/admin/database/backups"
+      );
       setBackups(data.backups);
     } catch {
       showError("Failed to load backups");
@@ -66,12 +68,18 @@ const BackupTab = () => {
   };
 
   const handleDeleteBackup = async (filename: string) => {
-    if (!confirm(`Are you sure you want to delete this backup?\n\n${filename}\n\nThis cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete this backup?\n\n${filename}\n\nThis cannot be undone.`
+      )
+    ) {
       return;
     }
     try {
       setDeleting(filename);
-      await apiDelete(`/admin/database/backups/${encodeURIComponent(filename)}`);
+      await apiDelete(
+        `/admin/database/backups/${encodeURIComponent(filename)}`
+      );
       showSuccess("Backup deleted");
       fetchBackups();
     } catch {
@@ -96,7 +104,10 @@ const BackupTab = () => {
       >
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+            <h3
+              className="text-lg font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
               Database Backup
             </h3>
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -118,7 +129,10 @@ const BackupTab = () => {
           </p>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
+            <p
+              className="text-sm mb-3"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {backups.length} backup{backups.length !== 1 ? "s" : ""} available
             </p>
 
@@ -132,10 +146,16 @@ const BackupTab = () => {
                 }}
               >
                 <div>
-                  <p className="font-medium" style={{ color: "var(--text-primary)" }}>
+                  <p
+                    className="font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {formatDate(backup.createdAt)}
                   </p>
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {formatBytes(backup.size)}
                   </p>
                 </div>

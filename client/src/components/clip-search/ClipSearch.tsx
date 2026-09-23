@@ -1,19 +1,19 @@
 import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useWallPlayback } from "../../hooks/useWallPlayback";
-import { useTableColumns } from "../../hooks/useTableColumns";
-import { useConfig } from "../../contexts/ConfigContext";
-import { getScenePathWithTime } from "../../utils/entityLinks";
-import { getClips, type GetClipsOptions } from "../../api";
+import { type GetClipsOptions, getClips } from "../../api";
 import { queryKeys } from "../../api/queryKeys";
+import { useConfig } from "../../contexts/ConfigContext";
+import { useTableColumns } from "../../hooks/useTableColumns";
+import { useWallPlayback } from "../../hooks/useWallPlayback";
+import { getScenePathWithTime } from "../../utils/entityLinks";
+import { ColumnConfigPopover, TableView } from "../table/index";
 import {
   ErrorMessage,
   PageHeader,
   PageLayout,
   SearchControls,
 } from "../ui/index";
-import { TableView, ColumnConfigPopover } from "../table/index";
 import WallView from "../wall/WallView";
 import ClipGrid from "./ClipGrid";
 
@@ -54,9 +54,16 @@ const ClipSearch = ({
   const { hasMultipleInstances } = useConfig();
 
   // Clip query params (set when SearchControls calls onQueryChange)
-  const [clipQueryParams, setClipQueryParams] = useState<GetClipsOptions | null>(null);
-  const { data, isLoading: queryLoading, error } = useQuery({
-    queryKey: queryKeys.clips.list((clipQueryParams ?? {}) as Record<string, unknown>),
+  const [clipQueryParams, setClipQueryParams] =
+    useState<GetClipsOptions | null>(null);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+  } = useQuery({
+    queryKey: queryKeys.clips.list(
+      (clipQueryParams ?? {}) as Record<string, unknown>
+    ),
     queryFn: () => getClips(clipQueryParams!),
     enabled: clipQueryParams !== null,
   });
@@ -82,8 +89,9 @@ const ClipSearch = ({
     parseInt(searchParams.get("per_page") ?? "24")
   );
 
-  const currentClips = (data as Record<string, unknown>)?.clips as unknown[] || [];
-  const totalCount = (data as Record<string, unknown>)?.total as number || 0;
+  const currentClips =
+    ((data as Record<string, unknown>)?.clips as unknown[]) || [];
+  const totalCount = ((data as Record<string, unknown>)?.total as number) || 0;
   const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   /**
@@ -115,12 +123,18 @@ const ClipSearch = ({
       }
 
       // Handle scene tag IDs filter
-      if (clipFilter.sceneTagIds && (clipFilter.sceneTagIds as string[]).length > 0) {
+      if (
+        clipFilter.sceneTagIds &&
+        (clipFilter.sceneTagIds as string[]).length > 0
+      ) {
         params.sceneTagIds = clipFilter.sceneTagIds as string[];
       }
 
       // Handle performer IDs filter
-      if (clipFilter.performerIds && (clipFilter.performerIds as string[]).length > 0) {
+      if (
+        clipFilter.performerIds &&
+        (clipFilter.performerIds as string[]).length > 0
+      ) {
         params.performerIds = clipFilter.performerIds as string[];
       }
 
@@ -131,7 +145,8 @@ const ClipSearch = ({
 
       // Merge permanent filters
       if ((permanentFilters as Record<string, unknown>).sceneId) {
-        params.sceneId = (permanentFilters as Record<string, unknown>).sceneId as string;
+        params.sceneId = (permanentFilters as Record<string, unknown>)
+          .sceneId as string;
       }
 
       setClipQueryParams(params);
@@ -140,9 +155,19 @@ const ClipSearch = ({
   );
 
   const handleClipClick = (clip: Record<string, unknown>) => {
-    navigate(getScenePathWithTime({ id: clip.sceneId as string, instanceId: clip.instanceId as string | undefined } as Record<string, unknown>, clip.seconds as number, hasMultipleInstances), {
-      state: { fromPageTitle, shouldAutoplay: true },
-    });
+    navigate(
+      getScenePathWithTime(
+        {
+          id: clip.sceneId as string,
+          instanceId: clip.instanceId as string | undefined,
+        } as Record<string, unknown>,
+        clip.seconds as number,
+        hasMultipleInstances
+      ),
+      {
+        state: { fromPageTitle, shouldAutoplay: true },
+      }
+    );
   };
 
   if (error) {
@@ -170,7 +195,9 @@ const ClipSearch = ({
         totalCount={totalCount}
         syncToUrl={syncToUrl}
         supportsWallView={true}
-        viewModes={VIEW_MODES as React.ComponentProps<typeof SearchControls>["viewModes"]}
+        viewModes={
+          VIEW_MODES as React.ComponentProps<typeof SearchControls>["viewModes"]
+        }
         wallPlayback={wallPlayback}
         onWallPlaybackChange={updateWallPlayback}
         currentTableColumns={getColumnConfig()}
@@ -184,47 +211,60 @@ const ClipSearch = ({
           />
         }
       >
-        {(({ viewMode, zoomLevel, gridDensity }: { viewMode: string; zoomLevel: string; gridDensity: string }) =>
-          viewMode === "table" ? (
-            <TableView
-              items={currentClips as Record<string, unknown>[]}
-              columns={visibleColumns}
-              sort={{ field: "stashCreatedAt", direction: "DESC" }}
-              onHideColumn={hideColumn}
-              entityType="clip"
-              isLoading={isLoading}
-              columnsPopover={
-                <ColumnConfigPopover
-                  allColumns={allColumns}
-                  visibleColumnIds={visibleColumnIds}
-                  columnOrder={columnOrder}
-                  onToggleColumn={toggleColumn}
-                  onMoveColumn={moveColumn}
-                />
-              }
-            />
-          ) : viewMode === "wall" ? (
-            <WallView
-              items={currentClips as Record<string, unknown>[]}
-              entityType="clip"
-              zoomLevel={zoomLevel as "small" | "medium" | "large"}
-              playbackMode={wallPlayback as "autoplay" | "hover" | "static"}
-              onItemClick={handleClipClick}
-              loading={isLoading}
-              emptyMessage="No clips found"
-            />
-          ) : (
-            <ClipGrid
-              clips={currentClips as Record<string, unknown>[]}
-              density={gridDensity}
-              loading={isLoading}
-              onClipClick={handleClipClick as React.ComponentProps<typeof ClipGrid>["onClipClick"]}
-              fromPageTitle={fromPageTitle}
-              emptyMessage="No clips found"
-              emptyDescription="Try adjusting your search filters"
-            />
-          )
-        ) as unknown as React.ReactNode}
+        {
+          (({
+            viewMode,
+            zoomLevel,
+            gridDensity,
+          }: {
+            viewMode: string;
+            zoomLevel: string;
+            gridDensity: string;
+          }) =>
+            viewMode === "table" ? (
+              <TableView
+                items={currentClips as Record<string, unknown>[]}
+                columns={visibleColumns}
+                sort={{ field: "stashCreatedAt", direction: "DESC" }}
+                onHideColumn={hideColumn}
+                entityType="clip"
+                isLoading={isLoading}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
+              />
+            ) : viewMode === "wall" ? (
+              <WallView
+                items={currentClips as Record<string, unknown>[]}
+                entityType="clip"
+                zoomLevel={zoomLevel as "small" | "medium" | "large"}
+                playbackMode={wallPlayback as "autoplay" | "hover" | "static"}
+                onItemClick={handleClipClick}
+                loading={isLoading}
+                emptyMessage="No clips found"
+              />
+            ) : (
+              <ClipGrid
+                clips={currentClips as Record<string, unknown>[]}
+                density={gridDensity}
+                loading={isLoading}
+                onClipClick={
+                  handleClipClick as React.ComponentProps<
+                    typeof ClipGrid
+                  >["onClipClick"]
+                }
+                fromPageTitle={fromPageTitle}
+                emptyMessage="No clips found"
+                emptyDescription="Try adjusting your search filters"
+              />
+            )) as unknown as React.ReactNode
+        }
       </SearchControls>
     </PageLayout>
   );

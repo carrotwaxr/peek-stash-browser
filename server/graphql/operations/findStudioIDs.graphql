@@ -1,7 +1,4 @@
-query FindStudioIDs(
-  $filter: FindFilterType
-  $studio_filter: StudioFilterType
-) {
+query FindStudioIDs($filter: FindFilterType, $studio_filter: StudioFilterType) {
   findStudios(filter: $filter, studio_filter: $studio_filter) {
     count
     studios {

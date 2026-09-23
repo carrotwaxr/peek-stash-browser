@@ -75,10 +75,9 @@ const migrations: Migration[] = [
       try {
         await userStatsService.rebuildAllStats();
         const duration = Date.now() - startTime;
-        logger.info(
-          "[Migration 002] Stats rebuild completed successfully",
-          { durationMs: duration }
-        );
+        logger.info("[Migration 002] Stats rebuild completed successfully", {
+          durationMs: duration,
+        });
       } catch (error) {
         const duration = Date.now() - startTime;
         logger.error(

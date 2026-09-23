@@ -3,7 +3,7 @@
  * Mock for CardDisplaySettingsContext
  * Provides controllable settings for testing card display customization
  */
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 
 const DEFAULT_ENTITY_SETTINGS = {
   showDescriptionOnCard: true,

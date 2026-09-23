@@ -1,9 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatRelativeTime } from "../../utils/date";
+import type { NormalizedScene } from "@peek/shared-types";
 import { useConfig } from "../../contexts/ConfigContext";
 import { useCardSelection } from "../../hooks/useCardSelection";
+import { formatRelativeTime } from "../../utils/date";
 import { getEntityPath } from "../../utils/entityLinks";
+import { getSceneDescription } from "../../utils/format";
 import {
   SceneMetadata,
   SceneStats,
@@ -11,8 +13,6 @@ import {
   SceneTitle,
 } from "../scene/index";
 import { ExpandableDescription } from "./ExpandableDescription";
-import { getSceneDescription } from "../../utils/format";
-import type { NormalizedScene } from "@peek/shared-types";
 
 interface WatchHistoryData {
   resumeTime?: number;
@@ -53,11 +53,14 @@ const SceneListItem = ({
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
 
-  const { selectionHandlers, isLongPressing, handleNavigationClick } = useCardSelection({
-    entity: scene as unknown as Record<string, unknown>,
-    selectionMode,
-    onToggleSelect: onToggleSelect as ((entity: Record<string, unknown>) => void) | undefined,
-  });
+  const { selectionHandlers, isLongPressing, handleNavigationClick } =
+    useCardSelection({
+      entity: scene as unknown as Record<string, unknown>,
+      selectionMode,
+      onToggleSelect: onToggleSelect as
+        | ((entity: Record<string, unknown>) => void)
+        | undefined,
+    });
 
   // Track if viewport is mobile-width for scroll-based preview autoplay
   // Uses md breakpoint (768px) since list items stack vertically below this
@@ -89,7 +92,9 @@ const SceneListItem = ({
       const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
 
       // Check if the last O was within 5 minutes of the last play session
-      const timeDiff = Math.abs(lastOTimestamp.getTime() - lastPlayedAt.getTime());
+      const timeDiff = Math.abs(
+        lastOTimestamp.getTime() - lastPlayedAt.getTime()
+      );
       const fiveMinutes = 5 * 60 * 1000;
 
       return timeDiff < fiveMinutes;
@@ -152,7 +157,8 @@ const SceneListItem = ({
       // Also check if video is fullscreen
       const isFullscreen =
         document.fullscreenElement ||
-        (document as unknown as Record<string, unknown>).webkitFullscreenElement ||
+        (document as unknown as Record<string, unknown>)
+          .webkitFullscreenElement ||
         (document as unknown as Record<string, unknown>).mozFullScreenElement ||
         (document as unknown as Record<string, unknown>).msFullscreenElement;
       if (isFullscreen) {
@@ -160,7 +166,14 @@ const SceneListItem = ({
       }
     }
 
-    navigate(getEntityPath('scene', scene as unknown as Parameters<typeof getEntityPath>[1], hasMultipleInstances), { state: linkState });
+    navigate(
+      getEntityPath(
+        "scene",
+        scene as unknown as Parameters<typeof getEntityPath>[1],
+        hasMultipleInstances
+      ),
+      { state: linkState }
+    );
   };
 
   return (
@@ -170,9 +183,11 @@ const SceneListItem = ({
       className="rounded-lg border transition-all hover:shadow-lg"
       style={{
         backgroundColor: "var(--bg-card)",
-        border: isSelected ? "2px solid var(--selection-color)" : "1px solid var(--border-color)",
+        border: isSelected
+          ? "2px solid var(--selection-color)"
+          : "1px solid var(--border-color)",
         opacity: exists ? 1 : 0.6,
-        cursor: selectionMode ? "pointer" : (exists ? "pointer" : "default"),
+        cursor: selectionMode ? "pointer" : exists ? "pointer" : "default",
       }}
     >
       <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
@@ -201,8 +216,18 @@ const SceneListItem = ({
                 }}
               >
                 {isSelected && (
-                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-5 h-5 sm:w-4 sm:h-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 )}
               </button>
@@ -210,7 +235,11 @@ const SceneListItem = ({
             {exists ? (
               <SceneThumbnail
                 scene={scene!}
-                watchHistory={watchHistory as Parameters<typeof SceneThumbnail>[0]['watchHistory']}
+                watchHistory={
+                  watchHistory as Parameters<
+                    typeof SceneThumbnail
+                  >[0]["watchHistory"]
+                }
                 className="w-full aspect-video"
                 autoplayOnScroll={isMobileWidth}
               />
@@ -290,7 +319,14 @@ const SceneListItem = ({
 
                       {/* Stats Row */}
                       <div className="flex items-center gap-2 mb-2">
-                        <SceneStats scene={scene} watchHistory={watchHistory as Parameters<typeof SceneStats>[0]['watchHistory']} />
+                        <SceneStats
+                          scene={scene}
+                          watchHistory={
+                            watchHistory as Parameters<
+                              typeof SceneStats
+                            >[0]["watchHistory"]
+                          }
+                        />
                         {showSessionOIndicator && hadOInLastSession() && (
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"

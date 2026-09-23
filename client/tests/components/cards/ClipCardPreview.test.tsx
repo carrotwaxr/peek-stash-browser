@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
 import { act } from "react";
-import ClipCardPreview from "../../../src/components/cards/ClipCardPreview";
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Clip } from "../../../src/components/cards/ClipCard";
+import ClipCardPreview from "../../../src/components/cards/ClipCardPreview";
 
 vi.mock("../../../src/api", () => ({
   getClipPreviewUrl: (id: string) => `/api/proxy/clip/${id}/preview`,
@@ -11,22 +11,24 @@ vi.mock("../../../src/api", () => ({
 // Mock IntersectionObserver — triggers on observe() to avoid TDZ issue
 let intersectionCallback: IntersectionObserverCallback;
 beforeEach(() => {
-  const mockIntersectionObserver = vi.fn((callback: IntersectionObserverCallback) => {
-    intersectionCallback = callback;
-    return {
-      observe: vi.fn(() => {
-        // Trigger intersection asynchronously after observer is assigned
-        queueMicrotask(() => {
-          intersectionCallback(
-            [{ isIntersecting: true } as IntersectionObserverEntry],
-            {} as IntersectionObserver
-          );
-        });
-      }),
-      disconnect: vi.fn(),
-      unobserve: vi.fn(),
-    };
-  });
+  const mockIntersectionObserver = vi.fn(
+    (callback: IntersectionObserverCallback) => {
+      intersectionCallback = callback;
+      return {
+        observe: vi.fn(() => {
+          // Trigger intersection asynchronously after observer is assigned
+          queueMicrotask(() => {
+            intersectionCallback(
+              [{ isIntersecting: true } as IntersectionObserverEntry],
+              {} as IntersectionObserver
+            );
+          });
+        }),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+      };
+    }
+  );
   vi.stubGlobal("IntersectionObserver", mockIntersectionObserver);
 });
 
@@ -52,7 +54,10 @@ describe("ClipCardPreview", () => {
     // Flush microtask for IntersectionObserver
     await act(() => Promise.resolve());
     const img = container.querySelector("img");
-    expect(img).toHaveAttribute("src", "/api/proxy/stash?path=%2Fmarker-screenshot.jpg");
+    expect(img).toHaveAttribute(
+      "src",
+      "/api/proxy/stash?path=%2Fmarker-screenshot.jpg"
+    );
   });
 
   it("falls back to scene cover when no marker screenshot", async () => {

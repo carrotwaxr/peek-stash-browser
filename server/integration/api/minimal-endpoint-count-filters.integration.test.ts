@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Integration tests for minimal endpoint count_filter functionality.
@@ -52,7 +52,9 @@ describe("Minimal Endpoint Count Filters", () => {
         }
       );
       expect(filteredResponse.ok).toBe(true);
-      expect(filteredResponse.data.performers.length).toBeLessThanOrEqual(totalCount);
+      expect(filteredResponse.data.performers.length).toBeLessThanOrEqual(
+        totalCount
+      );
 
       // Known performer with scenes should be in filtered results
       const hasPerformerWithScenes = filteredResponse.data.performers.some(
@@ -102,7 +104,9 @@ describe("Minimal Endpoint Count Filters", () => {
         }
       );
       expect(filteredResponse.ok).toBe(true);
-      expect(filteredResponse.data.studios.length).toBeLessThanOrEqual(totalCount);
+      expect(filteredResponse.data.studios.length).toBeLessThanOrEqual(
+        totalCount
+      );
 
       // Known studio with scenes should be in filtered results
       const hasStudioWithScenes = filteredResponse.data.studios.some(
@@ -179,7 +183,9 @@ describe("Minimal Endpoint Count Filters", () => {
       );
       expect(filteredResponse.ok).toBe(true);
       // Filtered count should be <= total (some galleries may have 0 images)
-      expect(filteredResponse.data.galleries.length).toBeLessThanOrEqual(totalCount);
+      expect(filteredResponse.data.galleries.length).toBeLessThanOrEqual(
+        totalCount
+      );
     });
   });
 
@@ -201,7 +207,9 @@ describe("Minimal Endpoint Count Filters", () => {
         }
       );
       expect(filteredResponse.ok).toBe(true);
-      expect(filteredResponse.data.groups.length).toBeLessThanOrEqual(totalCount);
+      expect(filteredResponse.data.groups.length).toBeLessThanOrEqual(
+        totalCount
+      );
     });
 
     it("supports min_performer_count filter", async () => {
@@ -255,15 +263,20 @@ describe("Minimal Endpoint Count Filters", () => {
       const bothCount = bothFiltersResponse.data.tags.length;
 
       // Combined should be at least as big as the larger individual result
-      expect(bothCount).toBeGreaterThanOrEqual(Math.max(scenesOnlyCount, performersOnlyCount));
+      expect(bothCount).toBeGreaterThanOrEqual(
+        Math.max(scenesOnlyCount, performersOnlyCount)
+      );
     });
   });
 
   describe("Authentication", () => {
     it("rejects unauthenticated requests", async () => {
-      const response = await guestClient.post("/api/library/performers/minimal", {
-        count_filter: { min_scene_count: 1 },
-      });
+      const response = await guestClient.post(
+        "/api/library/performers/minimal",
+        {
+          count_filter: { min_scene_count: 1 },
+        }
+      );
       expect(response.status).toBe(401);
     });
   });

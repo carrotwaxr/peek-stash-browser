@@ -76,11 +76,13 @@ validateArrayResponse(schema, items, context);
 ## Migration Strategy
 
 Schemas are being adopted incrementally. Current status:
+
 - [ ] `/api/library/scenes` - Schema defined, not yet validated at runtime
 - [ ] `/api/library/performers` - Schema defined, not yet validated at runtime
 - [ ] Other endpoints - Pending
 
 To enable validation for an endpoint:
+
 1. Import the appropriate schema
 2. Use `validateResponse()` before `res.json()`
 3. Test with invalid data to ensure errors are logged

@@ -1,26 +1,26 @@
 import { DownloadStatus, DownloadType } from "@prisma/client";
 import { downloadService } from "../services/DownloadService.js";
-import { playlistZipService } from "../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import { playlistZipService } from "../services/PlaylistZipService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type {
-  StartSceneDownloadParams,
-  StartSceneDownloadResponse,
+  DeleteDownloadParams,
+  DeleteDownloadResponse,
+  GetDownloadFileParams,
+  GetDownloadStatusParams,
+  GetDownloadStatusResponse,
+  GetUserDownloadsResponse,
+  RetryDownloadParams,
+  RetryDownloadResponse,
   StartImageDownloadParams,
   StartImageDownloadResponse,
   StartPlaylistDownloadParams,
   StartPlaylistDownloadResponse,
-  GetUserDownloadsResponse,
-  GetDownloadStatusParams,
-  GetDownloadStatusResponse,
-  GetDownloadFileParams,
-  DeleteDownloadParams,
-  DeleteDownloadResponse,
-  RetryDownloadParams,
-  RetryDownloadResponse,
+  StartSceneDownloadParams,
+  StartSceneDownloadResponse,
 } from "../types/api/download.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { logger } from "../utils/logger.js";
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
@@ -31,7 +31,8 @@ const MAX_PLAYLIST_SIZE_MB = parseInt(
   process.env.MAX_PLAYLIST_DOWNLOAD_SIZE_MB || "10240",
   10
 );
-const MAX_PLAYLIST_SIZE_BYTES = BigInt(MAX_PLAYLIST_SIZE_MB) * BigInt(1024 * 1024);
+const MAX_PLAYLIST_SIZE_BYTES =
+  BigInt(MAX_PLAYLIST_SIZE_MB) * BigInt(1024 * 1024);
 
 /**
  * Serialize a download record for JSON response.
@@ -500,7 +501,9 @@ export async function retryDownload(
     // Fetch updated download record
     const updatedDownload = await downloadService.getDownload(downloadId);
     if (!updatedDownload) {
-      return res.status(500).json({ error: "Failed to retrieve updated download" });
+      return res
+        .status(500)
+        .json({ error: "Failed to retrieve updated download" });
     }
 
     return res.json({ download: serializeDownload(updatedDownload) });

@@ -44,7 +44,9 @@ function parseVTT(vttContent: string): SpriteCue[] {
 
     // Look for timestamp lines (format: 00:00:00.000 --> 00:00:10.000)
     if (line.includes("-->")) {
-      const [startTime, endTime] = line.split("-->").map((t: string) => t.trim());
+      const [startTime, endTime] = line
+        .split("-->")
+        .map((t: string) => t.trim());
 
       // Next line should have the sprite position
       i++;
@@ -136,7 +138,10 @@ export async function fetchAndParseVTT(vttUrl: string): Promise<SpriteCue[]> {
  * @param {number} count - Number of sprites to return
  * @returns {Array<Object>} Array of sprite positions
  */
-export function getEvenlySpacedSprites(cues: SpriteCue[], count = 5): SpritePosition[] {
+export function getEvenlySpacedSprites(
+  cues: SpriteCue[],
+  count = 5
+): SpritePosition[] {
   if (!cues || cues.length === 0) return [];
 
   if (cues.length <= count) {

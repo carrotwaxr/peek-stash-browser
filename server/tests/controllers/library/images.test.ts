@@ -5,7 +5,17 @@
  * Note: mergeImagesWithUserData and transformImageResult are private
  * and tested indirectly through the handlers.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  findImageById,
+  findImages,
+} from "../../../controllers/library/images.js";
+// --- Imports ---
+
+import prisma from "../../../prisma/singleton.js";
+import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
+import { stashEntityService } from "../../../services/StashEntityService.js";
+import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -46,17 +56,6 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     .fn()
     .mockImplementation((_type, id) => `http://stash/images/${id}`),
 }));
-
-// --- Imports ---
-
-import prisma from "../../../prisma/singleton.js";
-import { stashEntityService } from "../../../services/StashEntityService.js";
-import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
-import {
-  findImages,
-  findImageById,
-} from "../../../controllers/library/images.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -135,11 +134,7 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, image_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -164,11 +159,7 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, image_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -189,11 +180,7 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq(
-        { filter: {}, image_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -346,11 +333,7 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        { filter: {}, image_filter: {} },
-        {},
-        adminUser
-      );
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, adminUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -365,11 +348,7 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        { filter: {}, image_filter: {} },
-        {},
-        defaultUser
-      );
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -379,9 +358,7 @@ describe("Images Controller", () => {
     });
 
     it("returns 500 when query builder throws", async () => {
-      mockImageQueryBuilder.execute.mockRejectedValue(
-        new Error("DB error")
-      );
+      mockImageQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
       const req = mockReq({ filter: {} }, {}, defaultUser);
       const res = mockRes();

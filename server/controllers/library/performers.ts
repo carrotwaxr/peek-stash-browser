@@ -1,29 +1,32 @@
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../../prisma/singleton.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
-  FindPerformersRequest,
-  FindPerformersResponse,
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
   FindPerformersMinimalRequest,
   FindPerformersMinimalResponse,
+  FindPerformersRequest,
+  FindPerformersResponse,
+  TypedAuthRequest,
+  TypedResponse,
   UpdatePerformerParams,
   UpdatePerformerRequest,
   UpdatePerformerResponse,
-  ApiErrorResponse,
-  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
 } from "../../types/index.js";
-import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import {
+  disambiguateEntityNames,
+  getEntityInstanceId,
+} from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -40,7 +43,9 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
  * @param careerLengthStr The career_length string from Stash
  * @returns Number of years, or null if unparseable/empty
  */
-export function parseCareerLength(careerLengthStr: string | null | undefined): number | null {
+export function parseCareerLength(
+  careerLengthStr: string | null | undefined
+): number | null {
   if (!careerLengthStr || careerLengthStr.trim() === "") {
     return null;
   }
@@ -66,7 +71,11 @@ export function parseCareerLength(careerLengthStr: string | null | undefined): n
   if (rangeMatch) {
     const startYear = parseInt(rangeMatch[1] as string, 10);
     const endYear = parseInt(rangeMatch[2] as string, 10);
-    if (startYear > 1900 && endYear >= startYear && endYear <= currentYear + 1) {
+    if (
+      startYear > 1900 &&
+      endYear >= startYear &&
+      endYear <= currentYear + 1
+    ) {
       return endYear - startYear;
     }
   }
@@ -147,7 +156,9 @@ export async function mergePerformersWithUserData(
  */
 export const findPerformers = async (
   req: TypedAuthRequest<FindPerformersRequest>,
-  res: TypedResponse<FindPerformersResponse | ApiErrorResponse | AmbiguousLookupResponse>
+  res: TypedResponse<
+    FindPerformersResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   try {
     const startTime = Date.now();
@@ -156,13 +167,18 @@ export const findPerformers = async (
     const { filter, performer_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
+    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
+      | "ASC"
+      | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
+    const { sortField, randomSeed } = parseRandomSort(
+      sortFieldRaw,
+      requestingUser.id
+    );
 
     // Merge root-level ids with performer_filter
     const normalizedIds = ids
@@ -174,7 +190,9 @@ export const findPerformers = async (
     };
 
     // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
-    const specificInstanceId = performer_filter?.instance_id as string | undefined;
+    const specificInstanceId = performer_filter?.instance_id as
+      | string
+      | undefined;
 
     // Use SQL query builder - admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
@@ -198,16 +216,21 @@ export const findPerformers = async (
 
     // Check for ambiguous results on single-ID lookups
     // This happens when the same ID exists in multiple Stash instances
-    if (ids && ids.length === 1 && !specificInstanceId && performers.length > 1) {
+    if (
+      ids &&
+      ids.length === 1 &&
+      !specificInstanceId &&
+      performers.length > 1
+    ) {
       logger.warn("Ambiguous performer lookup", {
         id: ids[0],
         matchCount: performers.length,
-        instances: performers.map(p => p.instanceId),
+        instances: performers.map((p) => p.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple performers found with ID ${ids[0]}. Specify instance_id parameter.`,
-        matches: performers.map(p => ({
+        matches: performers.map((p) => ({
           id: p.id,
           name: p.name,
           instanceId: p.instanceId,
@@ -222,9 +245,13 @@ export const findPerformers = async (
     }
 
     // Add stashUrl to each performer
-    const performersWithStashUrl = resultPerformers.map(performer => ({
+    const performersWithStashUrl = resultPerformers.map((performer) => ({
       ...performer,
-      stashUrl: buildStashEntityUrl('performer', performer.id, performer.instanceId || undefined),
+      stashUrl: buildStashEntityUrl(
+        "performer",
+        performer.id,
+        performer.instanceId || undefined
+      ),
     }));
 
     logger.info("findPerformers completed", {
@@ -290,7 +317,9 @@ export async function applyPerformerFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((p) => {
-        const performerTagIds = (p.tags || []).map((t: { id: string }) => String(t.id));
+        const performerTagIds = (p.tags || []).map((t: { id: string }) =>
+          String(t.id)
+        );
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
@@ -319,7 +348,8 @@ export async function applyPerformerFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.studios && filters.studios.value) {
     const studioIds = filters.studios.value.map(String);
-    const performerIdsInStudios = await stashEntityService.getPerformerIdsByStudios(studioIds);
+    const performerIdsInStudios =
+      await stashEntityService.getPerformerIdsByStudios(studioIds);
     filtered = filtered.filter((p) => performerIdsInStudios.has(p.id));
   }
 
@@ -329,7 +359,8 @@ export async function applyPerformerFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.groups && filters.groups.value) {
     const groupIds = filters.groups.value.map(String);
-    const performerIdsInGroups = await stashEntityService.getPerformerIdsByGroups(groupIds);
+    const performerIdsInGroups =
+      await stashEntityService.getPerformerIdsByGroups(groupIds);
     filtered = filtered.filter((p) => performerIdsInGroups.has(p.id));
   }
 
@@ -473,7 +504,8 @@ export async function applyPerformerFilters(
         const name = (p.name || "").toLowerCase();
         const aliases = (p.alias_list || []).join(" ").toLowerCase();
         const combinedText = name + " " + aliases;
-        if (modifier === "INCLUDES" || !modifier) return combinedText.includes(searchValue);
+        if (modifier === "INCLUDES" || !modifier)
+          return combinedText.includes(searchValue);
         if (modifier === "EXCLUDES") return !combinedText.includes(searchValue);
         if (modifier === "EQUALS") return name === searchValue;
         if (modifier === "NOT_EQUALS") return name !== searchValue;
@@ -489,7 +521,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toLowerCase();
       filtered = filtered.filter((p) => {
         const details = (p.details || "").toLowerCase();
-        if (modifier === "INCLUDES" || !modifier) return details.includes(searchValue);
+        if (modifier === "INCLUDES" || !modifier)
+          return details.includes(searchValue);
         if (modifier === "EXCLUDES") return !details.includes(searchValue);
         return true;
       });
@@ -503,7 +536,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toLowerCase();
       filtered = filtered.filter((p) => {
         const tattoos = (p.tattoos || "").toLowerCase();
-        if (modifier === "INCLUDES" || !modifier) return tattoos.includes(searchValue);
+        if (modifier === "INCLUDES" || !modifier)
+          return tattoos.includes(searchValue);
         if (modifier === "EXCLUDES") return !tattoos.includes(searchValue);
         return true;
       });
@@ -517,7 +551,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toLowerCase();
       filtered = filtered.filter((p) => {
         const piercings = (p.piercings || "").toLowerCase();
-        if (modifier === "INCLUDES" || !modifier) return piercings.includes(searchValue);
+        if (modifier === "INCLUDES" || !modifier)
+          return piercings.includes(searchValue);
         if (modifier === "EXCLUDES") return !piercings.includes(searchValue);
         return true;
       });
@@ -531,7 +566,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toLowerCase();
       filtered = filtered.filter((p) => {
         const measurements = (p.measurements || "").toLowerCase();
-        if (modifier === "INCLUDES" || !modifier) return measurements.includes(searchValue);
+        if (modifier === "INCLUDES" || !modifier)
+          return measurements.includes(searchValue);
         if (modifier === "EXCLUDES") return !measurements.includes(searchValue);
         return true;
       });
@@ -613,7 +649,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
         const ethnicity = (p.ethnicity || "").toUpperCase();
-        if (modifier === "EQUALS" || !modifier) return ethnicity === searchValue;
+        if (modifier === "EQUALS" || !modifier)
+          return ethnicity === searchValue;
         if (modifier === "NOT_EQUALS") return ethnicity !== searchValue;
         return true;
       });
@@ -627,7 +664,8 @@ export async function applyPerformerFilters(
       const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
         const hairColor = (p.hair_color || "").toUpperCase();
-        if (modifier === "EQUALS" || !modifier) return hairColor === searchValue;
+        if (modifier === "EQUALS" || !modifier)
+          return hairColor === searchValue;
         if (modifier === "NOT_EQUALS") return hairColor !== searchValue;
         return true;
       });
@@ -696,7 +734,10 @@ export async function applyPerformerFilters(
         const birthDate = new Date(p.birthdate);
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birthDate.getDate())
+        ) {
           age--;
         }
         if (modifier === "GREATER_THAN") return age > value;
@@ -713,24 +754,34 @@ export async function applyPerformerFilters(
 
   // Filter by career_length (numeric range in years)
   if (filters.career_length) {
-    const careerFilter = filters.career_length as { value?: number; value2?: number; modifier?: string };
+    const careerFilter = filters.career_length as {
+      value?: number;
+      value2?: number;
+      modifier?: string;
+    };
     const { modifier, value, value2 } = careerFilter;
     // For BETWEEN, we need at least one bound; for other modifiers we need value
-    const hasValidFilter = (modifier === "BETWEEN" && (value !== undefined || value2 !== undefined)) ||
-                           (modifier !== "BETWEEN" && value !== undefined && value !== null);
+    const hasValidFilter =
+      (modifier === "BETWEEN" &&
+        (value !== undefined || value2 !== undefined)) ||
+      (modifier !== "BETWEEN" && value !== undefined && value !== null);
     if (hasValidFilter) {
       filtered = filtered.filter((p) => {
         const careerLength = parseCareerLength(p.career_length);
         // Exclude performers with unparseable career_length
         if (careerLength === null) return false;
-        if (modifier === "GREATER_THAN" && value !== undefined) return careerLength > value;
-        if (modifier === "LESS_THAN" && value !== undefined) return careerLength < value;
+        if (modifier === "GREATER_THAN" && value !== undefined)
+          return careerLength > value;
+        if (modifier === "LESS_THAN" && value !== undefined)
+          return careerLength < value;
         if (modifier === "EQUALS") return careerLength === value;
         if (modifier === "NOT_EQUALS") return careerLength !== value;
         if (modifier === "BETWEEN") {
           // Support partial ranges (min only, max only, or both)
-          const minOk = value === undefined || value === null || careerLength >= value;
-          const maxOk = value2 === undefined || value2 === null || careerLength <= value2;
+          const minOk =
+            value === undefined || value === null || careerLength >= value;
+          const maxOk =
+            value2 === undefined || value2 === null || careerLength <= value2;
           return minOk && maxOk;
         }
         return true;
@@ -815,13 +866,22 @@ export const findPerformersMinimal = async (
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {
-      const { min_scene_count, min_gallery_count, min_image_count, min_group_count } = count_filter;
+      const {
+        min_scene_count,
+        min_gallery_count,
+        min_image_count,
+        min_group_count,
+      } = count_filter;
       performers = performers.filter((p) => {
         const conditions: boolean[] = [];
-        if (min_scene_count !== undefined) conditions.push(p.scene_count >= min_scene_count);
-        if (min_gallery_count !== undefined) conditions.push(p.gallery_count >= min_gallery_count);
-        if (min_image_count !== undefined) conditions.push(p.image_count >= min_image_count);
-        if (min_group_count !== undefined) conditions.push(p.group_count >= min_group_count);
+        if (min_scene_count !== undefined)
+          conditions.push(p.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined)
+          conditions.push(p.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined)
+          conditions.push(p.image_count >= min_image_count);
+        if (min_group_count !== undefined)
+          conditions.push(p.group_count >= min_group_count);
         return conditions.length === 0 || conditions.some((c) => c);
       });
     }
@@ -891,10 +951,12 @@ export const updatePerformer = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const instanceId = await getEntityInstanceId('performer', id);
+    const instanceId = await getEntityInstanceId("performer", id);
     const stash = stashInstanceManager.get(instanceId);
     if (!stash) {
-      return res.status(404).json({ error: "Stash instance not found for performer" });
+      return res
+        .status(404)
+        .json({ error: "Stash instance not found for performer" });
     }
 
     const updatedPerformer = await stash.performerUpdate({
@@ -908,9 +970,15 @@ export const updatePerformer = async (
       return res.status(500).json({ error: "Performer update returned null" });
     }
 
-    res.json({ success: true, performer: updatedPerformer.performerUpdate as unknown as NormalizedPerformer });
+    res.json({
+      success: true,
+      performer:
+        updatedPerformer.performerUpdate as unknown as NormalizedPerformer,
+    });
   } catch (error) {
-    logger.error("Error updating performer", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating performer", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update performer" });
   }
 };

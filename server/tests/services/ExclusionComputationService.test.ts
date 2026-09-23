@@ -1,13 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../services/../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 
 // Mock UserInstanceService before importing service
 vi.mock("../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["test-instance-1"]),
-  buildInstanceFilterClause: vi.fn().mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
-    if (ids.length === 0) return { sql: "1 = 0", params: [] };
-    const placeholders = ids.map(() => "?").join(", ");
-    return { sql: `${col} IN (${placeholders})`, params: ids };
-  }),
+  buildInstanceFilterClause: vi
+    .fn()
+    .mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
+      if (ids.length === 0) return { sql: "1 = 0", params: [] };
+      const placeholders = ids.map(() => "?").join(", ");
+      return { sql: `${col} IN (${placeholders})`, params: ids };
+    }),
 }));
 
 // Mock prisma before importing service
@@ -93,9 +97,6 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import prisma from "../../services/../prisma/singleton.js";
-
 const mockPrisma = prisma as any;
 
 describe("ExclusionComputationService", () => {
@@ -105,7 +106,9 @@ describe("ExclusionComputationService", () => {
 
   describe("recomputeForUser", () => {
     it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.recomputeForUser).toBe("function");
+      expect(typeof exclusionComputationService.recomputeForUser).toBe(
+        "function"
+      );
     });
 
     it("should re-run recompute when called while another is pending", async () => {
@@ -332,19 +335,25 @@ describe("ExclusionComputationService", () => {
 
   describe("recomputeAllUsers", () => {
     it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.recomputeAllUsers).toBe("function");
+      expect(typeof exclusionComputationService.recomputeAllUsers).toBe(
+        "function"
+      );
     });
   });
 
   describe("addHiddenEntity", () => {
     it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.addHiddenEntity).toBe("function");
+      expect(typeof exclusionComputationService.addHiddenEntity).toBe(
+        "function"
+      );
     });
   });
 
   describe("removeHiddenEntity", () => {
     it("should be a callable method", () => {
-      expect(typeof exclusionComputationService.removeHiddenEntity).toBe("function");
+      expect(typeof exclusionComputationService.removeHiddenEntity).toBe(
+        "function"
+      );
     });
   });
 });
@@ -400,7 +409,8 @@ describe("computeDirectExclusions", () => {
 
     // Verify createMany was called with the excluded tags
     expect(mockPrisma.userExcludedEntity.createMany).toHaveBeenCalled();
-    const createCall = mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
+    const createCall =
+      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
     expect(createCall.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -435,7 +445,8 @@ describe("computeDirectExclusions", () => {
     await exclusionComputationService.recomputeForUser(1);
 
     expect(mockPrisma.userExcludedEntity.createMany).toHaveBeenCalled();
-    const createCall = mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
+    const createCall =
+      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
     expect(createCall.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -513,7 +524,8 @@ describe("computeDirectExclusions", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const createCall = mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
+    const createCall =
+      mockPrisma.userExcludedEntity.createMany.mock.calls[0][0];
     expect(createCall.data).toHaveLength(2);
     expect(createCall.data).toEqual(
       expect.arrayContaining([
@@ -673,9 +685,10 @@ describe("computeCascadeExclusions", () => {
     ]);
 
     // Tag inherited by another scene (via $queryRawUnsafe for global inherited tag path)
-    mockPrisma.$queryRawUnsafe = vi.fn()
-      .mockResolvedValueOnce([{ id: "scene2" }])  // inherited tag query
-      .mockResolvedValue([]);  // empty exclusion queries
+    mockPrisma.$queryRawUnsafe = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: "scene2" }]) // inherited tag query
+      .mockResolvedValue([]); // empty exclusion queries
 
     // Tag on a performer
     mockPrisma.performerTag.findMany.mockResolvedValue([
@@ -1191,12 +1204,14 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - return empty galleries
-        case 1: return Promise.resolve([
-          { galleryId: "gallery1", imageId: null },
-          { galleryId: "gallery2", imageId: null },
-        ]);
+        case 1:
+          return Promise.resolve([
+            { galleryId: "gallery1", imageId: null },
+            { galleryId: "gallery2", imageId: null },
+          ]);
         // Query 2-5: other entities have visible content
-        default: return Promise.resolve([]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1238,13 +1253,16 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - none empty
-        case 1: return Promise.resolve([]);
+        case 1:
+          return Promise.resolve([]);
         // Query 2: performers - return empty performer
-        case 2: return Promise.resolve([
-          { performerId: "performer1", sceneId: null, imageId: null },
-        ]);
+        case 2:
+          return Promise.resolve([
+            { performerId: "performer1", sceneId: null, imageId: null },
+          ]);
         // Query 3-5: other entities have visible content
-        default: return Promise.resolve([]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1281,14 +1299,18 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-2: galleries and performers - none empty
-        case 1: return Promise.resolve([]);
-        case 2: return Promise.resolve([]);
+        case 1:
+          return Promise.resolve([]);
+        case 2:
+          return Promise.resolve([]);
         // Query 3: studios - return empty studio
-        case 3: return Promise.resolve([
-          { studioId: "studio1", sceneId: null, imageId: null },
-        ]);
+        case 3:
+          return Promise.resolve([
+            { studioId: "studio1", sceneId: null, imageId: null },
+          ]);
         // Query 4-5: other entities have visible content
-        default: return Promise.resolve([]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1325,15 +1347,18 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-3: galleries, performers, studios - none empty
-        case 1: return Promise.resolve([]);
-        case 2: return Promise.resolve([]);
-        case 3: return Promise.resolve([]);
+        case 1:
+          return Promise.resolve([]);
+        case 2:
+          return Promise.resolve([]);
+        case 3:
+          return Promise.resolve([]);
         // Query 4: groups - return empty group
-        case 4: return Promise.resolve([
-          { groupId: "group1", sceneId: null },
-        ]);
+        case 4:
+          return Promise.resolve([{ groupId: "group1", sceneId: null }]);
         // Query 5: tags have visible content
-        default: return Promise.resolve([]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1370,15 +1395,27 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1-4: galleries, performers, studios, groups - none empty
-        case 1: return Promise.resolve([]);
-        case 2: return Promise.resolve([]);
-        case 3: return Promise.resolve([]);
-        case 4: return Promise.resolve([]);
+        case 1:
+          return Promise.resolve([]);
+        case 2:
+          return Promise.resolve([]);
+        case 3:
+          return Promise.resolve([]);
+        case 4:
+          return Promise.resolve([]);
         // Query 5: tags - return empty tag
-        case 5: return Promise.resolve([
-          { tagId: "tag1", sceneId: null, performerId: null, studioId: null, groupId: null },
-        ]);
-        default: return Promise.resolve([]);
+        case 5:
+          return Promise.resolve([
+            {
+              tagId: "tag1",
+              sceneId: null,
+              performerId: null,
+              studioId: null,
+              groupId: null,
+            },
+          ]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1441,26 +1478,36 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries with images - gallery1 has image1 (which is excluded)
-        case 1: return Promise.resolve([
-          { galleryId: "gallery1", imageId: "image1" },
-        ]);
+        case 1:
+          return Promise.resolve([
+            { galleryId: "gallery1", imageId: "image1" },
+          ]);
         // Query 2: performers with content - performer has visible scene
-        case 2: return Promise.resolve([
-          { performerId: "performer1", sceneId: "scene1", imageId: null },
-        ]);
+        case 2:
+          return Promise.resolve([
+            { performerId: "performer1", sceneId: "scene1", imageId: null },
+          ]);
         // Query 3: studios with content - studio has visible scene
-        case 3: return Promise.resolve([
-          { studioId: "studio1", sceneId: "scene1", imageId: null },
-        ]);
+        case 3:
+          return Promise.resolve([
+            { studioId: "studio1", sceneId: "scene1", imageId: null },
+          ]);
         // Query 4: groups with scenes - group has visible scene
-        case 4: return Promise.resolve([
-          { groupId: "group1", sceneId: "scene1" },
-        ]);
+        case 4:
+          return Promise.resolve([{ groupId: "group1", sceneId: "scene1" }]);
         // Query 5: tags with entities - tag has visible content
-        case 5: return Promise.resolve([
-          { tagId: "tag1", sceneId: "scene1", performerId: null, studioId: null, groupId: null },
-        ]);
-        default: return Promise.resolve([]);
+        case 5:
+          return Promise.resolve([
+            {
+              tagId: "tag1",
+              sceneId: "scene1",
+              performerId: null,
+              studioId: null,
+              groupId: null,
+            },
+          ]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1501,26 +1548,34 @@ describe("computeEmptyExclusions", () => {
       queryCallCount++;
       switch (queryCallCount) {
         // Query 1: galleries - return gallery with no images
-        case 1: return Promise.resolve([
-          { galleryId: "gallery1", imageId: null },
-        ]);
+        case 1:
+          return Promise.resolve([{ galleryId: "gallery1", imageId: null }]);
         // Query 2: performers - return performer with no content
-        case 2: return Promise.resolve([
-          { performerId: "performer1", sceneId: null, imageId: null },
-        ]);
+        case 2:
+          return Promise.resolve([
+            { performerId: "performer1", sceneId: null, imageId: null },
+          ]);
         // Query 3: studios - return studio with no content
-        case 3: return Promise.resolve([
-          { studioId: "studio1", sceneId: null, imageId: null },
-        ]);
+        case 3:
+          return Promise.resolve([
+            { studioId: "studio1", sceneId: null, imageId: null },
+          ]);
         // Query 4: groups - return group with no scenes
-        case 4: return Promise.resolve([
-          { groupId: "group1", sceneId: null },
-        ]);
+        case 4:
+          return Promise.resolve([{ groupId: "group1", sceneId: null }]);
         // Query 5: tags - return tag with no visible entities
-        case 5: return Promise.resolve([
-          { tagId: "tag1", sceneId: null, performerId: null, studioId: null, groupId: null },
-        ]);
-        default: return Promise.resolve([]);
+        case 5:
+          return Promise.resolve([
+            {
+              tagId: "tag1",
+              sceneId: null,
+              performerId: null,
+              studioId: null,
+              groupId: null,
+            },
+          ]);
+        default:
+          return Promise.resolve([]);
       }
     });
 
@@ -1538,11 +1593,31 @@ describe("computeEmptyExclusions", () => {
     expect(allData).toHaveLength(5);
     expect(allData).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ entityType: "gallery", entityId: "gallery1", reason: "empty" }),
-        expect.objectContaining({ entityType: "performer", entityId: "performer1", reason: "empty" }),
-        expect.objectContaining({ entityType: "studio", entityId: "studio1", reason: "empty" }),
-        expect.objectContaining({ entityType: "group", entityId: "group1", reason: "empty" }),
-        expect.objectContaining({ entityType: "tag", entityId: "tag1", reason: "empty" }),
+        expect.objectContaining({
+          entityType: "gallery",
+          entityId: "gallery1",
+          reason: "empty",
+        }),
+        expect.objectContaining({
+          entityType: "performer",
+          entityId: "performer1",
+          reason: "empty",
+        }),
+        expect.objectContaining({
+          entityType: "studio",
+          entityId: "studio1",
+          reason: "empty",
+        }),
+        expect.objectContaining({
+          entityType: "group",
+          entityId: "group1",
+          reason: "empty",
+        }),
+        expect.objectContaining({
+          entityType: "tag",
+          entityId: "tag1",
+          reason: "empty",
+        }),
       ])
     );
   });
@@ -1653,11 +1728,19 @@ describe("addHiddenEntity", () => {
 
   it("should add hidden exclusion and cascade for tag to scenes, performers, studios, and groups", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneTag.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", tagId: "tag1" }]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([
+      { sceneId: "scene1", sceneInstanceId: "inst1", tagId: "tag1" },
+    ]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "scene2" }]); // inherited tag scene
-    mockPrisma.performerTag.findMany.mockResolvedValue([{ performerId: "perf1", performerInstanceId: "inst1", tagId: "tag1" }]);
-    mockPrisma.studioTag.findMany.mockResolvedValue([{ studioId: "studio1", studioInstanceId: "inst1", tagId: "tag1" }]);
-    mockPrisma.groupTag.findMany.mockResolvedValue([{ groupId: "group1", groupInstanceId: "inst1", tagId: "tag1" }]);
+    mockPrisma.performerTag.findMany.mockResolvedValue([
+      { performerId: "perf1", performerInstanceId: "inst1", tagId: "tag1" },
+    ]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([
+      { studioId: "studio1", studioInstanceId: "inst1", tagId: "tag1" },
+    ]);
+    mockPrisma.groupTag.findMany.mockResolvedValue([
+      { groupId: "group1", groupInstanceId: "inst1", tagId: "tag1" },
+    ]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
     });
@@ -1709,7 +1792,9 @@ describe("addHiddenEntity", () => {
 
   it("should add hidden exclusion and cascade for gallery to scenes and images", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.sceneGallery.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", galleryId: "gallery1" }]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([
+      { sceneId: "scene1", sceneInstanceId: "inst1", galleryId: "gallery1" },
+    ]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([
       { imageId: "image1", imageInstanceId: "inst1", galleryId: "gallery1" },
       { imageId: "image2", imageInstanceId: "inst1", galleryId: "gallery1" },
@@ -1765,7 +1850,11 @@ describe("addHiddenEntity", () => {
       return callback(mockPrisma);
     });
 
-    await exclusionComputationService.addHiddenEntity(1, "performer", "perf-no-scenes");
+    await exclusionComputationService.addHiddenEntity(
+      1,
+      "performer",
+      "perf-no-scenes"
+    );
 
     // Only one upsert call for the direct hidden entity, no cascade upserts
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(1);
@@ -1773,7 +1862,9 @@ describe("addHiddenEntity", () => {
 
   it("should use upsert for cascade exclusions to handle duplicates", async () => {
     mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
-    mockPrisma.scenePerformer.findMany.mockResolvedValue([{ sceneId: "scene1", sceneInstanceId: "inst1", performerId: "perf1" }]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([
+      { sceneId: "scene1", sceneInstanceId: "inst1", performerId: "perf1" },
+    ]);
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
     });
@@ -1827,7 +1918,11 @@ describe("removeHiddenEntity", () => {
     // Spy on setImmediate
     const setImmediateSpy = vi.spyOn(global, "setImmediate");
 
-    await exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
+    await exclusionComputationService.removeHiddenEntity(
+      1,
+      "performer",
+      "perf1"
+    );
 
     // Verify setImmediate was called
     expect(setImmediateSpy).toHaveBeenCalled();
@@ -1839,7 +1934,11 @@ describe("removeHiddenEntity", () => {
     // Use fake timers to control setImmediate
     vi.useFakeTimers();
 
-    await exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
+    await exclusionComputationService.removeHiddenEntity(
+      1,
+      "performer",
+      "perf1"
+    );
 
     // Transaction should not have been called yet (async)
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
@@ -1860,7 +1959,11 @@ describe("removeHiddenEntity", () => {
     mockPrisma.$transaction.mockRejectedValue(new Error("Database error"));
 
     // This should not throw
-    await exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
+    await exclusionComputationService.removeHiddenEntity(
+      1,
+      "performer",
+      "perf1"
+    );
 
     // Run the async callback - should not throw even if recompute fails
     await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
@@ -1989,7 +2092,12 @@ describe("instance-scoped cascades", () => {
     // Performer hidden with specific instanceId should cascade via the scoped path
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1", instanceId: "instA" },
+      {
+        userId: 1,
+        entityType: "performer",
+        entityId: "perf1",
+        instanceId: "instA",
+      },
     ]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
@@ -2054,8 +2162,18 @@ describe("instance-scoped cascades", () => {
     // Mix of global (from restriction) and scoped (from hidden) performer exclusions
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perfGlobal", instanceId: "" },
-      { userId: 1, entityType: "performer", entityId: "perfScoped", instanceId: "instA" },
+      {
+        userId: 1,
+        entityType: "performer",
+        entityId: "perfGlobal",
+        instanceId: "",
+      },
+      {
+        userId: 1,
+        entityType: "performer",
+        entityId: "perfScoped",
+        instanceId: "instA",
+      },
     ]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 4 });
@@ -2107,7 +2225,12 @@ describe("instance-scoped cascades", () => {
     // Studio exclusions use direct column (not junction), different code path
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "studio", entityId: "studio1", instanceId: "instA" },
+      {
+        userId: 1,
+        entityType: "studio",
+        entityId: "studio1",
+        instanceId: "instA",
+      },
     ]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
@@ -2157,7 +2280,12 @@ describe("addHiddenEntity with instanceId scoping", () => {
       { sceneId: "scene1", sceneInstanceId: "instA" },
     ]);
 
-    await exclusionComputationService.addHiddenEntity(1, "performer", "perf1", "instA");
+    await exclusionComputationService.addHiddenEntity(
+      1,
+      "performer",
+      "perf1",
+      "instA"
+    );
 
     // Direct exclusion should carry the instanceId
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
@@ -2199,7 +2327,12 @@ describe("addHiddenEntity with instanceId scoping", () => {
       { sceneId: "scene1", sceneInstanceId: "instB" },
     ]);
 
-    await exclusionComputationService.addHiddenEntity(1, "group", "group1", "instB");
+    await exclusionComputationService.addHiddenEntity(
+      1,
+      "group",
+      "group1",
+      "instB"
+    );
 
     expect(mockPrisma.sceneGroup.findMany).toHaveBeenCalledWith({
       where: { groupId: "group1", groupInstanceId: "instB" },
@@ -2225,7 +2358,12 @@ describe("addHiddenEntity with instanceId scoping", () => {
       { id: "scene1", stashInstanceId: "instA" },
     ]);
 
-    await exclusionComputationService.addHiddenEntity(1, "studio", "studio1", "instA");
+    await exclusionComputationService.addHiddenEntity(
+      1,
+      "studio",
+      "studio1",
+      "instA"
+    );
 
     expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
       where: { studioId: "studio1", stashInstanceId: "instA", deletedAt: null },

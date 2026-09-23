@@ -4,12 +4,23 @@
  * Builds parameterized SQL queries for image filtering, sorting, and pagination.
  * Eliminates the need to load all images into memory.
  */
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import { getImageFallbackTitle } from "../utils/titleUtils.js";
-import { buildFavoriteFilter, buildDateFilter, buildJunctionFilter, buildDirectFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import type { NormalizedImage, PerformerRef, TagRef, GalleryRef } from "../types/index.js";
+import prisma from "../prisma/singleton.js";
+import type {
+  GalleryRef,
+  NormalizedImage,
+  PerformerRef,
+  TagRef,
+} from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import {
+  type FilterClause,
+  buildDateFilter,
+  buildDirectFilter,
+  buildFavoriteFilter,
+  buildJunctionFilter,
+} from "../utils/sqlFilterBuilders.js";
+import { getImageFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
 export interface ImageQueryOptions {
@@ -105,7 +116,9 @@ class ImageQueryBuilder {
   /**
    * Build instance filter clause for multi-instance support
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -137,7 +150,10 @@ class ImageQueryBuilder {
       case "NOT_EQUALS":
         return { sql: `${ratingExpr} != ?`, params: [value] };
       case "BETWEEN":
-        return { sql: `${ratingExpr} BETWEEN ? AND ?`, params: [value, value2 ?? value] };
+        return {
+          sql: `${ratingExpr} BETWEEN ? AND ?`,
+          params: [value, value2 ?? value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -164,7 +180,10 @@ class ImageQueryBuilder {
       case "NOT_EQUALS":
         return { sql: `${oExpr} != ?`, params: [value] };
       case "BETWEEN":
-        return { sql: `${oExpr} BETWEEN ? AND ?`, params: [value, value2 ?? value] };
+        return {
+          sql: `${oExpr} BETWEEN ? AND ?`,
+          params: [value, value2 ?? value],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -180,7 +199,16 @@ class ImageQueryBuilder {
 
     const { value, modifier = "INCLUDES" } = filter;
     const ids = coerceEntityRefs(value);
-    return buildJunctionFilter(ids, "ImagePerformer", "imageId", "imageInstanceId", "performerId", "performerInstanceId", "i", modifier);
+    return buildJunctionFilter(
+      ids,
+      "ImagePerformer",
+      "imageId",
+      "imageInstanceId",
+      "performerId",
+      "performerInstanceId",
+      "i",
+      modifier
+    );
   }
 
   // Build tag filter
@@ -193,7 +221,16 @@ class ImageQueryBuilder {
 
     const { value, modifier = "INCLUDES" } = filter;
     const ids = coerceEntityRefs(value);
-    return buildJunctionFilter(ids, "ImageTag", "imageId", "imageInstanceId", "tagId", "tagInstanceId", "i", modifier);
+    return buildJunctionFilter(
+      ids,
+      "ImageTag",
+      "imageId",
+      "imageInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "i",
+      modifier
+    );
   }
 
   // Build studio filter
@@ -219,7 +256,16 @@ class ImageQueryBuilder {
 
     const { value, modifier = "INCLUDES" } = filter;
     const ids = coerceEntityRefs(value);
-    return buildJunctionFilter(ids, "ImageGallery", "imageId", "imageInstanceId", "galleryId", "galleryInstanceId", "i", modifier);
+    return buildJunctionFilter(
+      ids,
+      "ImageGallery",
+      "imageId",
+      "imageInstanceId",
+      "galleryId",
+      "galleryInstanceId",
+      "i",
+      modifier
+    );
   }
 
   // Build search query filter
@@ -301,7 +347,9 @@ class ImageQueryBuilder {
    * Hydrate image rows with related entities
    * Uses raw SQL to handle orphaned junction records gracefully
    */
-  private async hydrateImages(rows: Record<string, unknown>[]): Promise<NormalizedImage[]> {
+  private async hydrateImages(
+    rows: Record<string, unknown>[]
+  ): Promise<NormalizedImage[]> {
     if (rows.length === 0) return [];
 
     const imageIds = rows.map((r) => r.id as string);
@@ -310,28 +358,39 @@ class ImageQueryBuilder {
     // Fetch all related data in parallel using raw SQL to handle orphaned records
     const [performers, tags, galleries, studios] = await Promise.all([
       // Performers - join with existence check
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(`
+      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        `
         SELECT ip.imageId, p.*
         FROM ImagePerformer ip
         INNER JOIN StashPerformer p ON p.id = ip.performerId AND p.stashInstanceId = ip.performerInstanceId
         WHERE ip.imageId IN (${imageIdPlaceholders}) AND p.deletedAt IS NULL
-      `, ...imageIds),
+      `,
+        ...imageIds
+      ),
       // Tags - join with existence check (handles orphaned ImageTag records)
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(`
+      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        `
         SELECT it.imageId, t.*
         FROM ImageTag it
         INNER JOIN StashTag t ON t.id = it.tagId AND t.stashInstanceId = it.tagInstanceId
         WHERE it.imageId IN (${imageIdPlaceholders}) AND t.deletedAt IS NULL
-      `, ...imageIds),
+      `,
+        ...imageIds
+      ),
       // Galleries - join with existence check
-      prisma.$queryRawUnsafe<Record<string, unknown>[]>(`
+      prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        `
         SELECT ig.imageId, g.*
         FROM ImageGallery ig
         INNER JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
         WHERE ig.imageId IN (${imageIdPlaceholders}) AND g.deletedAt IS NULL
-      `, ...imageIds),
+      `,
+        ...imageIds
+      ),
       prisma.stashStudio.findMany({
-        where: { id: { in: rows.map((r) => r.studioId as string).filter(Boolean) } },
+        where: {
+          id: { in: rows.map((r) => r.studioId as string).filter(Boolean) },
+        },
       }),
     ]);
 
@@ -351,7 +410,10 @@ class ImageQueryBuilder {
         gender: row.gender as string | null,
         favorite: row.favorite as boolean | null,
         rating100: row.rating100 as number | null,
-        image_path: this.transformUrl(row.imagePath as string | null, row.stashInstanceId as string),
+        image_path: this.transformUrl(
+          row.imagePath as string | null,
+          row.stashInstanceId as string
+        ),
       });
     }
 
@@ -366,7 +428,10 @@ class ImageQueryBuilder {
         instanceId: row.stashInstanceId as string,
         name: row.name as string,
         favorite: row.favorite as boolean | null,
-        image_path: this.transformUrl(row.imagePath as string | null, row.stashInstanceId as string),
+        image_path: this.transformUrl(
+          row.imagePath as string | null,
+          row.stashInstanceId as string
+        ),
       });
     }
 
@@ -380,7 +445,10 @@ class ImageQueryBuilder {
         id: row.id as string,
         instanceId: row.stashInstanceId as string,
         title: row.title as string | null,
-        cover: this.transformUrl(row.coverPath as string | null, row.stashInstanceId as string),
+        cover: this.transformUrl(
+          row.coverPath as string | null,
+          row.stashInstanceId as string
+        ),
       });
     }
 
@@ -403,7 +471,14 @@ class ImageQueryBuilder {
 
   async execute(options: ImageQueryOptions): Promise<ImageQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, filters } = options;
+    const {
+      userId,
+      page,
+      perPage,
+      applyExclusions = true,
+      allowedInstanceIds,
+      filters,
+    } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -473,12 +548,18 @@ class ImageQueryBuilder {
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at, "i.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(
+        filters.created_at,
+        "i.stashCreatedAt"
+      );
       if (createdAtFilter.sql) whereClauses.push(createdAtFilter);
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at, "i.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(
+        filters.updated_at,
+        "i.stashUpdatedAt"
+      );
       if (updatedAtFilter.sql) whereClauses.push(updatedAtFilter);
     }
 
@@ -518,16 +599,30 @@ class ImageQueryBuilder {
     });
 
     // Execute query
-    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      sql,
+      ...params
+    );
 
     // Convert BigInt fields to Number and transform URLs to proxy paths with instanceId
     const transformedRows = rows.map((row) => ({
       ...row,
-      title: (row.title as string) || getImageFallbackTitle(row.filePath as string | null),
+      title:
+        (row.title as string) ||
+        getImageFallbackTitle(row.filePath as string | null),
       fileSize: row.fileSize != null ? Number(row.fileSize) : null,
-      pathThumbnail: this.transformUrl(row.pathThumbnail as string | null, row.stashInstanceId as string),
-      pathPreview: this.transformUrl(row.pathPreview as string | null, row.stashInstanceId as string),
-      pathImage: this.transformUrl(row.pathImage as string | null, row.stashInstanceId as string),
+      pathThumbnail: this.transformUrl(
+        row.pathThumbnail as string | null,
+        row.stashInstanceId as string
+      ),
+      pathPreview: this.transformUrl(
+        row.pathPreview as string | null,
+        row.stashInstanceId as string
+      ),
+      pathImage: this.transformUrl(
+        row.pathImage as string | null,
+        row.stashInstanceId as string
+      ),
     }));
 
     // Hydrate with related entities
@@ -559,7 +654,10 @@ class ImageQueryBuilder {
   /**
    * Get images by IDs with user data
    */
-  async getByIds(options: { userId: number; ids: string[] }): Promise<ImageQueryResult> {
+  async getByIds(options: {
+    userId: number;
+    ids: string[];
+  }): Promise<ImageQueryResult> {
     const { userId, ids } = options;
 
     if (ids.length === 0) {
@@ -582,7 +680,10 @@ class ImageQueryBuilder {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is

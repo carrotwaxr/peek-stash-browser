@@ -4,9 +4,9 @@
  *
  * Tests the group filters in controllers/library/groups.ts
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyGroupFilters } from "../../controllers/library/groups.js";
+import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import {
   createMockGroup,
   createMockGroups,
@@ -141,7 +141,12 @@ describe("Group Filters", () => {
       // Add both tags to some groups
       const groupsWithTags = mockGroups.map((g, i) => ({
         ...g,
-        tags: i % 5 === 0 ? [mockTags[0], mockTags[1]] : i % 3 === 0 ? [mockTags[0]] : [],
+        tags:
+          i % 5 === 0
+            ? [mockTags[0], mockTags[1]]
+            : i % 3 === 0
+              ? [mockTags[0]]
+              : [],
       }));
 
       const result = await applyGroupFilters(groupsWithTags, filter);

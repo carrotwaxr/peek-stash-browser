@@ -7,8 +7,8 @@
  * - Click handlers and selection state
  * - Dropdown open/close behavior
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import ViewModeToggle from "../../../src/components/ui/ViewModeToggle";
 
 describe("ViewModeToggle", () => {
@@ -26,8 +26,12 @@ describe("ViewModeToggle", () => {
     fireEvent.click(trigger);
 
     // Dropdown should show both modes
-    expect(screen.getByRole("option", { name: /grid view/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /wall view/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /grid view/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /wall view/i })
+    ).toBeInTheDocument();
   });
 
   it("renders custom modes when modes prop provided", () => {
@@ -40,9 +44,15 @@ describe("ViewModeToggle", () => {
     // Open dropdown
     fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
 
-    expect(screen.getByRole("option", { name: /grid view/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /hierarchy view/i })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /wall view/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /grid view/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /hierarchy view/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /wall view/i })
+    ).not.toBeInTheDocument();
   });
 
   it("calls onChange with mode id when option selected", () => {
@@ -65,12 +75,16 @@ describe("ViewModeToggle", () => {
       { id: "grid", label: "Grid view" },
       { id: "hierarchy", label: "Hierarchy view" },
     ];
-    render(<ViewModeToggle modes={modes} value="hierarchy" onChange={() => {}} />);
+    render(
+      <ViewModeToggle modes={modes} value="hierarchy" onChange={() => {}} />
+    );
 
     // Open dropdown
     fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
 
-    const hierarchyOption = screen.getByRole("option", { name: /hierarchy view/i });
+    const hierarchyOption = screen.getByRole("option", {
+      name: /hierarchy view/i,
+    });
     expect(hierarchyOption).toHaveAttribute("aria-selected", "true");
   });
 

@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import {
   ArrowLeft,
   ArrowUpDown,
-  ChevronUp,
   ChevronDown,
-  ChevronsUp,
+  ChevronUp,
   ChevronsDown,
+  ChevronsUp,
   Copy,
   Edit2,
   MoreVertical,
@@ -20,15 +21,22 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+  duplicatePlaylist,
+  getMyPermissions,
+} from "../../api";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
-import { useConfig } from "../../contexts/ConfigContext";
 import { getEntityPath } from "../../utils/entityLinks";
-import { apiGet, apiPost, apiPut, apiDelete, duplicatePlaylist, getMyPermissions } from "../../api";
-import SharePlaylistModal from "../playlists/SharePlaylistModal";
 import { getSceneTitle } from "../../utils/format";
 import { showError, showSuccess } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
+import SharePlaylistModal from "../playlists/SharePlaylistModal";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -39,7 +47,6 @@ import {
   Paper,
   SceneListItem,
 } from "../ui/index";
-import type { NormalizedScene } from "@peek/shared-types";
 
 interface PlaylistResponse {
   playlist: Record<string, unknown>;
@@ -55,7 +62,9 @@ const PlaylistDetail = () => {
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
-  const [playlist, setPlaylist] = useState<Record<string, unknown> | null>(null);
+  const [playlist, setPlaylist] = useState<Record<string, unknown> | null>(
+    null
+  );
   const [scenes, setScenes] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,19 +72,27 @@ const PlaylistDetail = () => {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
-  const [sceneToRemove, setSceneToRemove] = useState<Record<string, unknown> | null>(null);
+  const [sceneToRemove, setSceneToRemove] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState<Record<string, unknown> | null>(null);
+  const [permissions, setPermissions] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [isOwner, setIsOwner] = useState(true);
   const [ownerName, setOwnerName] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
   // Selection state for multi-select (view mode only)
-  const [selectedScenes, setSelectedScenes] = useState<Record<string, unknown>[]>([]);
+  const [selectedScenes, setSelectedScenes] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
 
   const handleToggleSelect = useCallback((scene: Record<string, unknown>) => {
@@ -89,7 +106,9 @@ const PlaylistDetail = () => {
 
   const handleSelectAll = useCallback(() => {
     setSelectedScenes(
-      scenes.filter((s) => s.exists && s.scene).map((s) => s.scene as Record<string, unknown>)
+      scenes
+        .filter((s) => s.exists && s.scene)
+        .map((s) => s.scene as Record<string, unknown>)
     );
   }, [scenes]);
 
@@ -135,17 +154,24 @@ const PlaylistDetail = () => {
 
       // Set access info from response
       setIsOwner(data.isOwner !== false);
-      if (!data.isOwner && (playlistData?.user as Record<string, unknown> | undefined)?.username) {
-        setOwnerName((playlistData.user as Record<string, unknown>).username as string);
+      if (
+        !data.isOwner &&
+        (playlistData?.user as Record<string, unknown> | undefined)?.username
+      ) {
+        setOwnerName(
+          (playlistData.user as Record<string, unknown>).username as string
+        );
       }
 
       // Backend now returns items with scene data attached
       const items = playlistData.items as Record<string, unknown>[] | undefined;
       if (items && items.length > 0) {
-        const scenesWithDetails = items.map((item: Record<string, unknown>) => ({
-          ...item,
-          exists: item.scene !== null && item.scene !== undefined,
-        }));
+        const scenesWithDetails = items.map(
+          (item: Record<string, unknown>) => ({
+            ...item,
+            exists: item.scene !== null && item.scene !== undefined,
+          })
+        );
         setScenes(scenesWithDetails);
       } else {
         setScenes([]);
@@ -198,42 +224,60 @@ const PlaylistDetail = () => {
   };
 
   // Position control handlers for reordering
-  const moveItem = useCallback((fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= scenes.length) return;
-    if (fromIndex === toIndex) return;
+  const moveItem = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (toIndex < 0 || toIndex >= scenes.length) return;
+      if (fromIndex === toIndex) return;
 
-    const newScenes = [...scenes];
-    const item = newScenes.splice(fromIndex, 1)[0];
-    newScenes.splice(toIndex, 0, item);
-    setScenes(newScenes);
-  }, [scenes]);
+      const newScenes = [...scenes];
+      const item = newScenes.splice(fromIndex, 1)[0];
+      newScenes.splice(toIndex, 0, item);
+      setScenes(newScenes);
+    },
+    [scenes]
+  );
 
-  const handleMoveTop = useCallback((index: number) => {
-    moveItem(index, 0);
-  }, [moveItem]);
+  const handleMoveTop = useCallback(
+    (index: number) => {
+      moveItem(index, 0);
+    },
+    [moveItem]
+  );
 
-  const handleMoveUp = useCallback((index: number) => {
-    moveItem(index, index - 1);
-  }, [moveItem]);
+  const handleMoveUp = useCallback(
+    (index: number) => {
+      moveItem(index, index - 1);
+    },
+    [moveItem]
+  );
 
-  const handleMoveDown = useCallback((index: number) => {
-    moveItem(index, index + 1);
-  }, [moveItem]);
+  const handleMoveDown = useCallback(
+    (index: number) => {
+      moveItem(index, index + 1);
+    },
+    [moveItem]
+  );
 
-  const handleMoveBottom = useCallback((index: number) => {
-    moveItem(index, scenes.length - 1);
-  }, [moveItem, scenes.length]);
+  const handleMoveBottom = useCallback(
+    (index: number) => {
+      moveItem(index, scenes.length - 1);
+    },
+    [moveItem, scenes.length]
+  );
 
-  const handleSetPosition = useCallback((fromIndex: number, newPosition: number) => {
-    // Convert 1-indexed input to 0-indexed
-    let targetIndex = newPosition - 1;
+  const handleSetPosition = useCallback(
+    (fromIndex: number, newPosition: number) => {
+      // Convert 1-indexed input to 0-indexed
+      let targetIndex = newPosition - 1;
 
-    // Clamp to valid range
-    if (targetIndex < 0) targetIndex = 0;
-    if (targetIndex >= scenes.length) targetIndex = scenes.length - 1;
+      // Clamp to valid range
+      if (targetIndex < 0) targetIndex = 0;
+      if (targetIndex >= scenes.length) targetIndex = scenes.length - 1;
 
-    moveItem(fromIndex, targetIndex);
-  }, [moveItem, scenes.length]);
+      moveItem(fromIndex, targetIndex);
+    },
+    [moveItem, scenes.length]
+  );
 
   const saveReorder = async () => {
     try {
@@ -271,7 +315,9 @@ const PlaylistDetail = () => {
 
   const cycleRepeat = async () => {
     const repeatModes = ["none", "all", "one"] as const;
-    const currentIndex = repeatModes.indexOf(repeat as typeof repeatModes[number]);
+    const currentIndex = repeatModes.indexOf(
+      repeat as (typeof repeatModes)[number]
+    );
     const newRepeat = repeatModes[(currentIndex + 1) % repeatModes.length];
     try {
       await apiPut(`/playlists/${playlistId}`, { repeat: newRepeat });
@@ -293,29 +339,38 @@ const PlaylistDetail = () => {
       const validScenes = scenes.filter((s) => s.exists && s.scene);
 
       // If shuffle is enabled, pick a random scene to start with
-      const startIndex = shuffle ? Math.floor(Math.random() * validScenes.length) : 0;
+      const startIndex = shuffle
+        ? Math.floor(Math.random() * validScenes.length)
+        : 0;
       const startScene = validScenes[startIndex];
 
-      navigate(getEntityPath('scene', startScene.scene as Record<string, unknown>, hasMultipleInstances), {
-        state: {
-          scene: startScene.scene,
-          shouldAutoplay: true, // Start playing immediately when entering from playlist
-          playlist: {
-            id: playlistId,
-            name: playlist!.name,
-            autoplayNext: true, // Default to autoplay enabled
-            shuffle,
-            repeat,
-            shuffleHistory: [], // Initialize empty history
-            scenes: validScenes.map((s, idx) => ({
-              sceneId: s.sceneId,
-              scene: s.scene,
-              position: idx,
-            })),
-            currentIndex: startIndex,
+      navigate(
+        getEntityPath(
+          "scene",
+          startScene.scene as Record<string, unknown>,
+          hasMultipleInstances
+        ),
+        {
+          state: {
+            scene: startScene.scene,
+            shouldAutoplay: true, // Start playing immediately when entering from playlist
+            playlist: {
+              id: playlistId,
+              name: playlist!.name,
+              autoplayNext: true, // Default to autoplay enabled
+              shuffle,
+              repeat,
+              shuffleHistory: [], // Initialize empty history
+              scenes: validScenes.map((s, idx) => ({
+                sceneId: s.sceneId,
+                scene: s.scene,
+                position: idx,
+              })),
+              currentIndex: startIndex,
+            },
           },
-        },
-      });
+        }
+      );
     }
   };
 
@@ -329,7 +384,9 @@ const PlaylistDetail = () => {
       const error = err as ApiError;
       const message = error.data?.error || error.message || "Download failed";
       if (error.data?.totalSizeMB) {
-        showError(`${message} (${error.data.totalSizeMB}MB exceeds ${error.data.maxSizeMB}MB limit)`);
+        showError(
+          `${message} (${error.data.totalSizeMB}MB exceeds ${error.data.maxSizeMB}MB limit)`
+        );
       } else {
         showError(message);
       }
@@ -371,11 +428,20 @@ const PlaylistDetail = () => {
     }
 
     const removedIds = new Set(selectedScenes.map((s) => s.id));
-    setScenes((prev) => prev.filter((item) => !removedIds.has((item.scene as Record<string, unknown> | undefined)?.id)));
+    setScenes((prev) =>
+      prev.filter(
+        (item) =>
+          !removedIds.has(
+            (item.scene as Record<string, unknown> | undefined)?.id
+          )
+      )
+    );
     setSelectedScenes([]);
 
     if (failCount === 0) {
-      showSuccess(`Removed ${successCount} scene${successCount !== 1 ? "s" : ""} from playlist`);
+      showSuccess(
+        `Removed ${successCount} scene${successCount !== 1 ? "s" : ""} from playlist`
+      );
     } else {
       showError(`Removed ${successCount}, ${failCount} failed`);
     }
@@ -430,7 +496,10 @@ const PlaylistDetail = () => {
                 {/* Edit button - owner only */}
                 {isOwner && (
                   <Button
-                    onClick={() => { setSelectedScenes([]); setIsEditing(true); }}
+                    onClick={() => {
+                      setSelectedScenes([]);
+                      setIsEditing(true);
+                    }}
                     variant="primary"
                     icon={<Edit2 size={16} className="sm:w-4 sm:h-4" />}
                     title="Edit Playlist"
@@ -442,7 +511,10 @@ const PlaylistDetail = () => {
                 {/* Reorder button - owner only */}
                 {isOwner && scenes.length > 1 && (
                   <Button
-                    onClick={() => { setSelectedScenes([]); setReorderMode(true); }}
+                    onClick={() => {
+                      setSelectedScenes([]);
+                      setReorderMode(true);
+                    }}
                     variant="secondary"
                     icon={<ArrowUpDown size={16} className="sm:w-4 sm:h-4" />}
                     title="Reorder Scenes"
@@ -452,19 +524,21 @@ const PlaylistDetail = () => {
                 )}
 
                 {/* Download button - owner only */}
-                {isOwner && !!permissions?.canDownloadPlaylists && scenes.length > 0 && (
-                  <Button
-                    onClick={handleDownload}
-                    variant="secondary"
-                    disabled={downloading}
-                    icon={<ThemedIcon name="download" size={16} />}
-                    title="Download Playlist"
-                  >
-                    <span className="hidden sm:inline">
-                      {downloading ? "Starting..." : "Download"}
-                    </span>
-                  </Button>
-                )}
+                {isOwner &&
+                  !!permissions?.canDownloadPlaylists &&
+                  scenes.length > 0 && (
+                    <Button
+                      onClick={handleDownload}
+                      variant="secondary"
+                      disabled={downloading}
+                      icon={<ThemedIcon name="download" size={16} />}
+                      title="Download Playlist"
+                    >
+                      <span className="hidden sm:inline">
+                        {downloading ? "Starting..." : "Download"}
+                      </span>
+                    </Button>
+                  )}
 
                 {/* Share button - owner only with share permission */}
                 {isOwner && !!permissions?.canShare && (
@@ -487,7 +561,9 @@ const PlaylistDetail = () => {
                     icon={<Copy size={16} />}
                     title="Duplicate to My Playlists"
                   >
-                    <span className="hidden sm:inline">{duplicating ? "Duplicating..." : "Duplicate"}</span>
+                    <span className="hidden sm:inline">
+                      {duplicating ? "Duplicating..." : "Duplicate"}
+                    </span>
                   </Button>
                 )}
               </>
@@ -633,7 +709,9 @@ const PlaylistDetail = () => {
                       onClick={() => {
                         setIsEditing(false);
                         setEditName(playlist.name as string);
-                        setEditDescription((playlist.description as string) || "");
+                        setEditDescription(
+                          (playlist.description as string) || ""
+                        );
                       }}
                       variant="secondary"
                       icon={<X size={16} className="sm:w-4 sm:h-4" />}
@@ -705,15 +783,26 @@ const PlaylistDetail = () => {
                   color: "rgb(59, 130, 246)",
                 }}
               >
-                Use the position controls to reorder scenes. Click &quot;Save Order&quot; when done.
+                Use the position controls to reorder scenes. Click &quot;Save
+                Order&quot; when done.
               </div>
             )}
             {selectedScenes.length > 0 && !isEditing && !reorderMode && (
               <div className="flex items-center justify-end gap-3">
-                <Button onClick={handleSelectAll} variant="primary" size="sm" className="font-medium">
-                  Select All ({scenes.filter(s => s.exists).length})
+                <Button
+                  onClick={handleSelectAll}
+                  variant="primary"
+                  size="sm"
+                  className="font-medium"
+                >
+                  Select All ({scenes.filter((s) => s.exists).length})
                 </Button>
-                <Button onClick={handleDeselectAll} variant="secondary" size="sm" className="font-medium">
+                <Button
+                  onClick={handleDeselectAll}
+                  variant="secondary"
+                  size="sm"
+                  className="font-medium"
+                >
                   Deselect All
                 </Button>
               </div>
@@ -724,9 +813,25 @@ const PlaylistDetail = () => {
                 scene={item.scene as NormalizedScene | null}
                 exists={item.exists as boolean | undefined}
                 sceneId={item.sceneId as string | undefined}
-                isSelected={!isEditing && !reorderMode && selectedScenes.some((s) => s.id === (item.scene as Record<string, unknown> | undefined)?.id)}
-                onToggleSelect={!isEditing && !reorderMode ? handleToggleSelect as unknown as ((scene: NormalizedScene) => void) : undefined}
-                selectionMode={!isEditing && !reorderMode && selectedScenes.length > 0}
+                isSelected={
+                  !isEditing &&
+                  !reorderMode &&
+                  selectedScenes.some(
+                    (s) =>
+                      s.id ===
+                      (item.scene as Record<string, unknown> | undefined)?.id
+                  )
+                }
+                onToggleSelect={
+                  !isEditing && !reorderMode
+                    ? (handleToggleSelect as unknown as (
+                        scene: NormalizedScene
+                      ) => void)
+                    : undefined
+                }
+                selectionMode={
+                  !isEditing && !reorderMode && selectedScenes.length > 0
+                }
                 linkState={{
                   scene: item.scene,
                   playlist: {
@@ -772,7 +877,10 @@ const PlaylistDetail = () => {
                       {/* Move buttons */}
                       <div className="flex items-center gap-0.5">
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveTop(index); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveTop(index);
+                          }}
                           disabled={index === 0}
                           className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ color: "var(--text-secondary)" }}
@@ -781,7 +889,10 @@ const PlaylistDetail = () => {
                           <ChevronsUp size={16} />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveUp(index); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveUp(index);
+                          }}
                           disabled={index === 0}
                           className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ color: "var(--text-secondary)" }}
@@ -790,7 +901,10 @@ const PlaylistDetail = () => {
                           <ChevronUp size={16} />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveDown(index); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveDown(index);
+                          }}
                           disabled={index === scenes.length - 1}
                           className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ color: "var(--text-secondary)" }}
@@ -799,7 +913,10 @@ const PlaylistDetail = () => {
                           <ChevronDown size={16} />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveBottom(index); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveBottom(index);
+                          }}
                           disabled={index === scenes.length - 1}
                           className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ color: "var(--text-secondary)" }}

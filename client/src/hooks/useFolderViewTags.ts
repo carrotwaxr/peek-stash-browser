@@ -1,5 +1,5 @@
 // client/src/hooks/useFolderViewTags.js
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { libraryApi } from "../api";
 import { apiPost } from "../api";
 
@@ -14,7 +14,10 @@ interface FolderViewFilters {
   groupId?: string;
 }
 
-export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters | null = null) {
+export function useFolderViewTags(
+  isActive: boolean,
+  filters: FolderViewFilters | null = null
+) {
   const [tags, setTags] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<any>(null);
@@ -46,8 +49,16 @@ export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters 
         let fetchedTags;
 
         // Use filtered endpoint if filters are provided
-        if (filters && (filters.performerId || filters.tagId || filters.studioId || filters.groupId)) {
-          const result = await apiPost<{ tags: Array<{ id: string; name: string }> }>("/library/tags/for-scenes", {
+        if (
+          filters &&
+          (filters.performerId ||
+            filters.tagId ||
+            filters.studioId ||
+            filters.groupId)
+        ) {
+          const result = await apiPost<{
+            tags: Array<{ id: string; name: string }>;
+          }>("/library/tags/for-scenes", {
             performerId: filters.performerId,
             tagId: filters.tagId,
             studioId: filters.studioId,
@@ -63,7 +74,12 @@ export function useFolderViewTags(isActive: boolean, filters: FolderViewFilters 
               direction: "ASC",
             },
           });
-          fetchedTags = (result as { findTags?: { tags?: Array<{ id: string; name: string }> } })?.findTags?.tags || [];
+          fetchedTags =
+            (
+              result as {
+                findTags?: { tags?: Array<{ id: string; name: string }> };
+              }
+            )?.findTags?.tags || [];
         }
 
         setTags(fetchedTags);

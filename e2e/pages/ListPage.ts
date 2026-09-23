@@ -1,4 +1,4 @@
-import { Page, Locator, expect } from "@playwright/test";
+import { Locator, Page, expect } from "@playwright/test";
 
 /**
  * Shared page object for all library list pages
@@ -20,9 +20,7 @@ export class ListPage {
     this.searchInput = page.getByPlaceholder("Search...");
     this.filtersButton = page.locator('[data-tv-search-item="filters-button"]');
     this.sortControl = page.locator('[data-tv-search-item="sort-control"]');
-    this.sortDirection = page.locator(
-      '[data-tv-search-item="sort-direction"]'
-    );
+    this.sortDirection = page.locator('[data-tv-search-item="sort-direction"]');
     this.viewModeButton = page.locator('button[aria-label*="View mode"]');
     this.perPageSelect = page.locator("#perPage");
     this.paginationNext = page.locator('button[aria-label="Next page"]');

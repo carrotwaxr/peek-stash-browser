@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient, selectTestInstanceOnly } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import {
+  adminClient,
+  guestClient,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 // Response type for /api/library/galleries
 interface FindGalleriesResponse {
@@ -24,10 +28,13 @@ describe("Gallery API", () => {
     });
 
     it("returns galleries with pagination", async () => {
-      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        page: 1,
-        per_page: 10,
-      });
+      const response = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          page: 1,
+          per_page: 10,
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries).toBeDefined();
@@ -37,13 +44,18 @@ describe("Gallery API", () => {
     });
 
     it("returns gallery by ID", async () => {
-      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
-        ids: [TEST_ENTITIES.galleryWithImages],
-      });
+      const response = await adminClient.post<FindGalleriesResponse>(
+        "/api/library/galleries",
+        {
+          ids: [TEST_ENTITIES.galleryWithImages],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries.galleries).toHaveLength(1);
-      expect(response.data.findGalleries.galleries[0].id).toBe(TEST_ENTITIES.galleryWithImages);
+      expect(response.data.findGalleries.galleries[0].id).toBe(
+        TEST_ENTITIES.galleryWithImages
+      );
     });
   });
 

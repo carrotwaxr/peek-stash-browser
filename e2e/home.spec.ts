@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for the Home page.
@@ -36,12 +36,8 @@ test.describe("Home Page", () => {
     });
 
     // Key navigation links should be present
-    await expect(
-      page.getByRole("link", { name: /Scenes/i })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /Playlists/i })
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Scenes/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Playlists/i })).toBeVisible();
   });
 
   test("home page renders carousel sections or empty state", async ({

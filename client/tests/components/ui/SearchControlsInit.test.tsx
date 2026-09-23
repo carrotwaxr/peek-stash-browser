@@ -9,9 +9,9 @@
  * parent (e.g., Tags.jsx). The parent's activeViewMode stays "grid", so
  * the hierarchy data fetch useEffect never triggers.
  */
-import { render, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchControls from "../../../src/components/ui/SearchControls";
 
 // Track the mock state that useFilterState will return
@@ -57,15 +57,23 @@ vi.mock("../../../src/api", () => ({
   apiGet: vi.fn().mockResolvedValue({ presets: {}, defaults: {} }),
   apiPost: vi.fn().mockResolvedValue({}),
   libraryApi: {
-    findPerformers: vi.fn().mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
+    findPerformers: vi
+      .fn()
+      .mockResolvedValue({ findPerformers: { count: 0, performers: [] } }),
     findPerformersMinimal: vi.fn().mockResolvedValue([]),
-    findStudios: vi.fn().mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
+    findStudios: vi
+      .fn()
+      .mockResolvedValue({ findStudios: { count: 0, studios: [] } }),
     findStudiosMinimal: vi.fn().mockResolvedValue([]),
     findTags: vi.fn().mockResolvedValue({ findTags: { count: 0, tags: [] } }),
     findTagsMinimal: vi.fn().mockResolvedValue([]),
-    findGroups: vi.fn().mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
+    findGroups: vi
+      .fn()
+      .mockResolvedValue({ findGroups: { count: 0, groups: [] } }),
     findGroupsMinimal: vi.fn().mockResolvedValue([]),
-    findGalleries: vi.fn().mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
+    findGalleries: vi
+      .fn()
+      .mockResolvedValue({ findGalleries: { count: 0, galleries: [] } }),
     findGalleriesMinimal: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -122,11 +130,13 @@ describe("SearchControls - initialization notifications", () => {
           onViewModeChange={onViewModeChange}
           totalPages={1}
           totalCount={10}
-          viewModes={[
-            { id: "grid", label: "Grid" },
-            { id: "table", label: "Table" },
-            { id: "hierarchy", label: "Hierarchy" },
-          ] as any}
+          viewModes={
+            [
+              { id: "grid", label: "Grid" },
+              { id: "table", label: "Table" },
+              { id: "hierarchy", label: "Hierarchy" },
+            ] as any
+          }
         >
           {null}
         </SearchControls>
@@ -191,10 +201,12 @@ describe("SearchControls - initialization notifications", () => {
           onViewModeChange={onViewModeChange}
           totalPages={1}
           totalCount={10}
-          viewModes={[
-            { id: "grid", label: "Grid" },
-            { id: "table", label: "Table" },
-          ] as any}
+          viewModes={
+            [
+              { id: "grid", label: "Grid" },
+              { id: "table", label: "Table" },
+            ] as any
+          }
         >
           {null}
         </SearchControls>

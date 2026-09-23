@@ -5,21 +5,21 @@
  * Request and response types for /api/library/* endpoints.
  */
 import type {
-  NormalizedScene,
-  NormalizedPerformer,
-  NormalizedStudio,
-  NormalizedTag,
   NormalizedGallery,
   NormalizedGroup,
   NormalizedImage,
-  PeekSceneFilter,
-  PeekPerformerFilter,
-  PeekStudioFilter,
-  PeekTagFilter,
+  NormalizedPerformer,
+  NormalizedScene,
+  NormalizedStudio,
+  NormalizedTag,
   PeekGalleryFilter,
   PeekGroupFilter,
+  PeekPerformerFilter,
+  PeekSceneFilter,
+  PeekStudioFilter,
+  PeekTagFilter,
 } from "../index.js";
-import type { PaginationFilter, MinimalCountFilter } from "./common.js";
+import type { MinimalCountFilter, PaginationFilter } from "./common.js";
 
 // =============================================================================
 // SCENES
@@ -48,7 +48,10 @@ export interface FindSimilarScenesParams extends Record<string, string> {
   id: string;
 }
 
-export interface FindSimilarScenesQuery extends Record<string, string | undefined> {
+export interface FindSimilarScenesQuery extends Record<
+  string,
+  string | undefined
+> {
   page?: string;
 }
 
@@ -62,7 +65,10 @@ export interface FindSimilarScenesResponse {
 /**
  * GET /api/library/scenes/recommended - Get recommended scenes
  */
-export interface GetRecommendedScenesQuery extends Record<string, string | undefined> {
+export interface GetRecommendedScenesQuery extends Record<
+  string,
+  string | undefined
+> {
   page?: string;
   per_page?: string;
 }
@@ -296,8 +302,10 @@ export interface GetGalleryImagesParams extends Record<string, string> {
   id: string;
 }
 
-export interface GetGalleryImagesQuery
-  extends Record<string, string | undefined> {
+export interface GetGalleryImagesQuery extends Record<
+  string,
+  string | undefined
+> {
   page?: string;
   per_page?: string;
   instance?: string;

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth";
 import { getLandingPage } from "../../constants/navigation";
+import { useAuth } from "../../hooks/useAuth";
 
 export const PeekLogo = ({
   size = "default", // 'small', 'default', 'large'
@@ -14,7 +14,10 @@ export const PeekLogo = ({
   // Passes current path so random mode excludes the current page
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    const destination = getLandingPage(user?.landingPagePreference, location.pathname);
+    const destination = getLandingPage(
+      user?.landingPagePreference,
+      location.pathname
+    );
     navigate(destination);
   };
 

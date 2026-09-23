@@ -124,14 +124,22 @@ const FilterPresets = ({
         apiGet("/user/default-presets"),
       ]);
 
-      const allPresets = (presetsResponse as Record<string, unknown>)?.presets as Record<string, Preset[]> || {};
+      const allPresets =
+        ((presetsResponse as Record<string, unknown>)?.presets as Record<
+          string,
+          Preset[]
+        >) || {};
       // Get presets for the artifact type (scene grid contexts use "scene" presets)
       const presetArtifactType = effectiveContext.startsWith("scene_")
         ? "scene"
         : effectiveContext;
       setPresets(allPresets[presetArtifactType] || []);
 
-      const defaults = (defaultsResponse as Record<string, unknown>)?.defaults as Record<string, string> || {};
+      const defaults =
+        ((defaultsResponse as Record<string, unknown>)?.defaults as Record<
+          string,
+          string
+        >) || {};
       // Get default for this specific context
       setDefaultPresetId(defaults[effectiveContext] || null);
     } catch (err) {
@@ -209,7 +217,11 @@ const FilterPresets = ({
     setTimeout(() => setSuccess(null), 3000);
   };
 
-  const handleToggleDefault = async (presetId: string, presetName: string, event: React.MouseEvent) => {
+  const handleToggleDefault = async (
+    presetId: string,
+    presetName: string,
+    event: React.MouseEvent
+  ) => {
     // Prevent the load preset action from triggering
     event.stopPropagation();
 
@@ -225,10 +237,14 @@ const FilterPresets = ({
       });
 
       if (isCurrentlyDefault) {
-        setSuccess(`"${presetName}" removed as default for ${getContextLabel(effectiveContext)}`);
+        setSuccess(
+          `"${presetName}" removed as default for ${getContextLabel(effectiveContext)}`
+        );
         setDefaultPresetId(null);
       } else {
-        setSuccess(`"${presetName}" set as default for ${getContextLabel(effectiveContext)}!`);
+        setSuccess(
+          `"${presetName}" set as default for ${getContextLabel(effectiveContext)}!`
+        );
         setDefaultPresetId(presetId);
       }
 
@@ -357,9 +373,7 @@ const FilterPresets = ({
                             >
                               <LucidePin
                                 className={`w-3.5 h-3.5 ${
-                                  isDefault
-                                    ? "fill-current"
-                                    : ""
+                                  isDefault ? "fill-current" : ""
                                 }`}
                                 style={{
                                   color: isDefault

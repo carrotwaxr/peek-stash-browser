@@ -9,13 +9,15 @@
     "test:e2e:headed": "npx playwright test --headed",
     "screenshots": "node screenshots/capture.js",
     "screenshots:publish": "node screenshots/publish.js",
-    "docs": ".venv/bin/mkdocs serve --livereload -a localhost:8001"
+    "docs": ".venv/bin/mkdocs serve --livereload -a localhost:8001",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "form-data": "^4.0.5",
     "playwright": "^1.56.1",
-    "prettier": "^3.8.0"
+    "prettier": "^3.8.1"
   }
 }

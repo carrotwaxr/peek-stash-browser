@@ -1,8 +1,17 @@
- 
-import { useState, useEffect } from "react";
-import { User, X, Shield, Users, Key, Trash2, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Key, Lock, Shield, Trash2, User, Users, X } from "lucide-react";
+import {
+  addGroupMember,
+  adminRegenerateRecoveryKey,
+  adminResetPassword,
+  apiDelete,
+  apiPut,
+  getUserGroupMemberships,
+  getUserPermissions,
+  removeGroupMember,
+  updateUserPermissionOverrides,
+} from "../../api";
 import { Button, Paper } from "../ui/index";
-import { apiPut, apiDelete, getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../api";
 import ContentRestrictionsModal from "./ContentRestrictionsModal";
 
 interface UserData {
@@ -65,7 +74,6 @@ const UserEditModalContent = ({
   const [role, setRole] = useState(user.role || "USER");
   const [userGroups, setUserGroups] = useState<number[]>([]);
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
-   
 
   // Password reset state
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -73,7 +81,8 @@ const UserEditModalContent = ({
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
 
   // Content restrictions modal state
-  const [showContentRestrictionsModal, setShowContentRestrictionsModal] = useState(false);
+  const [showContentRestrictionsModal, setShowContentRestrictionsModal] =
+    useState(false);
 
   // Track what has changed for save
   const [hasChanges, setHasChanges] = useState(false);
@@ -84,7 +93,9 @@ const UserEditModalContent = ({
       try {
         const response = await getUserGroupMemberships(user.id);
         const groups = response.groups || [];
-        const memberGroupIds = groups.map((g) => (g as Record<string, unknown>).id as number);
+        const memberGroupIds = groups.map(
+          (g) => (g as Record<string, unknown>).id as number
+        );
         setUserGroups(memberGroupIds);
       } catch (err) {
         console.error("Failed to load user groups:", err);
@@ -100,7 +111,9 @@ const UserEditModalContent = ({
   useEffect(() => {
     const loadPermissions = async () => {
       try {
-        const response = await getUserPermissions(user.id) as unknown as { permissions: UserPermissions };
+        const response = (await getUserPermissions(user.id)) as unknown as {
+          permissions: UserPermissions;
+        };
         setPermissions(response.permissions);
       } catch (err) {
         console.error("Failed to load user permissions:", err);
@@ -112,7 +125,10 @@ const UserEditModalContent = ({
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
 
-  const handleGroupToggle = async (groupId: number, isCurrentlyMember: boolean) => {
+  const handleGroupToggle = async (
+    groupId: number,
+    isCurrentlyMember: boolean
+  ) => {
     try {
       if (isCurrentlyMember) {
         await removeGroupMember(String(groupId), String(user.id));
@@ -129,12 +145,15 @@ const UserEditModalContent = ({
     }
   };
 
-  const handlePermissionOverride = async (permissionKey: string, newValue: boolean | null) => {
+  const handlePermissionOverride = async (
+    permissionKey: string,
+    newValue: boolean | null
+  ) => {
     try {
       const overrideKey = `${permissionKey}Override`;
-      const response = await updateUserPermissionOverrides(user.id, {
+      const response = (await updateUserPermissionOverrides(user.id, {
         [overrideKey]: newValue,
-      }) as unknown as { permissions: UserPermissions };
+      })) as unknown as { permissions: UserPermissions };
       setPermissions(response.permissions);
       onMessage?.(`Permission updated for ${user.username}`);
       setHasChanges(true);
@@ -149,7 +168,11 @@ const UserEditModalContent = ({
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -194,7 +217,11 @@ const UserEditModalContent = ({
   };
 
   const handleRegenerateRecoveryKey = async () => {
-    if (!confirm(`Regenerate recovery key for "${user.username}"?\n\nTheir old key will no longer work.`)) {
+    if (
+      !confirm(
+        `Regenerate recovery key for "${user.username}"?\n\nTheir old key will no longer work.`
+      )
+    ) {
       return;
     }
 
@@ -269,7 +296,10 @@ const UserEditModalContent = ({
         <Paper.Header>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <User className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
+              <User
+                className="w-5 h-5"
+                style={{ color: "var(--text-secondary)" }}
+              />
               <Paper.Title>Edit User: {user.username}</Paper.Title>
             </div>
             <button
@@ -396,12 +426,18 @@ const UserEditModalContent = ({
                         <label
                           key={group.id}
                           className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-opacity-50"
-                          style={{ backgroundColor: isMember ? "rgba(59, 130, 246, 0.05)" : "transparent" }}
+                          style={{
+                            backgroundColor: isMember
+                              ? "rgba(59, 130, 246, 0.05)"
+                              : "transparent",
+                          }}
                         >
                           <input
                             type="checkbox"
                             checked={isMember}
-                            onChange={() => handleGroupToggle(group.id, isMember)}
+                            onChange={() =>
+                              handleGroupToggle(group.id, isMember)
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
@@ -505,7 +541,9 @@ const UserEditModalContent = ({
                           Can download files
                         </span>
                         <div className="mt-1">
-                          {renderInheritanceLabel(permissions.sources.canDownloadFiles)}
+                          {renderInheritanceLabel(
+                            permissions.sources.canDownloadFiles
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -549,13 +587,16 @@ const UserEditModalContent = ({
                           Can download playlists
                         </span>
                         <div className="mt-1">
-                          {renderInheritanceLabel(permissions.sources.canDownloadPlaylists)}
+                          {renderInheritanceLabel(
+                            permissions.sources.canDownloadPlaylists
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <select
                           value={
-                            permissions.sources.canDownloadPlaylists === "override"
+                            permissions.sources.canDownloadPlaylists ===
+                            "override"
                               ? String(permissions.canDownloadPlaylists)
                               : "inherit"
                           }
@@ -603,8 +644,13 @@ const UserEditModalContent = ({
                   border: "1px solid var(--border-color)",
                 }}
               >
-                <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
-                  Manage content restrictions for this user. Restrictions control which content is visible based on collections, tags, studios, and galleries.
+                <p
+                  className="text-sm mb-3"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Manage content restrictions for this user. Restrictions
+                  control which content is visible based on collections, tags,
+                  studios, and galleries.
                 </p>
                 <Button
                   variant="secondary"
@@ -635,7 +681,8 @@ const UserEditModalContent = ({
               >
                 {isCurrentUser ? (
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    You cannot modify your own account from this modal. Use the account settings page instead.
+                    You cannot modify your own account from this modal. Use the
+                    account settings page instead.
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -654,19 +701,40 @@ const UserEditModalContent = ({
                             color: "var(--text-primary)",
                           }}
                         />
-                        <Button variant="primary" size="sm" onClick={handleResetPassword} disabled={loading}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleResetPassword}
+                          disabled={loading}
+                        >
                           Set
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={() => { setShowPasswordReset(false); setNewPassword(""); }}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setShowPasswordReset(false);
+                            setNewPassword("");
+                          }}
+                        >
                           Cancel
                         </Button>
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => setShowPasswordReset(true)}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setShowPasswordReset(true)}
+                        >
                           Reset Password
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={handleRegenerateRecoveryKey} disabled={loading}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleRegenerateRecoveryKey}
+                          disabled={loading}
+                        >
                           <Key size={14} className="mr-1" />
                           Regenerate Recovery Key
                         </Button>
@@ -691,10 +759,16 @@ const UserEditModalContent = ({
                           border: "1px solid var(--border-color)",
                         }}
                       >
-                        <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                        <p
+                          className="text-xs mb-1"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           New recovery key (show to user):
                         </p>
-                        <code className="text-sm font-mono" style={{ color: "var(--text-primary)" }}>
+                        <code
+                          className="text-sm font-mono"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           {generatedKey}
                         </code>
                       </div>
@@ -711,7 +785,9 @@ const UserEditModalContent = ({
           <ContentRestrictionsModal
             user={user}
             onClose={() => setShowContentRestrictionsModal(false)}
-            onSave={() => onMessage?.(`Content restrictions updated for ${user.username}`)}
+            onSave={() =>
+              onMessage?.(`Content restrictions updated for ${user.username}`)
+            }
           />
         )}
 
@@ -750,7 +826,9 @@ const UserEditModalContent = ({
  * @param {Function} props.onError - Callback for error messages
  * @param {Object} props.api - API instance for requests
  */
-const UserEditModal = (props: Omit<UserEditModalContentProps, 'user'> & { user: UserData | null }) => {
+const UserEditModal = (
+  props: Omit<UserEditModalContentProps, "user"> & { user: UserData | null }
+) => {
   // Early return before any hooks - this wrapper has no hooks
   if (!props.user) return null;
 

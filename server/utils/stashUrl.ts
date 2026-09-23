@@ -1,7 +1,6 @@
 /**
  * Utility functions for working with Stash URLs
  */
-
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 
 /**
@@ -41,7 +40,14 @@ export function getStashUiUrl(instanceId?: string): string | null {
  * @returns Full URL to the entity in Stash, or null if stashBaseUrl is not available
  */
 export function buildStashEntityUrl(
-  entityType: 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image',
+  entityType:
+    | "scene"
+    | "performer"
+    | "studio"
+    | "tag"
+    | "group"
+    | "gallery"
+    | "image",
   entityId: string | number,
   instanceId?: string
 ): string | null {
@@ -53,13 +59,13 @@ export function buildStashEntityUrl(
 
   // Map entity types to Stash URL paths
   const pathMap: Record<string, string> = {
-    scene: 'scenes',
-    performer: 'performers',
-    studio: 'studios',
-    tag: 'tags',
-    group: 'groups',
-    gallery: 'galleries',
-    image: 'images',
+    scene: "scenes",
+    performer: "performers",
+    studio: "studios",
+    tag: "tags",
+    group: "groups",
+    gallery: "galleries",
+    image: "images",
   };
 
   const path = pathMap[entityType];

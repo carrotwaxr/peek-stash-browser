@@ -4,8 +4,8 @@
  * Zod schemas for gallery API responses.
  */
 import { z } from "zod";
-import { PerformerRefSchema, StudioRefSchema, TagRefSchema } from "./refs.js";
 import { ProxyUrlSchema, TimestampSchema } from "./base.js";
+import { PerformerRefSchema, StudioRefSchema, TagRefSchema } from "./refs.js";
 
 /**
  * Full gallery response
@@ -22,17 +22,23 @@ export const GallerySchema = z.object({
 
   // Media
   cover: ProxyUrlSchema,
-  paths: z.object({
-    cover: ProxyUrlSchema,
-  }).nullable(),
+  paths: z
+    .object({
+      cover: ProxyUrlSchema,
+    })
+    .nullable(),
 
   // File info
-  folder: z.object({
-    path: z.string(),
-  }).nullable(),
-  files: z.array(z.object({
-    path: z.string(),
-  })),
+  folder: z
+    .object({
+      path: z.string(),
+    })
+    .nullable(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+    })
+  ),
 
   // Relationships
   studio: StudioRefSchema.nullable(),

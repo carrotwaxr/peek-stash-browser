@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 
@@ -38,105 +38,326 @@ describe("SceneTagInheritanceService", () => {
 
   describe("computeInheritedTags", () => {
     it("should inherit tags from performer", async () => {
-      await prisma.stashTag.create({ data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Performer Tag" } });
-      await prisma.stashPerformer.create({ data: { id: `${PREFIX}performer-1`, stashInstanceId: INSTANCE_ID, name: "Test Performer" } });
-      await prisma.performerTag.create({ data: { performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene" } });
-      await prisma.scenePerformer.create({ data: { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID } });
+      await prisma.stashTag.create({
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Performer Tag",
+        },
+      });
+      await prisma.stashPerformer.create({
+        data: {
+          id: `${PREFIX}performer-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Performer",
+        },
+      });
+      await prisma.performerTag.create({
+        data: {
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+        },
+      });
+      await prisma.scenePerformer.create({
+        data: {
+          sceneId: `${PREFIX}scene-1`,
+          sceneInstanceId: INSTANCE_ID,
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
     it("should inherit tags from studio", async () => {
-      await prisma.stashTag.create({ data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Studio Tag" } });
-      await prisma.stashStudio.create({ data: { id: `${PREFIX}studio-1`, stashInstanceId: INSTANCE_ID, name: "Test Studio" } });
-      await prisma.studioTag.create({ data: { studioId: `${PREFIX}studio-1`, studioInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene", studioId: `${PREFIX}studio-1` } });
+      await prisma.stashTag.create({
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Studio Tag",
+        },
+      });
+      await prisma.stashStudio.create({
+        data: {
+          id: `${PREFIX}studio-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Studio",
+        },
+      });
+      await prisma.studioTag.create({
+        data: {
+          studioId: `${PREFIX}studio-1`,
+          studioInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+          studioId: `${PREFIX}studio-1`,
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
     it("should inherit tags from group", async () => {
-      await prisma.stashTag.create({ data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Group Tag" } });
-      await prisma.stashGroup.create({ data: { id: `${PREFIX}group-1`, stashInstanceId: INSTANCE_ID, name: "Test Group" } });
-      await prisma.groupTag.create({ data: { groupId: `${PREFIX}group-1`, groupInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene" } });
-      await prisma.sceneGroup.create({ data: { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, groupId: `${PREFIX}group-1`, groupInstanceId: INSTANCE_ID } });
+      await prisma.stashTag.create({
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Group Tag",
+        },
+      });
+      await prisma.stashGroup.create({
+        data: {
+          id: `${PREFIX}group-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Group",
+        },
+      });
+      await prisma.groupTag.create({
+        data: {
+          groupId: `${PREFIX}group-1`,
+          groupInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+        },
+      });
+      await prisma.sceneGroup.create({
+        data: {
+          sceneId: `${PREFIX}scene-1`,
+          sceneInstanceId: INSTANCE_ID,
+          groupId: `${PREFIX}group-1`,
+          groupInstanceId: INSTANCE_ID,
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
     it("should NOT include direct scene tags in inheritedTagIds", async () => {
-      await prisma.stashTag.create({ data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Direct Tag" } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene" } });
-      await prisma.sceneTag.create({ data: { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
+      await prisma.stashTag.create({
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Direct Tag",
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+        },
+      });
+      await prisma.sceneTag.create({
+        data: {
+          sceneId: `${PREFIX}scene-1`,
+          sceneInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).not.toContain(`${PREFIX}tag-1`);
     });
 
     it("should deduplicate tags from multiple sources", async () => {
-      await prisma.stashTag.create({ data: { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Shared Tag" } });
-      await prisma.stashPerformer.create({ data: { id: `${PREFIX}performer-1`, stashInstanceId: INSTANCE_ID, name: "Test Performer" } });
-      await prisma.performerTag.create({ data: { performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashStudio.create({ data: { id: `${PREFIX}studio-1`, stashInstanceId: INSTANCE_ID, name: "Test Studio" } });
-      await prisma.studioTag.create({ data: { studioId: `${PREFIX}studio-1`, studioInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene", studioId: `${PREFIX}studio-1` } });
-      await prisma.scenePerformer.create({ data: { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID } });
+      await prisma.stashTag.create({
+        data: {
+          id: `${PREFIX}tag-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Shared Tag",
+        },
+      });
+      await prisma.stashPerformer.create({
+        data: {
+          id: `${PREFIX}performer-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Performer",
+        },
+      });
+      await prisma.performerTag.create({
+        data: {
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashStudio.create({
+        data: {
+          id: `${PREFIX}studio-1`,
+          stashInstanceId: INSTANCE_ID,
+          name: "Test Studio",
+        },
+      });
+      await prisma.studioTag.create({
+        data: {
+          studioId: `${PREFIX}studio-1`,
+          studioInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+          studioId: `${PREFIX}studio-1`,
+        },
+      });
+      await prisma.scenePerformer.create({
+        data: {
+          sceneId: `${PREFIX}scene-1`,
+          sceneInstanceId: INSTANCE_ID,
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
-      const tagCount = inheritedTagIds.filter((id: string) => id === `${PREFIX}tag-1`).length;
+      const tagCount = inheritedTagIds.filter(
+        (id: string) => id === `${PREFIX}tag-1`
+      ).length;
       expect(tagCount).toBe(1);
     });
 
     it("should handle scene with no related entities", async () => {
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Standalone Scene" } });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Standalone Scene",
+        },
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).toEqual([]);
     });
 
     it("should collect tags from multiple performers", async () => {
-      await prisma.stashTag.createMany({ data: [
-        { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Tag 1" },
-        { id: `${PREFIX}tag-2`, stashInstanceId: INSTANCE_ID, name: "Tag 2" }
-      ] });
-      await prisma.stashPerformer.createMany({ data: [
-        { id: `${PREFIX}performer-1`, stashInstanceId: INSTANCE_ID, name: "P1" },
-        { id: `${PREFIX}performer-2`, stashInstanceId: INSTANCE_ID, name: "P2" }
-      ] });
-      await prisma.performerTag.create({ data: { performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-1`, tagInstanceId: INSTANCE_ID } });
-      await prisma.performerTag.create({ data: { performerId: `${PREFIX}performer-2`, performerInstanceId: INSTANCE_ID, tagId: `${PREFIX}tag-2`, tagInstanceId: INSTANCE_ID } });
-      await prisma.stashScene.create({ data: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_ID, title: "Test Scene" } });
-      await prisma.scenePerformer.createMany({ data: [
-        { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-1`, performerInstanceId: INSTANCE_ID },
-        { sceneId: `${PREFIX}scene-1`, sceneInstanceId: INSTANCE_ID, performerId: `${PREFIX}performer-2`, performerInstanceId: INSTANCE_ID }
-      ] });
+      await prisma.stashTag.createMany({
+        data: [
+          { id: `${PREFIX}tag-1`, stashInstanceId: INSTANCE_ID, name: "Tag 1" },
+          { id: `${PREFIX}tag-2`, stashInstanceId: INSTANCE_ID, name: "Tag 2" },
+        ],
+      });
+      await prisma.stashPerformer.createMany({
+        data: [
+          {
+            id: `${PREFIX}performer-1`,
+            stashInstanceId: INSTANCE_ID,
+            name: "P1",
+          },
+          {
+            id: `${PREFIX}performer-2`,
+            stashInstanceId: INSTANCE_ID,
+            name: "P2",
+          },
+        ],
+      });
+      await prisma.performerTag.create({
+        data: {
+          performerId: `${PREFIX}performer-1`,
+          performerInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-1`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.performerTag.create({
+        data: {
+          performerId: `${PREFIX}performer-2`,
+          performerInstanceId: INSTANCE_ID,
+          tagId: `${PREFIX}tag-2`,
+          tagInstanceId: INSTANCE_ID,
+        },
+      });
+      await prisma.stashScene.create({
+        data: {
+          id: `${PREFIX}scene-1`,
+          stashInstanceId: INSTANCE_ID,
+          title: "Test Scene",
+        },
+      });
+      await prisma.scenePerformer.createMany({
+        data: [
+          {
+            sceneId: `${PREFIX}scene-1`,
+            sceneInstanceId: INSTANCE_ID,
+            performerId: `${PREFIX}performer-1`,
+            performerInstanceId: INSTANCE_ID,
+          },
+          {
+            sceneId: `${PREFIX}scene-1`,
+            sceneInstanceId: INSTANCE_ID,
+            performerId: `${PREFIX}performer-2`,
+            performerInstanceId: INSTANCE_ID,
+          },
+        ],
+      });
 
       await sceneTagInheritanceService.computeInheritedTags();
 
-      const scene = await prisma.stashScene.findFirst({ where: { id: `${PREFIX}scene-1` } });
+      const scene = await prisma.stashScene.findFirst({
+        where: { id: `${PREFIX}scene-1` },
+      });
       const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-2`);

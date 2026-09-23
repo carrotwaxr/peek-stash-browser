@@ -35,7 +35,12 @@ interface KeyboardShortcutOptions {
 
 export const useKeyboardShortcuts = (
   shortcuts: Record<string, (event: KeyboardEvent) => any> = {},
-  { enabled = true, context = "global", priority = 0, shouldHandle = null }: KeyboardShortcutOptions = {}
+  {
+    enabled = true,
+    context = "global",
+    priority = 0,
+    shouldHandle = null,
+  }: KeyboardShortcutOptions = {}
 ) => {
   // Use ref to avoid recreating handler on every render
   const shortcutsRef = useRef(shortcuts);

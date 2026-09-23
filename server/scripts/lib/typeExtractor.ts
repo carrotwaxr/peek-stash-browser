@@ -23,7 +23,11 @@ export function extractControllerTypes(
   controllerName: string,
   serverDir: string
 ): ControllerTypes {
-  const fullPath = path.resolve(serverDir, "controllers", controllerFile.replace(/^\.\.\/controllers\//, ""));
+  const fullPath = path.resolve(
+    serverDir,
+    "controllers",
+    controllerFile.replace(/^\.\.\/controllers\//, "")
+  );
 
   if (!fs.existsSync(fullPath)) {
     return {};
@@ -61,7 +65,9 @@ export function extractControllerTypes(
 
   // Step 2: Check if this controller uses TypedRequest or TypedAuthRequest with generics
   // Only match if there's an actual <...> with type parameters
-  const reqMatch = parameterList.match(/req:\s*(?:TypedAuthRequest|TypedRequest)<([^>]+)>/);
+  const reqMatch = parameterList.match(
+    /req:\s*(?:TypedAuthRequest|TypedRequest)<([^>]+)>/
+  );
 
   if (reqMatch) {
     const reqTypes = reqMatch[1] as string;
@@ -128,7 +134,9 @@ export function resolveTypeDefinition(
     return null;
   }
 
-  const files = fs.readdirSync(apiTypesDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
+  const files = fs
+    .readdirSync(apiTypesDir)
+    .filter((f) => f.endsWith(".ts") && f !== "index.ts");
 
   for (const file of files) {
     const filePath = path.join(apiTypesDir, file);
@@ -160,7 +168,10 @@ export function resolveTypeDefinition(
 /**
  * Extract content between matching braces using depth counting
  */
-function extractBracedContent(content: string, startIndex: number): string | null {
+function extractBracedContent(
+  content: string,
+  startIndex: number
+): string | null {
   if (content[startIndex] !== "{") return null;
 
   let depth = 0;
@@ -184,7 +195,10 @@ function extractBracedContent(content: string, startIndex: number): string | nul
 /**
  * Enrich ControllerTypes with resolved definitions
  */
-export function enrichTypes(types: ControllerTypes, serverDir: string): ControllerTypes {
+export function enrichTypes(
+  types: ControllerTypes,
+  serverDir: string
+): ControllerTypes {
   const enrich = (info?: TypeInfo): TypeInfo | undefined => {
     if (!info) return undefined;
     const resolved = resolveTypeDefinition(info.name, serverDir);

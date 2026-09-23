@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance";
-import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath } from "../../utils/entityLinks";
-import FavoriteButton from "./FavoriteButton";
-import OCounterButton from "./OCounterButton";
-import RatingBadge from "./RatingBadge";
-import RatingSliderDialog from "./RatingSliderDialog";
-import SectionLink from "./SectionLink";
-import TagChips from "./TagChips";
-
 /**
  * Adaptive metadata drawer that opens on the longer viewport axis:
  * - Landscape (wider): opens from the right as a side panel
  * - Portrait (taller): opens from the bottom as a sheet
  */
 import type { NormalizedImage } from "@peek/shared-types";
+import { useConfig } from "../../contexts/ConfigContext";
+import { getEntityPath } from "../../utils/entityLinks";
+import {
+  getEffectiveImageMetadata,
+  getImageTitle,
+} from "../../utils/imageGalleryInheritance";
+import FavoriteButton from "./FavoriteButton";
+import OCounterButton from "./OCounterButton";
+import RatingBadge from "./RatingBadge";
+import RatingSliderDialog from "./RatingSliderDialog";
+import SectionLink from "./SectionLink";
+import TagChips from "./TagChips";
 
 interface Props {
   open: boolean;
@@ -68,7 +70,9 @@ const MetadataDrawer = ({
     effectiveDetails,
     effectivePhotographer,
     effectiveUrls,
-  } = getEffectiveImageMetadata(image as Parameters<typeof getEffectiveImageMetadata>[0]);
+  } = getEffectiveImageMetadata(
+    image as Parameters<typeof getEffectiveImageMetadata>[0]
+  );
 
   const date = effectiveDate
     ? new Date(effectiveDate).toLocaleDateString()
@@ -77,8 +81,15 @@ const MetadataDrawer = ({
     image.width && image.height ? `${image.width}×${image.height}` : null;
 
   // Build subtitle parts
-  const photographerText = effectivePhotographer ? `by ${effectivePhotographer}` : null;
-  const subtitleParts = [effectiveStudio?.name, date, photographerText, resolution].filter(Boolean);
+  const photographerText = effectivePhotographer
+    ? `by ${effectivePhotographer}`
+    : null;
+  const subtitleParts = [
+    effectiveStudio?.name,
+    date,
+    photographerText,
+    resolution,
+  ].filter(Boolean);
   const subtitle = subtitleParts.join(" • ");
 
   return (
@@ -114,7 +125,9 @@ const MetadataDrawer = ({
           }
         >
           <div
-            className={isLandscape ? "h-10 w-1 rounded-full" : "w-10 h-1 rounded-full"}
+            className={
+              isLandscape ? "h-10 w-1 rounded-full" : "w-10 h-1 rounded-full"
+            }
             style={{ backgroundColor: "var(--text-muted)" }}
           />
         </div>
@@ -169,7 +182,11 @@ const MetadataDrawer = ({
             >
               {effectiveStudio ? (
                 <Link
-                  to={getEntityPath('studio', effectiveStudio, hasMultipleInstances)}
+                  to={getEntityPath(
+                    "studio",
+                    effectiveStudio,
+                    hasMultipleInstances
+                  )}
                   className="hover:underline hover:text-blue-400"
                   onClick={onClose}
                 >
@@ -202,7 +219,11 @@ const MetadataDrawer = ({
                 {effectivePerformers.map((performer) => (
                   <Link
                     key={performer.id}
-                    to={getEntityPath('performer', performer, hasMultipleInstances)}
+                    to={getEntityPath(
+                      "performer",
+                      performer,
+                      hasMultipleInstances
+                    )}
                     className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                     onClick={onClose}
                   >
@@ -251,7 +272,9 @@ const MetadataDrawer = ({
               >
                 Tags
               </h3>
-              <TagChips tags={effectiveTags as Parameters<typeof TagChips>[0]['tags']} />
+              <TagChips
+                tags={effectiveTags as Parameters<typeof TagChips>[0]["tags"]}
+              />
             </div>
           )}
 
@@ -305,7 +328,10 @@ const MetadataDrawer = ({
         initialRating={rating}
         onSave={onRatingChange}
         entityType="image"
-        entityTitle={getImageTitle(image as Parameters<typeof getImageTitle>[0]) ?? undefined}
+        entityTitle={
+          getImageTitle(image as Parameters<typeof getImageTitle>[0]) ??
+          undefined
+        }
         anchorEl={ratingBadgeRef.current}
       />
     </>

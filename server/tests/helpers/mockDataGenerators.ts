@@ -451,9 +451,7 @@ export function createMockScenes(
         created_at: new Date(Date.now() - i * 86400000).toISOString(),
         updated_at: new Date(Date.now() - i * 43200000).toISOString(),
         last_played_at:
-          i % 3 === 0
-            ? new Date(Date.now() - i * 3600000).toISOString()
-            : null,
+          i % 3 === 0 ? new Date(Date.now() - i * 3600000).toISOString() : null,
       })
     );
   }

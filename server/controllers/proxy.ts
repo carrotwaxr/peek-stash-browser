@@ -3,8 +3,8 @@ import https from "https";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import type { TypedRequest, TypedResponse } from "../types/api/express.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedRequest, TypedResponse } from "../types/api/express.js";
 import type { ProxyOptions } from "../types/api/proxy.js";
 import { logger } from "../utils/logger.js";
 
@@ -71,7 +71,10 @@ function getAgentForUrl(urlObj: URL): http.Agent | https.Agent {
  * @param instanceId - Optional instance ID. If not provided, uses default instance.
  * @returns Object with baseUrl and apiKey
  */
-function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey: string } {
+function getInstanceCredentials(instanceId?: string): {
+  baseUrl: string;
+  apiKey: string;
+} {
   // Treat "default" the same as undefined - use the default instance
   if (instanceId && instanceId !== "default") {
     const instance = stashInstanceManager.get(instanceId);
@@ -102,7 +105,13 @@ function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey:
  * - Double-release guard for concurrency slots
  * - Timeout handling
  */
-function proxyHttpRequest({ fullUrl, res, label, defaultCacheControl, timeoutMs }: ProxyOptions): void {
+function proxyHttpRequest({
+  fullUrl,
+  res,
+  label,
+  defaultCacheControl,
+  timeoutMs,
+}: ProxyOptions): void {
   let slotReleased = false;
   const releaseOnce = () => {
     if (!slotReleased) {
@@ -182,7 +191,10 @@ function proxyHttpRequest({ fullUrl, res, label, defaultCacheControl, timeoutMs 
  * GET /api/proxy/scene/:id/preview
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
-export const proxyScenePreview = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
+export const proxyScenePreview = async (
+  req: TypedRequest<never, { id: string }>,
+  res: TypedResponse<ApiErrorResponse>
+) => {
   const { id } = req.params;
 
   if (!id) {
@@ -207,7 +219,10 @@ export const proxyScenePreview = async (req: TypedRequest<never, { id: string }>
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId: scene.stashInstanceId });
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId: scene.stashInstanceId,
+    });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -242,7 +257,10 @@ export const proxyScenePreview = async (req: TypedRequest<never, { id: string }>
  * GET /api/proxy/scene/:id/webp
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
-export const proxySceneWebp = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
+export const proxySceneWebp = async (
+  req: TypedRequest<never, { id: string }>,
+  res: TypedResponse<ApiErrorResponse>
+) => {
   const { id } = req.params;
 
   if (!id) {
@@ -267,7 +285,10 @@ export const proxySceneWebp = async (req: TypedRequest<never, { id: string }>, r
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId: scene.stashInstanceId });
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId: scene.stashInstanceId,
+    });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -302,13 +323,18 @@ export const proxySceneWebp = async (req: TypedRequest<never, { id: string }>, r
  * Handles images, sprites, and other static media
  * GET /api/proxy/stash?path=/xxx&instanceId=yyy
  */
-export const proxyStashMedia = async (req: TypedRequest<never, Record<string, string>, { path?: string; instanceId?: string }>, res: TypedResponse<ApiErrorResponse>) => {
+export const proxyStashMedia = async (
+  req: TypedRequest<
+    never,
+    Record<string, string>,
+    { path?: string; instanceId?: string }
+  >,
+  res: TypedResponse<ApiErrorResponse>
+) => {
   const { path, instanceId } = req.query;
 
   if (!path || typeof path !== "string") {
-    return res
-      .status(400)
-      .json({ error: "Missing or invalid path parameter" });
+    return res.status(400).json({ error: "Missing or invalid path parameter" });
   }
 
   // Validate path to prevent traversal attacks
@@ -324,7 +350,10 @@ export const proxyStashMedia = async (req: TypedRequest<never, Record<string, st
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId });
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId,
+    });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -362,7 +391,10 @@ export const proxyStashMedia = async (req: TypedRequest<never, Record<string, st
  * Falls back to screenshot if stream is unavailable.
  * Uses the clip's stashInstanceId to route to correct Stash server.
  */
-export const proxyClipPreview = async (req: TypedRequest<never, { id: string }>, res: TypedResponse<ApiErrorResponse>) => {
+export const proxyClipPreview = async (
+  req: TypedRequest<never, { id: string }>,
+  res: TypedResponse<ApiErrorResponse>
+) => {
   const { id } = req.params;
 
   if (!id) {
@@ -388,7 +420,10 @@ export const proxyClipPreview = async (req: TypedRequest<never, { id: string }>,
     const creds = getInstanceCredentials(clip.stashInstanceId ?? undefined);
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId: clip.stashInstanceId });
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId: clip.stashInstanceId,
+    });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -424,7 +459,10 @@ export const proxyClipPreview = async (req: TypedRequest<never, { id: string }>,
  * :type = "thumbnail" | "preview" | "image"
  * Uses the image's stashInstanceId to route to correct Stash server.
  */
-export const proxyImage = async (req: TypedRequest<never, { imageId: string; type: string }>, res: TypedResponse<ApiErrorResponse>) => {
+export const proxyImage = async (
+  req: TypedRequest<never, { imageId: string; type: string }>,
+  res: TypedResponse<ApiErrorResponse>
+) => {
   const { imageId, type } = req.params;
 
   if (!imageId) {
@@ -433,7 +471,9 @@ export const proxyImage = async (req: TypedRequest<never, { imageId: string; typ
 
   const validTypes = ["thumbnail", "preview", "image"];
   if (!type || !validTypes.includes(type)) {
-    return res.status(400).json({ error: "Invalid image type. Must be: thumbnail, preview, or image" });
+    return res.status(400).json({
+      error: "Invalid image type. Must be: thumbnail, preview, or image",
+    });
   }
 
   // Get image from database - include stashInstanceId for routing
@@ -471,7 +511,10 @@ export const proxyImage = async (req: TypedRequest<never, { imageId: string; typ
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId: image.stashInstanceId });
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId: image.stashInstanceId,
+    });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 

@@ -1,15 +1,19 @@
 // client/src/components/pages/UserStats/UserStats.tsx
-
 import { type ReactNode, useState } from "react";
 import { BarChart3, Info, RefreshCw } from "lucide-react";
 import { usePageTitle } from "../../../hooks/usePageTitle";
 import { useUserStats } from "../../../hooks/useUserStats";
-import { PageHeader, PageLayout, LoadingSpinner, Tooltip } from "../../ui/index";
 import {
-  LibraryOverview,
+  LoadingSpinner,
+  PageHeader,
+  PageLayout,
+  Tooltip,
+} from "../../ui/index";
+import {
   EngagementTotals,
-  TopList,
   HighlightCard,
+  LibraryOverview,
+  TopList,
 } from "./components/index";
 
 type TopListSortBy = "engagement" | "oCount" | "playCount";
@@ -126,7 +130,10 @@ const UserStats = () => {
   if (loading) {
     return (
       <PageLayout fullHeight>
-        <div className="flex items-center justify-center h-64" style={{ backgroundColor: "var(--bg-primary)" }}>
+        <div
+          className="flex items-center justify-center h-64"
+          style={{ backgroundColor: "var(--bg-primary)" }}
+        >
           <LoadingSpinner />
         </div>
       </PageLayout>
@@ -136,9 +143,7 @@ const UserStats = () => {
   if (error) {
     return (
       <PageLayout fullHeight>
-        <PageHeader
-          title="My Stats"
-        />
+        <PageHeader title="My Stats" />
         <div
           className="text-center py-12"
           style={{ color: "var(--status-error)" }}
@@ -158,10 +163,7 @@ const UserStats = () => {
   return (
     <PageLayout fullHeight>
       <div className="flex items-start justify-between">
-        <PageHeader
-          title="My Stats"
-          subtitle="Your viewing statistics"
-        />
+        <PageHeader title="My Stats" subtitle="Your viewing statistics" />
         <button
           onClick={handleRefresh}
           disabled={refreshing || loading}
@@ -191,7 +193,19 @@ const UserStats = () => {
               <LibraryInfoContent />
             </SectionInfo>
           </div>
-          <LibraryOverview library={data.library as { sceneCount: number; performerCount: number; studioCount: number; tagCount: number; galleryCount: number; imageCount: number; clipCount: number }} />
+          <LibraryOverview
+            library={
+              data.library as {
+                sceneCount: number;
+                performerCount: number;
+                studioCount: number;
+                tagCount: number;
+                galleryCount: number;
+                imageCount: number;
+                clipCount: number;
+              }
+            }
+          />
         </section>
 
         {/* Engagement Stats */}
@@ -210,8 +224,18 @@ const UserStats = () => {
                 </SectionInfo>
               </div>
               <EngagementTotals
-                engagement={data.engagement as { totalWatchTime: number; totalPlayCount: number; totalOCount: number; uniqueScenesWatched: number; totalImagesViewed: number }}
-                librarySceneCount={(data.library as { sceneCount: number }).sceneCount}
+                engagement={
+                  data.engagement as {
+                    totalWatchTime: number;
+                    totalPlayCount: number;
+                    totalOCount: number;
+                    uniqueScenesWatched: number;
+                    totalImagesViewed: number;
+                  }
+                }
+                librarySceneCount={
+                  (data.library as { sceneCount: number }).sceneCount
+                }
               />
             </section>
 
@@ -284,35 +308,88 @@ const UserStats = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <HighlightCard
                   title="Most Watched Scene"
-                  item={data.mostWatchedScene as { id: string; name?: string; title?: string; filePath?: string; imageUrl?: string } | null}
+                  item={
+                    data.mostWatchedScene as {
+                      id: string;
+                      name?: string;
+                      title?: string;
+                      filePath?: string;
+                      imageUrl?: string;
+                    } | null
+                  }
                   linkPrefix="/scene"
                   entityType="scene"
                   statLabel="plays"
-                  statValue={(data.mostWatchedScene as Record<string, unknown> | undefined)?.playCount as number || 0}
+                  statValue={
+                    ((
+                      data.mostWatchedScene as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.playCount as number) || 0
+                  }
                 />
                 <HighlightCard
                   title="Most Viewed Image"
-                  item={data.mostViewedImage as { id: string; name?: string; title?: string; filePath?: string; imageUrl?: string } | null}
+                  item={
+                    data.mostViewedImage as {
+                      id: string;
+                      name?: string;
+                      title?: string;
+                      filePath?: string;
+                      imageUrl?: string;
+                    } | null
+                  }
                   linkPrefix="/image"
                   entityType="image"
                   statLabel="views"
-                  statValue={(data.mostViewedImage as Record<string, unknown> | undefined)?.viewCount as number || 0}
+                  statValue={
+                    ((
+                      data.mostViewedImage as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.viewCount as number) || 0
+                  }
                 />
                 <HighlightCard
                   title="Most O'd Scene"
-                  item={data.mostOdScene as { id: string; name?: string; title?: string; filePath?: string; imageUrl?: string } | null}
+                  item={
+                    data.mostOdScene as {
+                      id: string;
+                      name?: string;
+                      title?: string;
+                      filePath?: string;
+                      imageUrl?: string;
+                    } | null
+                  }
                   linkPrefix="/scene"
                   entityType="scene"
                   statLabel="Os"
-                  statValue={(data.mostOdScene as Record<string, unknown> | undefined)?.oCount as number || 0}
+                  statValue={
+                    ((data.mostOdScene as Record<string, unknown> | undefined)
+                      ?.oCount as number) || 0
+                  }
                 />
                 <HighlightCard
                   title="Most O'd Performer"
-                  item={data.mostOdPerformer as { id: string; name?: string; title?: string; filePath?: string; imageUrl?: string } | null}
+                  item={
+                    data.mostOdPerformer as {
+                      id: string;
+                      name?: string;
+                      title?: string;
+                      filePath?: string;
+                      imageUrl?: string;
+                    } | null
+                  }
                   linkPrefix="/performer"
                   entityType="performer"
                   statLabel="Os"
-                  statValue={(data.mostOdPerformer as Record<string, unknown> | undefined)?.oCount as number || 0}
+                  statValue={
+                    ((
+                      data.mostOdPerformer as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.oCount as number) || 0
+                  }
                 />
               </div>
             </section>

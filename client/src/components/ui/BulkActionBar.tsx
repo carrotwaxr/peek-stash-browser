@@ -12,7 +12,11 @@ interface Props {
  * Generic Bulk Action Bar for multiselect
  * Shows selected count and renders provided action buttons
  */
-const BulkActionBar = ({ selectedScenes, onClearSelection, actions }: Props) => {
+const BulkActionBar = ({
+  selectedScenes,
+  onClearSelection,
+  actions,
+}: Props) => {
   const selectedCount = selectedScenes.length;
 
   return (

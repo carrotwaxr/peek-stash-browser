@@ -1,7 +1,7 @@
 // client/tests/components/folder/FolderView.test.jsx
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import FolderView from "../../../src/components/folder/FolderView";
 
 // Helper to capture URL search params
@@ -43,7 +43,11 @@ describe("FolderView", () => {
         <FolderView
           items={sampleItems}
           tags={sampleTags}
-          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => (
+            <div key={item.id} data-testid={`item-${item.id}`}>
+              {item.id}
+            </div>
+          )}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
@@ -54,9 +58,9 @@ describe("FolderView", () => {
 
       // Find and click the "Photo" folder card (has h3 with folder name)
       // The folder card has an h3 inside it, so we find that and click its parent button
-      const folderCards = screen.getAllByRole("button").filter(
-        (btn) => btn.querySelector("h3")?.textContent === "Photo"
-      );
+      const folderCards = screen
+        .getAllByRole("button")
+        .filter((btn) => btn.querySelector("h3")?.textContent === "Photo");
       expect(folderCards.length).toBeGreaterThan(0);
       fireEvent.click(folderCards[0]);
 
@@ -73,7 +77,11 @@ describe("FolderView", () => {
         <FolderView
           items={sampleItems}
           tags={sampleTags}
-          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => (
+            <div key={item.id} data-testid={`item-${item.id}`}>
+              {item.id}
+            </div>
+          )}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
@@ -84,7 +92,9 @@ describe("FolderView", () => {
       expect(capturedSearchParams!.get("folderPath")).toBe("tag1");
 
       // Find the breadcrumb nav and click "All" (root) within it
-      const breadcrumbNav = screen.getByRole("navigation", { name: /folder navigation/i });
+      const breadcrumbNav = screen.getByRole("navigation", {
+        name: /folder navigation/i,
+      });
       const allContentBreadcrumb = within(breadcrumbNav).getByText("All");
       fireEvent.click(allContentBreadcrumb);
 
@@ -106,7 +116,11 @@ describe("FolderView", () => {
         <FolderView
           items={itemsWithSubfolder}
           tags={sampleTags}
-          renderItem={(item: any) => <div key={item.id} data-testid={`item-${item.id}`}>{item.id}</div>}
+          renderItem={(item: any) => (
+            <div key={item.id} data-testid={`item-${item.id}`}>
+              {item.id}
+            </div>
+          )}
           onFolderPathChange={onFolderPathChange}
         />,
         { wrapper: Wrapper }
@@ -116,9 +130,9 @@ describe("FolderView", () => {
       expect(capturedSearchParams!.get("page")).toBe("2");
 
       // Find and click the "Color" folder card (has h3 with folder name)
-      const folderCards = screen.getAllByRole("button").filter(
-        (btn) => btn.querySelector("h3")?.textContent === "Color"
-      );
+      const folderCards = screen
+        .getAllByRole("button")
+        .filter((btn) => btn.querySelector("h3")?.textContent === "Color");
       expect(folderCards.length).toBeGreaterThan(0);
       fireEvent.click(folderCards[0]);
 

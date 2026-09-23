@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
 /**
  * Pagination Edge Cases Integration Tests
@@ -52,12 +52,15 @@ describe("Pagination Edge Cases", () => {
 
   describe("per_page variations", () => {
     it("handles per_page of 1", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 1,
-          page: 1,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 1,
+            page: 1,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -65,12 +68,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles per_page of 10", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 1,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 1,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -78,12 +84,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles per_page of 100", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 100,
-          page: 1,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 100,
+            page: 1,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -91,12 +100,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles per_page of 1000", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 1000,
-          page: 1,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 1000,
+            page: 1,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -104,9 +116,12 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles default per_page when not specified", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {},
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {},
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -115,16 +130,19 @@ describe("Pagination Edge Cases", () => {
 
   describe("empty result sets", () => {
     it("returns empty array for impossible filter", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          // Filter that should return no results
-          rating100: {
-            value: 999, // Impossible rating
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            // Filter that should return no results
+            rating100: {
+              value: 999, // Impossible rating
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -133,9 +151,12 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("returns empty array for non-existent ID", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        ids: ["999999999"], // Non-existent ID
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: ["999999999"], // Non-existent ID
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -143,12 +164,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("returns empty array for text search with no matches", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-          q: "xyznonexistentquerystring12345",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
+            q: "xyznonexistentquerystring12345",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -159,14 +183,17 @@ describe("Pagination Edge Cases", () => {
 
   describe("page navigation", () => {
     it("returns correct items for page 1", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-          page: 1,
-          sort: "id",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+            page: 1,
+            sort: "id",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -174,29 +201,38 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("returns different items for page 2", async () => {
-      const page1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-          page: 1,
-          sort: "id",
-          direction: "ASC",
-        },
-      });
+      const page1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+            page: 1,
+            sort: "id",
+            direction: "ASC",
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-          page: 2,
-          sort: "id",
-          direction: "ASC",
-        },
-      });
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+            page: 2,
+            sort: "id",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
 
       // If there are enough results, page 2 should have different items
-      if (page1.data.findScenes.count > 5 && page2.data.findScenes.scenes.length > 0) {
+      if (
+        page1.data.findScenes.count > 5 &&
+        page2.data.findScenes.scenes.length > 0
+      ) {
         const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
         const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
 
@@ -207,19 +243,25 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("maintains consistent count across pages", async () => {
-      const page1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 1,
-        },
-      });
+      const page1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 1,
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 2,
-        },
-      });
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 2,
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
@@ -232,21 +274,27 @@ describe("Pagination Edge Cases", () => {
   describe("beyond-range page numbers", () => {
     it("returns empty array for page beyond total pages", async () => {
       // First get the count
-      const countResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 10, page: 1 },
-      });
+      const countResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 10, page: 1 },
+        }
+      );
 
       expect(countResponse.ok).toBe(true);
       const totalCount = countResponse.data.findScenes.count;
       const totalPages = Math.ceil(totalCount / 10);
 
       // Request a page way beyond the total
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: totalPages + 100,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: totalPages + 100,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -256,12 +304,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles page 0 gracefully", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 0,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 0,
+          },
+        }
+      );
 
       // Should either treat as page 1 or return error gracefully
       expect(response.ok).toBe(true);
@@ -269,12 +320,15 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("handles negative page gracefully", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: -1,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: -1,
+          },
+        }
+      );
 
       // Should either treat as page 1 or return error gracefully
       expect(response.ok).toBe(true);
@@ -285,9 +339,12 @@ describe("Pagination Edge Cases", () => {
   describe("last page handling", () => {
     it("returns partial results on last page", async () => {
       // Get total count with per_page that won't divide evenly
-      const countResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 7, page: 1 },
-      });
+      const countResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 7, page: 1 },
+        }
+      );
 
       expect(countResponse.ok).toBe(true);
       const totalCount = countResponse.data.findScenes.count;
@@ -296,44 +353,60 @@ describe("Pagination Edge Cases", () => {
         const lastPage = Math.ceil(totalCount / 7);
         const expectedLastPageCount = totalCount % 7 || 7;
 
-        const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          filter: {
-            per_page: 7,
-            page: lastPage,
-          },
-        });
+        const response = await adminClient.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            filter: {
+              per_page: 7,
+              page: lastPage,
+            },
+          }
+        );
 
         expect(response.ok).toBe(true);
-        expect(response.data.findScenes.scenes.length).toBe(expectedLastPageCount);
+        expect(response.data.findScenes.scenes.length).toBe(
+          expectedLastPageCount
+        );
       }
     });
   });
 
   describe("pagination across entity types", () => {
     it("paginates performers correctly", async () => {
-      const page1 = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 5,
-          page: 1,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const page1 = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 5,
+            page: 1,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 5,
-          page: 2,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const page2 = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 5,
+            page: 2,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
-      expect(page1.data.findPerformers.count).toBe(page2.data.findPerformers.count);
+      expect(page1.data.findPerformers.count).toBe(
+        page2.data.findPerformers.count
+      );
 
-      if (page1.data.findPerformers.count > 5 && page2.data.findPerformers.performers.length > 0) {
+      if (
+        page1.data.findPerformers.count > 5 &&
+        page2.data.findPerformers.performers.length > 0
+      ) {
         const page1Ids = page1.data.findPerformers.performers.map((p) => p.id);
         const page2Ids = page2.data.findPerformers.performers.map((p) => p.id);
         const overlap = page1Ids.filter((id) => page2Ids.includes(id));
@@ -342,29 +415,38 @@ describe("Pagination Edge Cases", () => {
     });
 
     it("paginates tags correctly", async () => {
-      const page1 = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 5,
-          page: 1,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const page1 = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 5,
+            page: 1,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: 5,
-          page: 2,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const page2 = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: 5,
+            page: 2,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
       expect(page1.data.findTags.count).toBe(page2.data.findTags.count);
 
-      if (page1.data.findTags.count > 5 && page2.data.findTags.tags.length > 0) {
+      if (
+        page1.data.findTags.count > 5 &&
+        page2.data.findTags.tags.length > 0
+      ) {
         const page1Ids = page1.data.findTags.tags.map((t) => t.id);
         const page2Ids = page2.data.findTags.tags.map((t) => t.id);
         const overlap = page1Ids.filter((id) => page2Ids.includes(id));
@@ -376,30 +458,36 @@ describe("Pagination Edge Cases", () => {
   describe("pagination with filters", () => {
     it("paginates filtered results correctly", async () => {
       // First get count of filtered results
-      const countResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 5, page: 1 },
-        scene_filter: {
-          rating100: {
-            value: 0,
-            modifier: "NOT_NULL",
-          },
-        },
-      });
-
-      expect(countResponse.ok).toBe(true);
-      const filteredCount = countResponse.data.findScenes.count;
-
-      if (filteredCount > 5) {
-        // Get page 2 of filtered results
-        const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          filter: { per_page: 5, page: 2 },
+      const countResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 5, page: 1 },
           scene_filter: {
             rating100: {
               value: 0,
               modifier: "NOT_NULL",
             },
           },
-        });
+        }
+      );
+
+      expect(countResponse.ok).toBe(true);
+      const filteredCount = countResponse.data.findScenes.count;
+
+      if (filteredCount > 5) {
+        // Get page 2 of filtered results
+        const page2 = await adminClient.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            filter: { per_page: 5, page: 2 },
+            scene_filter: {
+              rating100: {
+                value: 0,
+                modifier: "NOT_NULL",
+              },
+            },
+          }
+        );
 
         expect(page2.ok).toBe(true);
         expect(page2.data.findScenes.count).toBe(filteredCount);
@@ -412,27 +500,36 @@ describe("Pagination Edge Cases", () => {
     it("maintains stable pagination with random seed", async () => {
       const seed = 77777777;
 
-      const page1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-          page: 1,
-          sort: `random_${seed}`,
-        },
-      });
+      const page1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+            page: 1,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-          page: 2,
-          sort: `random_${seed}`,
-        },
-      });
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+            page: 2,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
 
       // With same seed, pages should not overlap
-      if (page1.data.findScenes.count > 5 && page2.data.findScenes.scenes.length > 0) {
+      if (
+        page1.data.findScenes.count > 5 &&
+        page2.data.findScenes.scenes.length > 0
+      ) {
         const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
         const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
         const overlap = page1Ids.filter((id) => page2Ids.includes(id));
@@ -443,21 +540,27 @@ describe("Pagination Edge Cases", () => {
     it("re-requesting same page with same seed returns same results", async () => {
       const seed = 88888888;
 
-      const first = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 1,
-          sort: `random_${seed}`,
-        },
-      });
+      const first = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 1,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
-      const second = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 10,
-          page: 1,
-          sort: `random_${seed}`,
-        },
-      });
+      const second = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 10,
+            page: 1,
+            sort: `random_${seed}`,
+          },
+        }
+      );
 
       expect(first.ok).toBe(true);
       expect(second.ok).toBe(true);

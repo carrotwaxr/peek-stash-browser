@@ -4,7 +4,7 @@
  * Tests that buildStudioFilter correctly transforms UI filter values
  * into the GraphQL filter format expected by the backend
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildStudioFilter } from "../../src/utils/filterConfig";
 
 describe("buildStudioFilter", () => {

@@ -1,18 +1,28 @@
 // server/scripts/generate-api-docs.ts
 import * as fs from "fs";
 import * as path from "path";
-import { parseApiMounts, parseRouteFile, RouteDefinition } from "./lib/routeParser.js";
-import { extractControllerTypes, enrichTypes } from "./lib/typeExtractor.js";
 import {
-  generateMarkdown,
-  DocumentedRoute,
   DocumentedGroup,
+  DocumentedRoute,
+  generateMarkdown,
 } from "./lib/markdownGenerator.js";
+import {
+  RouteDefinition,
+  parseApiMounts,
+  parseRouteFile,
+} from "./lib/routeParser.js";
+import { enrichTypes, extractControllerTypes } from "./lib/typeExtractor.js";
 
 const SERVER_DIR = path.resolve(import.meta.dirname, "..");
 const API_FILE = path.join(SERVER_DIR, "initializers", "api.ts");
 const ROUTES_DIR = path.join(SERVER_DIR, "routes");
-const DOCS_OUTPUT = path.join(SERVER_DIR, "..", "docs", "development", "api-reference.md");
+const DOCS_OUTPUT = path.join(
+  SERVER_DIR,
+  "..",
+  "docs",
+  "development",
+  "api-reference.md"
+);
 
 // Routes to skip (complex handlers, streaming, etc.)
 const SKIP_ROUTES = ["video.ts"];
@@ -21,7 +31,8 @@ const SKIP_ROUTES = ["video.ts"];
 const GROUP_CONFIG: Record<string, { order: number; description: string }> = {
   "/api/auth": {
     order: 1,
-    description: "Authentication endpoints for login, logout, and session management.",
+    description:
+      "Authentication endpoints for login, logout, and session management.",
   },
   "/api/setup": {
     order: 2,
@@ -41,7 +52,8 @@ const GROUP_CONFIG: Record<string, { order: number; description: string }> = {
   },
   "/api/playlists": {
     order: 6,
-    description: "Playlist management endpoints for creating and organizing scene collections.",
+    description:
+      "Playlist management endpoints for creating and organizing scene collections.",
   },
   "/api/carousels": {
     order: 7,
@@ -65,7 +77,8 @@ const GROUP_CONFIG: Record<string, { order: number; description: string }> = {
   },
   "/api/library": {
     order: 12,
-    description: "Library browsing endpoints for scenes, performers, studios, tags, groups, galleries, and images.",
+    description:
+      "Library browsing endpoints for scenes, performers, studios, tags, groups, galleries, and images.",
   },
 };
 
@@ -124,7 +137,8 @@ function findBasePath(
   // Fallback: try matching by route file name
   for (const [varName, basePath] of mounts) {
     // Check if variable name matches file name pattern
-    const expectedVarName = routeFileName.replace(/([A-Z])/g, (m) => m.toLowerCase()) + "Routes";
+    const expectedVarName =
+      routeFileName.replace(/([A-Z])/g, (m) => m.toLowerCase()) + "Routes";
     if (varName.toLowerCase() === expectedVarName.toLowerCase()) {
       return basePath;
     }
@@ -182,25 +196,35 @@ async function main() {
     const basePath = findBasePath(routeFile, mounts, apiContent);
 
     if (!basePath) {
-      console.warn(`  Warning: No mount found for ${path.relative(ROUTES_DIR, routeFile)}`);
+      console.warn(
+        `  Warning: No mount found for ${path.relative(ROUTES_DIR, routeFile)}`
+      );
       continue;
     }
 
-    console.log(`  Processing ${path.relative(ROUTES_DIR, routeFile)} -> ${basePath}`);
+    console.log(
+      `  Processing ${path.relative(ROUTES_DIR, routeFile)} -> ${basePath}`
+    );
 
     // Parse routes from file
     const routes = parseRouteFile(routeFile, basePath);
 
     // Enrich each route with type information
-    const documentedRoutes: DocumentedRoute[] = routes.map((route: RouteDefinition) => {
-      const rawTypes = extractControllerTypes(route.controllerFile, route.controllerName, SERVER_DIR);
-      const types = enrichTypes(rawTypes, SERVER_DIR);
+    const documentedRoutes: DocumentedRoute[] = routes.map(
+      (route: RouteDefinition) => {
+        const rawTypes = extractControllerTypes(
+          route.controllerFile,
+          route.controllerName,
+          SERVER_DIR
+        );
+        const types = enrichTypes(rawTypes, SERVER_DIR);
 
-      return {
-        ...route,
-        types,
-      };
-    });
+        return {
+          ...route,
+          types,
+        };
+      }
+    );
 
     // Add to group
     const existing = groupedRoutes.get(basePath) || [];

@@ -1,27 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowLeft,
-  Save,
-  Eye,
-  Plus,
-  Trash2,
   AlertCircle,
+  ArrowLeft,
+  Eye,
   Loader2,
+  Plus,
+  Save,
+  Trash2,
 } from "lucide-react";
-import { Button } from "../ui/index";
-import IconPickerButton from "./IconPickerButton";
-import RuleEditor from "./RuleEditor";
-import CarouselPreview from "./CarouselPreview";
 import { libraryApi } from "../../api";
 import {
-  SCENE_SORT_OPTIONS,
   CAROUSEL_FILTER_DEFINITIONS,
+  SCENE_SORT_OPTIONS,
   buildSceneFilter,
   carouselRulesToFilterState,
 } from "../../utils/filterConfig";
+import { Button } from "../ui/index";
+import CarouselPreview from "./CarouselPreview";
+import IconPickerButton from "./IconPickerButton";
+import RuleEditor from "./RuleEditor";
 
 // Simple ID generator for rule keys (doesn't need to be cryptographically secure)
 let ruleIdCounter = 0;
@@ -56,7 +56,9 @@ const CarouselBuilder = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [previewScenes, setPreviewScenes] = useState<Record<string, unknown>[] | null>(null);
+  const [previewScenes, setPreviewScenes] = useState<
+    Record<string, unknown>[] | null
+  >(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewValid, setPreviewValid] = useState(false);
@@ -68,7 +70,10 @@ const CarouselBuilder = () => {
     const loadCarousel = async () => {
       setLoading(true);
       try {
-        const result = await libraryApi.getCarousel(id) as Record<string, unknown>;
+        const result = (await libraryApi.getCarousel(id)) as Record<
+          string,
+          unknown
+        >;
         const carousel = result.carousel as Record<string, unknown>;
         setTitle(carousel.title as string);
         setIcon(carousel.icon as string);
@@ -76,7 +81,9 @@ const CarouselBuilder = () => {
         setDirection(carousel.direction as string);
 
         // Convert stored rules back to editable format
-        const filterState = carouselRulesToFilterState(carousel.rules as Record<string, unknown>[]);
+        const filterState = carouselRulesToFilterState(
+          carousel.rules as Record<string, unknown>[]
+        );
         const ruleList = convertFilterStateToRules(filterState);
         setRules(ruleList);
       } catch (err) {
@@ -92,7 +99,9 @@ const CarouselBuilder = () => {
   /**
    * Convert filter state (flat object) to rule array for the editor
    */
-  const convertFilterStateToRules = (filterState: Record<string, unknown>): CarouselRule[] => {
+  const convertFilterStateToRules = (
+    filterState: Record<string, unknown>
+  ): CarouselRule[] => {
     const ruleList: CarouselRule[] = [];
 
     // Entity selection rules
@@ -134,29 +143,38 @@ const CarouselBuilder = () => {
     }
 
     // Range rules
-    ["rating", "oCount", "duration", "playCount", "playDuration", "performerCount", "performerAge", "bitrate"].forEach(
+    [
+      "rating",
+      "oCount",
+      "duration",
+      "playCount",
+      "playDuration",
+      "performerCount",
+      "performerAge",
+      "bitrate",
+    ].forEach((key) => {
+      const val = filterState[key] as Record<string, unknown> | undefined;
+      if (val?.min !== undefined || val?.max !== undefined) {
+        ruleList.push({
+          id: generateRuleId(),
+          filterKey: key,
+          value: filterState[key],
+        });
+      }
+    });
+
+    // Boolean rules
+    ["favorite", "performerFavorite", "studioFavorite", "tagFavorite"].forEach(
       (key) => {
-        const val = filterState[key] as Record<string, unknown> | undefined;
-        if (val?.min !== undefined || val?.max !== undefined) {
+        if (filterState[key] === true) {
           ruleList.push({
             id: generateRuleId(),
             filterKey: key,
-            value: filterState[key],
+            value: true,
           });
         }
       }
     );
-
-    // Boolean rules
-    ["favorite", "performerFavorite", "studioFavorite", "tagFavorite"].forEach((key) => {
-      if (filterState[key] === true) {
-        ruleList.push({
-          id: generateRuleId(),
-          filterKey: key,
-          value: true,
-        });
-      }
-    });
 
     // Resolution
     if (filterState.resolution) {
@@ -201,7 +219,9 @@ const CarouselBuilder = () => {
     const filterState: Record<string, unknown> = {};
 
     rules.forEach((rule) => {
-      const def = CAROUSEL_FILTER_DEFINITIONS.find((d) => d.key === rule.filterKey);
+      const def = CAROUSEL_FILTER_DEFINITIONS.find(
+        (d) => d.key === rule.filterKey
+      );
       if (!def) return;
 
       switch (def.type) {
@@ -252,7 +272,9 @@ const CarouselBuilder = () => {
    */
   const addRule = () => {
     const usedKeys = new Set(rules.map((r) => r.filterKey));
-    const availableFilter = CAROUSEL_FILTER_DEFINITIONS.find((f) => !usedKeys.has(f.key));
+    const availableFilter = CAROUSEL_FILTER_DEFINITIONS.find(
+      (f) => !usedKeys.has(f.key)
+    );
 
     if (!availableFilter) {
       return; // All filters already used
@@ -261,7 +283,12 @@ const CarouselBuilder = () => {
     const newRule = {
       id: generateRuleId(),
       filterKey: availableFilter.key,
-      value: availableFilter.type === "checkbox" ? true : availableFilter.multi ? [] : "",
+      value:
+        availableFilter.type === "checkbox"
+          ? true
+          : availableFilter.multi
+            ? []
+            : "",
       modifier: availableFilter.defaultModifier,
     };
 
@@ -304,11 +331,11 @@ const CarouselBuilder = () => {
       const filterState = convertRulesToFilterState();
       const apiRules = buildSceneFilter(filterState);
 
-      const result = await libraryApi.previewCarousel({
+      const result = (await libraryApi.previewCarousel({
         rules: apiRules,
         sort,
         direction,
-      }) as Record<string, unknown>;
+      })) as Record<string, unknown>;
 
       setPreviewScenes(result.scenes as Record<string, unknown>[]);
       setPreviewValid(true);
@@ -369,21 +396,31 @@ const CarouselBuilder = () => {
     }
   };
 
-  const IconComponent = (LucideIcons as unknown as Record<string, LucideIcon>)[icon] || LucideIcons.Film;
+  const IconComponent =
+    (LucideIcons as unknown as Record<string, LucideIcon>)[icon] ||
+    LucideIcons.Film;
   const canSave = title.trim() && rules.length > 0 && previewValid;
   const usedFilterKeys = new Set(rules.map((r) => r.filterKey));
-  const hasMoreFilters = CAROUSEL_FILTER_DEFINITIONS.some((f) => !usedFilterKeys.has(f.key));
+  const hasMoreFilters = CAROUSEL_FILTER_DEFINITIONS.some(
+    (f) => !usedFilterKeys.has(f.key)
+  );
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--accent-primary)" }} />
+        <Loader2
+          className="w-8 h-8 animate-spin"
+          style={{ color: "var(--accent-primary)" }}
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: "var(--bg-primary)" }}
+    >
       {/* Header */}
       <div
         className="sticky top-0 z-10 border-b px-4 py-3"
@@ -394,10 +431,19 @@ const CarouselBuilder = () => {
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => navigate("/settings?section=user&tab=customization")} icon={<ArrowLeft className="w-4 h-4" />}>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate("/settings?section=user&tab=customization")
+              }
+              icon={<ArrowLeft className="w-4 h-4" />}
+            >
               Back
             </Button>
-            <h1 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+            <h1
+              className="text-lg font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
               {isEditing ? "Edit Carousel" : "Create Carousel"}
             </h1>
           </div>
@@ -407,7 +453,13 @@ const CarouselBuilder = () => {
               variant="secondary"
               onClick={handlePreview}
               disabled={previewing || rules.length === 0}
-              icon={previewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+              icon={
+                previewing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )
+              }
             >
               Preview
             </Button>
@@ -415,7 +467,13 @@ const CarouselBuilder = () => {
               variant="primary"
               onClick={handleSave}
               disabled={!canSave || saving}
-              icon={saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              icon={
+                saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )
+              }
             >
               {isEditing ? "Update" : "Save"}
             </Button>
@@ -448,7 +506,10 @@ const CarouselBuilder = () => {
             borderColor: "var(--border-color)",
           }}
         >
-          <h2 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+          <h2
+            className="text-sm font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Carousel Details
           </h2>
 
@@ -458,12 +519,18 @@ const CarouselBuilder = () => {
               className="flex-shrink-0 w-14 h-14 rounded-lg flex items-center justify-center"
               style={{ backgroundColor: "var(--bg-secondary)" }}
             >
-              <IconComponent className="w-7 h-7" style={{ color: "var(--accent-primary)" }} />
+              <IconComponent
+                className="w-7 h-7"
+                style={{ color: "var(--accent-primary)" }}
+              />
             </div>
 
             {/* Title Input */}
             <div className="flex-1 space-y-2">
-              <label className="block text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              <label
+                className="block text-sm font-medium"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Title
               </label>
               <input
@@ -494,7 +561,10 @@ const CarouselBuilder = () => {
           }}
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+            <h2
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Filter Rules (ALL must match)
             </h2>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -543,13 +613,19 @@ const CarouselBuilder = () => {
             borderColor: "var(--border-color)",
           }}
         >
-          <h2 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+          <h2
+            className="text-sm font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Sort Order
           </h2>
 
           <div className="flex flex-wrap gap-4">
             <div className="space-y-1">
-              <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+              <label
+                className="block text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Sort By
               </label>
               <select
@@ -575,7 +651,10 @@ const CarouselBuilder = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+              <label
+                className="block text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Direction
               </label>
               <select
@@ -601,7 +680,11 @@ const CarouselBuilder = () => {
 
         {/* Preview Section */}
         <CarouselPreview
-          scenes={previewScenes as React.ComponentProps<typeof CarouselPreview>["scenes"]}
+          scenes={
+            previewScenes as React.ComponentProps<
+              typeof CarouselPreview
+            >["scenes"]
+          }
           error={previewError}
           loading={previewing}
           onPreview={handlePreview}
@@ -609,7 +692,10 @@ const CarouselBuilder = () => {
 
         {/* Save Hint */}
         {!previewValid && rules.length > 0 && (
-          <p className="text-center text-sm" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="text-center text-sm"
+            style={{ color: "var(--text-muted)" }}
+          >
             Preview your carousel to enable saving
           </p>
         )}

@@ -16,6 +16,7 @@ When a filter is provided with an empty array as the value (e.g., `performers: {
 ### Expected Behavior
 
 Empty filter arrays should be treated as "no filter" - meaning all scenes should pass through. This is the expected behavior because:
+
 1. An empty array means "filter by nothing"
 2. Filtering by nothing should match everything
 3. This is consistent with how `null` or `undefined` filters are handled
@@ -56,8 +57,10 @@ if (filters.performers) {
     const scenePerformerIds = (s.performers || []).map((p) => String(p.id));
     const filterPerformerIds = performerIds.map((id) => String(id)); // [] maps to []
     if (modifier === "INCLUDES") {
-      return filterPerformerIds.some((id: string) => // [].some() always returns false
-        scenePerformerIds.includes(id)
+      return filterPerformerIds.some(
+        (
+          id: string // [].some() always returns false
+        ) => scenePerformerIds.includes(id)
       );
     }
     // ...
@@ -82,6 +85,7 @@ if (filters.performers) {
 ```
 
 This fix should be applied to ALL array-based filters:
+
 - `performers`
 - `tags`
 - `studios`
@@ -90,6 +94,7 @@ This fix should be applied to ALL array-based filters:
 ### Impact
 
 **User Impact**: Low to Medium
+
 - Users are unlikely to intentionally pass empty arrays
 - However, if client-side code generates filters dynamically (e.g., from URL params), empty arrays could occur
 - This would result in unexpectedly empty grids/lists
@@ -99,6 +104,7 @@ This fix should be applied to ALL array-based filters:
 ### Additional Notes
 
 This same bug likely exists in other entity filter controllers:
+
 - `controllers/library/performers.ts`
 - `controllers/library/studios.ts`
 - `controllers/library/tags.ts`
@@ -121,6 +127,7 @@ When a range filter (like `oCounter`, `playCount`, `rating`, etc.) is provided w
 ### Expected Behavior
 
 Range filters with no actual values should be omitted from the result object. An empty object `{}` should never be sent to the backend because:
+
 1. It has no `modifier` or `value` properties
 2. The backend expects either a complete filter object or `undefined`
 3. Empty objects waste bandwidth and could confuse backend validation
@@ -185,6 +192,7 @@ if (
 ```
 
 **Problem**: The outer `if` condition checks `!== undefined`, but `hasMin` and `hasMax` also check `!== ""`. This means:
+
 - `{ min: "", max: "" }` passes the outer check (values are defined, just empty strings)
 - But both `hasMin` and `hasMax` are false (empty strings)
 - Result: Empty object `{}` is created but never populated
@@ -192,14 +200,17 @@ if (
 ### Proposed Fix
 
 **Option 1**: Add check at the end to delete empty objects
+
 ```javascript
 if (
   filters.oCounter?.min !== undefined ||
   filters.oCounter?.max !== undefined
 ) {
   performerFilter.o_counter = {};
-  const hasMin = filters.oCounter.min !== undefined && filters.oCounter.min !== "";
-  const hasMax = filters.oCounter.max !== undefined && filters.oCounter.max !== "";
+  const hasMin =
+    filters.oCounter.min !== undefined && filters.oCounter.min !== "";
+  const hasMax =
+    filters.oCounter.max !== undefined && filters.oCounter.max !== "";
 
   if (hasMin && hasMax) {
     performerFilter.o_counter.modifier = "BETWEEN";
@@ -219,9 +230,12 @@ if (
 ```
 
 **Option 2**: Check for empty values in outer condition
+
 ```javascript
-const hasOCounterMin = filters.oCounter?.min !== undefined && filters.oCounter.min !== "";
-const hasOCounterMax = filters.oCounter?.max !== undefined && filters.oCounter.max !== "";
+const hasOCounterMin =
+  filters.oCounter?.min !== undefined && filters.oCounter.min !== "";
+const hasOCounterMax =
+  filters.oCounter?.max !== undefined && filters.oCounter.max !== "";
 
 if (hasOCounterMin || hasOCounterMax) {
   performerFilter.o_counter = {};
@@ -247,12 +261,14 @@ if (hasOCounterMin || hasOCounterMax) {
 This pattern affects ALL range-based filters in frontend filter builders:
 
 **In `buildPerformerFilter()`**:
+
 - `rating100` (lines 1404-1422)
 - `o_counter` (lines 1526-1547)
 - `play_count` (lines 1549-1570)
 - `scene_count` (lines 1572-1593)
 
 **In `buildSceneFilter()`**:
+
 - `rating100` (lines ~1058+)
 - `o_counter` (lines ~1137+)
 - Other range filters
@@ -262,12 +278,14 @@ This pattern affects ALL range-based filters in frontend filter builders:
 ### Impact
 
 **User Impact**: Very Low
+
 - Empty objects `{}` are likely ignored by the backend (no `modifier` property)
 - Wastes minimal bandwidth
 - Could cause confusion or errors if backend validates filter structure strictly
 - No functional bugs in production observed
 
 **Code Quality Impact**: Low to Medium
+
 - Creates unnecessary properties in filter objects
 - Makes debugging harder (seeing `{ o_counter: {} }` is confusing)
 - Violates clean code principles (objects should be meaningful or not exist)
@@ -277,6 +295,7 @@ This pattern affects ALL range-based filters in frontend filter builders:
 ### Fix Priority
 
 **Priority**: Low
+
 - Not causing user-facing issues currently
 - Backend likely handles empty objects gracefully
 - Should be fixed for code cleanliness and to prevent potential future issues
@@ -300,18 +319,21 @@ if (hasOCounterMin || hasOCounterMax) {
 ```
 
 **Filters Fixed in `buildPerformerFilter()`**:
+
 - `rating100` (lines 1404-1424)
 - `o_counter` (lines 1528-1548)
 - `play_count` (lines 1550-1570)
 - `scene_count` (lines 1572-1592)
 
 **Test Coverage**: Updated frontend tests to verify empty range values result in `undefined` filters:
+
 - `should not include rating filter when min and max are empty strings` - ✅ Passing
 - `should not include count filters when min and max are empty strings` - ✅ Passing
 
 All 66 frontend performer filter tests passing after fix.
 
 **Remaining Work**: This same pattern should be applied to:
+
 - `buildSceneFilter()` range filters
 - `buildStudioFilter()` range filters
 - `buildTagFilter()` range filters

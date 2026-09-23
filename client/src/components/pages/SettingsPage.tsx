@@ -4,17 +4,17 @@ import { useAuth } from "../../hooks/useAuth";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import SectionSelector from "../settings/SectionSelector";
 import SettingsLayout from "../settings/SettingsLayout";
-import { PageHeader, PageLayout } from "../ui/index";
-import ThemeTab from "../settings/tabs/ThemeTab";
-import PlaybackTab from "../settings/tabs/PlaybackTab";
-import CustomizationTab from "../settings/tabs/CustomizationTab";
-import ContentTab from "../settings/tabs/ContentTab";
 import AccountTab from "../settings/tabs/AccountTab";
-import NavigationTab from "../settings/tabs/NavigationTab";
-import UserManagementTab from "../settings/tabs/UserManagementTab";
-import ServerConfigTab from "../settings/tabs/ServerConfigTab";
-import MergeRecoveryTab from "../settings/tabs/MergeRecoveryTab";
 import BackupTab from "../settings/tabs/BackupTab";
+import ContentTab from "../settings/tabs/ContentTab";
+import CustomizationTab from "../settings/tabs/CustomizationTab";
+import MergeRecoveryTab from "../settings/tabs/MergeRecoveryTab";
+import NavigationTab from "../settings/tabs/NavigationTab";
+import PlaybackTab from "../settings/tabs/PlaybackTab";
+import ServerConfigTab from "../settings/tabs/ServerConfigTab";
+import ThemeTab from "../settings/tabs/ThemeTab";
+import UserManagementTab from "../settings/tabs/UserManagementTab";
+import { PageHeader, PageLayout } from "../ui/index";
 
 // Tab definitions
 const USER_TABS = [
@@ -41,12 +41,17 @@ const SettingsPage = () => {
 
   // Parse URL parameters
   const sectionParam = searchParams.get("section") || "user";
-  const validSection = ["user", "server"].includes(sectionParam) ? sectionParam : "user";
+  const validSection = ["user", "server"].includes(sectionParam)
+    ? sectionParam
+    : "user";
   const tabParam = searchParams.get("tab");
 
   // Determine active section (redirect non-admins from server section)
   const isAdmin = user?.role === "ADMIN";
-  const activeSection: "user" | "server" = validSection === "server" && !isAdmin ? "user" : validSection as "user" | "server";
+  const activeSection: "user" | "server" =
+    validSection === "server" && !isAdmin
+      ? "user"
+      : (validSection as "user" | "server");
 
   // Redirect if non-admin tries to access server section
   useEffect(() => {
@@ -58,7 +63,8 @@ const SettingsPage = () => {
   // Determine active tab (default to first tab of section if invalid)
   const tabs = activeSection === "user" ? USER_TABS : SERVER_TABS;
   const defaultTab = tabs[0].id;
-  const activeTab = tabParam && tabs.some((t) => t.id === tabParam) ? tabParam : defaultTab;
+  const activeTab =
+    tabParam && tabs.some((t) => t.id === tabParam) ? tabParam : defaultTab;
 
   // Sync URL if tab param is missing or invalid
   useEffect(() => {
@@ -72,8 +78,11 @@ const SettingsPage = () => {
 
   // Handle section change
   const handleSectionChange = (newSection: string) => {
-    const newDefaultTab = newSection === "user" ? USER_TABS[0].id : SERVER_TABS[0].id;
-    navigate(`/settings?section=${newSection}&tab=${newDefaultTab}`, { replace: true });
+    const newDefaultTab =
+      newSection === "user" ? USER_TABS[0].id : SERVER_TABS[0].id;
+    navigate(`/settings?section=${newSection}&tab=${newDefaultTab}`, {
+      replace: true,
+    });
   };
 
   // Handle tab change

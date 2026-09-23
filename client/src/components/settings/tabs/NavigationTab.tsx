@@ -26,16 +26,21 @@ interface LandingPagePreference {
 
 const NavigationTab = () => {
   const [loading, setLoading] = useState(true);
-  const [carouselPreferences, setCarouselPreferences] = useState<CarouselPreference[]>([]);
+  const [carouselPreferences, setCarouselPreferences] = useState<
+    CarouselPreference[]
+  >([]);
   const [navPreferences, setNavPreferences] = useState<NavPreference[]>([]);
-  const [landingPagePreference, setLandingPagePreference] = useState<LandingPagePreference | null>(null);
+  const [landingPagePreference, setLandingPagePreference] =
+    useState<LandingPagePreference | null>(null);
 
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const data = await apiGet<{ settings: Record<string, unknown> }>("/user/settings");
+        const data = await apiGet<{ settings: Record<string, unknown> }>(
+          "/user/settings"
+        );
         const { settings } = data;
 
         const migratedCarouselPrefs = migrateCarouselPreferences(
@@ -43,11 +48,16 @@ const NavigationTab = () => {
         ) as CarouselPreference[];
         setCarouselPreferences(migratedCarouselPrefs);
 
-        const migratedNavPrefs = migrateNavPreferences(settings.navPreferences as NavPreference[]);
+        const migratedNavPrefs = migrateNavPreferences(
+          settings.navPreferences as NavPreference[]
+        );
         setNavPreferences(migratedNavPrefs as NavPreference[]);
 
         setLandingPagePreference(
-          (settings.landingPagePreference as LandingPagePreference) || { pages: ["home"], randomize: false }
+          (settings.landingPagePreference as LandingPagePreference) || {
+            pages: ["home"],
+            randomize: false,
+          }
         );
       } catch {
         showError("Failed to load navigation settings");
@@ -59,7 +69,9 @@ const NavigationTab = () => {
     loadSettings();
   }, []);
 
-  const saveCarouselPreferences = async (newPreferences: CarouselPreference[]) => {
+  const saveCarouselPreferences = async (
+    newPreferences: CarouselPreference[]
+  ) => {
     try {
       await apiPut("/user/settings", {
         carouselPreferences: newPreferences,
@@ -68,7 +80,9 @@ const NavigationTab = () => {
       setCarouselPreferences(newPreferences);
       showSuccess("Carousel preferences saved successfully!");
     } catch (err) {
-      showError((err as Error).message || "Failed to save carousel preferences");
+      showError(
+        (err as Error).message || "Failed to save carousel preferences"
+      );
     }
   };
 
@@ -84,11 +98,15 @@ const NavigationTab = () => {
       // Reload the page to apply nav changes immediately
       window.location.reload();
     } catch (err) {
-      showError((err as Error).message || "Failed to save navigation preferences");
+      showError(
+        (err as Error).message || "Failed to save navigation preferences"
+      );
     }
   };
 
-  const saveLandingPagePreference = async (newPreference: LandingPagePreference) => {
+  const saveLandingPagePreference = async (
+    newPreference: LandingPagePreference
+  ) => {
     try {
       await apiPut("/user/settings", {
         landingPagePreference: newPreference,
@@ -97,7 +115,9 @@ const NavigationTab = () => {
       setLandingPagePreference(newPreference);
       showSuccess("Landing page preference saved successfully!");
     } catch (err) {
-      showError((err as Error).message || "Failed to save landing page preference");
+      showError(
+        (err as Error).message || "Failed to save landing page preference"
+      );
     }
   };
 

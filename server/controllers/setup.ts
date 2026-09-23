@@ -2,32 +2,32 @@ import bcrypt from "bcryptjs";
 import { Request } from "express";
 import { StashClient } from "../graphql/StashClient.js";
 import prisma from "../prisma/singleton.js";
-import { stashSyncService } from "../services/StashSyncService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import { stashSyncService } from "../services/StashSyncService.js";
 import type {
-  TypedRequest,
-  TypedResponse,
   ApiErrorResponse,
-  GetSetupStatusResponse,
+  CarouselPreference,
   CreateFirstAdminRequest,
   CreateFirstAdminResponse,
-  TestStashConnectionRequest,
-  TestStashConnectionResponse,
   CreateFirstStashInstanceRequest,
   CreateFirstStashInstanceResponse,
+  CreateStashInstanceRequest,
+  CreateStashInstanceResponse,
+  DeleteStashInstanceParams,
+  DeleteStashInstanceResponse,
+  // Multi-instance types
+  GetAllStashInstancesResponse,
+  GetSetupStatusResponse,
   GetStashInstanceResponse,
   ResetSetupRequest,
   ResetSetupResponse,
-  // Multi-instance types
-  GetAllStashInstancesResponse,
-  CreateStashInstanceRequest,
-  CreateStashInstanceResponse,
+  TestStashConnectionRequest,
+  TestStashConnectionResponse,
+  TypedRequest,
+  TypedResponse,
   UpdateStashInstanceParams,
   UpdateStashInstanceRequest,
   UpdateStashInstanceResponse,
-  DeleteStashInstanceParams,
-  DeleteStashInstanceResponse,
-  CarouselPreference,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
 
@@ -205,7 +205,9 @@ export const testStashConnection = async (
           logger.warn("Failed to fetch Stash version", { error: versionError });
         }
 
-        logger.info("Stash connection test successful", { version: versionString });
+        logger.info("Stash connection test successful", {
+          version: versionString,
+        });
         res.json({
           success: true,
           message: "Connection successful",
@@ -219,14 +221,20 @@ export const testStashConnection = async (
       }
     } catch (error) {
       // Get the full error details including cause
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorCause = error instanceof Error && (error as Error & { cause?: unknown }).cause ? String((error as Error & { cause?: unknown }).cause) : "";
-      const fullError = errorCause ? `${errorMessage}: ${errorCause}` : errorMessage;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorCause =
+        error instanceof Error && (error as Error & { cause?: unknown }).cause
+          ? String((error as Error & { cause?: unknown }).cause)
+          : "";
+      const fullError = errorCause
+        ? `${errorMessage}: ${errorCause}`
+        : errorMessage;
 
       logger.error("Stash connection test failed", {
         error: errorMessage,
         cause: errorCause,
-        fullError
+        fullError,
       });
 
       // Provide user-friendly error messages
@@ -235,17 +243,25 @@ export const testStashConnection = async (
 
       if (checkString.includes("econnrefused")) {
         friendlyMessage = "Connection refused. Is Stash running?";
-      } else if (checkString.includes("enotfound") || checkString.includes("getaddrinfo")) {
+      } else if (
+        checkString.includes("enotfound") ||
+        checkString.includes("getaddrinfo")
+      ) {
         friendlyMessage = "Host not found. Check the hostname.";
-      } else if (checkString.includes("401") || checkString.includes("unauthorized")) {
+      } else if (
+        checkString.includes("401") ||
+        checkString.includes("unauthorized")
+      ) {
         friendlyMessage = "Authentication failed. Check your API key.";
       } else if (checkString.includes("404")) {
-        friendlyMessage = "Endpoint not found. Make sure URL ends with /graphql";
+        friendlyMessage =
+          "Endpoint not found. Make sure URL ends with /graphql";
       } else if (checkString.includes("etimedout")) {
         friendlyMessage = "Connection timed out. Check network connectivity.";
       } else if (checkString.includes("fetch failed")) {
         // Generic fetch error - try to give more context
-        friendlyMessage = "Network error connecting to Stash. Check the URL and ensure Stash is accessible from the server.";
+        friendlyMessage =
+          "Network error connecting to Stash. Check the URL and ensure Stash is accessible from the server.";
       }
 
       res.status(400).json({
@@ -317,8 +333,11 @@ export const createFirstStashInstance = async (
       try {
         await testStash.configuration();
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error("Stash connection validation failed", { error: errorMessage });
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Stash connection validation failed", {
+          error: errorMessage,
+        });
         return res.status(400).json({
           error: "Could not connect to Stash server",
           details: errorMessage,
@@ -447,14 +466,16 @@ export const resetSetup = async (
     // Strict guard: multiple users means the system is in use
     if (userCount > 1) {
       return res.status(403).json({
-        error: "Cannot reset: multiple users exist. This system appears to be in use.",
+        error:
+          "Cannot reset: multiple users exist. This system appears to be in use.",
       });
     }
 
     // Only allow reset if setup is incomplete
     if (setupComplete) {
       return res.status(403).json({
-        error: "Cannot reset a fully configured system. Use Server Settings to manage configuration.",
+        error:
+          "Cannot reset a fully configured system. Use Server Settings to manage configuration.",
       });
     }
 
@@ -539,7 +560,15 @@ export const createStashInstance = async (
   res: TypedResponse<CreateStashInstanceResponse | ApiErrorResponse>
 ) => {
   try {
-    const { name, description, url, uiUrl, apiKey, enabled = true, priority } = req.body;
+    const {
+      name,
+      description,
+      url,
+      uiUrl,
+      apiKey,
+      enabled = true,
+      priority,
+    } = req.body;
 
     if (!name || !url || !apiKey) {
       return res.status(400).json({
@@ -572,8 +601,11 @@ export const createStashInstance = async (
     try {
       await testStash.configuration();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error("Stash connection validation failed", { error: errorMessage });
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Stash connection validation failed", {
+        error: errorMessage,
+      });
       return res.status(400).json({
         error: "Could not connect to Stash server",
         details: errorMessage,
@@ -656,7 +688,8 @@ export const updateStashInstance = async (
 ) => {
   try {
     const { id } = req.params;
-    const { name, description, url, uiUrl, apiKey, enabled, priority } = req.body;
+    const { name, description, url, uiUrl, apiKey, enabled, priority } =
+      req.body;
 
     // Check instance exists
     const existing = await prisma.stashInstance.findUnique({
@@ -670,7 +703,8 @@ export const updateStashInstance = async (
     }
 
     // Track if connection details changed (requires re-sync)
-    const connectionChanged = (url && url !== existing.url) || (apiKey && apiKey !== existing.apiKey);
+    const connectionChanged =
+      (url && url !== existing.url) || (apiKey && apiKey !== existing.apiKey);
 
     // If URL or API key changed, test connection
     if (url || apiKey) {
@@ -681,8 +715,11 @@ export const updateStashInstance = async (
       try {
         await testStash.configuration();
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error("Stash connection validation failed", { error: errorMessage });
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Stash connection validation failed", {
+          error: errorMessage,
+        });
         return res.status(400).json({
           error: "Could not connect to Stash server with new credentials",
           details: errorMessage,
@@ -737,7 +774,9 @@ export const updateStashInstance = async (
 
     // If connection details changed, re-sync this instance to refresh cached data
     if (connectionChanged && instance.enabled) {
-      logger.info("Connection details changed, triggering re-sync for instance...");
+      logger.info(
+        "Connection details changed, triggering re-sync for instance..."
+      );
       stashSyncService.fullSync(instance.id).catch((err) => {
         logger.error("Failed to re-sync Stash instance after update", {
           instanceId: instance.id,
@@ -794,7 +833,8 @@ export const deleteStashInstance = async (
       });
       if (lastEnabled?.id === id) {
         return res.status(400).json({
-          error: "Cannot delete the last enabled Stash instance. Disable it first or add another instance.",
+          error:
+            "Cannot delete the last enabled Stash instance. Disable it first or add another instance.",
         });
       }
     }

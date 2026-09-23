@@ -1,9 +1,8 @@
 // client/src/components/pages/UserStats/components/EngagementTotals.tsx
-
-import { Clock, Play, Heart } from "lucide-react";
+import { Clock, Heart, Play } from "lucide-react";
 import { ENTITY_ICONS } from "../../../../constants/entityIcons";
-import StatCard from "./StatCard";
 import { formatDurationHumanReadable } from "../../../../utils/format";
+import StatCard from "./StatCard";
 
 interface EngagementData {
   totalWatchTime: number;

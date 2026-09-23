@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useKeyboardShortcuts,
   useVideoPlayerShortcuts,
@@ -46,11 +46,7 @@ describe("useKeyboardShortcuts", () => {
       useKeyboardShortcuts({ k: handler }, { enabled: true })
     );
 
-    expect(addSpy).toHaveBeenCalledWith(
-      "keydown",
-      expect.any(Function),
-      false
-    );
+    expect(addSpy).toHaveBeenCalledWith("keydown", expect.any(Function), false);
 
     unmount();
   });
@@ -79,9 +75,7 @@ describe("useKeyboardShortcuts", () => {
   it("does not add listener when enabled=false", () => {
     const handler = vi.fn();
 
-    renderHook(() =>
-      useKeyboardShortcuts({ k: handler }, { enabled: false })
-    );
+    renderHook(() => useKeyboardShortcuts({ k: handler }, { enabled: false }));
 
     pressKey("k");
     expect(handler).not.toHaveBeenCalled();
@@ -293,10 +287,7 @@ describe("useKeyboardShortcuts", () => {
   it("skips handler when shouldHandle returns false", () => {
     const handler = vi.fn();
     renderHook(() =>
-      useKeyboardShortcuts(
-        { k: handler },
-        { shouldHandle: () => false }
-      )
+      useKeyboardShortcuts({ k: handler }, { shouldHandle: () => false })
     );
 
     pressKey("k");
@@ -310,17 +301,10 @@ describe("useKeyboardShortcuts", () => {
     const handler = vi.fn();
 
     const { unmount } = renderHook(() =>
-      useKeyboardShortcuts(
-        { k: handler },
-        { context: "video-player" }
-      )
+      useKeyboardShortcuts({ k: handler }, { context: "video-player" })
     );
 
-    expect(addSpy).toHaveBeenCalledWith(
-      "keydown",
-      expect.any(Function),
-      true
-    );
+    expect(addSpy).toHaveBeenCalledWith("keydown", expect.any(Function), true);
 
     unmount();
   });
@@ -335,9 +319,7 @@ describe("useVideoPlayerShortcuts", () => {
     const handler = vi.fn();
     const playerRef = { current: null };
 
-    renderHook(() =>
-      useVideoPlayerShortcuts(playerRef, { k: handler })
-    );
+    renderHook(() => useVideoPlayerShortcuts(playerRef, { k: handler }));
 
     pressKey("k");
     expect(handler).not.toHaveBeenCalled();
@@ -347,9 +329,7 @@ describe("useVideoPlayerShortcuts", () => {
     const handler = vi.fn();
     const playerRef = { current: {} };
 
-    renderHook(() =>
-      useVideoPlayerShortcuts(playerRef, { k: handler })
-    );
+    renderHook(() => useVideoPlayerShortcuts(playerRef, { k: handler }));
 
     pressKey("k");
     expect(handler).toHaveBeenCalledTimes(1);

@@ -1,6 +1,6 @@
 // client/tests/hooks/useMediaQuery.test.js
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMediaQuery } from "../../src/hooks/useMediaQuery";
 
 describe("useMediaQuery", () => {
@@ -84,7 +84,10 @@ describe("useMediaQuery", () => {
 
     unmount();
 
-    expect(removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith(
+      "change",
+      expect.any(Function)
+    );
   });
 
   it("updates listener when query changes", () => {

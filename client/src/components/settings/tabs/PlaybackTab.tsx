@@ -16,11 +16,15 @@ const PlaybackTab = () => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const data = await apiGet<{ settings: Record<string, unknown> }>("/user/settings");
+        const data = await apiGet<{ settings: Record<string, unknown> }>(
+          "/user/settings"
+        );
         const { settings } = data;
 
         setPreferredQuality((settings.preferredQuality as string) || "auto");
-        setPreferredPlaybackMode((settings.preferredPlaybackMode as string) || "auto");
+        setPreferredPlaybackMode(
+          (settings.preferredPlaybackMode as string) || "auto"
+        );
         setEnableCast(settings.enableCast !== false);
         setMinimumPlayPercent((settings.minimumPlayPercent as number) ?? 20);
       } catch {
@@ -101,8 +105,8 @@ const PlaybackTab = () => {
               <option value="360p">360p</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Default quality for video playback. Auto selects the best quality based on
-              your connection.
+              Default quality for video playback. Auto selects the best quality
+              based on your connection.
             </p>
           </div>
 
@@ -130,8 +134,8 @@ const PlaybackTab = () => {
               <option value="direct">Direct Play</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Auto uses direct play when supported, otherwise streams via Stash. Direct
-              play offers best quality but limited codec support.
+              Auto uses direct play when supported, otherwise streams via Stash.
+              Direct play offers best quality but limited codec support.
             </p>
           </div>
 
@@ -149,8 +153,9 @@ const PlaybackTab = () => {
                   Enable Chromecast/AirPlay
                 </span>
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Allow casting videos to Chromecast devices and AirPlay. Disable if you
-                  don't use these features or experience playback issues.
+                  Allow casting videos to Chromecast devices and AirPlay.
+                  Disable if you don't use these features or experience playback
+                  issues.
                 </p>
               </div>
               <input
@@ -189,14 +194,22 @@ const PlaybackTab = () => {
               }}
             />
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Percentage of video to watch before counting as "played". This determines
-              when the play count increments during watch sessions.
+              Percentage of video to watch before counting as "played". This
+              determines when the play count increments during watch sessions.
             </p>
           </div>
 
           {/* Save Button */}
-          <div className="flex justify-end pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
-            <Button type="submit" disabled={saving} variant="primary" loading={saving}>
+          <div
+            className="flex justify-end pt-4 border-t"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <Button
+              type="submit"
+              disabled={saving}
+              variant="primary"
+              loading={saving}
+            >
               Save Settings
             </Button>
           </div>

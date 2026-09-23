@@ -5,7 +5,9 @@
  * Verifies multi-instance support, exclusion filtering, scene/tag/performer
  * filters, and search by inspecting generated SQL.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -24,9 +26,6 @@ vi.mock("../../utils/logger.js", () => ({
     verbose: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
 
 const mockPrisma = vi.mocked(prisma);
 

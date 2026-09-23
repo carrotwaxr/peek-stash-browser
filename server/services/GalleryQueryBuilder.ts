@@ -4,15 +4,30 @@
  * Builds parameterized SQL queries for gallery filtering, sorting, and pagination.
  * Eliminates the need to load all galleries into memory.
  */
-import type { PeekGalleryFilter, NormalizedGallery, PerformerRef, TagRef, StudioRef } from "../types/index.js";
-import type { GalleryQueryRow } from "../types/internal/queryRows.js";
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
-import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues, type FilterClause } from "../utils/sqlFilterBuilders.js";
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../prisma/singleton.js";
+import type {
+  NormalizedGallery,
+  PeekGalleryFilter,
+  PerformerRef,
+  StudioRef,
+  TagRef,
+} from "../types/index.js";
+import type { GalleryQueryRow } from "../types/internal/queryRows.js";
+import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { logger } from "../utils/logger.js";
+import {
+  type FilterClause,
+  buildDateFilter,
+  buildDirectFilter,
+  buildFavoriteFilter,
+  buildJunctionFilter,
+  buildNumericFilter,
+  buildTextFilter,
+  parseCompositeFilterValues,
+} from "../utils/sqlFilterBuilders.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
 export interface GalleryQueryOptions {
@@ -92,7 +107,9 @@ class GalleryQueryBuilder {
   /**
    * Build instance filter clause for multi-instance support
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       return { sql: "", params: [] };
     }
@@ -106,7 +123,9 @@ class GalleryQueryBuilder {
   /**
    * Build filter for a specific instance ID (for disambiguation on detail pages)
    */
-  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+  private buildSpecificInstanceFilter(
+    instanceId: string | undefined
+  ): FilterClause {
     if (!instanceId) {
       return { sql: "", params: [] };
     }
@@ -120,14 +139,20 @@ class GalleryQueryBuilder {
    * Build ID filter clause
    */
   private buildIdFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | string[] | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | string[]
+      | undefined
+      | null
   ): FilterClause {
     const ids = Array.isArray(filter) ? filter : filter?.value;
     if (!ids || ids.length === 0) {
       return { sql: "", params: [] };
     }
 
-    const modifier = Array.isArray(filter) ? "INCLUDES" : filter?.modifier || "INCLUDES";
+    const modifier = Array.isArray(filter)
+      ? "INCLUDES"
+      : filter?.modifier || "INCLUDES";
     const placeholders = ids.map(() => "?").join(", ");
 
     switch (modifier) {
@@ -144,7 +169,14 @@ class GalleryQueryBuilder {
    * Build studio filter clause with hierarchy support
    */
   private async buildStudioFilterWithHierarchy(
-    filter: { value?: string[] | null; modifier?: string | null; depth?: number | null } | undefined | null
+    filter:
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
+      | undefined
+      | null
   ): Promise<FilterClause> {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -152,7 +184,7 @@ class GalleryQueryBuilder {
 
     // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const modifier = filter.modifier ?? "INCLUDES";
     const depth = filter.depth;
 
@@ -165,13 +197,23 @@ class GalleryQueryBuilder {
     const entityRefs = coerceEntityRefs(ids);
     if (modifier === "INCLUDES_ALL") {
       if (ids.length === 1) {
-        return buildDirectFilter(entityRefs, "g.studioId", "g.stashInstanceId", "INCLUDES");
+        return buildDirectFilter(
+          entityRefs,
+          "g.studioId",
+          "g.stashInstanceId",
+          "INCLUDES"
+        );
       }
       // Multiple studios in INCLUDES_ALL means no gallery can match (a gallery has at most one studio)
       return { sql: "1 = 0", params: [] };
     }
 
-    return buildDirectFilter(entityRefs, "g.studioId", "g.stashInstanceId", modifier);
+    return buildDirectFilter(
+      entityRefs,
+      "g.studioId",
+      "g.stashInstanceId",
+      modifier
+    );
   }
 
   /**
@@ -179,7 +221,10 @@ class GalleryQueryBuilder {
    * Filter galleries by scenes they contain
    */
   private buildScenesFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -228,7 +273,10 @@ class GalleryQueryBuilder {
    * Build performer filter clause
    */
   private buildPerformerFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -237,14 +285,30 @@ class GalleryQueryBuilder {
     const ids = coerceEntityRefs(filter.value);
     const modifier = filter.modifier ?? "INCLUDES";
 
-    return buildJunctionFilter(ids, "GalleryPerformer", "galleryId", "galleryInstanceId", "performerId", "performerInstanceId", "g", modifier);
+    return buildJunctionFilter(
+      ids,
+      "GalleryPerformer",
+      "galleryId",
+      "galleryInstanceId",
+      "performerId",
+      "performerInstanceId",
+      "g",
+      modifier
+    );
   }
 
   /**
    * Build tag filter clause with hierarchy support
    */
   private async buildTagFilterWithHierarchy(
-    filter: { value?: string[] | null; modifier?: string | null; depth?: number | null } | undefined | null
+    filter:
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
+      | undefined
+      | null
   ): Promise<FilterClause> {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -252,7 +316,7 @@ class GalleryQueryBuilder {
 
     // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const modifier = filter.modifier ?? "INCLUDES";
     const depth = filter.depth;
 
@@ -261,7 +325,16 @@ class GalleryQueryBuilder {
       ids = await expandTagIds(ids, depth);
     }
 
-    return buildJunctionFilter(coerceEntityRefs(ids), "GalleryTag", "galleryId", "galleryInstanceId", "tagId", "tagInstanceId", "g", modifier);
+    return buildJunctionFilter(
+      coerceEntityRefs(ids),
+      "GalleryTag",
+      "galleryId",
+      "galleryInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "g",
+      modifier
+    );
   }
 
   /**
@@ -305,7 +378,11 @@ class GalleryQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
+  private buildSortClause(
+    sort: string,
+    direction: "ASC" | "DESC",
+    randomSeed?: number
+  ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
     const seed = randomSeed || 12345;
 
@@ -343,7 +420,17 @@ class GalleryQueryBuilder {
 
   async execute(options: GalleryQueryOptions): Promise<GalleryQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, specificInstanceId, randomSeed } = options;
+    const {
+      userId,
+      page,
+      perPage,
+      applyExclusions = true,
+      filters,
+      searchQuery,
+      allowedInstanceIds,
+      specificInstanceId,
+      randomSeed,
+    } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -359,7 +446,8 @@ class GalleryQueryBuilder {
 
     // Specific instance filter (for disambiguation on detail pages)
     if (specificInstanceId) {
-      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      const specificFilter =
+        this.buildSpecificInstanceFilter(specificInstanceId);
       if (specificFilter.sql) {
         whereClauses.push(specificFilter);
       }
@@ -387,7 +475,10 @@ class GalleryQueryBuilder {
 
     // Has favorite image filter
     if (filters?.hasFavoriteImage) {
-      const hasFavImageFilter = this.buildHasFavoriteImageFilter(filters.hasFavoriteImage, userId);
+      const hasFavImageFilter = this.buildHasFavoriteImageFilter(
+        filters.hasFavoriteImage,
+        userId
+      );
       if (hasFavImageFilter.sql) {
         whereClauses.push(hasFavImageFilter);
       }
@@ -395,7 +486,9 @@ class GalleryQueryBuilder {
 
     // Studio filter
     if (filters?.studios) {
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(
+        filters.studios
+      );
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -427,7 +520,10 @@ class GalleryQueryBuilder {
 
     // Rating filter
     if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
+      const ratingFilter = buildNumericFilter(
+        filters.rating100,
+        "COALESCE(r.rating, 0)"
+      );
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
@@ -435,7 +531,10 @@ class GalleryQueryBuilder {
 
     // Image count filter
     if (filters?.image_count) {
-      const imageCountFilter = buildNumericFilter(filters.image_count, "COALESCE(g.imageCount, 0)");
+      const imageCountFilter = buildNumericFilter(
+        filters.image_count,
+        "COALESCE(g.imageCount, 0)"
+      );
       if (imageCountFilter.sql) {
         whereClauses.push(imageCountFilter);
       }
@@ -458,25 +557,38 @@ class GalleryQueryBuilder {
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = buildDateFilter(filters.created_at, "g.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(
+        filters.created_at,
+        "g.stashCreatedAt"
+      );
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = buildDateFilter(filters.updated_at, "g.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(
+        filters.updated_at,
+        "g.stashUpdatedAt"
+      );
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
     }
 
     // Combine WHERE clauses
-    const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+    const whereSQL = whereClauses
+      .map((c) => c.sql)
+      .filter(Boolean)
+      .join(" AND ");
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
+    const sortClause = this.buildSortClause(
+      options.sort,
+      options.sortDirection,
+      randomSeed
+    );
 
     // Build full query
     const offset = (page - 1) * perPage;
@@ -500,7 +612,10 @@ class GalleryQueryBuilder {
 
     // Execute query
     const queryStart = Date.now();
-    const rows = await prisma.$queryRawUnsafe<GalleryQueryRow[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<GalleryQueryRow[]>(
+      sql,
+      ...params
+    );
     const queryMs = Date.now() - queryStart;
 
     // Count query
@@ -520,14 +635,20 @@ class GalleryQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...countParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...countParams
+      );
       total = Number(countResult[0]?.total || 0);
     } else {
       // Fast path: count without JOINs
       const baseWhereClauses = whereClauses.filter(
         (c) => !c.sql.includes("r.")
       );
-      const baseWhereSQL = baseWhereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+      const baseWhereSQL = baseWhereClauses
+        .map((c) => c.sql)
+        .filter(Boolean)
+        .join(" AND ");
       const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
 
       const countSql = `
@@ -535,7 +656,10 @@ class GalleryQueryBuilder {
         FROM StashGallery g
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(countSql, ...baseWhereParams);
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...baseWhereParams
+      );
       total = Number(countResult[0]?.total || 0);
     }
     const countMs = Date.now() - countStart;
@@ -559,7 +683,6 @@ class GalleryQueryBuilder {
     return { galleries, total };
   }
 
-
   /**
    * Transform a raw database row into a NormalizedGallery
    */
@@ -567,7 +690,8 @@ class GalleryQueryBuilder {
     const gallery = {
       id: row.id,
       instanceId: row.stashInstanceId,
-      title: row.title || getGalleryFallbackTitle(row.folderPath, row.fileBasename),
+      title:
+        row.title || getGalleryFallbackTitle(row.folderPath, row.fileBasename),
       date: row.date || null,
       code: row.code || null,
       details: row.details || null,
@@ -601,10 +725,16 @@ class GalleryQueryBuilder {
       files: [] as Array<{ basename: string }>,
 
       // Relations - populated separately
-      studio: row.studioId ? { id: row.studioId, name: "" } as StudioRef : null,
+      studio: row.studioId
+        ? ({ id: row.studioId, name: "" } as StudioRef)
+        : null,
       performers: [] as PerformerRef[],
       tags: [] as TagRef[],
-      scenes: [] as Array<{ id: string; title: string | null; paths: { screenshot: string | null } }>,
+      scenes: [] as Array<{
+        id: string;
+        title: string | null;
+        paths: { screenshot: string | null };
+      }>,
     };
 
     return gallery as NormalizedGallery;
@@ -621,11 +751,16 @@ class GalleryQueryBuilder {
     const galleryInstanceIds = [...new Set(galleries.map((g) => g.instanceId))];
 
     // Collect unique (studioId, instanceId) pairs - each gallery's studio comes from its own instance
-    const studioKeys = [...new Map(
-      galleries
-        .filter((g) => g.studio?.id)
-        .map((g) => [`${g.studio?.id}:${g.instanceId}`, { id: g.studio?.id ?? "", instanceId: g.instanceId }])
-    ).values()];
+    const studioKeys = [
+      ...new Map(
+        galleries
+          .filter((g) => g.studio?.id)
+          .map((g) => [
+            `${g.studio?.id}:${g.instanceId}`,
+            { id: g.studio?.id ?? "", instanceId: g.instanceId },
+          ])
+      ).values(),
+    ];
 
     // Batch load all relations in parallel
     // Filter by both galleryId AND galleryInstanceId for multi-instance correctness
@@ -645,12 +780,22 @@ class GalleryQueryBuilder {
     ]);
 
     // Collect unique entity keys (id:instanceId) from junction tables
-    const performerKeys = [...new Map(
-      performerJunctions.map((j) => [`${j.performerId}:${j.performerInstanceId}`, { id: j.performerId, instanceId: j.performerInstanceId }])
-    ).values()];
-    const tagKeys = [...new Map(
-      tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
-    ).values()];
+    const performerKeys = [
+      ...new Map(
+        performerJunctions.map((j) => [
+          `${j.performerId}:${j.performerInstanceId}`,
+          { id: j.performerId, instanceId: j.performerInstanceId },
+        ])
+      ).values(),
+    ];
+    const tagKeys = [
+      ...new Map(
+        tagJunctions.map((j) => [
+          `${j.tagId}:${j.tagInstanceId}`,
+          { id: j.tagId, instanceId: j.tagInstanceId },
+        ])
+      ).values(),
+    ];
 
     // Build OR conditions for entity queries (need to match on composite keys)
     const performerOrConditions = performerKeys.map((k) => ({
@@ -695,7 +840,10 @@ class GalleryQueryBuilder {
         name: performer.name,
         disambiguation: performer.disambiguation,
         gender: performer.gender,
-        image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
+        image_path: this.transformUrl(
+          performer.imagePath,
+          performer.stashInstanceId
+        ),
         favorite: performer.favorite,
         rating100: performer.rating100,
       });
@@ -772,7 +920,10 @@ class GalleryQueryBuilder {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {

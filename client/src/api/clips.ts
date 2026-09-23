@@ -24,11 +24,14 @@ export async function getClips(options: GetClipsOptions = {}) {
   if (options.perPage) params.set("perPage", String(options.perPage));
   if (options.sortBy) params.set("sortBy", options.sortBy);
   if (options.sortDir) params.set("sortDir", options.sortDir);
-  if (options.isGenerated !== undefined) params.set("isGenerated", String(options.isGenerated));
+  if (options.isGenerated !== undefined)
+    params.set("isGenerated", String(options.isGenerated));
   if (options.sceneId) params.set("sceneId", options.sceneId);
   if (options.tagIds?.length) params.set("tagIds", options.tagIds.join(","));
-  if (options.sceneTagIds?.length) params.set("sceneTagIds", options.sceneTagIds.join(","));
-  if (options.performerIds?.length) params.set("performerIds", options.performerIds.join(","));
+  if (options.sceneTagIds?.length)
+    params.set("sceneTagIds", options.sceneTagIds.join(","));
+  if (options.performerIds?.length)
+    params.set("performerIds", options.performerIds.join(","));
   if (options.studioId) params.set("studioId", options.studioId);
   if (options.q) params.set("q", options.q);
 
@@ -36,12 +39,18 @@ export async function getClips(options: GetClipsOptions = {}) {
   return apiGet(`/clips${queryString ? `?${queryString}` : ""}`);
 }
 
-export async function getClipsForScene(sceneId: string, instanceId?: string, includeUngenerated = false) {
+export async function getClipsForScene(
+  sceneId: string,
+  instanceId?: string,
+  includeUngenerated = false
+) {
   const params = new URLSearchParams();
   if (includeUngenerated) params.set("includeUngenerated", "true");
   if (instanceId) params.set("instanceId", instanceId);
   const queryString = params.toString();
-  return apiGet(`/scenes/${sceneId}/clips${queryString ? `?${queryString}` : ""}`);
+  return apiGet(
+    `/scenes/${sceneId}/clips${queryString ? `?${queryString}` : ""}`
+  );
 }
 
 export function getClipPreviewUrl(clipId: string): string {

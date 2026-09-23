@@ -8,7 +8,10 @@ import React, { useEffect, useRef } from "react";
  * @param {Function} onEscape Optional callback when Escape is pressed
  * @returns {Object} Ref to attach to container element
  */
-export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = null) => {
+export const useFocusTrap = (
+  enabled = true,
+  onEscape: (() => void) | null = null
+) => {
   const containerRef = useRef<HTMLElement | null>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
@@ -18,7 +21,8 @@ export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = nul
     const container = containerRef.current;
 
     // Store the previously focused element
-    previousActiveElement.current = document.activeElement as HTMLElement | null;
+    previousActiveElement.current =
+      document.activeElement as HTMLElement | null;
 
     // Get all focusable elements within the container
     const getFocusableElements = () => {
@@ -31,7 +35,9 @@ export const useFocusTrap = (enabled = true, onEscape: (() => void) | null = nul
         '[tabindex]:not([tabindex="-1"])',
       ].join(", ");
 
-      return Array.from(container.querySelectorAll(focusableSelectors)) as HTMLElement[];
+      return Array.from(
+        container.querySelectorAll(focusableSelectors)
+      ) as HTMLElement[];
     };
 
     // Focus the first focusable element

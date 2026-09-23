@@ -6,7 +6,18 @@
  * Covers proxy auth flow, JWT token validation, token refresh, role checks,
  * and cache readiness.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { NextFunction, Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  authenticate,
+  authenticateToken,
+  generateToken,
+  requireAdmin,
+  requireCacheReady,
+  setTokenCookie,
+} from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -32,18 +43,6 @@ vi.mock("../../utils/logger.js", () => ({
     verbose: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import {
-  authenticate,
-  authenticateToken,
-  requireAdmin,
-  requireCacheReady,
-  generateToken,
-  setTokenCookie,
-} from "../../middleware/auth.js";
-import type { Request, Response, NextFunction } from "express";
 
 const mockPrisma = vi.mocked(prisma);
 const mockEntityService = vi.mocked(stashEntityService);
@@ -412,8 +411,7 @@ describe("Auth Middleware", () => {
       expect(statusFn).toHaveBeenCalledWith(503);
       expect(jsonFn).toHaveBeenCalledWith({
         error: "Server is initializing",
-        message:
-          "Cache is still loading. Please wait a moment and try again.",
+        message: "Cache is still loading. Please wait a moment and try again.",
         ready: false,
       });
       expect(nextFn).not.toHaveBeenCalled();

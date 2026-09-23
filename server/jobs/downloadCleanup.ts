@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
@@ -35,7 +34,9 @@ export async function cleanupExpiredDownloads(): Promise<void> {
       return;
     }
 
-    logger.info(`Found ${expiredDownloads.length} expired download(s) to clean up`);
+    logger.info(
+      `Found ${expiredDownloads.length} expired download(s) to clean up`
+    );
 
     let successCount = 0;
     let errorCount = 0;
@@ -53,7 +54,10 @@ export async function cleanupExpiredDownloads(): Promise<void> {
               logger.debug(`File already deleted: ${download.filePath}`);
             } else {
               logger.warn(`Failed to delete file: ${download.filePath}`, {
-                error: fileError instanceof Error ? fileError.message : String(fileError),
+                error:
+                  fileError instanceof Error
+                    ? fileError.message
+                    : String(fileError),
               });
             }
           }

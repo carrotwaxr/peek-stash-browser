@@ -1,16 +1,20 @@
 import {
+  type Dispatch,
   createContext,
   useCallback,
   useContext,
   useEffect,
   useReducer,
-  type Dispatch,
 } from "react";
 import type { NormalizedScene } from "@peek/shared-types";
 import { apiPost } from "../api";
-import { initialState, scenePlayerReducer, type ScenePlayerReducerState } from "./scenePlayerReducer";
-import { useConfig } from "./ConfigContext";
 import { getEntityPath } from "../utils/entityLinks";
+import { useConfig } from "./ConfigContext";
+import {
+  type ScenePlayerReducerState,
+  initialState,
+  scenePlayerReducer,
+} from "./scenePlayerReducer";
 
 // Use the reducer's state type directly
 type ScenePlayerState = ScenePlayerReducerState;
@@ -63,7 +67,8 @@ export function ScenePlayerProvider({
       type: "INITIALIZE",
       payload: {
         playlist,
-        currentIndex: (playlist as Record<string, unknown> | null)?.currentIndex || 0,
+        currentIndex:
+          (playlist as Record<string, unknown> | null)?.currentIndex || 0,
         compatibility,
         initialQuality,
         initialShouldAutoplay,
@@ -75,38 +80,43 @@ export function ScenePlayerProvider({
   // ACTION CREATORS (with side effects)
   // ============================================================================
 
-  const loadScene = useCallback(async (sceneIdToLoad: string, sceneInstanceId?: string | null) => {
-    dispatch({ type: "LOAD_SCENE_START" });
-    try {
-      const requestBody: Record<string, unknown> = {
-        ids: [sceneIdToLoad],
-      };
-      // Include instance_id for disambiguation when multiple instances exist
-      if (sceneInstanceId) {
-        requestBody.scene_filter = { instance_id: sceneInstanceId };
-      }
-      const data = await apiPost<{ findScenes: { scenes: NormalizedScene[] } }>("/library/scenes", requestBody);
-      const scene = data?.findScenes?.scenes?.[0];
+  const loadScene = useCallback(
+    async (sceneIdToLoad: string, sceneInstanceId?: string | null) => {
+      dispatch({ type: "LOAD_SCENE_START" });
+      try {
+        const requestBody: Record<string, unknown> = {
+          ids: [sceneIdToLoad],
+        };
+        // Include instance_id for disambiguation when multiple instances exist
+        if (sceneInstanceId) {
+          requestBody.scene_filter = { instance_id: sceneInstanceId };
+        }
+        const data = await apiPost<{
+          findScenes: { scenes: NormalizedScene[] };
+        }>("/library/scenes", requestBody);
+        const scene = data?.findScenes?.scenes?.[0];
 
-      if (!scene) {
-        throw new Error("Scene not found");
-      }
+        if (!scene) {
+          throw new Error("Scene not found");
+        }
 
-      dispatch({
-        type: "LOAD_SCENE_SUCCESS",
-        payload: {
-          scene: scene,
-          oCounter: scene.o_counter || 0,
-        },
-      });
-    } catch (error) {
-      console.error("Error loading scene:", error);
-      dispatch({
-        type: "LOAD_SCENE_ERROR",
-        payload: error,
-      });
-    }
-  }, []);
+        dispatch({
+          type: "LOAD_SCENE_SUCCESS",
+          payload: {
+            scene: scene,
+            oCounter: scene.o_counter || 0,
+          },
+        });
+      } catch (error) {
+        console.error("Error loading scene:", error);
+        dispatch({
+          type: "LOAD_SCENE_ERROR",
+          payload: error,
+        });
+      }
+    },
+    []
+  );
 
   // Playlist navigation helpers (kept for convenience)
   const nextScene = useCallback(() => {
@@ -117,12 +127,15 @@ export function ScenePlayerProvider({
     dispatch({ type: "PREV_SCENE" });
   }, []);
 
-  const gotoSceneIndex = useCallback((index: number, shouldAutoplay = false) => {
-    dispatch({
-      type: "GOTO_SCENE_INDEX",
-      payload: { index, shouldAutoplay },
-    });
-  }, []);
+  const gotoSceneIndex = useCallback(
+    (index: number, shouldAutoplay = false) => {
+      dispatch({
+        type: "GOTO_SCENE_INDEX",
+        payload: { index, shouldAutoplay },
+      });
+    },
+    []
+  );
 
   // Playlist control toggles
   const toggleAutoplayNext = useCallback(() => {
@@ -144,9 +157,11 @@ export function ScenePlayerProvider({
   // Load scene when sceneId or currentIndex changes
   useEffect(() => {
     const playlistScene = state.playlist?.scenes?.[state.currentIndex];
-    const effectiveSceneId = (playlistScene?.sceneId as string | undefined) || sceneId;
+    const effectiveSceneId =
+      (playlistScene?.sceneId as string | undefined) || sceneId;
     // For playlists, get instanceId from playlist entry; otherwise use prop
-    const effectiveInstanceId = (playlistScene?.instanceId as string | undefined) || instanceId;
+    const effectiveInstanceId =
+      (playlistScene?.instanceId as string | undefined) || instanceId;
 
     if (effectiveSceneId) {
       loadScene(effectiveSceneId, effectiveInstanceId);
@@ -156,7 +171,7 @@ export function ScenePlayerProvider({
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
     if (state.playlist && state.scene) {
-      const newUrl = getEntityPath('scene', state.scene, hasMultipleInstances);
+      const newUrl = getEntityPath("scene", state.scene, hasMultipleInstances);
       // Compare pathname + search to handle instance query param
       const currentFullPath = window.location.pathname + window.location.search;
       if (currentFullPath !== newUrl) {

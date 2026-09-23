@@ -3,10 +3,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { Readable } from "stream";
 import prisma from "../prisma/singleton.js";
-import { downloadService } from "./DownloadService.js";
-import { generateSceneNfo } from "../utils/nfoGenerator.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
+import { generateSceneNfo } from "../utils/nfoGenerator.js";
+import { downloadService } from "./DownloadService.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
  * Service for creating zip archives of playlists.
@@ -162,7 +162,9 @@ export class PlaylistZipService {
           const studio = await prisma.stashStudio.findFirst({
             where: {
               id: scene.studioId,
-              ...(scene.stashInstanceId ? { stashInstanceId: scene.stashInstanceId } : {}),
+              ...(scene.stashInstanceId
+                ? { stashInstanceId: scene.stashInstanceId }
+                : {}),
             },
             select: { name: true },
           });

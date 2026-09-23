@@ -1,7 +1,9 @@
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useUpdateRating } from "../../../src/api/hooks/useRatingMutation";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -34,9 +36,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import { useUpdateRating } from "../../../src/api/hooks/useRatingMutation";
 
 function createWrapper() {
   const queryClient = new QueryClient({

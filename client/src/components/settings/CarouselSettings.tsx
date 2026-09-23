@@ -5,14 +5,14 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
-  Plus,
-  Pencil,
-  Trash2,
   Loader2,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { Button } from "../ui/index";
 import { libraryApi } from "../../api";
+import { Button } from "../ui/index";
 
 /**
  * Carousel metadata mapping fetchKey to display information
@@ -77,7 +77,9 @@ interface CustomCarousel {
 
 const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   const navigate = useNavigate();
-  const [userPreferences, setUserPreferences] = useState<CarouselPreference[] | null>(null);
+  const [userPreferences, setUserPreferences] = useState<
+    CarouselPreference[] | null
+  >(null);
   const [customCarousels, setCustomCarousels] = useState<CustomCarousel[]>([]);
   const [loadingCustom, setLoadingCustom] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
@@ -87,7 +89,9 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   useEffect(() => {
     const loadCustomCarousels = async () => {
       try {
-        const { carousels } = (await libraryApi.getCarousels()) as { carousels: CustomCarousel[] };
+        const { carousels } = (await libraryApi.getCarousels()) as {
+          carousels: CustomCarousel[];
+        };
         setCustomCarousels(carousels || []);
       } catch (err) {
         console.error("Failed to load custom carousels:", err);
@@ -231,7 +235,16 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
       const actualId = prefId.replace("custom-", "");
       const carousel = customCarousels.find((c) => c.id === actualId);
       if (carousel) {
-        const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>)[carousel.icon] || LucideIcons.Film;
+        const IconComponent =
+          (
+            LucideIcons as unknown as Record<
+              string,
+              React.ComponentType<{
+                className?: string;
+                style?: React.CSSProperties;
+              }>
+            >
+          )[carousel.icon] || LucideIcons.Film;
         return {
           title: carousel.title,
           description: "Custom carousel",
@@ -247,7 +260,12 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
       };
     }
 
-    const metadata = (CAROUSEL_METADATA as Record<string, { title: string; description: string }>)[prefId];
+    const metadata = (
+      CAROUSEL_METADATA as Record<
+        string,
+        { title: string; description: string }
+      >
+    )[prefId];
     return {
       title: metadata?.title || prefId,
       description: metadata?.description || "",
@@ -262,7 +280,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   if (loadingCustom) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--accent-primary)" }} />
+        <Loader2
+          className="w-6 h-6 animate-spin"
+          style={{ color: "var(--accent-primary)" }}
+        />
       </div>
     );
   }
@@ -277,7 +298,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
           >
             Homepage Carousels
           </h3>
-          <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+          <p
+            className="text-sm mb-4"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Use arrow buttons to reorder carousels, click the eye icon to toggle
             visibility
           </p>

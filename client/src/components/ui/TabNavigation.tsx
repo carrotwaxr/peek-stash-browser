@@ -30,19 +30,27 @@ interface Props {
  * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
  * @param {boolean} [props.showEmpty] - If true, show tabs even when count is 0 (still shows count badge)
  */
-const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, showEmpty = false }: Props) => {
+const TabNavigation = ({
+  tabs,
+  defaultTab,
+  onTabChange,
+  showSingleTab = false,
+  showEmpty = false,
+}: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get active tab from URL or use default
-  const activeTab = searchParams.get('tab') || defaultTab;
+  const activeTab = searchParams.get("tab") || defaultTab;
 
   // Filter out tabs with zero count unless showEmpty is true
   // TAB_COUNT_LOADING means loading, show tab without badge
-  const visibleTabs = tabs.filter(tab => tab.count > 0 || tab.count === TAB_COUNT_LOADING || showEmpty);
+  const visibleTabs = tabs.filter(
+    (tab) => tab.count > 0 || tab.count === TAB_COUNT_LOADING || showEmpty
+  );
 
   // Pagination/filter params that should be cleared when switching tabs
   // Each tab has its own pagination state, so these shouldn't carry over
-  const PAGINATION_PARAMS = ['page', 'per_page', 'sort', 'dir', 'q'];
+  const PAGINATION_PARAMS = ["page", "per_page", "sort", "dir", "q"];
 
   const handleTabClick = (tabId: string) => {
     if (tabId === activeTab) return; // Already on this tab
@@ -51,13 +59,13 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
     const newParams = new URLSearchParams(searchParams);
 
     // Clear pagination params - each tab has independent pagination state
-    PAGINATION_PARAMS.forEach(param => newParams.delete(param));
+    PAGINATION_PARAMS.forEach((param) => newParams.delete(param));
 
     if (tabId === defaultTab) {
       // Remove tab param if switching to default
-      newParams.delete('tab');
+      newParams.delete("tab");
     } else {
-      newParams.set('tab', tabId);
+      newParams.set("tab", tabId);
     }
     setSearchParams(newParams);
 
@@ -81,8 +89,8 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
     <div
       className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-rounded"
       style={{
-        borderBottom: '2px solid var(--bg-tertiary)',
-        marginBottom: '1.5rem',
+        borderBottom: "2px solid var(--bg-tertiary)",
+        marginBottom: "1.5rem",
       }}
     >
       <div className="flex gap-1 min-w-full">
@@ -95,12 +103,18 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
               onClick={() => handleTabClick(tab.id)}
               className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{
-                color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                borderBottom: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                backgroundColor: isActive ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                cursor: isActive ? 'default' : 'pointer',
+                color: isActive
+                  ? "var(--accent-primary)"
+                  : "var(--text-secondary)",
+                borderBottom: isActive
+                  ? "3px solid var(--accent-primary)"
+                  : "3px solid transparent",
+                backgroundColor: isActive
+                  ? "rgba(59, 130, 246, 0.05)"
+                  : "transparent",
+                cursor: isActive ? "default" : "pointer",
               }}
-              aria-current={isActive ? 'page' : undefined}
+              aria-current={isActive ? "page" : undefined}
               disabled={isActive}
             >
               <span className="flex items-center gap-2">
@@ -110,9 +124,9 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false, s
                     className="text-xs font-semibold px-2 py-0.5 rounded-full"
                     style={{
                       backgroundColor: isActive
-                        ? 'var(--accent-primary)'
-                        : 'var(--bg-tertiary)',
-                      color: isActive ? 'white' : 'var(--text-muted)',
+                        ? "var(--accent-primary)"
+                        : "var(--bg-tertiary)",
+                      color: isActive ? "white" : "var(--text-muted)",
                     }}
                   >
                     {tab.count}

@@ -4,7 +4,7 @@
  * Tests that buildPerformerFilter correctly transforms UI filter values
  * into the GraphQL filter format expected by the backend
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildPerformerFilter } from "../../src/utils/filterConfig";
 
 describe("buildPerformerFilter", () => {
@@ -741,7 +741,11 @@ describe("buildPerformerFilter", () => {
         value: 70,
         value2: 100,
       });
-      expect(result.age).toEqual({ value: 21, modifier: "BETWEEN", value2: 35 });
+      expect(result.age).toEqual({
+        value: 21,
+        modifier: "BETWEEN",
+        value2: 35,
+      });
       expect(result.tags).toEqual({
         value: ["1", "2"],
         modifier: "INCLUDES",
@@ -776,7 +780,11 @@ describe("buildPerformerFilter", () => {
         modifier: "GREATER_THAN",
         value: 79,
       });
-      expect(result.age).toEqual({ value: 25, modifier: "BETWEEN", value2: 40 });
+      expect(result.age).toEqual({
+        value: 25,
+        modifier: "BETWEEN",
+        value2: 40,
+      });
       expect(result.height).toEqual({ value: 164, modifier: "GREATER_THAN" }); // min - 1
       expect(result.o_counter).toEqual({
         modifier: "BETWEEN",
@@ -791,7 +799,10 @@ describe("buildPerformerFilter", () => {
         modifier: "LESS_THAN",
         value: 101,
       });
-      expect(result.ethnicity).toEqual({ value: "caucasian", modifier: "EQUALS" });
+      expect(result.ethnicity).toEqual({
+        value: "caucasian",
+        modifier: "EQUALS",
+      });
       expect(result.hair_color).toEqual({ value: "brown", modifier: "EQUALS" });
       expect(result.name).toEqual({ value: "Jane", modifier: "INCLUDES" });
       expect(result.created_at).toEqual({

@@ -89,7 +89,10 @@ export const useOrientationFullscreen = (
           // Auto-fullscreen on landscape if: playing, not fullscreen, and user hasn't declined
           autoFullscreenRef.current = true;
           const fullscreenPromise = player.requestFullscreen();
-          if (fullscreenPromise && typeof fullscreenPromise.then === "function") {
+          if (
+            fullscreenPromise &&
+            typeof fullscreenPromise.then === "function"
+          ) {
             fullscreenPromise
               .then(() => {
                 pushHistoryGuard();

@@ -98,11 +98,7 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
 
   // Handle empty/null items
   if (!hasItems) {
-    return (
-      <span style={{ color: "var(--text-muted)" }}>
-        {emptyText}
-      </span>
-    );
+    return <span style={{ color: "var(--text-muted)" }}>{emptyText}</span>;
   }
 
   // Render a single item (as link or text)
@@ -121,7 +117,10 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
       );
     }
     return (
-      <span key={item.id} style={{ color: isInPopover ? "var(--text-primary)" : undefined }}>
+      <span
+        key={item.id}
+        style={{ color: isInPopover ? "var(--text-primary)" : undefined }}
+      >
         {item.name}
       </span>
     );
@@ -151,7 +150,10 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
     >
       <div className="p-2 flex flex-col gap-1">
         {items.map((item) => (
-          <div key={item.id} className="py-1 px-2 rounded hover:bg-[var(--bg-secondary)]">
+          <div
+            key={item.id}
+            className="py-1 px-2 rounded hover:bg-[var(--bg-secondary)]"
+          >
             {renderItem(item, true)}
           </div>
         ))}

@@ -1,22 +1,22 @@
 import bcrypt from "bcryptjs";
 import express, { Response } from "express";
 import {
+  checkAccountLockout,
+  clearFailedAttempts,
+  recordFailedAttempt,
+} from "../middleware/accountLockout.js";
+import {
   AuthenticatedRequest,
   authenticate,
   generateToken,
   setTokenCookie,
 } from "../middleware/auth.js";
 import { authRateLimiter } from "../middleware/rateLimiter.js";
-import {
-  checkAccountLockout,
-  recordFailedAttempt,
-  clearFailedAttempts,
-} from "../middleware/accountLockout.js";
 import prisma from "../prisma/singleton.js";
 import rankingComputeService from "../services/RankingComputeService.js";
-import { generateRecoveryKey } from "../utils/recoveryKey.js";
-import { validatePassword } from "../utils/passwordValidation.js";
 import { logger } from "../utils/logger.js";
+import { validatePassword } from "../utils/passwordValidation.js";
+import { generateRecoveryKey } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -24,7 +24,10 @@ const router = express.Router();
 // Login endpoint
 router.post("/login", authRateLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body as { username: string; password: string };
+    const { username, password } = req.body as {
+      username: string;
+      password: string;
+    };
 
     if (!username || !password) {
       return res
@@ -35,7 +38,9 @@ router.post("/login", authRateLimiter, async (req, res) => {
     // Check if account is locked out
     const lockoutStatus = checkAccountLockout(username);
     if (lockoutStatus.locked) {
-      const retryAfterSeconds = Math.ceil((lockoutStatus.remainingMs || 0) / 1000);
+      const retryAfterSeconds = Math.ceil(
+        (lockoutStatus.remainingMs || 0) / 1000
+      );
       res.setHeader("Retry-After", retryAfterSeconds.toString());
       return res.status(423).json({
         error: "Account temporarily locked due to too many failed attempts",
@@ -91,7 +96,9 @@ router.post("/login", authRateLimiter, async (req, res) => {
 
     // Recompute rankings asynchronously on login (fire-and-forget)
     rankingComputeService.recomputeAllRankings(user.id).catch((err) => {
-      logger.error("Failed to recompute rankings on login", { error: err instanceof Error ? err.message : "Unknown error" });
+      logger.error("Failed to recompute rankings on login", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
     });
 
     res.json({
@@ -100,12 +107,17 @@ router.post("/login", authRateLimiter, async (req, res) => {
         id: user.id,
         username: user.username,
         role: user.role,
-        landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
+        landingPagePreference: user.landingPagePreference || {
+          pages: ["home"],
+          randomize: false,
+        },
         setupCompleted: user.setupCompleted,
       },
     });
   } catch (error) {
-    logger.error("Login error", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Login error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -157,7 +169,9 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 
     res.json({ hasRecoveryKey: !!user.recoveryKey });
   } catch (error) {
-    logger.error("Forgot password init error", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Forgot password init error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -165,7 +179,11 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 // Forgot password - verify recovery key and set new password
 router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
   try {
-    const { username, recoveryKey, newPassword } = req.body as { username: string; recoveryKey: string; newPassword: string };
+    const { username, recoveryKey, newPassword } = req.body as {
+      username: string;
+      recoveryKey: string;
+      newPassword: string;
+    };
 
     if (!username || !recoveryKey || !newPassword) {
       return res.status(400).json({ error: "All fields are required" });
@@ -173,7 +191,9 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return res
+        .status(400)
+        .json({ error: passwordValidation.errors.join(". ") });
     }
 
     const user = await prisma.user.findUnique({
@@ -204,7 +224,9 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    logger.error("Forgot password reset error", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Forgot password reset error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -225,7 +247,10 @@ router.post("/first-time-password", async (req, res) => {
       });
     }
 
-    const { username, newPassword } = req.body as { username: string; newPassword: string };
+    const { username, newPassword } = req.body as {
+      username: string;
+      newPassword: string;
+    };
 
     if (!username || !newPassword) {
       return res
@@ -260,7 +285,9 @@ router.post("/first-time-password", async (req, res) => {
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {
-    logger.error("First-time password error", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("First-time password error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Server error" });
   }
 });

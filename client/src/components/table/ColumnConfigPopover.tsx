@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Columns3 as LucideColumns3,
-  ChevronUp as LucideChevronUp,
   ChevronDown as LucideChevronDown,
-  ChevronsUp as LucideChevronsUp,
+  ChevronUp as LucideChevronUp,
   ChevronsDown as LucideChevronsDown,
+  ChevronsUp as LucideChevronsUp,
+  Columns3 as LucideColumns3,
   X as LucideX,
 } from "lucide-react";
 import Button from "../ui/Button";
@@ -20,7 +20,10 @@ interface Props {
   visibleColumnIds: string[];
   columnOrder: string[];
   onToggleColumn?: (columnId: string) => void;
-  onMoveColumn?: (columnId: string, direction: "up" | "down" | "top" | "bottom") => void;
+  onMoveColumn?: (
+    columnId: string,
+    direction: "up" | "down" | "top" | "bottom"
+  ) => void;
 }
 
 /**
@@ -72,7 +75,8 @@ const ColumnConfigPopover = ({
   const orderedColumns = getOrderedColumns();
 
   // Check if column is visible
-  const isColumnVisible = (columnId: string) => visibleColumnIds.includes(columnId);
+  const isColumnVisible = (columnId: string) =>
+    visibleColumnIds.includes(columnId);
 
   // Check if column can move in a direction
   const canMoveUp = (index: number) => index > 0;
@@ -82,7 +86,8 @@ const ColumnConfigPopover = ({
   const handleMoveTop = (columnId: string) => onMoveColumn?.(columnId, "top");
   const handleMoveUp = (columnId: string) => onMoveColumn?.(columnId, "up");
   const handleMoveDown = (columnId: string) => onMoveColumn?.(columnId, "down");
-  const handleMoveBottom = (columnId: string) => onMoveColumn?.(columnId, "bottom");
+  const handleMoveBottom = (columnId: string) =>
+    onMoveColumn?.(columnId, "bottom");
 
   // Handle visibility toggle
   const handleToggle = (columnId: string) => onToggleColumn?.(columnId);
@@ -99,7 +104,9 @@ const ColumnConfigPopover = ({
           aria-label="Columns"
           style={{
             backgroundColor: isOpen ? "var(--bg-card)" : "var(--bg-secondary)",
-            borderColor: isOpen ? "var(--accent-primary)" : "var(--border-color)",
+            borderColor: isOpen
+              ? "var(--accent-primary)"
+              : "var(--border-color)",
           }}
         />
       </div>

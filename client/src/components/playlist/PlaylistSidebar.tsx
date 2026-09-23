@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -197,9 +197,7 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                   : "var(--text-secondary)",
                 border: "1px solid var(--border-color)",
               }}
-              title={
-                playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
-              }
+              title={playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"}
             >
               <PlayCircle size={14} />
             </button>
@@ -230,7 +228,9 @@ const PlaylistSidebar = ({ maxHeight }: Props) => {
                     ? "var(--accent-primary)"
                     : "transparent",
                 color:
-                  playlist.repeat !== "none" ? "white" : "var(--text-secondary)",
+                  playlist.repeat !== "none"
+                    ? "white"
+                    : "var(--text-secondary)",
                 border: "1px solid var(--border-color)",
               }}
               title={

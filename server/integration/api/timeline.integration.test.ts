@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient, guestClient } from "../helpers/testClient.js";
 
 interface DistributionResponse {
   distribution: Array<{
@@ -16,7 +16,9 @@ describe("Timeline API", () => {
 
   describe("GET /api/timeline/:entityType/distribution", () => {
     it("rejects unauthenticated requests", async () => {
-      const response = await guestClient.get("/api/timeline/scene/distribution");
+      const response = await guestClient.get(
+        "/api/timeline/scene/distribution"
+      );
       expect(response.status).toBe(401);
     });
 
@@ -46,7 +48,9 @@ describe("Timeline API", () => {
     });
 
     it("returns 400 for invalid entity type", async () => {
-      const response = await adminClient.get("/api/timeline/invalid/distribution");
+      const response = await adminClient.get(
+        "/api/timeline/invalid/distribution"
+      );
       expect(response.status).toBe(400);
     });
 

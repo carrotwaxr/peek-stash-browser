@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import { describe, expect, it } from "vitest";
 import { CardCountIndicators } from "../../../src/components/ui/CardCountIndicators";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -15,7 +15,10 @@ describe("CardCountIndicators", () => {
 describe("CardCountIndicator hoverDisabled", () => {
   it("passes hoverDisabled to Tooltip for rich content", () => {
     // Read the source file to check implementation details
-    const sourcePath = resolve(__dirname, "../../../src/components/ui/CardCountIndicators.tsx");
+    const sourcePath = resolve(
+      __dirname,
+      "../../../src/components/ui/CardCountIndicators.tsx"
+    );
     const sourceCode = readFileSync(sourcePath, "utf8");
 
     // The component should pass hoverDisabled={true} when tooltipContent is rich (not string)

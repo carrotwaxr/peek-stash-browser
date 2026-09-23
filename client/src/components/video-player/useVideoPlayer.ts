@@ -32,10 +32,15 @@ chromecast(videojs);
  * @param {Object} params - Additional query parameters
  * @returns {string} Full URL with instanceId if provided
  */
-function buildStreamUrl(sceneId: string, path: string, instanceId: string | null | undefined, params: Record<string, string | undefined | null> = {}) {
+function buildStreamUrl(
+  sceneId: string,
+  path: string,
+  instanceId: string | null | undefined,
+  params: Record<string, string | undefined | null> = {}
+) {
   const url = new URL(`/api/scene/${sceneId}/${path}`, window.location.origin);
   if (instanceId) {
-    url.searchParams.set('instanceId', instanceId);
+    url.searchParams.set("instanceId", instanceId);
   }
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
@@ -52,7 +57,11 @@ function buildStreamUrl(sceneId: string, path: string, instanceId: string | null
  * @param {number} baseDelay - Base delay in ms (default: 1000)
  * @returns {Promise} Result of the function or throws after all retries
  */
-async function retryWithBackoff(fn: () => Promise<any>, maxAttempts = 3, baseDelay = 1000) {
+async function retryWithBackoff(
+  fn: () => Promise<any>,
+  maxAttempts = 3,
+  baseDelay = 1000
+) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -61,8 +70,11 @@ async function retryWithBackoff(fn: () => Promise<any>, maxAttempts = 3, baseDel
       lastError = error;
       if (attempt < maxAttempts) {
         const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(`[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`, (error as Error).message);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        console.warn(
+          `[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`,
+          (error as Error).message
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -109,7 +121,7 @@ function getBestTranscodeQuality(sourceHeight: number): string {
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getAvailableQualities(sourceHeight: number) {
-  return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
+  return QUALITY_PRESETS.filter((preset) => preset.height <= sourceHeight);
 }
 
 /**
@@ -290,7 +302,8 @@ export function useVideoPlayer({
     if (!mediaSessionPlugin) return;
 
     // Build performer string from scene performers
-    const performers = scene.performers?.map((p: any) => p.name).join(", ") || "";
+    const performers =
+      scene.performers?.map((p: any) => p.name).join(", ") || "";
 
     // Set metadata for OS media controls
     mediaSessionPlugin.setMetadata(
@@ -299,7 +312,13 @@ export function useVideoPlayer({
       scene.paths?.screenshot || ""
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps list all accessed scene properties individually; adding `scene` object would cause re-runs on every render
-  }, [scene?.id, scene?.title, scene?.performers, scene?.paths?.screenshot, playerRef]);
+  }, [
+    scene?.id,
+    scene?.title,
+    scene?.performers,
+    scene?.paths?.screenshot,
+    playerRef,
+  ]);
 
   // ============================================================================
   // TRACK ACTIVITY PLUGIN (Stash pattern - integrates with watch history)
@@ -320,7 +339,10 @@ export function useVideoPlayer({
 
     // Connect plugin callbacks to API endpoints
     // saveActivity is called periodically (every 10s) during playback
-    trackActivityPlugin.saveActivity = async (resumeTime: number, playDuration: number) => {
+    trackActivityPlugin.saveActivity = async (
+      resumeTime: number,
+      playDuration: number
+    ) => {
       try {
         await retryWithBackoff(() =>
           apiPost("/watch-history/save-activity", {
@@ -341,7 +363,10 @@ export function useVideoPlayer({
           apiPost("/watch-history/increment-play-count", { sceneId })
         );
       } catch (error) {
-        console.error("Failed to increment play count after 3 attempts:", error);
+        console.error(
+          "Failed to increment play count after 3 attempts:",
+          error
+        );
       }
     };
 
@@ -417,7 +442,9 @@ export function useVideoPlayer({
 
     const handleError = async () => {
       if (hasFallbackTriggeredRef.current) {
-        console.log("[AUTO-FALLBACK] Already triggered for this scene, ignoring");
+        console.log(
+          "[AUTO-FALLBACK] Already triggered for this scene, ignoring"
+        );
         return;
       }
 
@@ -429,13 +456,15 @@ export function useVideoPlayer({
 
       // Only auto-fallback if we're currently on direct play
       const currentSrc = player.currentSrc();
-      if (!currentSrc || currentSrc.includes('.m3u8')) return;  // Already on HLS
+      if (!currentSrc || currentSrc.includes(".m3u8")) return; // Already on HLS
 
       // Determine best transcode quality based on source resolution
       const sourceHeight = scene?.files?.[0]?.height || 1080;
       const bestQuality = getBestTranscodeQuality(sourceHeight);
 
-      console.log(`[AUTO-FALLBACK] Codec error detected, falling back to ${bestQuality} transcoding (source: ${sourceHeight}p)`);
+      console.log(
+        `[AUTO-FALLBACK] Codec error detected, falling back to ${bestQuality} transcoding (source: ${sourceHeight}p)`
+      );
       hasFallbackTriggeredRef.current = true;
       isAutoFallbackRef.current = true; // Set ref flag (no re-render)
 
@@ -444,16 +473,25 @@ export function useVideoPlayer({
 
       // Map quality preset to Stash resolution parameter
       const qualityToResolution = {
-        '2160p': 'FOUR_K',
-        '1080p': 'FULL_HD',
-        '720p': 'STANDARD_HD',
-        '480p': 'STANDARD',
-        '360p': 'LOW',
+        "2160p": "FOUR_K",
+        "1080p": "FULL_HD",
+        "720p": "STANDARD_HD",
+        "480p": "STANDARD",
+        "360p": "LOW",
       };
-      const resolution = (qualityToResolution as Record<string, string>)[bestQuality] || 'STANDARD_HD';
-      const hlsUrl = buildStreamUrl(scene.id, 'proxy-stream/stream.m3u8', scene.instanceId, { resolution });
+      const resolution =
+        (qualityToResolution as Record<string, string>)[bestQuality] ||
+        "STANDARD_HD";
+      const hlsUrl = buildStreamUrl(
+        scene.id,
+        "proxy-stream/stream.m3u8",
+        scene.instanceId,
+        { resolution }
+      );
 
-      console.log(`[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`);
+      console.log(
+        `[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`
+      );
 
       // Configure transcoded playback
       togglePlaybackRateControl(player, false);
@@ -478,7 +516,11 @@ export function useVideoPlayer({
       });
 
       // Call play() immediately to prevent big play button from showing
-      player.play().catch((err: any) => console.error("[AUTO-FALLBACK] Play failed:", err));
+      player
+        .play()
+        .catch((err: any) =>
+          console.error("[AUTO-FALLBACK] Play failed:", err)
+        );
     };
 
     player.on("error", handleError);
@@ -538,52 +580,60 @@ export function useVideoPlayer({
       // Helper to check if stream is Direct (not transcoded)
       const isDirect = (url: URL) => {
         return (
-          url.pathname.endsWith('/stream') ||
-          url.pathname.endsWith('/stream.mpd') ||
-          url.pathname.endsWith('/stream.m3u8')
+          url.pathname.endsWith("/stream") ||
+          url.pathname.endsWith("/stream.mpd") ||
+          url.pathname.endsWith("/stream.m3u8")
         );
       };
 
       // Rewrite Stash URLs to use Peek's proxy
-      sources = scene.sceneStreams.map((stream: any) => {
-        try {
-          const url = new URL(stream.url);
+      sources = scene.sceneStreams
+        .map((stream: any) => {
+          try {
+            const url = new URL(stream.url);
 
-          // Extract path after /scene/{id}/
-          // e.g., "stream.m3u8" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
-          const pathParts = url.pathname.split(`/scene/${scene.id}/`);
-          const streamPath = pathParts[1] || 'stream'; // "stream.m3u8" or "stream"
+            // Extract path after /scene/{id}/
+            // e.g., "stream.m3u8" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
+            const pathParts = url.pathname.split(`/scene/${scene.id}/`);
+            const streamPath = pathParts[1] || "stream"; // "stream.m3u8" or "stream"
 
-          // Strip apikey from query params (security: don't expose Stash API key to client)
-          url.searchParams.delete('apikey');
-          url.searchParams.delete('ApiKey');
-          url.searchParams.delete('APIKEY');
-          // Add instanceId for multi-instance support
-          if (scene.instanceId) {
-            url.searchParams.set('instanceId', scene.instanceId);
+            // Strip apikey from query params (security: don't expose Stash API key to client)
+            url.searchParams.delete("apikey");
+            url.searchParams.delete("ApiKey");
+            url.searchParams.delete("APIKEY");
+            // Add instanceId for multi-instance support
+            if (scene.instanceId) {
+              url.searchParams.set("instanceId", scene.instanceId);
+            }
+            const queryString = url.search; // "?resolution=STANDARD_HD&instanceId=..." or ""
+
+            // Rewrite to Peek's proxy endpoint
+            const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
+
+            return {
+              src: proxiedUrl,
+              type: stream.mime_type || undefined,
+              label: stream.label || undefined,
+              offset: !isDirect(url), // Transcoded streams need time offset correction
+              duration, // Total video duration (fixes HLS duration incrementing)
+            };
+          } catch (error) {
+            console.error(
+              "[VideoPlayer] Error parsing stream URL:",
+              stream.url,
+              error
+            );
+            return null;
           }
-          const queryString = url.search; // "?resolution=STANDARD_HD&instanceId=..." or ""
-
-          // Rewrite to Peek's proxy endpoint
-          const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
-
-          return {
-            src: proxiedUrl,
-            type: stream.mime_type || undefined,
-            label: stream.label || undefined,
-            offset: !isDirect(url), // Transcoded streams need time offset correction
-            duration, // Total video duration (fixes HLS duration incrementing)
-          };
-        } catch (error) {
-          console.error('[VideoPlayer] Error parsing stream URL:', stream.url, error);
-          return null;
-        }
-      }).filter(Boolean); // Remove any null entries from errors
+        })
+        .filter(Boolean); // Remove any null entries from errors
     } else {
-      console.warn('[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream');
+      console.warn(
+        "[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream"
+      );
       // Fallback: Use legacy Direct stream if sceneStreams not available
       // This maintains backward compatibility during transition
-      const directUrl = buildStreamUrl(scene.id, 'stream', scene.instanceId);
+      const directUrl = buildStreamUrl(scene.id, "stream", scene.instanceId);
       sources.push({
         src: directUrl,
         label: "Direct",
@@ -636,7 +686,12 @@ export function useVideoPlayer({
     const resumeTime = initialResumeTimeRef.current;
 
     // Handle resume playback before starting
-    if (shouldResume && !hasResumedRef.current && resumeTime != null && resumeTime > 0) {
+    if (
+      shouldResume &&
+      !hasResumedRef.current &&
+      resumeTime != null &&
+      resumeTime > 0
+    ) {
       hasResumedRef.current = true;
       player.currentTime(resumeTime);
     }
@@ -690,7 +745,9 @@ export function useVideoPlayer({
       // Repeat One: replay current scene
       if (playlist.repeat === "one") {
         player.currentTime(0);
-        player.play().catch((err: any) => console.error("Repeat play failed:", err));
+        player
+          .play()
+          .catch((err: any) => console.error("Repeat play failed:", err));
         return;
       }
 
@@ -721,9 +778,10 @@ export function useVideoPlayer({
           // All scenes played, reset shuffle history and start over
           dispatch({ type: "SET_SHUFFLE_HISTORY", payload: [] });
           // Pick random scene (excluding current)
-          const candidates = Array.from({ length: totalScenes }, (_, i) => i).filter(
-            (i) => i !== currentIndex
-          );
+          const candidates = Array.from(
+            { length: totalScenes },
+            (_, i) => i
+          ).filter((i) => i !== currentIndex);
           nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
         }
         // else: no more scenes and repeat is not "all", stop playback
@@ -760,12 +818,7 @@ export function useVideoPlayer({
         player.off("ended", handleEnded);
       }
     };
-  }, [
-    playerRef,
-    playlist,
-    currentIndex,
-    dispatch,
-  ]);
+  }, [playerRef, playlist, currentIndex, dispatch]);
 
   // Configure skipButtons plugin for playlist navigation (Stash pattern)
   useEffect(() => {

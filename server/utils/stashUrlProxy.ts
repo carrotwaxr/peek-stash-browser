@@ -37,7 +37,11 @@ type GroupLike = {
  */
 type SceneLike = {
   paths?: object;
-  sceneStreams?: Array<{ url: string; mime_type?: string | null; label?: string | null }>;
+  sceneStreams?: Array<{
+    url: string;
+    mime_type?: string | null;
+    label?: string | null;
+  }>;
   performers?: Array<HasImagePath>;
   tags?: Array<{ image_path?: string | null }>;
   studio?: HasImagePath | null;
@@ -85,9 +89,7 @@ export const appendApiKeyToUrl = convertToProxyUrl;
  * Transform performer to add API key to image_path
  * Works with both full Performer objects and nested PerformerCompact/PerformerFull
  */
-export const transformPerformer = <T extends HasImagePath>(
-  performer: T
-): T => {
+export const transformPerformer = <T extends HasImagePath>(performer: T): T => {
   try {
     const mutated = {
       ...performer,
@@ -98,12 +100,14 @@ export const transformPerformer = <T extends HasImagePath>(
 
     // Transform nested tags
     if (performer.tags && Array.isArray(performer.tags)) {
-      mutated.tags = performer.tags.map((t: { image_path?: string | null }) => ({
-        ...t,
-        image_path: t.image_path
-          ? appendApiKeyToUrl(t.image_path)
-          : t.image_path,
-      }));
+      mutated.tags = performer.tags.map(
+        (t: { image_path?: string | null }) => ({
+          ...t,
+          image_path: t.image_path
+            ? appendApiKeyToUrl(t.image_path)
+            : t.image_path,
+        })
+      );
     }
 
     return mutated;
@@ -196,7 +200,7 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
           acc[key] = appendApiKeyToUrl(val as string);
           return acc;
         },
-        {} as Record<string, string>,
+        {} as Record<string, string>
       );
     }
 

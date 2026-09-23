@@ -27,7 +27,9 @@ export const ThemedIcon = ({
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("");
 
-  const LucideIcon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon | undefined>)[pascalCaseName];
+  const LucideIcon = (
+    LucideIcons as unknown as Record<string, LucideIcons.LucideIcon | undefined>
+  )[pascalCaseName];
 
   if (!LucideIcon) {
     return null;

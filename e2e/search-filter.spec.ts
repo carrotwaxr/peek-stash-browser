@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for search and filter functionality.
@@ -50,12 +50,14 @@ test.describe("Search and Filter", () => {
 
     // Filter panel content should be visible — check for common filter sections
     // Look for filter labels/headings that appear in the panel
-    await expect(page.getByText("Clear All")).toBeVisible({
-      timeout: 5_000,
-    }).catch(() => {
-      // "Clear All" only shows if there are active filters
-      // The panel itself being open is sufficient
-    });
+    await expect(page.getByText("Clear All"))
+      .toBeVisible({
+        timeout: 5_000,
+      })
+      .catch(() => {
+        // "Clear All" only shows if there are active filters
+        // The panel itself being open is sufficient
+      });
   });
 
   test("sort direction toggles between ascending and descending", async ({
@@ -93,9 +95,7 @@ test.describe("Search and Filter", () => {
     ).toBeVisible();
 
     // View mode toggle should be present
-    await expect(
-      page.locator('button[aria-label*="View mode"]')
-    ).toBeVisible();
+    await expect(page.locator('button[aria-label*="View mode"]')).toBeVisible();
   });
 
   test("gallery page has search controls", async ({ page }) => {

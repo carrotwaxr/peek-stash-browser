@@ -8,7 +8,9 @@
  * - Composite key behavior (performerId + instanceId)
  * - Edge cases: missing instanceId, empty string fallback
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 
 // Hoist mock functions so they can be referenced in vi.mock factories
 const { mockGetScene, mockGetScenesByIdsWithRelations } = vi.hoisted(() => ({
@@ -80,9 +82,6 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-
 const mockPrisma = vi.mocked(prisma);
 
 describe("UserStatsService", () => {
@@ -100,7 +99,13 @@ describe("UserStatsService", () => {
       });
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 0, 1, new Date(), undefined, "instance-xyz"
+        1,
+        "scene-1",
+        0,
+        1,
+        new Date(),
+        undefined,
+        "instance-xyz"
       );
 
       expect(mockGetScene).toHaveBeenCalledWith("scene-1", "instance-xyz");
@@ -115,7 +120,13 @@ describe("UserStatsService", () => {
       });
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 1, 1, new Date(), new Date(), "instance-aaa"
+        1,
+        "scene-1",
+        1,
+        1,
+        new Date(),
+        new Date(),
+        "instance-aaa"
       );
 
       // Performer stats should use the provided instanceId
@@ -173,7 +184,10 @@ describe("UserStatsService", () => {
       } as any);
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 0, 1
+        1,
+        "scene-1",
+        0,
+        1
         // No instanceId provided
       );
 
@@ -199,9 +213,7 @@ describe("UserStatsService", () => {
       });
       mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
-      await userStatsService.updateStatsForScene(
-        1, "scene-1", 0, 1
-      );
+      await userStatsService.updateStatsForScene(1, "scene-1", 0, 1);
 
       expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -239,7 +251,13 @@ describe("UserStatsService", () => {
       });
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 1, 1, undefined, undefined, "inst-a"
+        1,
+        "scene-1",
+        1,
+        1,
+        undefined,
+        undefined,
+        "inst-a"
       );
 
       expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(3);
@@ -257,7 +275,13 @@ describe("UserStatsService", () => {
       });
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 0, 1, undefined, undefined, "inst-a"
+        1,
+        "scene-1",
+        0,
+        1,
+        undefined,
+        undefined,
+        "inst-a"
       );
 
       expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledTimes(2);
@@ -272,7 +296,13 @@ describe("UserStatsService", () => {
       });
 
       await userStatsService.updateStatsForScene(
-        1, "scene-1", 0, 1, undefined, undefined, "inst-a"
+        1,
+        "scene-1",
+        0,
+        1,
+        undefined,
+        undefined,
+        "inst-a"
       );
 
       expect(mockPrisma.userStudioStats.upsert).not.toHaveBeenCalled();
@@ -357,7 +387,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       // Performer stats should have TWO entries (one per instance)
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       const performerData = performerCall.data as any[];
       expect(performerData).toHaveLength(2);
 
@@ -420,7 +451,8 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       const performerData = performerCall.data as any[];
 
       // Should aggregate into ONE entry (same performer + same instance)
@@ -456,7 +488,8 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       const performerData = performerCall.data as any[];
 
       expect(performerData[0].instanceId).toBe("");
@@ -468,7 +501,8 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       expect((performerCall.data as any[]).length).toBe(0);
     });
 
@@ -479,8 +513,15 @@ describe("UserStatsService", () => {
           instanceId: "inst-a",
           oCount: 2,
           playCount: 3,
-          oHistory: JSON.stringify(["2026-01-10T12:00:00Z", "2026-02-01T15:30:00Z"]),
-          playHistory: JSON.stringify(["2026-01-10T12:00:00Z", "2026-01-20T08:00:00Z", "2026-02-05T20:00:00Z"]),
+          oHistory: JSON.stringify([
+            "2026-01-10T12:00:00Z",
+            "2026-02-01T15:30:00Z",
+          ]),
+          playHistory: JSON.stringify([
+            "2026-01-10T12:00:00Z",
+            "2026-01-20T08:00:00Z",
+            "2026-02-05T20:00:00Z",
+          ]),
         },
       ] as any);
 
@@ -496,13 +537,18 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       const performerData = performerCall.data as any[];
 
       // lastPlayedAt should be the last entry in playHistory
-      expect(performerData[0].lastPlayedAt).toEqual(new Date("2026-02-05T20:00:00Z"));
+      expect(performerData[0].lastPlayedAt).toEqual(
+        new Date("2026-02-05T20:00:00Z")
+      );
       // lastOAt should be the last entry in oHistory
-      expect(performerData[0].lastOAt).toEqual(new Date("2026-02-01T15:30:00Z"));
+      expect(performerData[0].lastOAt).toEqual(
+        new Date("2026-02-01T15:30:00Z")
+      );
     });
 
     it("handles watch history with oHistory/playHistory as arrays (already parsed)", async () => {
@@ -530,7 +576,8 @@ describe("UserStatsService", () => {
       // Should not throw
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       expect((performerCall.data as any[]).length).toBe(1);
     });
 
@@ -567,7 +614,8 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const performerCall = mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
       const performerData = performerCall.data as any[];
 
       // Only scene-1's stats should be included
@@ -622,8 +670,12 @@ describe("UserStatsService", () => {
       // Should be TWO entries (same studio ID but different instances)
       expect(studioData).toHaveLength(2);
 
-      const instAStudio = studioData.find((d: any) => d.instanceId === "instance-a");
-      const instBStudio = studioData.find((d: any) => d.instanceId === "instance-b");
+      const instAStudio = studioData.find(
+        (d: any) => d.instanceId === "instance-a"
+      );
+      const instBStudio = studioData.find(
+        (d: any) => d.instanceId === "instance-b"
+      );
 
       expect(instAStudio.studioId).toBe("studio-1");
       expect(instAStudio.oCounter).toBe(1);
@@ -634,10 +686,7 @@ describe("UserStatsService", () => {
 
   describe("rebuildAllStats", () => {
     it("rebuilds stats for all users", async () => {
-      mockPrisma.user.findMany.mockResolvedValue([
-        { id: 1 },
-        { id: 2 },
-      ] as any);
+      mockPrisma.user.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }] as any);
 
       // Mock the rebuild for each user
       mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({} as any);
@@ -693,8 +742,22 @@ describe("UserStatsService", () => {
 
     it("returns separate stats for same performerId across different instances", async () => {
       mockPrisma.userPerformerStats.findMany.mockResolvedValue([
-        { performerId: "2", instanceId: "instance-aaa", oCounter: 5, playCount: 10, lastPlayedAt: null, lastOAt: null },
-        { performerId: "2", instanceId: "instance-bbb", oCounter: 3, playCount: 7, lastPlayedAt: null, lastOAt: null },
+        {
+          performerId: "2",
+          instanceId: "instance-aaa",
+          oCounter: 5,
+          playCount: 10,
+          lastPlayedAt: null,
+          lastOAt: null,
+        },
+        {
+          performerId: "2",
+          instanceId: "instance-bbb",
+          oCounter: 3,
+          playCount: 7,
+          lastPlayedAt: null,
+          lastOAt: null,
+        },
       ]);
 
       const stats = await userStatsService.getPerformerStats(1);
@@ -712,7 +775,12 @@ describe("UserStatsService", () => {
   describe("getStudioStats", () => {
     it("returns Map of studio stats for a user", async () => {
       mockPrisma.userStudioStats.findMany.mockResolvedValue([
-        { studioId: "studio-1", instanceId: "inst-a", oCounter: 2, playCount: 5 },
+        {
+          studioId: "studio-1",
+          instanceId: "inst-a",
+          oCounter: 2,
+          playCount: 5,
+        },
       ] as any);
 
       const result = await userStatsService.getStudioStats(1);
@@ -748,7 +816,10 @@ describe("UserStatsService", () => {
       const result = await userStatsService.getTagStats(1);
 
       expect(result.size).toBe(2);
-      expect(result.get("tag-1\0inst-a")).toEqual({ oCounter: 3, playCount: 7 });
+      expect(result.get("tag-1\0inst-a")).toEqual({
+        oCounter: 3,
+        playCount: 7,
+      });
     });
 
     it("returns separate stats for same tagId across different instances", async () => {

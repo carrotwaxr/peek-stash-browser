@@ -11,6 +11,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - Integration: `cd server && npm run test:integration`. Needs `STASH_TEST_URL` and `STASH_TEST_API_KEY` (or `STASH_URL` and `STASH_API_KEY`) in the root `.env`, and `server/integration/fixtures/testEntities.ts` copied from its example.
 - E2E: `npm run test:e2e` from the root, against the running compose stack
 - Lint: `npm run lint` in `client/` and `server/`
+- Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
 - Types: `cd server && npx tsc --noEmit` and `cd client && npm run typecheck` (CI runs only the server one)
 - Build: `cd client && npm run build`
 - Release: `/pre-release`, then `/release-beta` or `/release-stable`
@@ -28,7 +29,6 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 
 ## Pitfalls
 
-- A one-line edit becomes a whole-file diff with reordered imports: most files are not Prettier-clean, and the harness format hook runs `prettier --write` on every file it edits. Until the Prettier baseline lands, apply edits to such files through Bash, which the hook does not watch.
 - A filter or content restriction silently matches nothing, or INCLUDE mode hides everything: an `"id:instanceId"` value reached SQL unparsed (#412, #424).
 - A filter or restriction also matches another instance's entities: the value was parsed to a bare ID and the instance dropped (#390, #437).
 - The server container fails on a `@peek/shared-types/...` import that `tsc` accepts: docker dev runs ts-node, which ignores wildcard subpath exports. Add an explicit entry to `exports` in `shared/package.json` (#498).

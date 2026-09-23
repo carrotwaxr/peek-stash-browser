@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
  * Performer Filters Integration Tests
@@ -41,12 +41,15 @@ describe("Performer Filters", () => {
 
   describe("favorite filter", () => {
     it("filters favorite performers", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          favorite: true,
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            favorite: true,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -57,12 +60,15 @@ describe("Performer Filters", () => {
     });
 
     it("filters non-favorite performers", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          favorite: false,
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            favorite: false,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -71,15 +77,18 @@ describe("Performer Filters", () => {
 
   describe("gender filter", () => {
     it("filters by gender EQUALS FEMALE", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          gender: {
-            value: "FEMALE",
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            gender: {
+              value: "FEMALE",
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -90,15 +99,18 @@ describe("Performer Filters", () => {
     });
 
     it("filters by gender EQUALS MALE", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          gender: {
-            value: "MALE",
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            gender: {
+              value: "MALE",
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -109,15 +121,18 @@ describe("Performer Filters", () => {
     });
 
     it("filters by gender NOT_EQUALS", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          gender: {
-            value: "MALE",
-            modifier: "NOT_EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            gender: {
+              value: "MALE",
+              modifier: "NOT_EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -130,45 +145,57 @@ describe("Performer Filters", () => {
 
   describe("tags filter", () => {
     it("filters performers by tag with INCLUDES", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters performers by tag with EXCLUDES", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters performers by multiple tags with INCLUDES_ALL", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities, TEST_ENTITIES.restrictableTag],
-            modifier: "INCLUDES_ALL",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            tags: {
+              value: [
+                TEST_ENTITIES.tagWithEntities,
+                TEST_ENTITIES.restrictableTag,
+              ],
+              modifier: "INCLUDES_ALL",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -177,15 +204,18 @@ describe("Performer Filters", () => {
 
   describe("scenes filter", () => {
     it("filters performers appearing in specific scene with INCLUDES", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scenes: {
-            value: [TEST_ENTITIES.sceneWithRelations],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scenes: {
+              value: [TEST_ENTITIES.sceneWithRelations],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -193,15 +223,18 @@ describe("Performer Filters", () => {
     });
 
     it("filters performers excluding specific scene with EXCLUDES", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scenes: {
-            value: [TEST_ENTITIES.sceneWithRelations],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scenes: {
+              value: [TEST_ENTITIES.sceneWithRelations],
+              modifier: "EXCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -210,15 +243,18 @@ describe("Performer Filters", () => {
 
   describe("studios filter", () => {
     it("filters performers who appear in scenes from studio", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -228,46 +264,55 @@ describe("Performer Filters", () => {
 
   describe("rating100 filter", () => {
     it("filters by rating GREATER_THAN", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          rating100: {
-            value: 70,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            rating100: {
+              value: 70,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters by rating LESS_THAN", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          rating100: {
-            value: 50,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            rating100: {
+              value: 50,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters by rating BETWEEN", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          rating100: {
-            value: 50,
-            value2: 80,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            rating100: {
+              value: 50,
+              value2: 80,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -276,30 +321,36 @@ describe("Performer Filters", () => {
 
   describe("o_counter filter", () => {
     it("filters by o_counter GREATER_THAN", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters by o_counter EQUALS zero", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          o_counter: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            o_counter: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -308,30 +359,36 @@ describe("Performer Filters", () => {
 
   describe("play_count filter", () => {
     it("filters by play_count GREATER_THAN (watched performers)", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          play_count: {
-            value: 0,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            play_count: {
+              value: 0,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters by play_count EQUALS zero (unwatched performers)", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          play_count: {
-            value: 0,
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            play_count: {
+              value: 0,
+              modifier: "EQUALS",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -340,46 +397,55 @@ describe("Performer Filters", () => {
 
   describe("scene_count filter", () => {
     it("filters performers with many scenes", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scene_count: {
-            value: 10,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scene_count: {
+              value: 10,
+              modifier: "GREATER_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters performers with few scenes", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scene_count: {
-            value: 5,
-            modifier: "LESS_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scene_count: {
+              value: 5,
+              modifier: "LESS_THAN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("filters performers with scene_count BETWEEN", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scene_count: {
-            value: 5,
-            value2: 20,
-            modifier: "BETWEEN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scene_count: {
+              value: 5,
+              value2: 20,
+              modifier: "BETWEEN",
+            },
           },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -388,12 +454,15 @@ describe("Performer Filters", () => {
 
   describe("text search (q parameter)", () => {
     it("searches performers by name", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 50,
-          q: "a",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 50,
+            q: "a",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -402,16 +471,19 @@ describe("Performer Filters", () => {
 
   describe("combined filters", () => {
     it("combines gender and favorite filters", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          gender: {
-            value: "FEMALE",
-            modifier: "EQUALS",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            gender: {
+              value: "FEMALE",
+              modifier: "EQUALS",
+            },
+            favorite: true,
           },
-          favorite: true,
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -423,38 +495,44 @@ describe("Performer Filters", () => {
     });
 
     it("combines scene_count and rating filters", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          scene_count: {
-            value: 5,
-            modifier: "GREATER_THAN",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            scene_count: {
+              value: 5,
+              modifier: "GREATER_THAN",
+            },
+            rating100: {
+              value: 60,
+              modifier: "GREATER_THAN",
+            },
           },
-          rating100: {
-            value: 60,
-            modifier: "GREATER_THAN",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("combines tags and studios filters", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: { per_page: 50 },
-        performer_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: { per_page: 50 },
+          performer_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
           },
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
@@ -463,39 +541,48 @@ describe("Performer Filters", () => {
 
   describe("sorting", () => {
     it("sorts performers by name ASC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 50,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 50,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("sorts performers by scene_count DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 50,
-          sort: "scene_count",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 50,
+            sort: "scene_count",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();
     });
 
     it("sorts performers by rating100 DESC", async () => {
-      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
-        filter: {
-          per_page: 50,
-          sort: "rating100",
-          direction: "DESC",
-        },
-      });
+      const response = await adminClient.post<FindPerformersResponse>(
+        "/api/library/performers",
+        {
+          filter: {
+            per_page: 50,
+            sort: "rating100",
+            direction: "DESC",
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers).toBeDefined();

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTheme } from "../../../themes/useTheme";
-import CustomThemeManager from "../CustomThemeManager";
 import { Button } from "../../ui/index";
+import CustomThemeManager from "../CustomThemeManager";
 
 const ThemeTab = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();
@@ -37,7 +37,9 @@ const ThemeTab = () => {
                 className="text-left px-4 py-3 text-sm flex items-center justify-between"
               >
                 <span>{theme.name}</span>
-                {currentTheme === theme.key && <span className="text-sm">✓</span>}
+                {currentTheme === theme.key && (
+                  <span className="text-sm">✓</span>
+                )}
               </Button>
             ))}
         </div>
@@ -64,7 +66,9 @@ const ThemeTab = () => {
               size={20}
               style={{
                 color: "var(--text-secondary)",
-                transform: uiExamplesExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                transform: uiExamplesExpanded
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
                 transition: "transform 0.2s",
               }}
             />

@@ -23,7 +23,9 @@ export const useTVNavigation = ({
   initialZone = null,
   enabled = true,
 }: UseTVNavigationOptions) => {
-  const [currentZone, setCurrentZone] = useState<string>(initialZone || zones[0]);
+  const [currentZone, setCurrentZone] = useState<string>(
+    initialZone || zones[0]
+  );
   const [focusIndex, setFocusIndex] = useState(0); // Focus index within current zone
 
   /**

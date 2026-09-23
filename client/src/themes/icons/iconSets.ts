@@ -4,9 +4,14 @@
 // NOTE: Entity icons are defined in constants/entityIcons.js as the single source of truth.
 // NOTE: App icons are defined in constants/appIcons.js for features, actions, etc.
 // This file provides theme-specific overrides and can extend icons per theme.
-
+import {
+  ACTION_ICONS,
+  BRAND_ICONS,
+  FEATURE_ICONS,
+  NAV_ICONS,
+  UI_ICONS,
+} from "../../constants/appIcons";
 import { ENTITY_ICON_NAMES } from "../../constants/entityIcons";
-import { FEATURE_ICONS, ACTION_ICONS, NAV_ICONS, UI_ICONS, BRAND_ICONS } from "../../constants/appIcons";
 
 const iconSets = {
   peek: {
@@ -85,7 +90,10 @@ const iconSets = {
 };
 
 const getIconSet = (themeName: string) => {
-  return (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] || iconSets.peek;
+  return (
+    (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] ||
+    iconSets.peek
+  );
 };
 
 export const getIconName = (iconKey: string, themeName = "peek") => {

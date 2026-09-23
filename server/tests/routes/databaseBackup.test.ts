@@ -1,8 +1,9 @@
 /**
  * Unit Tests for Database Backup Routes (Admin API)
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { databaseBackupService } from "../../services/DatabaseBackupService.js";
 
 // Mock DatabaseBackupService
 vi.mock("../../services/DatabaseBackupService.js", () => ({
@@ -15,8 +16,12 @@ vi.mock("../../services/DatabaseBackupService.js", () => ({
 
 // Mock auth middleware
 vi.mock("../../middleware/auth.js", () => ({
-  authenticate: vi.fn((_req: Request, _res: Response, next: NextFunction) => next()),
-  requireAdmin: vi.fn((_req: Request, _res: Response, next: NextFunction) => next()),
+  authenticate: vi.fn((_req: Request, _res: Response, next: NextFunction) =>
+    next()
+  ),
+  requireAdmin: vi.fn((_req: Request, _res: Response, next: NextFunction) =>
+    next()
+  ),
 }));
 
 // Mock logger
@@ -28,15 +33,15 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-import { databaseBackupService } from "../../services/DatabaseBackupService.js";
-
 const mockService = vi.mocked(databaseBackupService);
 
-function createMockRequest(options: {
-  params?: Record<string, string>;
-  body?: Record<string, unknown>;
-  user?: { id: number; username: string; role: string };
-} = {}): Partial<Request> {
+function createMockRequest(
+  options: {
+    params?: Record<string, string>;
+    body?: Record<string, unknown>;
+    user?: { id: number; username: string; role: string };
+  } = {}
+): Partial<Request> {
   return {
     params: options.params || {},
     body: options.body || {},
@@ -75,7 +80,8 @@ describe("Database Backup Routes", () => {
       ];
       mockService.listBackups.mockResolvedValue(mockBackups);
 
-      const { default: router } = await import("../../routes/databaseBackup.js");
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
 
       const mockReq = createMockRequest({
         user: { id: 1, username: "admin", role: "ADMIN" },
@@ -85,7 +91,8 @@ describe("Database Backup Routes", () => {
 
       // Find and call the route handler
       const layer = router.stack.find(
-        (l: any) => l.route?.path === "/database/backups" && l.route?.methods?.get
+        (l: any) =>
+          l.route?.path === "/database/backups" && l.route?.methods?.get
       );
       const handler = layer?.route?.stack?.[0]?.handle;
 
@@ -98,16 +105,19 @@ describe("Database Backup Routes", () => {
     it("should return 500 on service error", async () => {
       mockService.listBackups.mockRejectedValue(new Error("Disk error"));
 
-      const { default: router } = await import("../../routes/databaseBackup.js");
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
 
       const mockReq = createMockRequest({
         user: { id: 1, username: "admin", role: "ADMIN" },
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       const layer = router.stack.find(
-        (l: any) => l.route?.path === "/database/backups" && l.route?.methods?.get
+        (l: any) =>
+          l.route?.path === "/database/backups" && l.route?.methods?.get
       );
       const handler = layer?.route?.stack?.[0]?.handle;
 
@@ -130,7 +140,8 @@ describe("Database Backup Routes", () => {
       };
       mockService.createBackup.mockResolvedValue(mockBackup);
 
-      const { default: router } = await import("../../routes/databaseBackup.js");
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
 
       const mockReq = createMockRequest({
         user: { id: 1, username: "admin", role: "ADMIN" },
@@ -139,7 +150,8 @@ describe("Database Backup Routes", () => {
       const mockRes = { json, status } as unknown as Response;
 
       const layer = router.stack.find(
-        (l: any) => l.route?.path === "/database/backup" && l.route?.methods?.post
+        (l: any) =>
+          l.route?.path === "/database/backup" && l.route?.methods?.post
       );
       const handler = layer?.route?.stack?.[0]?.handle;
 
@@ -154,7 +166,8 @@ describe("Database Backup Routes", () => {
     it("should delete a backup", async () => {
       mockService.deleteBackup.mockResolvedValue(undefined);
 
-      const { default: router } = await import("../../routes/databaseBackup.js");
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
 
       const mockReq = createMockRequest({
         params: { filename: "peek-stash-browser.db.backup-20260118-104532" },
@@ -183,13 +196,15 @@ describe("Database Backup Routes", () => {
         new Error("Invalid backup filename")
       );
 
-      const { default: router } = await import("../../routes/databaseBackup.js");
+      const { default: router } =
+        await import("../../routes/databaseBackup.js");
 
       const mockReq = createMockRequest({
         params: { filename: "../etc/passwd" },
         user: { id: 1, username: "admin", role: "ADMIN" },
       });
-      const { json, status, responseJson, responseStatus } = createMockResponse();
+      const { json, status, responseJson, responseStatus } =
+        createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
       const layer = router.stack.find(

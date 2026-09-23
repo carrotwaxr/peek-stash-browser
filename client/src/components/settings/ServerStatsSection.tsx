@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { Clock, Cpu, Database, Film, HardDrive, RefreshCw } from "lucide-react";
 import { apiGet, apiPost } from "../../api";
-import { Clock, Cpu, Database, HardDrive, RefreshCw, Film } from "lucide-react";
-import { Button, Paper } from "../ui/index";
 import { useAuth } from "../../hooks/useAuth";
+import { Button, Paper } from "../ui/index";
 
 interface CacheCounts {
   scenes: number;
@@ -52,7 +52,9 @@ const ServerStatsSection = () => {
   const [loading, setLoading] = useState(true);
   const [refreshingCache, setRefreshingCache] = useState(false);
   const [reprobingClips, setReprobingClips] = useState(false);
-  const [reprobeResult, setReprobeResult] = useState<ReprobeResult | null>(null);
+  const [reprobeResult, setReprobeResult] = useState<ReprobeResult | null>(
+    null
+  );
 
   const loadStats = async () => {
     try {
@@ -84,7 +86,10 @@ const ServerStatsSection = () => {
     try {
       setReprobingClips(true);
       setReprobeResult(null);
-      const data = await apiPost<{ checked: number; updated: number }>("/sync/reprobe-clips", {});
+      const data = await apiPost<{ checked: number; updated: number }>(
+        "/sync/reprobe-clips",
+        {}
+      );
       setReprobeResult({
         success: true,
         checked: data.checked,
@@ -271,7 +276,10 @@ const ServerStatsSection = () => {
         {/* Clips Maintenance Section - show if there are ungenerated clips */}
         {isAdmin && (stats.cache?.counts?.ungeneratedClips ?? 0) > 0 && (
           <>
-            <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
+            <hr
+              className="my-6"
+              style={{ borderColor: "var(--border-color)" }}
+            />
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -281,8 +289,13 @@ const ServerStatsSection = () => {
                   >
                     Clips Maintenance
                   </h3>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    {stats.cache!.counts.ungeneratedClips.toLocaleString()} clip{stats.cache!.counts.ungeneratedClips !== 1 ? "s" : ""} pending preview generation
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {stats.cache!.counts.ungeneratedClips.toLocaleString()} clip
+                    {stats.cache!.counts.ungeneratedClips !== 1 ? "s" : ""}{" "}
+                    pending preview generation
                   </p>
                 </div>
                 <Button
@@ -307,8 +320,9 @@ const ServerStatsSection = () => {
                 }}
               >
                 <p>
-                  Some clips were synced before their previews were generated in Stash.
-                  Click &quot;Re-probe Clips&quot; to check if previews are now available.
+                  Some clips were synced before their previews were generated in
+                  Stash. Click &quot;Re-probe Clips&quot; to check if previews
+                  are now available.
                 </p>
               </div>
               {reprobeResult && (

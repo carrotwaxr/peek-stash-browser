@@ -34,7 +34,8 @@ class MockIntersectionObserver {
   unobserve() {}
   disconnect() {}
 }
-globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+globalThis.IntersectionObserver =
+  MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver (used by some UI components)
 class MockResizeObserver {
@@ -46,7 +47,8 @@ class MockResizeObserver {
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+globalThis.ResizeObserver =
+  MockResizeObserver as unknown as typeof ResizeObserver;
 
 // Mock scrollIntoView (not implemented in happy-dom)
 Element.prototype.scrollIntoView = vi.fn();

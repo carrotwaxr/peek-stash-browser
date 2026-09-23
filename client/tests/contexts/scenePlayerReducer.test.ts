@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  scenePlayerReducer,
   initialState,
+  scenePlayerReducer,
 } from "@/contexts/scenePlayerReducer";
 import type { ScenePlayerReducerState } from "@/contexts/scenePlayerReducer";
 
@@ -124,7 +124,7 @@ describe("scenePlayerReducer", () => {
       const scene = { id: "1", isStreamable: true, files: [{ height: 1080 }] };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("direct");
@@ -138,7 +138,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("1080p");
@@ -152,7 +152,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("2160p");
@@ -166,7 +166,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("720p");
@@ -180,7 +180,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("360p");
@@ -194,7 +194,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("480p");
@@ -208,7 +208,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("360p");
@@ -218,7 +218,7 @@ describe("scenePlayerReducer", () => {
       const scene = { id: "1", isStreamable: false };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("1080p");
@@ -228,7 +228,7 @@ describe("scenePlayerReducer", () => {
       const scene = { id: "1", isStreamable: false, files: [] };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       expect(result.quality).toBe("1080p");
@@ -238,7 +238,7 @@ describe("scenePlayerReducer", () => {
       const scene = { id: "1", files: [{ height: 720 }] };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       // isStreamable is undefined so the condition `scene.isStreamable !== undefined`
@@ -254,7 +254,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "720p" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       // Quality is already "720p" (not "direct"), so no auto-selection
@@ -269,7 +269,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
 
       // 1440 is less than 2160 but >= 1080, so 1080p is the best <= sourceHeight
@@ -723,7 +723,11 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
         // shuffleHistory should end with the previous currentIndex (2)
-        expect((result.shuffleHistory as number[])[(result.shuffleHistory as number[]).length - 1]).toBe(2);
+        expect(
+          (result.shuffleHistory as number[])[
+            (result.shuffleHistory as number[]).length - 1
+          ]
+        ).toBe(2);
       });
 
       it("updates playlist.shuffleHistory as well", () => {
@@ -1210,7 +1214,9 @@ describe("scenePlayerReducer", () => {
     it("preserves other state fields not set by INITIALIZE", () => {
       const state = {
         ...initialState,
-        scene: { id: "existing" } as unknown as ScenePlayerReducerState["scene"],
+        scene: {
+          id: "existing",
+        } as unknown as ScenePlayerReducerState["scene"],
         video: { url: "existing" },
         sessionId: "existing-sess",
         oCounter: 5,
@@ -1473,7 +1479,7 @@ describe("scenePlayerReducer", () => {
       };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
       expect(result.quality).toBe("2160p");
     });
@@ -1482,7 +1488,7 @@ describe("scenePlayerReducer", () => {
       const scene = { id: "1", isStreamable: false, files: [{ height: 0 }] };
       const result = scenePlayerReducer(
         { ...initialState, quality: "direct" },
-        { type: "LOAD_SCENE_SUCCESS", payload: { scene } },
+        { type: "LOAD_SCENE_SUCCESS", payload: { scene } }
       );
       // height 0 is falsy, so `|| 1080` kicks in -> sourceHeight=1080 -> "1080p"
       expect(result.quality).toBe("1080p");

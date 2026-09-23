@@ -6,8 +6,8 @@
  */
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Merge two JSON arrays (for oHistory and playHistory).
@@ -27,10 +27,14 @@ function mergeJsonArrays(arr1: unknown, arr2: unknown): string {
   });
   // Sort by timestamp/startTime if present
   deduped.sort((a, b) => {
-    const aRec = typeof a === "string" ? null : (a as Record<string, string | undefined>);
-    const bRec = typeof b === "string" ? null : (b as Record<string, string | undefined>);
-    const aTime = typeof a === "string" ? a : (aRec?.startTime ?? aRec?.time ?? "");
-    const bTime = typeof b === "string" ? b : (bRec?.startTime ?? bRec?.time ?? "");
+    const aRec =
+      typeof a === "string" ? null : (a as Record<string, string | undefined>);
+    const bRec =
+      typeof b === "string" ? null : (b as Record<string, string | undefined>);
+    const aTime =
+      typeof a === "string" ? a : (aRec?.startTime ?? aRec?.time ?? "");
+    const bTime =
+      typeof b === "string" ? b : (bRec?.startTime ?? bRec?.time ?? "");
     return aTime.localeCompare(bTime);
   });
   return JSON.stringify(deduped);
@@ -139,7 +143,10 @@ class MergeReconciliationService {
   /**
    * Find potential phash matches for an orphaned scene.
    */
-  async findPhashMatches(sceneId: string, instanceId?: string): Promise<PhashMatch[]> {
+  async findPhashMatches(
+    sceneId: string,
+    instanceId?: string
+  ): Promise<PhashMatch[]> {
     // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
     const scene = await prisma.stashScene.findFirst({
       where: {
@@ -159,7 +166,9 @@ class MergeReconciliationService {
       try {
         const parsed: unknown = JSON.parse(scene.phashes);
         if (Array.isArray(parsed)) {
-          scenePhashes.push(...(parsed as string[]).filter((p: string) => p !== scene.phash));
+          scenePhashes.push(
+            ...(parsed as string[]).filter((p: string) => p !== scene.phash)
+          );
         }
       } catch {
         // Invalid JSON, ignore
@@ -208,16 +217,28 @@ class MergeReconciliationService {
   ): Promise<{ success: boolean; mergeRecordId?: string }> {
     // Get instanceIds for both scenes
     const [sourceInstanceId, targetInstanceId] = await Promise.all([
-      getEntityInstanceId('scene', sourceSceneId),
-      getEntityInstanceId('scene', targetSceneId),
+      getEntityInstanceId("scene", sourceSceneId),
+      getEntityInstanceId("scene", targetSceneId),
     ]);
 
     const sourceHistory = await prisma.watchHistory.findUnique({
-      where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
+      where: {
+        userId_instanceId_sceneId: {
+          userId,
+          instanceId: sourceInstanceId,
+          sceneId: sourceSceneId,
+        },
+      },
     });
 
     const sourceRating = await prisma.sceneRating.findUnique({
-      where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
+      where: {
+        userId_instanceId_sceneId: {
+          userId,
+          instanceId: sourceInstanceId,
+          sceneId: sourceSceneId,
+        },
+      },
     });
 
     if (!sourceHistory && !sourceRating) {
@@ -227,20 +248,42 @@ class MergeReconciliationService {
     // Transfer WatchHistory
     if (sourceHistory) {
       const targetHistory = await prisma.watchHistory.findUnique({
-        where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
+        where: {
+          userId_instanceId_sceneId: {
+            userId,
+            instanceId: targetInstanceId,
+            sceneId: targetSceneId,
+          },
+        },
       });
 
       if (targetHistory) {
         // Merge with existing
         await prisma.watchHistory.update({
-          where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
+          where: {
+            userId_instanceId_sceneId: {
+              userId,
+              instanceId: targetInstanceId,
+              sceneId: targetSceneId,
+            },
+          },
           data: {
             playCount: targetHistory.playCount + sourceHistory.playCount,
-            playDuration: targetHistory.playDuration + sourceHistory.playDuration,
+            playDuration:
+              targetHistory.playDuration + sourceHistory.playDuration,
             oCount: targetHistory.oCount + sourceHistory.oCount,
-            oHistory: mergeJsonArrays(targetHistory.oHistory, sourceHistory.oHistory),
-            playHistory: mergeJsonArrays(targetHistory.playHistory, sourceHistory.playHistory),
-            lastPlayedAt: laterDate(targetHistory.lastPlayedAt, sourceHistory.lastPlayedAt),
+            oHistory: mergeJsonArrays(
+              targetHistory.oHistory,
+              sourceHistory.oHistory
+            ),
+            playHistory: mergeJsonArrays(
+              targetHistory.playHistory,
+              sourceHistory.playHistory
+            ),
+            lastPlayedAt: laterDate(
+              targetHistory.lastPlayedAt,
+              sourceHistory.lastPlayedAt
+            ),
             // resumeTime: keep target's (survivor wins)
           },
         });
@@ -266,13 +309,25 @@ class MergeReconciliationService {
     // Transfer SceneRating
     if (sourceRating) {
       const targetRating = await prisma.sceneRating.findUnique({
-        where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
+        where: {
+          userId_instanceId_sceneId: {
+            userId,
+            instanceId: targetInstanceId,
+            sceneId: targetSceneId,
+          },
+        },
       });
 
       if (targetRating) {
         // Merge: survivor wins for rating, OR for favorite
         await prisma.sceneRating.update({
-          where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
+          where: {
+            userId_instanceId_sceneId: {
+              userId,
+              instanceId: targetInstanceId,
+              sceneId: targetSceneId,
+            },
+          },
           data: {
             rating: targetRating.rating ?? sourceRating.rating,
             favorite: targetRating.favorite || sourceRating.favorite,
@@ -299,7 +354,9 @@ class MergeReconciliationService {
     });
 
     // Filter to only this user's playlist items
-    const userPlaylistItems = playlistItems.filter((item) => item.playlist.userId === userId);
+    const userPlaylistItems = playlistItems.filter(
+      (item) => item.playlist.userId === userId
+    );
 
     for (const item of userPlaylistItems) {
       // Check if target scene already exists in this playlist
@@ -310,19 +367,25 @@ class MergeReconciliationService {
       if (existing) {
         // Delete orphaned item (target already present in playlist)
         await prisma.playlistItem.delete({ where: { id: item.id } });
-        logger.debug(`Deleted duplicate playlist item ${item.id} (target scene ${targetSceneId} already in playlist ${item.playlistId})`);
+        logger.debug(
+          `Deleted duplicate playlist item ${item.id} (target scene ${targetSceneId} already in playlist ${item.playlistId})`
+        );
       } else {
         // Update to point to target scene
         await prisma.playlistItem.update({
           where: { id: item.id },
           data: { sceneId: targetSceneId, instanceId: targetInstanceId },
         });
-        logger.debug(`Updated playlist item ${item.id} to point to target scene ${targetSceneId}`);
+        logger.debug(
+          `Updated playlist item ${item.id} to point to target scene ${targetSceneId}`
+        );
       }
     }
 
     if (userPlaylistItems.length > 0) {
-      logger.info(`Transferred ${userPlaylistItems.length} playlist items from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`);
+      logger.info(
+        `Transferred ${userPlaylistItems.length} playlist items from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`
+      );
     }
 
     // Create audit record
@@ -345,16 +408,30 @@ class MergeReconciliationService {
     // Delete source records after successful transfer
     if (sourceHistory) {
       await prisma.watchHistory.delete({
-        where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
+        where: {
+          userId_instanceId_sceneId: {
+            userId,
+            instanceId: sourceInstanceId,
+            sceneId: sourceSceneId,
+          },
+        },
       });
     }
     if (sourceRating) {
       await prisma.sceneRating.delete({
-        where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
+        where: {
+          userId_instanceId_sceneId: {
+            userId,
+            instanceId: sourceInstanceId,
+            sceneId: sourceSceneId,
+          },
+        },
       });
     }
 
-    logger.info(`Transferred user data from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`);
+    logger.info(
+      `Transferred user data from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`
+    );
 
     return { success: true, mergeRecordId: mergeRecord.id };
   }
@@ -380,10 +457,12 @@ class MergeReconciliationService {
     });
 
     // Combine and deduplicate user IDs
-    const userIds = [...new Set([
-      ...usersWithHistory.map((h) => h.userId),
-      ...usersWithRatings.map((r) => r.userId),
-    ])];
+    const userIds = [
+      ...new Set([
+        ...usersWithHistory.map((h) => h.userId),
+        ...usersWithRatings.map((r) => r.userId),
+      ]),
+    ];
 
     let mergeRecordsCreated = 0;
 
@@ -400,7 +479,9 @@ class MergeReconciliationService {
       }
     }
 
-    logger.info(`Reconciled ${mergeRecordsCreated} users from scene ${sourceSceneId} to ${targetSceneId}`);
+    logger.info(
+      `Reconciled ${mergeRecordsCreated} users from scene ${sourceSceneId} to ${targetSceneId}`
+    );
 
     return {
       sourceSceneId,
@@ -413,7 +494,9 @@ class MergeReconciliationService {
   /**
    * Discard orphaned user data for a scene (delete WatchHistory and SceneRating).
    */
-  async discardOrphanedData(sceneId: string): Promise<{ watchHistoryDeleted: number; ratingsDeleted: number }> {
+  async discardOrphanedData(
+    sceneId: string
+  ): Promise<{ watchHistoryDeleted: number; ratingsDeleted: number }> {
     const watchHistoryResult = await prisma.watchHistory.deleteMany({
       where: { sceneId },
     });
@@ -422,7 +505,9 @@ class MergeReconciliationService {
       where: { sceneId },
     });
 
-    logger.info(`Discarded orphaned data for scene ${sceneId}: ${watchHistoryResult.count} watch history, ${ratingsResult.count} ratings`);
+    logger.info(
+      `Discarded orphaned data for scene ${sceneId}: ${watchHistoryResult.count} watch history, ${ratingsResult.count} ratings`
+    );
 
     return {
       watchHistoryDeleted: watchHistoryResult.count,

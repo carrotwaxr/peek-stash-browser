@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient } from "../helpers/testClient.js";
 
 interface UserSettings {
   settings: {
@@ -30,7 +30,8 @@ describe("User Settings API - cardDisplaySettings", () => {
 
   describe("GET /api/user/settings", () => {
     it("should return cardDisplaySettings in response", async () => {
-      const response = await adminClient.get<UserSettings>("/api/user/settings");
+      const response =
+        await adminClient.get<UserSettings>("/api/user/settings");
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
@@ -129,7 +130,10 @@ describe("User Settings API - cardDisplaySettings", () => {
           },
         },
       };
-      await adminClient.put<UserSettings>("/api/user/settings", initialSettings);
+      await adminClient.put<UserSettings>(
+        "/api/user/settings",
+        initialSettings
+      );
 
       // Simulating client behavior: send complete merged settings
       // (as the client would after updating only performer)
@@ -198,7 +202,10 @@ describe("User Settings API - cardDisplaySettings", () => {
           },
         },
       };
-      await adminClient.put<UserSettings>("/api/user/settings", initialSettings);
+      await adminClient.put<UserSettings>(
+        "/api/user/settings",
+        initialSettings
+      );
 
       // Clear settings by setting to null
       const clearSettings = {
@@ -230,8 +237,9 @@ describe("User Settings API - cardDisplaySettings", () => {
       // Either is acceptable - defaults are applied client-side
       expect(
         response.data.settings.cardDisplaySettings === null ||
-        (typeof response.data.settings.cardDisplaySettings === "object" &&
-          Object.keys(response.data.settings.cardDisplaySettings).length === 0)
+          (typeof response.data.settings.cardDisplaySettings === "object" &&
+            Object.keys(response.data.settings.cardDisplaySettings).length ===
+              0)
       ).toBe(true);
     });
   });

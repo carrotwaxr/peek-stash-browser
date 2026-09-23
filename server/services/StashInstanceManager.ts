@@ -136,7 +136,9 @@ class StashInstanceManager {
   getForSync(instanceId: string): StashClient | null {
     const instance = this.instances.get(instanceId);
     if (!instance) {
-      logger.warn("Stash instance not found for sync, skipping", { instanceId });
+      logger.warn("Stash instance not found for sync, skipping", {
+        instanceId,
+      });
       return null;
     }
     return instance;

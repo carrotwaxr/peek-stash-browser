@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adminClient, guestClient, TestClient } from "../helpers/testClient.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
 
 /**
  * Integration tests for User Groups API
@@ -115,7 +115,9 @@ describe("User Groups API", () => {
       expect(response.ok).toBe(true);
       expect(response.status).toBe(201);
       expect(response.data.group.name).toBe(groupName);
-      expect(response.data.group.description).toBe("A group with all permissions enabled");
+      expect(response.data.group.description).toBe(
+        "A group with all permissions enabled"
+      );
       expect(response.data.group.canShare).toBe(true);
       expect(response.data.group.canDownloadFiles).toBe(true);
       expect(response.data.group.canDownloadPlaylists).toBe(true);
@@ -147,16 +149,22 @@ describe("User Groups API", () => {
       const groupName = `Duplicate Group ${Date.now()}`;
 
       // Create first group
-      const firstResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: groupName,
-      });
+      const firstResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+        }
+      );
       expect(firstResponse.ok).toBe(true);
       createdGroupIds.push(firstResponse.data.group.id);
 
       // Try to create a second group with the same name
-      const duplicateResponse = await adminClient.post<ErrorResponse>("/api/groups", {
-        name: groupName,
-      });
+      const duplicateResponse = await adminClient.post<ErrorResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+        }
+      );
 
       expect(duplicateResponse.ok).toBe(false);
       expect(duplicateResponse.status).toBe(409);
@@ -190,14 +198,18 @@ describe("User Groups API", () => {
       const groupName = `List Test Group ${Date.now()}`;
 
       // Create a group
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: groupName,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
       // List groups and find the created one
-      const listResponse = await adminClient.get<GroupsListResponse>("/api/groups");
+      const listResponse =
+        await adminClient.get<GroupsListResponse>("/api/groups");
       expect(listResponse.ok).toBe(true);
 
       const foundGroup = listResponse.data.groups.find(
@@ -212,10 +224,13 @@ describe("User Groups API", () => {
     it("returns a group by ID with member details", async () => {
       // First create a group
       const groupName = `Get By ID Group ${Date.now()}`;
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: groupName,
-        description: "Test group for get by ID",
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+          description: "Test group for get by ID",
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
@@ -228,7 +243,9 @@ describe("User Groups API", () => {
       expect(getResponse.status).toBe(200);
       expect(getResponse.data.group).toBeDefined();
       expect(getResponse.data.group.name).toBe(groupName);
-      expect(getResponse.data.group.description).toBe("Test group for get by ID");
+      expect(getResponse.data.group.description).toBe(
+        "Test group for get by ID"
+      );
       expect(getResponse.data.group.members).toBeDefined();
       expect(Array.isArray(getResponse.data.group.members)).toBe(true);
     });
@@ -236,9 +253,12 @@ describe("User Groups API", () => {
     it("returns members with nested user objects (regression: #438)", async () => {
       // Create a group and add the admin user as a member
       const groupName = `Member Shape Test ${Date.now()}`;
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: groupName,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const groupId = createResponse.data.group.id;
       createdGroupIds.push(groupId);
@@ -254,9 +274,12 @@ describe("User Groups API", () => {
       expect(adminUser).toBeDefined();
 
       // Add admin as a member
-      const addResponse = await adminClient.post(`/api/groups/${groupId}/members`, {
-        userId: adminUser!.id,
-      });
+      const addResponse = await adminClient.post(
+        `/api/groups/${groupId}/members`,
+        {
+          userId: adminUser!.id,
+        }
+      );
       expect(addResponse.ok).toBe(true);
 
       // Fetch the group and verify the member structure has nested user object
@@ -279,7 +302,8 @@ describe("User Groups API", () => {
     });
 
     it("returns 404 for non-existent group", async () => {
-      const response = await adminClient.get<ErrorResponse>("/api/groups/999999");
+      const response =
+        await adminClient.get<ErrorResponse>("/api/groups/999999");
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(404);
@@ -287,7 +311,9 @@ describe("User Groups API", () => {
     });
 
     it("returns 400 for invalid group ID", async () => {
-      const response = await adminClient.get<ErrorResponse>("/api/groups/invalid");
+      const response = await adminClient.get<ErrorResponse>(
+        "/api/groups/invalid"
+      );
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(400);
@@ -299,9 +325,12 @@ describe("User Groups API", () => {
     it("updates group name", async () => {
       // Create a group
       const originalName = `Update Name Group ${Date.now()}`;
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: originalName,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: originalName,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
@@ -319,10 +348,13 @@ describe("User Groups API", () => {
 
     it("updates group description", async () => {
       // Create a group
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Update Desc Group ${Date.now()}`,
-        description: "Original description",
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Update Desc Group ${Date.now()}`,
+          description: "Original description",
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
@@ -338,12 +370,15 @@ describe("User Groups API", () => {
 
     it("updates group permissions", async () => {
       // Create a group with no permissions
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Update Perms Group ${Date.now()}`,
-        canShare: false,
-        canDownloadFiles: false,
-        canDownloadPlaylists: false,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Update Perms Group ${Date.now()}`,
+          canShare: false,
+          canDownloadFiles: false,
+          canDownloadPlaylists: false,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
@@ -364,9 +399,12 @@ describe("User Groups API", () => {
     });
 
     it("returns 404 when updating non-existent group", async () => {
-      const response = await adminClient.put<ErrorResponse>("/api/groups/999999", {
-        name: "New Name",
-      });
+      const response = await adminClient.put<ErrorResponse>(
+        "/api/groups/999999",
+        {
+          name: "New Name",
+        }
+      );
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(404);
@@ -374,9 +412,12 @@ describe("User Groups API", () => {
 
     it("rejects empty name in update", async () => {
       // Create a group
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Empty Name Update Group ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Empty Name Update Group ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       createdGroupIds.push(createResponse.data.group.id);
 
@@ -394,9 +435,12 @@ describe("User Groups API", () => {
   describe("DELETE /api/groups/:id - Delete Group", () => {
     it("deletes a group", async () => {
       // Create a group to delete
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: `Delete Group ${Date.now()}`,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: `Delete Group ${Date.now()}`,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       const groupId = createResponse.data.group.id;
 
@@ -410,12 +454,15 @@ describe("User Groups API", () => {
       expect(deleteResponse.data.success).toBe(true);
 
       // Verify it's deleted
-      const getResponse = await adminClient.get<ErrorResponse>(`/api/groups/${groupId}`);
+      const getResponse = await adminClient.get<ErrorResponse>(
+        `/api/groups/${groupId}`
+      );
       expect(getResponse.status).toBe(404);
     });
 
     it("returns 404 when deleting non-existent group", async () => {
-      const response = await adminClient.delete<ErrorResponse>("/api/groups/999999");
+      const response =
+        await adminClient.delete<ErrorResponse>("/api/groups/999999");
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(404);
@@ -424,7 +471,9 @@ describe("User Groups API", () => {
 
   describe("GET /api/groups/user/mine - User's Own Groups", () => {
     it("returns groups for authenticated user", async () => {
-      const response = await adminClient.get<GroupsListResponse>("/api/groups/user/mine");
+      const response = await adminClient.get<GroupsListResponse>(
+        "/api/groups/user/mine"
+      );
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
@@ -433,7 +482,9 @@ describe("User Groups API", () => {
     });
 
     it("rejects unauthenticated requests", async () => {
-      const response = await guestClient.get<ErrorResponse>("/api/groups/user/mine");
+      const response = await guestClient.get<ErrorResponse>(
+        "/api/groups/user/mine"
+      );
       expect(response.status).toBe(401);
     });
   });
@@ -443,24 +494,32 @@ describe("User Groups API", () => {
       const groupName = `Lifecycle Group ${Date.now()}`;
 
       // CREATE
-      const createResponse = await adminClient.post<GroupResponse>("/api/groups", {
-        name: groupName,
-        description: "Initial description",
-        canShare: false,
-      });
+      const createResponse = await adminClient.post<GroupResponse>(
+        "/api/groups",
+        {
+          name: groupName,
+          description: "Initial description",
+          canShare: false,
+        }
+      );
       expect(createResponse.ok).toBe(true);
       expect(createResponse.status).toBe(201);
       const groupId = createResponse.data.group.id;
 
       // READ (verify in list)
-      const listResponse = await adminClient.get<GroupsListResponse>("/api/groups");
+      const listResponse =
+        await adminClient.get<GroupsListResponse>("/api/groups");
       expect(listResponse.ok).toBe(true);
-      const foundInList = listResponse.data.groups.find((g) => g.id === groupId);
+      const foundInList = listResponse.data.groups.find(
+        (g) => g.id === groupId
+      );
       expect(foundInList).toBeDefined();
       expect(foundInList?.name).toBe(groupName);
 
       // READ (single)
-      const getResponse = await adminClient.get<GroupResponse>(`/api/groups/${groupId}`);
+      const getResponse = await adminClient.get<GroupResponse>(
+        `/api/groups/${groupId}`
+      );
       expect(getResponse.ok).toBe(true);
       expect(getResponse.data.group.name).toBe(groupName);
       expect(getResponse.data.group.description).toBe("Initial description");

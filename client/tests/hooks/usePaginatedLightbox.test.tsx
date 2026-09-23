@@ -1,6 +1,6 @@
 // client/src/hooks/__tests__/usePaginatedLightbox.test.jsx
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { usePaginatedLightbox } from "../../src/hooks/usePaginatedLightbox";
 
 describe("usePaginatedLightbox", () => {

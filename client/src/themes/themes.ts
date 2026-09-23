@@ -11,7 +11,13 @@ import {
 export interface ThemeConfig {
   mode: string;
   fonts: { brand: string; heading: string; body: string; mono: string };
-  colors: { background: string; backgroundSecondary: string; backgroundCard: string; text: string; border: string };
+  colors: {
+    background: string;
+    backgroundSecondary: string;
+    backgroundCard: string;
+    text: string;
+    border: string;
+  };
   accents: { primary: string; secondary: string };
   status: { success: string; error: string; info: string; warning: string };
 }

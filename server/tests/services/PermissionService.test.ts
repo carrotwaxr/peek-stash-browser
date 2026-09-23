@@ -1,4 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import {
+  type UserPermissions,
+  resolveUserPermissions,
+} from "../../services/PermissionService.js";
 
 // Mock prisma before importing the service
 vi.mock("../../prisma/singleton.js", () => ({
@@ -14,9 +19,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
   },
 }));
-
-import { resolveUserPermissions, type UserPermissions } from "../../services/PermissionService.js";
-import prisma from "../../prisma/singleton.js";
 
 const mockPrisma = vi.mocked(prisma);
 

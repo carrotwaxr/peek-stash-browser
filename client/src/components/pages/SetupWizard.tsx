@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { setupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
+import type { ThemeDefinition } from "../../themes/ThemeContext";
 import { useTheme } from "../../themes/useTheme";
 import { Button } from "../ui/index";
-import type { ThemeDefinition } from "../../themes/ThemeContext";
 
 interface WelcomeStepProps {
   theme: ThemeDefinition | undefined;
@@ -349,9 +349,12 @@ const StashConfigStep = ({
         />
         <p
           className="text-xs mt-1"
-          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+          style={{
+            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+          }}
         >
-          The full URL to your Stash GraphQL endpoint (usually ends with /graphql)
+          The full URL to your Stash GraphQL endpoint (usually ends with
+          /graphql)
         </p>
       </div>
 
@@ -378,9 +381,12 @@ const StashConfigStep = ({
         />
         <p
           className="text-xs mt-1"
-          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+          style={{
+            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+          }}
         >
-          Optional. Used for "View in Stash" links. If blank, Peek uses the API URL.
+          Optional. Used for "View in Stash" links. If blank, Peek uses the API
+          URL.
         </p>
       </div>
 
@@ -407,7 +413,9 @@ const StashConfigStep = ({
         />
         <p
           className="text-xs mt-1"
-          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+          style={{
+            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+          }}
         >
           Found in Stash Settings → Security → API Key
         </p>
@@ -500,7 +508,12 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
   const [testing, setTesting] = useState(false);
   const [testSuccess, setTestSuccess] = useState(false);
 
-  const steps = ["Welcome", "Create Admin User", "Connect to Stash", "Complete"];
+  const steps = [
+    "Welcome",
+    "Create Admin User",
+    "Connect to Stash",
+    "Complete",
+  ];
 
   const createAdminUser = async () => {
     if (adminPassword !== confirmPassword) {
@@ -536,7 +549,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
             password: adminPassword,
           });
           if (!loginResult.success) {
-            console.warn("Auto-login failed, user will need to log in manually");
+            console.warn(
+              "Auto-login failed, user will need to log in manually"
+            );
           }
         } catch (loginErr) {
           console.warn("Auto-login failed:", loginErr);
@@ -555,7 +570,8 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
       }
     } catch (err: unknown) {
       setError(
-        "Failed to create admin user: " + ((err as Error).message || "Unknown error")
+        "Failed to create admin user: " +
+          ((err as Error).message || "Unknown error")
       );
     } finally {
       setLoading(false);
@@ -568,7 +584,10 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
     setTestSuccess(false);
 
     try {
-      const response = await setupApi.testStashConnection(stashUrl, stashApiKey);
+      const response = await setupApi.testStashConnection(
+        stashUrl,
+        stashApiKey
+      );
 
       if (response.success) {
         setTestSuccess(true);
@@ -577,7 +596,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
       }
     } catch (err: unknown) {
       const apiErr = err as { data?: { error?: string }; message?: string };
-      setError(apiErr.data?.error || apiErr.message || "Connection test failed");
+      setError(
+        apiErr.data?.error || apiErr.message || "Connection test failed"
+      );
     } finally {
       setTesting(false);
     }
@@ -624,8 +645,12 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
             loading={loading}
             adminPassword={adminPassword}
             confirmPassword={confirmPassword}
-            onAdminPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) => setAdminPassword(e.target.value)}
-            onConfirmPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
+            onAdminPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setAdminPassword(e.target.value)
+            }
+            onConfirmPasswordChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setConfirmPassword(e.target.value)
+            }
             onBack={() => setCurrentStep(0)}
             onSubmit={createAdminUser}
           />
@@ -678,11 +703,18 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
       <div className="max-w-2xl w-full">
         {/* Resume setup message */}
         {setupStatus?.hasUsers && currentStep === 2 && (
-          <div className="mb-4 p-4 rounded border-l-4" style={{
-            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-            borderColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-          }}>
-            <p style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}>
+          <div
+            className="mb-4 p-4 rounded border-l-4"
+            style={{
+              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+              borderColor: theme?.properties?.["--accent-color"] || "#3b82f6",
+            }}
+          >
+            <p
+              style={{
+                color: theme?.properties?.["--text-primary"] || "#ffffff",
+              }}
+            >
               Resuming setup - admin account already exists
             </p>
           </div>

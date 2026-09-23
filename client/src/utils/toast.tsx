@@ -11,7 +11,13 @@ import {
  * Uses react-hot-toast with custom components
  */
 
-type ToastPosition = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right";
+type ToastPosition =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 interface ToastOptions {
   duration?: number;
@@ -99,7 +105,11 @@ const showInfo = (message: string, options: ToastOptions = {}) => {
  * Promise-based toast for async operations
  * Example: showPromise(fetchData(), { loading: 'Saving...', success: 'Saved!', error: 'Failed' })
  */
-const showPromise = (promise: Promise<any>, messages: PromiseMessages, options: ToastOptions = {}) => {
+const showPromise = (
+  promise: Promise<any>,
+  messages: PromiseMessages,
+  options: ToastOptions = {}
+) => {
   return toast.promise(
     promise,
     {

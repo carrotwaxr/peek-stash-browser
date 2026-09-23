@@ -1,5 +1,5 @@
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useFullscreen } from "@/hooks/useFullscreen";
 
 describe("useFullscreen", () => {
@@ -172,9 +172,7 @@ describe("useFullscreen", () => {
   it("does not add orientation listener when enabled=false", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
 
-    renderHook(() =>
-      useFullscreen({ autoOnLandscape: true, enabled: false })
-    );
+    renderHook(() => useFullscreen({ autoOnLandscape: true, enabled: false }));
 
     const addedEvents = addSpy.mock.calls.map((call) => call[0]);
     expect(addedEvents).not.toContain("orientationchange");
@@ -185,9 +183,7 @@ describe("useFullscreen", () => {
   it("does not add orientation listener when autoOnLandscape=false", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
 
-    renderHook(() =>
-      useFullscreen({ autoOnLandscape: false, enabled: true })
-    );
+    renderHook(() => useFullscreen({ autoOnLandscape: false, enabled: true }));
 
     const addedEvents = addSpy.mock.calls.map((call) => call[0]);
     expect(addedEvents).not.toContain("orientationchange");

@@ -1,27 +1,27 @@
 import { WatchHistory } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import { userStatsService } from "../services/UserStatsService.js";
 import type {
-  TypedAuthRequest,
-  TypedResponse,
   ApiErrorResponse,
-  PingWatchHistoryRequest,
-  PingWatchHistoryResponse,
-  SaveActivityRequest,
-  SaveActivityResponse,
-  IncrementPlayCountRequest,
-  IncrementPlayCountResponse,
-  IncrementOCounterRequest,
-  IncrementOCounterResponse,
+  ClearAllWatchHistoryResponse,
   GetAllWatchHistoryQuery,
   GetAllWatchHistoryResponse,
   GetWatchHistoryParams,
   GetWatchHistoryResponse,
-  ClearAllWatchHistoryResponse,
+  IncrementOCounterRequest,
+  IncrementOCounterResponse,
+  IncrementPlayCountRequest,
+  IncrementPlayCountResponse,
+  PingWatchHistoryRequest,
+  PingWatchHistoryResponse,
+  SaveActivityRequest,
+  SaveActivityResponse,
+  TypedAuthRequest,
+  TypedResponse,
 } from "../types/api/index.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import { userStatsService } from "../services/UserStatsService.js";
-import { logger } from "../utils/logger.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Key format: "userId:sceneId"
@@ -82,7 +82,8 @@ export async function pingWatchHistory(
       });
       sceneDuration = scene?.duration || 0;
       // Get instanceId from scene, or fall back to looking it up
-      instanceId = scene?.stashInstanceId || await getEntityInstanceId('scene', sceneId);
+      instanceId =
+        scene?.stashInstanceId || (await getEntityInstanceId("scene", sceneId));
     } catch (error) {
       logger.error("Failed to fetch scene duration from cache", {
         sceneId,
@@ -90,7 +91,7 @@ export async function pingWatchHistory(
       });
       // Continue without duration - won't be able to calculate percentages
       // Still need to get instanceId for watch history
-      instanceId = await getEntityInstanceId('scene', sceneId);
+      instanceId = await getEntityInstanceId("scene", sceneId);
     }
 
     // Get or create watch history record
@@ -205,9 +206,11 @@ export async function pingWatchHistory(
     // Increment play count ONCE per session when threshold is met
     let newPlayCount = watchHistory.playCount;
     let playCountIncremented = false;
-    const playHistoryArray = (Array.isArray(watchHistory.playHistory)
-      ? watchHistory.playHistory
-      : JSON.parse((watchHistory.playHistory as string) || "[]")) as string[];
+    const playHistoryArray = (
+      Array.isArray(watchHistory.playHistory)
+        ? watchHistory.playHistory
+        : JSON.parse((watchHistory.playHistory as string) || "[]")
+    ) as string[];
 
     if (
       !hasIncrementedThisSession &&
@@ -343,7 +346,7 @@ export async function incrementOCounter(
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('scene', sceneId),
+      getEntityInstanceId("scene", sceneId),
     ]);
 
     if (!user) {
@@ -377,9 +380,11 @@ export async function incrementOCounter(
       });
     } else {
       // Parse existing O history
-      const oHistory = (Array.isArray(watchHistory.oHistory)
-        ? watchHistory.oHistory
-        : JSON.parse((watchHistory.oHistory as string) || "[]")) as string[];
+      const oHistory = (
+        Array.isArray(watchHistory.oHistory)
+          ? watchHistory.oHistory
+          : JSON.parse((watchHistory.oHistory as string) || "[]")
+      ) as string[];
 
       // Update with incremented O counter
       watchHistory = await prisma.watchHistory.update({
@@ -474,7 +479,7 @@ export async function getWatchHistory(
     }
 
     // Get scene instanceId
-    const instanceId = await getEntityInstanceId('scene', sceneId);
+    const instanceId = await getEntityInstanceId("scene", sceneId);
 
     const watchHistory = await prisma.watchHistory.findUnique({
       where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
@@ -490,13 +495,17 @@ export async function getWatchHistory(
     }
 
     // Parse JSON fields
-    const oHistory = (Array.isArray(watchHistory.oHistory)
-      ? watchHistory.oHistory
-      : JSON.parse((watchHistory.oHistory as string) || "[]")) as string[];
+    const oHistory = (
+      Array.isArray(watchHistory.oHistory)
+        ? watchHistory.oHistory
+        : JSON.parse((watchHistory.oHistory as string) || "[]")
+    ) as string[];
 
-    const playHistory = (Array.isArray(watchHistory.playHistory)
-      ? watchHistory.playHistory
-      : JSON.parse((watchHistory.playHistory as string) || "[]")) as string[];
+    const playHistory = (
+      Array.isArray(watchHistory.playHistory)
+        ? watchHistory.playHistory
+        : JSON.parse((watchHistory.playHistory as string) || "[]")
+    ) as string[];
 
     res.json({
       exists: true,
@@ -522,7 +531,11 @@ export async function getWatchHistory(
  * Get all watch history for current user (for Continue Watching carousel)
  */
 export async function getAllWatchHistory(
-  req: TypedAuthRequest<unknown, Record<string, string>, GetAllWatchHistoryQuery>,
+  req: TypedAuthRequest<
+    unknown,
+    Record<string, string>,
+    GetAllWatchHistoryQuery
+  >,
   res: TypedResponse<GetAllWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
@@ -657,7 +670,7 @@ export async function saveActivity(
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('scene', sceneId),
+      getEntityInstanceId("scene", sceneId),
     ]);
 
     if (!user) {
@@ -757,7 +770,7 @@ export async function incrementPlayCount(
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('scene', sceneId),
+      getEntityInstanceId("scene", sceneId),
     ]);
 
     if (!user) {
@@ -772,9 +785,9 @@ export async function incrementPlayCount(
     });
 
     const existingPlayHistory: string[] = existing
-      ? (Array.isArray(existing.playHistory)
-        ? existing.playHistory
-        : JSON.parse((existing.playHistory as string) || "[]")) as string[]
+      ? ((Array.isArray(existing.playHistory)
+          ? existing.playHistory
+          : JSON.parse((existing.playHistory as string) || "[]")) as string[])
       : [];
 
     const newPlayHistory = [...existingPlayHistory, now.toISOString()];

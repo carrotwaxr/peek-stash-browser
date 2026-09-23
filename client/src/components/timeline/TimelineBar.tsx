@@ -70,14 +70,18 @@ function TimelineBar({
           rounded-full transition-all duration-150 z-10
           ${isFocused ? "ring-2 ring-offset-1" : ""}
         `}
-        style={{
-          width: `${CIRCLE_SIZE}px`,
-          height: `${CIRCLE_SIZE}px`,
-          backgroundColor: isSelected ? "var(--status-success)" : "var(--bg-primary)",
-          border: `1.5px solid ${isSelected ? "var(--status-success)" : "var(--accent-primary)"}`,
-          "--tw-ring-color": "var(--accent-primary)",
-          "--tw-ring-offset-color": "var(--bg-primary)",
-        } as React.CSSProperties}
+        style={
+          {
+            width: `${CIRCLE_SIZE}px`,
+            height: `${CIRCLE_SIZE}px`,
+            backgroundColor: isSelected
+              ? "var(--status-success)"
+              : "var(--bg-primary)",
+            border: `1.5px solid ${isSelected ? "var(--status-success)" : "var(--accent-primary)"}`,
+            "--tw-ring-color": "var(--accent-primary)",
+            "--tw-ring-offset-color": "var(--bg-primary)",
+          } as React.CSSProperties
+        }
         data-testid="timeline-circle"
       />
 
@@ -88,7 +92,9 @@ function TimelineBar({
           width: `${BAR_WIDTH}px`,
           height: `${barHeight}px`,
           marginTop: `-1px`, // Overlap with circle slightly
-          backgroundColor: isSelected ? "var(--status-success)" : "var(--accent-primary)",
+          backgroundColor: isSelected
+            ? "var(--status-success)"
+            : "var(--accent-primary)",
         }}
         data-testid="timeline-bar"
       />

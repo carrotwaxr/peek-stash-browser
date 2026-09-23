@@ -284,8 +284,8 @@ export const usePlaylistMediaKeys = ({
       if (
         target &&
         (target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable)
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
       ) {
         return;
       }
@@ -310,7 +310,10 @@ export const usePlaylistMediaKeys = ({
  * @param {Object} playerRef - Ref to Video.js player
  * @param {number} percentage - Percentage (0-100)
  */
-function jumpToPercentage(playerRef: React.MutableRefObject<VideoPlayer | null>, percentage: number) {
+function jumpToPercentage(
+  playerRef: React.MutableRefObject<VideoPlayer | null>,
+  percentage: number
+) {
   const player = playerRef.current;
   if (player && player.duration()) {
     const targetTime = (player.duration() * percentage) / 100;

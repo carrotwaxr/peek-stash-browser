@@ -58,13 +58,43 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
   const navItems = getOrderedNavItems(navPreferences);
 
   // User menu sub-items (static definition)
-  const userMenuSubItems = useMemo(() => [
-    { name: "Watch History", path: "/watch-history", icon: "history", isSubItem: true },
-    { name: "My Stats", path: "/user-stats", icon: "bar-chart-3", isSubItem: true },
-    { name: "Downloads", path: "/downloads", icon: "download", isSubItem: true },
-    { name: "TV Mode", path: null, isToggle: true, icon: "tv", isSubItem: true },
-    { name: "Sign Out", path: null, isButton: true, icon: "logout", isSubItem: true },
-  ], []);
+  const userMenuSubItems = useMemo(
+    () => [
+      {
+        name: "Watch History",
+        path: "/watch-history",
+        icon: "history",
+        isSubItem: true,
+      },
+      {
+        name: "My Stats",
+        path: "/user-stats",
+        icon: "bar-chart-3",
+        isSubItem: true,
+      },
+      {
+        name: "Downloads",
+        path: "/downloads",
+        icon: "download",
+        isSubItem: true,
+      },
+      {
+        name: "TV Mode",
+        path: null,
+        isToggle: true,
+        icon: "tv",
+        isSubItem: true,
+      },
+      {
+        name: "Sign Out",
+        path: null,
+        isButton: true,
+        icon: "logout",
+        isSubItem: true,
+      },
+    ],
+    []
+  );
 
   // Build complete list of all navigable items (nav items + bottom items)
   // When user menu is expanded, include sub-items in the navigation list
@@ -151,7 +181,10 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
           e.preventDefault();
           let newIndex = focusedIndex + 1;
           // Skip over the current page
-          while (newIndex < allNavItems.length && allNavItems[newIndex]?.name === currentPage) {
+          while (
+            newIndex < allNavItems.length &&
+            allNavItems[newIndex]?.name === currentPage
+          ) {
             newIndex++;
           }
           if (newIndex < allNavItems.length) {
@@ -185,7 +218,17 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isTVMode, isMainNavActive, focusedIndex, allNavItems, navigate, currentPage, isUserMenuExpanded, toggleTVMode, logout]);
+  }, [
+    isTVMode,
+    isMainNavActive,
+    focusedIndex,
+    allNavItems,
+    navigate,
+    currentPage,
+    isUserMenuExpanded,
+    toggleTVMode,
+    logout,
+  ]);
 
   // Scroll focused item into view
   useEffect(() => {
@@ -218,44 +261,59 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
           {/* Navigation items */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="flex flex-col gap-1 px-2">
-              {navItems.filter((i): i is NonNullable<typeof i> => Boolean(i)).map((item, index) => {
-                const isActive = currentPage === item.name;
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === index;
+              {navItems
+                .filter((i): i is NonNullable<typeof i> => Boolean(i))
+                .map((item, index) => {
+                  const isActive = currentPage === item.name;
+                  const isFocused =
+                    isTVMode && isMainNavActive && focusedIndex === index;
 
-                return (
-                  <li key={item.name}>
-                    {/* Collapsed view (lg-xl): Icon only with tooltip */}
-                    <div className="xl:hidden">
-                      <Tooltip content={item.name} position="right">
-                        <Link
-                          ref={(el: HTMLElement | null) => { itemRefs.current[index] = el; }}
-                          to={item.path}
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
-                            isActive ? "nav-link-active" : isFocused ? "keyboard-focus" : "nav-link"
-                          }`}
-                          aria-label={item.name}
-                          tabIndex={isFocused ? 0 : -1}
-                        >
-                          <ThemedIcon name={item.icon} size={20} />
-                        </Link>
-                      </Tooltip>
-                    </div>
+                  return (
+                    <li key={item.name}>
+                      {/* Collapsed view (lg-xl): Icon only with tooltip */}
+                      <div className="xl:hidden">
+                        <Tooltip content={item.name} position="right">
+                          <Link
+                            ref={(el: HTMLElement | null) => {
+                              itemRefs.current[index] = el;
+                            }}
+                            to={item.path}
+                            className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${
+                              isActive
+                                ? "nav-link-active"
+                                : isFocused
+                                  ? "keyboard-focus"
+                                  : "nav-link"
+                            }`}
+                            aria-label={item.name}
+                            tabIndex={isFocused ? 0 : -1}
+                          >
+                            <ThemedIcon name={item.icon} size={20} />
+                          </Link>
+                        </Tooltip>
+                      </div>
 
-                    {/* Expanded view (xl+): Icon + text */}
-                    <Link
-                      ref={(el: HTMLElement | null) => { itemRefs.current[index] = el; }}
-                      to={item.path}
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                        isActive ? "nav-link-active" : isFocused ? "keyboard-focus" : "nav-link"
-                      }`}
-                      tabIndex={isFocused ? 0 : -1}
-                    >
-                      <ThemedIcon name={item.icon} size={20} />
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+                      {/* Expanded view (xl+): Icon + text */}
+                      <Link
+                        ref={(el: HTMLElement | null) => {
+                          itemRefs.current[index] = el;
+                        }}
+                        to={item.path}
+                        className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+                          isActive
+                            ? "nav-link-active"
+                            : isFocused
+                              ? "keyboard-focus"
+                              : "nav-link"
+                        }`}
+                        tabIndex={isFocused ? 0 : -1}
+                      >
+                        <ThemedIcon name={item.icon} size={20} />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
             </ul>
           </nav>
 
@@ -268,13 +326,16 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
               {/* Help button */}
               {(() => {
                 const itemIndex = navItems.length;
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
+                const isFocused =
+                  isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
                     <div className="xl:hidden">
                       <Tooltip content="Help" position="right">
                         <button
-                          ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
+                          ref={(el: HTMLElement | null) => {
+                            itemRefs.current[itemIndex] = el;
+                          }}
                           onClick={() => setIsHelpModalOpen(true)}
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="Help"
@@ -285,7 +346,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       </Tooltip>
                     </div>
                     <button
-                      ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
+                      ref={(el: HTMLElement | null) => {
+                        itemRefs.current[itemIndex] = el;
+                      }}
                       onClick={() => setIsHelpModalOpen(true)}
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isFocused ? 0 : -1}
@@ -300,13 +363,16 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
               {/* Settings (universal) */}
               {(() => {
                 const itemIndex = navItems.length + 1;
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
+                const isFocused =
+                  isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
                     <div className="xl:hidden">
                       <Tooltip content="Settings" position="right">
                         <Link
-                          ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
+                          ref={(el: HTMLElement | null) => {
+                            itemRefs.current[itemIndex] = el;
+                          }}
                           to="/settings"
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="Settings"
@@ -317,7 +383,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                       </Tooltip>
                     </div>
                     <Link
-                      ref={(el: HTMLElement | null) => { itemRefs.current[itemIndex] = el; }}
+                      ref={(el: HTMLElement | null) => {
+                        itemRefs.current[itemIndex] = el;
+                      }}
                       to="/settings"
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isFocused ? 0 : -1}
@@ -332,7 +400,10 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
               {/* User Menu */}
               {(() => {
                 const userMenuItemIndex = navItems.length + 2;
-                const isUserMenuFocused = isTVMode && isMainNavActive && focusedIndex === userMenuItemIndex;
+                const isUserMenuFocused =
+                  isTVMode &&
+                  isMainNavActive &&
+                  focusedIndex === userMenuItemIndex;
 
                 return (
                   <div>
@@ -343,7 +414,10 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                         clickable={true}
                         content={
                           <div className="flex flex-col gap-1 min-w-[160px]">
-                            <div className="px-2 py-1 text-xs font-medium opacity-60 border-b mb-1" style={{ borderColor: "var(--border-color)" }}>
+                            <div
+                              className="px-2 py-1 text-xs font-medium opacity-60 border-b mb-1"
+                              style={{ borderColor: "var(--border-color)" }}
+                            >
                               {user?.username || "User"}
                             </div>
                             <Link
@@ -374,14 +448,20 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                               onClick={logout}
                               className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 text-red-600 hover:bg-red-50"
                             >
-                              <ThemedIcon name="logout" size={16} color="currentColor" />
+                              <ThemedIcon
+                                name="logout"
+                                size={16}
+                                color="currentColor"
+                              />
                               <span>Sign Out</span>
                             </button>
                           </div>
                         }
                       >
                         <button
-                          ref={(el: HTMLElement | null) => { itemRefs.current[userMenuItemIndex] = el; }}
+                          ref={(el: HTMLElement | null) => {
+                            itemRefs.current[userMenuItemIndex] = el;
+                          }}
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="User menu"
                           tabIndex={isUserMenuFocused ? 0 : -1}
@@ -393,33 +473,47 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
                     {/* User menu toggle - expanded view */}
                     <button
-                      ref={(el: HTMLElement | null) => { itemRefs.current[userMenuItemIndex] = el; }}
+                      ref={(el: HTMLElement | null) => {
+                        itemRefs.current[userMenuItemIndex] = el;
+                      }}
                       onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
                       className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isUserMenuFocused ? 0 : -1}
                     >
                       <div className="flex items-center gap-3">
                         <ThemedIcon name="circle-user-round" size={20} />
-                        <span className="text-sm font-medium">{user?.username || "User"}</span>
+                        <span className="text-sm font-medium">
+                          {user?.username || "User"}
+                        </span>
                       </div>
                       <ThemedIcon
-                        name={isUserMenuExpanded ? "chevron-up" : "chevron-down"}
+                        name={
+                          isUserMenuExpanded ? "chevron-up" : "chevron-down"
+                        }
                         size={16}
                       />
                     </button>
 
                     {/* Nested user menu items - only in expanded view */}
                     {isUserMenuExpanded && (
-                      <div className="hidden xl:block mt-1 ml-4 pl-4 border-l" style={{ borderColor: "var(--border-color)" }}>
+                      <div
+                        className="hidden xl:block mt-1 ml-4 pl-4 border-l"
+                        style={{ borderColor: "var(--border-color)" }}
+                      >
                         {userMenuSubItems.map((subItem, subIndex) => {
                           const subItemIndex = userMenuItemIndex + 1 + subIndex;
-                          const isSubItemFocused = isTVMode && isMainNavActive && focusedIndex === subItemIndex;
+                          const isSubItemFocused =
+                            isTVMode &&
+                            isMainNavActive &&
+                            focusedIndex === subItemIndex;
 
                           if (subItem.name === "TV Mode") {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
+                                ref={(el: HTMLElement | null) => {
+                                  itemRefs.current[subItemIndex] = el;
+                                }}
                                 onClick={() => {
                                   toggleTVMode();
                                 }}
@@ -437,12 +531,18 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <button
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
+                                ref={(el: HTMLElement | null) => {
+                                  itemRefs.current[subItemIndex] = el;
+                                }}
                                 onClick={logout}
                                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}
                               >
-                                <ThemedIcon name="logout" size={16} color="currentColor" />
+                                <ThemedIcon
+                                  name="logout"
+                                  size={16}
+                                  color="currentColor"
+                                />
                                 <span>Sign Out</span>
                               </button>
                             );
@@ -450,7 +550,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                             return (
                               <Link
                                 key={subItem.name}
-                                ref={(el: HTMLElement | null) => { itemRefs.current[subItemIndex] = el; }}
+                                ref={(el: HTMLElement | null) => {
+                                  itemRefs.current[subItemIndex] = el;
+                                }}
                                 to={subItem.path!}
                                 className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}

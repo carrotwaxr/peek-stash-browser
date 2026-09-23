@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "../queryKeys";
 import { libraryApi } from "../library";
+import { queryKeys } from "../queryKeys";
 
 interface UpdateFavoriteParams {
   entityType: string;
@@ -13,7 +13,12 @@ export function useUpdateFavorite() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ entityType, entityId, favorite, instanceId = null }: UpdateFavoriteParams) =>
+    mutationFn: ({
+      entityType,
+      entityId,
+      favorite,
+      instanceId = null,
+    }: UpdateFavoriteParams) =>
       libraryApi.updateFavorite(entityType, entityId, favorite, instanceId),
     onSuccess: (_data, { entityType }) => {
       const keyMap: Record<string, () => readonly unknown[]> = {

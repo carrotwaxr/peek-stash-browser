@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { getColumnSortField } from "../../config/tableColumns";
 
 interface ColumnDef {

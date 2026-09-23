@@ -15,7 +15,11 @@ interface Props {
  * @param {string} [props.className] - Additional CSS classes
  * @param {string} [props.size] - Icon size (default: 20)
  */
-export default function ViewInStashButton({ stashUrl, className = "", size = 20 }: Props) {
+export default function ViewInStashButton({
+  stashUrl,
+  className = "",
+  size = 20,
+}: Props) {
   const { user } = useAuth();
 
   // Only show button to admin users

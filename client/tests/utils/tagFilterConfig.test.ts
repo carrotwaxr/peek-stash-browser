@@ -4,11 +4,13 @@
  * Tests that buildTagFilter correctly transforms UI filter values
  * into the GraphQL filter format expected by the backend
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildTagFilter as _buildTagFilter } from "../../src/utils/filterConfig";
 
 // Cast return type for test assertions — buildTagFilter returns a dynamically-built filter object
-const buildTagFilter = (filters: Record<string, unknown>): Record<string, any> => _buildTagFilter(filters);
+const buildTagFilter = (
+  filters: Record<string, unknown>
+): Record<string, any> => _buildTagFilter(filters);
 
 describe("buildTagFilter", () => {
   describe("Boolean Filters", () => {
@@ -332,7 +334,10 @@ describe("buildTagFilter", () => {
         value: 9,
       });
       expect(result.name).toEqual({ value: "Outdoor", modifier: "INCLUDES" });
-      expect(result.description).toEqual({ value: "beach", modifier: "INCLUDES" });
+      expect(result.description).toEqual({
+        value: "beach",
+        modifier: "INCLUDES",
+      });
       expect(result.created_at).toEqual({
         value: "2023-01-01",
         modifier: "BETWEEN",

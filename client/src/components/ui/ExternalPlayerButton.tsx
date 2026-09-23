@@ -1,7 +1,7 @@
-import { ExternalLink, ChevronDown, Copy } from "lucide-react";
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { showSuccess, showError } from "../../utils/toast";
+import { ChevronDown, Copy, ExternalLink } from "lucide-react";
+import { showError, showSuccess } from "../../utils/toast";
 
 interface Props {
   sceneId: string;
@@ -48,7 +48,7 @@ export default function ExternalPlayerButton({
   // Build the direct stream URL (original file, no transcoding)
   // This needs to be an absolute URL for external players
   const streamUrl = sceneId
-    ? `${window.location.origin}/api/scene/${sceneId}/proxy-stream/stream${instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : ''}`
+    ? `${window.location.origin}/api/scene/${sceneId}/proxy-stream/stream${instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : ""}`
     : null;
 
   /**
@@ -71,9 +71,7 @@ export default function ExternalPlayerButton({
       // Replace protocol with intent:
       // Note: Can't use url.protocol = "intent:" due to browser security restrictions
       // on changing from "special" protocols (http/https) to non-special ones
-      return url
-        .toString()
-        .replace(new RegExp(`^${url.protocol}`), "intent:");
+      return url.toString().replace(new RegExp(`^${url.protocol}`), "intent:");
     } else if (isAppleDevice) {
       // iOS: Use VLC's x-callback-url scheme
       // Format: vlc-x-callback://x-callback-url/stream?url=<encoded-url>

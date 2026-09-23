@@ -1,6 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultSettings } from "../../src/config/entityDisplayConfig";
+// Import after mock setup
+import {
+  CardDisplaySettingsProvider,
+  useCardDisplaySettings,
+} from "../../src/contexts/CardDisplaySettingsContext";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const { mockGet, mockPut } = vi.hoisted(() => {
@@ -16,9 +21,6 @@ vi.mock("../../src/api", () => ({
   apiPut: (...args: unknown[]) => mockPut(...args),
 }));
 
-// Import after mock setup
-import { CardDisplaySettingsProvider, useCardDisplaySettings } from "../../src/contexts/CardDisplaySettingsContext";
-
 describe("useCardDisplaySettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -30,11 +32,15 @@ describe("useCardDisplaySettings", () => {
   describe("without provider", () => {
     it("throws error when used outside provider", () => {
       // Suppress console.error for this test
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       expect(() => {
         renderHook(() => useCardDisplaySettings());
-      }).toThrow("useCardDisplaySettings must be used within CardDisplaySettingsProvider");
+      }).toThrow(
+        "useCardDisplaySettings must be used within CardDisplaySettingsProvider"
+      );
 
       consoleSpy.mockRestore();
     });
@@ -46,7 +52,9 @@ describe("useCardDisplaySettings", () => {
     );
 
     it("initially shows loading state then loads", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       // Initially loading
       expect(result.current.isLoading).toBe(true);
@@ -58,7 +66,9 @@ describe("useCardDisplaySettings", () => {
     });
 
     it("provides getSettings function", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -68,7 +78,9 @@ describe("useCardDisplaySettings", () => {
     });
 
     it("provides updateSettings function", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -84,7 +96,9 @@ describe("useCardDisplaySettings", () => {
     );
 
     it("returns default settings for scene entity type", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -97,7 +111,9 @@ describe("useCardDisplaySettings", () => {
     });
 
     it("returns default settings for performer entity type (no showCodeOnCard)", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -123,7 +139,9 @@ describe("useCardDisplaySettings", () => {
         },
       });
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -142,7 +160,9 @@ describe("useCardDisplaySettings", () => {
     });
 
     it("returns different defaults for different entity types", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -167,7 +187,9 @@ describe("useCardDisplaySettings", () => {
     );
 
     it("performs optimistic update", async () => {
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -194,7 +216,9 @@ describe("useCardDisplaySettings", () => {
         },
       });
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -215,9 +239,13 @@ describe("useCardDisplaySettings", () => {
 
     it("reverts on API error", async () => {
       mockPut.mockRejectedValueOnce(new Error("Network error"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -248,10 +276,14 @@ describe("useCardDisplaySettings", () => {
     );
 
     it("handles API load failure gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       mockGet.mockRejectedValueOnce(new Error("Network error"));
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -269,7 +301,9 @@ describe("useCardDisplaySettings", () => {
         settings: { cardDisplaySettings: null },
       });
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -285,7 +319,9 @@ describe("useCardDisplaySettings", () => {
         settings: {},
       });
 
-      const { result } = renderHook(() => useCardDisplaySettings(), { wrapper });
+      const { result } = renderHook(() => useCardDisplaySettings(), {
+        wrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);

@@ -236,7 +236,6 @@ section.video-container {
   font-size: 0.8em; /* Stash font size */
 }
 
-
 /* ============================================================================
    BIG PLAY BUTTON (Stash pattern - no background, no border, large icon)
    ============================================================================ */
@@ -465,19 +464,26 @@ section.video-container {
     visibility: visible;
   }
 
-  .video-js.vjs-touch-enabled.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-big-button-group {
+  .video-js.vjs-touch-enabled.vjs-has-started.vjs-user-inactive.vjs-playing
+    .vjs-big-button-group {
     opacity: 0;
     pointer-events: none;
-    transition: visibility 1s, opacity 1s;
+    transition:
+      visibility 1s,
+      opacity 1s;
     visibility: visible;
   }
 
-  .video-js.vjs-touch-enabled .vjs-big-play-pause-button .vjs-icon-placeholder::before {
+  .video-js.vjs-touch-enabled
+    .vjs-big-play-pause-button
+    .vjs-icon-placeholder::before {
     content: "\f101";
     font-family: VideoJS;
   }
 
-  .video-js.vjs-touch-enabled.vjs-playing .vjs-big-play-pause-button .vjs-icon-placeholder::before {
+  .video-js.vjs-touch-enabled.vjs-playing
+    .vjs-big-play-pause-button
+    .vjs-icon-placeholder::before {
     content: "\f103";
   }
 
@@ -552,7 +558,9 @@ section.video-container {
   font-size: 0.8em;
 }
 
-.video-js .vjs-source-selector .vjs-menu-item.vjs-source-menu-item-error:not(.vjs-selected) {
+.video-js
+  .vjs-source-selector
+  .vjs-menu-item.vjs-source-menu-item-error:not(.vjs-selected) {
   color: rgba(255, 255, 255, 0.5);
 }
 

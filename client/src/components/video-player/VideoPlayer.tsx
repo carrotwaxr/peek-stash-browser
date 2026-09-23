@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "video.js/dist/video-js.css";
+import { apiGet, getClipsForScene } from "../../api";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys";
 import { useWatchHistory } from "../../hooks/useWatchHistory";
-import { apiGet, getClipsForScene } from "../../api";
 import "./VideoPlayer.css";
 import { useOrientationFullscreen } from "./useOrientationFullscreen";
 import { useVideoPlayer } from "./useVideoPlayer";
@@ -99,7 +99,11 @@ const VideoPlayer = () => {
         return;
       }
       try {
-        const response: any = await getClipsForScene(scene.id as string, scene.instanceId as string, true);
+        const response: any = await getClipsForScene(
+          scene.id as string,
+          scene.instanceId as string,
+          true
+        );
         setClips(response.clips || []);
       } catch (err) {
         console.error("Failed to fetch clips for timeline", err);
@@ -250,7 +254,6 @@ const VideoPlayer = () => {
             </div>
           </div>
         )}
-
       </div>
     </section>
   );

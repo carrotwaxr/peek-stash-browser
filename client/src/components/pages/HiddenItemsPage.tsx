@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities";
 import { useNavigationState } from "../../hooks/useNavigationState";
@@ -10,8 +10,8 @@ import {
   LoadingSpinner,
   PageHeader,
   PageLayout,
-  TabNavigation,
   TAB_COUNT_LOADING,
+  TabNavigation,
 } from "../ui/index";
 
 /**
@@ -30,7 +30,11 @@ const HiddenItemsPage = () => {
   const tabs = [
     { id: "all", label: "All", count: TAB_COUNT_LOADING as number },
     { id: "scene", label: "Scenes", count: TAB_COUNT_LOADING as number },
-    { id: "performer", label: "Performers", count: TAB_COUNT_LOADING as number },
+    {
+      id: "performer",
+      label: "Performers",
+      count: TAB_COUNT_LOADING as number,
+    },
     { id: "studio", label: "Studios", count: TAB_COUNT_LOADING as number },
     { id: "tag", label: "Tags", count: TAB_COUNT_LOADING as number },
     { id: "group", label: "Collections", count: TAB_COUNT_LOADING as number },
@@ -80,14 +84,17 @@ const HiddenItemsPage = () => {
   // Group items by type for "All" tab
   const groupedItems: Record<string, Record<string, unknown>[]> =
     activeTab === "all"
-      ? hiddenItems.reduce((acc: Record<string, Record<string, unknown>[]>, item) => {
-          const type = item.entityType as string;
-          if (!acc[type]) {
-            acc[type] = [];
-          }
-          acc[type].push(item);
-          return acc;
-        }, {})
+      ? hiddenItems.reduce(
+          (acc: Record<string, Record<string, unknown>[]>, item) => {
+            const type = item.entityType as string;
+            if (!acc[type]) {
+              acc[type] = [];
+            }
+            acc[type].push(item);
+            return acc;
+          },
+          {}
+        )
       : { [activeTab]: hiddenItems };
 
   const formatDate = (dateString: string): string => {
@@ -143,7 +150,8 @@ const HiddenItemsPage = () => {
             loading={restoringAll}
             disabled={restoringAll}
           >
-            Restore All {activeTab !== "all" ? capitalizeType(activeTab) + "s" : ""}
+            Restore All{" "}
+            {activeTab !== "all" ? capitalizeType(activeTab) + "s" : ""}
           </Button>
         )}
       </div>
@@ -180,7 +188,9 @@ const HiddenItemsPage = () => {
                 <div className="space-y-2">
                   {items.map((item) => {
                     const entityName = getEntityName(item);
-                    const entity = item.entity as Record<string, unknown> | undefined;
+                    const entity = item.entity as
+                      | Record<string, unknown>
+                      | undefined;
                     const hasImage = entity?.image_path;
 
                     return (

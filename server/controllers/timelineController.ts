@@ -1,7 +1,12 @@
 // server/controllers/timelineController.ts
-import { timelineService, type Granularity, type TimelineEntityType, type TimelineFilters } from "../services/TimelineService.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import {
+  type Granularity,
+  type TimelineEntityType,
+  type TimelineFilters,
+  timelineService,
+} from "../services/TimelineService.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type {
   GetDateDistributionParams,
   GetDateDistributionQuery,
@@ -13,7 +18,11 @@ const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
 const VALID_GRANULARITIES: Granularity[] = ["years", "months", "weeks", "days"];
 
 export async function getDateDistribution(
-  req: TypedAuthRequest<never, GetDateDistributionParams, GetDateDistributionQuery>,
+  req: TypedAuthRequest<
+    never,
+    GetDateDistributionParams,
+    GetDateDistributionQuery
+  >,
   res: TypedResponse<GetDateDistributionResponse | ApiErrorResponse>
 ): Promise<void> {
   const { entityType } = req.params;

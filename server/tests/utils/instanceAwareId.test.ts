@@ -4,15 +4,15 @@
  * Tests the compile-time branded type system and runtime utilities for
  * composite entity keys ("entityId:instanceId" format).
  */
-import { describe, it, expect } from "vitest";
 import {
-  makeEntityRef,
-  parseEntityRef,
-  isEntityRef,
+  type InstanceAwareId,
   assertEntityRef,
   coerceEntityRefs,
-  type InstanceAwareId,
+  isEntityRef,
+  makeEntityRef,
+  parseEntityRef,
 } from "@peek/shared-types/instanceAwareId.js";
+import { describe, expect, it } from "vitest";
 
 describe("makeEntityRef", () => {
   it("creates a composite key from string id and instanceId", () => {

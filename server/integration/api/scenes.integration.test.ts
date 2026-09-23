@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient, selectTestInstanceOnly } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import {
+  adminClient,
+  guestClient,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 // Response type for /api/library/scenes
 interface FindScenesResponse {
@@ -32,12 +36,15 @@ describe("Scene API", () => {
     });
 
     it("returns scenes with pagination", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 1,
-          per_page: 10,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 1,
+            per_page: 10,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -48,9 +55,12 @@ describe("Scene API", () => {
     });
 
     it("returns scene by ID with relations", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        ids: [TEST_ENTITIES.sceneWithRelations],
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: [TEST_ENTITIES.sceneWithRelations],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
@@ -62,17 +72,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by performer", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.count).toBeGreaterThan(0);
@@ -81,17 +94,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by studio", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          studios: {
-            value: [TEST_ENTITIES.studioWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            studios: {
+              value: [TEST_ENTITIES.studioWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.count).toBeGreaterThan(0);
@@ -100,17 +116,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by tag", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.count).toBeGreaterThan(0);
@@ -119,17 +138,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by gallery with INCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          galleries: {
-            value: [TEST_ENTITIES.galleryWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            galleries: {
+              value: [TEST_ENTITIES.galleryWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -138,17 +160,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by gallery with EXCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          galleries: {
-            value: [TEST_ENTITIES.galleryWithScenes],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            galleries: {
+              value: [TEST_ENTITIES.galleryWithScenes],
+              modifier: "EXCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -156,17 +181,20 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by group/collection with INCLUDES", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          groups: {
-            value: [TEST_ENTITIES.groupWithScenes],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            groups: {
+              value: [TEST_ENTITIES.groupWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -176,23 +204,29 @@ describe("Scene API", () => {
 
     it("filters scenes by group/collection with EXCLUDES", async () => {
       // First get total count without filter
-      const totalResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 1 },
-      });
+      const totalResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+        }
+      );
       const totalCount = totalResponse.data.findScenes.count;
 
       // Now filter with EXCLUDES
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 50,
-        },
-        scene_filter: {
-          groups: {
-            value: [TEST_ENTITIES.groupWithScenes],
-            modifier: "EXCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 50,
           },
-        },
-      });
+          scene_filter: {
+            groups: {
+              value: [TEST_ENTITIES.groupWithScenes],
+              modifier: "EXCLUDES",
+            },
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -201,30 +235,39 @@ describe("Scene API", () => {
     });
 
     it("respects per_page limit", async () => {
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          per_page: 5,
-        },
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 5,
+          },
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes.length).toBeLessThanOrEqual(5);
     });
 
     it("paginates correctly", async () => {
-      const page1 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 1,
-          per_page: 5,
-        },
-      });
+      const page1 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 1,
+            per_page: 5,
+          },
+        }
+      );
 
-      const page2 = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: {
-          page: 2,
-          per_page: 5,
-        },
-      });
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            page: 2,
+            per_page: 5,
+          },
+        }
+      );
 
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
@@ -278,15 +321,20 @@ describe("Scene API", () => {
       let inheritedTagId = TEST_ENTITIES.inheritedTagFromPerformerOrStudio;
 
       if (!sceneId) {
-        console.log("Skipping scene tag inheritance test - sceneWithInheritedTags not configured");
+        console.log(
+          "Skipping scene tag inheritance test - sceneWithInheritedTags not configured"
+        );
         return;
       }
 
       // If inheritedTagId not provided, fetch the scene and get one from inheritedTagIds
       if (!inheritedTagId) {
-        const sceneResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          ids: [sceneId],
-        });
+        const sceneResponse = await adminClient.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            ids: [sceneId],
+          }
+        );
 
         expect(sceneResponse.ok).toBe(true);
         expect(sceneResponse.data.findScenes.scenes).toHaveLength(1);
@@ -294,7 +342,9 @@ describe("Scene API", () => {
         const scene = sceneResponse.data.findScenes.scenes[0];
 
         if (!scene.inheritedTagIds || scene.inheritedTagIds.length === 0) {
-          console.log("Skipping scene tag inheritance test - scene has no inherited tags");
+          console.log(
+            "Skipping scene tag inheritance test - scene has no inherited tags"
+          );
           return;
         }
 
@@ -307,19 +357,22 @@ describe("Scene API", () => {
       // This tests that the scene is correctly filterable by its inherited tag
       // We use scene_filter.ids instead of per_page pagination to avoid issues
       // where the test scene might not appear in the first N results
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 10 },
-        scene_filter: {
-          ids: {
-            value: [sceneId],
-            modifier: "INCLUDES",
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 10 },
+          scene_filter: {
+            ids: {
+              value: [sceneId],
+              modifier: "INCLUDES",
+            },
+            tags: {
+              value: [inheritedTagId],
+              modifier: "INCLUDES",
+            },
           },
-          tags: {
-            value: [inheritedTagId],
-            modifier: "INCLUDES",
-          },
-        },
-      });
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
@@ -336,13 +389,18 @@ describe("Scene API", () => {
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
 
       if (!sceneId) {
-        console.log("Skipping direct+inherited tags test - sceneWithInheritedTags not configured");
+        console.log(
+          "Skipping direct+inherited tags test - sceneWithInheritedTags not configured"
+        );
         return;
       }
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        ids: [sceneId],
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: [sceneId],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
@@ -362,25 +420,31 @@ describe("Scene API", () => {
       const inheritedTagId = scene.inheritedTagIds![0];
 
       // Filter by direct tag AND scene ID - should find the scene
-      const directResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 10 },
-        scene_filter: {
-          ids: { value: [sceneId], modifier: "INCLUDES" },
-          tags: { value: [directTagId], modifier: "INCLUDES" },
-        },
-      });
+      const directResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 10 },
+          scene_filter: {
+            ids: { value: [sceneId], modifier: "INCLUDES" },
+            tags: { value: [directTagId], modifier: "INCLUDES" },
+          },
+        }
+      );
       expect(directResponse.ok).toBe(true);
       expect(directResponse.data.findScenes.count).toBe(1);
       expect(directResponse.data.findScenes.scenes[0].id).toBe(sceneId);
 
       // Filter by inherited tag AND scene ID - should also find the scene
-      const inheritedResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 10 },
-        scene_filter: {
-          ids: { value: [sceneId], modifier: "INCLUDES" },
-          tags: { value: [inheritedTagId], modifier: "INCLUDES" },
-        },
-      });
+      const inheritedResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 10 },
+          scene_filter: {
+            ids: { value: [sceneId], modifier: "INCLUDES" },
+            tags: { value: [inheritedTagId], modifier: "INCLUDES" },
+          },
+        }
+      );
       expect(inheritedResponse.ok).toBe(true);
       expect(inheritedResponse.data.findScenes.count).toBe(1);
       expect(inheritedResponse.data.findScenes.scenes[0].id).toBe(sceneId);
@@ -391,19 +455,26 @@ describe("Scene API", () => {
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
 
       if (!sceneId) {
-        console.log("Skipping inherited-tags test - sceneWithInheritedTags not configured");
+        console.log(
+          "Skipping inherited-tags test - sceneWithInheritedTags not configured"
+        );
         return;
       }
 
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        ids: [sceneId],
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: [sceneId],
+        }
+      );
 
       expect(response.ok).toBe(true);
       const scene = response.data.findScenes.scenes[0];
 
       if (!scene.inheritedTagIds || scene.inheritedTagIds.length === 0) {
-        console.log("Skipping inherited-tags test - scene has no inherited tags");
+        console.log(
+          "Skipping inherited-tags test - scene has no inherited tags"
+        );
         return;
       }
 
@@ -412,17 +483,22 @@ describe("Scene API", () => {
       // Cross-instance inherited tags (data inconsistency) won't match, which is correct behavior
       let filterableTagCount = 0;
       for (const inheritedTagId of scene.inheritedTagIds) {
-        const filterResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          filter: { per_page: 10 },
-          scene_filter: {
-            ids: { value: [sceneId], modifier: "INCLUDES" },
-            tags: { value: [inheritedTagId], modifier: "INCLUDES" },
-          },
-        });
+        const filterResponse = await adminClient.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            filter: { per_page: 10 },
+            scene_filter: {
+              ids: { value: [sceneId], modifier: "INCLUDES" },
+              tags: { value: [inheritedTagId], modifier: "INCLUDES" },
+            },
+          }
+        );
 
         expect(filterResponse.ok).toBe(true);
-        if (filterResponse.data.findScenes.count === 1 &&
-            filterResponse.data.findScenes.scenes[0].id === sceneId) {
+        if (
+          filterResponse.data.findScenes.count === 1 &&
+          filterResponse.data.findScenes.scenes[0].id === sceneId
+        ) {
           filterableTagCount++;
         }
       }
@@ -433,9 +509,12 @@ describe("Scene API", () => {
 
     it("verifies scene retains its own direct tags", async () => {
       // Use sceneWithRelations which should have its own tags
-      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        ids: [TEST_ENTITIES.sceneWithRelations],
-      });
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          ids: [TEST_ENTITIES.sceneWithRelations],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
@@ -449,17 +528,22 @@ describe("Scene API", () => {
       if (scene.tags && scene.tags.length > 0) {
         const tagId = scene.tags[0].id;
 
-        const filterResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          filter: { per_page: 50 },
-          scene_filter: {
-            tags: { value: [tagId], modifier: "INCLUDES" },
-          },
-        });
+        const filterResponse = await adminClient.post<FindScenesResponse>(
+          "/api/library/scenes",
+          {
+            filter: { per_page: 50 },
+            scene_filter: {
+              tags: { value: [tagId], modifier: "INCLUDES" },
+            },
+          }
+        );
 
         expect(filterResponse.ok).toBe(true);
         expect(filterResponse.data.findScenes.count).toBeGreaterThan(0);
 
-        const foundSceneIds = filterResponse.data.findScenes.scenes.map((s) => s.id);
+        const foundSceneIds = filterResponse.data.findScenes.scenes.map(
+          (s) => s.id
+        );
         expect(foundSceneIds).toContain(TEST_ENTITIES.sceneWithRelations);
       }
     });

@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adminClient, guestClient, TestClient, selectTestInstanceOnly } from "../helpers/testClient.js";
-import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import {
+  TestClient,
+  adminClient,
+  guestClient,
+  selectTestInstanceOnly,
+} from "../helpers/testClient.js";
 
 // Response type for /api/library/tags
 interface FindTagsResponse {
@@ -8,9 +13,17 @@ interface FindTagsResponse {
     tags: Array<{
       id: string;
       name: string;
-      performers?: Array<{ id: string; name: string; image_path: string | null }>;
+      performers?: Array<{
+        id: string;
+        name: string;
+        image_path: string | null;
+      }>;
       studios?: Array<{ id: string; name: string; image_path: string | null }>;
-      groups?: Array<{ id: string; name: string; front_image_path: string | null }>;
+      groups?: Array<{
+        id: string;
+        name: string;
+        front_image_path: string | null;
+      }>;
       galleries?: Array<{ id: string; title: string; cover: string | null }>;
     }>;
     count: number;
@@ -31,10 +44,13 @@ describe("Tag API", () => {
     });
 
     it("returns tags with pagination", async () => {
-      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        page: 1,
-        per_page: 10,
-      });
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          page: 1,
+          per_page: 10,
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
@@ -44,53 +60,61 @@ describe("Tag API", () => {
     });
 
     it("returns tag by ID", async () => {
-      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        ids: [TEST_ENTITIES.tagWithEntities],
-      });
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          ids: [TEST_ENTITIES.tagWithEntities],
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags.tags).toHaveLength(1);
-      expect(response.data.findTags.tags[0].id).toBe(TEST_ENTITIES.tagWithEntities);
+      expect(response.data.findTags.tags[0].id).toBe(
+        TEST_ENTITIES.tagWithEntities
+      );
     });
 
     it("returns tag with tooltip entity data (performers, studios, groups, galleries)", async () => {
-      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        ids: [TEST_ENTITIES.tagWithEntities],
-      });
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          ids: [TEST_ENTITIES.tagWithEntities],
+        }
+      );
 
       expect(response.ok).toBe(true);
       const tag = response.data.findTags.tags[0];
 
       // Performers should exist with tooltip data
-      expect(tag).toHaveProperty('performers');
+      expect(tag).toHaveProperty("performers");
       if (tag.performers && tag.performers.length > 0) {
-        expect(tag.performers[0]).toHaveProperty('id');
-        expect(tag.performers[0]).toHaveProperty('name');
-        expect(tag.performers[0]).toHaveProperty('image_path');
+        expect(tag.performers[0]).toHaveProperty("id");
+        expect(tag.performers[0]).toHaveProperty("name");
+        expect(tag.performers[0]).toHaveProperty("image_path");
       }
 
       // Studios should exist with tooltip data
-      expect(tag).toHaveProperty('studios');
+      expect(tag).toHaveProperty("studios");
       if (tag.studios && tag.studios.length > 0) {
-        expect(tag.studios[0]).toHaveProperty('id');
-        expect(tag.studios[0]).toHaveProperty('name');
-        expect(tag.studios[0]).toHaveProperty('image_path');
+        expect(tag.studios[0]).toHaveProperty("id");
+        expect(tag.studios[0]).toHaveProperty("name");
+        expect(tag.studios[0]).toHaveProperty("image_path");
       }
 
       // Groups should exist with tooltip data
-      expect(tag).toHaveProperty('groups');
+      expect(tag).toHaveProperty("groups");
       if (tag.groups && tag.groups.length > 0) {
-        expect(tag.groups[0]).toHaveProperty('id');
-        expect(tag.groups[0]).toHaveProperty('name');
-        expect(tag.groups[0]).toHaveProperty('front_image_path');
+        expect(tag.groups[0]).toHaveProperty("id");
+        expect(tag.groups[0]).toHaveProperty("name");
+        expect(tag.groups[0]).toHaveProperty("front_image_path");
       }
 
       // Galleries should exist with tooltip data
-      expect(tag).toHaveProperty('galleries');
+      expect(tag).toHaveProperty("galleries");
       if (tag.galleries && tag.galleries.length > 0) {
-        expect(tag.galleries[0]).toHaveProperty('id');
-        expect(tag.galleries[0]).toHaveProperty('title');
-        expect(tag.galleries[0]).toHaveProperty('cover');
+        expect(tag.galleries[0]).toHaveProperty("id");
+        expect(tag.galleries[0]).toHaveProperty("title");
+        expect(tag.galleries[0]).toHaveProperty("cover");
       }
     });
   });
@@ -175,25 +199,31 @@ describe("Tag API", () => {
 
     it("non-admin user with no restrictions should see most tags (parent tags preserved for folder view)", async () => {
       // Get admin tag count
-      const adminResponse = await adminClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: -1,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const adminResponse = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: -1,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(adminResponse.ok).toBe(true);
       const adminTagCount = adminResponse.data.findTags.count;
 
       // Get non-admin tag count (same query as folder view uses)
-      const userResponse = await testUserClient.post<FindTagsResponse>("/api/library/tags", {
-        filter: {
-          per_page: -1,
-          sort: "name",
-          direction: "ASC",
-        },
-      });
+      const userResponse = await testUserClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: {
+            per_page: -1,
+            sort: "name",
+            direction: "ASC",
+          },
+        }
+      );
 
       expect(userResponse.ok).toBe(true);
       const userTagCount = userResponse.data.findTags.count;

@@ -9,9 +9,19 @@
  * - getAllWatchHistory (list retrieval)
  * - clearAllWatchHistory (bulk deletion)
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Import after mocks are set up
+import {
+  clearAllWatchHistory,
+  getAllWatchHistory,
+  getWatchHistory,
+  incrementOCounter,
+  incrementPlayCount,
+  saveActivity,
+} from "../../controllers/watchHistory.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
 
 // Mock Prisma - hoisted to top level
 vi.mock("../../prisma/singleton.js", () => ({
@@ -56,10 +66,14 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
         findScenes: { scenes: [{ files: [{ duration: 600 }] }] },
       }),
       sceneSaveActivity: vi.fn().mockResolvedValue({}),
-      sceneAddPlay: vi.fn().mockResolvedValue({ sceneAddPlay: { count: 1, history: [] } }),
+      sceneAddPlay: vi
+        .fn()
+        .mockResolvedValue({ sceneAddPlay: { count: 1, history: [] } }),
       sceneIncrementO: vi.fn().mockResolvedValue({ sceneIncrementO: 1 }),
     })),
-    getAllConfigs: vi.fn(() => [{ id: "test-instance", name: "Test", priority: 0 }]),
+    getAllConfigs: vi.fn(() => [
+      { id: "test-instance", name: "Test", priority: 0 },
+    ]),
   },
 }));
 
@@ -78,17 +92,6 @@ vi.mock("../../utils/logger.js", () => ({
     error: vi.fn(),
   },
 }));
-
-// Import after mocks are set up
-import {
-  saveActivity,
-  incrementPlayCount,
-  incrementOCounter,
-  getWatchHistory,
-  getAllWatchHistory,
-  clearAllWatchHistory,
-} from "../../controllers/watchHistory.js";
-import prisma from "../../prisma/singleton.js";
 
 // Get mocked functions
 const mockPrisma = vi.mocked(prisma);
@@ -126,7 +129,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
       expect(responseJson).toHaveBeenCalledWith({ error: "User not found" });
@@ -138,10 +144,15 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Missing required field: sceneId" });
+      expect(responseJson).toHaveBeenCalledWith({
+        error: "Missing required field: sceneId",
+      });
     });
 
     it("should create new watch history record if none exists (upsert)", async () => {
@@ -150,7 +161,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -164,11 +178,20 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId_instanceId_sceneId: { userId: 1, instanceId: "test-instance", sceneId: "123" } },
+          where: {
+            userId_instanceId_sceneId: {
+              userId: 1,
+              instanceId: "test-instance",
+              sceneId: "123",
+            },
+          },
           create: expect.objectContaining({
             userId: 1,
             instanceId: "test-instance",
@@ -200,7 +223,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -214,7 +240,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalled();
       expect(responseJson).toHaveBeenCalledWith(
@@ -230,7 +259,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -244,7 +276,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseJson).toHaveBeenCalledWith(
         expect.objectContaining({ success: true })
@@ -257,7 +292,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -271,7 +309,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -294,7 +335,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
     });
@@ -305,7 +349,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
     });
@@ -316,7 +363,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
@@ -331,7 +381,10 @@ describe("Watch History Controller", () => {
         playHistory: [new Date().toISOString()],
       } as never);
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -357,7 +410,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue({
         id: 1,
         userId: 1,
@@ -378,7 +434,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -396,7 +455,10 @@ describe("Watch History Controller", () => {
       };
 
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue({
         id: 1,
         playHistory: existingHistory,
@@ -412,7 +474,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -435,7 +500,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await incrementOCounter(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementOCounter(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
     });
@@ -446,7 +514,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      await incrementOCounter(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementOCounter(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
     });
@@ -457,7 +528,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
       mockPrisma.watchHistory.create.mockResolvedValue({
         id: 1,
@@ -465,7 +539,10 @@ describe("Watch History Controller", () => {
         oHistory: [new Date().toISOString()],
       } as never);
 
-      await incrementOCounter(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementOCounter(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -489,7 +566,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue({
         id: 1,
         oCount: 3,
@@ -501,7 +581,10 @@ describe("Watch History Controller", () => {
         oHistory: ["2024-01-01T00:00:00.000Z", new Date().toISOString()],
       } as never);
 
-      await incrementOCounter(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementOCounter(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -524,7 +607,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      await getWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(400);
     });
@@ -535,7 +621,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await getWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
     });
@@ -548,7 +637,10 @@ describe("Watch History Controller", () => {
 
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
 
-      await getWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseJson).toHaveBeenCalledWith({
         exists: false,
@@ -575,7 +667,10 @@ describe("Watch History Controller", () => {
         playHistory: ["2024-01-01T00:00:00.000Z"],
       } as never);
 
-      await getWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseJson).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -600,7 +695,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await getAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getAllWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
     });
@@ -630,7 +728,10 @@ describe("Watch History Controller", () => {
         },
       ] as never);
 
-      await getAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getAllWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -656,7 +757,10 @@ describe("Watch History Controller", () => {
 
       mockPrisma.watchHistory.findMany.mockResolvedValue([] as never);
 
-      await getAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await getAllWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -679,7 +783,10 @@ describe("Watch History Controller", () => {
         user: undefined,
       };
 
-      await clearAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await clearAllWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(responseStatus).toHaveBeenCalledWith(401);
     });
@@ -689,13 +796,26 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.watchHistory.deleteMany.mockResolvedValue({ count: 10 } as never);
-      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({ count: 5 } as never);
-      mockPrisma.userStudioStats.deleteMany.mockResolvedValue({ count: 3 } as never);
-      mockPrisma.userTagStats.deleteMany.mockResolvedValue({ count: 15 } as never);
-      mockPrisma.userEntityRanking.deleteMany.mockResolvedValue({ count: 20 } as never);
+      mockPrisma.watchHistory.deleteMany.mockResolvedValue({
+        count: 10,
+      } as never);
+      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({
+        count: 5,
+      } as never);
+      mockPrisma.userStudioStats.deleteMany.mockResolvedValue({
+        count: 3,
+      } as never);
+      mockPrisma.userTagStats.deleteMany.mockResolvedValue({
+        count: 15,
+      } as never);
+      mockPrisma.userEntityRanking.deleteMany.mockResolvedValue({
+        count: 20,
+      } as never);
 
-      await clearAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await clearAllWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       expect(mockPrisma.watchHistory.deleteMany).toHaveBeenCalledWith({
         where: { userId: 1 },
@@ -739,7 +859,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
         playCount: 0,
@@ -751,7 +874,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await saveActivity(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       // Verify upsert was called instead of findUnique + create/update
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalled();
@@ -766,7 +892,10 @@ describe("Watch History Controller", () => {
         user: { id: 1 },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 1, syncToStash: false } as never);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null); // For playHistory
       mockPrisma.watchHistory.upsert.mockResolvedValue({
         id: 1,
@@ -779,7 +908,10 @@ describe("Watch History Controller", () => {
         playHistory: [],
       } as never);
 
-      await incrementPlayCount(mockRequest as AuthenticatedRequest, mockResponse as Response);
+      await incrementPlayCount(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
 
       // Verify upsert was called
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalled();

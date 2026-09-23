@@ -1,7 +1,7 @@
 /**
  * Admin API — groups, permissions, recovery keys, password reset.
  */
-import { apiGet, apiPost, apiPut, apiDelete } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 // ── User Groups (admin management) ────────────────────────────────────
 
@@ -37,10 +37,14 @@ export const getMyPermissions = () =>
   apiGet<{ permissions: Record<string, unknown> }>("/user/permissions");
 
 export const getUserPermissions = (userId: number) =>
-  apiGet<{ permissions: Record<string, unknown> }>(`/user/${userId}/permissions`);
+  apiGet<{ permissions: Record<string, unknown> }>(
+    `/user/${userId}/permissions`
+  );
 
-export const updateUserPermissionOverrides = (userId: number, overrides: Record<string, unknown>) =>
-  apiPut(`/user/${userId}/permissions`, overrides);
+export const updateUserPermissionOverrides = (
+  userId: number,
+  overrides: Record<string, unknown>
+) => apiPut(`/user/${userId}/permissions`, overrides);
 
 // ── Recovery Key & Password Reset ─────────────────────────────────────
 
@@ -51,13 +55,25 @@ export const regenerateRecoveryKey = () =>
   apiPost<{ recoveryKey: string }>("/user/recovery-key/regenerate");
 
 export const forgotPasswordInit = (username: string) =>
-  apiPost<{ hasRecoveryKey: boolean }>("/auth/forgot-password/init", { username });
+  apiPost<{ hasRecoveryKey: boolean }>("/auth/forgot-password/init", {
+    username,
+  });
 
-export const forgotPasswordReset = (username: string, recoveryKey: string, newPassword: string) =>
-  apiPost<{ success: boolean }>("/auth/forgot-password/reset", { username, recoveryKey, newPassword });
+export const forgotPasswordReset = (
+  username: string,
+  recoveryKey: string,
+  newPassword: string
+) =>
+  apiPost<{ success: boolean }>("/auth/forgot-password/reset", {
+    username,
+    recoveryKey,
+    newPassword,
+  });
 
 export const adminResetPassword = (userId: number, newPassword: string) =>
-  apiPost<{ success: boolean }>(`/user/${userId}/reset-password`, { newPassword });
+  apiPost<{ success: boolean }>(`/user/${userId}/reset-password`, {
+    newPassword,
+  });
 
 export const adminRegenerateRecoveryKey = (userId: number) =>
   apiPost<{ recoveryKey: string }>(`/user/${userId}/regenerate-recovery-key`);

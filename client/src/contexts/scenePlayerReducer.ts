@@ -112,7 +112,10 @@ export const initialState: ScenePlayerReducerState = {
 // REDUCER
 // ============================================================================
 
-export function scenePlayerReducer(state: ScenePlayerReducerState, action: ScenePlayerAction) {
+export function scenePlayerReducer(
+  state: ScenePlayerReducerState,
+  action: ScenePlayerAction
+) {
   switch (action.type) {
     // Scene loading
     case "LOAD_SCENE_START":
@@ -123,7 +126,10 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
       };
 
     case "LOAD_SCENE_SUCCESS": {
-      const payload = action.payload as { scene: NormalizedScene; oCounter?: number };
+      const payload = action.payload as {
+        scene: NormalizedScene;
+        oCounter?: number;
+      };
       const scene = payload.scene;
 
       // Smart default quality selection based on codec detection (Phase 3)
@@ -168,7 +174,10 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
       };
 
     case "LOAD_VIDEO_SUCCESS": {
-      const payload = action.payload as { video: Record<string, unknown>; sessionId: string | null };
+      const payload = action.payload as {
+        video: Record<string, unknown>;
+        sessionId: string | null;
+      };
       return {
         ...state,
         video: payload.video,
@@ -229,10 +238,7 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
         const unplayedScenes = [];
 
         for (let i = 0; i < totalScenes; i++) {
-          if (
-            i !== state.currentIndex &&
-            !state.shuffleHistory.includes(i)
-          ) {
+          if (i !== state.currentIndex && !state.shuffleHistory.includes(i)) {
             unplayedScenes.push(i);
           }
         }
@@ -243,8 +249,9 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
             unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)];
         } else if (state.repeat === "all") {
           // All scenes played, reset shuffle history and start over
-          const candidates = Array.from({ length: totalScenes }, (_, i) =>
-            i
+          const candidates = Array.from(
+            { length: totalScenes },
+            (_, i) => i
           ).filter((i) => i !== state.currentIndex);
           nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
 
@@ -336,9 +343,12 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
         } else {
           // No history - pick a random scene (excluding current)
           if (state.repeat === "all" || totalScenes > 1) {
-            const candidates = Array.from({ length: totalScenes }, (_, i) => i)
-              .filter((i) => i !== state.currentIndex);
-            prevIndex = candidates[Math.floor(Math.random() * candidates.length)];
+            const candidates = Array.from(
+              { length: totalScenes },
+              (_, i) => i
+            ).filter((i) => i !== state.currentIndex);
+            prevIndex =
+              candidates[Math.floor(Math.random() * candidates.length)];
           }
           // else: only 1 scene in playlist, can't go anywhere
         }
@@ -371,9 +381,17 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
     }
 
     case "GOTO_SCENE_INDEX": {
-      const gotoPayload = action.payload as { index?: number; shouldAutoplay?: boolean } | number;
-      const index = typeof gotoPayload === 'object' && gotoPayload !== null ? (gotoPayload.index ?? 0) : (gotoPayload as number);
-      const shouldAutoplay = typeof gotoPayload === 'object' && gotoPayload !== null ? (gotoPayload.shouldAutoplay ?? false) : false;
+      const gotoPayload = action.payload as
+        | { index?: number; shouldAutoplay?: boolean }
+        | number;
+      const index =
+        typeof gotoPayload === "object" && gotoPayload !== null
+          ? (gotoPayload.index ?? 0)
+          : (gotoPayload as number);
+      const shouldAutoplay =
+        typeof gotoPayload === "object" && gotoPayload !== null
+          ? (gotoPayload.shouldAutoplay ?? false)
+          : false;
 
       if (
         !state.playlist ||
@@ -515,7 +533,8 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
 
       // Get shouldAutoplay from props (passed via location.state)
       // Preserve existing value if already set (for re-initialization)
-      const shouldAutoplay = initPayload.initialShouldAutoplay || state.shouldAutoplay || false;
+      const shouldAutoplay =
+        initPayload.initialShouldAutoplay || state.shouldAutoplay || false;
 
       return {
         ...state,
@@ -527,7 +546,8 @@ export function scenePlayerReducer(state: ScenePlayerReducerState, action: Scene
         autoplayNext: (playlist?.autoplayNext as boolean | undefined) ?? true,
         shuffle: (playlist?.shuffle as boolean | undefined) ?? false,
         repeat: (playlist?.repeat as string | undefined) ?? "none",
-        shuffleHistory: (playlist?.shuffleHistory as number[] | undefined) ?? [],
+        shuffleHistory:
+          (playlist?.shuffleHistory as number[] | undefined) ?? [],
         // Use the determined shouldAutoplay value
         shouldAutoplay: shouldAutoplay,
       };

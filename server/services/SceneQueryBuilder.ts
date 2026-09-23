@@ -4,29 +4,45 @@
  * Builds parameterized SQL queries for scene filtering, sorting, and pagination.
  * Eliminates the need to load all scenes into memory.
  */
-import type { PeekSceneFilter, NormalizedScene, PerformerRef, TagRef, StudioRef, GroupRef, GalleryRef } from "../types/index.js";
-import type { SceneQueryRow } from "../types/internal/queryRows.js";
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
-import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-import { parseJsonArray } from "../utils/sqlHelpers.js";
-import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter, buildJunctionFilter, buildDirectFilter, parseCompositeFilterValues } from "../utils/sqlFilterBuilders.js";
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import prisma from "../prisma/singleton.js";
+import type {
+  GalleryRef,
+  GroupRef,
+  NormalizedScene,
+  PeekSceneFilter,
+  PerformerRef,
+  StudioRef,
+  TagRef,
+} from "../types/index.js";
+import type { SceneQueryRow } from "../types/internal/queryRows.js";
+import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { logger } from "../utils/logger.js";
+import {
+  type FilterClause,
+  buildDateFilter,
+  buildDirectFilter,
+  buildFavoriteFilter,
+  buildJunctionFilter,
+  buildNumericFilter,
+  parseCompositeFilterValues,
+} from "../utils/sqlFilterBuilders.js";
+import { parseJsonArray } from "../utils/sqlHelpers.js";
+import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 
 // Query builder options
 export interface SceneQueryOptions {
   userId: number;
   filters?: PeekSceneFilter;
-  applyExclusions?: boolean;  // Default true - use pre-computed exclusions
-  allowedInstanceIds?: string[];  // Multi-instance filtering - array of instances the user can access
-  specificInstanceId?: string;  // Single instance filter for disambiguation on detail pages
+  applyExclusions?: boolean; // Default true - use pre-computed exclusions
+  allowedInstanceIds?: string[]; // Multi-instance filtering - array of instances the user can access
+  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
   perPage: number;
   randomSeed?: number;
-  searchQuery?: string;  // Text search query - searches title, details, path, performer names, studio name, tag names
+  searchQuery?: string; // Text search query - searches title, details, path, performer names, studio name, tag names
 }
 
 // Query result
@@ -39,7 +55,7 @@ export interface SceneQueryResult {
 export interface SceneByIdsOptions {
   userId: number;
   ids: string[];
-  allowedInstanceIds?: string[];  // Multi-instance filtering
+  allowedInstanceIds?: string[]; // Multi-instance filtering
 }
 
 /**
@@ -64,7 +80,10 @@ class SceneQueryBuilder {
   `.trim();
 
   // Base FROM clause with user data JOINs
-  private buildFromClause(userId: number, applyExclusions: boolean = true): { sql: string; params: number[] } {
+  private buildFromClause(
+    userId: number,
+    applyExclusions: boolean = true
+  ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashScene s
         LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?
@@ -103,7 +122,9 @@ class SceneQueryBuilder {
    * Build instance filter clause for multi-instance support
    * Filters scenes to only those from allowed Stash instances
    */
-  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+  private buildInstanceFilter(
+    allowedInstanceIds: string[] | undefined
+  ): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
       // No instance filter - return all scenes
       return { sql: "", params: [] };
@@ -120,7 +141,9 @@ class SceneQueryBuilder {
    * Build filter for a specific instance ID (for disambiguation on detail pages)
    * This is different from allowedInstanceIds - it filters to exactly one instance.
    */
-  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+  private buildSpecificInstanceFilter(
+    instanceId: string | undefined
+  ): FilterClause {
     if (!instanceId) {
       return { sql: "", params: [] };
     }
@@ -136,7 +159,10 @@ class SceneQueryBuilder {
    * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildPerformerFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -146,8 +172,14 @@ class SceneQueryBuilder {
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
-      ids, "ScenePerformer", "sceneId", "sceneInstanceId",
-      "performerId", "performerInstanceId", "s", modifier
+      ids,
+      "ScenePerformer",
+      "sceneId",
+      "sceneInstanceId",
+      "performerId",
+      "performerInstanceId",
+      "s",
+      modifier
     );
   }
 
@@ -156,7 +188,10 @@ class SceneQueryBuilder {
    * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildTagFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -166,8 +201,14 @@ class SceneQueryBuilder {
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
-      ids, "SceneTag", "sceneId", "sceneInstanceId",
-      "tagId", "tagInstanceId", "s", modifier
+      ids,
+      "SceneTag",
+      "sceneId",
+      "sceneInstanceId",
+      "tagId",
+      "tagInstanceId",
+      "s",
+      modifier
     );
   }
 
@@ -177,7 +218,10 @@ class SceneQueryBuilder {
    * Instance is implied by scene's stashInstanceId.
    */
   private buildStudioFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -194,7 +238,10 @@ class SceneQueryBuilder {
    * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildGroupFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -204,8 +251,14 @@ class SceneQueryBuilder {
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
-      ids, "SceneGroup", "sceneId", "sceneInstanceId",
-      "groupId", "groupInstanceId", "s", modifier
+      ids,
+      "SceneGroup",
+      "sceneId",
+      "sceneInstanceId",
+      "groupId",
+      "groupInstanceId",
+      "s",
+      modifier
     );
   }
 
@@ -214,7 +267,10 @@ class SceneQueryBuilder {
    * Handles composite "id:instanceId" values for multi-instance filtering
    */
   private buildGalleriesFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value || filter.value.length === 0) {
       return { sql: "", params: [] };
@@ -224,17 +280,26 @@ class SceneQueryBuilder {
     const modifier = filter.modifier || "INCLUDES";
 
     return buildJunctionFilter(
-      ids, "SceneGallery", "sceneId", "sceneInstanceId",
-      "galleryId", "galleryInstanceId", "s", modifier
+      ids,
+      "SceneGallery",
+      "sceneId",
+      "sceneInstanceId",
+      "galleryId",
+      "galleryInstanceId",
+      "s",
+      modifier
     );
   }
-
 
   /**
    * Build ID filter clause (for specific scene IDs)
    */
   private buildIdFilter(
-    filter: { value?: string[] | null; modifier?: string | null } | string[] | undefined | null
+    filter:
+      | { value?: string[] | null; modifier?: string | null }
+      | string[]
+      | undefined
+      | null
   ): FilterClause {
     // Handle both array and object formats
     const ids = Array.isArray(filter) ? filter : filter?.value;
@@ -242,7 +307,9 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    const modifier = Array.isArray(filter) ? "INCLUDES" : filter?.modifier || "INCLUDES";
+    const modifier = Array.isArray(filter)
+      ? "INCLUDES"
+      : filter?.modifier || "INCLUDES";
     const placeholders = ids.map(() => "?").join(", ");
 
     switch (modifier) {
@@ -259,7 +326,10 @@ class SceneQueryBuilder {
    * Build resolution filter clause
    */
   private buildResolutionFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -322,7 +392,10 @@ class SceneQueryBuilder {
    * Build title filter clause (text search)
    */
   private buildTitleFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -358,7 +431,10 @@ class SceneQueryBuilder {
    * Build details filter clause (text search)
    */
   private buildDetailsFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -368,7 +444,10 @@ class SceneQueryBuilder {
 
     switch (modifier) {
       case "INCLUDES":
-        return { sql: "LOWER(s.details) LIKE LOWER(?)", params: [`%${value}%`] };
+        return {
+          sql: "LOWER(s.details) LIKE LOWER(?)",
+          params: [`%${value}%`],
+        };
       case "EXCLUDES":
         return {
           sql: "(s.details IS NULL OR LOWER(s.details) NOT LIKE LOWER(?))",
@@ -384,7 +463,10 @@ class SceneQueryBuilder {
       case "IS_NULL":
         return { sql: "(s.details IS NULL OR s.details = '')", params: [] };
       case "NOT_NULL":
-        return { sql: "(s.details IS NOT NULL AND s.details != '')", params: [] };
+        return {
+          sql: "(s.details IS NOT NULL AND s.details != '')",
+          params: [],
+        };
       default:
         return { sql: "", params: [] };
     }
@@ -394,7 +476,9 @@ class SceneQueryBuilder {
    * Build text search filter clause (searches across title, details, path, performers, studio, tags)
    * Uses LIKE with wildcard for broad text matching
    */
-  private buildSearchQueryFilter(searchQuery: string | undefined): FilterClause {
+  private buildSearchQueryFilter(
+    searchQuery: string | undefined
+  ): FilterClause {
     if (!searchQuery || searchQuery.trim() === "") {
       return { sql: "", params: [] };
     }
@@ -429,7 +513,14 @@ class SceneQueryBuilder {
 
     return {
       sql,
-      params: [likeParam, likeParam, likeParam, likeParam, likeParam, likeParam],
+      params: [
+        likeParam,
+        likeParam,
+        likeParam,
+        likeParam,
+        likeParam,
+        likeParam,
+      ],
     };
   }
 
@@ -471,7 +562,10 @@ class SceneQueryBuilder {
    * Build video codec filter clause
    */
   private buildVideoCodecFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -516,7 +610,10 @@ class SceneQueryBuilder {
    * Build audio codec filter clause
    */
   private buildAudioCodecFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null
+    filter:
+      | { value?: string | null; modifier?: string | null }
+      | undefined
+      | null
   ): FilterClause {
     if (!filter || !filter.value) {
       return { sql: "", params: [] };
@@ -562,7 +659,11 @@ class SceneQueryBuilder {
    */
   private buildPerformerCountFilter(
     filter:
-      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
       | undefined
       | null
   ): FilterClause {
@@ -585,7 +686,10 @@ class SceneQueryBuilder {
         return { sql: `${subquery} < ?`, params: [value] };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `${subquery} BETWEEN ? AND ?`, params: [value, value2] };
+          return {
+            sql: `${subquery} BETWEEN ? AND ?`,
+            params: [value, value2],
+          };
         }
         return { sql: `${subquery} >= ?`, params: [value] };
       default:
@@ -598,7 +702,11 @@ class SceneQueryBuilder {
    */
   private buildTagCountFilter(
     filter:
-      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
       | undefined
       | null
   ): FilterClause {
@@ -607,7 +715,8 @@ class SceneQueryBuilder {
     }
 
     const { value, value2, modifier = "EQUALS" } = filter;
-    const subquery = "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
+    const subquery =
+      "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
 
     switch (modifier) {
       case "EQUALS":
@@ -620,7 +729,10 @@ class SceneQueryBuilder {
         return { sql: `${subquery} < ?`, params: [value] };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `${subquery} BETWEEN ? AND ?`, params: [value, value2] };
+          return {
+            sql: `${subquery} BETWEEN ? AND ?`,
+            params: [value, value2],
+          };
         }
         return { sql: `${subquery} >= ?`, params: [value] };
       default:
@@ -678,7 +790,11 @@ class SceneQueryBuilder {
    */
   private buildPerformerAgeFilter(
     filter:
-      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | {
+          value?: number | null;
+          value2?: number | null;
+          modifier?: string | null;
+        }
       | undefined
       | null
   ): FilterClause {
@@ -709,7 +825,10 @@ class SceneQueryBuilder {
         return { sql: `${ageSubquery} < ?`, params: [value] };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
-          return { sql: `${ageSubquery} BETWEEN ? AND ?`, params: [value, value2] };
+          return {
+            sql: `${ageSubquery} BETWEEN ? AND ?`,
+            params: [value, value2],
+          };
         }
         return { sql: `${ageSubquery} >= ?`, params: [value] };
       default:
@@ -722,7 +841,11 @@ class SceneQueryBuilder {
    */
   private async buildStudioFilterWithHierarchy(
     filter:
-      | { value?: string[] | null; modifier?: string | null; depth?: number | null }
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
       | undefined
       | null
   ): Promise<FilterClause> {
@@ -733,7 +856,7 @@ class SceneQueryBuilder {
     // Parse composite keys ("5:instance-1" -> "5") since UI sends composite format
     // but StashScene.studioId stores bare IDs
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -767,7 +890,11 @@ class SceneQueryBuilder {
    */
   private async buildTagFilterWithHierarchy(
     filter:
-      | { value?: string[] | null; modifier?: string | null; depth?: number | null }
+      | {
+          value?: string[] | null;
+          modifier?: string | null;
+          depth?: number | null;
+        }
       | undefined
       | null
   ): Promise<FilterClause> {
@@ -778,7 +905,7 @@ class SceneQueryBuilder {
     // Parse composite keys ("284:instance-1" -> "284") since UI sends composite format
     // but SceneTag.tagId and inheritedTagIds store bare IDs
     const { parsed } = parseCompositeFilterValues(filter.value);
-    let ids = parsed.map(p => p.id);
+    let ids = parsed.map((p) => p.id);
     const { modifier = "INCLUDES", depth } = filter;
 
     // Expand IDs if depth is specified and not 0
@@ -792,9 +919,12 @@ class SceneQueryBuilder {
     // inheritedTagIds is stored as JSON string like '["284","313"]'
     // IMPORTANT: Also verify the tag exists in the scene's instance to prevent cross-instance pollution
     // Different instances can have different tags with the same ID
-    const inheritedTagCheck = ids.map(() =>
-      `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL))`
-    ).join(" OR ");
+    const inheritedTagCheck = ids
+      .map(
+        () =>
+          `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL))`
+      )
+      .join(" OR ");
 
     switch (modifier) {
       case "INCLUDES":
@@ -807,11 +937,14 @@ class SceneQueryBuilder {
       case "INCLUDES_ALL": {
         // Match if ALL tags are present (in direct tags OR inherited tags)
         // For each tag, check if it's in SceneTag OR in inheritedTagIds (with instance validation)
-        const allTagChecks = ids.map(() =>
-          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL)))`
-        ).join(" AND ");
+        const allTagChecks = ids
+          .map(
+            () =>
+              `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL)))`
+          )
+          .join(" AND ");
         // Flatten params: for each id, we need it twice (once for SceneTag, once for json_each)
-        const allTagParams = ids.flatMap(id => [id, id]);
+        const allTagParams = ids.flatMap((id) => [id, id]);
         return {
           sql: `(${allTagChecks})`,
           params: allTagParams,
@@ -887,7 +1020,15 @@ class SceneQueryBuilder {
 
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters } = options;
+    const {
+      userId,
+      page,
+      perPage,
+      applyExclusions = true,
+      allowedInstanceIds,
+      specificInstanceId,
+      filters,
+    } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -903,7 +1044,8 @@ class SceneQueryBuilder {
 
     // Specific instance filter (for disambiguation on detail pages)
     if (specificInstanceId) {
-      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      const specificFilter =
+        this.buildSpecificInstanceFilter(specificInstanceId);
       if (specificFilter.sql) {
         whereClauses.push(specificFilter);
       }
@@ -919,7 +1061,10 @@ class SceneQueryBuilder {
 
     // Metadata filters
     if (filters?.duration) {
-      const durationFilter = buildNumericFilter(filters.duration, "COALESCE(s.duration, 0)");
+      const durationFilter = buildNumericFilter(
+        filters.duration,
+        "COALESCE(s.duration, 0)"
+      );
       if (durationFilter.sql) {
         whereClauses.push(durationFilter);
       }
@@ -950,7 +1095,9 @@ class SceneQueryBuilder {
 
     if (filters?.studios) {
       // Use hierarchy-aware filter that supports depth parameter
-      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios);
+      const studioFilter = await this.buildStudioFilterWithHierarchy(
+        filters.studios
+      );
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -977,21 +1124,30 @@ class SceneQueryBuilder {
     }
 
     if (filters?.rating100) {
-      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
+      const ratingFilter = buildNumericFilter(
+        filters.rating100,
+        "COALESCE(r.rating, 0)"
+      );
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
     }
 
     if (filters?.play_count) {
-      const playCountFilter = buildNumericFilter(filters.play_count, "COALESCE(w.playCount, 0)");
+      const playCountFilter = buildNumericFilter(
+        filters.play_count,
+        "COALESCE(w.playCount, 0)"
+      );
       if (playCountFilter.sql) {
         whereClauses.push(playCountFilter);
       }
     }
 
     if (filters?.o_counter) {
-      const oCounterFilter = buildNumericFilter(filters.o_counter, "COALESCE(w.oCount, 0)");
+      const oCounterFilter = buildNumericFilter(
+        filters.o_counter,
+        "COALESCE(w.oCount, 0)"
+      );
       if (oCounterFilter.sql) {
         whereClauses.push(oCounterFilter);
       }
@@ -1021,21 +1177,30 @@ class SceneQueryBuilder {
     }
 
     if (filters?.created_at) {
-      const createdFilter = buildDateFilter(filters.created_at, "s.stashCreatedAt");
+      const createdFilter = buildDateFilter(
+        filters.created_at,
+        "s.stashCreatedAt"
+      );
       if (createdFilter.sql) {
         whereClauses.push(createdFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedFilter = buildDateFilter(filters.updated_at, "s.stashUpdatedAt");
+      const updatedFilter = buildDateFilter(
+        filters.updated_at,
+        "s.stashUpdatedAt"
+      );
       if (updatedFilter.sql) {
         whereClauses.push(updatedFilter);
       }
     }
 
     if (filters?.last_played_at) {
-      const lastPlayedFilter = buildDateFilter(filters.last_played_at, "w.lastPlayedAt");
+      const lastPlayedFilter = buildDateFilter(
+        filters.last_played_at,
+        "w.lastPlayedAt"
+      );
       if (lastPlayedFilter.sql) {
         whereClauses.push(lastPlayedFilter);
       }
@@ -1043,14 +1208,20 @@ class SceneQueryBuilder {
 
     // Numeric filters
     if (filters?.bitrate) {
-      const bitrateFilter = buildNumericFilter(filters.bitrate, "COALESCE(s.fileBitRate, 0)");
+      const bitrateFilter = buildNumericFilter(
+        filters.bitrate,
+        "COALESCE(s.fileBitRate, 0)"
+      );
       if (bitrateFilter.sql) {
         whereClauses.push(bitrateFilter);
       }
     }
 
     if (filters?.framerate) {
-      const framerateFilter = buildNumericFilter(filters.framerate, "COALESCE(s.fileFrameRate, 0)");
+      const framerateFilter = buildNumericFilter(
+        filters.framerate,
+        "COALESCE(s.fileFrameRate, 0)"
+      );
       if (framerateFilter.sql) {
         whereClauses.push(framerateFilter);
       }
@@ -1068,7 +1239,9 @@ class SceneQueryBuilder {
 
     // Count filters
     if (filters?.performer_count) {
-      const performerCountFilter = this.buildPerformerCountFilter(filters.performer_count);
+      const performerCountFilter = this.buildPerformerCountFilter(
+        filters.performer_count
+      );
       if (performerCountFilter.sql) {
         whereClauses.push(performerCountFilter);
       }
@@ -1082,7 +1255,9 @@ class SceneQueryBuilder {
     }
 
     if (filters?.performer_age) {
-      const performerAgeFilter = this.buildPerformerAgeFilter(filters.performer_age);
+      const performerAgeFilter = this.buildPerformerAgeFilter(
+        filters.performer_age
+      );
       if (performerAgeFilter.sql) {
         whereClauses.push(performerAgeFilter);
       }
@@ -1090,7 +1265,9 @@ class SceneQueryBuilder {
 
     // Enum/select filters
     if (filters?.orientation) {
-      const orientationFilter = this.buildOrientationFilter(filters.orientation);
+      const orientationFilter = this.buildOrientationFilter(
+        filters.orientation
+      );
       if (orientationFilter.sql) {
         whereClauses.push(orientationFilter);
       }
@@ -1132,7 +1309,10 @@ class SceneQueryBuilder {
     }
 
     // Combine WHERE clauses
-    const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+    const whereSQL = whereClauses
+      .map((c) => c.sql)
+      .filter(Boolean)
+      .join(" AND ");
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
@@ -1288,18 +1468,24 @@ class SceneQueryBuilder {
       last_o_at: lastOAt,
 
       // File data - build from individual columns
-      files: row.filePath ? [{
-        path: row.filePath,
-        basename: row.filePath.split('/').pop()?.split('\\').pop() || row.filePath,
-        duration: row.duration,
-        bit_rate: row.fileBitRate,
-        frame_rate: row.fileFrameRate,
-        width: row.fileWidth,
-        height: row.fileHeight,
-        video_codec: row.fileVideoCodec,
-        audio_codec: row.fileAudioCodec,
-        size: row.fileSize ? Number(row.fileSize) : null,
-      }] : [],
+      files: row.filePath
+        ? [
+            {
+              path: row.filePath,
+              basename:
+                row.filePath.split("/").pop()?.split("\\").pop() ||
+                row.filePath,
+              duration: row.duration,
+              bit_rate: row.fileBitRate,
+              frame_rate: row.fileFrameRate,
+              width: row.fileWidth,
+              height: row.fileHeight,
+              video_codec: row.fileVideoCodec,
+              audio_codec: row.fileAudioCodec,
+              size: row.fileSize ? Number(row.fileSize) : null,
+            },
+          ]
+        : [],
 
       // Paths - transform to proxy URLs with instanceId for multi-instance routing
       paths: {
@@ -1308,7 +1494,10 @@ class SceneQueryBuilder {
         stream: this.transformUrl(row.pathStream, row.stashInstanceId),
         sprite: this.transformUrl(row.pathSprite, row.stashInstanceId),
         vtt: this.transformUrl(row.pathVtt, row.stashInstanceId),
-        chapters_vtt: this.transformUrl(row.pathChaptersVtt, row.stashInstanceId),
+        chapters_vtt: this.transformUrl(
+          row.pathChaptersVtt,
+          row.stashInstanceId
+        ),
         caption: this.transformUrl(row.pathCaption, row.stashInstanceId),
       },
 
@@ -1316,7 +1505,7 @@ class SceneQueryBuilder {
       sceneStreams: this.parseSceneStreams(row.streams),
 
       // Caption metadata for multi-language subtitle support
-      captions: row.captions ? JSON.parse(row.captions) as unknown[] : [],
+      captions: row.captions ? (JSON.parse(row.captions) as unknown[]) : [],
 
       // Relations - populated separately after query
       studio: null as StudioRef | null,
@@ -1347,66 +1536,99 @@ class SceneQueryBuilder {
     // All scenes should have valid instanceIds after migration
     const normalizeInstanceId = (id: string | null | undefined): string => {
       if (!id) {
-        throw new Error('Scene has null/undefined instanceId - this should not happen after migration');
+        throw new Error(
+          "Scene has null/undefined instanceId - this should not happen after migration"
+        );
       }
       return id;
     };
 
     const sceneIds = scenes.map((s) => s.id);
-    const sceneInstanceIds = [...new Set(scenes.map((s) => normalizeInstanceId(s.instanceId)))];
+    const sceneInstanceIds = [
+      ...new Set(scenes.map((s) => normalizeInstanceId(s.instanceId))),
+    ];
     // Collect unique (studioId, instanceId) pairs - each scene's studio comes from its own instance
-    const studioKeys = [...new Map(
-      scenes
-        .flatMap((s) => s.studioId ? [[`${s.studioId}:${normalizeInstanceId(s.instanceId)}`, { id: s.studioId, instanceId: normalizeInstanceId(s.instanceId) }] as const] : [])
-    ).values()];
+    const studioKeys = [
+      ...new Map(
+        scenes.flatMap((s) =>
+          s.studioId
+            ? [
+                [
+                  `${s.studioId}:${normalizeInstanceId(s.instanceId)}`,
+                  {
+                    id: s.studioId,
+                    instanceId: normalizeInstanceId(s.instanceId),
+                  },
+                ] as const,
+              ]
+            : []
+        )
+      ).values(),
+    ];
 
     // Batch load all relations in parallel
     // Filter by both sceneId AND sceneInstanceId for multi-instance correctness
-    const [
-      performerJunctions,
-      tagJunctions,
-      groupJunctions,
-      galleryJunctions,
-    ] = await Promise.all([
-      prisma.scenePerformer.findMany({
-        where: {
-          sceneId: { in: sceneIds },
-          sceneInstanceId: { in: sceneInstanceIds },
-        },
-      }),
-      prisma.sceneTag.findMany({
-        where: {
-          sceneId: { in: sceneIds },
-          sceneInstanceId: { in: sceneInstanceIds },
-        },
-      }),
-      prisma.sceneGroup.findMany({
-        where: {
-          sceneId: { in: sceneIds },
-          sceneInstanceId: { in: sceneInstanceIds },
-        },
-      }),
-      prisma.sceneGallery.findMany({
-        where: {
-          sceneId: { in: sceneIds },
-          sceneInstanceId: { in: sceneInstanceIds },
-        },
-      }),
-    ]);
+    const [performerJunctions, tagJunctions, groupJunctions, galleryJunctions] =
+      await Promise.all([
+        prisma.scenePerformer.findMany({
+          where: {
+            sceneId: { in: sceneIds },
+            sceneInstanceId: { in: sceneInstanceIds },
+          },
+        }),
+        prisma.sceneTag.findMany({
+          where: {
+            sceneId: { in: sceneIds },
+            sceneInstanceId: { in: sceneInstanceIds },
+          },
+        }),
+        prisma.sceneGroup.findMany({
+          where: {
+            sceneId: { in: sceneIds },
+            sceneInstanceId: { in: sceneInstanceIds },
+          },
+        }),
+        prisma.sceneGallery.findMany({
+          where: {
+            sceneId: { in: sceneIds },
+            sceneInstanceId: { in: sceneInstanceIds },
+          },
+        }),
+      ]);
 
     // Collect unique entity keys (id:instanceId) from junction tables
-    const performerKeys = [...new Map(
-      performerJunctions.map((j) => [`${j.performerId}:${j.performerInstanceId}`, { id: j.performerId, instanceId: j.performerInstanceId }])
-    ).values()];
-    const tagKeys = [...new Map(
-      tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
-    ).values()];
-    const groupKeys = [...new Map(
-      groupJunctions.map((j) => [`${j.groupId}:${j.groupInstanceId}`, { id: j.groupId, instanceId: j.groupInstanceId }])
-    ).values()];
-    const galleryKeys = [...new Map(
-      galleryJunctions.map((j) => [`${j.galleryId}:${j.galleryInstanceId}`, { id: j.galleryId, instanceId: j.galleryInstanceId }])
-    ).values()];
+    const performerKeys = [
+      ...new Map(
+        performerJunctions.map((j) => [
+          `${j.performerId}:${j.performerInstanceId}`,
+          { id: j.performerId, instanceId: j.performerInstanceId },
+        ])
+      ).values(),
+    ];
+    const tagKeys = [
+      ...new Map(
+        tagJunctions.map((j) => [
+          `${j.tagId}:${j.tagInstanceId}`,
+          { id: j.tagId, instanceId: j.tagInstanceId },
+        ])
+      ).values(),
+    ];
+    const groupKeys = [
+      ...new Map(
+        groupJunctions.map((j) => [
+          `${j.groupId}:${j.groupInstanceId}`,
+          { id: j.groupId, instanceId: j.groupInstanceId },
+        ])
+      ).values(),
+    ];
+    const galleryKeys = [
+      ...new Map(
+        galleryJunctions.map((j) => [
+          `${j.galleryId}:${j.galleryInstanceId}`,
+          { id: j.galleryId, instanceId: j.galleryInstanceId },
+        ])
+      ).values(),
+    ];
 
     // Collect inherited tag IDs (these may not be in tagJunctions since they come from performers/studios/groups)
     // For inherited tags, we use just ID since they're pre-computed and stored without instance info
@@ -1433,7 +1655,10 @@ class SceneQueryBuilder {
       id: tagId,
       stashInstanceId: { in: sceneInstanceIds },
     }));
-    const allTagOrConditions = [...tagOrConditions, ...inheritedTagOrConditions];
+    const allTagOrConditions = [
+      ...tagOrConditions,
+      ...inheritedTagOrConditions,
+    ];
     const groupOrConditions = groupKeys.map((k) => ({
       id: k.id,
       stashInstanceId: k.instanceId,
@@ -1531,7 +1756,10 @@ class SceneQueryBuilder {
       tagsByScene.set(sceneKey, list);
     }
 
-    const groupsByScene = new Map<string, (GroupRef & { scene_index: number | null })[]>();
+    const groupsByScene = new Map<
+      string,
+      (GroupRef & { scene_index: number | null })[]
+    >();
     for (const junction of groupJunctions) {
       const groupKey = `${junction.groupId}:${junction.groupInstanceId}`;
       const group = groupsByKey.get(groupKey);
@@ -1571,7 +1799,9 @@ class SceneQueryBuilder {
       // Inherited tags use scene's instanceId since they're from the same Stash instance
       if (scene.inheritedTagIds && scene.inheritedTagIds.length > 0) {
         scene.inheritedTags = scene.inheritedTagIds
-          .map((tagId) => tagsByKey.get(`${tagId}:${normalizedSceneInstanceId}`))
+          .map((tagId) =>
+            tagsByKey.get(`${tagId}:${normalizedSceneInstanceId}`)
+          )
           .filter((tag): tag is TagRef => tag !== undefined);
       }
     }
@@ -1579,7 +1809,16 @@ class SceneQueryBuilder {
 
   // Helper transforms for Stash entities - all image URLs need proxy treatment
   // Each entity includes its stashInstanceId for multi-instance routing
-  private transformStashPerformer(p: { id: string; stashInstanceId: string; name: string; disambiguation: string | null; gender: string | null; imagePath: string | null; favorite: boolean; rating100: number | null }): PerformerRef {
+  private transformStashPerformer(p: {
+    id: string;
+    stashInstanceId: string;
+    name: string;
+    disambiguation: string | null;
+    gender: string | null;
+    imagePath: string | null;
+    favorite: boolean;
+    rating100: number | null;
+  }): PerformerRef {
     return {
       id: p.id,
       instanceId: p.stashInstanceId,
@@ -1592,7 +1831,13 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashTag(t: { id: string; stashInstanceId: string; name: string; imagePath: string | null; favorite: boolean }): TagRef {
+  private transformStashTag(t: {
+    id: string;
+    stashInstanceId: string;
+    name: string;
+    imagePath: string | null;
+    favorite: boolean;
+  }): TagRef {
     return {
       id: t.id,
       instanceId: t.stashInstanceId,
@@ -1602,7 +1847,14 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashStudio(s: { id: string; stashInstanceId: string; name: string; imagePath: string | null; favorite: boolean; parentId: string | null }): StudioRef {
+  private transformStashStudio(s: {
+    id: string;
+    stashInstanceId: string;
+    name: string;
+    imagePath: string | null;
+    favorite: boolean;
+    parentId: string | null;
+  }): StudioRef {
     return {
       id: s.id,
       instanceId: s.stashInstanceId,
@@ -1613,7 +1865,13 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashGroup(g: { id: string; name: string; frontImagePath: string | null; backImagePath: string | null; stashInstanceId: string }): GroupRef {
+  private transformStashGroup(g: {
+    id: string;
+    name: string;
+    frontImagePath: string | null;
+    backImagePath: string | null;
+    stashInstanceId: string;
+  }): GroupRef {
     return {
       id: g.id,
       instanceId: g.stashInstanceId,
@@ -1623,8 +1881,15 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformStashGallery(g: { id: string; title: string | null; coverPath: string | null; stashInstanceId: string }): GalleryRef {
-    const coverUrl = g.coverPath ? this.transformUrl(g.coverPath, g.stashInstanceId) : null;
+  private transformStashGallery(g: {
+    id: string;
+    title: string | null;
+    coverPath: string | null;
+    stashInstanceId: string;
+  }): GalleryRef {
+    const coverUrl = g.coverPath
+      ? this.transformUrl(g.coverPath, g.stashInstanceId)
+      : null;
     return {
       id: g.id,
       instanceId: g.stashInstanceId,
@@ -1647,7 +1912,10 @@ class SceneQueryBuilder {
    * @param urlOrPath - The URL or path to transform
    * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
+  private transformUrl(
+    urlOrPath: string | null,
+    instanceId?: string | null
+  ): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is

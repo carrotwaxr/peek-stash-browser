@@ -33,19 +33,28 @@ export const useCardSelection = ({
     };
   }, []);
 
-  const isInteractiveElement = useCallback((target: HTMLElement, currentTarget: HTMLElement) => {
-    const closestButton = target.closest("button");
-    const isButton = closestButton && closestButton !== currentTarget;
-    const closestLink = target.closest("a");
-    // Only count as interactive if it's a NESTED link (different from currentTarget)
-    const isNestedLink = closestLink && closestLink !== currentTarget;
-    const isInput = target.closest("input");
-    return isButton || isNestedLink || isInput;
-  }, []);
+  const isInteractiveElement = useCallback(
+    (target: HTMLElement, currentTarget: HTMLElement) => {
+      const closestButton = target.closest("button");
+      const isButton = closestButton && closestButton !== currentTarget;
+      const closestLink = target.closest("a");
+      // Only count as interactive if it's a NESTED link (different from currentTarget)
+      const isNestedLink = closestLink && closestLink !== currentTarget;
+      const isInput = target.closest("input");
+      return isButton || isNestedLink || isInput;
+    },
+    []
+  );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) return;
+      if (
+        isInteractiveElement(
+          e.target as HTMLElement,
+          e.currentTarget as HTMLElement
+        )
+      )
+        return;
 
       longPressTimerRef.current = setTimeout(() => {
         setIsLongPressing(true);
@@ -64,7 +73,13 @@ export const useCardSelection = ({
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) return;
+      if (
+        isInteractiveElement(
+          e.target as HTMLElement,
+          e.currentTarget as HTMLElement
+        )
+      )
+        return;
 
       const touch = e.touches[0];
       startPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -123,13 +138,24 @@ export const useCardSelection = ({
 
       // If click originated from an interactive element (button, nested link, input),
       // prevent navigation - the interactive element handles its own action
-      if (isInteractiveElement(e.target as HTMLElement, e.currentTarget as HTMLElement)) {
+      if (
+        isInteractiveElement(
+          e.target as HTMLElement,
+          e.currentTarget as HTMLElement
+        )
+      ) {
         e.preventDefault();
         return;
       }
       // Otherwise, let the Link navigate normally
     },
-    [isLongPressing, selectionMode, entity, onToggleSelect, isInteractiveElement]
+    [
+      isLongPressing,
+      selectionMode,
+      entity,
+      onToggleSelect,
+      isInteractiveElement,
+    ]
   );
 
   return {

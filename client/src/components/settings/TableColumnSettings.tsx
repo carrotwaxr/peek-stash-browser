@@ -1,14 +1,14 @@
 import { useState } from "react";
 import {
-  LucideChevronUp,
   LucideChevronDown,
-  LucideChevronsUp,
+  LucideChevronUp,
   LucideChevronsDown,
+  LucideChevronsUp,
 } from "lucide-react";
 import {
   getColumnsForEntity,
-  getDefaultVisibleColumns,
   getDefaultColumnOrder,
+  getDefaultVisibleColumns,
 } from "../../config/tableColumns";
 import Button from "../ui/Button";
 
@@ -48,7 +48,9 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   };
 
   const handleToggleColumn = (columnId: string) => {
-    const column = allColumns.find((c: { id: string; mandatory?: boolean }) => c.id === columnId);
+    const column = allColumns.find(
+      (c: { id: string; mandatory?: boolean }) => c.id === columnId
+    );
     if (column?.mandatory) return;
 
     const newVisible = currentConfig.visible.includes(columnId)
@@ -65,7 +67,10 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
     setHasChanges(true);
   };
 
-  const handleMoveColumn = (columnId: string, direction: "top" | "up" | "down" | "bottom") => {
+  const handleMoveColumn = (
+    columnId: string,
+    direction: "top" | "up" | "down" | "bottom"
+  ) => {
     const currentIndex = currentConfig.order.indexOf(columnId);
     if (currentIndex === -1) return;
 
@@ -136,7 +141,10 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const missingColumns = typedAllColumns.filter(
     (col) => !currentConfig.order.includes(col.id)
   );
-  const allOrderedColumns: TableColumn[] = [...orderedColumns, ...missingColumns];
+  const allOrderedColumns: TableColumn[] = [
+    ...orderedColumns,
+    ...missingColumns,
+  ];
 
   return (
     <div>

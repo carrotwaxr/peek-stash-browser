@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import BulkActionBar from "../../../src/components/ui/BulkActionBar";
 
 const mockScenes = [
@@ -78,10 +78,7 @@ describe("BulkActionBar", () => {
   it("does not render actions when no scenes selected", () => {
     render(
       <MemoryRouter>
-        <BulkActionBar
-          {...defaultProps}
-          selectedScenes={[]}
-        />
+        <BulkActionBar {...defaultProps} selectedScenes={[]} />
       </MemoryRouter>
     );
 

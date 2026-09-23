@@ -4,7 +4,6 @@
  *
  * Types for the internal HTTP proxy that forwards requests to Stash instances.
  */
-
 import type { Response } from "express";
 
 /**

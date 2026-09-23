@@ -1,9 +1,10 @@
 /**
  * Unit Tests for DatabaseBackupService
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import fs from "fs/promises";
 import path from "path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
 
 // Mock fs/promises
 vi.mock("fs/promises");
@@ -14,8 +15,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     $executeRawUnsafe: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -49,9 +48,8 @@ describe("DatabaseBackupService", () => {
         "other-file.txt",
       ] as any);
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
       const backups = await databaseBackupService.listBackups();
 
       expect(backups).toEqual([]);
@@ -67,20 +65,29 @@ describe("DatabaseBackupService", () => {
       vi.mocked(fs.stat).mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
         if (filename === "peek-stash-browser.db.backup-20260118-104532") {
-          return { size: 246747136, mtime: new Date("2026-01-18T10:45:32.000Z") } as any;
+          return {
+            size: 246747136,
+            mtime: new Date("2026-01-18T10:45:32.000Z"),
+          } as any;
         }
-        return { size: 123456789, mtime: new Date("2026-01-17T09:30:45.000Z") } as any;
+        return {
+          size: 123456789,
+          mtime: new Date("2026-01-17T09:30:45.000Z"),
+        } as any;
       });
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
       const backups = await databaseBackupService.listBackups();
 
       expect(backups).toHaveLength(2);
-      expect(backups[0].filename).toBe("peek-stash-browser.db.backup-20260118-104532");
+      expect(backups[0].filename).toBe(
+        "peek-stash-browser.db.backup-20260118-104532"
+      );
       expect(backups[0].size).toBe(246747136);
-      expect(backups[1].filename).toBe("peek-stash-browser.db.backup-20260117-093045");
+      expect(backups[1].filename).toBe(
+        "peek-stash-browser.db.backup-20260117-093045"
+      );
     });
 
     it("should sort backups by date descending (newest first)", async () => {
@@ -92,14 +99,19 @@ describe("DatabaseBackupService", () => {
       vi.mocked(fs.stat).mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
         if (filename.includes("20260118")) {
-          return { size: 100, mtime: new Date("2026-01-18T10:45:32.000Z") } as any;
+          return {
+            size: 100,
+            mtime: new Date("2026-01-18T10:45:32.000Z"),
+          } as any;
         }
-        return { size: 100, mtime: new Date("2026-01-17T09:30:45.000Z") } as any;
+        return {
+          size: 100,
+          mtime: new Date("2026-01-17T09:30:45.000Z"),
+        } as any;
       });
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
       const backups = await databaseBackupService.listBackups();
 
       expect(backups[0].filename).toContain("20260118");
@@ -111,9 +123,8 @@ describe("DatabaseBackupService", () => {
       const readError = new Error("ENOENT: no such file or directory");
       vi.mocked(fs.readdir).mockRejectedValue(readError);
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       await expect(databaseBackupService.listBackups()).rejects.toThrow(
         "ENOENT: no such file or directory"
@@ -141,20 +152,29 @@ describe("DatabaseBackupService", () => {
           throw new Error("ENOENT: no such file or directory");
         }
         if (filename.includes("20260118")) {
-          return { size: 200, mtime: new Date("2026-01-18T10:45:32.000Z") } as any;
+          return {
+            size: 200,
+            mtime: new Date("2026-01-18T10:45:32.000Z"),
+          } as any;
         }
-        return { size: 100, mtime: new Date("2026-01-16T08:00:00.000Z") } as any;
+        return {
+          size: 100,
+          mtime: new Date("2026-01-16T08:00:00.000Z"),
+        } as any;
       });
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
       const backups = await databaseBackupService.listBackups();
 
       // Should return 2 backups, skipping the deleted one
       expect(backups).toHaveLength(2);
-      expect(backups[0].filename).toBe("peek-stash-browser.db.backup-20260118-104532");
-      expect(backups[1].filename).toBe("peek-stash-browser.db.backup-20260116-080000");
+      expect(backups[0].filename).toBe(
+        "peek-stash-browser.db.backup-20260118-104532"
+      );
+      expect(backups[1].filename).toBe(
+        "peek-stash-browser.db.backup-20260116-080000"
+      );
     });
   });
 
@@ -171,13 +191,14 @@ describe("DatabaseBackupService", () => {
         mtime: new Date("2026-01-18T10:45:32.000Z"),
       } as any);
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       const backup = await databaseBackupService.createBackup();
 
-      expect(backup.filename).toBe("peek-stash-browser.db.backup-20260118-104532");
+      expect(backup.filename).toBe(
+        "peek-stash-browser.db.backup-20260118-104532"
+      );
       expect(backup.size).toBe(246747136);
       expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining("VACUUM INTO")
@@ -191,9 +212,8 @@ describe("DatabaseBackupService", () => {
         new Error("Database locked")
       );
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       await expect(databaseBackupService.createBackup()).rejects.toThrow(
         "Database locked"
@@ -205,9 +225,8 @@ describe("DatabaseBackupService", () => {
     it("should delete a valid backup file", async () => {
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       await databaseBackupService.deleteBackup(
         "peek-stash-browser.db.backup-20260118-104532"
@@ -219,9 +238,8 @@ describe("DatabaseBackupService", () => {
     });
 
     it("should reject invalid filenames (path traversal prevention)", async () => {
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       await expect(
         databaseBackupService.deleteBackup("../../../etc/passwd")
@@ -243,9 +261,8 @@ describe("DatabaseBackupService", () => {
         Object.assign(new Error("ENOENT"), { code: "ENOENT" })
       );
 
-      const { databaseBackupService } = await import(
-        "../../services/DatabaseBackupService.js"
-      );
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
 
       await expect(
         databaseBackupService.deleteBackup(

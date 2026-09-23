@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "../queryKeys";
 import { apiPost } from "../client";
+import { queryKeys } from "../queryKeys";
 
 interface IncrementOCounterParams {
   sceneId?: string;
@@ -19,13 +19,19 @@ export function useIncrementOCounter() {
   return useMutation({
     mutationFn: ({ sceneId, imageId, instanceId }: IncrementOCounterParams) => {
       if (sceneId) {
-        return apiPost<IncrementOCounterResponse>("/watch-history/increment-o", { sceneId });
+        return apiPost<IncrementOCounterResponse>(
+          "/watch-history/increment-o",
+          { sceneId }
+        );
       }
       if (imageId) {
-        return apiPost<IncrementOCounterResponse>("/image-view-history/increment-o", {
-          imageId,
-          ...(instanceId && { instanceId }),
-        });
+        return apiPost<IncrementOCounterResponse>(
+          "/image-view-history/increment-o",
+          {
+            imageId,
+            ...(instanceId && { instanceId }),
+          }
+        );
       }
       return Promise.reject(new Error("Either sceneId or imageId is required"));
     },

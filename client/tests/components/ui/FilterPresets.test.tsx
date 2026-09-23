@@ -9,7 +9,7 @@
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import FilterPresets from "../../../src/components/ui/FilterPresets";
 
 // Mock the API module
@@ -40,8 +40,20 @@ describe("FilterPresets", () => {
   };
 
   const mockPresets = [
-    { id: "preset-1", name: "Favorites", filters: { favorite: true }, sort: "rating", direction: "DESC" },
-    { id: "preset-2", name: "Recent", filters: {}, sort: "created_at", direction: "DESC" },
+    {
+      id: "preset-1",
+      name: "Favorites",
+      filters: { favorite: true },
+      sort: "rating",
+      direction: "DESC",
+    },
+    {
+      id: "preset-2",
+      name: "Recent",
+      filters: {},
+      sort: "created_at",
+      direction: "DESC",
+    },
   ];
 
   beforeEach(() => {
@@ -229,7 +241,9 @@ describe("FilterPresets", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Save Filter Preset")).toBeInTheDocument();
-        expect(screen.getByPlaceholderText("Enter preset name...")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter preset name...")
+        ).toBeInTheDocument();
       });
     });
 
@@ -261,7 +275,10 @@ describe("FilterPresets", () => {
       });
 
       // Enter preset name
-      await user.type(screen.getByPlaceholderText("Enter preset name..."), "My Preset");
+      await user.type(
+        screen.getByPlaceholderText("Enter preset name..."),
+        "My Preset"
+      );
 
       // Save
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -285,7 +302,9 @@ describe("FilterPresets", () => {
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByText("Save Filter Preset")).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Save Filter Preset")
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -307,16 +326,22 @@ describe("FilterPresets", () => {
       });
 
       // Enter preset name
-      await user.type(screen.getByPlaceholderText("Enter preset name..."), "My Preset");
+      await user.type(
+        screen.getByPlaceholderText("Enter preset name..."),
+        "My Preset"
+      );
 
       // Save
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => {
         // Should not include studioId (permanent filter)
-        expect(mockApiPost).toHaveBeenCalledWith("/user/filter-presets", expect.objectContaining({
-          filters: { favorite: true }, // studioId stripped out
-        }));
+        expect(mockApiPost).toHaveBeenCalledWith(
+          "/user/filter-presets",
+          expect.objectContaining({
+            filters: { favorite: true }, // studioId stripped out
+          })
+        );
       });
     });
 
@@ -332,7 +357,10 @@ describe("FilterPresets", () => {
       });
 
       // Enter preset name
-      await user.type(screen.getByPlaceholderText("Enter preset name..."), "Default Preset");
+      await user.type(
+        screen.getByPlaceholderText("Enter preset name..."),
+        "Default Preset"
+      );
 
       // Check "Set as default"
       await user.click(screen.getByRole("checkbox"));
@@ -341,9 +369,12 @@ describe("FilterPresets", () => {
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => {
-        expect(mockApiPost).toHaveBeenCalledWith("/user/filter-presets", expect.objectContaining({
-          setAsDefault: true,
-        }));
+        expect(mockApiPost).toHaveBeenCalledWith(
+          "/user/filter-presets",
+          expect.objectContaining({
+            setAsDefault: true,
+          })
+        );
       });
     });
 
@@ -363,7 +394,9 @@ describe("FilterPresets", () => {
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByText("Save Filter Preset")).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Save Filter Preset")
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -391,7 +424,9 @@ describe("FilterPresets", () => {
       expect(window.confirm).toHaveBeenCalledWith('Delete preset "Favorites"?');
 
       await waitFor(() => {
-        expect(mockApiDelete).toHaveBeenCalledWith("/user/filter-presets/scene/preset-1");
+        expect(mockApiDelete).toHaveBeenCalledWith(
+          "/user/filter-presets/scene/preset-1"
+        );
       });
     });
 

@@ -1,8 +1,13 @@
 // client/tests/components/ui/CardComponents.density.test.jsx
-import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, it, expect, vi } from "vitest";
-import { CardContainer, CardTitle, CardIndicators, CardRatingRow } from "../../../src/components/ui/CardComponents";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import {
+  CardContainer,
+  CardIndicators,
+  CardRatingRow,
+  CardTitle,
+} from "../../../src/components/ui/CardComponents";
 
 // Mock hooks used by CardRatingRow
 vi.mock("../../../src/hooks/useHiddenEntities", () => ({

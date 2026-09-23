@@ -10,7 +10,10 @@
 // =============================================================================
 
 /** GET /api/clips */
-export interface GetClipsQuery extends Record<string, string | string[] | undefined> {
+export interface GetClipsQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   page?: string;
   perPage?: string;
   sortBy?: string;
@@ -54,7 +57,10 @@ export interface GetClipsForSceneParams extends Record<string, string> {
   id: string;
 }
 
-export interface GetClipsForSceneQuery extends Record<string, string | string[] | undefined> {
+export interface GetClipsForSceneQuery extends Record<
+  string,
+  string | string[] | undefined
+> {
   includeUngenerated?: string;
   instanceId?: string;
 }

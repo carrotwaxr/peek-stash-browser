@@ -1,5 +1,14 @@
 // server/tests/services/MultiInstanceIsolation.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import {
+  type EntityPreferences,
+  PERFORMER_FAVORITE_WEIGHT,
+  STUDIO_FAVORITE_WEIGHT,
+  scoreSceneByPreferences,
+} from "../../services/RecommendationScoringService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -48,16 +57,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     getInstance: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import {
-  scoreSceneByPreferences,
-  PERFORMER_FAVORITE_WEIGHT,
-  STUDIO_FAVORITE_WEIGHT,
-  type EntityPreferences,
-} from "../../services/RecommendationScoringService.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -129,7 +128,10 @@ describe("Multi-Instance Isolation", () => {
       mockPrisma.galleryPerformer.count.mockResolvedValue(0);
       mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
 
-      const performer = await stashEntityService.getPerformer("perf1", "inst-a");
+      const performer = await stashEntityService.getPerformer(
+        "perf1",
+        "inst-a"
+      );
 
       expect(performer).not.toBeNull();
       expect(performer!.name).toBe("Alice");
@@ -190,7 +192,10 @@ describe("Multi-Instance Isolation", () => {
       mockPrisma.galleryPerformer.count.mockResolvedValue(0);
       mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
 
-      const performer = await stashEntityService.getPerformer("perf1", "inst-b");
+      const performer = await stashEntityService.getPerformer(
+        "perf1",
+        "inst-b"
+      );
 
       expect(performer).not.toBeNull();
       // instanceId is required — query must always include stashInstanceId filter
@@ -315,7 +320,12 @@ describe("Multi-Instance Isolation", () => {
         // scene3 from inst-b should NOT appear because the query filters by performerInstanceId
       ]);
 
-      await exclusionComputationService.addHiddenEntity(1, "performer", "perf1", INST_A);
+      await exclusionComputationService.addHiddenEntity(
+        1,
+        "performer",
+        "perf1",
+        INST_A
+      );
 
       // Verify the query included instance filtering
       expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledWith({
@@ -370,7 +380,11 @@ describe("Multi-Instance Isolation", () => {
         { sceneId: "scene3", sceneInstanceId: INST_B, performerId: "perf1" },
       ]);
 
-      await exclusionComputationService.addHiddenEntity(1, "performer", "perf1");
+      await exclusionComputationService.addHiddenEntity(
+        1,
+        "performer",
+        "perf1"
+      );
 
       // Without instanceId, query should not include instance filter
       expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledWith({
@@ -405,11 +419,20 @@ describe("Multi-Instance Isolation", () => {
         { id: "scene1", stashInstanceId: INST_A, studioId: "studio1" },
       ]);
 
-      await exclusionComputationService.addHiddenEntity(1, "studio", "studio1", INST_A);
+      await exclusionComputationService.addHiddenEntity(
+        1,
+        "studio",
+        "studio1",
+        INST_A
+      );
 
       // Verify the query included instance + deletedAt filtering
       expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
-        where: { studioId: "studio1", stashInstanceId: INST_A, deletedAt: null },
+        where: {
+          studioId: "studio1",
+          stashInstanceId: INST_A,
+          deletedAt: null,
+        },
         select: { id: true, stashInstanceId: true },
       });
 
@@ -444,7 +467,12 @@ describe("Multi-Instance Isolation", () => {
       // Tag -> Groups
       mockPrisma.groupTag.findMany.mockResolvedValue([]);
 
-      await exclusionComputationService.addHiddenEntity(1, "tag", "tag1", INST_A);
+      await exclusionComputationService.addHiddenEntity(
+        1,
+        "tag",
+        "tag1",
+        INST_A
+      );
 
       // Verify all junction queries include instance filtering
       expect(mockPrisma.sceneTag.findMany).toHaveBeenCalledWith({

@@ -1,13 +1,13 @@
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LucideArrowLeft,
   LucideArrowLeftToLine,
   LucideArrowRight,
   LucideArrowRightToLine,
 } from "lucide-react";
-import Button from "./Button";
-import { useTVMode } from "../../hooks/useTVMode";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation";
+import { useTVMode } from "../../hooks/useTVMode";
+import Button from "./Button";
 
 interface Props {
   currentPage?: number;
@@ -134,7 +134,9 @@ const Pagination = ({
     items: paginationItems,
     enabled: isTVMode && tvActive,
     onSelect: (item) => {
-      const element = document.querySelector(`[data-tv-pagination-item="${item.id}"]`) as HTMLElement | null;
+      const element = document.querySelector(
+        `[data-tv-pagination-item="${item.id}"]`
+      ) as HTMLElement | null;
       if (element) {
         element.click();
         // For inputs/dropdowns, focus them so user can interact
@@ -173,98 +175,98 @@ const Pagination = ({
       {/* Navigation row - includes per-page on mobile */}
       <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 w-full sm:w-auto">
         <nav className="flex items-center gap-1 sm:gap-2">
-        {/* First Page Button */}
-        <div
-          data-tv-pagination-item="first"
-          ref={(el) => paginationNav.setItemRef(0, el)}
-          className={paginationNav.isFocused(0) ? "keyboard-focus" : ""}
-        >
-          <Button
-            onClick={() => onPageChange?.(1)}
-            disabled={currentPage <= 1}
-            variant="secondary"
-            size="sm"
-            title="First Page"
-            aria-label="First Page"
-            icon={<LucideArrowLeftToLine size={16} />}
-          />
-        </div>
-
-        {/* Previous Page Button */}
-        <div
-          data-tv-pagination-item="prev"
-          ref={(el) => paginationNav.setItemRef(1, el)}
-          className={paginationNav.isFocused(1) ? "keyboard-focus" : ""}
-        >
-          <Button
-            onClick={() => onPageChange?.(currentPage - 1)}
-            disabled={currentPage <= 1}
-            variant="secondary"
-            size="sm"
-            title="Previous Page"
-            aria-label="Previous Page"
-            icon={<LucideArrowLeft size={16} />}
-          />
-        </div>
-
-        {/* Page Dropdown */}
-        <div
-          data-tv-pagination-item="page-select"
-          ref={(el) => paginationNav.setItemRef(2, el)}
-          className={paginationNav.isFocused(2) ? "keyboard-focus" : ""}
-        >
-          <select
-            value={currentPage}
-            onChange={(e) => onPageChange?.(parseInt(e.target.value))}
-            className="px-3 py-1 rounded text-sm font-medium transition-colors flex-grow sm:flex-grow-0"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--border-color)",
-              height: "1.8rem",
-            }}
+          {/* First Page Button */}
+          <div
+            data-tv-pagination-item="first"
+            ref={(el) => paginationNav.setItemRef(0, el)}
+            className={paginationNav.isFocused(0) ? "keyboard-focus" : ""}
           >
-            {allPages.map((page) => (
-              <option key={page} value={page}>
-                {page} of {totalPages}
-              </option>
-            ))}
-          </select>
-        </div>
+            <Button
+              onClick={() => onPageChange?.(1)}
+              disabled={currentPage <= 1}
+              variant="secondary"
+              size="sm"
+              title="First Page"
+              aria-label="First Page"
+              icon={<LucideArrowLeftToLine size={16} />}
+            />
+          </div>
 
-        {/* Next Page Button */}
-        <div
-          data-tv-pagination-item="next"
-          ref={(el) => paginationNav.setItemRef(3, el)}
-          className={paginationNav.isFocused(3) ? "keyboard-focus" : ""}
-        >
-          <Button
-            onClick={() => onPageChange?.(currentPage + 1)}
-            disabled={currentPage >= totalPages}
-            variant="secondary"
-            size="sm"
-            title="Next Page"
-            aria-label="Next Page"
-            icon={<LucideArrowRight size={16} />}
-          />
-        </div>
+          {/* Previous Page Button */}
+          <div
+            data-tv-pagination-item="prev"
+            ref={(el) => paginationNav.setItemRef(1, el)}
+            className={paginationNav.isFocused(1) ? "keyboard-focus" : ""}
+          >
+            <Button
+              onClick={() => onPageChange?.(currentPage - 1)}
+              disabled={currentPage <= 1}
+              variant="secondary"
+              size="sm"
+              title="Previous Page"
+              aria-label="Previous Page"
+              icon={<LucideArrowLeft size={16} />}
+            />
+          </div>
 
-        {/* Last Page Button */}
-        <div
-          data-tv-pagination-item="last"
-          ref={(el) => paginationNav.setItemRef(4, el)}
-          className={paginationNav.isFocused(4) ? "keyboard-focus" : ""}
-        >
-          <Button
-            onClick={() => onPageChange?.(totalPages)}
-            disabled={currentPage >= totalPages}
-            variant="secondary"
-            size="sm"
-            title="Last Page"
-            aria-label="Last Page"
-            icon={<LucideArrowRightToLine size={16} />}
-          />
-        </div>
+          {/* Page Dropdown */}
+          <div
+            data-tv-pagination-item="page-select"
+            ref={(el) => paginationNav.setItemRef(2, el)}
+            className={paginationNav.isFocused(2) ? "keyboard-focus" : ""}
+          >
+            <select
+              value={currentPage}
+              onChange={(e) => onPageChange?.(parseInt(e.target.value))}
+              className="px-3 py-1 rounded text-sm font-medium transition-colors flex-grow sm:flex-grow-0"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-color)",
+                height: "1.8rem",
+              }}
+            >
+              {allPages.map((page) => (
+                <option key={page} value={page}>
+                  {page} of {totalPages}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Next Page Button */}
+          <div
+            data-tv-pagination-item="next"
+            ref={(el) => paginationNav.setItemRef(3, el)}
+            className={paginationNav.isFocused(3) ? "keyboard-focus" : ""}
+          >
+            <Button
+              onClick={() => onPageChange?.(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              variant="secondary"
+              size="sm"
+              title="Next Page"
+              aria-label="Next Page"
+              icon={<LucideArrowRight size={16} />}
+            />
+          </div>
+
+          {/* Last Page Button */}
+          <div
+            data-tv-pagination-item="last"
+            ref={(el) => paginationNav.setItemRef(4, el)}
+            className={paginationNav.isFocused(4) ? "keyboard-focus" : ""}
+          >
+            <Button
+              onClick={() => onPageChange?.(totalPages)}
+              disabled={currentPage >= totalPages}
+              variant="secondary"
+              size="sm"
+              title="Last Page"
+              aria-label="Last Page"
+              icon={<LucideArrowRightToLine size={16} />}
+            />
+          </div>
         </nav>
 
         {showPerPageSelector && onPerPageChange && (
@@ -317,7 +319,9 @@ const Pagination = ({
                   className="w-14 px-2 py-1 rounded text-sm font-medium transition-colors text-center"
                   style={{
                     backgroundColor: "var(--bg-card)",
-                    color: customError ? "var(--status-error)" : "var(--text-primary)",
+                    color: customError
+                      ? "var(--status-error)"
+                      : "var(--text-primary)",
                     border: `1px solid ${customError ? "var(--status-error)" : "var(--border-color)"}`,
                     height: "1.8rem",
                   }}

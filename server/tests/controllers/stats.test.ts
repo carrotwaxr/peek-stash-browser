@@ -6,7 +6,12 @@
  * and indirectly tests the internal formatBytes/formatUptime pure functions
  * through response assertions.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { promises as fs } from "fs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getStats, refreshCache } from "../../controllers/stats.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
+import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -34,12 +39,6 @@ vi.mock("fs", () => ({
   },
 }));
 
-import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
-import { promises as fs } from "fs";
-import { getStats, refreshCache } from "../../controllers/stats.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
-
 const mockEntityService = vi.mocked(stashEntityService);
 const mockSyncService = vi.mocked(stashSyncService);
 const mockFsStat = vi.mocked(fs.stat);
@@ -62,7 +61,9 @@ describe("Stats Controller", () => {
       groups: 3,
     } as any);
     mockEntityService.isReady.mockReturnValue(true);
-    mockEntityService.getLastRefreshed.mockReturnValue(new Date("2026-01-15T12:00:00Z"));
+    mockEntityService.getLastRefreshed.mockReturnValue(
+      new Date("2026-01-15T12:00:00Z")
+    );
     mockSyncService.isSyncing.mockReturnValue(false);
     mockFsStat.mockResolvedValue({ size: 1048576 } as any); // 1 MB
   });

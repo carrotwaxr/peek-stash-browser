@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import type React from "react";
+import type { NormalizedScene } from "@peek/shared-types";
 import { History, Trash2 } from "lucide-react";
+import { apiDelete, libraryApi } from "../../api";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory";
-import { apiDelete, libraryApi } from "../../api";
 import {
   Button,
   LoadingSpinner,
@@ -10,8 +12,6 @@ import {
   PageLayout,
   SceneListItem,
 } from "../ui/index";
-import type { NormalizedScene } from "@peek/shared-types";
-import type React from "react";
 
 interface WatchHistoryEntry {
   sceneId: string;
@@ -61,7 +61,9 @@ const WatchHistory = () => {
   // Fetch full scene data for watch history
   useEffect(() => {
     const fetchScenes = async () => {
-      const historyList = watchHistoryList as unknown as WatchHistoryEntry[] | null;
+      const historyList = watchHistoryList as unknown as
+        | WatchHistoryEntry[]
+        | null;
       if (!historyList || historyList.length === 0) {
         setScenes([]);
         setLoading(false);
@@ -75,37 +77,43 @@ const WatchHistory = () => {
         const sceneIds: string[] = historyList.map((wh) => wh.sceneId);
 
         // Fetch scenes in bulk - must set per_page to match number of IDs
-        const response = await libraryApi.findScenes({
+        const response = (await libraryApi.findScenes({
           ids: sceneIds,
           filter: { per_page: sceneIds.length },
-        }) as Record<string, Record<string, unknown>>;
-        const fetchedScenes = (response?.findScenes?.scenes || []) as Record<string, unknown>[];
+        })) as Record<string, Record<string, unknown>>;
+        const fetchedScenes = (response?.findScenes?.scenes || []) as Record<
+          string,
+          unknown
+        >[];
 
         // Match scenes with watch history data
-        const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map((scene: Record<string, unknown>) => {
-          const watchHistory = historyList.find(
-            (wh) => wh.sceneId === scene.id
-          ) || null;
-          const files = scene.files as Array<{ duration?: number }> | undefined;
-          const duration = files?.[0]?.duration || 0;
-          const resumeTime = watchHistory?.resumeTime || 0;
-          const isCompleted =
-            duration > 0 && resumeTime > 0 && resumeTime / duration > 0.9;
+        const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map(
+          (scene: Record<string, unknown>) => {
+            const watchHistory =
+              historyList.find((wh) => wh.sceneId === scene.id) || null;
+            const files = scene.files as
+              | Array<{ duration?: number }>
+              | undefined;
+            const duration = files?.[0]?.duration || 0;
+            const resumeTime = watchHistory?.resumeTime || 0;
+            const isCompleted =
+              duration > 0 && resumeTime > 0 && resumeTime / duration > 0.9;
 
-          return {
-            ...scene,
-            id: scene.id as string,
-            instanceId: scene.instanceId as string,
-            watchHistory: watchHistory,
-            resumeTime: resumeTime,
-            playCount: watchHistory?.playCount || 0,
-            playDuration: watchHistory?.playDuration || 0,
-            lastPlayedAt: watchHistory?.lastPlayedAt || null,
-            oCount: watchHistory?.oCount || 0,
-            oHistory: watchHistory?.oHistory || [],
-            isCompleted: isCompleted,
-          };
-        });
+            return {
+              ...scene,
+              id: scene.id as string,
+              instanceId: scene.instanceId as string,
+              watchHistory: watchHistory,
+              resumeTime: resumeTime,
+              playCount: watchHistory?.playCount || 0,
+              playDuration: watchHistory?.playDuration || 0,
+              lastPlayedAt: watchHistory?.lastPlayedAt || null,
+              oCount: watchHistory?.oCount || 0,
+              oHistory: watchHistory?.oHistory || [],
+              isCompleted: isCompleted,
+            };
+          }
+        );
 
         // Apply filtering
         let filtered = scenesWithHistory;
@@ -114,7 +122,9 @@ const WatchHistory = () => {
             (s: SceneWithHistory) => !s.isCompleted && s.resumeTime > 0
           );
         } else if (filterBy === "completed") {
-          filtered = scenesWithHistory.filter((s: SceneWithHistory) => s.isCompleted);
+          filtered = scenesWithHistory.filter(
+            (s: SceneWithHistory) => s.isCompleted
+          );
         }
 
         // Apply sorting
@@ -249,7 +259,10 @@ const WatchHistory = () => {
                 <span>
                   Total watch time:{" "}
                   {formatDuration(
-                    scenes.reduce((sum, s) => sum + (s.playDuration as number), 0)
+                    scenes.reduce(
+                      (sum, s) => sum + (s.playDuration as number),
+                      0
+                    )
                   )}
                 </span>
               )}

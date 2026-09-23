@@ -19,7 +19,10 @@ export interface RouteGroup {
 /**
  * Parse Express route files to extract route definitions
  */
-export function parseRouteFile(filePath: string, basePath: string): RouteDefinition[] {
+export function parseRouteFile(
+  filePath: string,
+  basePath: string
+): RouteDefinition[] {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf-8");
@@ -34,7 +37,8 @@ export function parseRouteFile(filePath: string, basePath: string): RouteDefinit
   const hasFileAuth = /router\.use\(authenticate\)/.test(content);
 
   // Match multiline route definitions - capture method and path first
-  const routePattern = /router\.(get|post|put|delete|patch)\(\s*["'`]([^"'`]+)["'`]/g;
+  const routePattern =
+    /router\.(get|post|put|delete|patch)\(\s*["'`]([^"'`]+)["'`]/g;
 
   let match;
   while ((match = routePattern.exec(content)) !== null) {
@@ -88,7 +92,10 @@ export function parseRouteFile(filePath: string, basePath: string): RouteDefinit
 /**
  * Extract controller file path from import statements
  */
-function extractControllerFile(content: string, controllerName: string): string {
+function extractControllerFile(
+  content: string,
+  controllerName: string
+): string {
   // Match: import { controllerName, ... } from "path"
   const importRegex = new RegExp(
     `import\\s*{[^}]*\\b${controllerName}\\b[^}]*}\\s*from\\s*["'\`]([^"'\`]+)["'\`]`,

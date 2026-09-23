@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/api/client";
+import Tags from "@/components/pages/Tags";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Mock react-router-dom
@@ -62,7 +64,11 @@ vi.mock("@/api/client", () => ({
     isInitializing = false;
     status: number;
     data: Record<string, unknown>;
-    constructor(message: string, status = 500, data: Record<string, unknown> = {}) {
+    constructor(
+      message: string,
+      status = 500,
+      data: Record<string, unknown> = {}
+    ) {
       super(message);
       this.status = status;
       this.data = data;
@@ -140,9 +146,6 @@ vi.mock("@/components/table/index", () => ({
   TableView: () => <div data-testid="table-view" />,
   ColumnConfigPopover: () => <div data-testid="column-config" />,
 }));
-
-import Tags from "@/components/pages/Tags";
-import { ApiError } from "@/api/client";
 
 describe("Tags", () => {
   beforeEach(() => {

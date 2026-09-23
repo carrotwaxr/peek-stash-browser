@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useScenePlayer } from "../../contexts/ScenePlayerContext";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { apiPost, getMyPermissions, libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
 import { showError, showSuccess } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
 import {
@@ -14,8 +14,13 @@ import {
 } from "../ui/index";
 
 const PlaybackControls = () => {
-  const { scene: rawScene, sceneLoading, videoLoading, oCounter, dispatch } =
-    useScenePlayer();
+  const {
+    scene: rawScene,
+    sceneLoading,
+    videoLoading,
+    oCounter,
+    dispatch,
+  } = useScenePlayer();
   const scene = rawScene;
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene") as Record<string, boolean>;
@@ -26,7 +31,10 @@ const PlaybackControls = () => {
 
   // Download state
   const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState<Record<string, unknown> | null>(null);
+  const [permissions, setPermissions] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   // Sync state when scene changes
   const sceneId = scene?.id;
@@ -61,7 +69,12 @@ const PlaybackControls = () => {
     setRating(newRating);
 
     try {
-      await libraryApi.updateRating("scene", scene.id as string, newRating, scene.instanceId as string);
+      await libraryApi.updateRating(
+        "scene",
+        scene.id as string,
+        newRating,
+        scene.instanceId as string
+      );
     } catch (error) {
       console.error("Failed to update scene rating:", error);
       setRating(previousRating);
@@ -76,7 +89,12 @@ const PlaybackControls = () => {
     setIsFavorite(newFavorite);
 
     try {
-      await libraryApi.updateFavorite("scene", scene.id as string, newFavorite, scene.instanceId as string);
+      await libraryApi.updateFavorite(
+        "scene",
+        scene.id as string,
+        newFavorite,
+        scene.instanceId as string
+      );
     } catch (error) {
       console.error("Failed to update scene favorite:", error);
       setIsFavorite(previousFavorite);
@@ -95,7 +113,9 @@ const PlaybackControls = () => {
     try {
       setDownloading(true);
       if (!scene) return;
-      const response = await apiPost<{ download: { id: string; status: string } }>(`/downloads/scene/${scene.id}`);
+      const response = await apiPost<{
+        download: { id: string; status: string };
+      }>(`/downloads/scene/${scene.id}`);
       const download = response.download;
 
       // For scenes, download is immediate - redirect to file endpoint
@@ -170,7 +190,11 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
-            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
+            <AddToPlaylistButton
+              sceneId={scene?.id as string}
+              disabled={isLoading}
+              compact
+            />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
@@ -228,7 +252,11 @@ const PlaybackControls = () => {
 
           {/* Row 2: Add to Playlist + Download */}
           <div className="flex items-center justify-end gap-4">
-            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
+            <AddToPlaylistButton
+              sceneId={scene?.id as string}
+              disabled={isLoading}
+              compact
+            />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
@@ -266,7 +294,11 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
-            <AddToPlaylistButton sceneId={scene?.id as string} disabled={isLoading} compact />
+            <AddToPlaylistButton
+              sceneId={scene?.id as string}
+              disabled={isLoading}
+              compact
+            />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"

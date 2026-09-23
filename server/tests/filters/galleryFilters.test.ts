@@ -3,15 +3,18 @@
  *
  * Tests the gallery filters in controllers/library/galleries.ts
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import type { NormalizedGallery, PeekGalleryFilter } from "../../types/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyGalleryFilters } from "../../controllers/library/galleries.js";
+import type {
+  NormalizedGallery,
+  PeekGalleryFilter,
+} from "../../types/index.js";
 import {
-  createMockGallery,
   createMockGalleries,
-  createMockTags,
-  createMockStudios,
+  createMockGallery,
   createMockPerformers,
+  createMockStudios,
+  createMockTags,
 } from "../helpers/mockDataGenerators.js";
 
 describe("Gallery Filters", () => {
@@ -40,7 +43,11 @@ describe("Gallery Filters", () => {
     });
 
     it("should filter galleries by multiple IDs", async () => {
-      const targetIds = [mockGalleries[0].id, mockGalleries[5].id, mockGalleries[10].id];
+      const targetIds = [
+        mockGalleries[0].id,
+        mockGalleries[5].id,
+        mockGalleries[10].id,
+      ];
       const filter: PeekGalleryFilter = {
         ids: { value: targetIds, modifier: "INCLUDES" },
       };
@@ -293,7 +300,8 @@ describe("Gallery Filters", () => {
       // Add studios to some galleries
       const galleriesWithStudios = mockGalleries.map((g, i) => ({
         ...g,
-        studio: i % 2 === 0 ? mockStudios[0] : i % 3 === 0 ? mockStudios[1] : null,
+        studio:
+          i % 2 === 0 ? mockStudios[0] : i % 3 === 0 ? mockStudios[1] : null,
       }));
 
       const result = await applyGalleryFilters(galleriesWithStudios, filter);
@@ -360,14 +368,20 @@ describe("Gallery Filters", () => {
       const galleriesWithPerformers = mockGalleries.map((g, i) => ({
         ...g,
         performers:
-          i % 2 === 0 ? [mockPerformers[0]] : i % 3 === 0 ? [mockPerformers[1]] : [],
+          i % 2 === 0
+            ? [mockPerformers[0]]
+            : i % 3 === 0
+              ? [mockPerformers[1]]
+              : [],
       }));
 
       const result = await applyGalleryFilters(galleriesWithPerformers, filter);
 
       result.forEach((gallery) => {
         const galleryPerformerIds = (gallery.performers || []).map((p) => p.id);
-        const hasMatch = performerIds.some((id) => galleryPerformerIds.includes(id));
+        const hasMatch = performerIds.some((id) =>
+          galleryPerformerIds.includes(id)
+        );
         expect(hasMatch).toBe(true);
       });
     });
@@ -454,20 +468,28 @@ describe("Gallery Filters", () => {
     });
 
     it("should handle galleries without ratings correctly", async () => {
-      const galleriesWithNullRatings = mockGalleries.filter((g) => !g.rating100);
+      const galleriesWithNullRatings = mockGalleries.filter(
+        (g) => !g.rating100
+      );
 
       const filter: PeekGalleryFilter = {
         rating100: { value: 0, modifier: "GREATER_THAN" },
       };
 
-      const result = await applyGalleryFilters(galleriesWithNullRatings, filter);
+      const result = await applyGalleryFilters(
+        galleriesWithNullRatings,
+        filter
+      );
 
       // Galleries with null ratings should be treated as 0
       expect(result.length).toBe(0);
     });
 
     it("should handle galleries without tags correctly", async () => {
-      const galleriesWithoutTags = mockGalleries.map((g) => ({ ...g, tags: [] }));
+      const galleriesWithoutTags = mockGalleries.map((g) => ({
+        ...g,
+        tags: [],
+      }));
 
       const filter: PeekGalleryFilter = {
         tags: {
@@ -494,7 +516,10 @@ describe("Gallery Filters", () => {
         },
       };
 
-      const result = await applyGalleryFilters(galleriesWithoutPerformers, filter);
+      const result = await applyGalleryFilters(
+        galleriesWithoutPerformers,
+        filter
+      );
 
       expect(result.length).toBe(0);
     });

@@ -5,7 +5,7 @@
  * Covers initialization, instance lookup, reload, and edge cases around
  * multi-instance configuration.
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock PrismaClient constructor
 const mockFindMany = vi.fn();
@@ -19,11 +19,13 @@ vi.mock("@prisma/client", () => ({
 
 // Mock StashClient constructor
 vi.mock("../../graphql/StashClient.js", () => ({
-  StashClient: vi.fn().mockImplementation((config: { url: string; apiKey: string }) => ({
-    url: config.url,
-    apiKey: config.apiKey,
-    _isStashClient: true,
-  })),
+  StashClient: vi
+    .fn()
+    .mockImplementation((config: { url: string; apiKey: string }) => ({
+      url: config.url,
+      apiKey: config.apiKey,
+      _isStashClient: true,
+    })),
 }));
 
 // Mock logger
@@ -348,7 +350,9 @@ describe("StashInstanceManager", () => {
       const manager = await importFresh();
       await manager.initialize();
 
-      expect(() => manager.getBaseUrl()).toThrow("No Stash instance configured");
+      expect(() => manager.getBaseUrl()).toThrow(
+        "No Stash instance configured"
+      );
     });
   });
 
@@ -359,17 +363,24 @@ describe("StashInstanceManager", () => {
       const manager = await importFresh();
       await manager.initialize();
 
-      expect(manager.getUiUrl(INSTANCE_A.id)).toBe("https://stash-a.example.com");
+      expect(manager.getUiUrl(INSTANCE_A.id)).toBe(
+        "https://stash-a.example.com"
+      );
     });
 
     it("strips trailing slash from uiUrl", async () => {
-      const instanceWithTrailingSlash = { ...INSTANCE_A, uiUrl: "https://stash-a.example.com/" };
+      const instanceWithTrailingSlash = {
+        ...INSTANCE_A,
+        uiUrl: "https://stash-a.example.com/",
+      };
       mockFindMany.mockResolvedValue([instanceWithTrailingSlash]);
 
       const manager = await importFresh();
       await manager.initialize();
 
-      expect(manager.getUiUrl(INSTANCE_A.id)).toBe("https://stash-a.example.com");
+      expect(manager.getUiUrl(INSTANCE_A.id)).toBe(
+        "https://stash-a.example.com"
+      );
     });
 
     it("falls back to url stripped of /graphql when uiUrl not set", async () => {

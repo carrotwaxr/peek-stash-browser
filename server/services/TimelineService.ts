@@ -20,7 +20,10 @@ export interface TimelineFilters {
   groupId?: string;
 }
 
-const ENTITY_CONFIG: Record<TimelineEntityType, { table: string; alias: string; dateField: string }> = {
+const ENTITY_CONFIG: Record<
+  TimelineEntityType,
+  { table: string; alias: string; dateField: string }
+> = {
   scene: { table: "StashScene", alias: "s", dateField: "s.date" },
   gallery: { table: "StashGallery", alias: "g", dateField: "g.date" },
   image: { table: "StashImage", alias: "i", dateField: "i.date" },
@@ -56,27 +59,37 @@ export class TimelineService {
 
     if (entityType === "scene") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN ScenePerformer sp ON sp.sceneId = ${config.alias}.id AND sp.sceneInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN ScenePerformer sp ON sp.sceneId = ${config.alias}.id AND sp.sceneInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`sp.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN SceneTag st ON st.sceneId = ${config.alias}.id AND st.sceneInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN SceneTag st ON st.sceneId = ${config.alias}.id AND st.sceneInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`st.tagId = ?`);
       }
       if (filters?.studioId) {
         whereConditions.push(`${config.alias}.studioId = ?`);
       }
       if (filters?.groupId) {
-        joins.push(`INNER JOIN SceneGroup sg ON sg.sceneId = ${config.alias}.id AND sg.sceneInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN SceneGroup sg ON sg.sceneId = ${config.alias}.id AND sg.sceneInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`sg.groupId = ?`);
       }
     } else if (entityType === "gallery") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN GalleryPerformer gp ON gp.galleryId = ${config.alias}.id AND gp.galleryInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN GalleryPerformer gp ON gp.galleryId = ${config.alias}.id AND gp.galleryInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`gp.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN GalleryTag gt ON gt.galleryId = ${config.alias}.id AND gt.galleryInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN GalleryTag gt ON gt.galleryId = ${config.alias}.id AND gt.galleryInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`gt.tagId = ?`);
       }
       if (filters?.studioId) {
@@ -84,11 +97,15 @@ export class TimelineService {
       }
     } else if (entityType === "image") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN ImagePerformer ip ON ip.imageId = ${config.alias}.id AND ip.imageInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN ImagePerformer ip ON ip.imageId = ${config.alias}.id AND ip.imageInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`ip.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN ImageTag it ON it.imageId = ${config.alias}.id AND it.imageInstanceId = ${config.alias}.stashInstanceId`);
+        joins.push(
+          `INNER JOIN ImageTag it ON it.imageId = ${config.alias}.id AND it.imageInstanceId = ${config.alias}.stashInstanceId`
+        );
         whereConditions.push(`it.tagId = ?`);
       }
       if (filters?.studioId) {
@@ -97,7 +114,8 @@ export class TimelineService {
     }
 
     const joinClause = joins.length > 0 ? joins.join("\n      ") : "";
-    const extraWhere = whereConditions.length > 0 ? `AND ${whereConditions.join(" AND ")}` : "";
+    const extraWhere =
+      whereConditions.length > 0 ? `AND ${whereConditions.join(" AND ")}` : "";
 
     const sql = `
       SELECT
@@ -121,7 +139,8 @@ export class TimelineService {
     if (filters?.performerId) params.push(filters.performerId);
     if (filters?.tagId) params.push(filters.tagId);
     if (filters?.studioId) params.push(filters.studioId);
-    if (entityType === "scene" && filters?.groupId) params.push(filters.groupId);
+    if (entityType === "scene" && filters?.groupId)
+      params.push(filters.groupId);
 
     return { sql, params };
   }
@@ -132,12 +151,16 @@ export class TimelineService {
     granularity: Granularity,
     filters?: TimelineFilters
   ): Promise<DistributionItem[]> {
-    const { sql, params } = this.buildDistributionQuery(entityType, userId, granularity, filters);
-
-    const results = await prisma.$queryRawUnsafe<Array<{ period: string; count: bigint }>>(
-      sql,
-      ...params
+    const { sql, params } = this.buildDistributionQuery(
+      entityType,
+      userId,
+      granularity,
+      filters
     );
+
+    const results = await prisma.$queryRawUnsafe<
+      Array<{ period: string; count: bigint }>
+    >(sql, ...params);
 
     return results.map((row) => ({
       period: row.period,

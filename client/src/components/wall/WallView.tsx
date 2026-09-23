@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { RowsPhotoAlbum } from "react-photo-album";
 import "react-photo-album/rows.css";
 import WallItem from "./WallItem";
-import { wallConfig, ZOOM_LEVELS, DEFAULT_ZOOM } from "./wallConfig";
+import { DEFAULT_ZOOM, ZOOM_LEVELS, wallConfig } from "./wallConfig";
 
 /**
  * Justified gallery view using react-photo-album.
@@ -28,14 +28,17 @@ const WallView = ({
   emptyMessage = "No items found",
 }: Props) => {
   const config = wallConfig[entityType];
-  const { targetRowHeight } = ZOOM_LEVELS[zoomLevel] || ZOOM_LEVELS[DEFAULT_ZOOM];
+  const { targetRowHeight } =
+    ZOOM_LEVELS[zoomLevel] || ZOOM_LEVELS[DEFAULT_ZOOM];
 
   // Transform items to photo album format
   const photos = useMemo(() => {
     if (!items || !config) return [];
 
     return items.map((item) => {
-      const aspectRatio = config.getAspectRatio(item as Record<string, unknown>);
+      const aspectRatio = config.getAspectRatio(
+        item as Record<string, unknown>
+      );
       // react-photo-album needs width/height, we use aspect ratio to derive them
       const baseHeight = targetRowHeight;
       const baseWidth = baseHeight * aspectRatio;
@@ -67,7 +70,11 @@ const WallView = ({
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-            {entityType === "scene" ? "🎬" : entityType === "gallery" ? "🖼️" : "📷"}
+            {entityType === "scene"
+              ? "🎬"
+              : entityType === "gallery"
+                ? "🖼️"
+                : "📷"}
           </div>
           <h3
             className="text-xl font-medium mb-2"

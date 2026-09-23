@@ -4,7 +4,12 @@
  * Tests the access control layer that determines whether a user has
  * owner, shared, or no access to a given playlist.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import {
+  getPlaylistAccess,
+  getUserGroups,
+} from "../../services/PlaylistAccessService.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -14,12 +19,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     userGroupMembership: { findMany: vi.fn() },
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import {
-  getPlaylistAccess,
-  getUserGroups,
-} from "../../services/PlaylistAccessService.js";
 
 const mockPrisma = vi.mocked(prisma);
 

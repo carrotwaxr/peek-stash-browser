@@ -6,12 +6,11 @@
  * - POST /api/exclusions/recompute-all - Recompute for all users
  * - GET /api/exclusions/stats - Get exclusion statistics
  */
-
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
+import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { authenticated } from "../utils/routeHelpers.js";
-import prisma from "../prisma/singleton.js";
 
 const router = express.Router();
 

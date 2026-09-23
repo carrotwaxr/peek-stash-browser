@@ -30,7 +30,12 @@ interface Props {
  * @param {string} title - Grid title (e.g., "Performers", "Tags")
  * @param {string} parentInstanceId - Instance ID from parent entity (fallback when entities don't have their own)
  */
-export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceId }: Props) => {
+export const TooltipEntityGrid = ({
+  entityType,
+  entities,
+  title,
+  parentInstanceId,
+}: Props) => {
   const { hasMultipleInstances } = useConfig();
 
   if (!entities || entities.length === 0) return null;
@@ -61,7 +66,11 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
     const entityWithInstance = entity.instanceId
       ? entity
       : { ...entity, instanceId: parentInstanceId };
-    return getEntityPath(entityType, entityWithInstance as Parameters<typeof getEntityPath>[1], hasMultipleInstances);
+    return getEntityPath(
+      entityType,
+      entityWithInstance as Parameters<typeof getEntityPath>[1],
+      hasMultipleInstances
+    );
   };
 
   // Get image path for entity

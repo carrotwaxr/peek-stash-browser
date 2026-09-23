@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { forgotPasswordInit, forgotPasswordReset } from "../../api";
 import { Button } from "../ui/index";
 
@@ -24,7 +24,9 @@ const ForgotPasswordPage = () => {
       if (response.hasRecoveryKey) {
         setStep(2);
       } else {
-        setError("This account does not have a recovery key set. Please contact an administrator.");
+        setError(
+          "This account does not have a recovery key set. Please contact an administrator."
+        );
       }
     } catch {
       setError("Failed to check username. Please try again.");
@@ -62,7 +64,9 @@ const ForgotPasswordPage = () => {
       setSuccess(true);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr.response?.data?.error || "Invalid recovery key or username");
+      setError(
+        axiosErr.response?.data?.error || "Invalid recovery key or username"
+      );
     } finally {
       setLoading(false);
     }
@@ -70,15 +74,35 @@ const ForgotPasswordPage = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--bg-primary)" }}>
-        <div className="w-full max-w-md p-8 rounded-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <h1 className="text-2xl font-bold mb-4 text-center" style={{ color: "var(--text-primary)" }}>
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{ backgroundColor: "var(--bg-primary)" }}
+      >
+        <div
+          className="w-full max-w-md p-8 rounded-lg"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+          }}
+        >
+          <h1
+            className="text-2xl font-bold mb-4 text-center"
+            style={{ color: "var(--text-primary)" }}
+          >
             Password Reset Successful
           </h1>
-          <p className="text-center mb-6" style={{ color: "var(--text-secondary)" }}>
-            Your password has been reset. You can now log in with your new password.
+          <p
+            className="text-center mb-6"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Your password has been reset. You can now log in with your new
+            password.
           </p>
-          <Button variant="primary" className="w-full" onClick={() => navigate("/login")}>
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={() => navigate("/login")}
+          >
             Go to Login
           </Button>
         </div>
@@ -87,14 +111,32 @@ const ForgotPasswordPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--bg-primary)" }}>
-      <div className="w-full max-w-md p-8 rounded-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <h1 className="text-2xl font-bold mb-6 text-center" style={{ color: "var(--text-primary)" }}>
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: "var(--bg-primary)" }}
+    >
+      <div
+        className="w-full max-w-md p-8 rounded-lg"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-color)",
+        }}
+      >
+        <h1
+          className="text-2xl font-bold mb-6 text-center"
+          style={{ color: "var(--text-primary)" }}
+        >
           Forgot Password
         </h1>
 
         {error && (
-          <div className="p-3 rounded-lg mb-4 text-sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", color: "rgb(239, 68, 68)" }}>
+          <div
+            className="p-3 rounded-lg mb-4 text-sm"
+            style={{
+              backgroundColor: "rgba(239, 68, 68, 0.1)",
+              color: "rgb(239, 68, 68)",
+            }}
+          >
             {error}
           </div>
         )}
@@ -102,7 +144,11 @@ const ForgotPasswordPage = () => {
         {step === 1 ? (
           <form onSubmit={handleUsernameSubmit}>
             <div className="mb-4">
-              <label htmlFor="username" className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Username
               </label>
               <input
@@ -111,16 +157,30 @@ const ForgotPasswordPage = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg"
-                style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
                 required
                 autoFocus
               />
             </div>
-            <Button type="submit" variant="primary" className="w-full" disabled={loading} loading={loading}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              disabled={loading}
+              loading={loading}
+            >
               Continue
             </Button>
             <div className="mt-4 text-center">
-              <Link to="/login" className="text-sm" style={{ color: "var(--text-muted)" }}>
+              <Link
+                to="/login"
+                className="text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Back to Login
               </Link>
             </div>
@@ -131,7 +191,11 @@ const ForgotPasswordPage = () => {
               Enter your recovery key and choose a new password.
             </p>
             <div className="mb-4">
-              <label htmlFor="recoveryKey" className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <label
+                htmlFor="recoveryKey"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Recovery Key
               </label>
               <input
@@ -141,13 +205,21 @@ const ForgotPasswordPage = () => {
                 onChange={(e) => setRecoveryKey(e.target.value)}
                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                 className="w-full px-4 py-2 rounded-lg font-mono"
-                style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
                 required
                 autoFocus
               />
             </div>
             <div className="mb-4">
-              <label htmlFor="newPassword" className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <label
+                htmlFor="newPassword"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 New Password
               </label>
               <input
@@ -156,16 +228,27 @@ const ForgotPasswordPage = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg"
-                style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
                 required
                 minLength={8}
               />
-              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 8+ characters with at least one letter and one number
               </p>
             </div>
             <div className="mb-6">
-              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Confirm New Password
               </label>
               <input
@@ -174,16 +257,34 @@ const ForgotPasswordPage = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg"
-                style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
                 required
                 minLength={8}
               />
             </div>
-            <Button type="submit" variant="primary" className="w-full" disabled={loading} loading={loading}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              disabled={loading}
+              loading={loading}
+            >
               Reset Password
             </Button>
             <div className="mt-4 text-center">
-              <button type="button" onClick={() => { setStep(1); setError(null); }} className="text-sm" style={{ color: "var(--text-muted)" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setError(null);
+                }}
+                className="text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Back
               </button>
             </div>

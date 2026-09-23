@@ -34,10 +34,10 @@ export interface SceneQueryRow {
   studioId: string | null;
   stashRating100: number | null;
   duration: number | null;
-  organized: number | null;          // SQLite boolean: 0 | 1
+  organized: number | null; // SQLite boolean: 0 | 1
   details: string | null;
   director: string | null;
-  urls: string | null;               // JSON-encoded string[]
+  urls: string | null; // JSON-encoded string[]
   filePath: string | null;
   fileBitRate: number | null;
   fileFrameRate: number | null;
@@ -45,7 +45,7 @@ export interface SceneQueryRow {
   fileHeight: number | null;
   fileVideoCodec: string | null;
   fileAudioCodec: string | null;
-  fileSize: number | null;           // BigInt stored as number
+  fileSize: number | null; // BigInt stored as number
   pathScreenshot: string | null;
   pathPreview: string | null;
   pathSprite: string | null;
@@ -53,9 +53,9 @@ export interface SceneQueryRow {
   pathChaptersVtt: string | null;
   pathStream: string | null;
   pathCaption: string | null;
-  captions: string | null;           // JSON-encoded caption metadata
-  streams: string | null;            // JSON-encoded stream info
-  inheritedTagIds: string | null;    // JSON-encoded string[]
+  captions: string | null; // JSON-encoded caption metadata
+  streams: string | null; // JSON-encoded stream info
+  inheritedTagIds: string | null; // JSON-encoded string[]
   stashOCounter: number | null;
   stashPlayCount: number | null;
   stashPlayDuration: number | null;
@@ -64,7 +64,7 @@ export interface SceneQueryRow {
 
   // User data from LEFT JOIN SceneRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 
   // User data from LEFT JOIN WatchHistory (w)
   userPlayCount: number | null;
@@ -72,8 +72,8 @@ export interface SceneQueryRow {
   userLastPlayedAt: string | null;
   userOCount: number | null;
   userResumeTime: number | null;
-  userOHistory: string | null;       // JSON-encoded string[]
-  userPlayHistory: string | null;    // JSON-encoded string[]
+  userOHistory: string | null; // JSON-encoded string[]
+  userPlayHistory: string | null; // JSON-encoded string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -94,14 +94,14 @@ export interface PerformerQueryRow {
   disambiguation: string | null;
   gender: string | null;
   birthdate: string | null;
-  stashFavorite: number | null;      // SQLite boolean: 0 | 1
+  stashFavorite: number | null; // SQLite boolean: 0 | 1
   stashRating100: number | null;
   sceneCount: number | null;
   imageCount: number | null;
   galleryCount: number | null;
   groupCount: number | null;
   details: string | null;
-  aliasList: string | null;          // JSON-encoded string[]
+  aliasList: string | null; // JSON-encoded string[]
   country: string | null;
   ethnicity: string | null;
   hairColor: string | null;
@@ -121,7 +121,7 @@ export interface PerformerQueryRow {
 
   // User data from LEFT JOIN PerformerRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 
   // User data from LEFT JOIN UserPerformerStats (s)
   userOCounter: number | null;
@@ -146,7 +146,7 @@ export interface StudioQueryRow {
   stashInstanceId: string;
   name: string;
   parentId: string | null;
-  stashFavorite: number | null;      // SQLite boolean: 0 | 1
+  stashFavorite: number | null; // SQLite boolean: 0 | 1
   stashRating100: number | null;
   sceneCount: number | null;
   imageCount: number | null;
@@ -161,7 +161,7 @@ export interface StudioQueryRow {
 
   // User data from LEFT JOIN StudioRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 
   // User data from LEFT JOIN UserStudioStats (us)
   userOCounter: number | null;
@@ -183,7 +183,7 @@ export interface TagQueryRow {
   id: string;
   stashInstanceId: string;
   name: string;
-  stashFavorite: number | null;      // SQLite boolean: 0 | 1
+  stashFavorite: number | null; // SQLite boolean: 0 | 1
   sceneCount: number | null;
   imageCount: number | null;
   galleryCount: number | null;
@@ -193,15 +193,15 @@ export interface TagQueryRow {
   sceneMarkerCount: number | null;
   sceneCountViaPerformers: number | null;
   description: string | null;
-  aliases: string | null;            // JSON-encoded string[]
-  parentIds: string | null;          // JSON-encoded string[]
+  aliases: string | null; // JSON-encoded string[]
+  parentIds: string | null; // JSON-encoded string[]
   imagePath: string | null;
   stashCreatedAt: string | null;
   stashUpdatedAt: string | null;
 
   // User data from LEFT JOIN TagRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 
   // User data from LEFT JOIN UserTagStats (us)
   userOCounter: number | null;
@@ -233,7 +233,7 @@ export interface GalleryQueryRow {
   url: string | null;
   code: string | null;
   photographer: string | null;
-  urls: string | null;               // JSON-encoded string[]
+  urls: string | null; // JSON-encoded string[]
   folderPath: string | null;
   fileBasename: string | null;
   coverPath: string | null;
@@ -242,7 +242,7 @@ export interface GalleryQueryRow {
 
   // User data from LEFT JOIN GalleryRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 
   // Cover image dimensions from LEFT JOIN StashImage (ci)
   coverWidth: number | null;
@@ -272,7 +272,7 @@ export interface GroupQueryRow {
   performerCount: number | null;
   director: string | null;
   synopsis: string | null;
-  urls: string | null;               // JSON-encoded string[]
+  urls: string | null; // JSON-encoded string[]
   frontImagePath: string | null;
   backImagePath: string | null;
   stashCreatedAt: string | null;
@@ -280,5 +280,5 @@ export interface GroupQueryRow {
 
   // User data from LEFT JOIN GroupRating (r)
   userRating: number | null;
-  userFavorite: number | null;       // SQLite boolean: 0 | 1
+  userFavorite: number | null; // SQLite boolean: 0 | 1
 }

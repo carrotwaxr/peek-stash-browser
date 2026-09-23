@@ -2,79 +2,82 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
-import type { EntityType } from "../services/UserHiddenEntityService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import type { EntityType } from "../services/UserHiddenEntityService.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type {
+  AdminRegenerateRecoveryKeyParams,
+  AdminRegenerateRecoveryKeyResponse,
+  AdminResetPasswordBody,
+  AdminResetPasswordParams,
+  AdminResetPasswordResponse,
   CarouselPreference,
-  TableColumnsConfig,
-  FilterPreset,
-  FilterPresets,
-  DefaultFilterPresets,
-  SyncUpdates,
-  UserRestriction,
-  NavPreference,
-  LandingPagePreference,
-  GetUserSettingsResponse,
-  UpdateUserSettingsParams,
-  UpdateUserSettingsBody,
-  UpdateUserSettingsResponse,
   ChangePasswordBody,
   ChangePasswordResponse,
-  GetRecoveryKeyResponse,
-  RegenerateRecoveryKeyResponse,
-  GetAllUsersResponse,
+  CompleteSetupBody,
   CreateUserBody,
   CreateUserResponse,
-  DeleteUserParams,
-  DeleteUserResponse,
-  UpdateUserRoleParams,
-  UpdateUserRoleBody,
-  UpdateUserRoleResponse,
-  GetFilterPresetsResponse,
-  SaveFilterPresetBody,
-  SaveFilterPresetResponse,
+  DefaultFilterPresets,
   DeleteFilterPresetParams,
   DeleteFilterPresetResponse,
-  GetDefaultFilterPresetsResponse,
-  SetDefaultFilterPresetBody,
-  SetDefaultFilterPresetResponse,
-  SyncFromStashParams,
-  SyncFromStashBody,
-  SyncFromStashResponse,
-  GetUserRestrictionsParams,
-  UpdateUserRestrictionsBody,
-  UpdateUserRestrictionsResponse,
+  DeleteUserParams,
+  DeleteUserResponse,
   DeleteUserRestrictionsParams,
   DeleteUserRestrictionsResponse,
+  FilterPreset,
+  FilterPresets,
+  GetAllUsersResponse,
+  GetDefaultFilterPresetsResponse,
+  GetFilterPresetsResponse,
+  GetHiddenEntitiesQuery,
+  GetHiddenEntityIdsResponse,
+  GetRecoveryKeyResponse,
+  GetUserGroupMembershipsParams,
+  GetUserPermissionsParams,
+  GetUserRestrictionsParams,
+  GetUserSettingsResponse,
+  HideEntitiesBody,
+  HideEntitiesResponse,
   HideEntityBody,
   HideEntityResponse,
+  LandingPagePreference,
+  NavPreference,
+  RegenerateRecoveryKeyResponse,
+  SaveFilterPresetBody,
+  SaveFilterPresetResponse,
+  SetDefaultFilterPresetBody,
+  SetDefaultFilterPresetResponse,
+  SyncFromStashBody,
+  SyncFromStashParams,
+  SyncFromStashResponse,
+  SyncUpdates,
+  TableColumnsConfig,
+  UnhideAllEntitiesQuery,
+  UnhideAllEntitiesResponse,
   UnhideEntityParams,
   UnhideEntityQuery,
   UnhideEntityResponse,
-  UnhideAllEntitiesQuery,
-  UnhideAllEntitiesResponse,
-  GetHiddenEntitiesQuery,
-  GetHiddenEntityIdsResponse,
-  HideEntitiesBody,
-  HideEntitiesResponse,
   UpdateHideConfirmationBody,
   UpdateHideConfirmationResponse,
   UpdatePermissionOverridesBody,
-  GetUserPermissionsParams,
-  GetUserGroupMembershipsParams,
-  AdminResetPasswordParams,
-  AdminResetPasswordBody,
-  AdminResetPasswordResponse,
-  AdminRegenerateRecoveryKeyParams,
-  AdminRegenerateRecoveryKeyResponse,
+  UpdateUserRestrictionsBody,
+  UpdateUserRestrictionsResponse,
+  UpdateUserRoleBody,
+  UpdateUserRoleParams,
+  UpdateUserRoleResponse,
+  UpdateUserSettingsBody,
+  UpdateUserSettingsParams,
+  UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
-  CompleteSetupBody,
+  UserRestriction,
 } from "../types/api/user.js";
-import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
-import type { ApiErrorResponse } from "../types/api/common.js";
 import { logger } from "../utils/logger.js";
-import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
+import {
+  formatRecoveryKey,
+  generateRecoveryKey,
+} from "../utils/recoveryKey.js";
 
 // Inline the default carousel preferences to avoid ESM loading issues
 const getDefaultCarouselPreferences = (): CarouselPreference[] => [
@@ -140,21 +143,33 @@ export const getUserSettings = async (
         enableCast: user.enableCast,
         theme: user.theme ?? "dark",
         carouselPreferences:
-          (user.carouselPreferences as CarouselPreference[] | null) ?? getDefaultCarouselPreferences(),
+          (user.carouselPreferences as CarouselPreference[] | null) ??
+          getDefaultCarouselPreferences(),
         navPreferences: (user.navPreferences as NavPreference[] | null) ?? null,
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
         hideConfirmationDisabled: user.hideConfirmationDisabled,
         unitPreference: user.unitPreference ?? "metric",
         wallPlayback: user.wallPlayback ?? "autoplay",
-        tableColumnDefaults: (user.tableColumnDefaults as Record<string, TableColumnsConfig> | null) ?? null,
-        cardDisplaySettings: (user.cardDisplaySettings as Record<string, unknown> | null) ?? null,
-        landingPagePreference: (user.landingPagePreference as LandingPagePreference | null) ?? { pages: ["home"], randomize: false },
+        tableColumnDefaults:
+          (user.tableColumnDefaults as Record<
+            string,
+            TableColumnsConfig
+          > | null) ?? null,
+        cardDisplaySettings:
+          (user.cardDisplaySettings as Record<string, unknown> | null) ?? null,
+        landingPagePreference:
+          (user.landingPagePreference as LandingPagePreference | null) ?? {
+            pages: ["home"],
+            randomize: false,
+          },
         lightboxDoubleTapAction: user.lightboxDoubleTapAction ?? "favorite",
       },
     });
   } catch (error) {
-    logger.error("Error getting user settings", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user settings", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get user settings" });
   }
 };
@@ -261,9 +276,9 @@ export const updateUserSettings = async (
     if (wallPlayback !== undefined) {
       const validWallPlayback = ["autoplay", "hover", "static"];
       if (!validWallPlayback.includes(wallPlayback)) {
-        return res
-          .status(400)
-          .json({ error: "Wall playback must be 'autoplay', 'hover', or 'static'" });
+        return res.status(400).json({
+          error: "Wall playback must be 'autoplay', 'hover', or 'static'",
+        });
       }
     }
 
@@ -313,7 +328,10 @@ export const updateUserSettings = async (
 
     // Validate table column defaults if provided
     if (tableColumnDefaults !== undefined) {
-      if (tableColumnDefaults !== null && typeof tableColumnDefaults !== "object") {
+      if (
+        tableColumnDefaults !== null &&
+        typeof tableColumnDefaults !== "object"
+      ) {
         return res
           .status(400)
           .json({ error: "Table column defaults must be an object or null" });
@@ -330,11 +348,13 @@ export const updateUserSettings = async (
           "image",
         ];
 
-        for (const [entityType, config] of Object.entries(tableColumnDefaults)) {
+        for (const [entityType, config] of Object.entries(
+          tableColumnDefaults
+        )) {
           if (!validEntityTypes.includes(entityType)) {
-            return res
-              .status(400)
-              .json({ error: `Invalid entity type in table column defaults: ${entityType}` });
+            return res.status(400).json({
+              error: `Invalid entity type in table column defaults: ${entityType}`,
+            });
           }
 
           const typedConfig = config as TableColumnsConfig;
@@ -343,21 +363,23 @@ export const updateUserSettings = async (
             !Array.isArray(typedConfig.visible) ||
             !Array.isArray(typedConfig.order)
           ) {
-            return res
-              .status(400)
-              .json({ error: `Invalid table column config for ${entityType}: must have visible and order arrays` });
+            return res.status(400).json({
+              error: `Invalid table column config for ${entityType}: must have visible and order arrays`,
+            });
           }
 
           // Validate that arrays contain strings
-          if (!typedConfig.visible.every((v: unknown) => typeof v === "string")) {
-            return res
-              .status(400)
-              .json({ error: `Invalid visible columns for ${entityType}: must be string array` });
+          if (
+            !typedConfig.visible.every((v: unknown) => typeof v === "string")
+          ) {
+            return res.status(400).json({
+              error: `Invalid visible columns for ${entityType}: must be string array`,
+            });
           }
           if (!typedConfig.order.every((v: unknown) => typeof v === "string")) {
-            return res
-              .status(400)
-              .json({ error: `Invalid column order for ${entityType}: must be string array` });
+            return res.status(400).json({
+              error: `Invalid column order for ${entityType}: must be string array`,
+            });
           }
         }
       }
@@ -365,7 +387,10 @@ export const updateUserSettings = async (
 
     // Validate card display settings if provided
     if (cardDisplaySettings !== undefined) {
-      if (cardDisplaySettings !== null && typeof cardDisplaySettings !== "object") {
+      if (
+        cardDisplaySettings !== null &&
+        typeof cardDisplaySettings !== "object"
+      ) {
         return res
           .status(400)
           .json({ error: "Card display settings must be an object or null" });
@@ -374,27 +399,36 @@ export const updateUserSettings = async (
 
     // Validate landing page preference if provided
     if (landingPagePreference !== undefined) {
-      if (landingPagePreference !== null && typeof landingPagePreference !== "object") {
+      if (
+        landingPagePreference !== null &&
+        typeof landingPagePreference !== "object"
+      ) {
         return res
           .status(400)
           .json({ error: "Landing page preference must be an object or null" });
       }
 
       if (landingPagePreference !== null) {
-        if (!Array.isArray(landingPagePreference.pages) || landingPagePreference.pages.length === 0) {
-          return res
-            .status(400)
-            .json({ error: "Landing page preference must have at least one page" });
+        if (
+          !Array.isArray(landingPagePreference.pages) ||
+          landingPagePreference.pages.length === 0
+        ) {
+          return res.status(400).json({
+            error: "Landing page preference must have at least one page",
+          });
         }
 
         if (typeof landingPagePreference.randomize !== "boolean") {
-          return res
-            .status(400)
-            .json({ error: "Landing page preference randomize must be a boolean" });
+          return res.status(400).json({
+            error: "Landing page preference randomize must be a boolean",
+          });
         }
 
         // Validate minimum pages for randomize mode
-        if (landingPagePreference.randomize && landingPagePreference.pages.length < 2) {
+        if (
+          landingPagePreference.randomize &&
+          landingPagePreference.pages.length < 2
+        ) {
           return res
             .status(400)
             .json({ error: "Random mode requires at least 2 pages selected" });
@@ -402,8 +436,18 @@ export const updateUserSettings = async (
 
         // Validate page keys
         const validPageKeys = [
-          "home", "scenes", "performers", "studios", "tags", "collections",
-          "galleries", "images", "playlists", "recommended", "watch-history", "user-stats"
+          "home",
+          "scenes",
+          "performers",
+          "studios",
+          "tags",
+          "collections",
+          "galleries",
+          "images",
+          "playlists",
+          "recommended",
+          "watch-history",
+          "user-stats",
         ];
         for (const pageKey of landingPagePreference.pages) {
           if (!validPageKeys.includes(pageKey)) {
@@ -419,9 +463,10 @@ export const updateUserSettings = async (
     if (lightboxDoubleTapAction !== undefined) {
       const validActions = ["favorite", "o_counter", "fullscreen"];
       if (!validActions.includes(lightboxDoubleTapAction)) {
-        return res
-          .status(400)
-          .json({ error: "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'" });
+        return res.status(400).json({
+          error:
+            "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'",
+        });
       }
     }
 
@@ -435,16 +480,28 @@ export const updateUserSettings = async (
         }),
         ...(enableCast !== undefined && { enableCast }),
         ...(theme !== undefined && { theme }),
-        ...(carouselPreferences !== undefined && { carouselPreferences: carouselPreferences as never }),
-        ...(navPreferences !== undefined && { navPreferences: navPreferences as never }),
+        ...(carouselPreferences !== undefined && {
+          carouselPreferences: carouselPreferences as never,
+        }),
+        ...(navPreferences !== undefined && {
+          navPreferences: navPreferences as never,
+        }),
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
         ...(syncToStash !== undefined && { syncToStash }),
         ...(unitPreference !== undefined && { unitPreference }),
         ...(wallPlayback !== undefined && { wallPlayback }),
-        ...(tableColumnDefaults !== undefined && { tableColumnDefaults: tableColumnDefaults as never }),
-        ...(cardDisplaySettings !== undefined && { cardDisplaySettings: cardDisplaySettings as never }),
-        ...(landingPagePreference !== undefined && { landingPagePreference: landingPagePreference as never }),
-        ...(lightboxDoubleTapAction !== undefined && { lightboxDoubleTapAction }),
+        ...(tableColumnDefaults !== undefined && {
+          tableColumnDefaults: tableColumnDefaults as never,
+        }),
+        ...(cardDisplaySettings !== undefined && {
+          cardDisplaySettings: cardDisplaySettings as never,
+        }),
+        ...(landingPagePreference !== undefined && {
+          landingPagePreference: landingPagePreference as never,
+        }),
+        ...(lightboxDoubleTapAction !== undefined && {
+          lightboxDoubleTapAction,
+        }),
       },
       select: {
         id: true,
@@ -473,19 +530,34 @@ export const updateUserSettings = async (
         preferredPlaybackMode: updatedUser.preferredPlaybackMode ?? "auto",
         theme: updatedUser.theme ?? "dark",
         carouselPreferences:
-          (updatedUser.carouselPreferences as CarouselPreference[] | null) ?? getDefaultCarouselPreferences(),
-        navPreferences: (updatedUser.navPreferences as NavPreference[] | null) ?? null,
+          (updatedUser.carouselPreferences as CarouselPreference[] | null) ??
+          getDefaultCarouselPreferences(),
+        navPreferences:
+          (updatedUser.navPreferences as NavPreference[] | null) ?? null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
         wallPlayback: updatedUser.wallPlayback ?? "autoplay",
-        tableColumnDefaults: (updatedUser.tableColumnDefaults as Record<string, TableColumnsConfig> | null) ?? null,
-        cardDisplaySettings: (updatedUser.cardDisplaySettings as Record<string, unknown> | null) ?? null,
-        landingPagePreference: (updatedUser.landingPagePreference as LandingPagePreference | null) ?? { pages: ["home"], randomize: false },
-        lightboxDoubleTapAction: updatedUser.lightboxDoubleTapAction ?? "favorite",
+        tableColumnDefaults:
+          (updatedUser.tableColumnDefaults as Record<
+            string,
+            TableColumnsConfig
+          > | null) ?? null,
+        cardDisplaySettings:
+          (updatedUser.cardDisplaySettings as Record<string, unknown> | null) ??
+          null,
+        landingPagePreference:
+          (updatedUser.landingPagePreference as LandingPagePreference | null) ?? {
+            pages: ["home"],
+            randomize: false,
+          },
+        lightboxDoubleTapAction:
+          updatedUser.lightboxDoubleTapAction ?? "favorite",
       },
     });
   } catch (error) {
-    logger.error("Error updating user settings", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating user settings", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update user settings" });
   }
 };
@@ -514,7 +586,9 @@ export const changePassword = async (
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return res
+        .status(400)
+        .json({ error: passwordValidation.errors.join(". ") });
     }
 
     // Get current user with password
@@ -543,7 +617,9 @@ export const changePassword = async (
 
     res.json({ success: true, message: "Password changed successfully" });
   } catch (error) {
-    logger.error("Error changing password", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error changing password", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to change password" });
   }
 };
@@ -578,7 +654,9 @@ export const getRecoveryKey = async (
 
     res.json({ recoveryKey: formattedKey });
   } catch (error) {
-    logger.error("Error getting recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting recovery key", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get recovery key" });
   }
 };
@@ -609,7 +687,9 @@ export const regenerateRecoveryKey = async (
     // Return formatted key
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
-    logger.error("Error regenerating recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error regenerating recovery key", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to regenerate recovery key" });
   }
 };
@@ -617,7 +697,10 @@ export const regenerateRecoveryKey = async (
 /**
  * Get all users (admin only)
  */
-export const getAllUsers = async (req: TypedAuthRequest, res: TypedResponse<GetAllUsersResponse | ApiErrorResponse>) => {
+export const getAllUsers = async (
+  req: TypedAuthRequest,
+  res: TypedResponse<GetAllUsersResponse | ApiErrorResponse>
+) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -655,7 +738,9 @@ export const getAllUsers = async (req: TypedAuthRequest, res: TypedResponse<GetA
       })),
     });
   } catch (error) {
-    logger.error("Error getting all users", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting all users", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get users" });
   }
 };
@@ -663,7 +748,10 @@ export const getAllUsers = async (req: TypedAuthRequest, res: TypedResponse<GetA
 /**
  * Create new user (admin only)
  */
-export const createUser = async (req: TypedAuthRequest<CreateUserBody>, res: TypedResponse<CreateUserResponse | ApiErrorResponse>) => {
+export const createUser = async (
+  req: TypedAuthRequest<CreateUserBody>,
+  res: TypedResponse<CreateUserResponse | ApiErrorResponse>
+) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -722,7 +810,9 @@ export const createUser = async (req: TypedAuthRequest<CreateUserBody>, res: Typ
 
     res.status(201).json({ success: true, user: newUser });
   } catch (error) {
-    logger.error("Error creating user", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error creating user", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to create user" });
   }
 };
@@ -730,7 +820,10 @@ export const createUser = async (req: TypedAuthRequest<CreateUserBody>, res: Typ
 /**
  * Delete user (admin only)
  */
-export const deleteUser = async (req: TypedAuthRequest<never, DeleteUserParams>, res: TypedResponse<DeleteUserResponse | ApiErrorResponse>) => {
+export const deleteUser = async (
+  req: TypedAuthRequest<never, DeleteUserParams>,
+  res: TypedResponse<DeleteUserResponse | ApiErrorResponse>
+) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
@@ -767,7 +860,9 @@ export const deleteUser = async (req: TypedAuthRequest<never, DeleteUserParams>,
 
     res.json({ success: true, message: "User deleted successfully" });
   } catch (error) {
-    logger.error("Error deleting user", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error deleting user", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to delete user" });
   }
 };
@@ -820,7 +915,9 @@ export const updateUserRole = async (
 
     res.json({ success: true, user: updatedUser });
   } catch (error) {
-    logger.error("Error updating user role", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating user role", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update user role" });
   }
 };
@@ -860,7 +957,9 @@ export const getFilterPresets = async (
 
     res.json({ presets });
   } catch (error) {
-    logger.error("Error getting filter presets", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting filter presets", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get filter presets" });
   }
 };
@@ -983,7 +1082,9 @@ export const saveFilterPreset = async (
 
     res.json({ success: true, preset: newPreset });
   } catch (error) {
-    logger.error("Error saving filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error saving filter preset", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to save filter preset" });
   }
 };
@@ -1054,7 +1155,9 @@ export const deleteFilterPreset = async (
 
     res.json({ success: true });
   } catch (error) {
-    logger.error("Error deleting filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error deleting filter preset", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to delete filter preset" });
   }
 };
@@ -1086,11 +1189,14 @@ export const getDefaultFilterPresets = async (
     }
 
     // Return empty object if no defaults set
-    const defaults = (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
+    const defaults =
+      (user.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
 
     res.json({ defaults });
   } catch (error) {
-    logger.error("Error getting default filter presets", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting default filter presets", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get default filter presets" });
   }
 };
@@ -1177,7 +1283,9 @@ export const setDefaultFilterPreset = async (
 
     res.json({ success: true, defaults: currentDefaults });
   } catch (error) {
-    logger.error("Error setting default filter preset", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error setting default filter preset", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to set default filter preset" });
   }
 };
@@ -1228,9 +1336,8 @@ export const syncFromStash = async (
     };
 
     // Get Stash instances from manager
-    const { stashInstanceManager } = await import(
-      "../services/StashInstanceManager.js"
-    );
+    const { stashInstanceManager } =
+      await import("../services/StashInstanceManager.js");
     const allInstances = stashInstanceManager.getAll();
 
     if (allInstances.length === 0) {
@@ -1276,7 +1383,9 @@ export const syncFromStash = async (
       return results;
     }
 
-    logger.info("Syncing from Stash: Fetching entities in paginated batches...");
+    logger.info(
+      "Syncing from Stash: Fetching entities in paginated batches..."
+    );
 
     for (const [currentInstanceId, stash] of allInstances) {
       try {
@@ -1289,7 +1398,10 @@ export const syncFromStash = async (
           // Determine which filter to use
           if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
             sceneFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
-          } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
+          } else if (
+            syncOptions.scenes.oCounter &&
+            !syncOptions.scenes.rating
+          ) {
             sceneFilter = { o_counter: { value: 0, modifier: "GREATER_THAN" } };
           }
           // If both are selected, fetch all scenes (can't do OR in single query)
@@ -1306,21 +1418,17 @@ export const syncFromStash = async (
                     s.o_counter > 0)
               : () => true;
 
-          const filteredScenes = await fetchPaginated(
-            async (page) => {
-              const result = await stash.findScenes({
-                filter: { page, per_page: PAGE_SIZE },
-                scene_filter:
-                  Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
-              });
-              return {
-                items: result.findScenes.scenes,
-                count: result.findScenes.count,
-              };
-            },
-            sceneFilterFn
-          );
-
+          const filteredScenes = await fetchPaginated(async (page) => {
+            const result = await stash.findScenes({
+              filter: { page, per_page: PAGE_SIZE },
+              scene_filter:
+                Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
+            });
+            return {
+              items: result.findScenes.scenes,
+              count: result.findScenes.count,
+            };
+          }, sceneFilterFn);
 
           // Track unique scenes to avoid double-counting when syncing both rating and o_counter
           const createdScenes = new Set<string>();
@@ -1334,12 +1442,20 @@ export const syncFromStash = async (
             const [existingRatings, existingWatchHistory] = await Promise.all([
               syncOptions.scenes.rating
                 ? prisma.sceneRating.findMany({
-                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
+                    where: {
+                      userId: targetUserId,
+                      instanceId: currentInstanceId,
+                      sceneId: { in: sceneIds },
+                    },
                   })
                 : Promise.resolve([]),
               syncOptions.scenes.oCounter
                 ? prisma.watchHistory.findMany({
-                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
+                    where: {
+                      userId: targetUserId,
+                      instanceId: currentInstanceId,
+                      sceneId: { in: sceneIds },
+                    },
                   })
                 : Promise.resolve([]),
             ]);
@@ -1352,10 +1468,12 @@ export const syncFromStash = async (
             );
 
             // Build bulk operations
-            const ratingUpserts: Parameters<typeof prisma.sceneRating.upsert>[0][] =
-              [];
-            const watchUpserts: Parameters<typeof prisma.watchHistory.upsert>[0][] =
-              [];
+            const ratingUpserts: Parameters<
+              typeof prisma.sceneRating.upsert
+            >[0][] = [];
+            const watchUpserts: Parameters<
+              typeof prisma.watchHistory.upsert
+            >[0][] = [];
 
             for (const scene of batch) {
               let sceneWasCreated = false;
@@ -1372,7 +1490,11 @@ export const syncFromStash = async (
                 const existing = existingRatingMap.get(scene.id);
                 ratingUpserts.push({
                   where: {
-                    userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
+                    userId_instanceId_sceneId: {
+                      userId: targetUserId,
+                      instanceId: sceneInstanceId,
+                      sceneId: scene.id,
+                    },
                   },
                   update: { rating: scene.rating100 },
                   create: {
@@ -1400,7 +1522,11 @@ export const syncFromStash = async (
                 const existing = existingWatchMap.get(scene.id);
                 watchUpserts.push({
                   where: {
-                    userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
+                    userId_instanceId_sceneId: {
+                      userId: targetUserId,
+                      instanceId: sceneInstanceId,
+                      sceneId: scene.id,
+                    },
                   },
                   update: { oCount: scene.o_counter },
                   create: {
@@ -1450,8 +1576,13 @@ export const syncFromStash = async (
           let performerFilter: Record<string, unknown> = {};
 
           // Use GraphQL filter when only one option is selected
-          if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
-            performerFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
+          if (
+            syncOptions.performers.rating &&
+            !syncOptions.performers.favorite
+          ) {
+            performerFilter = {
+              rating100: { value: 0, modifier: "GREATER_THAN" },
+            };
           } else if (
             syncOptions.performers.favorite &&
             !syncOptions.performers.rating
@@ -1463,30 +1594,29 @@ export const syncFromStash = async (
           // Build filter function for in-code filtering when both options selected
           const performerFilterFn =
             syncOptions.performers.rating && syncOptions.performers.favorite
-              ? (p: { rating100?: number | null; favorite?: boolean }): boolean =>
+              ? (p: {
+                  rating100?: number | null;
+                  favorite?: boolean;
+                }): boolean =>
                   (p.rating100 !== null &&
                     p.rating100 !== undefined &&
                     p.rating100 > 0) ||
                   !!p.favorite
               : (): boolean => true;
 
-          const filteredPerformers = await fetchPaginated(
-            async (page) => {
-              const result = await stash.findPerformers({
-                filter: { page, per_page: PAGE_SIZE },
-                performer_filter:
-                  Object.keys(performerFilter).length > 0
-                    ? performerFilter
-                    : undefined,
-              });
-              return {
-                items: result.findPerformers.performers,
-                count: result.findPerformers.count,
-              };
-            },
-            performerFilterFn
-          );
-
+          const filteredPerformers = await fetchPaginated(async (page) => {
+            const result = await stash.findPerformers({
+              filter: { page, per_page: PAGE_SIZE },
+              performer_filter:
+                Object.keys(performerFilter).length > 0
+                  ? performerFilter
+                  : undefined,
+            });
+            return {
+              items: result.findPerformers.performers,
+              count: result.findPerformers.count,
+            };
+          }, performerFilterFn);
 
           for (let i = 0; i < filteredPerformers.length; i += BATCH_SIZE) {
             const batch = filteredPerformers.slice(i, i + BATCH_SIZE);
@@ -1494,7 +1624,11 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.performerRating.findMany({
-              where: { userId: targetUserId, instanceId: currentInstanceId, performerId: { in: performerIds } },
+              where: {
+                userId: targetUserId,
+                instanceId: currentInstanceId,
+                performerId: { in: performerIds },
+              },
             });
 
             const existingRatingMap = new Map(
@@ -1502,8 +1636,9 @@ export const syncFromStash = async (
             );
 
             // Build bulk operations
-            const upserts: Parameters<typeof prisma.performerRating.upsert>[0][] =
-              [];
+            const upserts: Parameters<
+              typeof prisma.performerRating.upsert
+            >[0][] = [];
 
             for (const performer of batch) {
               const stashRating = syncOptions.performers.rating
@@ -1518,7 +1653,8 @@ export const syncFromStash = async (
 
               const updates: SyncUpdates = {};
               if (syncOptions.performers.rating) updates.rating = stashRating;
-              if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
+              if (syncOptions.performers.favorite)
+                updates.favorite = stashFavorite;
 
               upserts.push({
                 where: {
@@ -1576,8 +1712,13 @@ export const syncFromStash = async (
 
           // Use GraphQL filter when only one option is selected
           if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
-            studioFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
-          } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
+            studioFilter = {
+              rating100: { value: 0, modifier: "GREATER_THAN" },
+            };
+          } else if (
+            syncOptions.studios.favorite &&
+            !syncOptions.studios.rating
+          ) {
             studioFilter = { favorite: true };
           }
           // If both are selected, fetch all and filter in code (can't do OR in single query)
@@ -1585,28 +1726,27 @@ export const syncFromStash = async (
           // Build filter function for in-code filtering when both options selected
           const studioFilterFn =
             syncOptions.studios.rating && syncOptions.studios.favorite
-              ? (s: { rating100?: number | null; favorite?: boolean }): boolean =>
+              ? (s: {
+                  rating100?: number | null;
+                  favorite?: boolean;
+                }): boolean =>
                   (s.rating100 !== null &&
                     s.rating100 !== undefined &&
                     s.rating100 > 0) ||
                   !!s.favorite
               : (): boolean => true;
 
-          const filteredStudios = await fetchPaginated(
-            async (page) => {
-              const result = await stash.findStudios({
-                filter: { page, per_page: PAGE_SIZE },
-                studio_filter:
-                  Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
-              });
-              return {
-                items: result.findStudios.studios,
-                count: result.findStudios.count,
-              };
-            },
-            studioFilterFn
-          );
-
+          const filteredStudios = await fetchPaginated(async (page) => {
+            const result = await stash.findStudios({
+              filter: { page, per_page: PAGE_SIZE },
+              studio_filter:
+                Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
+            });
+            return {
+              items: result.findStudios.studios,
+              count: result.findStudios.count,
+            };
+          }, studioFilterFn);
 
           for (let i = 0; i < filteredStudios.length; i += BATCH_SIZE) {
             const batch = filteredStudios.slice(i, i + BATCH_SIZE);
@@ -1614,7 +1754,11 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.studioRating.findMany({
-              where: { userId: targetUserId, instanceId: currentInstanceId, studioId: { in: studioIds } },
+              where: {
+                userId: targetUserId,
+                instanceId: currentInstanceId,
+                studioId: { in: studioIds },
+              },
             });
 
             const existingRatingMap = new Map(
@@ -1622,7 +1766,8 @@ export const syncFromStash = async (
             );
 
             // Build bulk operations
-            const upserts: Parameters<typeof prisma.studioRating.upsert>[0][] = [];
+            const upserts: Parameters<typeof prisma.studioRating.upsert>[0][] =
+              [];
 
             for (const studio of batch) {
               const stashRating = syncOptions.studios.rating
@@ -1637,11 +1782,16 @@ export const syncFromStash = async (
 
               const updates: SyncUpdates = {};
               if (syncOptions.studios.rating) updates.rating = stashRating;
-              if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
+              if (syncOptions.studios.favorite)
+                updates.favorite = stashFavorite;
 
               upserts.push({
                 where: {
-                  userId_instanceId_studioId: { userId: targetUserId, instanceId: studioInstanceId, studioId: studio.id },
+                  userId_instanceId_studioId: {
+                    userId: targetUserId,
+                    instanceId: studioInstanceId,
+                    studioId: studio.id,
+                  },
                 },
                 update: updates,
                 create: {
@@ -1657,7 +1807,10 @@ export const syncFromStash = async (
                 stats.studios.created++;
               } else {
                 let needsUpdate = false;
-                if (syncOptions.studios.rating && existing.rating !== stashRating)
+                if (
+                  syncOptions.studios.rating &&
+                  existing.rating !== stashRating
+                )
                   needsUpdate = true;
                 if (
                   syncOptions.studios.favorite &&
@@ -1689,7 +1842,10 @@ export const syncFromStash = async (
               filter: { page, per_page: PAGE_SIZE },
               tag_filter: { favorite: true },
             });
-            return { items: result.findTags.tags, count: result.findTags.count };
+            return {
+              items: result.findTags.tags,
+              count: result.findTags.count,
+            };
           });
 
           for (let i = 0; i < tags.length; i += BATCH_SIZE) {
@@ -1698,7 +1854,11 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.tagRating.findMany({
-              where: { userId: targetUserId, instanceId: currentInstanceId, tagId: { in: tagIds } },
+              where: {
+                userId: targetUserId,
+                instanceId: currentInstanceId,
+                tagId: { in: tagIds },
+              },
             });
 
             const existingRatingMap = new Map(
@@ -1714,7 +1874,13 @@ export const syncFromStash = async (
               const tagInstanceId = currentInstanceId;
 
               upserts.push({
-                where: { userId_instanceId_tagId: { userId: targetUserId, instanceId: tagInstanceId, tagId: tag.id } },
+                where: {
+                  userId_instanceId_tagId: {
+                    userId: targetUserId,
+                    instanceId: tagInstanceId,
+                    tagId: tag.id,
+                  },
+                },
                 update: { favorite: stashFavorite },
                 create: {
                   userId: targetUserId,
@@ -1758,7 +1924,9 @@ export const syncFromStash = async (
               };
             },
             (g: { rating100?: number | null }) =>
-              g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+              g.rating100 !== null &&
+              g.rating100 !== undefined &&
+              g.rating100 > 0
           );
 
           for (let i = 0; i < galleries.length; i += BATCH_SIZE) {
@@ -1767,7 +1935,11 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.galleryRating.findMany({
-              where: { userId: targetUserId, instanceId: currentInstanceId, galleryId: { in: galleryIds } },
+              where: {
+                userId: targetUserId,
+                instanceId: currentInstanceId,
+                galleryId: { in: galleryIds },
+              },
             });
 
             const existingRatingMap = new Map(
@@ -1775,7 +1947,8 @@ export const syncFromStash = async (
             );
 
             // Build bulk operations
-            const upserts: Parameters<typeof prisma.galleryRating.upsert>[0][] = [];
+            const upserts: Parameters<typeof prisma.galleryRating.upsert>[0][] =
+              [];
 
             for (const gallery of batch) {
               const stashRating = gallery.rating100;
@@ -1784,7 +1957,11 @@ export const syncFromStash = async (
 
               upserts.push({
                 where: {
-                  userId_instanceId_galleryId: { userId: targetUserId, instanceId: galleryInstanceId, galleryId: gallery.id },
+                  userId_instanceId_galleryId: {
+                    userId: targetUserId,
+                    instanceId: galleryInstanceId,
+                    galleryId: gallery.id,
+                  },
                 },
                 update: { rating: stashRating },
                 create: {
@@ -1829,7 +2006,9 @@ export const syncFromStash = async (
               };
             },
             (g: { rating100?: number | null }) =>
-              g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+              g.rating100 !== null &&
+              g.rating100 !== undefined &&
+              g.rating100 > 0
           );
 
           for (let i = 0; i < groups.length; i += BATCH_SIZE) {
@@ -1838,7 +2017,11 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.groupRating.findMany({
-              where: { userId: targetUserId, instanceId: currentInstanceId, groupId: { in: groupIds } },
+              where: {
+                userId: targetUserId,
+                instanceId: currentInstanceId,
+                groupId: { in: groupIds },
+              },
             });
 
             const existingRatingMap = new Map(
@@ -1846,7 +2029,8 @@ export const syncFromStash = async (
             );
 
             // Build bulk operations
-            const upserts: Parameters<typeof prisma.groupRating.upsert>[0][] = [];
+            const upserts: Parameters<typeof prisma.groupRating.upsert>[0][] =
+              [];
 
             for (const group of batch) {
               const stashRating = group.rating100;
@@ -1855,7 +2039,11 @@ export const syncFromStash = async (
 
               upserts.push({
                 where: {
-                  userId_instanceId_groupId: { userId: targetUserId, instanceId: groupInstanceId, groupId: group.id },
+                  userId_instanceId_groupId: {
+                    userId: targetUserId,
+                    instanceId: groupInstanceId,
+                    groupId: group.id,
+                  },
                 },
                 update: { rating: stashRating },
                 create: {
@@ -1884,11 +2072,16 @@ export const syncFromStash = async (
             stats.groups.checked += batch.length;
           }
         }
-
       } catch (instanceError) {
-        logger.error(`Error syncing from Stash instance ${currentInstanceId}:`, {
-          error: instanceError instanceof Error ? instanceError.message : String(instanceError),
-        });
+        logger.error(
+          `Error syncing from Stash instance ${currentInstanceId}:`,
+          {
+            error:
+              instanceError instanceof Error
+                ? instanceError.message
+                : String(instanceError),
+          }
+        );
         // Continue with other instances
       }
     } // end for...of allInstances
@@ -1910,7 +2103,9 @@ export const syncFromStash = async (
       stats,
     });
   } catch (error) {
-    logger.error("Error syncing from Stash:", { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error syncing from Stash:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ error: "Failed to sync from Stash" });
   }
 };
@@ -1943,7 +2138,9 @@ export const getUserRestrictions = async (
 
     res.json({ restrictions });
   } catch (error) {
-    logger.error("Error getting user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user restrictions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get content restrictions" });
   }
 };
@@ -2023,7 +2220,9 @@ export const updateUserRestrictions = async (
       restrictions: created,
     });
   } catch (error) {
-    logger.error("Error updating user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating user restrictions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update content restrictions" });
   }
 };
@@ -2064,7 +2263,9 @@ export const deleteUserRestrictions = async (
       message: "All content restrictions removed successfully",
     });
   } catch (error) {
-    logger.error("Error deleting user restrictions", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error deleting user restrictions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to delete content restrictions" });
   }
 };
@@ -2107,9 +2308,8 @@ export const hideEntity = async (
 
     // Validate instanceId if provided
     if (instanceId) {
-      const { stashInstanceManager } = await import(
-        "../services/StashInstanceManager.js"
-      );
+      const { stashInstanceManager } =
+        await import("../services/StashInstanceManager.js");
       const instance = stashInstanceManager.getConfig(instanceId);
       if (!instance) {
         return res.status(400).json({ error: "Invalid instanceId" });
@@ -2117,15 +2317,21 @@ export const hideEntity = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
-    await userHiddenEntityService.hideEntity(userId, entityType as EntityType, entityId, instanceId ?? "");
+    await userHiddenEntityService.hideEntity(
+      userId,
+      entityType as EntityType,
+      entityId,
+      instanceId ?? ""
+    );
 
     res.json({ success: true, message: "Entity hidden successfully" });
   } catch (error) {
-    logger.error("Error hiding entity", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error hiding entity", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to hide entity" });
   }
 };
@@ -2167,28 +2373,33 @@ export const unhideEntity = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
     const unhideInstanceId = req.query.instanceId ?? "";
 
     // Validate instanceId if provided
     if (unhideInstanceId) {
-      const { stashInstanceManager } = await import(
-        "../services/StashInstanceManager.js"
-      );
+      const { stashInstanceManager } =
+        await import("../services/StashInstanceManager.js");
       const instance = stashInstanceManager.getConfig(unhideInstanceId);
       if (!instance) {
         return res.status(400).json({ error: "Invalid instanceId" });
       }
     }
 
-    await userHiddenEntityService.unhideEntity(userId, entityType as EntityType, entityId, unhideInstanceId);
+    await userHiddenEntityService.unhideEntity(
+      userId,
+      entityType as EntityType,
+      entityId,
+      unhideInstanceId
+    );
 
     res.json({ success: true, message: "Entity restored successfully" });
   } catch (error) {
-    logger.error("Error unhiding entity", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error unhiding entity", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to restore entity" });
   }
 };
@@ -2227,14 +2438,10 @@ export const unhideAllEntities = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
-    const count = await userHiddenEntityService.unhideAll(
-      userId,
-      entityType
-    );
+    const count = await userHiddenEntityService.unhideAll(userId, entityType);
 
     res.json({
       success: true,
@@ -2242,7 +2449,9 @@ export const unhideAllEntities = async (
       count,
     });
   } catch (error) {
-    logger.error("Error unhiding all entities", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error unhiding all entities", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to restore all items" });
   }
 };
@@ -2281,9 +2490,8 @@ export const getHiddenEntities = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
     const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
       userId,
@@ -2292,7 +2500,9 @@ export const getHiddenEntities = async (
 
     res.json({ hiddenEntities });
   } catch (error) {
-    logger.error("Error getting hidden entities", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting hidden entities", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get hidden entities" });
   }
 };
@@ -2312,9 +2522,8 @@ export const getHiddenEntityIds = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
     const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
 
@@ -2331,7 +2540,9 @@ export const getHiddenEntityIds = async (
 
     res.json({ hiddenIds: result });
   } catch (error) {
-    logger.error("Error getting hidden entity IDs", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting hidden entity IDs", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get hidden entity IDs" });
   }
 };
@@ -2383,9 +2594,8 @@ export const hideEntities = async (
     }
 
     // Import service
-    const { userHiddenEntityService } = await import(
-      "../services/UserHiddenEntityService.js"
-    );
+    const { userHiddenEntityService } =
+      await import("../services/UserHiddenEntityService.js");
 
     // Hide all entities
     let successCount = 0;
@@ -2402,7 +2612,9 @@ export const hideEntities = async (
         successCount++;
       } catch (error) {
         failCount++;
-        logger.error(`Failed to hide ${entity.entityType} ${entity.entityId}`, { error: error instanceof Error ? error.message : "Unknown error" });
+        logger.error(`Failed to hide ${entity.entityType} ${entity.entityId}`, {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
     }
 
@@ -2413,7 +2625,9 @@ export const hideEntities = async (
       failCount,
     });
   } catch (error) {
-    logger.error("Error hiding entities", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error hiding entities", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to hide entities" });
   }
 };
@@ -2447,7 +2661,9 @@ export const updateHideConfirmation = async (
 
     res.json({ success: true, hideConfirmationDisabled });
   } catch (error) {
-    logger.error("Error updating hide confirmation preference", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating hide confirmation preference", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res
       .status(500)
       .json({ error: "Failed to update hide confirmation preference" });
@@ -2474,7 +2690,9 @@ export const getUserPermissions = async (
 
     res.json({ permissions });
   } catch (error) {
-    logger.error("Error getting user permissions", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user permissions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get permissions" });
   }
 };
@@ -2488,7 +2706,9 @@ export const getAnyUserPermissions = async (
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const userId = parseInt(req.params.userId);
@@ -2504,7 +2724,9 @@ export const getAnyUserPermissions = async (
 
     res.json({ permissions });
   } catch (error) {
-    logger.error("Error getting user permissions", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user permissions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get permissions" });
   }
 };
@@ -2513,12 +2735,17 @@ export const getAnyUserPermissions = async (
  * Admin endpoint to update user permission overrides
  */
 export const updateUserPermissionOverrides = async (
-  req: TypedAuthRequest<UpdatePermissionOverridesBody, GetUserPermissionsParams>,
+  req: TypedAuthRequest<
+    UpdatePermissionOverridesBody,
+    GetUserPermissionsParams
+  >,
   res: TypedResponse<{ success: true; permissions: unknown } | ApiErrorResponse>
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const userId = parseInt(req.params.userId);
@@ -2526,8 +2753,11 @@ export const updateUserPermissionOverrides = async (
       return res.status(400).json({ error: "Invalid user ID" });
     }
 
-    const { canShareOverride, canDownloadFilesOverride, canDownloadPlaylistsOverride } =
-      req.body;
+    const {
+      canShareOverride,
+      canDownloadFilesOverride,
+      canDownloadPlaylistsOverride,
+    } = req.body;
 
     // Validate values (must be boolean or null)
     const validateOverride = (value: unknown): boolean | null | undefined => {
@@ -2544,10 +2774,12 @@ export const updateUserPermissionOverrides = async (
       if (shareOverride !== undefined) updates.canShareOverride = shareOverride;
 
       const filesOverride = validateOverride(canDownloadFilesOverride);
-      if (filesOverride !== undefined) updates.canDownloadFilesOverride = filesOverride;
+      if (filesOverride !== undefined)
+        updates.canDownloadFilesOverride = filesOverride;
 
       const playlistsOverride = validateOverride(canDownloadPlaylistsOverride);
-      if (playlistsOverride !== undefined) updates.canDownloadPlaylistsOverride = playlistsOverride;
+      if (playlistsOverride !== undefined)
+        updates.canDownloadPlaylistsOverride = playlistsOverride;
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid updates provided" });
@@ -2562,10 +2794,14 @@ export const updateUserPermissionOverrides = async (
       const permissions = await resolveUserPermissions(userId);
       res.json({ success: true, permissions });
     } catch {
-      return res.status(400).json({ error: "Invalid override value - must be true, false, or null" });
+      return res.status(400).json({
+        error: "Invalid override value - must be true, false, or null",
+      });
     }
   } catch (error) {
-    logger.error("Error updating permission overrides", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating permission overrides", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update permission overrides" });
   }
 };
@@ -2579,7 +2815,9 @@ export const getUserGroupMemberships = async (
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const userId = parseInt(req.params.userId);
@@ -2607,7 +2845,9 @@ export const getUserGroupMemberships = async (
       groups: memberships.map((m) => m.group),
     });
   } catch (error) {
-    logger.error("Error getting user group memberships", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user group memberships", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get user group memberships" });
   }
 };
@@ -2641,7 +2881,9 @@ export const adminResetPassword = async (
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return res
+        .status(400)
+        .json({ error: passwordValidation.errors.join(". ") });
     }
 
     // Check if user exists
@@ -2664,7 +2906,9 @@ export const adminResetPassword = async (
 
     res.json({ success: true });
   } catch (error) {
-    logger.error("Error resetting user password", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error resetting user password", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to reset user password" });
   }
 };
@@ -2712,7 +2956,9 @@ export const adminRegenerateRecoveryKey = async (
     // Return formatted key
     res.json({ recoveryKey: formatRecoveryKey(newKey) });
   } catch (error) {
-    logger.error("Error regenerating user recovery key", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error regenerating user recovery key", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to regenerate user recovery key" });
   }
 };
@@ -2731,7 +2977,10 @@ export const adminRegenerateRecoveryKey = async (
  */
 export const getUserStashInstances = async (
   req: TypedAuthRequest,
-  res: TypedResponse<{ selectedInstanceIds: string[]; availableInstances: unknown[] } | ApiErrorResponse>
+  res: TypedResponse<
+    | { selectedInstanceIds: string[]; availableInstances: unknown[] }
+    | ApiErrorResponse
+  >
 ) => {
   try {
     const userId = req.user?.id;
@@ -2762,7 +3011,9 @@ export const getUserStashInstances = async (
       availableInstances,
     });
   } catch (error) {
-    logger.error("Error getting user Stash instances", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting user Stash instances", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get Stash instance selection" });
   }
 };
@@ -2777,7 +3028,9 @@ export const getUserStashInstances = async (
  */
 export const updateUserStashInstances = async (
   req: TypedAuthRequest<UpdateUserStashInstancesBody>,
-  res: TypedResponse<{ success: true; selectedInstanceIds: string[] } | ApiErrorResponse>
+  res: TypedResponse<
+    { success: true; selectedInstanceIds: string[] } | ApiErrorResponse
+  >
 ) => {
   try {
     const userId = req.user?.id;
@@ -2831,8 +3084,12 @@ export const updateUserStashInstances = async (
       selectedInstanceIds: instanceIds,
     });
   } catch (error) {
-    logger.error("Error updating user Stash instances", { error: error instanceof Error ? error.message : "Unknown error" });
-    res.status(500).json({ error: "Failed to update Stash instance selection" });
+    logger.error("Error updating user Stash instances", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    res
+      .status(500)
+      .json({ error: "Failed to update Stash instance selection" });
   }
 };
 
@@ -2842,7 +3099,15 @@ export const updateUserStashInstances = async (
  */
 export const getSetupStatus = async (
   req: TypedAuthRequest,
-  res: TypedResponse<{ setupCompleted: boolean; recoveryKey: string | null; instances: unknown[]; instanceCount: number } | ApiErrorResponse>
+  res: TypedResponse<
+    | {
+        setupCompleted: boolean;
+        recoveryKey: string | null;
+        instances: unknown[];
+        instanceCount: number;
+      }
+    | ApiErrorResponse
+  >
 ) => {
   try {
     const userId = req.user?.id;
@@ -2882,7 +3147,9 @@ export const getSetupStatus = async (
       instanceCount,
     });
   } catch (error) {
-    logger.error("Error getting setup status", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error getting setup status", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to get setup status" });
   }
 };
@@ -2963,7 +3230,9 @@ export const completeSetup = async (
 
     res.json({ success: true });
   } catch (error) {
-    logger.error("Error completing setup", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error completing setup", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to complete setup" });
   }
 };

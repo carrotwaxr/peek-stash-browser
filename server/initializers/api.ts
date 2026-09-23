@@ -4,6 +4,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getClipsForScene } from "../controllers/clips.js";
 import {
   proxyClipPreview,
   proxyImage,
@@ -12,11 +13,20 @@ import {
   proxyStashMedia,
 } from "../controllers/proxy.js";
 import * as statsController from "../controllers/stats.js";
-import { authenticate, requireAdmin, requireCacheReady } from "../middleware/auth.js";
-import { getClipsForScene } from "../controllers/clips.js";
+import {
+  authenticate,
+  requireAdmin,
+  requireCacheReady,
+} from "../middleware/auth.js";
+import { errorHandler } from "../middleware/errorHandler.js";
 import authRoutes from "../routes/auth.js";
 import carouselRoutes from "../routes/carousel.js";
+import clipsRoutes from "../routes/clips.js";
 import customThemeRoutes from "../routes/customTheme.js";
+import databaseBackupRoutes from "../routes/databaseBackup.js";
+import downloadRoutes from "../routes/download.js";
+import exclusionsRoutes from "../routes/exclusions.js";
+import groupRoutes from "../routes/groups.js";
 import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
@@ -25,24 +35,18 @@ import libraryPerformersRoutes from "../routes/library/performers.js";
 import libraryScenesRoutes from "../routes/library/scenes.js";
 import libraryStudiosRoutes from "../routes/library/studios.js";
 import libraryTagsRoutes from "../routes/library/tags.js";
+import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
 import playlistRoutes from "../routes/playlist.js";
 import ratingsRoutes from "../routes/ratings.js";
 import setupRoutes from "../routes/setup.js";
 import syncRoutes from "../routes/sync.js";
-import exclusionsRoutes from "../routes/exclusions.js";
-import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
-import databaseBackupRoutes from "../routes/databaseBackup.js";
-import downloadRoutes from "../routes/download.js";
+import timelineRoutes from "../routes/timeline.js";
 import userRoutes from "../routes/user.js";
-import groupRoutes from "../routes/groups.js";
+import userStatsRoutes from "../routes/userStats.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
-import userStatsRoutes from "../routes/userStats.js";
-import timelineRoutes from "../routes/timeline.js";
-import clipsRoutes from "../routes/clips.js";
-import { authenticated } from "../utils/routeHelpers.js";
-import { errorHandler } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -89,7 +93,9 @@ export const setupAPI = () => {
 
     let version = "1.0.0";
     try {
-      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as { version?: string };
+      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
+        version?: string;
+      };
       version = packageJson.version ?? version;
     } catch (err) {
       logger.error("Failed to read package.json version:", {

@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { apiGet } from "../../api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  startOfYear,
-  endOfYear,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  startOfDay,
   endOfDay,
+  endOfMonth,
+  endOfWeek,
+  endOfYear,
   format,
   parse,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
 } from "date-fns";
+import { apiGet } from "../../api";
 
 interface DistributionItem {
   period: string;
@@ -38,7 +38,10 @@ interface DistributionResponse {
 
 const ZOOM_LEVELS = ["years", "months", "weeks", "days"];
 
-export function parsePeriodToDateRange(period: string, zoomLevel: string): DateRange | null {
+export function parsePeriodToDateRange(
+  period: string,
+  zoomLevel: string
+): DateRange | null {
   if (!period) return null;
 
   try {
@@ -98,7 +101,12 @@ interface UseTimelineStateOptions {
   filters?: TimelineFilters | null;
 }
 
-export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null, filters = null }: UseTimelineStateOptions) {
+export function useTimelineState({
+  entityType,
+  autoSelectRecent = false,
+  initialPeriod = null,
+  filters = null,
+}: UseTimelineStateOptions) {
   // Determine initial zoom level from initialPeriod format if provided
   const getInitialZoomLevel = () => {
     if (!initialPeriod) return "months";
@@ -152,7 +160,8 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
       try {
         // Build query params
         const params = new URLSearchParams({ granularity: zoomLevel });
-        if (filters?.performerId) params.set("performerId", filters.performerId);
+        if (filters?.performerId)
+          params.set("performerId", filters.performerId);
         if (filters?.tagId) params.set("tagId", filters.tagId);
         if (filters?.studioId) params.set("studioId", filters.studioId);
         if (filters?.groupId) params.set("groupId", filters.groupId);
@@ -170,15 +179,20 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
             !hasInitiallyLoaded.current &&
             response.distribution?.length > 0
           ) {
-            const mostRecent = response.distribution[response.distribution.length - 1];
-            setSelectedPeriod(parsePeriodToDateRange(mostRecent.period, zoomLevel));
+            const mostRecent =
+              response.distribution[response.distribution.length - 1];
+            setSelectedPeriod(
+              parsePeriodToDateRange(mostRecent.period, zoomLevel)
+            );
           }
 
           hasInitiallyLoaded.current = true;
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to fetch distribution");
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch distribution"
+          );
           setDistribution([]);
         }
       } finally {
@@ -199,7 +213,9 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
   const selectPeriod = useCallback(
     (period: string) => {
       setSelectedPeriod((prev) =>
-        prev?.period === period ? null : parsePeriodToDateRange(period, zoomLevel)
+        prev?.period === period
+          ? null
+          : parsePeriodToDateRange(period, zoomLevel)
       );
     },
     [zoomLevel]

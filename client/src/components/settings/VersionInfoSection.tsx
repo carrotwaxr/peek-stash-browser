@@ -58,7 +58,12 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
   const parseVersion = (v: string) => {
     const [core, pre] = v.split("-");
     const parts = core.split(".").map(Number);
-    return { major: parts[0] || 0, minor: parts[1] || 0, patch: parts[2] || 0, pre: pre || null };
+    return {
+      major: parts[0] || 0,
+      minor: parts[1] || 0,
+      patch: parts[2] || 0,
+      pre: pre || null,
+    };
   };
 
   const compareVersions = (current: string, latest: string) => {
@@ -73,8 +78,10 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
     return false;
   };
 
-  const hasUpdate = latestVersion && compareVersions(clientVersion, latestVersion);
-  const isUpToDate = latestVersion && !compareVersions(clientVersion, latestVersion);
+  const hasUpdate =
+    latestVersion && compareVersions(clientVersion, latestVersion);
+  const isUpToDate =
+    latestVersion && !compareVersions(clientVersion, latestVersion);
 
   return (
     <Paper className="mb-6">

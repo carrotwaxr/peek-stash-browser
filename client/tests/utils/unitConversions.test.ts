@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   UNITS,
   cmToFeetInches,
+  cmToInches,
   feetInchesToCm,
   formatHeight,
+  formatLength,
+  formatWeight,
+  inchesToCm,
   kgToLbs,
   lbsToKg,
-  formatWeight,
-  cmToInches,
-  inchesToCm,
-  formatLength,
 } from "../../src/utils/unitConversions";
 
 describe("unitConversions", () => {

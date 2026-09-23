@@ -5,7 +5,13 @@
  * Covers single lookups, batch lookups, fallback behavior, duplicate warnings,
  * and name disambiguation for filter dropdowns.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import {
+  disambiguateEntityNames,
+  getEntityInstanceId,
+  getEntityInstanceIds,
+} from "../../utils/entityInstanceId.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetAllConfigs } = vi.hoisted(() => ({
@@ -42,13 +48,6 @@ vi.mock("../../utils/logger.js", () => ({
     verbose: vi.fn(),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import {
-  getEntityInstanceId,
-  getEntityInstanceIds,
-  disambiguateEntityNames,
-} from "../../utils/entityInstanceId.js";
 
 const mockPrisma = vi.mocked(prisma);
 
@@ -180,9 +179,7 @@ describe("entityInstanceId", () => {
     });
 
     it("falls back gracefully on database error", async () => {
-      mockPrisma.stashScene.findMany.mockRejectedValue(
-        new Error("DB timeout")
-      );
+      mockPrisma.stashScene.findMany.mockRejectedValue(new Error("DB timeout"));
       const { logger } = await import("../../utils/logger.js");
 
       const result = await getEntityInstanceId("scene", "42");
@@ -239,9 +236,9 @@ describe("entityInstanceId", () => {
     it("throws when no Stash instances are configured", async () => {
       mockGetAllConfigs.mockReturnValue([]);
 
-      await expect(
-        getEntityInstanceIds("scene", ["1"])
-      ).rejects.toThrow("No Stash instances configured");
+      await expect(getEntityInstanceIds("scene", ["1"])).rejects.toThrow(
+        "No Stash instances configured"
+      );
     });
 
     it("handles batch lookup for performers", async () => {
@@ -332,9 +329,7 @@ describe("entityInstanceId", () => {
     });
 
     it("handles database errors gracefully with fallback", async () => {
-      mockPrisma.stashScene.findMany.mockRejectedValue(
-        new Error("DB error")
-      );
+      mockPrisma.stashScene.findMany.mockRejectedValue(new Error("DB error"));
 
       const result = await getEntityInstanceIds("scene", ["1", "2"]);
 
@@ -378,9 +373,17 @@ describe("entityInstanceId", () => {
       ]);
 
       // Default instance (lowest priority) keeps plain name
-      expect(result[0]).toEqual({ id: "1", name: "Jane Doe", instanceId: "aaa-111" });
+      expect(result[0]).toEqual({
+        id: "1",
+        name: "Jane Doe",
+        instanceId: "aaa-111",
+      });
       // Non-default instance gets suffix
-      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)", instanceId: "bbb-222" });
+      expect(result[1]).toEqual({
+        id: "2",
+        name: "Jane Doe (Secondary Stash)",
+        instanceId: "bbb-222",
+      });
     });
 
     it("disambiguates case-insensitively", () => {
@@ -389,8 +392,16 @@ describe("entityInstanceId", () => {
         { id: "2", name: "Jane Doe", instanceId: "bbb-222" },
       ]);
 
-      expect(result[0]).toEqual({ id: "1", name: "jane doe", instanceId: "aaa-111" });
-      expect(result[1]).toEqual({ id: "2", name: "Jane Doe (Secondary Stash)", instanceId: "bbb-222" });
+      expect(result[0]).toEqual({
+        id: "1",
+        name: "jane doe",
+        instanceId: "aaa-111",
+      });
+      expect(result[1]).toEqual({
+        id: "2",
+        name: "Jane Doe (Secondary Stash)",
+        instanceId: "bbb-222",
+      });
     });
 
     it("does not suffix default instance even with duplicates", () => {
@@ -418,7 +429,11 @@ describe("entityInstanceId", () => {
 
       // Both empty names = duplicates, non-default gets suffix
       expect(result[0]).toEqual({ id: "1", name: "", instanceId: "aaa-111" });
-      expect(result[1]).toEqual({ id: "2", name: " (Secondary Stash)", instanceId: "bbb-222" });
+      expect(result[1]).toEqual({
+        id: "2",
+        name: " (Secondary Stash)",
+        instanceId: "bbb-222",
+      });
     });
 
     it("handles no instances configured", () => {
@@ -429,7 +444,9 @@ describe("entityInstanceId", () => {
       ]);
 
       // With 0 instances, no disambiguation needed
-      expect(result).toEqual([{ id: "1", name: "Test", instanceId: "aaa-111" }]);
+      expect(result).toEqual([
+        { id: "1", name: "Test", instanceId: "aaa-111" },
+      ]);
     });
 
     it("handles multiple duplicated names correctly", () => {

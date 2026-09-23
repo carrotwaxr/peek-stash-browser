@@ -1,6 +1,6 @@
-import { MoreVertical } from "lucide-react";
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { MoreVertical } from "lucide-react";
 
 /**
  * EntityMenu - 3-dot menu for entity cards

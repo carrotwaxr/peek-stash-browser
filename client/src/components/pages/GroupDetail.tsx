@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import type { TagRef } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
+import { libraryApi } from "../../api";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
+import { useConfig } from "../../contexts/ConfigContext";
 import { useNavigationState } from "../../hooks/useNavigationState";
 import { usePageTitle } from "../../hooks/usePageTitle";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys";
-import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
-import { useConfig } from "../../contexts/ConfigContext";
-import { libraryApi } from "../../api";
 import { makeCompositeKey } from "../../utils/compositeKey";
-import { formatDuration } from "../../utils/format";
 import { getEntityPath } from "../../utils/entityLinks";
+import { formatDuration } from "../../utils/format";
+import { PerformerGrid } from "../grids/index";
 import SceneSearch from "../scene-search/SceneSearch";
+import ViewInStashButton from "../ui/ViewInStashButton";
 import {
   Button,
   FavoriteButton,
@@ -20,9 +23,6 @@ import {
   TabNavigation,
   TagChips,
 } from "../ui/index";
-import { PerformerGrid } from "../grids/index";
-import ViewInStashButton from "../ui/ViewInStashButton";
-import type { TagRef } from "@peek/shared-types";
 
 interface EntityRef {
   id: string;
@@ -60,13 +60,22 @@ const GroupDetail = () => {
 
   // Compute tabs with counts for smart default selection
   const contentTabs = [
-    { id: 'scenes', label: 'Scenes', count: (group?.scene_count as number) || 0 },
-    { id: 'performers', label: 'Performers', count: (group?.performer_count as number) || 0 },
+    {
+      id: "scenes",
+      label: "Scenes",
+      count: (group?.scene_count as number) || 0,
+    },
+    {
+      id: "performers",
+      label: "Performers",
+      count: (group?.performer_count as number) || 0,
+    },
   ];
-  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+  const effectiveDefaultTab =
+    contentTabs.find((t) => t.count > 0)?.id || "scenes";
 
   // Get active tab from URL or default to first tab with content
-  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
+  const activeTab = searchParams.get("tab") || effectiveDefaultTab;
 
   // Set page title to group name
   usePageTitle((group?.name as string) || "Collection");
@@ -75,10 +84,18 @@ const GroupDetail = () => {
     const fetchGroup = async () => {
       try {
         setIsLoading(true);
-        const groupData = await libraryApi.findGroupById(groupId!, instanceId) as Record<string, unknown> | null;
+        const groupData = (await libraryApi.findGroupById(
+          groupId!,
+          instanceId
+        )) as Record<string, unknown> | null;
         setGroup(groupData);
-        setRating((groupData as Record<string, unknown> | null)?.rating as number | null);
-        setIsFavorite(((groupData as Record<string, unknown> | null)?.favorite as boolean) || false);
+        setRating(
+          (groupData as Record<string, unknown> | null)?.rating as number | null
+        );
+        setIsFavorite(
+          ((groupData as Record<string, unknown> | null)
+            ?.favorite as boolean) || false
+        );
       } catch {
         // Error loading group - will show loading spinner
       } finally {
@@ -117,7 +134,8 @@ const GroupDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!group,
     setRating: handleRatingChange,
-    toggleFavorite });
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (
@@ -148,7 +166,9 @@ const GroupDetail = () => {
             title={
               (
                 <div className="flex gap-4 items-center">
-                  <span>{(group?.name as string) || `Collection ${groupId}`}</span>
+                  <span>
+                    {(group?.name as string) || `Collection ${groupId}`}
+                  </span>
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
@@ -156,7 +176,10 @@ const GroupDetail = () => {
                       size="large"
                     />
                   )}
-                  <ViewInStashButton stashUrl={group?.stashUrl as string} size={24} />
+                  <ViewInStashButton
+                    stashUrl={group?.stashUrl as string}
+                    size={24}
+                  />
                 </div>
               ) as unknown as string
             }
@@ -204,13 +227,19 @@ const GroupDetail = () => {
         {/* Full Width Sections - Statistics, Studio, Tags, Parent/Sub Collections */}
         <div className="space-y-6 mb-8">
           <GroupStats group={group} />
-          <GroupDetails group={group} hasMultipleInstances={hasMultipleInstances} />
+          <GroupDetails
+            group={group}
+            hasMultipleInstances={hasMultipleInstances}
+          />
         </div>
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          {contentTabs.every(t => t.count === 0) ? (
-            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+          {contentTabs.every((t) => t.count === 0) ? (
+            <div
+              className="py-16 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
               This collection has no content in Peek
             </div>
           ) : (
@@ -221,28 +250,39 @@ const GroupDetail = () => {
               />
 
               {/* Tab Content */}
-              {activeTab === 'scenes' && (
+              {activeTab === "scenes" && (
                 <SceneSearch
                   context="scene_group"
                   initialSort="scene_index"
                   permanentFilters={{
-                    groups: { value: [makeCompositeKey(groupId!, instanceId)], modifier: "INCLUDES" } }}
+                    groups: {
+                      value: [makeCompositeKey(groupId!, instanceId)],
+                      modifier: "INCLUDES",
+                    },
+                  }}
                   permanentFiltersMetadata={{
                     groups: [
-                      { id: makeCompositeKey(groupId!, instanceId), name: (group?.name as string) || "Unknown Collection" },
-                    ] }}
+                      {
+                        id: makeCompositeKey(groupId!, instanceId),
+                        name: (group?.name as string) || "Unknown Collection",
+                      },
+                    ],
+                  }}
                   title={`Scenes in ${(group?.name as string) || "this collection"}`}
                   fromPageTitle={(group?.name as string) || "Collection"}
                 />
               )}
 
-              {activeTab === 'performers' && (
+              {activeTab === "performers" && (
                 <PerformerGrid
                   lockedFilters={{
                     performer_filter: {
                       groups: {
                         value: [makeCompositeKey(groupId!, instanceId)],
-                        modifier: "INCLUDES" } } }}
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
                   hideLockedFilters
                   emptyMessage={`No performers found in "${group?.name}"`}
                 />
@@ -267,7 +307,8 @@ const Card = ({ title, children }: CardProps) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)" }}
+        borderColor: "var(--border-color)",
+      }}
     >
       {title && (
         <h3
@@ -310,7 +351,8 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
           backgroundColor: "var(--bg-card)",
           aspectRatio: "2/3",
           width: "100%",
-          maxHeight: "50vh" }}
+          maxHeight: "50vh",
+        }}
       >
         {displayImage ? (
           <img
@@ -319,7 +361,8 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain" }}
+              objectFit: "contain",
+            }}
           />
         ) : (
           <svg
@@ -356,7 +399,8 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
               color: showFront ? "white" : "var(--text-primary)",
               border: `1px solid ${
                 showFront ? "var(--accent-primary)" : "var(--border-color)"
-              }` }}
+              }`,
+            }}
             title="Show front cover"
           >
             Front
@@ -373,7 +417,8 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
               color: !showFront ? "white" : "var(--text-primary)",
               border: `1px solid ${
                 !showFront ? "var(--accent-primary)" : "var(--border-color)"
-              }` }}
+              }`,
+            }}
             title="Show back cover"
           >
             Back
@@ -391,20 +436,32 @@ interface GroupStatsProps {
 
 const GroupStats = ({ group }: GroupStatsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'scenes';
+  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === 'scenes') {
-      newParams.delete('tab');
+    if (tabId === "scenes") {
+      newParams.delete("tab");
     } else {
-      newParams.set('tab', tabId);
+      newParams.set("tab", tabId);
     }
     setSearchParams(newParams);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
-  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }: { label: string; value: string | number | null | undefined; valueColor?: string; onClick?: () => void; isActive?: boolean }) => {
+  const StatField = ({
+    label,
+    value,
+    valueColor = "var(--text-primary)",
+    onClick,
+    isActive,
+  }: {
+    label: string;
+    value: string | number | null | undefined;
+    valueColor?: string;
+    onClick?: () => void;
+    isActive?: boolean;
+  }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && Number(value) > 0;
@@ -419,8 +476,9 @@ const GroupStats = ({ group }: GroupStatsProps) => {
             className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
             style={{
               color: valueColor,
-              cursor: isActive ? 'default' : 'pointer',
-              textDecoration: isActive ? 'underline' : 'none' }}
+              cursor: isActive ? "default" : "pointer",
+              textDecoration: isActive ? "underline" : "none",
+            }}
           >
             {value}
           </button>
@@ -440,19 +498,21 @@ const GroupStats = ({ group }: GroupStatsProps) => {
           label="Scenes:"
           value={group?.scene_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('scenes')}
-          isActive={activeTab === 'scenes'}
+          onClick={() => handleTabSwitch("scenes")}
+          isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
           value={group?.performer_count as number | undefined}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('performers')}
-          isActive={activeTab === 'performers'}
+          onClick={() => handleTabSwitch("performers")}
+          isActive={activeTab === "performers"}
         />
         <StatField
           label="Duration:"
-          value={group?.duration ? formatDuration(group.duration as number) : null}
+          value={
+            group?.duration ? formatDuration(group.duration as number) : null
+          }
           valueColor="var(--accent-primary)"
         />
         <StatField
@@ -473,7 +533,9 @@ interface GroupDetailsProps {
 
 const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
   const studio = group?.studio as EntityRef | undefined;
-  const containingGroups = group?.containing_groups as GroupRelation[] | undefined;
+  const containingGroups = group?.containing_groups as
+    | GroupRelation[]
+    | undefined;
   const subGroups = group?.sub_groups as GroupRelation[] | undefined;
   const tags = group?.tags as TagRef[] | undefined;
   const urls = group?.urls as string[] | undefined;
@@ -483,7 +545,7 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
       {studio && (
         <Card title="Studio">
           <Link
-            to={getEntityPath('studio', studio, hasMultipleInstances)}
+            to={getEntityPath("studio", studio, hasMultipleInstances)}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
             {studio.image_path && (
@@ -505,7 +567,9 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
 
       {!!group?.director && (
         <Card title="Director">
-          <p style={{ color: "var(--text-primary)" }}>{group.director as React.ReactNode}</p>
+          <p style={{ color: "var(--text-primary)" }}>
+            {group.director as React.ReactNode}
+          </p>
         </Card>
       )}
 
@@ -515,7 +579,7 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
             {containingGroups.map((cg: GroupRelation) => (
               <Link
                 key={cg.group.id}
-                to={getEntityPath('group', cg.group, hasMultipleInstances)}
+                to={getEntityPath("group", cg.group, hasMultipleInstances)}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -546,7 +610,7 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
             {subGroups.map((sg: GroupRelation) => (
               <Link
                 key={sg.group.id}
-                to={getEntityPath('group', sg.group, hasMultipleInstances)}
+                to={getEntityPath("group", sg.group, hasMultipleInstances)}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">

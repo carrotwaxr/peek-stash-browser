@@ -1,17 +1,28 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
-import { useAuth } from "../../hooks/useAuth";
 import { libraryApi } from "../../api";
-import SearchResults from "./SearchResults";
+import { useAuth } from "../../hooks/useAuth";
 import SearchControls from "./SearchControls";
+import SearchResults from "./SearchResults";
 
-type EntityType = "scene" | "performer" | "gallery" | "group" | "studio" | "tag" | "image";
+type EntityType =
+  | "scene"
+  | "performer"
+  | "gallery"
+  | "group"
+  | "studio"
+  | "tag"
+  | "image";
 
 export interface SearchableGridProps {
   entityType: EntityType;
   lockedFilters?: Record<string, unknown>;
   hideLockedFilters?: boolean;
-  renderItem: (item: unknown, index: number, helpers: { onHideSuccess: (entityId: string) => void }) => ReactNode;
+  renderItem: (
+    item: unknown,
+    index: number,
+    helpers: { onHideSuccess: (entityId: string) => void }
+  ) => ReactNode;
   defaultSort?: string;
   defaultFilters?: Record<string, unknown>;
   onResultsChange?: (results: { items: unknown[]; count: number }) => void;
@@ -39,7 +50,9 @@ export const SearchableGrid = ({
 }: SearchableGridProps) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const [lastQuery, setLastQuery] = useState<Record<string, unknown> | null>(null);
+  const [lastQuery, setLastQuery] = useState<Record<string, unknown> | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<Array<Record<string, unknown>>>([]);
@@ -106,8 +119,17 @@ export const SearchableGrid = ({
         setLastQuery(mergedQuery);
         setError(null);
 
-        const result = await (libraryApi as unknown as Record<string, (params: unknown) => Promise<Record<string, Record<string, unknown>>>>)[apiMethod](mergedQuery);
-        const items = (result[responseKey]?.[dataKey] || []) as Array<Record<string, unknown>>;
+        const result = await (
+          libraryApi as unknown as Record<
+            string,
+            (
+              params: unknown
+            ) => Promise<Record<string, Record<string, unknown>>>
+          >
+        )[apiMethod](mergedQuery);
+        const items = (result[responseKey]?.[dataKey] || []) as Array<
+          Record<string, unknown>
+        >;
         const count = (result[responseKey]?.count || 0) as number;
 
         setData(items);
@@ -119,7 +141,16 @@ export const SearchableGrid = ({
         setIsLoading(false);
       }
     },
-    [apiMethod, responseKey, dataKey, lockedFilters, lastQuery, isAuthLoading, isAuthenticated, onResultsChange]
+    [
+      apiMethod,
+      responseKey,
+      dataKey,
+      lockedFilters,
+      lastQuery,
+      isAuthLoading,
+      isAuthenticated,
+      onResultsChange,
+    ]
   );
 
   // Handle successful hide - remove item from local state
@@ -129,7 +160,9 @@ export const SearchableGrid = ({
   }, []);
 
   // Calculate pagination
-  const currentPerPage = ((lastQuery?.filter as Record<string, unknown> | undefined)?.per_page as number) || 24;
+  const currentPerPage =
+    ((lastQuery?.filter as Record<string, unknown> | undefined)
+      ?.per_page as number) || 24;
   const totalPages = Math.ceil(totalCount / currentPerPage);
 
   // Build filter key for locked filters if we need to hide them
@@ -158,7 +191,10 @@ export const SearchableGrid = ({
         emptyMessage={emptyMessage || `No ${entityType}s found`}
         emptyDescription={emptyDescription}
         skeletonCount={skeletonCount}
-        currentPage={((lastQuery?.filter as Record<string, unknown> | undefined)?.page as number) || 1}
+        currentPage={
+          ((lastQuery?.filter as Record<string, unknown> | undefined)
+            ?.page as number) || 1
+        }
         totalPages={totalPages}
         onPageChange={() => {
           // SearchControls manages pagination state, but we pass it through for SearchResults to render

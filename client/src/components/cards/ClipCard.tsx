@@ -1,12 +1,12 @@
-import { forwardRef, useMemo, type FocusEvent } from "react";
+import { type FocusEvent, forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
 import { getScenePathWithTime } from "../../utils/entityLinks";
 import { formatDuration } from "../../utils/format";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import ClipCardPreview from "./ClipCardPreview";
 
 export interface Clip {
@@ -96,10 +96,14 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
 
     // Build indicators
     const indicators = useMemo(() => {
-      const tagsTooltip =
-        getIndicatorBehavior("clip", "tags") === "rich" &&
+      const tagsTooltip = getIndicatorBehavior("clip", "tags") === "rich" &&
         allTags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" parentInstanceId={clip.scene?.instanceId} />
+          <TooltipEntityGrid
+            entityType="tag"
+            entities={allTags}
+            title="Tags"
+            parentInstanceId={clip.scene?.instanceId}
+          />
         );
 
       // Performers would come from scene - need API enhancement
@@ -173,7 +177,11 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
     );
 
     // Handle navigation - navigate with autoplay state
-    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds ?? 0, hasMultipleInstances);
+    const clipUrl = getScenePathWithTime(
+      { id: clip.sceneId, instanceId: clip.instanceId },
+      clip.seconds ?? 0,
+      hasMultipleInstances
+    );
     const handleNavigate = () => {
       if (onClick) {
         onClick(clip);

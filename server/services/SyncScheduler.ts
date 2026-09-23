@@ -9,12 +9,11 @@
  * Note: Stash scan completion subscription is a future enhancement
  * that would require WebSocket connection to Stash GraphQL.
  */
-
 import { wereMigrationsApplied } from "../initializers/database.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { stashSyncService, type SyncProgress } from "./StashSyncService.js";
+import { type SyncProgress, stashSyncService } from "./StashSyncService.js";
 
 interface SyncSchedulerSettings {
   syncIntervalMinutes: number;
@@ -39,8 +38,12 @@ class SyncScheduler {
 
     // Check if Stash is configured
     if (!stashInstanceManager.hasInstances()) {
-      logger.info("No Stash instances configured - sync scheduler will not start");
-      logger.info("Sync will start automatically after Stash is configured via setup wizard");
+      logger.info(
+        "No Stash instances configured - sync scheduler will not start"
+      );
+      logger.info(
+        "Sync will start automatically after Stash is configured via setup wizard"
+      );
       this.isStarted = true;
       return;
     }
@@ -100,7 +103,9 @@ class SyncScheduler {
   /**
    * Update settings and restart scheduler if needed
    */
-  async updateSettings(settings: Partial<SyncSchedulerSettings>): Promise<void> {
+  async updateSettings(
+    settings: Partial<SyncSchedulerSettings>
+  ): Promise<void> {
     await prisma.syncSettings.upsert({
       where: { id: 1 },
       update: settings,
@@ -195,21 +200,25 @@ class SyncScheduler {
 
     const intervalMs = intervalMinutes * 60 * 1000;
 
-    this.intervalId = setInterval(() => void (async () => {
-      if (stashSyncService.isSyncing()) {
-        logger.debug("Scheduled sync skipped - sync already in progress");
-        return;
-      }
+    this.intervalId = setInterval(
+      () =>
+        void (async () => {
+          if (stashSyncService.isSyncing()) {
+            logger.debug("Scheduled sync skipped - sync already in progress");
+            return;
+          }
 
-      logger.info("Scheduled incremental sync triggered");
-      try {
-        await stashSyncService.incrementalSync();
-      } catch (error) {
-        logger.error("Scheduled sync failed", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    })(), intervalMs);
+          logger.info("Scheduled incremental sync triggered");
+          try {
+            await stashSyncService.incrementalSync();
+          } catch (error) {
+            logger.error("Scheduled sync failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })(),
+      intervalMs
+    );
 
     logger.info(`Sync polling interval started: ${intervalMinutes} minutes`);
   }
@@ -218,7 +227,9 @@ class SyncScheduler {
     // Check if migrations were applied - if so, force full sync to ensure
     // database schema changes are properly reflected in cached data
     if (wereMigrationsApplied()) {
-      logger.info("Database migrations were applied, performing full sync to refresh cache");
+      logger.info(
+        "Database migrations were applied, performing full sync to refresh cache"
+      );
       try {
         await stashSyncService.fullSync();
       } catch (error) {
@@ -258,7 +269,9 @@ class SyncScheduler {
 
     // If NO entity types have ever been synced, do a full sync
     if (completedTypes.length === 0) {
-      logger.info("No previous sync found for any entity type, performing full sync");
+      logger.info(
+        "No previous sync found for any entity type, performing full sync"
+      );
       try {
         await stashSyncService.fullSync();
       } catch (error) {

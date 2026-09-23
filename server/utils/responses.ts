@@ -16,10 +16,7 @@ export function sendSuccess(
 /**
  * Send a 201 Created response with the given data.
  */
-export function sendCreated(
-  res: Response,
-  data: Record<string, unknown>
-) {
+export function sendCreated(res: Response, data: Record<string, unknown>) {
   return res.status(201).json(data);
 }
 

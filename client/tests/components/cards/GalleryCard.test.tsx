@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { createElement } from "react";
+import { describe, expect, it } from "vitest";
 import GalleryCard from "../../../src/components/cards/GalleryCard";
 
 describe("GalleryCard", () => {

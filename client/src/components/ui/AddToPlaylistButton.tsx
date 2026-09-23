@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { showError, showSuccess, showWarning } from "../../utils/toast";
+import { type ReactNode } from "react";
 import { apiGet, apiPost } from "../../api";
 import { ApiError } from "../../api/client";
+import { showError, showSuccess, showWarning } from "../../utils/toast";
 import { ThemedIcon } from "../icons/index";
 import Button from "./Button";
 import Paper from "./Paper";
-
-import { type ReactNode } from "react";
 
 interface Props {
   sceneId?: string;
@@ -64,7 +63,9 @@ const AddToPlaylistButton = ({
       const menuHeight = 280; // approximate menu height
       const spaceAbove = rect.top;
       const spaceBelow = window.innerHeight - rect.bottom;
-      setComputedPosition(spaceAbove < menuHeight && spaceBelow > spaceAbove ? "below" : "above");
+      setComputedPosition(
+        spaceAbove < menuHeight && spaceBelow > spaceAbove ? "below" : "above"
+      );
     }
   }, [showMenu, dropdownPositionProp]);
 
@@ -97,10 +98,24 @@ const AddToPlaylistButton = ({
         apiGet("/playlists"),
         apiGet("/playlists/shared"),
       ]);
-      const ownData = ownResult.status === "fulfilled" ? (ownResult.value as { playlists?: Record<string, unknown>[] }).playlists || [] : [];
-      const own = ownData.map((p: Record<string, unknown>) => ({ ...p, isShared: false })) as PlaylistItem[];
-      const sharedData = sharedResult.status === "fulfilled" ? (sharedResult.value as { playlists?: Record<string, unknown>[] }).playlists || [] : [];
-      const shared = sharedData.map((p: Record<string, unknown>) => ({ ...p, isShared: true })) as PlaylistItem[];
+      const ownData =
+        ownResult.status === "fulfilled"
+          ? (ownResult.value as { playlists?: Record<string, unknown>[] })
+              .playlists || []
+          : [];
+      const own = ownData.map((p: Record<string, unknown>) => ({
+        ...p,
+        isShared: false,
+      })) as PlaylistItem[];
+      const sharedData =
+        sharedResult.status === "fulfilled"
+          ? (sharedResult.value as { playlists?: Record<string, unknown>[] })
+              .playlists || []
+          : [];
+      const shared = sharedData.map((p: Record<string, unknown>) => ({
+        ...p,
+        isShared: true,
+      })) as PlaylistItem[];
       setPlaylists([...own, ...shared]);
     } catch {
       // Error loading playlists - will show in UI
@@ -260,10 +275,12 @@ const AddToPlaylistButton = ({
                     borderColor: "var(--border-color)",
                   }}
                   onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = "var(--bg-secondary)";
+                    (e.target as HTMLElement).style.backgroundColor =
+                      "var(--bg-secondary)";
                   }}
                   onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = "transparent";
+                    (e.target as HTMLElement).style.backgroundColor =
+                      "transparent";
                   }}
                 >
                   + Create New Playlist
@@ -281,7 +298,9 @@ const AddToPlaylistButton = ({
                   </div>
                 ) : (
                   playlists
-                    .filter((playlist) => !excludePlaylistIds.includes(playlist.id))
+                    .filter(
+                      (playlist) => !excludePlaylistIds.includes(playlist.id)
+                    )
                     .map((playlist) => (
                       <Button
                         key={`${playlist.id}-${playlist.isShared ? "shared" : "own"}`}
@@ -296,10 +315,12 @@ const AddToPlaylistButton = ({
                           color: "var(--text-primary)",
                         }}
                         onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor = "var(--bg-secondary)";
+                          (e.target as HTMLElement).style.backgroundColor =
+                            "var(--bg-secondary)";
                         }}
                         onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor = "transparent";
+                          (e.target as HTMLElement).style.backgroundColor =
+                            "transparent";
                         }}
                       >
                         <div className="flex items-center gap-1.5">
@@ -321,7 +342,8 @@ const AddToPlaylistButton = ({
                           className="text-xs"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          {playlist._count?.items ?? playlist.sceneCount ?? 0} videos
+                          {playlist._count?.items ?? playlist.sceneCount ?? 0}{" "}
+                          videos
                         </div>
                       </Button>
                     ))

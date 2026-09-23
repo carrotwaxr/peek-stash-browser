@@ -7,13 +7,13 @@
  */
 
 const ENTITY_PATHS: Record<string, string> = {
-  performer: '/performer',
-  scene: '/scene',
-  studio: '/studio',
-  tag: '/tag',
-  group: '/collection',
-  gallery: '/gallery',
-  image: '/image',
+  performer: "/performer",
+  scene: "/scene",
+  studio: "/studio",
+  tag: "/tag",
+  group: "/collection",
+  gallery: "/gallery",
+  image: "/image",
 };
 
 /**
@@ -29,17 +29,25 @@ interface EntityLike {
   instanceId?: string;
 }
 
-export function getEntityPath(entityType: string, entity: EntityLike | string, hasMultipleInstances: boolean) {
+export function getEntityPath(
+  entityType: string,
+  entity: EntityLike | string,
+  hasMultipleInstances: boolean
+) {
   const basePath = ENTITY_PATHS[entityType];
   if (!basePath) {
     console.warn(`Unknown entity type: ${entityType}`);
-    return '#';
+    return "#";
   }
 
-  const id = typeof entity === 'string' ? entity : entity?.id ?? entity;
+  const id = typeof entity === "string" ? entity : (entity?.id ?? entity);
   const base = `${basePath}/${id}`;
 
-  if (hasMultipleInstances && typeof entity !== 'string' && entity?.instanceId) {
+  if (
+    hasMultipleInstances &&
+    typeof entity !== "string" &&
+    entity?.instanceId
+  ) {
     return `${base}?instance=${encodeURIComponent(entity.instanceId)}`;
   }
   return base;
@@ -64,19 +72,27 @@ export function getEntityPath(entityType: string, entity: EntityLike | string, h
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} URL with instance param appended if needed
  */
-export function appendInstanceParam(url: string, entity: EntityLike, hasMultipleInstances: boolean) {
+export function appendInstanceParam(
+  url: string,
+  entity: EntityLike,
+  hasMultipleInstances: boolean
+) {
   if (hasMultipleInstances && entity?.instanceId) {
     return `${url}&instance=${encodeURIComponent(entity.instanceId)}`;
   }
   return url;
 }
 
-export function getScenePathWithTime(scene: EntityLike | string, time: number, hasMultipleInstances: boolean) {
-  const id = typeof scene === 'string' ? scene : scene?.id ?? scene;
+export function getScenePathWithTime(
+  scene: EntityLike | string,
+  time: number,
+  hasMultipleInstances: boolean
+) {
+  const id = typeof scene === "string" ? scene : (scene?.id ?? scene);
   const base = `/scene/${id}`;
   const timeParam = `t=${Math.floor(time)}`;
 
-  if (hasMultipleInstances && typeof scene !== 'string' && scene?.instanceId) {
+  if (hasMultipleInstances && typeof scene !== "string" && scene?.instanceId) {
     return `${base}?instance=${encodeURIComponent(scene.instanceId)}&${timeParam}`;
   }
   return `${base}?${timeParam}`;

@@ -5,7 +5,10 @@
  * Peek's SQLite database, per-entity-type sync behavior, progress tracking,
  * and error handling.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { syncFromStash } from "../../controllers/user.js";
+import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 
 // Build a mock StashClient using vi.hoisted so it's available in vi.mock factories
 const mockStashClient = vi.hoisted(() => ({
@@ -70,10 +73,6 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     getAll: vi.fn().mockReturnValue([["instance-1", mockStashClient]]),
   },
 }));
-
-import prisma from "../../prisma/singleton.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { syncFromStash } from "../../controllers/user.js";
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
@@ -224,7 +223,16 @@ describe("syncFromStash", () => {
       });
 
       const req = mockReq(
-        { options: { ...DEFAULT_OPTIONS, performers: { rating: false, favorite: false }, studios: { rating: false, favorite: false }, tags: { rating: false, favorite: false }, galleries: { rating: false }, groups: { rating: false } } },
+        {
+          options: {
+            ...DEFAULT_OPTIONS,
+            performers: { rating: false, favorite: false },
+            studios: { rating: false, favorite: false },
+            tags: { rating: false, favorite: false },
+            galleries: { rating: false },
+            groups: { rating: false },
+          },
+        },
         { userId: "2" },
         ADMIN
       );
@@ -247,7 +255,11 @@ describe("syncFromStash", () => {
       mockStashClient.findScenes
         .mockResolvedValueOnce({
           findScenes: {
-            scenes: [makeScene("1", 80), makeScene("2", 60), makeScene("3", 40)],
+            scenes: [
+              makeScene("1", 80),
+              makeScene("2", 60),
+              makeScene("3", 40),
+            ],
             count: 5,
           },
         })
@@ -260,7 +272,16 @@ describe("syncFromStash", () => {
         });
 
       const req = mockReq(
-        { options: { scenes: { rating: true, favorite: false, oCounter: false }, performers: { rating: false, favorite: false }, studios: { rating: false, favorite: false }, tags: { rating: false, favorite: false }, galleries: { rating: false }, groups: { rating: false } } },
+        {
+          options: {
+            scenes: { rating: true, favorite: false, oCounter: false },
+            performers: { rating: false, favorite: false },
+            studios: { rating: false, favorite: false },
+            tags: { rating: false, favorite: false },
+            galleries: { rating: false },
+            groups: { rating: false },
+          },
+        },
         { userId: "2" },
         ADMIN
       );
@@ -296,7 +317,16 @@ describe("syncFromStash", () => {
         });
 
       const req = mockReq(
-        { options: { scenes: { rating: true, favorite: false, oCounter: false }, performers: { rating: false, favorite: false }, studios: { rating: false, favorite: false }, tags: { rating: false, favorite: false }, galleries: { rating: false }, groups: { rating: false } } },
+        {
+          options: {
+            scenes: { rating: true, favorite: false, oCounter: false },
+            performers: { rating: false, favorite: false },
+            studios: { rating: false, favorite: false },
+            tags: { rating: false, favorite: false },
+            galleries: { rating: false },
+            groups: { rating: false },
+          },
+        },
         { userId: "2" },
         ADMIN
       );
@@ -412,19 +442,12 @@ describe("syncFromStash", () => {
       };
       mockStashClient.findScenes.mockResolvedValue({
         findScenes: {
-          scenes: [
-            makeScene("1", null, 5),
-            makeScene("2", null, 0),
-          ],
+          scenes: [makeScene("1", null, 5), makeScene("2", null, 0)],
           count: 2,
         },
       });
 
-      const req = mockReq(
-        { options: oCounterOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: oCounterOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -451,11 +474,7 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: bothOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: bothOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -479,11 +498,7 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: bothOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: bothOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -498,11 +513,7 @@ describe("syncFromStash", () => {
         scenes: { rating: false, favorite: false, oCounter: false },
       };
 
-      const req = mockReq(
-        { options: noScenesOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: noScenesOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -775,11 +786,7 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: tagOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -793,11 +800,7 @@ describe("syncFromStash", () => {
         findTags: { tags: [], count: 0 },
       });
 
-      const req = mockReq(
-        { options: tagOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -819,11 +822,7 @@ describe("syncFromStash", () => {
         { tagId: "1", favorite: false } as any,
       ]);
 
-      const req = mockReq(
-        { options: tagOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -836,11 +835,7 @@ describe("syncFromStash", () => {
         tags: { rating: false, favorite: false },
       };
 
-      const req = mockReq(
-        { options: noTagOptions },
-        { userId: "2" },
-        ADMIN
-      );
+      const req = mockReq({ options: noTagOptions }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await syncFromStash(req, res);
 
@@ -1052,9 +1047,7 @@ describe("syncFromStash", () => {
       ]);
 
       // Make the scene sync throw inside the instance loop — this is caught per-instance
-      mockStashClient.findScenes.mockRejectedValue(
-        new Error("GraphQL Error")
-      );
+      mockStashClient.findScenes.mockRejectedValue(new Error("GraphQL Error"));
 
       const req = mockReq(
         {

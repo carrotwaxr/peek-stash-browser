@@ -1,7 +1,12 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  useStudioDetail,
+  useStudioList,
+} from "../../../src/api/hooks/useStudios";
+import { libraryApi } from "../../../src/api/library";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -14,12 +19,10 @@ vi.mock("../../../src/api/queryKeys", () => ({
   queryKeys: {
     studios: {
       all: () => ["studios"],
-      list: (instanceId: string | undefined, params: Record<string, unknown>) => [
-        "studios",
-        instanceId,
-        "list",
-        params,
-      ],
+      list: (
+        instanceId: string | undefined,
+        params: Record<string, unknown>
+      ) => ["studios", instanceId, "list", params],
       detail: (instanceId: string | undefined, id: string) => [
         "studios",
         instanceId,
@@ -29,9 +32,6 @@ vi.mock("../../../src/api/queryKeys", () => ({
     },
   },
 }));
-
-import { libraryApi } from "../../../src/api/library";
-import { useStudioList, useStudioDetail } from "../../../src/api/hooks/useStudios";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -57,7 +57,9 @@ describe("useStudioList", () => {
 
   it("fires query with correct params", async () => {
     const mockData = { studios: [], total: 0 };
-    (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     const { result } = renderHook(() => useStudioList(params), {
@@ -66,18 +68,24 @@ describe("useStudioList", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockData);
-    expect(libraryApi.findStudios).toHaveBeenCalledWith(params, expect.any(AbortSignal));
+    expect(libraryApi.findStudios).toHaveBeenCalledWith(
+      params,
+      expect.any(AbortSignal)
+    );
   });
 
   it("passes signal to queryFn", async () => {
     const mockData = { studios: [], total: 0 };
-    (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (libraryApi.findStudios as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockData
+    );
 
     const params = { filter: { page: 1, per_page: 24 } };
     renderHook(() => useStudioList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findStudios).toHaveBeenCalled());
-    const callArgs = (libraryApi.findStudios as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (libraryApi.findStudios as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 });
@@ -97,7 +105,9 @@ describe("useStudioDetail", () => {
 
   it("fires query and returns data on success", async () => {
     const mockStudio = { id: "studio-1", name: "Test Studio" };
-    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(mockStudio);
+    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockStudio
+    );
 
     const { result } = renderHook(() => useStudioDetail("studio-1"), {
       wrapper: createWrapper(),
@@ -110,13 +120,21 @@ describe("useStudioDetail", () => {
 
   it("passes instanceId to findStudioById", async () => {
     const mockStudio = { id: "studio-1", name: "Test Studio" };
-    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(mockStudio);
+    (libraryApi.findStudioById as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockStudio
+    );
 
-    const { result } = renderHook(() => useStudioDetail("studio-1", "instance-3"), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useStudioDetail("studio-1", "instance-3"),
+      {
+        wrapper: createWrapper(),
+      }
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(libraryApi.findStudioById).toHaveBeenCalledWith("studio-1", "instance-3");
+    expect(libraryApi.findStudioById).toHaveBeenCalledWith(
+      "studio-1",
+      "instance-3"
+    );
   });
 });

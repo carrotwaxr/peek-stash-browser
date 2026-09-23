@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { adminClient, guestClient } from "../helpers/testClient.js";
 
 // Response type for /api/library/images
 interface FindImagesResponse {
@@ -22,10 +22,13 @@ describe("Image API", () => {
     });
 
     it("returns images with pagination", async () => {
-      const response = await adminClient.post<FindImagesResponse>("/api/library/images", {
-        page: 1,
-        per_page: 10,
-      });
+      const response = await adminClient.post<FindImagesResponse>(
+        "/api/library/images",
+        {
+          page: 1,
+          per_page: 10,
+        }
+      );
 
       expect(response.ok).toBe(true);
       expect(response.data.findImages).toBeDefined();

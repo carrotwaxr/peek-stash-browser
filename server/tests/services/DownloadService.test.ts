@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
 
 // Mock prisma
@@ -24,8 +25,6 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-
 describe("DownloadService", () => {
   let service: DownloadService;
 
@@ -42,7 +41,9 @@ describe("DownloadService", () => {
         fileSize: BigInt(1000000),
       };
 
-      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(mockScene as any);
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
+        mockScene as any
+      );
       vi.mocked(prisma.download.create).mockResolvedValue({
         id: 1,
         userId: 1,
@@ -85,7 +86,9 @@ describe("DownloadService", () => {
         fileSize: BigInt(500000),
       };
 
-      vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(mockImage as any);
+      vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(
+        mockImage as any
+      );
       vi.mocked(prisma.download.create).mockResolvedValue({
         id: 2,
         userId: 1,
@@ -128,7 +131,9 @@ describe("DownloadService", () => {
         items: [{ sceneId: "s1" }, { sceneId: "s2" }],
       };
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
+        mockPlaylist as any
+      );
       vi.mocked(prisma.download.create).mockResolvedValue({
         id: 3,
         userId: 1,
@@ -168,13 +173,12 @@ describe("DownloadService", () => {
     it("should sum file sizes of all playlist items", async () => {
       const mockPlaylist = {
         id: 1,
-        items: [
-          { sceneId: "s1" },
-          { sceneId: "s2" },
-        ],
+        items: [{ sceneId: "s1" }, { sceneId: "s2" }],
       };
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
+        mockPlaylist as any
+      );
       vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
         { fileSize: BigInt(1000000) },
         { fileSize: BigInt(2000000) },
@@ -203,7 +207,9 @@ describe("DownloadService", () => {
         items: [],
       };
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
+        mockPlaylist as any
+      );
 
       const size = await service.calculatePlaylistSize(1);
 
@@ -213,13 +219,12 @@ describe("DownloadService", () => {
     it("should handle items with null fileSize", async () => {
       const mockPlaylist = {
         id: 1,
-        items: [
-          { sceneId: "s1" },
-          { sceneId: "s2" },
-        ],
+        items: [{ sceneId: "s1" }, { sceneId: "s2" }],
       };
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
+        mockPlaylist as any
+      );
       vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
         { fileSize: BigInt(1000000) },
         { fileSize: null },
@@ -240,7 +245,9 @@ describe("DownloadService", () => {
         status: "COMPLETED",
       };
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(
+        mockDownload as any
+      );
 
       const result = await service.getDownload(1);
 
@@ -258,7 +265,9 @@ describe("DownloadService", () => {
         { id: 1, createdAt: new Date("2024-01-01") },
       ];
 
-      vi.mocked(prisma.download.findMany).mockResolvedValue(mockDownloads as any);
+      vi.mocked(prisma.download.findMany).mockResolvedValue(
+        mockDownloads as any
+      );
 
       const result = await service.getUserDownloads(1);
 
@@ -322,7 +331,11 @@ describe("DownloadService", () => {
 
       vi.mocked(prisma.download.update).mockResolvedValue(mockDownload as any);
 
-      const result = await service.markCompleted(1, "/tmp/download.zip", BigInt(5000000));
+      const result = await service.markCompleted(
+        1,
+        "/tmp/download.zip",
+        BigInt(5000000)
+      );
 
       expect(result.status).toBe("COMPLETED");
       expect(result.progress).toBe(100);
@@ -360,7 +373,9 @@ describe("DownloadService", () => {
         userId: 1,
       };
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(
+        mockDownload as any
+      );
       vi.mocked(prisma.download.delete).mockResolvedValue(mockDownload as any);
 
       await service.deleteDownload(1, 1);
@@ -384,7 +399,9 @@ describe("DownloadService", () => {
         userId: 2, // Different user
       };
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(
+        mockDownload as any
+      );
 
       await expect(service.deleteDownload(1, 1)).rejects.toThrow(
         "Not authorized to delete this download"

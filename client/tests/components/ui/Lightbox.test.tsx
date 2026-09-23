@@ -1,6 +1,6 @@
 // client/src/components/ui/__tests__/Lightbox.test.jsx
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lightbox from "../../../src/components/ui/Lightbox";
 
 // Mock the API
@@ -103,7 +103,12 @@ describe("Lightbox", () => {
 
       // Track all render states
       const renderLog: any[] = [];
-      const RenderTracker = ({ images, initialIndex, isPageTransitioning, ...props }: any) => {
+      const RenderTracker = ({
+        images,
+        initialIndex,
+        isPageTransitioning,
+        ...props
+      }: any) => {
         // Log every render's key values
         renderLog.push({
           timestamp: Date.now(),
@@ -231,7 +236,9 @@ describe("Lightbox", () => {
       );
 
       // Find the image container div (has visibility style)
-      const imageContainer = container.querySelector(".w-\\[90vw\\]") as HTMLElement;
+      const imageContainer = container.querySelector(
+        ".w-\\[90vw\\]"
+      ) as HTMLElement;
       expect(imageContainer.style.visibility).toBe("visible");
 
       // Now transition
@@ -268,7 +275,8 @@ describe("Lightbox", () => {
         />
       );
 
-      const getImgSrc = () => container.querySelector("img")?.getAttribute("src");
+      const getImgSrc = () =>
+        container.querySelector("img")?.getAttribute("src");
 
       imgSrcLog.push({ step: "initial", src: getImgSrc() });
       expect(getImgSrc()).toBe("http://example.com/page1/image9.jpg");
@@ -303,7 +311,9 @@ describe("Lightbox", () => {
       expect(getImgSrc()).toBe("http://example.com/page1/image0.jpg");
 
       // Verify container is hidden
-      const imageContainer = container.querySelector(".w-\\[90vw\\]") as HTMLElement;
+      const imageContainer = container.querySelector(
+        ".w-\\[90vw\\]"
+      ) as HTMLElement;
       expect(imageContainer.style.visibility).toBe("hidden");
     });
 
@@ -332,9 +342,11 @@ describe("Lightbox", () => {
         />
       );
 
-      const getImgSrc = () => container.querySelector("img")?.getAttribute("src");
+      const getImgSrc = () =>
+        container.querySelector("img")?.getAttribute("src");
       const getVisibility = () =>
-        (container.querySelector(".w-\\[90vw\\]") as HTMLElement | null)?.style.visibility;
+        (container.querySelector(".w-\\[90vw\\]") as HTMLElement | null)?.style
+          .visibility;
 
       expect(getImgSrc()).toBe("http://example.com/page1/image9.jpg");
 
@@ -502,7 +514,9 @@ describe("Lightbox", () => {
 
       // FIXED: imageLoaded is now reset when images change, even if initialIndex stays 0
       // The img src has changed to page2/image0.jpg
-      expect(img.getAttribute("src")).toBe("http://example.com/page2/image0.jpg");
+      expect(img.getAttribute("src")).toBe(
+        "http://example.com/page2/image0.jpg"
+      );
 
       // With the fix, opacity should be "0" because imageLoaded was reset
       // when the image ID changed from page1-image0 to page2-image0
@@ -530,7 +544,7 @@ describe("Lightbox", () => {
           images={[{ id: "1", paths: { image: "/test.jpg" } }] as any}
           isOpen={true}
           onClose={onClose}
-          {...{ supportsFullscreen: true } as any}
+          {...({ supportsFullscreen: true } as any)}
         />
       );
 

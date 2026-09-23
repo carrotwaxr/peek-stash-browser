@@ -4,8 +4,9 @@
  * Bug #423: Client sends POST with no body, causing
  * "Cannot destructure property 'instanceId' of 'req.body' as it is undefined"
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stashSyncService } from "../../services/StashSyncService.js";
 
 // Mock auth middleware
 vi.mock("../../middleware/auth.js", () => ({
@@ -45,8 +46,6 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { stashSyncService } from "../../services/StashSyncService.js";
-
 const mockSyncService = vi.mocked(stashSyncService);
 
 function createMockRequest(
@@ -77,8 +76,7 @@ function createMockResponse() {
 async function getReprobeHandler() {
   const { default: router } = await import("../../routes/sync.js");
   const layer = (router as any).stack.find(
-    (l: any) =>
-      l.route?.path === "/reprobe-clips" && l.route?.methods?.post
+    (l: any) => l.route?.path === "/reprobe-clips" && l.route?.methods?.post
   );
   // The route has [requireAdmin, authenticated(handler)] — handler is the last in the stack
   const routeStack = layer?.route?.stack;
@@ -164,8 +162,7 @@ describe("POST /api/sync/reprobe-clips", () => {
       body: undefined,
       user: { id: 1, username: "admin", role: "ADMIN" },
     });
-    const { json, status, responseJson, responseStatus } =
-      createMockResponse();
+    const { json, status, responseJson, responseStatus } = createMockResponse();
     const mockRes = { json, status } as unknown as Response;
 
     await handler(mockReq, mockRes, () => {});

@@ -45,7 +45,4 @@ export type {
 } from "./generated/graphql.js";
 
 // Enums - re-export as values (not just types)
-export {
-  CriterionModifier,
-  GenderEnum,
-} from "./generated/graphql.js";
+export { CriterionModifier, GenderEnum } from "./generated/graphql.js";

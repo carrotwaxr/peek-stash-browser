@@ -1,12 +1,12 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NormalizedTag } from "@peek/shared-types";
-import { BaseCard } from "../ui/BaseCard";
-import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
 import { useConfig } from "../../contexts/ConfigContext";
-import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks";
+import { appendInstanceParam, getEntityPath } from "../../utils/entityLinks";
+import { BaseCard } from "../ui/BaseCard";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
 interface Props {
   tag: NormalizedTag & { child_count?: number };
@@ -29,24 +29,51 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
         : null;
 
     const indicators = useMemo(() => {
-      const performersTooltip = getIndicatorBehavior('tag', 'performers') === 'rich' &&
+      const performersTooltip = getIndicatorBehavior("tag", "performers") ===
+        "rich" &&
         (tag.performers?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" parentInstanceId={tag.instanceId} />
+          <TooltipEntityGrid
+            entityType="performer"
+            entities={tag.performers}
+            title="Performers"
+            parentInstanceId={tag.instanceId}
+          />
         );
 
-      const studiosTooltip = getIndicatorBehavior('tag', 'studios') === 'rich' &&
+      const studiosTooltip = getIndicatorBehavior("tag", "studios") ===
+        "rich" &&
         (tag.studios?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" parentInstanceId={tag.instanceId} />
+          <TooltipEntityGrid
+            entityType="studio"
+            entities={tag.studios}
+            title="Studios"
+            parentInstanceId={tag.instanceId}
+          />
         );
 
-      const groupsTooltip = getIndicatorBehavior('tag', 'groups') === 'rich' &&
+      const groupsTooltip = getIndicatorBehavior("tag", "groups") === "rich" &&
         (tag.groups?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" parentInstanceId={tag.instanceId} />
+          <TooltipEntityGrid
+            entityType="group"
+            entities={tag.groups}
+            title="Collections"
+            parentInstanceId={tag.instanceId}
+          />
         );
 
-      const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior("tag", "galleries") ===
+        "rich" &&
         (tag.galleries?.length ?? 0) > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={tag.galleries as React.ComponentProps<typeof TooltipEntityGrid>["entities"]} title="Galleries" parentInstanceId={tag.instanceId} />
+          <TooltipEntityGrid
+            entityType="gallery"
+            entities={
+              tag.galleries as React.ComponentProps<
+                typeof TooltipEntityGrid
+              >["entities"]
+            }
+            title="Galleries"
+            parentInstanceId={tag.instanceId}
+          />
         );
 
       return [
@@ -56,7 +83,14 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.scene_count,
           onClick:
             tag.scene_count > 0
-              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/scenes?tagIds=${tag.id}`,
+                      tag,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -64,7 +98,14 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
           count: tag.image_count,
           onClick:
             tag.image_count > 0
-              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag, hasMultipleInstances))
+              ? () =>
+                  navigate(
+                    appendInstanceParam(
+                      `/images?tagIds=${tag.id}`,
+                      tag,
+                      hasMultipleInstances
+                    )
+                  )
               : undefined,
         },
         {
@@ -91,7 +132,9 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
     }, [tag, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
-    const indicatorsToShow = tagSettings.showRelationshipIndicators ? indicators : [];
+    const indicatorsToShow = tagSettings.showRelationshipIndicators
+      ? indicators
+      : [];
 
     return (
       <BaseCard
@@ -101,11 +144,15 @@ const TagCard = forwardRef<HTMLDivElement, Props>(
         title={tag.name}
         subtitle={subtitle}
         description={tag.description}
-        linkTo={getEntityPath('tag', tag, hasMultipleInstances)}
+        linkTo={getEntityPath("tag", tag, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard as boolean | undefined }}
+        displayPreferences={{
+          showDescription: tagSettings.showDescriptionOnCard as
+            | boolean
+            | undefined,
+        }}
         ratingControlsProps={
           tag.rating100 !== undefined
             ? {

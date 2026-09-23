@@ -8,9 +8,9 @@
  * - Keyboard navigation
  * - Indicator display (counts, rating, favorite)
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import TagTreeNodeComponent from "../../../src/components/tags/TagTreeNode";
 
 // Cast to FC<any> since TagTreeNode is an untyped forwardRef
@@ -56,16 +56,12 @@ const mockTagWithRating = {
 describe("TagTreeNode", () => {
   describe("rendering", () => {
     it("renders tag name", () => {
-      renderWithRouter(
-        <TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />
-      );
+      renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />);
       expect(screen.getByText("Leaf Tag")).toBeInTheDocument();
     });
 
     it("renders scene count indicator when > 0", () => {
-      renderWithRouter(
-        <TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />
-      );
+      renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />);
       expect(screen.getByText("5")).toBeInTheDocument();
       expect(screen.getByTitle("5 scenes")).toBeInTheDocument();
     });
@@ -124,9 +120,7 @@ describe("TagTreeNode", () => {
     });
 
     it("does not render expand chevron for leaf nodes", () => {
-      renderWithRouter(
-        <TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />
-      );
+      renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={() => {}} />);
       const treeitem = screen.getByRole("treeitem");
       expect(treeitem).not.toHaveAttribute("aria-expanded");
     });
@@ -144,9 +138,7 @@ describe("TagTreeNode", () => {
 
     it("does not call onToggle when clicked on leaf node", () => {
       const onToggle = vi.fn();
-      renderWithRouter(
-        <TagTreeNode tag={mockTagLeaf} onToggle={onToggle} />
-      );
+      renderWithRouter(<TagTreeNode tag={mockTagLeaf} onToggle={onToggle} />);
       fireEvent.click(screen.getByRole("treeitem"));
       expect(onToggle).not.toHaveBeenCalled();
     });
@@ -186,23 +178,26 @@ describe("TagTreeNode", () => {
         />
       );
       // Only one treeitem when collapsed (children not rendered)
-      expect(screen.getByRole("treeitem")).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("treeitem")).toHaveAttribute(
+        "aria-expanded",
+        "false"
+      );
 
       rerender(
         <MemoryRouter>
-          {(
+          {
             <TagTreeNode
               tag={mockTagWithChildren}
               isExpanded={true}
               expandedIds={new Set(["1"])}
               onToggle={() => {}}
             />
-          )}
+          }
         </MemoryRouter>
       );
       // When expanded, multiple treeitems exist - get the parent by its name
       const allTreeItems = screen.getAllByRole("treeitem");
-      const parentItem = allTreeItems.find(item =>
+      const parentItem = allTreeItems.find((item) =>
         item.textContent!.includes("Parent Tag")
       );
       expect(parentItem).toHaveAttribute("aria-expanded", "true");
@@ -219,7 +214,10 @@ describe("TagTreeNode", () => {
           onFocus={() => {}}
         />
       );
-      expect(screen.getByRole("treeitem")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("treeitem")).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
     });
 
     it("sets tabIndex 0 when focused, -1 otherwise", () => {
@@ -235,14 +233,14 @@ describe("TagTreeNode", () => {
 
       rerender(
         <MemoryRouter>
-          {(
+          {
             <TagTreeNode
               tag={mockTagLeaf}
               focusedId="other"
               onToggle={() => {}}
               onFocus={() => {}}
             />
-          )}
+          }
         </MemoryRouter>
       );
       expect(screen.getByRole("treeitem")).toHaveAttribute("tabIndex", "-1");
@@ -251,11 +249,7 @@ describe("TagTreeNode", () => {
     it("calls onFocus when clicked", () => {
       const onFocus = vi.fn();
       renderWithRouter(
-        <TagTreeNode
-          tag={mockTagLeaf}
-          onToggle={() => {}}
-          onFocus={onFocus}
-        />
+        <TagTreeNode tag={mockTagLeaf} onToggle={() => {}} onFocus={onFocus} />
       );
       fireEvent.click(screen.getByRole("treeitem"));
       expect(onFocus).toHaveBeenCalledWith("4");
@@ -291,11 +285,7 @@ describe("TagTreeNode", () => {
   describe("depth indentation", () => {
     it("applies margin based on depth", () => {
       renderWithRouter(
-        <TagTreeNode
-          tag={mockTagLeaf}
-          depth={2}
-          onToggle={() => {}}
-        />
+        <TagTreeNode tag={mockTagLeaf} depth={2} onToggle={() => {}} />
       );
       const treeitem = screen.getByRole("treeitem");
       expect(treeitem).toHaveStyle({ marginLeft: "48px" }); // 2 * 24px

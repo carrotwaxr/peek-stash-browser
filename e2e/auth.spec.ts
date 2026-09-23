@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Authentication", () => {
   test("authenticated user can access the home page", async ({ page }) => {
@@ -56,9 +56,7 @@ test.describe("Unauthenticated access", () => {
     await expect(page.getByText("Sign in to your account")).toBeVisible();
     await expect(page.getByLabel("Username")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Sign in" })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
     await expect(page.getByText("Forgot your password?")).toBeVisible();
   });
 
@@ -74,7 +72,12 @@ test.describe("Unauthenticated access", () => {
   });
 
   test("protected routes redirect to login", async ({ page }) => {
-    const protectedRoutes = ["/scenes", "/performers", "/settings", "/playlists"];
+    const protectedRoutes = [
+      "/scenes",
+      "/performers",
+      "/settings",
+      "/playlists",
+    ];
 
     for (const route of protectedRoutes) {
       await page.goto(route);

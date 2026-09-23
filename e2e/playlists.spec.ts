@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * E2E tests for Playlist CRUD operations.
@@ -92,23 +92,19 @@ test.describe("Playlist CRUD", () => {
     // Fill in the form
     const playlistName = `E2E Playlist ${uniqueSuffix}`;
     await page.getByLabel("Playlist Name *").fill(playlistName);
-    await page
-      .getByLabel("Description (Optional)")
-      .fill("Created by E2E test");
+    await page.getByLabel("Description (Optional)").fill("Created by E2E test");
 
     // Create button should be enabled
-    const createButton = page
-      .getByRole("button", { name: "Create" })
-      .last();
+    const createButton = page.getByRole("button", { name: "Create" }).last();
     await expect(createButton).toBeEnabled();
 
     // Submit the form
     await createButton.click();
 
     // Wait for the playlist name to appear in the list (confirms creation + modal close)
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("create modal cancel closes without creating", async ({ page }) => {
@@ -145,9 +141,7 @@ test.describe("Playlist CRUD", () => {
     await expect(page.getByText("Create New Playlist")).toBeVisible();
 
     // Create button should be disabled when name is empty
-    const createButton = page
-      .getByRole("button", { name: "Create" })
-      .last();
+    const createButton = page.getByRole("button", { name: "Create" }).last();
     await expect(createButton).toBeDisabled();
 
     // Fill in a name
@@ -182,9 +176,9 @@ test.describe("Playlist CRUD", () => {
     await expect(page.getByText(playlistName)).toBeVisible();
 
     // Empty state should show since no scenes are added
-    await expect(
-      page.getByText("No scenes in this playlist yet")
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText("No scenes in this playlist yet")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("can delete a playlist with confirmation", async ({ page }) => {
@@ -198,9 +192,9 @@ test.describe("Playlist CRUD", () => {
     await page.getByRole("button", { name: "+ New Playlist" }).click();
     await page.getByLabel("Playlist Name *").fill(playlistName);
     await page.getByRole("button", { name: "Create" }).last().click();
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Navigate to playlist detail and delete from there
     await page.getByRole("link", { name: playlistName }).click();
@@ -208,9 +202,9 @@ test.describe("Playlist CRUD", () => {
 
     // Go back to the list and use the Delete button on the card
     await page.goto("/playlists");
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Each playlist card is a Paper component (div.rounded-lg.border)
     const card = page
@@ -247,9 +241,9 @@ test.describe("Playlist CRUD", () => {
     await page.getByRole("button", { name: "+ New Playlist" }).click();
     await page.getByLabel("Playlist Name *").fill(playlistName);
     await page.getByRole("button", { name: "Create" }).last().click();
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Each playlist card is a Paper component (div.rounded-lg.border)
     const card = page
@@ -262,8 +256,6 @@ test.describe("Playlist CRUD", () => {
     await dialog.getByRole("button", { name: "Cancel" }).click();
 
     // Playlist should still be visible
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: playlistName })).toBeVisible();
   });
 });

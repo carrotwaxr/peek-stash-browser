@@ -1,16 +1,4 @@
-import type {
-  TypedAuthRequest,
-  TypedResponse,
-  FindTagsRequest,
-  FindTagsResponse,
-  FindTagsMinimalRequest,
-  FindTagsMinimalResponse,
-  UpdateTagParams,
-  UpdateTagRequest,
-  UpdateTagResponse,
-  ApiErrorResponse,
-  AmbiguousLookupResponse,
-} from "../../types/api/index.js";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -18,9 +6,24 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import type {
+  AmbiguousLookupResponse,
+  ApiErrorResponse,
+  FindTagsMinimalRequest,
+  FindTagsMinimalResponse,
+  FindTagsRequest,
+  FindTagsResponse,
+  TypedAuthRequest,
+  TypedResponse,
+  UpdateTagParams,
+  UpdateTagRequest,
+  UpdateTagResponse,
+} from "../../types/api/index.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
-import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import {
+  disambiguateEntityNames,
+  getEntityInstanceId,
+} from "../../utils/entityInstanceId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -72,7 +75,9 @@ export async function mergeTagsWithUserData(
  */
 export const findTags = async (
   req: TypedAuthRequest<FindTagsRequest>,
-  res: TypedResponse<FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse>
+  res: TypedResponse<
+    FindTagsResponse | ApiErrorResponse | AmbiguousLookupResponse
+  >
 ) => {
   try {
     const startTime = Date.now();
@@ -81,13 +86,18 @@ export const findTags = async (
     const { filter, tag_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
+    const sortDirection = (filter?.direction || "ASC").toUpperCase() as
+      | "ASC"
+      | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
     // Parse random sort to extract seed for consistent pagination
-    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
+    const { sortField, randomSeed } = parseRandomSort(
+      sortFieldRaw,
+      requestingUser.id
+    );
 
     // Merge root-level ids with tag_filter
     const normalizedIds = ids
@@ -104,7 +114,8 @@ export const findTags = async (
     // Use SQL query builder - admins skip exclusions
     // When fetching by specific IDs, skip exclusions (for detail pages)
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
-    const applyExclusions = requestingUser?.role !== "ADMIN" && !isFetchingByIds;
+    const applyExclusions =
+      requestingUser?.role !== "ADMIN" && !isFetchingByIds;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -129,12 +140,12 @@ export const findTags = async (
       logger.warn("Ambiguous tag lookup", {
         id: ids[0],
         matchCount: tags.length,
-        instances: tags.map(t => t.instanceId),
+        instances: tags.map((t) => t.instanceId),
       });
       return res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple tags found with ID ${ids[0]}. Specify instance_id parameter.`,
-        matches: tags.map(t => ({
+        matches: tags.map((t) => ({
           id: t.id,
           name: t.name,
           instanceId: t.instanceId,
@@ -146,7 +157,10 @@ export const findTags = async (
     let resultTags = tags;
     if (ids && ids.length === 1 && resultTags.length === 1) {
       const firstTag = resultTags[0] as (typeof resultTags)[number];
-      const tagWithCounts = await stashEntityService.getTag(ids[0] as string, firstTag.instanceId);
+      const tagWithCounts = await stashEntityService.getTag(
+        ids[0] as string,
+        firstTag.instanceId
+      );
       if (tagWithCounts) {
         const existingTag = firstTag;
         resultTags = [
@@ -186,7 +200,9 @@ export const findTags = async (
       );
       // Merge the computed counts back
       hydratedTags = hydratedTags.map((h) => {
-        const result = resultTags.find((r) => r.id === h.id && r.instanceId === h.instanceId);
+        const result = resultTags.find(
+          (r) => r.id === h.id && r.instanceId === h.instanceId
+        );
         return result ? { ...h, ...result } : h;
       });
     } else {
@@ -541,23 +557,30 @@ export const findTagsMinimal = async (
     // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
     // Admins skip exclusions to see everything
     if (requestingUser?.role !== "ADMIN") {
-      tags = await entityExclusionHelper.filterExcluded(
-        tags,
-        userId,
-        "tag"
-      );
+      tags = await entityExclusionHelper.filterExcluded(tags, userId, "tag");
     }
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {
-      const { min_scene_count, min_gallery_count, min_image_count, min_performer_count, min_group_count } = count_filter;
+      const {
+        min_scene_count,
+        min_gallery_count,
+        min_image_count,
+        min_performer_count,
+        min_group_count,
+      } = count_filter;
       tags = tags.filter((t) => {
         const conditions: boolean[] = [];
-        if (min_scene_count !== undefined) conditions.push(t.scene_count >= min_scene_count);
-        if (min_gallery_count !== undefined) conditions.push(t.gallery_count >= min_gallery_count);
-        if (min_image_count !== undefined) conditions.push(t.image_count >= min_image_count);
-        if (min_performer_count !== undefined) conditions.push(t.performer_count >= min_performer_count);
-        if (min_group_count !== undefined) conditions.push(t.group_count >= min_group_count);
+        if (min_scene_count !== undefined)
+          conditions.push(t.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined)
+          conditions.push(t.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined)
+          conditions.push(t.image_count >= min_image_count);
+        if (min_performer_count !== undefined)
+          conditions.push(t.performer_count >= min_performer_count);
+        if (min_group_count !== undefined)
+          conditions.push(t.group_count >= min_group_count);
         return conditions.length === 0 || conditions.some((c) => c);
       });
     }
@@ -626,8 +649,16 @@ export const findTagsMinimal = async (
  * Used by folder view to show only relevant tags.
  */
 export const findTagsForScenes = async (
-  req: TypedAuthRequest<{ performerId?: string; tagId?: string; studioId?: string; groupId?: string }>,
-  res: TypedResponse<{ tags: Array<{ id: string; name: string; parent_ids?: string[] }> } | ApiErrorResponse>
+  req: TypedAuthRequest<{
+    performerId?: string;
+    tagId?: string;
+    studioId?: string;
+    groupId?: string;
+  }>,
+  res: TypedResponse<
+    | { tags: Array<{ id: string; name: string; parent_ids?: string[] }> }
+    | ApiErrorResponse
+  >
 ) => {
   try {
     const { performerId, tagId, studioId, groupId } = req.body;
@@ -662,8 +693,11 @@ export const findTagsForScenes = async (
       params.push(groupId);
     }
 
-    const tagIdResults = await prisma.$queryRawUnsafe<Array<{ tagId: string }>>(sceneTagQuery, ...params);
-    const tagIds = new Set(tagIdResults.map(r => r.tagId));
+    const tagIdResults = await prisma.$queryRawUnsafe<Array<{ tagId: string }>>(
+      sceneTagQuery,
+      ...params
+    );
+    const tagIds = new Set(tagIdResults.map((r) => r.tagId));
 
     if (tagIds.size === 0) {
       return res.json({ tags: [] });
@@ -674,12 +708,16 @@ export const findTagsForScenes = async (
 
     // Apply exclusions for non-admins
     if (requestingUser?.role !== "ADMIN") {
-      allTags = await entityExclusionHelper.filterExcluded(allTags, userId, "tag");
+      allTags = await entityExclusionHelper.filterExcluded(
+        allTags,
+        userId,
+        "tag"
+      );
     }
 
     // Expand to include parent tags for hierarchy
     const expandedTagIds = new Set(tagIds);
-    const tagMap = new Map(allTags.map(t => [t.id, t]));
+    const tagMap = new Map(allTags.map((t) => [t.id, t]));
 
     // Walk up parent chains
     for (const currentTagId of tagIds) {
@@ -689,19 +727,25 @@ export const findTagsForScenes = async (
           expandedTagIds.add(parent.id);
           // Also add grandparents, etc.
           let parentTag = tagMap.get(parent.id);
-          while (parentTag?.parents && Array.isArray(parentTag.parents) && parentTag.parents.length > 0) {
+          while (
+            parentTag?.parents &&
+            Array.isArray(parentTag.parents) &&
+            parentTag.parents.length > 0
+          ) {
             for (const gp of parentTag.parents) {
               expandedTagIds.add(gp.id);
             }
             // Get first parent to continue chain (tags can have multiple parents)
-            parentTag = parentTag.parents[0] ? tagMap.get(parentTag.parents[0].id) : undefined;
+            parentTag = parentTag.parents[0]
+              ? tagMap.get(parentTag.parents[0].id)
+              : undefined;
           }
         }
       }
     }
 
     // Filter to only expanded tags
-    const filteredTags = allTags.filter(t => expandedTagIds.has(t.id));
+    const filteredTags = allTags.filter((t) => expandedTagIds.has(t.id));
 
     // Build children arrays based on filtered tags only
     // A tag's children are tags that have this tag as a parent AND are in our filtered set
@@ -720,11 +764,14 @@ export const findTagsForScenes = async (
     }
 
     // Return tags with parents and children arrays (matching the structure buildFolderTree expects)
-    const tagsWithHierarchy = filteredTags.map(t => ({
+    const tagsWithHierarchy = filteredTags.map((t) => ({
       id: t.id,
       name: t.name,
       image_path: t.image_path,
-      parents: t.parents?.filter(p => expandedTagIds.has(p.id)).map(p => ({ id: p.id })) || [],
+      parents:
+        t.parents
+          ?.filter((p) => expandedTagIds.has(p.id))
+          .map((p) => ({ id: p.id })) || [],
       children: childrenMap.get(t.id) || [],
     }));
 
@@ -748,10 +795,12 @@ export const updateTag = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const instanceId = await getEntityInstanceId('tag', id);
+    const instanceId = await getEntityInstanceId("tag", id);
     const stash = stashInstanceManager.get(instanceId);
     if (!stash) {
-      return res.status(404).json({ error: "Stash instance not found for tag" });
+      return res
+        .status(404)
+        .json({ error: "Stash instance not found for tag" });
     }
 
     const updatedTag = await stash.tagUpdate({
@@ -765,9 +814,14 @@ export const updateTag = async (
       return res.status(500).json({ error: "Tag update returned null" });
     }
 
-    res.json({ success: true, tag: updatedTag.tagUpdate as unknown as NormalizedTag });
+    res.json({
+      success: true,
+      tag: updatedTag.tagUpdate as unknown as NormalizedTag,
+    });
   } catch (error) {
-    logger.error("Error updating tag", { error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Error updating tag", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({ error: "Failed to update tag" });
   }
 };

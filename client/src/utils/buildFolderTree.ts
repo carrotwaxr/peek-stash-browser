@@ -29,7 +29,11 @@ const getItemThumbnail = (item: FolderItem): string | null => {
  * @param {Array} currentPath - Array of tag IDs representing current navigation path
  * @returns {Object} { folders: FolderNode[], items: Item[], breadcrumbs: Breadcrumb[] }
  */
-export function buildFolderTree(items: FolderItem[], tags: FolderTag[], currentPath: string[] = []) {
+export function buildFolderTree(
+  items: FolderItem[],
+  tags: FolderTag[],
+  currentPath: string[] = []
+) {
   if (!items || !tags) {
     return { folders: [], items: [], breadcrumbs: [] };
   }
@@ -52,11 +56,15 @@ export function buildFolderTree(items: FolderItem[], tags: FolderTag[], currentP
   let childTagIds;
   if (currentTag) {
     // Inside a tag - show its children
-    childTagIds = new Set((currentTag.children || []).map((c: FolderTag) => c.id));
+    childTagIds = new Set(
+      (currentTag.children || []).map((c: FolderTag) => c.id)
+    );
   } else {
     // At root - show top-level tags (no parents)
     childTagIds = new Set(
-      tags.filter((t: FolderTag) => !t.parents || t.parents.length === 0).map((t: FolderTag) => t.id)
+      tags
+        .filter((t: FolderTag) => !t.parents || t.parents.length === 0)
+        .map((t: FolderTag) => t.id)
     );
   }
 
@@ -139,7 +147,8 @@ export function buildFolderTree(items: FolderItem[], tags: FolderTag[], currentP
 
     // Get pre-computed count from tag (image_count, scene_count, or gallery_count)
     // These are set by the backend during sync and represent the total items with this tag
-    const preComputedCount = tag.image_count || tag.scene_count || tag.gallery_count || 0;
+    const preComputedCount =
+      tag.image_count || tag.scene_count || tag.gallery_count || 0;
 
     // Check if tag has children (it's a container/organizational tag)
     const hasChildren = tag.children && tag.children.length > 0;
@@ -152,10 +161,13 @@ export function buildFolderTree(items: FolderItem[], tags: FolderTag[], currentP
 
     // Use items count if available (more accurate for current page context)
     // Fall back to pre-computed count when no items on current page
-    const totalCount = folderItems.length > 0 ? folderItems.length : preComputedCount;
+    const totalCount =
+      folderItems.length > 0 ? folderItems.length : preComputedCount;
 
     // Get thumbnail - prefer tag image, then first item, then null
-    const thumbnail = tag.image_path || (folderItems[0] ? getItemThumbnail(folderItems[0]) : null);
+    const thumbnail =
+      tag.image_path ||
+      (folderItems[0] ? getItemThumbnail(folderItems[0]) : null);
 
     folders.push({
       id: tagId,
@@ -192,7 +204,12 @@ export function buildFolderTree(items: FolderItem[], tags: FolderTag[], currentP
 /**
  * Check if an item has a tag or any of its descendants
  */
-function itemHasTagOrDescendant(item: FolderItem, tagId: string, tagMap: Map<string, FolderTag>, visited = new Set<string>()): boolean {
+function itemHasTagOrDescendant(
+  item: FolderItem,
+  tagId: string,
+  tagMap: Map<string, FolderTag>,
+  visited = new Set<string>()
+): boolean {
   if (visited.has(tagId)) return false;
   visited.add(tagId);
 

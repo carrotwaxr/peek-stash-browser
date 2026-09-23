@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useDebouncedCallback } from "../../hooks/useDebounce";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useDebouncedCallback } from "../../hooks/useDebounce";
 
 interface Props {
   isOpen: boolean;
