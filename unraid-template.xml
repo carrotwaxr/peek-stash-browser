@@ -46,7 +46,7 @@
   <WebUI>http://[IP]:[PORT:80]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/client/public/branding/logos/peek-logo.png</Icon>
-  <ExtraParams/>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>

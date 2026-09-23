@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { setupAPI, startServer } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
+import { installProcessHandlers } from "./initializers/processHandlers.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
@@ -26,6 +27,9 @@ const envPath =
     : path.resolve(__dirname, "../.env"); // From server/ to project root
 
 dotenv.config({ path: envPath });
+
+// Log (and, for an uncaught exception, exit on) errors nothing else caught
+installProcessHandlers();
 
 const main = async () => {
   logger.info("Starting Peek server");

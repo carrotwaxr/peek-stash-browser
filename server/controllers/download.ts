@@ -21,6 +21,7 @@ import type {
   StartSceneDownloadResponse,
 } from "../types/api/download.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
+import { attachmentContentDisposition } from "../utils/contentDisposition.js";
 import { logger } from "../utils/logger.js";
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
@@ -320,7 +321,9 @@ export async function getDownloadFile(
         }
         return res.sendFile(download.filePath, {
           headers: {
-            "Content-Disposition": `attachment; filename="${download.fileName}"`,
+            "Content-Disposition": attachmentContentDisposition(
+              download.fileName
+            ),
           },
         });
 
@@ -348,7 +351,7 @@ export async function getDownloadFile(
         // Set headers for download
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${download.fileName}"`
+          attachmentContentDisposition(download.fileName)
         );
 
         await pipeResponseToClient(sceneResponse, res, "[DOWNLOAD]", [
@@ -382,7 +385,7 @@ export async function getDownloadFile(
         // Set headers for download
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${download.fileName}"`
+          attachmentContentDisposition(download.fileName)
         );
 
         await pipeResponseToClient(imageResponse, res, "[DOWNLOAD]", [

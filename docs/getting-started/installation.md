@@ -77,6 +77,7 @@ docker run -d \
   -p 6969:80 \
   -v peek-data:/app/data \
   -e JWT_SECRET="${JWT_SECRET}" \
+  --restart unless-stopped \
   carrotwaxr/peek-stash-browser:latest
 ```
 
@@ -110,6 +111,7 @@ docker run -d `
     -p 6969:80 `
     -v peek-data:/app/data `
     -e JWT_SECRET=$jwt `
+    --restart unless-stopped `
     carrotwaxr/peek-stash-browser:latest
 ```
 
@@ -153,6 +155,7 @@ docker run -d \
     -p 6969:80 \
     -v peek-data:/app/data \
     -e JWT_SECRET="${JWT_SECRET}" \
+    --restart unless-stopped \
     carrotwaxr/peek-stash-browser:latest
 ```
 
@@ -230,6 +233,7 @@ To update your Docker container to the latest version:
       -p 6969:80 \
       -v peek-data:/app/data \
       -e JWT_SECRET="${JWT_SECRET}" \
+      --restart unless-stopped \
       carrotwaxr/peek-stash-browser:latest
     ```
 
@@ -248,6 +252,7 @@ To update your Docker container to the latest version:
       -p 6969:80 `
       -v peek-data:/app/data `
       -e JWT_SECRET=$jwt `
+      --restart unless-stopped `
       carrotwaxr/peek-stash-browser:latest
     ```
 

@@ -458,7 +458,7 @@ describe("Download Controller", () => {
       );
       expect(responseSetHeader).toHaveBeenCalledWith(
         "Content-Disposition",
-        'attachment; filename="test.mp4"'
+        "attachment; filename=\"test.mp4\"; filename*=UTF-8''test.mp4"
       );
       expect(mockPipeResponseToClient).toHaveBeenCalledWith(
         expect.objectContaining({ ok: true }),
@@ -513,7 +513,7 @@ describe("Download Controller", () => {
       );
       expect(responseSetHeader).toHaveBeenCalledWith(
         "Content-Disposition",
-        'attachment; filename="test.jpg"'
+        "attachment; filename=\"test.jpg\"; filename*=UTF-8''test.jpg"
       );
       expect(mockPipeResponseToClient).toHaveBeenCalledWith(
         expect.objectContaining({ ok: true }),
@@ -521,6 +521,43 @@ describe("Download Controller", () => {
         "[DOWNLOAD]",
         ["content-type", "content-length"]
       );
+    });
+
+    it("should serve a completed PLAYLIST zip with an RFC 6266 Content-Disposition", async () => {
+      mockRequest = {
+        user: { id: 1, username: "testuser", role: "USER" },
+        params: { id: "1" },
+      };
+      const mockDownload = {
+        id: 1,
+        userId: 1,
+        type: "PLAYLIST",
+        status: "COMPLETED",
+        entityType: null,
+        entityId: null,
+        fileName: "Kate’s picks.zip",
+        fileSize: BigInt(1000),
+        filePath: "/tmp/p.zip",
+        progress: 100,
+        error: null,
+        playlistId: 1,
+        createdAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: null,
+      };
+      mockDownloadService.getDownload.mockResolvedValue(mockDownload);
+
+      await getDownloadFile(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
+
+      expect(responseSendFile).toHaveBeenCalledWith("/tmp/p.zip", {
+        headers: {
+          "Content-Disposition":
+            "attachment; filename=\"Kate_s picks.zip\"; filename*=UTF-8''Kate%E2%80%99s%20picks.zip",
+        },
+      });
     });
 
     it("should return 400 if download is not completed", async () => {

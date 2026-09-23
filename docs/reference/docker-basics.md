@@ -208,6 +208,7 @@ docker run -d \
   -p 6969:80 \
   -v peek-data:/app/data \
   -e JWT_SECRET="your-secret-here" \
+  --restart unless-stopped \
   carrotwaxr/peek-stash-browser:latest
 ```
 
