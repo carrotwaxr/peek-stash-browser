@@ -75,5 +75,11 @@
     "graphql-tag": "^2.12.6",
     "jsonwebtoken": "^9.0.2",
     "zod": "^4.3.6"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "archiver-utils": {
+      "lodash": "^4.18.1"
+    }
   }
 }
