@@ -60,7 +60,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
     userContentRestriction: {
       findMany: vi.fn(),
-      create: vi.fn(),
+      createMany: vi.fn(),
       deleteMany: vi.fn(),
     },
     userGroupMembership: {
@@ -523,12 +523,19 @@ describe("User Controller — Features", () => {
     });
 
     it("replaces all restrictions and recomputes exclusions", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        role: "USER",
+      } as any);
       mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
         count: 1,
       } as any);
-      mockPrisma.userContentRestriction.create.mockResolvedValue({
-        id: 1,
+      mockPrisma.userContentRestriction.createMany.mockResolvedValue({
+        count: 1,
       } as any);
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+        { id: 1, entityType: "tags", mode: "EXCLUDE" },
+      ] as any);
       const req = mockReq(
         {
           restrictions: [
@@ -546,7 +553,11 @@ describe("User Controller — Features", () => {
           where: { userId: 2 },
         }
       );
+      expect(
+        mockPrisma.userContentRestriction.createMany
+      ).toHaveBeenCalledTimes(1);
       expect(mockExclusionService.recomputeForUser).toHaveBeenCalledWith(2);
+      expect(res._getBody().restrictions).toHaveLength(1);
     });
   });
 

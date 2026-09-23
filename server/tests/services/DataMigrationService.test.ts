@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 
 // Mock prisma
@@ -41,12 +42,25 @@ vi.mock("../../services/UserStatsService.js", () => ({
   },
 }));
 
+// Mock ExclusionComputationService (migration 003 recomputes every user)
+vi.mock("../../services/ExclusionComputationService.js", () => ({
+  exclusionComputationService: {
+    recomputeAllUsers: vi.fn(),
+  },
+}));
+
 const mockPrisma = vi.mocked(prisma);
 const mockStatsService = vi.mocked(userStatsService);
+const mockExclusionService = vi.mocked(exclusionComputationService);
 
 describe("DataMigrationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExclusionService.recomputeAllUsers.mockResolvedValue({
+      success: 0,
+      failed: 0,
+      errors: [],
+    });
   });
 
   afterEach(() => {
@@ -65,6 +79,11 @@ describe("DataMigrationService", () => {
         {
           id: 2,
           name: "002_rebuild_stats_multi_instance",
+          appliedAt: new Date(),
+        },
+        {
+          id: 3,
+          name: "003_recompute_exclusions_restriction_semantics",
           appliedAt: new Date(),
         },
       ] as any);
@@ -91,35 +110,80 @@ describe("DataMigrationService", () => {
       ] as any);
       mockStatsService.rebuildAllStatsForUser.mockResolvedValue();
       mockStatsService.rebuildAllStats.mockResolvedValue();
+      mockExclusionService.recomputeAllUsers.mockResolvedValue({
+        success: 1,
+        failed: 0,
+        errors: [],
+      });
 
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // Both migrations should be marked as applied
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(2);
+      // All three migrations should be marked as applied
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(3);
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "001_rebuild_user_stats" },
       });
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "002_rebuild_stats_multi_instance" },
       });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "003_recompute_exclusions_restriction_semantics" },
+      });
     });
 
     it("skips already-applied migration and only runs pending ones", async () => {
-      // 001 already applied, 002 pending
+      // 001 already applied, 002 and 003 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
         { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
       ] as any);
       mockPrisma.dataMigration.create.mockResolvedValue({} as any);
       mockStatsService.rebuildAllStats.mockResolvedValue();
+      mockExclusionService.recomputeAllUsers.mockResolvedValue({
+        success: 0,
+        failed: 0,
+        errors: [],
+      });
 
       const service = await importFresh();
       await service.runPendingMigrations();
 
-      // Only 002 should be created
-      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(1);
+      // 001 is skipped; 002 and 003 are created
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.dataMigration.create).not.toHaveBeenCalledWith({
+        data: { name: "001_rebuild_user_stats" },
+      });
       expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
         data: { name: "002_rebuild_stats_multi_instance" },
+      });
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "003_recompute_exclusions_restriction_semantics" },
+      });
+    });
+
+    it("recomputes every user's exclusions in migration 003 (item 13)", async () => {
+      mockPrisma.dataMigration.findMany.mockResolvedValue([
+        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
+        {
+          id: 2,
+          name: "002_rebuild_stats_multi_instance",
+          appliedAt: new Date(),
+        },
+      ] as any);
+      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      mockExclusionService.recomputeAllUsers.mockResolvedValue({
+        success: 2,
+        failed: 0,
+        errors: [],
+      });
+
+      const service = await importFresh();
+      await service.runPendingMigrations();
+
+      expect(mockExclusionService.recomputeAllUsers).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.dataMigration.create).toHaveBeenCalledWith({
+        data: { name: "003_recompute_exclusions_restriction_semantics" },
       });
     });
 

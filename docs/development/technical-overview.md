@@ -44,22 +44,32 @@ Peek has two mechanisms for hiding content from users. Both cascade (hiding a Ta
 |--------|------|-------------|
 | `userId` | Int | Target user |
 | `entityType` | String | `'groups'`, `'tags'`, `'studios'`, `'galleries'` |
-| `mode` | String | `'INCLUDE'` (whitelist) or `'EXCLUDE'` (blacklist) |
-| `entityIds` | String | JSON array of entity IDs |
-| `restrictEmpty` | Boolean | Also hide items with no entities of this type |
+| `mode` | String | `'INCLUDE'` (Show only) or `'EXCLUDE'` (Always hide) |
+| `entityIds` | String | JSON array of `"id:instanceId"` references |
+| `restrictEmpty` | Boolean | Also hide content with no item of this type |
+
+Unique per `(userId, entityType, mode)`: a type can have a Show-only and an Always-hide row at once. `restrictEmpty` is one setting per type (the compute ORs the rows); the API defaults it to `true` for INCLUDE and `false` for EXCLUDE when a client omits it. An empty `entityIds` list is rejected.
 
 **Key behaviors:**
-- Only admins can set restrictions (via Server Settings)
-- Users cannot see or modify their restrictions
-- Users cannot bypass restrictions
-- Supports both whitelist (INCLUDE) and blacklist (EXCLUDE) modes
-- Can restrict by: Tags, Groups, Studios, Galleries
+- Only admins can set restrictions (via Server Settings), and only on non-admin accounts: `restrictionsApplyTo(role)` in `server/services/exclusionPolicy.ts` is the one place that says who they apply to
+- Users cannot see, modify or bypass their restrictions
+- Rows stored on an admin account stay inert and apply again if the account is demoted; any role change recomputes the user
 
-**Cascading:**
-- Tag restriction → Hides Scenes/Performers/Studios with that Tag (including inherited tags)
-- Group restriction → Hides Scenes in that Group
-- Studio restriction → Hides Scenes from that Studio
-- Gallery restriction → Hides Scenes linked to that Gallery
+**Resolution:** every listed reference is looked up on the user's allowed instances before anything else (a bare id resolves to one reference per instance where the entity exists). Tags expand through `StashTag.parentIds` and studios through `StashStudio.parentId` to every descendant on the same instance with one recursive CTE; parents are not covered. The closure is what every later rule sees, for both lists and for hides.
+
+**Cascading (EXCLUDE closures and hides):**
+
+| Source | Targets |
+|--------|---------|
+| Performer | Scenes (`ScenePerformer`), galleries (`GalleryPerformer`), images (`ImagePerformer`) |
+| Studio | Scenes, galleries, images (`studioId` columns) |
+| Tag | Scenes (`SceneTag` and `inheritedTagIds`), performers, studios, groups, galleries, images, clips (`ClipTag` and `primaryTagId`) |
+| Group | Scenes (`SceneGroup`) |
+| Gallery | Scenes (`SceneGallery`), images (`ImageGallery`) |
+
+Cascades are first order only (a performer excluded through a tag does not cascade further). Clips get real `UserExcludedEntity` rows with `entityType = 'clip'`; the clip query builder joins both `'clip'` rows and the parent scene's rows.
+
+**INCLUDE (Show only):** every entity of the type not in the closure gets a `restricted` row (inversion), and inverted rows are not cascade sources. Content the type links to (scenes, galleries, images) is hidden when it has no item of the type in the closure, unless it has no item at all and `restrictEmpty` is off. Performers, studios, groups and tags are never hidden for lacking an included item; they disappear only through the empty phase. With only an EXCLUDE row, `restrictEmpty` hides content with no item of the type.
 
 ### Hidden Content (User-Controlled)
 
@@ -72,40 +82,28 @@ Peek has two mechanisms for hiding content from users. Both cascade (hiding a Ta
 | `userId` | Int | User who hid the entity |
 | `entityType` | String | Any entity type |
 | `entityId` | String | Stash entity ID |
+| `instanceId` | String | Stash instance (`""` means every instance) |
 | `hiddenAt` | DateTime | When it was hidden |
 
 **Key behaviors:**
 - Users control their own hidden items
 - Users can view and unhide items via Settings
 - Supports all entity types: Scene, Performer, Studio, Tag, Group, Gallery, Image
-- Admins still see their own hidden items (they can hide content for personal preference)
+- Hides apply to everyone, admins included: no read path checks the role, every list, by-id, download and media check consults `UserExcludedEntity` for every user
 
-**Cascading:**
-- Hidden Performer → Hides Scenes with that Performer
-- Hidden Studio → Hides Scenes from that Studio
-- Hidden Tag → Hides Scenes/Performers/Studios with that Tag (including inherited)
-- Hidden Group → Hides Scenes in that Group
-- Hidden Gallery → Hides Scenes linked to that Gallery, Images in Gallery
+**Cascading:** a hide resolves like a listed id (tags and studios expand to their descendants) and cascades along the table above. The stored row keeps its instance as stored; the descendants and the per-instance copies of a `""` hide get their own `hidden` rows, and the Hidden Items page still lists the one stored row. Unhiding the stored row removes the whole set at the next recompute.
 
 ### Processing Order
 
-Content filtering happens in this order:
-1. **INCLUDE restrictions** (intersection) — must match ALL includes
-2. **EXCLUDE restrictions** (difference) — must not match ANY excludes
-3. **Hidden entity filtering** (cascade)
-4. **Empty entity filtering** — remove organizational entities with no visible content
+`ExclusionComputationService.recomputeForUser` runs raw SQL end to end on a dedicated single-connection Prisma client, one recompute at a time, inside a deferred `BEGIN` that reads one snapshot and takes no write lock (TEMP tables hold the closures and exclusion sets, so every membership test is an indexed lookup). It then swaps the rows in one short write transaction:
 
-### Empty Entity Filtering
+1. **Resolve** the lists and hides on the allowed instances (recursive CTE for tags and studios)
+2. **Direct rows**: EXCLUDE closures (`restricted`), INCLUDE inversion (`restricted`), hides (`hidden`)
+3. **Cascades** from the EXCLUDE closures and hides only
+4. **Content rules**: INCLUDE admission and `restrictEmpty` for scenes, galleries and images
+5. **Empty phase**, per instance: galleries with no visible image; performers, studios and groups with no visible content; tags attached to no visible scene, performer, studio, group, gallery or image and with no live child tag on the same instance. Skipped for admins
 
-After restrictions/hiding are applied, organizational entities with no remaining content are removed. Order matters due to dependencies:
-
-1. **Galleries** — Keep if `image_count > 0`
-2. **Groups** — Keep if has scenes OR has sub-groups with content (tree traversal)
-3. **Studios** — Keep if appears in visible scenes OR has visible groups/galleries OR has child studios with content
-4. **Performers** — Keep if appears in visible scenes OR has images OR in visible groups/galleries
-5. **Tags** — Keep if attached to any visible entity OR has children with content (DAG traversal)
-
-**Current limitation:** Empty filtering uses scene/image counts from Stash metadata, not restriction-aware counts. A workaround passes `visibleScenes` to the filter methods.
+Every restriction-derived row carries a real `stashInstanceId`. When an entity qualifies twice, the first reason in that order is the one stored. Types AND together: content is hidden if any EXCLUDE or hide rule hits it, any INCLUDE rule does not admit it, or it is empty under `restrictEmpty`.
 
 ---
 

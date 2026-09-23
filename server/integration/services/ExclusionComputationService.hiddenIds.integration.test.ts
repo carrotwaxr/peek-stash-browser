@@ -6,9 +6,13 @@
  * text. These tests run a full recompute against the real test SQLite
  * database and check that such an id is matched as a value, never run as SQL.
  *
- * Scenes are seeded under a made-up stashInstanceId so the real sync and
- * other tests never touch them. A full recompute also runs the empty-entity
- * phase over the whole test library, hence the 60 s timeouts.
+ * Scenes, the inherited tag and an enabled StashInstance row are seeded under
+ * a made-up stashInstanceId so the real sync and other tests never touch
+ * them. A hide resolves through StashTag on the user's allowed instances
+ * (the user has no UserStashInstance rows, so every enabled instance is
+ * allowed), and the cascade query filters by allowed instance. A full
+ * recompute also runs the empty-entity phase over the whole test library,
+ * hence the 60 s timeouts.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
@@ -27,6 +31,10 @@ async function clearTestScenes(): Promise<void> {
   await prisma.stashScene.deleteMany({
     where: { stashInstanceId: TEST_INSTANCE },
   });
+  await prisma.stashTag.deleteMany({
+    where: { stashInstanceId: TEST_INSTANCE },
+  });
+  await prisma.stashInstance.deleteMany({ where: { id: TEST_INSTANCE } });
 }
 
 describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
@@ -46,6 +54,22 @@ describeWithDb("ExclusionComputationService hidden ids (integration)", () => {
     });
     userId = user.id;
 
+    await prisma.stashInstance.create({
+      data: {
+        id: TEST_INSTANCE,
+        name: TEST_INSTANCE,
+        url: `http://${TEST_INSTANCE}.invalid/graphql`,
+        apiKey: "x",
+        enabled: true,
+      },
+    });
+    await prisma.stashTag.create({
+      data: {
+        id: INHERITED_TAG_ID,
+        stashInstanceId: TEST_INSTANCE,
+        name: "Inherited (integration)",
+      },
+    });
     await prisma.stashScene.createMany({
       data: SCENE_IDS.map((id) => ({
         id,

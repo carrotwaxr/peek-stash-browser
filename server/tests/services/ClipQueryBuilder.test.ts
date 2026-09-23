@@ -79,6 +79,39 @@ describe("ClipQueryBuilder", () => {
       expect(mainQuerySql).toContain("UserExcludedEntity");
       expect(mainQuerySql).toContain("entityType = 'scene'");
       expect(mainQuerySql).toContain("e.id IS NULL");
+      // A clip also has rows of its own (its tags cascade to it, item 13)
+      expect(mainQuerySql).toContain("entityType = 'clip'");
+      expect(mainQuerySql).toContain("ec.id IS NULL");
+    });
+
+    it("binds the user id for both exclusion joins in the list and count queries", async () => {
+      await clipQueryBuilder.getClips({ userId: 7 });
+
+      const [listSql, ...listParams] = mockPrisma.$queryRawUnsafe.mock
+        .calls[0] as [string, ...unknown[]];
+      const [countSql, ...countParams] = mockPrisma.$queryRawUnsafe.mock
+        .calls[1] as [string, ...unknown[]];
+      expect(listParams.slice(0, 2)).toEqual([7, 7]);
+      expect(countParams.slice(0, 2)).toEqual([7, 7]);
+      expect(
+        (listSql.match(/e\.userId = \?|ec\.userId = \?/g) || []).length
+      ).toBe(2);
+      expect(
+        (countSql.match(/e\.userId = \?|ec\.userId = \?/g) || []).length
+      ).toBe(2);
+    });
+
+    it("getClipById applies both joins", async () => {
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+      await clipQueryBuilder.getClipById("c1", 1);
+
+      const sql = mockPrisma.$queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql).toContain("entityType = 'scene'");
+      expect(sql).toContain("entityType = 'clip'");
+      expect(sql).toContain("e.id IS NULL");
+      expect(sql).toContain("ec.id IS NULL");
     });
 
     it("filters both clip and scene deletedAt", async () => {

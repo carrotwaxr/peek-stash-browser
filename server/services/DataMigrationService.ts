@@ -1,5 +1,6 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { userStatsService } from "./UserStatsService.js";
 
 /**
@@ -86,6 +87,35 @@ const migrations: Migration[] = [
             durationMs: duration,
             error: error instanceof Error ? error.message : "Unknown error",
             stack: error instanceof Error ? error.stack : undefined,
+          }
+        );
+        throw error;
+      }
+    },
+  },
+  {
+    name: "003_recompute_exclusions_restriction_semantics",
+    description:
+      "Recompute every user's exclusions after the INCLUDE/restrictEmpty/hierarchy/admin semantics change (item 13)",
+    run: async () => {
+      const startTime = Date.now();
+      logger.info(
+        "[Migration 003] Recomputing exclusions for all users after the restriction semantics change"
+      );
+
+      try {
+        const result = await exclusionComputationService.recomputeAllUsers();
+        logger.info("[Migration 003] Exclusion recompute completed", {
+          durationMs: Date.now() - startTime,
+          success: result.success,
+          failed: result.failed,
+        });
+      } catch (error) {
+        logger.error(
+          "[Migration 003] Exclusion recompute failed - will retry on next startup",
+          {
+            durationMs: Date.now() - startTime,
+            error: error instanceof Error ? error.message : "Unknown error",
           }
         );
         throw error;

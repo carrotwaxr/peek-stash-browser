@@ -104,11 +104,10 @@ export const findTags = async (
     // Extract specific instance ID for disambiguation (from tag_filter.instance_id)
     const specificInstanceId = tag_filter?.instance_id as string | undefined;
 
-    // Use SQL query builder - admins skip exclusions
+    // Exclusions apply to every user; an admin's rows hold only their own hides.
     // When fetching by specific IDs, skip exclusions (for detail pages)
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
-    const applyExclusions =
-      requestingUser?.role !== "ADMIN" && !isFetchingByIds;
+    const applyExclusions = !isFetchingByIds;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -544,14 +543,10 @@ export const findTagsMinimal = async (
 
     let tags = await stashEntityService.getAllTags();
 
-    const requestingUser = req.user;
     const userId = req.user?.id;
 
     // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    if (requestingUser?.role !== "ADMIN") {
-      tags = await entityExclusionHelper.filterExcluded(tags, userId, "tag");
-    }
+    tags = await entityExclusionHelper.filterExcluded(tags, userId, "tag");
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {
@@ -656,7 +651,6 @@ export const findTagsForScenes = async (
   try {
     const { performerId, tagId, studioId, groupId } = req.body;
     const userId = req.user?.id;
-    const requestingUser = req.user;
 
     // Build query to find distinct tag IDs from matching scenes
     // Uses instanceId constraints on junction tables for multi-instance correctness
@@ -699,14 +693,12 @@ export const findTagsForScenes = async (
     // Get all tags to build hierarchy
     let allTags = await stashEntityService.getAllTags();
 
-    // Apply exclusions for non-admins
-    if (requestingUser?.role !== "ADMIN") {
-      allTags = await entityExclusionHelper.filterExcluded(
-        allTags,
-        userId,
-        "tag"
-      );
-    }
+    // Apply exclusions (every user; an admin's rows hold only their own hides)
+    allTags = await entityExclusionHelper.filterExcluded(
+      allTags,
+      userId,
+      "tag"
+    );
 
     // Expand to include parent tags for hierarchy
     const expandedTagIds = new Set(tagIds);

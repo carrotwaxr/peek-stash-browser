@@ -104,8 +104,8 @@ export const findStudios = async (
     // Extract specific instance ID for disambiguation (from studio_filter.instance_id)
     const specificInstanceId = studio_filter?.instance_id as string | undefined;
 
-    // Use SQL query builder - admins skip exclusions
-    const applyExclusions = requestingUser?.role !== "ADMIN";
+    // Exclusions apply to every user; an admin's rows hold only their own hides
+    const applyExclusions = true;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -462,16 +462,12 @@ export const findStudiosMinimal = async (
     let studios = await stashEntityService.getAllStudios();
 
     // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    const requestingUser = req.user;
     const userId = req.user?.id;
-    if (requestingUser?.role !== "ADMIN") {
-      studios = await entityExclusionHelper.filterExcluded(
-        studios,
-        userId,
-        "studio"
-      );
-    }
+    studios = await entityExclusionHelper.filterExcluded(
+      studios,
+      userId,
+      "studio"
+    );
 
     // Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {

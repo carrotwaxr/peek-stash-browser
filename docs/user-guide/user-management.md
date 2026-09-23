@@ -8,11 +8,11 @@ Peek has two user roles:
 
 | Role | Description |
 |------|-------------|
-| **Admin** | Full access including user management, server settings, and bypasses all content restrictions |
+| **Admin** | Full access including user management and server settings; content restrictions never apply |
 | **User** | Standard access with personal preferences, playlists, and watch history |
 
 !!! note "Admin Content Access"
-    Admins always see all content, regardless of any restrictions. This allows admins to manage and organize content that may be restricted for other users.
+    Admins always see all content, regardless of any restrictions, except items they hide themselves. This allows admins to manage and organize content that may be restricted for other users.
 
 ---
 
@@ -141,52 +141,60 @@ Permissions control what actions users can perform beyond viewing content.
 
 ## Content Restrictions
 
-Admins can restrict what content users see. Restrictions cascade throughout the UI—restricted items won't appear in lists, cards, dropdowns, or detail pages.
+Admins can restrict what content users see. Restrictions cascade throughout the UI: restricted items won't appear in lists, cards, dropdowns, or detail pages, and they reach galleries, images and clip markers.
 
 ### Restriction Types
 
 | Type | Best For |
 |------|----------|
-| **Collections (Groups)** | Most reliable—static, manually curated sets |
-| **Tags** | Content categories (may change if using Stash plugins) |
-| **Studios** | Limiting by production company |
+| **Collections (Groups)** | Most reliable: static, manually curated sets |
+| **Tags** | Content categories (may change if using Stash plugins). A listed tag covers its child tags |
+| **Studios** | Limiting by production company. A listed studio covers its child studios |
 | **Galleries** | Restricting specific gallery content |
 
 !!! tip "Recommended Approach"
     Use **Collections (Groups)** as your primary restriction mechanism. Create groups in Stash for content categories, then restrict users to specific groups in Peek.
 
-### Restriction Modes
+### The Two Lists
 
-| Mode | Behavior |
+Each type has two lists; either, both or neither can have items.
+
+| List | Behavior |
 |------|----------|
-| **None** | No restrictions (default) |
-| **Exclude** | Hide selected items and all associated content |
-| **Include** | Show ONLY selected items—user sees nothing else |
+| **Show only** | The user sees only content with at least one listed item |
+| **Always hide** | Listed items and all their content are hidden, even if also in Show only |
+
+The **Also hide items with no ...** box hides content with no item of that type. It is disabled until a list has an item, starts ticked with a Show-only list and unticked with only an Always-hide list, and keeps a value you set by hand.
 
 ### Setting Restrictions
 
-1. Click on a user in the User Management table
-2. Go to the **Content Restrictions** section
+1. Click **Edit** on a user in the User Management table (a user account; the editor is not shown for admin accounts)
+2. Go to the **Content Restrictions** section and click **Manage Restrictions**
 3. For each entity type (Collections, Tags, Studios, Galleries):
-   - Select a mode (None, Exclude, or Include)
-   - Choose specific items to include or exclude
-   - Optionally enable **Restrict Empty** to hide content with no metadata for that type
-4. Click **Save**
+   - Choose items for **Show only** and/or **Always hide**
+   - Check or uncheck **Also hide items with no ...**
+4. Click **Save Restrictions**
 
 ### How Restrictions Work
 
-**Exclude mode example:**
-- Exclude the tag "Documentary"
-- User won't see any scenes, performers, or studios tagged "Documentary"
+**Always hide example:**
+- Always hide the tag "Documentary"
+- User won't see any scenes, galleries, images, clip markers, performers or studios tagged "Documentary" (or one of its child tags)
 
-**Include mode example:**
-- Include only the collection "Favorites"
-- User only sees scenes in the "Favorites" group—nothing else
+**Show only example:**
+- Show only the collection "Favorites"
+- User only sees scenes in the "Favorites" group, and nothing else
+
+**Always hide wins:**
+- Show only "Cartoons" and always hide "Explicit": the user sees "Cartoons" content except anything also tagged "Explicit"
 
 **Cascading behavior:**
 - Restricted tags don't appear in filter dropdowns
 - Restricted studios don't appear on performer detail pages
+- Performers, studios, collections and tags with no visible content disappear
 - Scene counts exclude restricted content
+
+Promoting a user to admin stops their restrictions applying; demoting an admin applies any saved restrictions again. See [Content Restrictions](content-restrictions.md) for the full guide.
 
 ---
 

@@ -232,9 +232,9 @@ export const findGalleries = async (
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Admins skip exclusions to see everything
+    // Exclusions apply to every user; an admin's rows hold only their own hides
     const requestingUser = req.user;
-    const applyExclusions = requestingUser?.role !== "ADMIN";
+    const applyExclusions = true;
 
     // Parse random sort to extract seed for consistent pagination
     const { sortField, randomSeed } = parseRandomSort(
@@ -493,15 +493,11 @@ export const findGalleriesMinimal = async (
     galleries = await mergeGalleriesWithUserData(galleries, userId);
 
     // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    const requestingUser = req.user;
-    if (requestingUser?.role !== "ADMIN") {
-      galleries = await entityExclusionHelper.filterExcluded(
-        galleries,
-        userId,
-        "gallery"
-      );
-    }
+    galleries = await entityExclusionHelper.filterExcluded(
+      galleries,
+      userId,
+      "gallery"
+    );
 
     // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
     if (count_filter) {

@@ -74,12 +74,14 @@ You can toggle this setting on/off at any time.
 ### Cascading Behavior
 
 When you hide an entity:
-- **Hiding a Scene**: Only that scene is hidden
-- **Hiding a Performer**: That performer and scenes where they appear may be affected
-- **Hiding a Studio**: That studio and scenes from it may be affected
-- **Hiding a Tag**: That tag and related content may be affected
+- **Hiding a Scene or Image**: Only that item is hidden
+- **Hiding a Performer**: That performer, and the scenes, galleries and images they appear in
+- **Hiding a Studio**: That studio, its child studios, and the scenes, galleries and images from any of them
+- **Hiding a Tag**: That tag, its child tags, and the scenes (including inherited tags), galleries, images, clip markers, performers, studios and collections tagged with any of them
+- **Hiding a Collection**: That collection and its scenes
+- **Hiding a Gallery**: That gallery, its images and the scenes linked to it
 
-**Note**: The exact cascading behavior depends on your Content Restrictions settings and whether hidden entities are the only content associated with related items.
+Hiding a tag or studio hides its whole subtree; unhiding the parent restores the children and their content at the next recompute. Performers, studios, collections and tags left with no visible content disappear from lists until some of their content is visible again.
 
 ## FAQ
 
