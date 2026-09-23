@@ -364,4 +364,87 @@ describe("SceneQueryBuilder", () => {
       expect(countQuerySql).not.toContain("COUNT(DISTINCT");
     });
   });
+
+  describe("stream URLs (PM-02)", () => {
+    const executeOptions = {
+      userId: 1,
+      sort: "created_at",
+      sortDirection: "DESC" as const,
+      page: 1,
+      perPage: 10,
+    };
+
+    it("does not select the streams column", async () => {
+      await sceneQueryBuilder.execute(executeOptions);
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).not.toMatch(/\bs\.streams\b/);
+    });
+
+    it("returns no apikey and no Stash host in any row field", async () => {
+      // A row from before the upgrade still holds Stash's list with the key.
+      const row = {
+        id: "1",
+        stashInstanceId: "inst-a",
+        title: "Scene 1",
+        code: null,
+        date: null,
+        studioId: null,
+        stashRating100: null,
+        duration: 60,
+        organized: 0,
+        details: null,
+        director: null,
+        urls: null,
+        filePath: "/v/scene1.mp4",
+        fileBitRate: null,
+        fileFrameRate: null,
+        fileWidth: 1280,
+        fileHeight: 720,
+        fileVideoCodec: "h264",
+        fileAudioCodec: "aac",
+        fileSize: null,
+        pathScreenshot: "/scene/1/screenshot?t=1",
+        pathPreview: null,
+        pathSprite: null,
+        pathVtt: null,
+        pathChaptersVtt: null,
+        pathStream: null,
+        pathCaption: null,
+        captions: null,
+        streams:
+          '[{"url":"http://stash.test:9999/scene/1/stream?apikey=SECRET","mime_type":"video/mp4","label":"Direct stream"}]',
+        inheritedTagIds: null,
+        stashOCounter: 0,
+        stashPlayCount: 0,
+        stashPlayDuration: 0,
+        stashCreatedAt: null,
+        stashUpdatedAt: null,
+        userRating: null,
+        userFavorite: null,
+        userPlayCount: null,
+        userPlayDuration: null,
+        userLastPlayedAt: null,
+        userOCount: null,
+        userResumeTime: null,
+        userOHistory: null,
+        userPlayHistory: null,
+      };
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([row]) // main query
+        .mockResolvedValueOnce([{ total: 1 }]) // count query
+        .mockResolvedValue([]);
+
+      const result = await sceneQueryBuilder.execute(executeOptions);
+
+      expect(result.scenes).toHaveLength(1);
+      const json = JSON.stringify(result.scenes);
+      expect(json).not.toContain("apikey");
+      expect(json).not.toContain("stash.test:9999/scene/1/stream");
+      expect(result.scenes[0].sceneStreams).toEqual([]);
+    });
+  });
 });

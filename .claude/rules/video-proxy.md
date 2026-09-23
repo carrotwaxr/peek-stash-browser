@@ -22,7 +22,9 @@ No Stash host and no API key reaches the browser. The client gets media only thr
 ## Building proxy URLs
 
 - Raw Stash paths from the database become proxy URLs before any response. The query builders' `transformUrl` copies append `&instanceId=`. `convertToProxyUrl` in `server/utils/stashUrlProxy.ts` does not, so its URLs are served by the default instance.
-- The client builds stream URLs in `useVideoPlayer.ts` and `ExternalPlayerButton.tsx`, and caption URLs in `videoPlayerUtils.ts`.
+- The server builds player stream paths in `StashEntityService.generateSceneStreams` from Stash's recorded choices (`streamDirect`, `streamMkv`, `streamResolutions`), only for single-scene lookups; the client uses them unchanged (`playerSources.ts`). The client still builds the HLS auto-fallback URL in `useVideoPlayer.ts`, the direct URL in `ExternalPlayerButton.tsx` and caption URLs in `videoPlayerUtils.ts`.
+- `StashScene.streams` is always NULL until PR 3 drops it. Sync reads Stash's choices from its labels into those three columns and never stores its URLs, which carry the Stash API key.
+- Sprite and VTT use Stash's id-keyed routes, `/scene/:id/vtt/{sprite,thumbs}`, not the hash-keyed paths Stash reports.
 
 ## Two proxies
 

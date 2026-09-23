@@ -37,6 +37,7 @@ import type {
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
 // Transform functions no longer needed - URLs transformed at read time
 import { entityImageCountService } from "./EntityImageCountService.js";
@@ -1361,6 +1362,11 @@ class StashSyncService extends EventEmitter {
         const pathsExtended = scene.paths as Record<string, unknown>;
         // Extract phashes from files
         const { phash, phashes } = extractPhashes(scene.files);
+        // Stash's stream choices, read from its labels. The URLs carry the
+        // Stash API key and are never stored.
+        const streamOptions = summarizeStashStreams(
+          (scene.sceneStreams ?? []).map((s) => s.label ?? "")
+        );
 
         return `(
       '${this.escape(scene.id)}',
@@ -1391,7 +1397,9 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(pathsExtended?.stream as string | undefined)},
       ${this.escapeNullable(paths?.caption)},
       ${this.escapeNullable(JSON.stringify(scene.captions || []))},
-      ${this.escapeNullable(JSON.stringify(scene.sceneStreams || []))},
+      ${streamOptions.direct ? 1 : 0},
+      ${streamOptions.mkv ? 1 : 0},
+      ${this.escapeNullable(streamOptions.resolutions.join(","))},
       ${scene.o_counter ?? 0},
       ${scene.play_count ?? 0},
       ${scene.play_duration ?? 0},
@@ -1411,7 +1419,8 @@ class StashSyncService extends EventEmitter {
       organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
       pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption, captions,
-      streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
+      streamDirect, streamMkv, streamResolutions, oCounter, playCount, playDuration,
+      stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt, phash, phashes
     ) VALUES ${sceneValues}
     ON CONFLICT(id, stashInstanceId) DO UPDATE SET
@@ -1441,7 +1450,10 @@ class StashSyncService extends EventEmitter {
       pathStream = excluded.pathStream,
       pathCaption = excluded.pathCaption,
       captions = excluded.captions,
-      streams = excluded.streams,
+      streamDirect = excluded.streamDirect,
+      streamMkv = excluded.streamMkv,
+      streamResolutions = excluded.streamResolutions,
+      streams = NULL,
       oCounter = excluded.oCounter,
       playCount = excluded.playCount,
       playDuration = excluded.playDuration,

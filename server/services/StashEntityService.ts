@@ -27,14 +27,20 @@ import type {
   NormalizedStudio,
   NormalizedTag,
   SceneScoringData,
+  SceneStream,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import {
+  STREAM_RESOLUTIONS,
+  type StreamResolution,
+  buildSceneStreams,
+  inferStashStreamOptions,
+} from "../utils/sceneStreams.js";
 import {
   getGalleryFallbackTitle,
   getImageFallbackTitle,
   getSceneFallbackTitle,
 } from "../utils/titleUtils.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
  * Row shape returned by FTS search queries (raw SQL returning StashScene columns).
@@ -165,7 +171,19 @@ type ImageInput = StashImage & {
   galleries?: ImageGalleryEntry[];
 };
 
-/** Scene fields returned by BROWSE_SELECT queries (subset of StashScene without streams/data) */
+/** The stored stream choices and file fields a scene's stream list is built from */
+type SceneStreamSource = Pick<
+  StashScene,
+  | "streamDirect"
+  | "streamMkv"
+  | "streamResolutions"
+  | "filePath"
+  | "fileAudioCodec"
+  | "fileWidth"
+  | "fileHeight"
+>;
+
+/** Scene fields returned by BROWSE_SELECT queries (a subset of StashScene; no stream choices) */
 type BrowseSceneRow = Pick<
   StashScene,
   | "id"
@@ -286,7 +304,7 @@ class StashEntityService {
   private tagNameCache: Map<string, string> | null = null;
   private tagNameCachePromise: Promise<Map<string, string>> | null = null;
 
-  // Columns to select for browse queries (excludes heavy streams/data columns)
+  // Columns to select for browse queries (browse rows carry no stream list)
   private readonly BROWSE_SELECT = {
     id: true,
     stashInstanceId: true,
@@ -316,7 +334,7 @@ class StashEntityService {
     pathStream: true,
     pathCaption: true,
     captions: true,
-    // Explicitly NOT selecting: streams, data
+    // Not selected: the stream choices (read by getPlaybackStreams); streams is always NULL
     oCounter: true,
     playCount: true,
     playDuration: true,
@@ -1919,108 +1937,59 @@ class StashEntityService {
   // ==================== Data Transform Helpers ====================
 
   /**
-   * Generate scene stream URLs on-demand
-   * All scenes have the same stream formats - only the ID varies
-   * This eliminates storing ~4.4KB of redundant JSON per scene
-   * Public so it can be used to populate streams for scene detail views
-   *
-   * Returns absolute Stash URLs (without API key) matching original Stash format.
-   * The client will rewrite these to Peek proxy endpoints.
+   * Build a scene's stream list as Peek proxy paths, in Stash's order.
+   * Uses the choices Stash recorded at sync (Direct, MKV, resolution tiers)
+   * when present, else Stash's rules applied to the cached file fields.
+   * The paths carry no Stash host and no API key.
    */
   public generateSceneStreams(
     sceneId: string,
-    instanceId?: string
-  ): Array<{ url: string; mime_type: string; label: string }> {
-    // Get Stash base URL (without /graphql path) — use instance-specific config when available
-    const config = instanceId
-      ? stashInstanceManager.getConfig(instanceId) ||
-        stashInstanceManager.getDefaultConfig()
-      : stashInstanceManager.getDefaultConfig();
-    const stashUrl = new URL(config.url);
-    const baseUrl = `${stashUrl.protocol}//${stashUrl.host}`;
+    instanceId: string,
+    source: SceneStreamSource
+  ): SceneStream[] {
+    const { streamDirect, streamMkv, streamResolutions } = source;
+    const options =
+      streamDirect != null && streamMkv != null && streamResolutions != null
+        ? {
+            direct: streamDirect,
+            mkv: streamMkv,
+            resolutions: streamResolutions
+              .split(",")
+              .filter((r): r is StreamResolution =>
+                (STREAM_RESOLUTIONS as readonly string[]).includes(r)
+              ),
+          }
+        : inferStashStreamOptions({
+            path: source.filePath,
+            audioCodec: source.fileAudioCodec,
+            width: source.fileWidth,
+            height: source.fileHeight,
+          });
+    return buildSceneStreams(sceneId, instanceId, options);
+  }
 
-    const formats = [
-      { ext: "", mime: "video/mp4", label: "Direct stream", resolution: null },
-      { ext: ".mp4", mime: "video/mp4", label: "MP4", resolution: "ORIGINAL" },
-      {
-        ext: ".mp4",
-        mime: "video/mp4",
-        label: "MP4 Standard (480p)",
-        resolution: "STANDARD",
+  /**
+   * The stream list for one scene on one instance, for the Scene page.
+   * One primary-key lookup; [] when the scene is missing or deleted.
+   */
+  public async getPlaybackStreams(
+    sceneId: string,
+    instanceId: string
+  ): Promise<SceneStream[]> {
+    const source = await prisma.stashScene.findFirst({
+      where: { id: sceneId, stashInstanceId: instanceId, deletedAt: null },
+      select: {
+        streamDirect: true,
+        streamMkv: true,
+        streamResolutions: true,
+        filePath: true,
+        fileAudioCodec: true,
+        fileWidth: true,
+        fileHeight: true,
       },
-      {
-        ext: ".mp4",
-        mime: "video/mp4",
-        label: "MP4 Low (240p)",
-        resolution: "LOW",
-      },
-      {
-        ext: ".webm",
-        mime: "video/webm",
-        label: "WEBM",
-        resolution: "ORIGINAL",
-      },
-      {
-        ext: ".webm",
-        mime: "video/webm",
-        label: "WEBM Standard (480p)",
-        resolution: "STANDARD",
-      },
-      {
-        ext: ".webm",
-        mime: "video/webm",
-        label: "WEBM Low (240p)",
-        resolution: "LOW",
-      },
-      {
-        ext: ".m3u8",
-        mime: "application/vnd.apple.mpegurl",
-        label: "HLS",
-        resolution: "ORIGINAL",
-      },
-      {
-        ext: ".m3u8",
-        mime: "application/vnd.apple.mpegurl",
-        label: "HLS Standard (480p)",
-        resolution: "STANDARD",
-      },
-      {
-        ext: ".m3u8",
-        mime: "application/vnd.apple.mpegurl",
-        label: "HLS Low (240p)",
-        resolution: "LOW",
-      },
-      {
-        ext: ".mpd",
-        mime: "application/dash+xml",
-        label: "DASH",
-        resolution: "ORIGINAL",
-      },
-      {
-        ext: ".mpd",
-        mime: "application/dash+xml",
-        label: "DASH Standard (480p)",
-        resolution: "STANDARD",
-      },
-      {
-        ext: ".mpd",
-        mime: "application/dash+xml",
-        label: "DASH Low (240p)",
-        resolution: "LOW",
-      },
-    ];
-
-    return formats.map((f) => {
-      const streamPath = `/scene/${sceneId}/stream${f.ext}`;
-      const fullUrl = f.resolution
-        ? `${baseUrl}${streamPath}?resolution=${f.resolution}`
-        : `${baseUrl}${streamPath}`;
-      return {
-        url: fullUrl,
-        mime_type: f.mime,
-        label: f.label,
-      };
     });
+    if (!source) return [];
+    return this.generateSceneStreams(sceneId, instanceId, source);
   }
 
   // ==================== Relationship Queries (for filtering) ====================
@@ -2133,8 +2102,14 @@ class StashEntityService {
           scene.stashInstanceId
         ),
         preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
-        sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
-        vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
+        sprite: this.transformUrl(
+          scene.pathSprite ? `/scene/${scene.id}/vtt/sprite` : null,
+          scene.stashInstanceId
+        ),
+        vtt: this.transformUrl(
+          scene.pathVtt ? `/scene/${scene.id}/vtt/thumbs` : null,
+          scene.stashInstanceId
+        ),
         chapters_vtt: this.transformUrl(
           scene.pathChaptersVtt,
           scene.stashInstanceId
@@ -2143,8 +2118,12 @@ class StashEntityService {
         caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
       },
 
-      // Generate streams on-demand (no longer stored in DB)
-      sceneStreams: this.generateSceneStreams(scene.id, scene.stashInstanceId),
+      // Built from the stored stream choices, as keyless Peek proxy paths
+      sceneStreams: this.generateSceneStreams(
+        scene.id,
+        scene.stashInstanceId,
+        scene
+      ),
 
       // Caption metadata for multi-language subtitle support
       captions: scene.captions
@@ -2221,8 +2200,14 @@ class StashEntityService {
           scene.stashInstanceId
         ),
         preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
-        sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
-        vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
+        sprite: this.transformUrl(
+          scene.pathSprite ? `/scene/${scene.id}/vtt/sprite` : null,
+          scene.stashInstanceId
+        ),
+        vtt: this.transformUrl(
+          scene.pathVtt ? `/scene/${scene.id}/vtt/thumbs` : null,
+          scene.stashInstanceId
+        ),
         chapters_vtt: this.transformUrl(
           scene.pathChaptersVtt,
           scene.stashInstanceId

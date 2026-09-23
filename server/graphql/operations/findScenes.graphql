@@ -119,8 +119,6 @@ query FindScenes(
         webp
       }
       sceneStreams {
-        url
-        mime_type
         label
       }
       galleries {
