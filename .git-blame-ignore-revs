@@ -1,0 +1,5 @@
+# Commits git blame should skip. GitHub reads this file automatically; locally run
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the codebase with Prettier and check it in CI (#532)
+e2fc6eb45df99353dd5f5e317e391cbe93d0ba6a
