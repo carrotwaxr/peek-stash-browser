@@ -6,7 +6,6 @@ import type {
   CreateFirstAdminResponse,
   CreateFirstStashInstanceResponse,
   GetSetupStatusResponse,
-  ResetSetupResponse,
   TestStashConnectionResponse,
 } from "@peek/shared-types";
 import { apiGet, apiPost } from "./client";
@@ -38,8 +37,6 @@ export const setupApi = {
       apiKey,
       name,
     }),
-
-  resetSetup: () => apiPost<ResetSetupResponse>("/setup/reset", {}),
 };
 
 export const userSetupApi = {

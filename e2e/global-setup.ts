@@ -4,6 +4,8 @@
  * In CI (fresh database, no Stash instance), the server starts in "setup wizard"
  * mode. This setup creates the admin user and a dummy Stash instance via the API
  * so that the app considers setup complete and auth.setup.ts can log in normally.
+ * Adding the instance needs the admin session once the admin exists: create-admin
+ * leaves its cookie in the request context, and a resumed setup logs in first.
  *
  * Locally (docker-compose with persistent DB), setup is already complete
  * and this is a no-op.
@@ -39,11 +41,11 @@ async function globalSetup() {
       return;
     }
 
-    // Create admin user if none exist
-    if (!data.hasUsers) {
-      const username = process.env.E2E_USERNAME || "admin";
-      const password = process.env.E2E_PASSWORD || "admin123";
+    const username = process.env.E2E_USERNAME || "admin";
+    const password = process.env.E2E_PASSWORD || "admin123";
 
+    // Create admin user if none exist; its session cookie stays in `api`
+    if (!data.hasUsers) {
       const res = await api.post("/api/setup/create-admin", {
         data: { username, password },
       });
@@ -51,6 +53,17 @@ async function globalSetup() {
       if (!res.ok()) {
         throw new Error(
           `Failed to create admin: ${res.status()} ${await res.text()}`
+        );
+      }
+    } else if (!data.hasStashInstance) {
+      // The admin exists from an earlier run: sign in to add the instance
+      const res = await api.post("/api/auth/login", {
+        data: { username, password },
+      });
+
+      if (!res.ok()) {
+        throw new Error(
+          `Failed to log in as the E2E admin: ${res.status()} ${await res.text()}`
         );
       }
     }

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { setupApi } from "../../api";
+import type { LoginResult } from "../../contexts/AuthContextProvider";
 import { useAuth } from "../../hooks/useAuth";
 import type { ThemeDefinition } from "../../themes/ThemeContext";
 import { useTheme } from "../../themes/useTheme";
@@ -37,6 +38,13 @@ interface StashConfigStepProps {
   onTestConnection: () => void;
   onBack: () => void;
   onSubmit: () => void;
+}
+
+interface SignInToFinishStepProps {
+  onSignIn: (credentials: {
+    username: string;
+    password: string;
+  }) => Promise<LoginResult>;
 }
 
 interface CompleteStepProps {
@@ -450,6 +458,117 @@ const StashConfigStep = ({
   </div>
 );
 
+// Step 3 without a session (the wizard resumed after the admin was created):
+// the Stash setup routes need the admin session once the admin exists
+const SignInToFinishStep = ({ onSignIn }: SignInToFinishStepProps) => {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
+
+  const signIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSigningIn(true);
+    setError("");
+    try {
+      const result = await onSignIn({ username, password });
+      if (!result.success) {
+        setError(result.error || "Sign in failed");
+      }
+    } catch (err: unknown) {
+      setError((err as Error).message || "Sign in failed");
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const inputStyle = {
+    backgroundColor: "var(--bg-card)",
+    borderColor: "var(--border-color)",
+    color: "var(--text-primary)",
+  };
+
+  return (
+    <form className="space-y-6" onSubmit={signIn}>
+      <div>
+        <h2
+          className="text-2xl font-bold mb-2"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Sign in as the admin to finish setup
+        </h2>
+        <p style={{ color: "var(--text-secondary)" }}>
+          The admin account already exists. Sign in with it to connect Peek to
+          Stash.
+        </p>
+      </div>
+
+      {error && (
+        <div
+          className="p-4 rounded border-l-4"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            borderColor: "var(--status-error)",
+          }}
+        >
+          <p style={{ color: "var(--status-error)" }}>{error}</p>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div>
+          <label
+            htmlFor="setup-signin-username"
+            className="block text-sm font-semibold mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Username
+          </label>
+          <input
+            id="setup-signin-username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="setup-signin-password"
+            className="block text-sm font-semibold mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Password
+          </label>
+          <input
+            id="setup-signin-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+            style={inputStyle}
+          />
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        disabled={signingIn || !username || !password}
+        variant="primary"
+        fullWidth
+        size="lg"
+        loading={signingIn}
+      >
+        Sign in
+      </Button>
+    </form>
+  );
+};
+
 // Step 4: Complete - defined outside to avoid recreation on re-render
 const CompleteStep = ({ theme, onComplete }: CompleteStepProps) => (
   <div className="space-y-6 text-center">
@@ -482,7 +601,7 @@ const CompleteStep = ({ theme, onComplete }: CompleteStepProps) => (
 
 const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
   const { theme } = useTheme();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState(() => {
     // If both users and stash instance exist, go straight to complete
     if (setupStatus?.hasUsers && setupStatus?.hasStashInstance) {
@@ -656,6 +775,9 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
           />
         );
       case 2:
+        if (!authLoading && !isAuthenticated) {
+          return <SignInToFinishStep onSignIn={login} />;
+        }
         return (
           <StashConfigStep
             theme={theme}

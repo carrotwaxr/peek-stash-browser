@@ -51,7 +51,8 @@ export interface CreateFirstAdminResponse {
 
 /**
  * POST /api/setup/test-stash-connection
- * Test connection to a Stash server
+ * Test connection to a Stash server. Public only before any user or instance
+ * exists; `version` and the reason in `error` are for admins only.
  */
 export interface TestStashConnectionRequest {
   url: string;
@@ -62,7 +63,6 @@ export interface TestStashConnectionResponse {
   success: boolean;
   message?: string;
   error?: string;
-  details?: string;
   version?: string;
 }
 
@@ -113,27 +113,6 @@ export interface GetStashInstanceResponse {
     updatedAt: Date;
   } | null;
   instanceCount: number;
-}
-
-// =============================================================================
-// RESET SETUP
-// =============================================================================
-
-/**
- * POST /api/setup/reset
- * Reset setup state for recovery from partial setup
- */
-export interface ResetSetupRequest {
-  confirm: "RESET_SETUP";
-}
-
-export interface ResetSetupResponse {
-  success: true;
-  message: string;
-  deleted: {
-    users: number;
-    stashInstances: number;
-  };
 }
 
 // =============================================================================

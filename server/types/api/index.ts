@@ -147,8 +147,6 @@ export type {
   CreateFirstStashInstanceRequest,
   CreateFirstStashInstanceResponse,
   GetStashInstanceResponse,
-  ResetSetupRequest,
-  ResetSetupResponse,
   // Multi-instance management (admin)
   StashInstanceData,
   GetAllStashInstancesResponse,

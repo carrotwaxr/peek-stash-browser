@@ -2,6 +2,7 @@
  * HTTP tests for the auth routes (sweep item 8): recovery keys are compared by
  * their SHA-256 hash, a recovery-key reset stamps passwordChangedAt, and login
  * issues a token carrying the sign-in time without writing a recovery key.
+ * The setup-window `/first-time-password` route is gone (sweep item 7).
  *
  * `authRateLimiter` is module-level and counts failed requests per address, so
  * this file keeps well under its 10 failures.
@@ -138,6 +139,15 @@ describe("auth routes", () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ hasRecoveryKey: true });
     });
+  });
+
+  it("POST /api/auth/first-time-password is gone", async () => {
+    const res = await post("/first-time-password", {
+      username: "admin",
+      newPassword: "NewPassw0rd",
+    });
+
+    expect(res.status).toBe(404);
   });
 
   describe("POST /login", () => {

@@ -46,7 +46,7 @@ Introduction to Peek. Click **Get Started** to begin.
 
 - Username is set to "admin"
 - Choose a password (minimum 8 characters, at least 1 letter and 1 number)
-- You're automatically logged in after creation
+- You're automatically logged in after creation. If you leave and come back to the wizard later, it asks you to sign in as the admin before the Stash step
 
 **Step 3 — Connect to Stash**
 

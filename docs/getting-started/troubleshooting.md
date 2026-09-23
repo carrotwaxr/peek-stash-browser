@@ -48,6 +48,16 @@ docker exec peek-stash-browser curl -X POST http://your-stash-ip:9999/graphql \
 - [ ] Stash is reachable from Peek container (check Docker networking)
 - [ ] No firewall blocking the connection
 
+## Starting Setup Over
+
+If setup stops before it is finished (for example, you forgot the admin password before connecting Stash), start it over:
+
+1. Stop the container.
+2. In the data directory (`/app/data`), delete `peek-stash-browser.db`, and any `peek-stash-browser.db-wal` or `peek-stash-browser.db-shm` file next to it.
+3. Start the container again.
+
+The setup wizard starts from the beginning. The generated `.jwt-secret` file can stay.
+
 ## Videos Won't Play
 
 Peek proxies streams through Stash. If videos don't play:

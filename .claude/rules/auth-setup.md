@@ -3,12 +3,14 @@ paths:
   - "server/middleware/auth.ts"
   - "server/middleware/accountLockout.ts"
   - "server/middleware/rateLimiter.ts"
+  - "server/middleware/setupGuards.ts"
   - "server/routes/auth.ts"
   - "server/routes/setup.ts"
   - "server/controllers/setup.ts"
   - "server/services/StashInstanceManager.ts"
   - "server/initializers/stashInstance.ts"
   - "server/utils/jwtSecret.ts"
+  - "server/utils/trustProxy.ts"
   - "server/services/PasswordService.ts"
   - "server/initializers/recoveryKeys.ts"
 ---
@@ -23,14 +25,15 @@ paths:
 - `authRateLimiter` allows 10 failed attempts per client address per 15 minutes (successful requests don't count). Login, `/forgot-password/init` and `/forgot-password/reset` share that one budget.
 - `accountLockout` locks a username from one address for 15 minutes after 5 failures from that address and answers 423 with Retry-After; the same username from another address can still sign in. It is an in-memory Map: it resets on restart and isn't shared between processes.
 - `trust proxy` trusts a loopback first hop (the image's nginx), and `TRUST_PROXY=N` N more hops (`utils/trustProxy.ts`). The dev stack reaches the server through the Vite container, which is not loopback, so all dev clients share one address.
-- Instance create, update and delete in `controllers/setup.ts` call `stashInstanceManager.reload()` afterwards, or the in-memory clients keep the old URL and key. `resetSetup` deletes every instance without reloading.
+- Instance create, update and delete in `controllers/setup.ts` call `stashInstanceManager.reload()` afterwards, or the in-memory clients keep the old URL and key.
 - `STASH_URL` and `STASH_API_KEY` create a "Default" instance at startup only when no instance exists; this is the legacy setup path.
 
 ## Setup wizard endpoints
 
-Four endpoints in `routes/setup.ts` are public, each with its own guard:
+`setupRateLimiter` allows 20 failed attempts per client address per 15 minutes on the public setup POSTs.
 
-- `create-admin`: only while there are no users.
-- `create-stash-instance`: only while there are no instances. It skips the connection test when `NODE_ENV=test`, for E2E setup.
-- `test-stash-connection`: no guard. The server connects to whatever URL the caller sends, even after setup.
-- `reset`: a confirm string, at most one user, and setup not complete. It deletes all users and instances.
+- `create-admin`: public and rate-limited, only while there are no users. It signs the new admin in (sets the session cookie).
+- `create-stash-instance` and `test-stash-connection`: public and rate-limited only while there is no user and no instance; from the moment either exists they need the admin session (`requireAdminOnceSetupStarted` in `middleware/setupGuards.ts`).
+- `create-stash-instance` still only works while there are no instances, and hides the connection error text. It skips the connection test when `NODE_ENV=test`, for E2E setup.
+- `test-stash-connection` gives the reason for a failure, and the Stash version, only to admins; everyone else gets pass or fail. No response carries `details`; the full error goes to the log.
+- There is no reset endpoint and no `/auth/first-time-password`. To start setup over, delete the database file.

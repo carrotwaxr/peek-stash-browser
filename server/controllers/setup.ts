@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Request } from "express";
 import { StashClient } from "../graphql/StashClient.js";
+import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { stashSyncService } from "../services/StashSyncService.js";
@@ -19,8 +20,6 @@ import type {
   GetAllStashInstancesResponse,
   GetSetupStatusResponse,
   GetStashInstanceResponse,
-  ResetSetupRequest,
-  ResetSetupResponse,
   TestStashConnectionRequest,
   TestStashConnectionResponse,
   TypedRequest,
@@ -82,8 +81,9 @@ export const getSetupStatus = async (
 };
 
 /**
- * Create first admin user (public endpoint for setup wizard)
- * Only works if NO users exist yet
+ * Create first admin user (public, rate-limited endpoint for setup wizard)
+ * Only works if NO users exist yet. Signs the new admin in, so the wizard
+ * holds the admin session for its Stash step.
  */
 export const createFirstAdmin = async (
   req: TypedRequest<CreateFirstAdminRequest>,
@@ -137,6 +137,15 @@ export const createFirstAdmin = async (
       username: newUser.username,
     });
 
+    setTokenCookie(
+      res,
+      generateToken({
+        id: newUser.id,
+        username: newUser.username,
+        role: newUser.role,
+      })
+    );
+
     res.status(201).json({
       success: true,
       user: newUser,
@@ -150,9 +159,17 @@ export const createFirstAdmin = async (
   }
 };
 
+/** What a caller without the admin session learns about a failed connection test. */
+export const CONNECTION_TEST_FAILED =
+  "Could not connect to Stash. Check that the URL ends in /graphql, that Stash is running and reachable from the Peek server, and that the API key is correct.";
+
 /**
  * Test connection to a Stash server
  * POST /api/setup/test-stash-connection
+ *
+ * Public only before any user or instance exists (setupGuards.ts). Only an
+ * admin gets the reason for a failure and the Stash version; everyone else
+ * gets pass or fail. The full error stays in the log.
  */
 export const testStashConnection = async (
   req: TypedRequest<TestStashConnectionRequest>,
@@ -160,6 +177,7 @@ export const testStashConnection = async (
 ) => {
   try {
     const { url, apiKey } = req.body;
+    const isAdmin = req.user?.role === "ADMIN";
 
     if (!url || !apiKey) {
       return res.status(400).json({
@@ -211,12 +229,15 @@ export const testStashConnection = async (
         res.json({
           success: true,
           message: "Connection successful",
-          version: versionString,
+          ...(isAdmin && { version: versionString }),
         });
       } else {
-        res.status(500).json({
+        logger.error("Stash connection test got an empty configuration");
+        res.status(400).json({
           success: false,
-          error: "Connected but received empty configuration",
+          error: isAdmin
+            ? "Connected but received empty configuration"
+            : CONNECTION_TEST_FAILED,
         });
       }
     } catch (error) {
@@ -266,22 +287,19 @@ export const testStashConnection = async (
 
       res.status(400).json({
         success: false,
-        error: friendlyMessage,
-        details: fullError,
+        error: isAdmin ? friendlyMessage : CONNECTION_TEST_FAILED,
       });
     }
   } catch (error) {
     logger.error("Error testing Stash connection", { error });
-    res.status(500).json({
-      error: "Internal server error",
-      message: error instanceof Error ? error.message : String(error),
-    });
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
 /**
- * Create first Stash instance (public endpoint for setup wizard)
- * Only works if NO Stash instances exist yet
+ * Create first Stash instance (setup wizard)
+ * Only works if NO Stash instances exist yet. Public only before any user or
+ * instance exists (setupGuards.ts), admin session otherwise.
  * POST /api/setup/create-stash-instance
  */
 export const createFirstStashInstance = async (
@@ -340,7 +358,6 @@ export const createFirstStashInstance = async (
         });
         return res.status(400).json({
           error: "Could not connect to Stash server",
-          details: errorMessage,
         });
       }
     }
@@ -430,82 +447,6 @@ export const getStashInstance = async (
     logger.error("Failed to get Stash instance", { error });
     res.status(500).json({
       error: "Failed to get Stash instance",
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
-};
-
-/**
- * Reset setup state for recovery from partial setup
- * Deletes all users and Stash instances to allow fresh setup
- * POST /api/setup/reset
- *
- * SECURITY: Only works if setup is incomplete AND there's at most 1 user.
- * This prevents accidental data loss on systems with multiple users.
- */
-export const resetSetup = async (
-  req: TypedRequest<ResetSetupRequest>,
-  res: TypedResponse<ResetSetupResponse | ApiErrorResponse>
-) => {
-  try {
-    // Require explicit confirmation to prevent accidental resets
-    const { confirm } = req.body;
-    if (confirm !== "RESET_SETUP") {
-      return res.status(400).json({
-        error: "Confirmation required",
-        message:
-          "Send { confirm: 'RESET_SETUP' } to confirm this destructive action",
-      });
-    }
-
-    // Check current setup state
-    const userCount = await prisma.user.count();
-    const stashInstanceCount = await prisma.stashInstance.count();
-    const setupComplete = userCount > 0 && stashInstanceCount > 0;
-
-    // Strict guard: multiple users means the system is in use
-    if (userCount > 1) {
-      return res.status(403).json({
-        error:
-          "Cannot reset: multiple users exist. This system appears to be in use.",
-      });
-    }
-
-    // Only allow reset if setup is incomplete
-    if (setupComplete) {
-      return res.status(403).json({
-        error:
-          "Cannot reset a fully configured system. Use Server Settings to manage configuration.",
-      });
-    }
-
-    // Log BEFORE deleting for audit trail
-    logger.warn("Setup reset initiated - deleting all data", {
-      userCount,
-      stashInstanceCount,
-    });
-
-    // Delete all users and stash instances
-    await prisma.user.deleteMany({});
-    await prisma.stashInstance.deleteMany({});
-
-    logger.info("Setup state reset complete", {
-      deletedUsers: userCount,
-      deletedInstances: stashInstanceCount,
-    });
-
-    res.json({
-      success: true,
-      message: "Setup state has been reset. You can now start fresh.",
-      deleted: {
-        users: userCount,
-        stashInstances: stashInstanceCount,
-      },
-    });
-  } catch (error) {
-    logger.error("Failed to reset setup state", { error });
-    res.status(500).json({
-      error: "Failed to reset setup state",
       message: error instanceof Error ? error.message : String(error),
     });
   }

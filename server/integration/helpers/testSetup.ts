@@ -9,7 +9,8 @@ interface SetupStatus {
 
 /**
  * Ensures the test database is set up with an admin user and Stash connection.
- * Only runs the setup if needed (idempotent).
+ * Only runs the setup if needed (idempotent). Runs the wizard's path signed in:
+ * once the admin exists, the Stash setup routes need the admin session.
  */
 export async function ensureTestSetup(): Promise<void> {
   const status = await getSetupStatus();
@@ -30,14 +31,14 @@ export async function ensureTestSetup(): Promise<void> {
     await createAdminUser();
   }
 
-  // Step 2: Connect to Stash if needed
+  // Step 2: Login as admin
+  await loginAdmin();
+
+  // Step 3: Connect to Stash if needed
   if (!status.hasStashInstance) {
     console.log("[Integration Tests] Connecting to Stash...");
     await connectStash();
   }
-
-  // Step 3: Login as admin
-  await loginAdmin();
 
   // Note: We don't wait for sync here - globalSetup handles that after
   // initializing StashInstanceManager and the cache
@@ -78,43 +79,33 @@ async function createAdminUser(): Promise<void> {
 
 async function connectStash(): Promise<void> {
   // Test connection first
-  const testResponse = await fetch(
-    `${TEST_CONFIG.baseUrl}/api/setup/test-stash-connection`,
+  const testResponse = await adminClient.post(
+    "/api/setup/test-stash-connection",
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: process.env.STASH_URL,
-        apiKey: process.env.STASH_API_KEY,
-      }),
+      url: process.env.STASH_URL,
+      apiKey: process.env.STASH_API_KEY,
     }
   );
 
   if (!testResponse.ok) {
-    const error = await testResponse.text();
     throw new Error(
-      `Failed to test Stash connection: ${testResponse.status} ${error}`
+      `Failed to test Stash connection: ${testResponse.status} ${JSON.stringify(testResponse.data)}`
     );
   }
 
   // Create the instance
-  const createResponse = await fetch(
-    `${TEST_CONFIG.baseUrl}/api/setup/create-stash-instance`,
+  const createResponse = await adminClient.post(
+    "/api/setup/create-stash-instance",
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "Integration Test Stash",
-        url: process.env.STASH_URL,
-        apiKey: process.env.STASH_API_KEY,
-      }),
+      name: "Integration Test Stash",
+      url: process.env.STASH_URL,
+      apiKey: process.env.STASH_API_KEY,
     }
   );
 
   if (!createResponse.ok) {
-    const error = await createResponse.text();
     throw new Error(
-      `Failed to create Stash instance: ${createResponse.status} ${error}`
+      `Failed to create Stash instance: ${createResponse.status} ${JSON.stringify(createResponse.data)}`
     );
   }
 }
