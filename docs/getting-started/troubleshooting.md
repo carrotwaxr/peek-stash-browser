@@ -58,6 +58,12 @@ Peek proxies streams through Stash. If videos don't play:
 
 If videos work in Stash but not Peek, check the Stash connection settings.
 
+## Server Restarted on Its Own
+
+On an unexpected error, the server logs `Uncaught exception, shutting down` followed by a stack trace, then exits. Docker starts it again when the container has a restart policy: add `--restart unless-stopped` to your `docker run` command (the unRAID template sets it in Extra Parameters). In Docker Compose, set `restart: unless-stopped` on the service.
+
+Please [report the bug](https://github.com/carrotwaxr/peek-stash-browser/issues) and include that stack trace from the logs (see [Viewing Logs](#viewing-logs)).
+
 ## Viewing Logs
 
 ```bash

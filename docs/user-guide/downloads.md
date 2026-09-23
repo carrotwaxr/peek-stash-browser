@@ -30,6 +30,7 @@ Scene downloads stream directly from your Stash server—there's no waiting for 
 
 - The original video file in its native format
 - Filename based on the scene title
+- Titles and playlist names in any script (accents, curly quotes, emoji, CJK) keep their exact name; very old download tools that ignore the UTF-8 name get an ASCII version with `_` in place of other characters.
 
 ---
 
@@ -60,6 +61,8 @@ Playlist downloads create a zip archive containing all scenes in the playlist, p
     Playlist downloads require server-side processing to create the zip file. Large playlists may take several minutes.
 
 ### What's Included
+
+The zip is named after the playlist.
 
 Each playlist zip contains:
 

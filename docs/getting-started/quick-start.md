@@ -19,6 +19,7 @@ Get Peek up and running in 5 minutes!
       -p 6969:80 \
       -v peek-data:/app/data \
       -e JWT_SECRET="${JWT_SECRET}" \
+      --restart unless-stopped \
       carrotwaxr/peek-stash-browser:latest
     ```
 
