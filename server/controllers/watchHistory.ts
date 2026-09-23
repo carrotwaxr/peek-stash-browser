@@ -1,5 +1,6 @@
 import { WatchHistory } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../services/EntityAccessService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
 import type {
@@ -40,8 +41,14 @@ export async function pingWatchHistory(
   res: TypedResponse<PingWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
-    const { sceneId, currentTime, quality, sessionStart, seekEvents } =
-      req.body;
+    const {
+      sceneId,
+      instanceId: requestInstanceId,
+      currentTime,
+      quality,
+      sessionStart,
+      seekEvents,
+    } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -54,6 +61,15 @@ export async function pingWatchHistory(
         .json({ error: "Missing required fields: sceneId, currentTime" });
     }
 
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
     logger.info("Watch history ping", {
       userId,
       sceneId,
@@ -61,38 +77,30 @@ export async function pingWatchHistory(
       quality,
     });
 
-    // Get user settings for minimumPlayPercent and syncToStash
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { minimumPlayPercent: true, syncToStash: true },
-    });
+    // Get user settings for minimumPlayPercent and syncToStash, and the
+    // scene's instance if this user can see it
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { minimumPlayPercent: true, syncToStash: true },
+      }),
+      resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
+    ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Get scene duration from cache
-    let sceneDuration = 0;
-    let instanceId: string;
-    try {
-      // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
-      const scene = await prisma.stashScene.findFirst({
-        where: { id: sceneId },
-        select: { duration: true, stashInstanceId: true },
-      });
-      sceneDuration = scene?.duration || 0;
-      // Get instanceId from scene, or fall back to looking it up
-      instanceId =
-        scene?.stashInstanceId || (await getEntityInstanceId("scene", sceneId));
-    } catch (error) {
-      logger.error("Failed to fetch scene duration from cache", {
-        sceneId,
-        error,
-      });
-      // Continue without duration - won't be able to calculate percentages
-      // Still need to get instanceId for watch history
-      instanceId = await getEntityInstanceId("scene", sceneId);
+    if (!instanceId) {
+      return res.status(404).json({ error: "Scene not found" });
     }
+
+    // Scene duration from the cache, on the resolved instance
+    const scene = await prisma.stashScene.findFirst({
+      where: { id: sceneId, stashInstanceId: instanceId },
+      select: { duration: true },
+    });
+    const sceneDuration = scene?.duration || 0;
 
     // Get or create watch history record
     let watchHistory = await prisma.watchHistory.findUnique({
@@ -329,7 +337,7 @@ export async function incrementOCounter(
   res: TypedResponse<IncrementOCounterResponse | ApiErrorResponse>
 ) {
   try {
-    const { sceneId } = req.body;
+    const { sceneId, instanceId: requestInstanceId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -340,17 +348,31 @@ export async function incrementOCounter(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
-    // Get user settings for syncToStash and scene instanceId
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user settings for syncToStash, and the scene's instance if this
+    // user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId("scene", sceneId),
+      resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
     ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Scene not found" });
     }
 
     // Get or create watch history record
@@ -646,7 +668,12 @@ export async function saveActivity(
   res: TypedResponse<SaveActivityResponse | ApiErrorResponse>
 ) {
   try {
-    const { sceneId, resumeTime, playDuration } = req.body;
+    const {
+      sceneId,
+      instanceId: requestInstanceId,
+      resumeTime,
+      playDuration,
+    } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -657,6 +684,15 @@ export async function saveActivity(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
     logger.info("Save activity", {
       userId,
       sceneId,
@@ -664,17 +700,22 @@ export async function saveActivity(
       playDuration: playDuration?.toFixed(2),
     });
 
-    // Get user settings for syncToStash and scene instanceId
+    // Get user settings for syncToStash, and the scene's instance if this
+    // user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId("scene", sceneId),
+      resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
     ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Scene not found" });
     }
 
     const now = new Date();
@@ -751,7 +792,7 @@ export async function incrementPlayCount(
   res: TypedResponse<IncrementPlayCountResponse | ApiErrorResponse>
 ) {
   try {
-    const { sceneId } = req.body;
+    const { sceneId, instanceId: requestInstanceId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -762,19 +803,33 @@ export async function incrementPlayCount(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
     logger.info("Increment play count", { userId, sceneId });
 
-    // Get user settings for syncToStash and scene instanceId
+    // Get user settings for syncToStash, and the scene's instance if this
+    // user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId("scene", sceneId),
+      resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
     ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Scene not found" });
     }
 
     const now = new Date();

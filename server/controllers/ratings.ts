@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../services/EntityAccessService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type {
   ApiErrorResponse,
@@ -14,7 +15,6 @@ import type {
   UpdateStudioRatingParams,
   UpdateTagRatingParams,
 } from "../types/api/index.js";
-import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -76,17 +76,27 @@ export async function updateSceneRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and scene instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the scene's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("scene", sceneId),
+      resolveAccessibleInstanceId(userId, "scene", sceneId, requestInstanceId),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Scene not found" });
+    }
 
     // Upsert rating record in Peek DB
     const sceneRating = await prisma.sceneRating.upsert({
@@ -178,17 +188,32 @@ export async function updatePerformerRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and performer instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the performer's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("performer", performerId),
+      resolveAccessibleInstanceId(
+        userId,
+        "performer",
+        performerId,
+        requestInstanceId
+      ),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Performer not found" });
+    }
 
     // Upsert rating record in Peek DB
     const performerRating = await prisma.performerRating.upsert({
@@ -286,17 +311,32 @@ export async function updateStudioRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and studio instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the studio's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("studio", studioId),
+      resolveAccessibleInstanceId(
+        userId,
+        "studio",
+        studioId,
+        requestInstanceId
+      ),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Studio not found" });
+    }
 
     // Upsert rating record in Peek DB
     const studioRating = await prisma.studioRating.upsert({
@@ -394,17 +434,27 @@ export async function updateTagRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and tag instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the tag's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("tag", tagId),
+      resolveAccessibleInstanceId(userId, "tag", tagId, requestInstanceId),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Tag not found" });
+    }
 
     // Upsert rating record in Peek DB
     const tagRating = await prisma.tagRating.upsert({
@@ -495,17 +545,32 @@ export async function updateGalleryRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and gallery instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the gallery's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("gallery", galleryId),
+      resolveAccessibleInstanceId(
+        userId,
+        "gallery",
+        galleryId,
+        requestInstanceId
+      ),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Gallery not found" });
+    }
 
     // Upsert rating record in Peek DB
     const galleryRating = await prisma.galleryRating.upsert({
@@ -601,17 +666,27 @@ export async function updateGroupRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and group instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the group's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("group", groupId),
+      resolveAccessibleInstanceId(userId, "group", groupId, requestInstanceId),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Group not found" });
+    }
 
     // Upsert rating record in Peek DB
     const groupRating = await prisma.groupRating.upsert({
@@ -702,17 +777,27 @@ export async function updateImageRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings and image instanceId
-    // If instanceId is provided in request, use it directly; otherwise look up from DB
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user sync settings and the image's instance, if this user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("image", imageId),
+      resolveAccessibleInstanceId(userId, "image", imageId, requestInstanceId),
     ]);
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Image not found" });
+    }
 
     // Upsert rating record in Peek DB
     const imageRating = await prisma.imageRating.upsert({

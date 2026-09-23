@@ -16,8 +16,8 @@ import {
   updateTagRating,
 } from "../../controllers/ratings.js";
 import prisma from "../../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
@@ -46,14 +46,14 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-// Mock entityInstanceId
-vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn().mockResolvedValue("instance-1"),
+// Mock the access check: the request's instance when given, else "instance-1"
+vi.mock("../../services/EntityAccessService.js", () => ({
+  resolveAccessibleInstanceId: vi.fn(),
 }));
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
-const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
+const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
@@ -70,6 +70,9 @@ describe("Ratings Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.user.findUnique.mockResolvedValue({ syncToStash: false } as any);
+    mockResolve.mockImplementation(
+      async (_userId, _type, _id, requested) => requested ?? "instance-1"
+    );
   });
 
   // ─── Shared validation tests (tested via updateSceneRating, applies to all) ───
@@ -186,7 +189,12 @@ describe("Ratings Controller", () => {
       const res = mockRes();
       await updateSceneRating(req, res);
 
-      expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
+      expect(mockResolve).toHaveBeenCalledWith(
+        1,
+        "scene",
+        "1",
+        "custom-instance"
+      );
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -200,13 +208,13 @@ describe("Ratings Controller", () => {
       );
     });
 
-    it("looks up instanceId from DB when not provided in request", async () => {
+    it("lets the resolver pick the instance when the request has none", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
 
-      expect(mockGetEntityInstanceId).toHaveBeenCalledWith("scene", "1");
+      expect(mockResolve).toHaveBeenCalledWith(1, "scene", "1", undefined);
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -219,6 +227,89 @@ describe("Ratings Controller", () => {
         })
       );
     });
+  });
+
+  // ─── Entity access ───
+
+  describe("entity access", () => {
+    const handlers: [
+      string,
+      typeof updateSceneRating,
+      string,
+      keyof typeof mockPrisma,
+    ][] = [
+      ["scene", updateSceneRating, "sceneId", "sceneRating"],
+      ["performer", updatePerformerRating, "performerId", "performerRating"],
+      ["studio", updateStudioRating, "studioId", "studioRating"],
+      ["tag", updateTagRating, "tagId", "tagRating"],
+      ["gallery", updateGalleryRating, "galleryId", "galleryRating"],
+      ["group", updateGroupRating, "groupId", "groupRating"],
+      ["image", updateImageRating, "imageId", "imageRating"],
+    ];
+
+    it.each(handlers)(
+      "%s returns 404 and writes nothing when the user cannot see the entity",
+      async (entityType, handler, paramKey, modelKey) => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          syncToStash: true,
+        } as any);
+        mockResolve.mockResolvedValueOnce(null);
+        const model = mockPrisma[modelKey] as any;
+        const req = mockReq(
+          { rating: 50, favorite: true, instanceId: "inst-b" },
+          { [paramKey]: "77" },
+          USER
+        );
+        const res = mockRes();
+        await handler(req as any, res);
+
+        expect(mockResolve).toHaveBeenCalledWith(1, entityType, "77", "inst-b");
+        expect(res._getStatus()).toBe(404);
+        expect(res._getBody().error).toMatch(/not found/);
+        expect(model.upsert).not.toHaveBeenCalled();
+        expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
+      }
+    );
+
+    it("passes the request's instance to the resolver", async () => {
+      mockPrisma.performerRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      const req = mockReq(
+        { rating: 5, instanceId: "inst-b" },
+        { performerId: "77" },
+        USER
+      );
+      const res = mockRes();
+      await updatePerformerRating(req, res);
+
+      expect(mockResolve).toHaveBeenCalledWith(1, "performer", "77", "inst-b");
+      expect(mockPrisma.performerRating.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_instanceId_performerId: {
+              userId: 1,
+              instanceId: "inst-b",
+              performerId: "77",
+            },
+          },
+        })
+      );
+    });
+
+    it.each([[{ instanceId: 5 }], [{ instanceId: "" }]])(
+      "returns 400 when instanceId is not a non-empty string (%j)",
+      async (body) => {
+        const req = mockReq({ rating: 50, ...body }, { sceneId: "1" }, USER);
+        const res = mockRes();
+        await updateSceneRating(req, res);
+
+        expect(res._getStatus()).toBe(400);
+        expect(res._getBody().error).toBe(
+          "instanceId must be a non-empty string"
+        );
+        expect(mockResolve).not.toHaveBeenCalled();
+        expect(mockPrisma.sceneRating.upsert).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ─── Upsert behavior ───

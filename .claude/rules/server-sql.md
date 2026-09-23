@@ -7,6 +7,7 @@ paths:
   - "server/services/StashEntityService.ts"
   - "server/services/UserInstanceService.ts"
   - "server/services/UserStatsService.ts"
+  - "server/services/EntityAccessService.ts"
   - "server/services/RankingComputeService.ts"
   - "server/utils/entityInstanceId.ts"
   - "server/utils/instanceUtils.ts"

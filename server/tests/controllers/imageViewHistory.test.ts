@@ -5,6 +5,7 @@
  * - incrementImageOCounter (O counter for images)
  * - recordImageView (lightbox view tracking)
  * - getImageViewHistory (single image history retrieval)
+ * - the entity access check on both writes
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -13,6 +14,7 @@ import {
   recordImageView,
 } from "../../controllers/imageViewHistory.js";
 import prisma from "../../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
@@ -28,9 +30,14 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-// Mock entityInstanceId
+// Mock entityInstanceId (getImageViewHistory keeps its own lookup)
 vi.mock("../../utils/entityInstanceId.js", () => ({
   getEntityInstanceId: vi.fn().mockResolvedValue("instance-1"),
+}));
+
+// Mock the access check: the request's instance when given, else "instance-1"
+vi.mock("../../services/EntityAccessService.js", () => ({
+  resolveAccessibleInstanceId: vi.fn(),
 }));
 
 // Mock logger
@@ -40,12 +47,68 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma);
 const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
+const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
 describe("Image View History Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolve.mockImplementation(
+      async (_userId, _type, _id, requested) => requested ?? "instance-1"
+    );
+  });
+
+  // ==========================================================================
+  // Entity access (item 6)
+  // ==========================================================================
+
+  describe("entity access", () => {
+    const writes: [string, typeof recordImageView][] = [
+      ["incrementImageOCounter", incrementImageOCounter as never],
+      ["recordImageView", recordImageView],
+    ];
+
+    it.each(writes)(
+      "%s returns 404 and writes nothing when the image is not visible",
+      async (_name, handler) => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 1,
+          syncToStash: true,
+        } as any);
+        mockResolve.mockResolvedValueOnce(null);
+        const req = mockReq(
+          { imageId: "img-1", instanceId: "inst-b" },
+          {},
+          USER
+        );
+        const res = mockRes();
+        await handler(req, res);
+
+        expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", "inst-b");
+        expect(res._getStatus()).toBe(404);
+        expect(res._getBody()).toEqual({ error: "Image not found" });
+        expect(mockPrisma.imageViewHistory.create).not.toHaveBeenCalled();
+        expect(mockPrisma.imageViewHistory.update).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(writes)(
+      "%s returns 400 when instanceId is not a non-empty string",
+      async (_name, handler) => {
+        for (const instanceId of [5, ""]) {
+          const req = mockReq({ imageId: "img-1", instanceId }, {}, USER);
+          const res = mockRes();
+          await handler(req, res);
+
+          expect(res._getStatus()).toBe(400);
+          expect(res._getBody()).toEqual({
+            error: "instanceId must be a non-empty string",
+          });
+        }
+        expect(mockResolve).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ==========================================================================
@@ -166,7 +229,12 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await incrementImageOCounter(req, res);
 
-      expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
+      expect(mockResolve).toHaveBeenCalledWith(
+        1,
+        "image",
+        "img-1",
+        "custom-instance"
+      );
       expect(mockPrisma.imageViewHistory.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -178,7 +246,7 @@ describe("Image View History Controller", () => {
       );
     });
 
-    it("falls back to getEntityInstanceId when instanceId not in body", async () => {
+    it("lets the resolver pick the instance when instanceId is not in body", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -194,7 +262,8 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await incrementImageOCounter(req, res);
 
-      expect(mockGetEntityInstanceId).toHaveBeenCalledWith("image", "img-1");
+      expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", undefined);
+      expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
     });
 
     it("logs warning when user has syncToStash enabled", async () => {

@@ -262,6 +262,33 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(400);
     });
 
+    it("returns 403 when a non-admin sends syncToStash", async () => {
+      const req = mockReq({ syncToStash: true }, {}, USER);
+      const res = mockRes();
+      await updateUserSettings(req, res);
+      expect(res._getStatus()).toBe(403);
+      expect(res._getBody().error).toBe("Only admins can change Sync to Stash");
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("lets an admin set syncToStash on their own settings", async () => {
+      mockPrisma.user.update.mockResolvedValue({
+        ...mockUpdatedUser,
+        id: 1,
+        syncToStash: true,
+      } as any);
+      const req = mockReq({ syncToStash: true }, {}, ADMIN);
+      const res = mockRes();
+      await updateUserSettings(req, res);
+      expect(res._getBody().success).toBe(true);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1 },
+          data: expect.objectContaining({ syncToStash: true }),
+        })
+      );
+    });
+
     it("rejects invalid unitPreference", async () => {
       const req = mockReq({ unitPreference: "kelvin" }, {}, USER);
       const res = mockRes();
