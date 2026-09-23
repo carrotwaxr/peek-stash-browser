@@ -597,23 +597,25 @@ class ExclusionComputationService {
         allowedInstanceIds
       );
 
-      // 3b. Scenes with inherited tag (via inheritedTagIds JSON column — raw SQL required)
+      // 3b. Scenes with inherited tag (inheritedTagIds JSON column, raw SQL).
+      // Tag ids come from UserHiddenEntity and UserContentRestriction, which users
+      // write: bind them as one JSON parameter, never splice them into SQL text.
       const { sql: instanceFilter, params: instanceParams } =
         buildInstanceFilterClause(allowedInstanceIds, "s.stashInstanceId");
       if (globalIds.length > 0) {
-        const tagList = globalIds.map((t) => `'${t}'`).join(",");
         const query = `
           SELECT DISTINCT s.id FROM StashScene s
           WHERE s.deletedAt IS NULL
           AND ${instanceFilter}
           AND EXISTS (
             SELECT 1 FROM json_each(s.inheritedTagIds) je
-            WHERE je.value IN (${tagList})
+            WHERE je.value IN (SELECT value FROM json_each(?))
           )
         `;
         const inheritedScenes = (await tx.$queryRawUnsafe(
           query,
-          ...instanceParams
+          ...instanceParams,
+          JSON.stringify(globalIds)
         )) as Array<{ id: string }>;
         for (const s of inheritedScenes) addCascade("scene", s.id);
       }
@@ -625,14 +627,13 @@ class ExclusionComputationService {
           scopedByInstance.set(st.instanceId, list);
         }
         for (const [instId, tagIds] of scopedByInstance) {
-          const tagList = tagIds.map((t) => `'${t}'`).join(",");
           const inheritedScenes = (await tx.$queryRaw`
             SELECT DISTINCT s.id FROM StashScene s
             WHERE s.deletedAt IS NULL
             AND s.stashInstanceId = ${instId}
             AND EXISTS (
               SELECT 1 FROM json_each(s.inheritedTagIds) je
-              WHERE je.value IN (${Prisma.raw(tagList)})
+              WHERE je.value IN (SELECT value FROM json_each(${JSON.stringify(tagIds)}))
             )
           `) as Array<{ id: string }>;
           for (const s of inheritedScenes) addCascade("scene", s.id, instId);

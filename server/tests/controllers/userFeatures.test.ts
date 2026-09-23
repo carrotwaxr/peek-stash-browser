@@ -41,6 +41,8 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
@@ -595,6 +597,25 @@ describe("User Controller — Features", () => {
       await hideEntity(req, res);
       expect(res._getBody().success).toBe(true);
     });
+
+    it("returns 400 when entityId is not a numeric Stash id", async () => {
+      const req = mockReq(
+        { entityType: "tag", entityId: "x') OR 1=1 --" },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when entityId is not a string", async () => {
+      const req = mockReq({ entityType: "scene", entityId: 42 }, {}, USER);
+      const res = mockRes();
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(400);
+    });
   });
 
   describe("unhideEntity", () => {
@@ -727,6 +748,39 @@ describe("User Controller — Features", () => {
       expect(res._getBody().success).toBe(true);
       expect(res._getBody().successCount).toBe(2);
       expect(res._getBody().failCount).toBe(0);
+    });
+
+    it("returns 400 and hides nothing when any entityId is not a numeric Stash id", async () => {
+      const req = mockReq(
+        {
+          entities: [
+            { entityType: "scene", entityId: "1" },
+            { entityType: "tag", entityId: "1' OR '1'='1" },
+          ],
+        },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntities(req, res);
+      expect(res._getStatus()).toBe(400);
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for an unknown instanceId in bulk", async () => {
+      vi.mocked(stashInstanceManager.getConfig).mockReturnValueOnce(undefined);
+      const req = mockReq(
+        {
+          entities: [
+            { entityType: "scene", entityId: "1", instanceId: "nope" },
+          ],
+        },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntities(req, res);
+      expect(res._getStatus()).toBe(400);
     });
   });
 

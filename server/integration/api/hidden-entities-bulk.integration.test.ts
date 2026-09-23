@@ -53,9 +53,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
   describe("POST /api/user/hidden-entities/bulk", () => {
     it("should hide multiple entities at once", async () => {
       const entities = [
-        { entityType: "scene", entityId: "test-scene-1" },
-        { entityType: "scene", entityId: "test-scene-2" },
-        { entityType: "scene", entityId: "test-scene-3" },
+        { entityType: "scene", entityId: "990000001" },
+        { entityType: "scene", entityId: "990000002" },
+        { entityType: "scene", entityId: "990000003" },
       ];
 
       const response = await testUserClient.post<{
@@ -99,7 +99,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     });
 
     it("should validate entity type", async () => {
-      const entities = [{ entityType: "invalid_type", entityId: "test-1" }];
+      const entities = [{ entityType: "invalid_type", entityId: "1" }];
 
       const response = await testUserClient.post<{ error: string }>(
         "/api/user/hidden-entities/bulk",
@@ -126,11 +126,24 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.data.error).toContain("entityType and entityId");
     });
 
+    it("should reject a non-numeric entityId", async () => {
+      const entities = [{ entityType: "scene", entityId: "abc" }];
+
+      const response = await testUserClient.post<{ error: string }>(
+        "/api/user/hidden-entities/bulk",
+        { entities }
+      );
+
+      expect(response.ok).toBe(false);
+      expect(response.status).toBe(400);
+      expect(response.data.error).toContain("entityId");
+    });
+
     it("should handle mixed entity types", async () => {
       const entities = [
-        { entityType: "scene", entityId: "mixed-test-scene" },
-        { entityType: "performer", entityId: "mixed-test-performer" },
-        { entityType: "studio", entityId: "mixed-test-studio" },
+        { entityType: "scene", entityId: "990000011" },
+        { entityType: "performer", entityId: "990000012" },
+        { entityType: "studio", entityId: "990000013" },
       ];
 
       const response = await testUserClient.post<{
@@ -146,7 +159,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
     it("should require authentication", async () => {
       const unauthClient = new TestClient();
-      const entities = [{ entityType: "scene", entityId: "test-scene-unauth" }];
+      const entities = [{ entityType: "scene", entityId: "990000021" }];
 
       const response = await unauthClient.post(
         "/api/user/hidden-entities/bulk",
