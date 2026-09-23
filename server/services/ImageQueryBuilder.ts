@@ -316,9 +316,10 @@ class ImageQueryBuilder {
   // Build sort clause
   private buildSortClause(
     sort: string,
-    dir: "ASC" | "DESC",
+    direction: string,
     randomSeed?: number
   ): string {
+    const dir = direction === "ASC" ? "ASC" : "DESC";
     // Extract filename from path: '/images/My Image.jpg' -> 'My Image.jpg'
     // This matches the display logic in getImageFallbackTitle which uses basename
     const filenameExpr = `REPLACE(i.filePath, RTRIM(i.filePath, REPLACE(i.filePath, '/', '')), '')`;

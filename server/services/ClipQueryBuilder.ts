@@ -346,10 +346,13 @@ class ClipQueryBuilder {
    */
   private buildOrderBy(
     sortBy: string,
-    sortDir: "asc" | "desc",
+    sortDir: unknown,
     randomSeed?: number
   ): string {
-    const direction = sortDir.toUpperCase();
+    const direction =
+      typeof sortDir === "string" && sortDir.toUpperCase() === "ASC"
+        ? "ASC"
+        : "DESC";
     const seed = randomSeed || 12345;
 
     const validColumns: Record<string, string> = {

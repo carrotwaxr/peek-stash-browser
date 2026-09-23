@@ -558,4 +558,25 @@ describe("ImageQueryBuilder", () => {
       }
     });
   });
+
+  describe("sort direction", () => {
+    it("coerces a hostile sortDirection to DESC instead of running it", async () => {
+      // abs() of the minimum 64-bit integer overflows, so SQLite raises
+      // "integer overflow" if this text ever reaches the query.
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "created_at",
+        sortDirection: "ASC, (SELECT abs(-9223372036854775808))" as never,
+        page: 1,
+        perPage: 10,
+        allowedInstanceIds: [testInstanceId],
+      });
+
+      expect(result.images.map((i) => i.id)).toEqual([
+        "999003",
+        "999002",
+        "999001",
+      ]);
+    });
+  });
 });

@@ -210,6 +210,46 @@ describe("ClipQueryBuilder", () => {
 
       expect(mainQuerySql).toContain("ORDER BY c.seconds ASC");
     });
+
+    it("coerces a hostile sortDir to DESC instead of splicing it into ORDER BY", async () => {
+      await clipQueryBuilder.getClips({
+        userId: 1,
+        sortDir: "asc, (SELECT password FROM User)" as never,
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).toContain("ORDER BY c.stashCreatedAt DESC");
+      expect(mainQuerySql).not.toMatch(/select password/i);
+    });
+
+    it("treats a repeated sortDir query param (array) as DESC instead of throwing", async () => {
+      await expect(
+        clipQueryBuilder.getClips({
+          userId: 1,
+          sortDir: ["asc", "desc"] as never,
+        })
+      ).resolves.toBeDefined();
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).toContain("ORDER BY c.stashCreatedAt DESC");
+    });
+
+    it("accepts asc in any case", async () => {
+      await clipQueryBuilder.getClips({
+        userId: 1,
+        sortBy: "seconds",
+        sortDir: "ASC" as never,
+      });
+
+      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
+        .calls[0][0] as string;
+
+      expect(mainQuerySql).toContain("ORDER BY c.seconds ASC");
+    });
   });
 
   describe("pagination", () => {
