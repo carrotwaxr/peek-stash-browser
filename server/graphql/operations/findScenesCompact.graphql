@@ -85,8 +85,6 @@ query FindScenesCompact(
         caption
       }
       sceneStreams {
-        url
-        mime_type
         label
       }
       captions {

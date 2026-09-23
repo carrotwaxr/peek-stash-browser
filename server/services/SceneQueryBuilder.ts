@@ -69,7 +69,7 @@ class SceneQueryBuilder {
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
     s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption, s.captions,
-    s.streams, s.inheritedTagIds,
+    s.inheritedTagIds,
     s.oCounter AS stashOCounter, s.playCount AS stashPlayCount,
     s.playDuration AS stashPlayDuration, s.stashCreatedAt, s.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -1492,8 +1492,14 @@ class SceneQueryBuilder {
         screenshot: this.transformUrl(row.pathScreenshot, row.stashInstanceId),
         preview: this.transformUrl(row.pathPreview, row.stashInstanceId),
         stream: this.transformUrl(row.pathStream, row.stashInstanceId),
-        sprite: this.transformUrl(row.pathSprite, row.stashInstanceId),
-        vtt: this.transformUrl(row.pathVtt, row.stashInstanceId),
+        sprite: this.transformUrl(
+          row.pathSprite ? `/scene/${row.id}/vtt/sprite` : null,
+          row.stashInstanceId
+        ),
+        vtt: this.transformUrl(
+          row.pathVtt ? `/scene/${row.id}/vtt/thumbs` : null,
+          row.stashInstanceId
+        ),
         chapters_vtt: this.transformUrl(
           row.pathChaptersVtt,
           row.stashInstanceId
@@ -1501,8 +1507,9 @@ class SceneQueryBuilder {
         caption: this.transformUrl(row.pathCaption, row.stashInstanceId),
       },
 
-      // Parse sceneStreams from JSON
-      sceneStreams: this.parseSceneStreams(row.streams),
+      // Lists carry no streams; single-scene lookups add them
+      // (StashEntityService.getPlaybackStreams)
+      sceneStreams: [],
 
       // Caption metadata for multi-language subtitle support
       captions: row.captions ? (JSON.parse(row.captions) as unknown[]) : [],
@@ -1897,14 +1904,6 @@ class SceneQueryBuilder {
       // Cover as simple string URL for consistency
       cover: coverUrl,
     };
-  }
-
-  /**
-   * Parse sceneStreams JSON and keep the raw stream URLs
-   * The frontend will handle URL rewriting to proxy-stream endpoint
-   */
-  private parseSceneStreams(json: string | null): unknown[] {
-    return parseJsonArray<unknown>(json);
   }
 
   /**

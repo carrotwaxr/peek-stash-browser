@@ -235,13 +235,19 @@ export async function applyQuickSceneFilters(
   if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
     const idSet = new Set(filters.ids);
     filtered = filtered.filter((s) => idSet.has(s.id));
-    // Populate sceneStreams for detail views (browse queries return empty streams for performance)
-    filtered = filtered.map((s) => ({
-      ...s,
-      sceneStreams: s.sceneStreams?.length
-        ? s.sceneStreams
-        : stashEntityService.generateSceneStreams(s.id, s.instanceId),
-    }));
+    // The legacy detail path: a single-scene lookup gets its stream list.
+    // Lists never carry one.
+    if (idSet.size === 1) {
+      filtered = await Promise.all(
+        filtered.map(async (s) => ({
+          ...s,
+          sceneStreams: await stashEntityService.getPlaybackStreams(
+            s.id,
+            s.instanceId
+          ),
+        }))
+      );
+    }
   }
 
   // Filter by performers
@@ -1015,7 +1021,21 @@ export const findScenes = async (
       }
 
       // Add streamability info
-      const scenes = addStreamabilityInfo(result.scenes);
+      let scenes = addStreamabilityInfo(result.scenes);
+
+      // The Scene page loads one scene by id: only then build its stream
+      // list. Lists keep sceneStreams empty.
+      if (ids?.length === 1) {
+        scenes = await Promise.all(
+          scenes.map(async (s) => ({
+            ...s,
+            sceneStreams: await stashEntityService.getPlaybackStreams(
+              s.id,
+              s.instanceId
+            ),
+          }))
+        );
+      }
 
       logger.info("findScenes complete (SQL path)", {
         totalTimeMs: Date.now() - requestStart,

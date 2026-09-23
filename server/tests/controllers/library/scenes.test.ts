@@ -52,6 +52,7 @@ vi.mock("../../../services/StashEntityService.js", () => ({
     getAllScenes: vi.fn().mockResolvedValue([]),
     getAllPerformers: vi.fn().mockResolvedValue([]),
     generateSceneStreams: vi.fn().mockReturnValue([]),
+    getPlaybackStreams: vi.fn().mockResolvedValue([]),
     getSimilarSceneCandidates: vi.fn().mockResolvedValue([]),
     getScenesPaginated: vi.fn().mockResolvedValue({ scenes: [], total: 0 }),
     getScenesForScoring: vi.fn().mockResolvedValue([]),
@@ -287,6 +288,21 @@ describe("applyQuickSceneFilters", () => {
         ids: { value: ["1"] as any, modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2); // All scenes returned — filter not applied
+    });
+
+    it("does not build streams when the ids filter lists more than one scene", async () => {
+      const scenes = [
+        createMockScene({ id: "1" }),
+        createMockScene({ id: "2" }),
+      ];
+      const result = await applyQuickSceneFilters(scenes, {
+        ids: ["1", "2"] as any,
+      });
+      expect(result.map((s) => s.id)).toEqual(["1", "2"]);
+      expect(
+        mockStashEntityService.generateSceneStreams
+      ).not.toHaveBeenCalled();
+      expect(mockStashEntityService.getPlaybackStreams).not.toHaveBeenCalled();
     });
   });
 
@@ -1583,6 +1599,34 @@ describe("findScenes", () => {
     const body = res._getBody();
     expect(body.findScenes.count).toBe(1);
     expect(body.findScenes.scenes).toHaveLength(1);
+  });
+
+  it("attaches playback streams to a single-id lookup", async () => {
+    const scene = createMockScene({ id: "42", instanceId: "inst-a" });
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      scenes: [scene],
+      total: 1,
+    });
+    const streams = [
+      {
+        url: "/api/scene/42/proxy-stream/stream?instanceId=inst-a",
+        mime_type: "video/mp4",
+        label: "Direct stream",
+      },
+    ];
+    mockStashEntityService.getPlaybackStreams.mockResolvedValueOnce(streams);
+
+    const req = mockReq({ ids: ["42"] }, {}, { id: 1, role: "USER" });
+    const res = mockRes();
+
+    await findScenes(req, res);
+
+    expect(res._getStatus()).toBe(200);
+    expect(mockStashEntityService.getPlaybackStreams).toHaveBeenCalledWith(
+      "42",
+      "inst-a"
+    );
+    expect(res._getBody().findScenes.scenes[0].sceneStreams).toEqual(streams);
   });
 
   it("returns 400 for ambiguous single-ID lookup", async () => {

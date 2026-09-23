@@ -159,7 +159,6 @@ const mockCachedScene = {
   pathStream: null,
   pathCaption: null,
   captions: null,
-  streams: "[]",
   stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
@@ -1057,6 +1056,144 @@ describe("StashEntityService", () => {
           stashInstanceId: "test-instance",
         },
       });
+    });
+  });
+
+  describe("generateSceneStreams", () => {
+    const avi = {
+      filePath: "/v/a.avi",
+      fileAudioCodec: "aac",
+      fileWidth: 720,
+      fileHeight: 404,
+    };
+
+    it("uses the stored Stash choices when present", () => {
+      const streams = stashEntityService.generateSceneStreams("7", "inst-a", {
+        streamDirect: true,
+        streamMkv: false,
+        streamResolutions: "ORIGINAL,LOW",
+        ...avi,
+      });
+
+      // Inference alone would drop Direct for an .avi; Stash had a transcode.
+      expect(streams.map((s) => s.label)).toEqual([
+        "Direct stream",
+        "MP4",
+        "MP4 Low (240p)",
+        "WEBM",
+        "WEBM Low (240p)",
+        "HLS",
+        "HLS Low (240p)",
+        "DASH",
+        "DASH Low (240p)",
+      ]);
+    });
+
+    it("falls back to inference when the stored columns are NULL", () => {
+      const streams = stashEntityService.generateSceneStreams("7", "inst-a", {
+        streamDirect: null,
+        streamMkv: null,
+        streamResolutions: null,
+        ...avi,
+      });
+
+      expect(streams.map((s) => s.label)).toEqual([
+        "MP4",
+        "MP4 Low (240p)",
+        "WEBM",
+        "WEBM Low (240p)",
+        "HLS",
+        "HLS Low (240p)",
+        "DASH",
+        "DASH Low (240p)",
+      ]);
+
+      const mkv = stashEntityService.generateSceneStreams("8", "inst-a", {
+        streamDirect: null,
+        streamMkv: null,
+        streamResolutions: null,
+        filePath: "/v/b.mkv",
+        fileAudioCodec: "ac3",
+        fileWidth: 1920,
+        fileHeight: 1080,
+      });
+      expect(mkv.map((s) => s.label).slice(0, 3)).toEqual([
+        "MKV",
+        "MP4",
+        "MP4 Full HD (1080p)",
+      ]);
+    });
+
+    it("returns Peek proxy paths with instanceId and no Stash host", () => {
+      const streams = stashEntityService.generateSceneStreams("7", "inst-a", {
+        streamDirect: true,
+        streamMkv: false,
+        streamResolutions: "ORIGINAL,LOW",
+        ...avi,
+      });
+
+      expect(streams.length).toBeGreaterThan(0);
+      for (const s of streams) {
+        expect(s.url).toMatch(/^\/api\/scene\/7\/proxy-stream\/stream/);
+        expect(
+          new URL(s.url, "http://peek.test").searchParams.get("instanceId")
+        ).toBe("inst-a");
+      }
+      const json = JSON.stringify(streams);
+      expect(json).not.toContain("http");
+      expect(json).not.toContain("localhost:9999");
+      expect(json).not.toContain("apikey");
+      expect(streams[0].url).toBe(
+        "/api/scene/7/proxy-stream/stream?instanceId=inst-a"
+      );
+      expect(streams[2].url).toBe(
+        "/api/scene/7/proxy-stream/stream.mp4?resolution=LOW&instanceId=inst-a"
+      );
+    });
+
+    it("getPlaybackStreams reads the seven columns for (id, instance) and builds the list", async () => {
+      getMock(prisma.stashScene.findFirst).mockResolvedValueOnce({
+        streamDirect: false,
+        streamMkv: true,
+        streamResolutions: "ORIGINAL",
+        filePath: "/v/c.mkv",
+        fileAudioCodec: "ac3",
+        fileWidth: 1920,
+        fileHeight: 1080,
+      });
+
+      const streams = await stashEntityService.getPlaybackStreams(
+        "42",
+        "inst-a"
+      );
+
+      expect(prisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "42", stashInstanceId: "inst-a", deletedAt: null },
+        select: {
+          streamDirect: true,
+          streamMkv: true,
+          streamResolutions: true,
+          filePath: true,
+          fileAudioCodec: true,
+          fileWidth: true,
+          fileHeight: true,
+        },
+      });
+      expect(streams.map((s) => s.label)).toEqual([
+        "MKV",
+        "MP4",
+        "WEBM",
+        "HLS",
+        "DASH",
+      ]);
+      expect(streams[0].url).toBe(
+        "/api/scene/42/proxy-stream/stream.mkv?instanceId=inst-a"
+      );
+
+      getMock(prisma.stashScene.findFirst).mockResolvedValueOnce(null);
+      await expect(
+        stashEntityService.getPlaybackStreams("43", "inst-a")
+      ).resolves.toEqual([]);
     });
   });
 });

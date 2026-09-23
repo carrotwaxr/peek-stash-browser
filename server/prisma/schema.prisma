@@ -688,8 +688,11 @@ model StashScene {
   // === Caption metadata (for multi-language support) ===
   captions String? // JSON: [{language_code, caption_type}]
 
-  // === Stream data (small JSON array) ===
-  streams String? // JSON: [{url, mime_type, label}]
+  // === Stream choices (Stash's decisions, no URLs) ===
+  streams           String? // Always NULL since 3.3.7; dropped in PR 3. Do not read or write.
+  streamDirect      Boolean?
+  streamMkv         Boolean?
+  streamResolutions String? // comma list of Stash's StreamingResolutionEnum values, "" when Stash offered none
 
   // === Stash counter data ===
   oCounter     Int   @default(0) // Stash o_counter

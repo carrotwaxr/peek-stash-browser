@@ -54,7 +54,6 @@ export interface SceneQueryRow {
   pathStream: string | null;
   pathCaption: string | null;
   captions: string | null; // JSON-encoded caption metadata
-  streams: string | null; // JSON-encoded stream info
   inheritedTagIds: string | null; // JSON-encoded string[]
   stashOCounter: number | null;
   stashPlayCount: number | null;
