@@ -8,6 +8,8 @@
  * - getWatchHistory (single scene retrieval)
  * - getAllWatchHistory (list retrieval)
  * - clearAllWatchHistory (bulk deletion)
+ * - pingWatchHistory (player progress pings)
+ * - the entity access check on every write
  */
 import { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,10 +20,13 @@ import {
   getWatchHistory,
   incrementOCounter,
   incrementPlayCount,
+  pingWatchHistory,
   saveActivity,
 } from "../../controllers/watchHistory.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 
 // Mock Prisma - hoisted to top level
 vi.mock("../../prisma/singleton.js", () => ({
@@ -74,7 +79,13 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     getAllConfigs: vi.fn(() => [
       { id: "test-instance", name: "Test", priority: 0 },
     ]),
+    getForSync: vi.fn(),
   },
+}));
+
+// Mock the access check: the request's instance when given, else "test-instance"
+vi.mock("../../services/EntityAccessService.js", () => ({
+  resolveAccessibleInstanceId: vi.fn(),
 }));
 
 // Mock UserStatsService
@@ -95,6 +106,8 @@ vi.mock("../../utils/logger.js", () => ({
 
 // Get mocked functions
 const mockPrisma = vi.mocked(prisma);
+const mockResolve = vi.mocked(resolveAccessibleInstanceId);
+const mockInstanceManager = vi.mocked(stashInstanceManager);
 
 describe("Watch History Controller", () => {
   let mockRequest: Partial<AuthenticatedRequest>;
@@ -104,6 +117,9 @@ describe("Watch History Controller", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolve.mockImplementation(
+      async (_userId, _type, _id, requested) => requested ?? "test-instance"
+    );
 
     responseJson = vi.fn();
     responseStatus = vi.fn(() => ({ json: responseJson }));
@@ -843,6 +859,167 @@ describe("Watch History Controller", () => {
             tagStats: 15,
             rankings: 20,
           },
+        })
+      );
+    });
+  });
+
+  // ============================================================================
+  // Entity access (item 6)
+  // ============================================================================
+
+  describe("entity access", () => {
+    const writes: [
+      string,
+      (req: AuthenticatedRequest, res: Response) => Promise<unknown>,
+      Record<string, unknown>,
+    ][] = [
+      [
+        "saveActivity",
+        saveActivity as never,
+        { resumeTime: 5, playDuration: 5 },
+      ],
+      ["incrementPlayCount", incrementPlayCount as never, {}],
+      ["incrementOCounter", incrementOCounter as never, {}],
+      ["pingWatchHistory", pingWatchHistory as never, { currentTime: 1 }],
+    ];
+
+    it.each(writes)(
+      "%s returns 404 and writes nothing when the scene is not visible",
+      async (_name, handler, extra) => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 1,
+          minimumPlayPercent: 0,
+          syncToStash: true,
+        } as never);
+        mockResolve.mockResolvedValueOnce(null);
+        mockRequest = {
+          body: { sceneId: "123", instanceId: "inst-b", ...extra },
+          user: { id: 1 } as never,
+        };
+
+        await handler(
+          mockRequest as AuthenticatedRequest,
+          mockResponse as Response
+        );
+
+        expect(mockResolve).toHaveBeenCalledWith(1, "scene", "123", "inst-b");
+        expect(responseStatus).toHaveBeenCalledWith(404);
+        expect(responseJson).toHaveBeenCalledWith({
+          error: "Scene not found",
+        });
+        expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
+        expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+        expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
+      }
+    );
+
+    it("passes the request's instanceId through", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        syncToStash: false,
+      } as never);
+      mockPrisma.watchHistory.upsert.mockResolvedValue({
+        id: 1,
+        playCount: 0,
+        playDuration: 5,
+        resumeTime: 5,
+        lastPlayedAt: new Date(),
+      } as never);
+      mockRequest = {
+        body: {
+          sceneId: "123",
+          instanceId: "inst-b",
+          resumeTime: 5,
+          playDuration: 5,
+        },
+        user: { id: 1 } as never,
+      };
+
+      await saveActivity(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
+
+      expect(mockResolve).toHaveBeenCalledWith(1, "scene", "123", "inst-b");
+      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_instanceId_sceneId: {
+              userId: 1,
+              instanceId: "inst-b",
+              sceneId: "123",
+            },
+          },
+        })
+      );
+    });
+
+    it.each([[5], [""]])(
+      "returns 400 when instanceId is %j",
+      async (instanceId) => {
+        mockRequest = {
+          body: { sceneId: "123", instanceId },
+          user: { id: 1 } as never,
+        };
+
+        await incrementOCounter(
+          mockRequest as AuthenticatedRequest,
+          mockResponse as Response
+        );
+
+        expect(responseStatus).toHaveBeenCalledWith(400);
+        expect(responseJson).toHaveBeenCalledWith({
+          error: "instanceId must be a non-empty string",
+        });
+        expect(mockResolve).not.toHaveBeenCalled();
+      }
+    );
+
+    it("ping reads the duration from the resolved instance", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        minimumPlayPercent: 50,
+        syncToStash: false,
+      } as never);
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
+        duration: 600,
+      } as never);
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+      const record = {
+        id: 1,
+        playCount: 0,
+        playDuration: 0,
+        resumeTime: 1,
+        lastPlayedAt: new Date(),
+        playHistory: [],
+      };
+      mockPrisma.watchHistory.create.mockResolvedValue(record as never);
+      mockPrisma.watchHistory.update.mockResolvedValue(record as never);
+      mockRequest = {
+        body: { sceneId: "scene-1", currentTime: 1 },
+        user: { id: 1 } as never,
+      };
+
+      await pingWatchHistory(
+        mockRequest as AuthenticatedRequest,
+        mockResponse as Response
+      );
+
+      expect(mockResolve).toHaveBeenCalledWith(
+        1,
+        "scene",
+        "scene-1",
+        undefined
+      );
+      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "scene-1", stashInstanceId: "test-instance" },
+        select: { duration: true },
+      });
+      expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ instanceId: "test-instance" }),
         })
       );
     });

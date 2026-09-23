@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { resolveAccessibleInstanceId } from "../services/EntityAccessService.js";
 import type {
   ApiErrorResponse,
   GetImageViewHistoryParams,
@@ -32,19 +33,31 @@ export async function incrementImageOCounter(
       return res.status(400).json({ error: "Missing required field: imageId" });
     }
 
-    // Get user settings for syncToStash and image instanceId
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // Get user settings for syncToStash, and the image's instance if this
+    // user can see it
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      requestInstanceId
-        ? Promise.resolve(requestInstanceId)
-        : getEntityInstanceId("image", imageId),
+      resolveAccessibleInstanceId(userId, "image", imageId, requestInstanceId),
     ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Image not found" });
     }
 
     const now = new Date();
@@ -123,9 +136,26 @@ export async function recordImageView(
       return res.status(400).json({ error: "Missing required field: imageId" });
     }
 
-    // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
-    const instanceId =
-      requestInstanceId || (await getEntityInstanceId("image", imageId));
+    if (
+      requestInstanceId !== undefined &&
+      (typeof requestInstanceId !== "string" || requestInstanceId === "")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "instanceId must be a non-empty string" });
+    }
+
+    // The image's instance, if this user can see it
+    const instanceId = await resolveAccessibleInstanceId(
+      userId,
+      "image",
+      imageId,
+      requestInstanceId
+    );
+
+    if (!instanceId) {
+      return res.status(404).json({ error: "Image not found" });
+    }
 
     const now = new Date();
 

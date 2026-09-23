@@ -3,6 +3,7 @@ paths:
   - "server/services/ExclusionComputationService.ts"
   - "server/services/EntityExclusionHelper.ts"
   - "server/services/UserHiddenEntityService.ts"
+  - "server/services/EntityAccessService.ts"
   - "server/routes/exclusions.ts"
   - "server/controllers/user.ts"
   - "server/tests/**/*xclusion*"
@@ -36,4 +37,8 @@ paths:
 
 ## Reading exclusions
 
-A new endpoint filters through one of two paths: the `LEFT JOIN UserExcludedEntity` in the query builders, or `entityExclusionHelper.filterExcluded` for endpoints that read cached entities in memory. An endpoint with neither shows restricted content.
+A new endpoint filters through one of three paths. An endpoint with none of them shows restricted content.
+
+- The `LEFT JOIN UserExcludedEntity` in the query builders, for lists.
+- `entityExclusionHelper.filterExcluded`, for endpoints that read cached entities in memory.
+- `services/EntityAccessService.ts`, for endpoints that act on ids from the request: ratings, history writes, downloads and media. It also checks `deletedAt` and the user's allowed instances. It needs no role logic, because the compute already settles admins: an admin's rows hold only their own hides and cascades.

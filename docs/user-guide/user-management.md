@@ -253,6 +253,8 @@ When enabled, user activity syncs back to Stash:
 2. Find the user in the table
 3. Toggle the **Sync to Stash** column
 
+Only admins can turn Sync to Stash on or off, from User Management. A user's own settings don't offer it, and the server refuses it from anyone else. Ratings, favorites, O counts, plays and resume points are recorded only for items the user can see.
+
 ---
 
 ## Hidden Items

@@ -269,9 +269,17 @@ export const updateUserSettings = async (
       }
     }
 
-    // Validate syncToStash if provided (admin only can change this)
+    // Validate syncToStash if provided. Only an admin may change it, on their
+    // own settings (/settings) or on anyone's (/:userId/settings); a regular
+    // user's own request is refused.
     if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
       return res.status(400).json({ error: "Sync to Stash must be a boolean" });
+    }
+
+    if (syncToStash !== undefined && currentUserRole !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Only admins can change Sync to Stash" });
     }
 
     // Validate unitPreference if provided
