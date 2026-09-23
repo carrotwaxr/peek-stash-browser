@@ -111,11 +111,11 @@ The wizard stores your Stash connection details securely in the database.
 
 ### Environment Variables
 
-| Variable            | Required | Default        | Description                                            |
-| ------------------- | -------- | -------------- | ------------------------------------------------------ |
-| `JWT_SECRET`        | Yes      | Auto-generated | Secret for JWT tokens (recommended to set manually)    |
-| `CONFIG_DIR`        | No       | `/app/data`    | Directory for database and library data                |
-| `PROXY_AUTH_HEADER` | No       | (disabled)     | Enable proxy authentication (e.g., `X-Forwarded-User`) |
+| Variable            | Required | Default                                                   | Description                                                                        |
+| ------------------- | -------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `JWT_SECRET`        | No       | Generated on first start, kept in `/app/data/.jwt-secret` | Signs login sessions; set it only to control the value (`openssl rand -base64 32`) |
+| `CONFIG_DIR`        | No       | `/app/data`                                               | Directory for database and library data                                            |
+| `PROXY_AUTH_HEADER` | No       | (disabled)                                                | Enable proxy authentication (e.g., `X-Forwarded-User`)                             |
 
 > **Note**: Stash connection details (URL and API key) are configured via the Setup Wizard and stored in the database. No environment variables needed!
 

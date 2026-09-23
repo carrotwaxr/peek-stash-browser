@@ -204,12 +204,17 @@ export interface ChangePasswordResponse {
 // RECOVERY KEY
 // =============================================================================
 
-/** GET /api/user/recovery-key */
+/** GET /api/user/recovery-key. Only a hash is stored, so the key itself is never returned. */
 export interface GetRecoveryKeyResponse {
-  recoveryKey: string | null;
+  hasRecoveryKey: boolean;
 }
 
 /** POST /api/user/recovery-key/regenerate */
+export interface RegenerateRecoveryKeyBody {
+  currentPassword: string;
+}
+
+/** POST /api/user/recovery-key/regenerate. The new key, shown this once. */
 export interface RegenerateRecoveryKeyResponse {
   recoveryKey: string;
 }
@@ -561,4 +566,10 @@ export interface UpdateUserStashInstancesBody {
 /** POST /api/user/complete-setup */
 export interface CompleteSetupBody {
   selectedInstanceIds?: string[];
+}
+
+/** POST /api/user/complete-setup. The first recovery key, shown this once; null when setup was already complete. */
+export interface CompleteSetupResponse {
+  success: true;
+  recoveryKey: string | null;
 }

@@ -29,8 +29,8 @@ The fastest way to get a development environment running:
 3. **Configure `.env`**:
 
     ```bash
-    JWT_SECRET=your-dev-secret-here
     DATABASE_URL=file:./data/peek-stash-browser.db
+    # JWT_SECRET is optional: Peek generates one in CONFIG_DIR when unset
     ```
 
 4. **Start the development stack**:
@@ -82,12 +82,14 @@ Create a `.env` file in the `server/` directory:
 
 ```bash
 # Required
-JWT_SECRET=dev-secret-change-in-production
 DATABASE_URL=file:./data/peek-db.db
 
 # Optional
 NODE_ENV=development
 LOG_LEVEL=debug
+# JWT_SECRET is optional: when unset, Peek generates one into CONFIG_DIR
+# (default /app/data). Outside Docker, set CONFIG_DIR to a writable folder
+# or set JWT_SECRET.
 ```
 
 ## Database Management
@@ -226,7 +228,6 @@ docker run -d \
   --name peek-local-test \
   -p 6969:80 \
   -v peek-test-data:/app/data \
-  -e JWT_SECRET=test-secret \
   peek-stash-browser:local
 ```
 

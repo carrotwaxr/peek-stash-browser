@@ -13,10 +13,11 @@ import {
 } from "../middleware/auth.js";
 import { authRateLimiter } from "../middleware/rateLimiter.js";
 import prisma from "../prisma/singleton.js";
+import { setUserPassword } from "../services/PasswordService.js";
 import rankingComputeService from "../services/RankingComputeService.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
-import { generateRecoveryKey } from "../utils/recoveryKey.js";
+import { recoveryKeyMatches } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -56,7 +57,6 @@ router.post("/login", authRateLimiter, async (req, res) => {
         password: true,
         role: true,
         landingPagePreference: true,
-        recoveryKey: true,
         setupCompleted: true,
       },
     });
@@ -75,16 +75,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
     // Clear failed attempts on successful login
     clearFailedAttempts(username);
 
-    // Generate recovery key if user doesn't have one
-    if (!user.recoveryKey) {
-      const recoveryKey = generateRecoveryKey();
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { recoveryKey },
-      });
-      user.recoveryKey = recoveryKey;
-    }
-
+    // A password sign-in: the token's authTime starts the 30-day session
     const token = generateToken({
       id: user.id,
       username: user.username,
@@ -159,7 +150,7 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { username },
-      select: { id: true, recoveryKey: true },
+      select: { id: true, recoveryKeyHash: true },
     });
 
     if (!user) {
@@ -167,7 +158,7 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
       return res.json({ hasRecoveryKey: false });
     }
 
-    res.json({ hasRecoveryKey: !!user.recoveryKey });
+    res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
   } catch (error) {
     logger.error("Forgot password init error", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -198,29 +189,21 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { username },
-      select: { id: true, recoveryKey: true },
+      select: { id: true, recoveryKeyHash: true },
     });
 
-    if (!user || !user.recoveryKey) {
+    // Compared by hash: dashes and case in the input don't matter
+    if (
+      !user?.recoveryKeyHash ||
+      !recoveryKeyMatches(recoveryKey, user.recoveryKeyHash)
+    ) {
       return res
         .status(401)
         .json({ error: "Invalid username or recovery key" });
     }
 
-    // Normalize and compare recovery key
-    const normalizedInput = recoveryKey.replace(/-/g, "").toUpperCase();
-    if (normalizedInput !== user.recoveryKey) {
-      return res
-        .status(401)
-        .json({ error: "Invalid username or recovery key" });
-    }
-
-    // Hash new password and update
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword },
-    });
+    // Also signs out every existing session of this user
+    await setUserPassword(user.id, newPassword);
 
     res.json({ success: true });
   } catch (error) {
@@ -274,14 +257,7 @@ router.post("/first-time-password", async (req, res) => {
       return res.status(404).json({ error: "Admin user not found" });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword },
-    });
+    await setUserPassword(user.id, newPassword);
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {

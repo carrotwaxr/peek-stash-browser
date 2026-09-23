@@ -23,7 +23,8 @@ export function mockReq(
 }
 
 /**
- * Create a mock Express response with chainable `.status().json()`.
+ * Create a mock Express response with chainable `.status().json()` and a
+ * `cookie()` spy (password changes issue a fresh session cookie).
  *
  * Inspection helpers:
  * - `_getStatus()` — returns the first status code passed to `res.status()`,
@@ -34,6 +35,7 @@ export function mockRes() {
   const res: any = {
     json: vi.fn().mockReturnThis(),
     status: vi.fn().mockReturnThis(),
+    cookie: vi.fn().mockReturnThis(),
     _getStatus: () => res.status.mock.calls[0]?.[0] ?? 200,
     _getBody: () => {
       const jsonCalls = res.json.mock.calls;

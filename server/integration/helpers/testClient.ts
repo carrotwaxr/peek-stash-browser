@@ -32,13 +32,7 @@ export class TestClient {
     }
 
     // Extract token from Set-Cookie header
-    const setCookie = response.headers.get("set-cookie");
-    if (setCookie) {
-      const tokenMatch = setCookie.match(/token=([^;]+)/);
-      if (tokenMatch) {
-        this.token = tokenMatch[1];
-      }
-    }
+    this.captureToken(response);
 
     // Also check response body for token (some auth flows return it there)
     const data = await response.json();
@@ -53,6 +47,20 @@ export class TestClient {
 
   clearToken(): void {
     this.token = undefined;
+  }
+
+  /**
+   * Keep a `token=` cookie from any response, as a browser would: the server
+   * refreshes the session cookie and issues a new one on password change.
+   * Logout's clear-cookie has an empty value and does not match.
+   */
+  private captureToken(response: Response): void {
+    const tokenMatch = response.headers
+      .get("set-cookie")
+      ?.match(/token=([^;]+)/);
+    if (tokenMatch) {
+      this.token = tokenMatch[1];
+    }
   }
 
   private getHeaders(options?: RequestOptions): Record<string, string> {
@@ -76,6 +84,7 @@ export class TestClient {
       method: "GET",
       headers: this.getHeaders(options),
     });
+    this.captureToken(response);
 
     const data = await response.json().catch(() => ({}));
     return {
@@ -95,6 +104,7 @@ export class TestClient {
       headers: this.getHeaders(options),
       body: body ? JSON.stringify(body) : undefined,
     });
+    this.captureToken(response);
 
     const data = await response.json().catch(() => ({}));
     return {
@@ -114,6 +124,7 @@ export class TestClient {
       headers: this.getHeaders(options),
       body: body ? JSON.stringify(body) : undefined,
     });
+    this.captureToken(response);
 
     const data = await response.json().catch(() => ({}));
     return {
@@ -131,6 +142,7 @@ export class TestClient {
       method: "DELETE",
       headers: this.getHeaders(options),
     });
+    this.captureToken(response);
 
     const data = await response.json().catch(() => ({}));
     return {

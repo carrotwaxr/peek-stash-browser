@@ -43,6 +43,11 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
+import {
+  formatRecoveryKey,
+  generateRecoveryKey,
+  hashRecoveryKey,
+} from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
@@ -51,6 +56,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     user: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     userContentRestriction: {
       findMany: vi.fn(),
@@ -86,6 +92,7 @@ vi.mock("bcryptjs", () => ({
 vi.mock("../../utils/recoveryKey.js", () => ({
   generateRecoveryKey: vi.fn(),
   formatRecoveryKey: vi.fn(),
+  hashRecoveryKey: vi.fn(),
 }));
 
 // Mock passwordValidation (imported by user.ts)
@@ -1031,10 +1038,9 @@ describe("User Controller — Features", () => {
       expect(res._getStatus()).toBe(404);
     });
 
-    it("returns setup status with instances", async () => {
+    it("returns setup status with instances and no recovery key", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         setupCompleted: false,
-        recoveryKey: "KEY123",
       } as any);
       mockPrisma.stashInstance.findMany.mockResolvedValue([
         { id: "inst-1", name: "Stash 1", description: null },
@@ -1044,7 +1050,7 @@ describe("User Controller — Features", () => {
       await getSetupStatus(req, res);
       const body = res._getBody();
       expect(body.setupCompleted).toBe(false);
-      expect(body.recoveryKey).toBe("KEY123");
+      expect(body).not.toHaveProperty("recoveryKey");
       expect(body.instances).toHaveLength(1);
       expect(body.instanceCount).toBe(1);
     });
@@ -1060,16 +1066,32 @@ describe("User Controller — Features", () => {
 
     it("completes setup for single instance without selections", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(1);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 } as any);
+      vi.mocked(generateRecoveryKey).mockReturnValue("RAWKEY");
+      vi.mocked(hashRecoveryKey).mockReturnValue("hashed-key");
+      vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await completeSetup(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ setupCompleted: true }),
-        })
-      );
+      expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 2, setupCompleted: false },
+        data: expect.objectContaining({
+          setupCompleted: true,
+          recoveryKeyHash: "hashed-key",
+        }),
+      });
+      expect(hashRecoveryKey).toHaveBeenCalledWith("RAWKEY");
+      expect(res._getBody()).toEqual({ success: true, recoveryKey: "RAWK-EY" });
+    });
+
+    it("returns recoveryKey null when setup was already complete", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(1);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 0 } as any);
+      vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
+      const req = mockReq({}, {}, USER);
+      const res = mockRes();
+      await completeSetup(req, res);
+      expect(res._getBody()).toEqual({ success: true, recoveryKey: null });
     });
 
     it("returns 400 for multi-instance with no selections", async () => {
@@ -1092,7 +1114,7 @@ describe("User Controller — Features", () => {
       mockPrisma.userStashInstance.createMany.mockResolvedValue({
         count: 1,
       } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 } as any);
       const req = mockReq({ selectedInstanceIds: ["inst-1"] }, {}, USER);
       const res = mockRes();
       await completeSetup(req, res);

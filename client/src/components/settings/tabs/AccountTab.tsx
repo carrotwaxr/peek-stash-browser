@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import { apiPost } from "../../../api";
 import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
@@ -11,20 +11,22 @@ const AccountTab = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordChanging, setPasswordChanging] = useState(false);
 
-  // Recovery key state
-  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
-  const [showRecoveryKey, setShowRecoveryKey] = useState(false);
+  // Recovery key state. Peek stores only a hash, so a key is shown once:
+  // right after it is created, until the page is left.
+  const [hasRecoveryKey, setHasRecoveryKey] = useState(false);
   const [keyLoading, setKeyLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
+  const [keyPassword, setKeyPassword] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [newKey, setNewKey] = useState<string | null>(null);
 
-  // Load recovery key on mount
+  // Load whether a recovery key exists on mount
   useEffect(() => {
     const loadRecoveryKey = async () => {
       try {
         const response = await getRecoveryKey();
-        setRecoveryKey(response.recoveryKey);
+        setHasRecoveryKey(response.hasRecoveryKey);
       } catch (err) {
-        console.error("Failed to load recovery key:", err);
+        console.error("Failed to load recovery key status:", err);
       } finally {
         setKeyLoading(false);
       }
@@ -32,30 +34,26 @@ const AccountTab = () => {
     loadRecoveryKey();
   }, []);
 
-  const handleRegenerateKey = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to regenerate your recovery key?\n\nYour old key will no longer work for password recovery."
-      )
-    ) {
-      return;
-    }
+  const handleCreateKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyPassword) return;
 
     try {
-      setRegenerating(true);
-      const response = await regenerateRecoveryKey();
-      setRecoveryKey(response.recoveryKey);
-      setShowRecoveryKey(true);
-      showSuccess("Recovery key regenerated");
-    } catch {
-      showError("Failed to regenerate recovery key");
+      setCreatingKey(true);
+      const response = await regenerateRecoveryKey(keyPassword);
+      setNewKey(response.recoveryKey);
+      setHasRecoveryKey(true);
+      setKeyPassword("");
+    } catch (err) {
+      showError((err as Error).message || "Failed to create recovery key");
     } finally {
-      setRegenerating(false);
+      setCreatingKey(false);
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(recoveryKey!);
+    if (!newKey) return;
+    navigator.clipboard.writeText(newKey);
     showSuccess("Recovery key copied to clipboard");
   };
 
@@ -227,62 +225,98 @@ const AccountTab = () => {
           Recovery Key
         </h3>
         <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-          Use this key to reset your password if you forget it. Keep it
-          somewhere safe.
+          A recovery key resets your password if you forget it. Keep it
+          somewhere safe; creating a new key replaces the old one.
         </p>
 
         {keyLoading ? (
           <p style={{ color: "var(--text-muted)" }}>Loading...</p>
-        ) : recoveryKey ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div
-                className="flex-1 px-4 py-3 rounded-lg font-mono text-sm"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {showRecoveryKey
-                  ? recoveryKey
-                  : "••••-••••-••••-••••-••••-••••-••••"}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowRecoveryKey(!showRecoveryKey)}
-                title={showRecoveryKey ? "Hide key" : "Show key"}
-              >
-                {showRecoveryKey ? <EyeOff size={16} /> : <Eye size={16} />}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={copyToClipboard}
-                disabled={!showRecoveryKey}
-                title="Copy to clipboard"
-              >
-                <Copy size={16} />
-              </Button>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="tertiary"
-                size="sm"
-                onClick={handleRegenerateKey}
-                disabled={regenerating}
-                loading={regenerating}
-              >
-                <RefreshCw size={14} className="mr-1" />
-                Regenerate Key
-              </Button>
-            </div>
-          </div>
         ) : (
-          <p style={{ color: "var(--text-muted)" }}>
-            No recovery key set. Log out and back in to generate one.
-          </p>
+          <div className="space-y-4">
+            <div>
+              <p style={{ color: "var(--text-primary)" }}>
+                {hasRecoveryKey
+                  ? "A recovery key is set."
+                  : "You don't have a recovery key yet."}
+              </p>
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Peek stores only a fingerprint of your key, so it can show a key
+                only once, when it is created.
+              </p>
+            </div>
+
+            {newKey && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex-1 px-4 py-3 rounded-lg font-mono text-sm break-all"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {newKey}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={copyToClipboard}
+                    title="Copy to clipboard"
+                    aria-label="Copy recovery key"
+                  >
+                    <Copy size={16} />
+                  </Button>
+                </div>
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "var(--status-warning)" }}
+                >
+                  Save this key now. Peek won&apos;t show it again.
+                </p>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateKey} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="recoveryKeyPassword"
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Confirm with your current password
+                </label>
+                <input
+                  type="password"
+                  id="recoveryKeyPassword"
+                  autoComplete="current-password"
+                  value={keyPassword}
+                  onChange={(e) => setKeyPassword(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!keyPassword || creatingKey}
+                  loading={creatingKey}
+                >
+                  <RefreshCw size={14} className="mr-1" />
+                  {hasRecoveryKey ? "Create new key" : "Create key"}
+                </Button>
+              </div>
+            </form>
+          </div>
         )}
       </div>
     </div>

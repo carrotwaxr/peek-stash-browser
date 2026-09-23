@@ -8,11 +8,17 @@ paths:
   - "server/controllers/setup.ts"
   - "server/services/StashInstanceManager.ts"
   - "server/initializers/stashInstance.ts"
+  - "server/utils/jwtSecret.ts"
+  - "server/services/PasswordService.ts"
+  - "server/initializers/recoveryKeys.ts"
 ---
 
 # Auth, setup and Stash instances
 
-- The JWT lives in an HTTP-only cookie for 2 hours. A request whose cookie is older than 1 hour gets a fresh one. Bearer tokens are accepted but never refreshed.
+- The JWT lives in an HTTP-only cookie for 2 hours and is refreshed after 1 hour, keeping its `authTime` claim. A session ends 30 days after `authTime` (the last password sign-in), or when `User.passwordChangedAt` is newer than its `iat`, with 401 either way.
+- The signing secret is `JWT_SECRET`, or `<CONFIG_DIR>/.jwt-secret`, generated once when the variable is unset or a published example value. Read it with `getJwtSecret()`, never at module load.
+- Every password write goes through `setUserPassword()`.
+- Recovery keys are stored as `recoveryKeyHash` (SHA-256) and shown once: from `complete-setup`, from `recovery-key/regenerate` (current password required), or from the admin's regenerate.
 - When `PROXY_AUTH_HEADER` is set, that header's value is the username. An unknown username falls back to JWT auth, with nothing logged.
 - `authRateLimiter` allows 10 failed attempts per IP per 15 minutes (successful requests don't count). Login, `/forgot-password/init` and `/forgot-password/reset` share that one budget.
 - `accountLockout` locks a username for 15 minutes after 5 failures and answers 423 with Retry-After. It is an in-memory Map: it resets on restart and isn't shared between processes.

@@ -17,6 +17,7 @@ export type {
   ChangePasswordBody,
   ChangePasswordResponse,
   GetRecoveryKeyResponse,
+  RegenerateRecoveryKeyBody,
   RegenerateRecoveryKeyResponse,
   GetAllUsersResponse,
   CreateUserBody,
@@ -65,4 +66,5 @@ export type {
   AdminRegenerateRecoveryKeyResponse,
   UpdateUserStashInstancesBody,
   CompleteSetupBody,
+  CompleteSetupResponse,
 } from "@peek/shared-types/api/user.js";

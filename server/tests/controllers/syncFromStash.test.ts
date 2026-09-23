@@ -48,6 +48,7 @@ vi.mock("bcryptjs", () => ({
 vi.mock("../../utils/recoveryKey.js", () => ({
   generateRecoveryKey: vi.fn(),
   formatRecoveryKey: vi.fn(),
+  hashRecoveryKey: vi.fn(),
 }));
 
 // Mock passwordValidation

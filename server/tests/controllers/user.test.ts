@@ -6,6 +6,7 @@
  * getAllUsers, createUser, deleteUser, updateUserRole.
  */
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   adminRegenerateRecoveryKey,
@@ -55,6 +56,7 @@ vi.mock("bcryptjs", () => ({
 vi.mock("../../utils/recoveryKey.js", () => ({
   generateRecoveryKey: vi.fn().mockReturnValue("ABCD1234EFGH5678"),
   formatRecoveryKey: vi.fn().mockReturnValue("ABCD-1234-EFGH-5678"),
+  hashRecoveryKey: vi.fn().mockReturnValue("hashed-key"),
 }));
 
 // Mock passwordValidation
@@ -468,9 +470,25 @@ describe("User Controller", () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 2 },
-          data: { password: "hashed-password" },
+          data: {
+            password: "hashed-password",
+            passwordChangedAt: expect.any(Date),
+          },
         })
       );
+      // The current password was just proven, so this session gets a fresh
+      // token and its 30 days restart.
+      expect(res.cookie).toHaveBeenCalledWith(
+        "token",
+        expect.any(String),
+        expect.anything()
+      );
+      const claims = jwt.decode(res.cookie.mock.calls[0][1]) as {
+        id: number;
+        authTime: number;
+      };
+      expect(claims.id).toBe(2);
+      expect(Math.abs(claims.authTime - Date.now() / 1000)).toBeLessThan(5);
     });
   });
 
@@ -492,24 +510,24 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(404);
     });
 
-    it("returns formatted recovery key", async () => {
+    it("reports that a key exists without returning it", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
-        recoveryKey: "ABCD1234EFGH5678",
+        recoveryKeyHash: "a".repeat(64),
       } as any);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
-      expect(res._getBody().recoveryKey).toBe("ABCD-1234-EFGH-5678");
+      expect(res._getBody()).toEqual({ hasRecoveryKey: true });
     });
 
-    it("returns null when no recovery key exists", async () => {
+    it("reports hasRecoveryKey false when no recovery key exists", async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
-        recoveryKey: null,
+        recoveryKeyHash: null,
       } as any);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
-      expect(res._getBody().recoveryKey).toBeNull();
+      expect(res._getBody()).toEqual({ hasRecoveryKey: false });
     });
   });
 
@@ -523,18 +541,46 @@ describe("User Controller", () => {
       expect(res._getStatus()).toBe(401);
     });
 
-    it("generates and returns new formatted key", async () => {
-      mockPrisma.user.update.mockResolvedValue({} as any);
+    it("returns 400 without currentPassword", async () => {
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await regenerateRecoveryKey(req, res);
-      expect(res._getBody().recoveryKey).toBe("ABCD-1234-EFGH-5678");
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 2 },
-          data: { recoveryKey: "ABCD1234EFGH5678" },
-        })
-      );
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody().error).toBe("Current password is required");
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when currentPassword is wrong", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        password: "hashed",
+      } as any);
+      mockBcrypt.compare.mockResolvedValue(false as any);
+      const req = mockReq({ currentPassword: "wrong" }, {}, USER);
+      const res = mockRes();
+      await regenerateRecoveryKey(req, res);
+      // 400, not 401, so the client's apiFetch does not bounce to login
+      expect(res._getStatus()).toBe(400);
+      expect(res._getBody().error).toBe("Current password is incorrect");
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("stores only the hash and returns the formatted key", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 2,
+        password: "hashed",
+      } as any);
+      mockBcrypt.compare.mockResolvedValue(true as any);
+      mockPrisma.user.update.mockResolvedValue({} as any);
+      const req = mockReq({ currentPassword: "OldPass1" }, {}, USER);
+      const res = mockRes();
+      await regenerateRecoveryKey(req, res);
+      expect(mockBcrypt.compare).toHaveBeenCalledWith("OldPass1", "hashed");
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { recoveryKeyHash: "hashed-key" },
+      });
+      expect(res._getBody()).toEqual({ recoveryKey: "ABCD-1234-EFGH-5678" });
     });
   });
 
@@ -592,6 +638,15 @@ describe("User Controller", () => {
       const res = mockRes();
       await adminResetPassword(req, res);
       expect(res._getBody().success).toBe(true);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 3 },
+          data: {
+            password: "hashed-password",
+            passwordChangedAt: expect.any(Date),
+          },
+        })
+      );
     });
   });
 
@@ -620,6 +675,10 @@ describe("User Controller", () => {
       const res = mockRes();
       await adminRegenerateRecoveryKey(req, res);
       expect(res._getBody().recoveryKey).toBe("ABCD-1234-EFGH-5678");
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: { recoveryKeyHash: "hashed-key" },
+      });
     });
   });
 

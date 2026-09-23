@@ -64,15 +64,15 @@ Containers are temporary - when you delete one, everything inside is lost. Volum
 Configuration values passed into the container. Like filling in blanks on a form.
 
 ```
--e JWT_SECRET="abc123"
-      │           │
-      │           └── The value
-      └────────────── The variable name
+-e LOG_LEVEL="DEBUG"
+   │          │
+   │          └── The value
+   └───────────── The variable name
 ```
 
 **Common examples:**
 
-- `JWT_SECRET` - A password for encrypting user sessions
+- `LOG_LEVEL=DEBUG` - More detailed server logs
 - `TZ=America/New_York` - Timezone setting
 - `PUID=1000` - User ID for file permissions
 
@@ -108,7 +108,6 @@ docker run -d \
   --name peek-stash-browser \
   -p 6969:80 \
   -v peek-data:/app/data \
-  -e JWT_SECRET="your-secret-here" \
   --restart unless-stopped \
   carrotwaxr/peek-stash-browser:latest
 ```
@@ -207,7 +206,6 @@ docker run -d \
   --name peek-stash-browser \
   -p 6969:80 \
   -v peek-data:/app/data \
-  -e JWT_SECRET="your-secret-here" \
   --restart unless-stopped \
   carrotwaxr/peek-stash-browser:latest
 ```

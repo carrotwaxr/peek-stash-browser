@@ -150,7 +150,7 @@ Organize your favorite scenes into custom playlists:
 
 - Check container logs: `docker logs peek-stash-browser`
 - Verify database was created in `/app/data`
-- Ensure `JWT_SECRET` is set (or auto-generated)
+- The session secret is generated into `/app/data` on first start; the container stops with a message in the log if that directory is not writable
 
 ### No Scenes Showing
 
