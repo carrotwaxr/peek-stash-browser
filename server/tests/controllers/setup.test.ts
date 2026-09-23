@@ -2,18 +2,18 @@
  * Unit Tests for Setup Controller
  *
  * Tests the setup wizard endpoints (first-time admin creation, instance creation,
- * connection testing, reset) and multi-instance CRUD operations. Focuses on
- * the safety guards that protect public endpoints and destructive operations.
+ * connection testing) and multi-instance CRUD operations. Focuses on the
+ * safety guards that protect public endpoints and destructive operations.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CONNECTION_TEST_FAILED,
   createFirstAdmin,
   createFirstStashInstance,
   createStashInstance,
   deleteStashInstance,
   getAllStashInstances,
   getSetupStatus,
-  resetSetup,
   testStashConnection,
   updateStashInstance,
 } from "../../controllers/setup.js";
@@ -26,7 +26,6 @@ vi.mock("../../prisma/singleton.js", () => ({
     user: {
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
-      deleteMany: vi.fn().mockResolvedValue({}),
     },
     stashInstance: {
       count: vi.fn().mockResolvedValue(0),
@@ -36,7 +35,6 @@ vi.mock("../../prisma/singleton.js", () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      deleteMany: vi.fn().mockResolvedValue({}),
       aggregate: vi.fn().mockResolvedValue({ _max: { priority: null } }),
     },
   },
@@ -169,6 +167,11 @@ describe("Setup Controller", () => {
           }),
         })
       );
+      expect(res.cookie).toHaveBeenCalledWith(
+        "token",
+        expect.any(String),
+        expect.objectContaining({ httpOnly: true })
+      );
     });
 
     it("returns 403 when users already exist", async () => {
@@ -213,7 +216,11 @@ describe("Setup Controller", () => {
     it("returns success for a valid connection", async () => {
       const res = mockRes();
       await testStashConnection(
-        mockReq({ url: "http://stash:9999/graphql", apiKey: "test-key" }),
+        mockReq(
+          { url: "http://stash:9999/graphql", apiKey: "test-key" },
+          {},
+          { role: "ADMIN" }
+        ),
         res
       );
 
@@ -251,7 +258,11 @@ describe("Setup Controller", () => {
 
       const res = mockRes();
       await testStashConnection(
-        mockReq({ url: "http://stash:9999/graphql", apiKey: "test-key" }),
+        mockReq(
+          { url: "http://stash:9999/graphql", apiKey: "test-key" },
+          {},
+          { role: "ADMIN" }
+        ),
         res
       );
 
@@ -273,12 +284,41 @@ describe("Setup Controller", () => {
 
       const res = mockRes();
       await testStashConnection(
-        mockReq({ url: "http://badhost:9999/graphql", apiKey: "test-key" }),
+        mockReq(
+          { url: "http://badhost:9999/graphql", apiKey: "test-key" },
+          {},
+          { role: "ADMIN" }
+        ),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res._getBody().error).toContain("Host not found");
+    });
+
+    it("an anonymous caller gets the generic failure without details", async () => {
+      const { StashClient } = await import("../../graphql/StashClient.js");
+      vi.mocked(StashClient).mockImplementationOnce(
+        () =>
+          ({
+            configuration: vi
+              .fn()
+              .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
+            version: vi.fn(),
+          }) as any
+      );
+
+      const res = mockRes();
+      await testStashConnection(
+        mockReq({ url: "http://badhost:9999/graphql", apiKey: "test-key" }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res._getBody()).toEqual({
+        success: false,
+        error: CONNECTION_TEST_FAILED,
+      });
     });
   });
 
@@ -385,50 +425,6 @@ describe("Setup Controller", () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res._getBody().error).toContain("Invalid UI URL");
       expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("resetSetup", () => {
-    it("resets when confirmation is correct, userCount ≤ 1, and setup is incomplete", async () => {
-      mockPrisma.user.count.mockResolvedValue(1);
-      mockPrisma.stashInstance.count.mockResolvedValue(0);
-
-      const res = mockRes();
-      await resetSetup(mockReq({ confirm: "RESET_SETUP" }), res);
-
-      expect(res._getBody().success).toBe(true);
-      expect(mockPrisma.user.deleteMany).toHaveBeenCalled();
-      expect(mockPrisma.stashInstance.deleteMany).toHaveBeenCalled();
-    });
-
-    it("returns 400 without correct confirmation", async () => {
-      const res = mockRes();
-      await resetSetup(mockReq({ confirm: "wrong" }), res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it("returns 403 when multiple users exist", async () => {
-      mockPrisma.user.count.mockResolvedValue(3);
-      mockPrisma.stashInstance.count.mockResolvedValue(0);
-
-      const res = mockRes();
-      await resetSetup(mockReq({ confirm: "RESET_SETUP" }), res);
-
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res._getBody().error).toContain("multiple users");
-    });
-
-    it("returns 403 when setup is already complete", async () => {
-      mockPrisma.user.count.mockResolvedValue(1);
-      mockPrisma.stashInstance.count.mockResolvedValue(1);
-
-      const res = mockRes();
-      await resetSetup(mockReq({ confirm: "RESET_SETUP" }), res);
-
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res._getBody().error).toContain("fully configured");
     });
   });
 

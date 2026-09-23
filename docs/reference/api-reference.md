@@ -79,7 +79,7 @@ interface CreateFirstAdminResponse {
 
 ### POST /api/setup/test-stash-connection
 
-**Authentication:** None
+**Authentication:** None until an admin or Stash instance exists, then admin
 
 **Request Body:**
 
@@ -97,7 +97,6 @@ interface TestStashConnectionResponse {
   success: boolean;
   message?: string;
   error?: string;
-  details?: string;
 }
 ```
 
@@ -107,7 +106,7 @@ interface TestStashConnectionResponse {
 
 ### POST /api/setup/create-stash-instance
 
-**Authentication:** None
+**Authentication:** None until an admin or Stash instance exists, then admin
 
 **Request Body:**
 
@@ -135,27 +134,6 @@ interface CreateFirstStashInstanceResponse {
 ```
 
 **Controller:** `createFirstStashInstance` in `../controllers/setup.ts`
-
----
-
-### POST /api/setup/reset
-
-**Authentication:** None
-
-**Response:**
-
-```typescript
-interface ResetSetupResponse {
-  success: true;
-  message: string;
-  deleted: {
-  users: number;
-  stashInstances: number;
-};
-}
-```
-
-**Controller:** `resetSetup` in `../controllers/setup.ts`
 
 ---
 

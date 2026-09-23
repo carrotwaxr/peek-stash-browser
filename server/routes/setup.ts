@@ -8,20 +8,30 @@ import {
   getAllStashInstances,
   getSetupStatus,
   getStashInstance,
-  resetSetup,
   testStashConnection,
   updateStashInstance,
 } from "../controllers/setup.js";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { setupRateLimiter } from "../middleware/rateLimiter.js";
+import { requireAdminOnceSetupStarted } from "../middleware/setupGuards.js";
 
 const router = express.Router();
 
-// Public routes (no auth required - needed for initial setup wizard)
+// Setup wizard. Status is public; create-admin is public and rate-limited
+// and only works while there are no users. The Stash routes are public only
+// while there is no user and no instance, and need the admin session after.
 router.get("/status", getSetupStatus);
-router.post("/create-admin", createFirstAdmin);
-router.post("/test-stash-connection", testStashConnection);
-router.post("/create-stash-instance", createFirstStashInstance);
-router.post("/reset", resetSetup);
+router.post("/create-admin", setupRateLimiter, createFirstAdmin);
+router.post(
+  "/test-stash-connection",
+  requireAdminOnceSetupStarted,
+  testStashConnection
+);
+router.post(
+  "/create-stash-instance",
+  requireAdminOnceSetupStarted,
+  createFirstStashInstance
+);
 
 // Protected routes (require authentication)
 router.get("/stash-instance", authenticate, getStashInstance);

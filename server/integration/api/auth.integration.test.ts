@@ -174,19 +174,13 @@ describe("Authentication API Integration Tests", () => {
   });
 
   describe("POST /api/auth/first-time-password", () => {
-    it("should reject when setup is complete", async () => {
-      // Setup is already complete in our test environment
-      const response = await adminClient.post<{ error: string }>(
-        "/api/auth/first-time-password",
-        {
-          username: "admin",
-          newPassword: "new_password",
-        }
-      );
+    it("is gone", async () => {
+      const response = await adminClient.post("/api/auth/first-time-password", {
+        username: "admin",
+        newPassword: "new_password",
+      });
 
-      expect(response.ok).toBe(false);
-      expect(response.status).toBe(403);
-      expect(response.data.error).toContain("Setup is complete");
+      expect(response.status).toBe(404);
     });
   });
 
