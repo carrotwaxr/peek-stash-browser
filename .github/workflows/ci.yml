@@ -101,6 +101,36 @@ jobs:
           DATABASE_URL: file:./test.db
           JWT_SECRET: ci-test-secret
 
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Runtime dependencies only: dev tooling does not ship in the image.
+      - name: Audit server
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit client
+        if: ${{ !cancelled() }}
+        working-directory: client
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit shared
+        if: ${{ !cancelled() }}
+        working-directory: shared
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit root
+        if: ${{ !cancelled() }}
+        run: npm audit --omit=dev --audit-level=high
+
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
