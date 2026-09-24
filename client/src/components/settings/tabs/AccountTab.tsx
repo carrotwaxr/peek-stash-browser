@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { apiPost } from "../../../api";
 import { getRecoveryKey, regenerateRecoveryKey } from "../../../api";
 import { showError, showSuccess } from "../../../utils/toast";
 import { Button } from "../../ui/index";
+
+const COPY_FAILED = "Copy failed: the key is selected, press Ctrl+C";
 
 const AccountTab = () => {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -18,6 +20,7 @@ const AccountTab = () => {
   const [keyPassword, setKeyPassword] = useState("");
   const [creatingKey, setCreatingKey] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
+  const keyRef = useRef<HTMLDivElement>(null);
 
   // Load whether a recovery key exists on mount
   useEffect(() => {
@@ -51,10 +54,32 @@ const AccountTab = () => {
     }
   };
 
-  const copyToClipboard = () => {
+  // Select the key for a manual copy when the clipboard API is missing
+  // (plain HTTP) or refuses the write
+  const selectKeyForManualCopy = () => {
+    const keyElement = keyRef.current;
+    if (keyElement) {
+      window.getSelection()?.selectAllChildren(keyElement);
+    }
+    showError(COPY_FAILED);
+  };
+
+  const copyToClipboard = async () => {
     if (!newKey) return;
-    navigator.clipboard.writeText(newKey);
-    showSuccess("Recovery key copied to clipboard");
+
+    const clipboard = navigator.clipboard;
+    if (!clipboard || typeof clipboard.writeText !== "function") {
+      selectKeyForManualCopy();
+      return;
+    }
+
+    try {
+      await clipboard.writeText(newKey);
+      showSuccess("Recovery key copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy recovery key:", err);
+      selectKeyForManualCopy();
+    }
   };
 
   const changePassword = async (e: React.FormEvent) => {
@@ -252,6 +277,7 @@ const AccountTab = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <div
+                    ref={keyRef}
                     className="flex-1 px-4 py-3 rounded-lg font-mono text-sm break-all"
                     style={{
                       backgroundColor: "var(--bg-secondary)",
@@ -264,7 +290,7 @@ const AccountTab = () => {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={copyToClipboard}
+                    onClick={() => void copyToClipboard()}
                     title="Copy to clipboard"
                     aria-label="Copy recovery key"
                   >
