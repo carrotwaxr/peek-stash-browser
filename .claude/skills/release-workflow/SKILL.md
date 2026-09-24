@@ -64,16 +64,17 @@ Run `/release-stable`:
 
 GitHub Actions (`.github/workflows/docker-build.yml`) triggers on `v*` tags:
 
-1. **Build**: Multi-stage Dockerfile.production (frontend → backend → runtime)
-2. **Platforms**: `linux/amd64` + `linux/arm64`
-3. **Push to Docker Hub**: `carrotwaxr/peek-stash-browser`
-4. **Tag strategy**:
+1. **Smoke**: `image-smoke.yml` builds the image natively on amd64 and arm64, boots each against an empty volume and pushes it by digest.
+2. **Publish**: once both pass, the version, `beta` or `latest`/`stable` tags point at those two digests. Nothing is tagged if either fails.
+3. **Platforms**: `linux/amd64` + `linux/arm64`, each built on its own native runner (no QEMU). If one architecture fails, fix or re-run that job: the other may have left an untagged digest on Docker Hub, and no tag moved.
+4. **Push to Docker Hub**: `carrotwaxr/peek-stash-browser`
+5. **Tag strategy**:
    - Semver: `3.3.2`
    - Major.minor: `3.3`
    - `latest` (stable releases only)
    - `stable` (stable releases only)
    - `beta` (beta releases only)
-5. **GitHub Release**: Auto-created with generated release notes, marked as prerelease if beta
+6. **GitHub Release**: Auto-created with generated release notes, marked as prerelease if the tag has a hyphen
 
 ## Docker Hub Tags After Release
 
@@ -81,6 +82,8 @@ GitHub Actions (`.github/workflows/docker-build.yml`) triggers on `v*` tags:
 |-------------|-------------|
 | `v3.3.2` (stable) | `3.3.2`, `3.3`, `latest`, `stable` |
 | `v3.3.2-beta.1` | `3.3.2-beta.1`, `beta` |
+
+Any tag with a hyphen is a prerelease: it never moves `latest`, `stable` or the major.minor tag, and its GitHub Release is marked prerelease. Only `-beta` tags move `beta`, so a `v3.4.0-rc.1` gets `3.4.0-rc.1` alone.
 
 ## Updating on unRAID
 
