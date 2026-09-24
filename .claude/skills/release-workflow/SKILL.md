@@ -23,17 +23,19 @@ Both `client/package.json` and `server/package.json` must always have identical 
 
 ## Step 1: Pre-Release Validation
 
-Run `/pre-release` to execute all checks:
+Run `/pre-release` to execute all checks; checks 3-8 follow CI's jobs and their steps in order:
 
-1. Server unit tests: `cd server && npm test`
-2. Server linting and type check: `cd server && npm run lint && npm run typecheck`
-3. Client unit tests: `cd client && npm test`
-4. Client linting: `cd client && npm run lint`
-5. Integration tests: `cd server && npm run test:integration`
-6. Client build: `cd client && npm run build`
-7. Docker production build: `docker build -f Dockerfile.production -t peek:test .`
+1. CI on HEAD: `gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json status,conclusion,databaseId` shows one `completed`, `success` run, whose jobs include `Image Smoke Test / amd64` and `/ arm64`
+2. Clean shared types build: `rm -rf shared/dist shared/tsconfig.tsbuildinfo && (cd shared && npm run build)`
+3. Format: `npm run format:check`
+4. Client checks: `(cd client && npm run typecheck && npm run lint && npm run build && npm run test:coverage)`
+5. Server checks: `(cd server && npx prisma generate && npm run lint && npm run typecheck && npm run test:coverage)`; `typecheck` covers the source and the tests
+6. Dependency audit: `npm audit --omit=dev --audit-level=high` in `server`, `client`, `shared` and the root
+7. E2E tests: covered by check 1
+8. Integration tests: `(cd server && npm run test:integration:fresh)`
+9. Docker image: covered by check 1 (CI built and booted it on amd64 and arm64); to debug one locally, `docker build -f Dockerfile.production -t peek:test . && node docker/smoke-test.mjs peek:test`
 
-All 7 checks must pass before proceeding.
+All 9 checks must pass before proceeding.
 
 ## Step 2: Version Bump & Tag
 
