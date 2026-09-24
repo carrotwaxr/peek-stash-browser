@@ -2297,15 +2297,19 @@ export const updateUserRestrictions = async (
       });
     }
 
-    // Replace the stored rows (item 29 makes this atomic)
-    await prisma.userContentRestriction.deleteMany({
-      where: { userId: targetUserId },
-    });
-    if (rows.length > 0) {
-      await prisma.userContentRestriction.createMany({ data: rows });
-    }
+    // Replace the stored rows in one batch transaction, so a failed insert
+    // rolls the delete back and the user keeps their old restrictions. A batch
+    // holds SQLite's write lock for just these two statements.
+    await prisma.$transaction([
+      prisma.userContentRestriction.deleteMany({
+        where: { userId: targetUserId },
+      }),
+      ...(rows.length > 0
+        ? [prisma.userContentRestriction.createMany({ data: rows })]
+        : []),
+    ]);
 
-    // Recompute exclusions for this user after restriction change
+    // Recompute exclusions for this user once the new rows are committed
     await exclusionComputationService.recomputeForUser(targetUserId);
 
     const saved = await prisma.userContentRestriction.findMany({

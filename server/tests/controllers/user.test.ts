@@ -43,6 +43,7 @@ vi.mock("../../prisma/singleton.js", () => ({
       createMany: vi.fn(),
       findMany: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -971,6 +972,8 @@ describe("User Controller", () => {
         count: 1,
       } as any);
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([] as any);
+      mockPrisma.$transaction.mockImplementation(((ops: unknown[]) =>
+        Promise.all(ops)) as any);
       mockExclusions.recomputeForUser.mockResolvedValue(undefined);
     });
 
@@ -1163,6 +1166,56 @@ describe("User Controller", () => {
       });
       expect(res._getBody().success).toBe(true);
       expect(res._getBody().restrictions).toEqual(saved);
+    });
+
+    it("deletes and inserts in one batch transaction, then recomputes", async () => {
+      const deleteOp = { op: "deleteMany" };
+      const createOp = { op: "createMany" };
+      const order: string[] = [];
+      mockPrisma.userContentRestriction.deleteMany.mockReturnValue(
+        deleteOp as any
+      );
+      mockPrisma.userContentRestriction.createMany.mockReturnValue(
+        createOp as any
+      );
+      mockPrisma.$transaction.mockImplementation((async () => {
+        order.push("transaction");
+        return [{ count: 0 }, { count: 1 }];
+      }) as any);
+      mockExclusions.recomputeForUser.mockImplementation(async () => {
+        order.push("recompute");
+      });
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE")] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+
+      expect(res._getStatus()).toBe(200);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      const ops = mockPrisma.$transaction.mock.calls[0][0] as unknown[];
+      expect(ops).toHaveLength(2);
+      expect(ops[0]).toBe(deleteOp);
+      expect(ops[1]).toBe(createOp);
+      expect(order).toEqual(["transaction", "recompute"]);
+    });
+
+    it("500 and no recompute when the transaction fails", async () => {
+      mockPrisma.$transaction.mockRejectedValue(
+        new Error("UNIQUE constraint failed")
+      );
+      const req = mockReq(
+        { restrictions: [tagRule("EXCLUDE")] },
+        { userId: "3" },
+        ADMIN
+      );
+      const res = mockRes();
+      await updateUserRestrictions(req, res);
+
+      expect(res._getStatus()).toBe(500);
+      expect(mockExclusions.recomputeForUser).not.toHaveBeenCalled();
     });
   });
 });
