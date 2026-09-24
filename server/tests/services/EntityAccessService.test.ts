@@ -36,12 +36,12 @@ function call(n = 0): { sql: string; params: unknown[] } {
 describe("EntityAccessService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockQuery.mockResolvedValue([] as never);
+    mockQuery.mockResolvedValue([]);
   });
 
   describe("canUserAccessEntity", () => {
     it("returns true when the access query returns a row", async () => {
-      mockQuery.mockResolvedValueOnce([{ ok: 1 }] as never);
+      mockQuery.mockResolvedValueOnce([{ ok: 1 }]);
       await expect(
         canUserAccessEntity(7, "scene", "42", "inst-a")
       ).resolves.toBe(true);
@@ -158,7 +158,7 @@ describe("EntityAccessService", () => {
       mockQuery.mockResolvedValueOnce([
         { id: "1", instanceId: "A" },
         { id: "2", instanceId: "B" },
-      ] as never);
+      ]);
 
       const keys = await getVisibleEntityKeys(7, "scene", [
         { id: "1", instanceId: "A" },
@@ -173,7 +173,7 @@ describe("EntityAccessService", () => {
 
   describe("resolveAccessibleInstanceId", () => {
     it("uses the request's instance without guessing", async () => {
-      mockQuery.mockResolvedValueOnce([{ ok: 1 }] as never);
+      mockQuery.mockResolvedValueOnce([{ ok: 1 }]);
 
       await expect(
         resolveAccessibleInstanceId(7, "scene", "42", "inst-a")
@@ -187,7 +187,7 @@ describe("EntityAccessService", () => {
     });
 
     it("without a request instance, picks the first instance where the user can see the entity", async () => {
-      mockQuery.mockResolvedValueOnce([{ instanceId: "inst-b" }] as never);
+      mockQuery.mockResolvedValueOnce([{ instanceId: "inst-b" }]);
 
       await expect(
         resolveAccessibleInstanceId(7, "scene", "42", undefined)
@@ -220,7 +220,7 @@ describe("EntityAccessService", () => {
     });
 
     it("sends the ids as one deduplicated JSON parameter, probing the primary key", async () => {
-      mockQuery.mockResolvedValueOnce([{ id: "1" }] as never);
+      mockQuery.mockResolvedValueOnce([{ id: "1" }]);
 
       const ids = await getIdsVisibleOnAnyInstance(7, "tag", ["1", "2", "1"]);
 
@@ -286,7 +286,7 @@ describe("EntityAccessService", () => {
         { id: "1", requested: "A", instanceId: "A" },
         { id: "2", requested: "", instanceId: "B" },
         { id: "3", requested: "A", instanceId: null },
-      ] as never);
+      ]);
 
       const resolved = await resolveVisibleApartFromOwnHides(7, "scene", [
         { id: "1", instanceId: "A" },
@@ -305,7 +305,7 @@ describe("EntityAccessService", () => {
 
   describe("keepVisibleConditions", () => {
     it("keeps the conditions whose ref is visible, in order", async () => {
-      mockQuery.mockResolvedValueOnce([{ id: "2", instanceId: "B" }] as never);
+      mockQuery.mockResolvedValueOnce([{ id: "2", instanceId: "B" }]);
 
       const kept = await keepVisibleConditions(7, "tag", [
         { id: "1", stashInstanceId: "A" },

@@ -13,6 +13,7 @@ import {
   getEntityInstanceIds,
 } from "../../utils/entityInstanceId.js";
 import { must } from "../helpers/must.js";
+import { malformedRow, partialRow } from "../helpers/prismaMock.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetAllConfigs } = vi.hoisted(() => ({
@@ -89,9 +90,7 @@ describe("entityInstanceId", () => {
     it.each(entityTypeMocks)(
       "returns correct instanceId for a %s",
       async (entityType, getMock) => {
-        getMock().findMany.mockResolvedValue([
-          { stashInstanceId: "aaa-111" },
-        ] as any);
+        getMock().findMany.mockResolvedValue([{ stashInstanceId: "aaa-111" }]);
 
         const result = await getEntityInstanceId(entityType as any, "42");
         expect(result).toBe("aaa-111");
@@ -125,9 +124,9 @@ describe("entityInstanceId", () => {
 
     it("warns when entity exists in multiple instances and uses first by ID order", async () => {
       mockPrisma.stashPerformer.findMany.mockResolvedValue([
-        { stashInstanceId: "aaa-111" },
-        { stashInstanceId: "bbb-222" },
-      ] as any);
+        partialRow({ stashInstanceId: "aaa-111" }),
+        partialRow({ stashInstanceId: "bbb-222" }),
+      ]);
       const { logger } = await import("../../utils/logger.js");
 
       const result = await getEntityInstanceId("performer", "10");
@@ -145,8 +144,8 @@ describe("entityInstanceId", () => {
 
     it("queries with deterministic ordering by stashInstanceId", async () => {
       mockPrisma.stashScene.findMany.mockResolvedValue([
-        { stashInstanceId: "aaa-111" },
-      ] as any);
+        partialRow({ stashInstanceId: "aaa-111" }),
+      ]);
 
       await getEntityInstanceId("scene", "42");
 
@@ -159,8 +158,8 @@ describe("entityInstanceId", () => {
 
     it("falls back when entity has null stashInstanceId", async () => {
       mockPrisma.stashScene.findMany.mockResolvedValue([
-        { stashInstanceId: null },
-      ] as any);
+        malformedRow({ stashInstanceId: null }),
+      ]);
       const { logger } = await import("../../utils/logger.js");
 
       const result = await getEntityInstanceId("scene", "42");
@@ -197,9 +196,9 @@ describe("entityInstanceId", () => {
 
     it("returns correct mapping for multiple entities", async () => {
       mockPrisma.stashScene.findMany.mockResolvedValue([
-        { id: "1", stashInstanceId: "aaa-111" },
-        { id: "2", stashInstanceId: "bbb-222" },
-      ] as any);
+        partialRow({ id: "1", stashInstanceId: "aaa-111" }),
+        partialRow({ id: "2", stashInstanceId: "bbb-222" }),
+      ]);
 
       const result = await getEntityInstanceIds("scene", ["1", "2"]);
 
@@ -209,8 +208,8 @@ describe("entityInstanceId", () => {
 
     it("uses fallback for entities not found in database", async () => {
       mockPrisma.stashScene.findMany.mockResolvedValue([
-        { id: "1", stashInstanceId: "aaa-111" },
-      ] as any);
+        partialRow({ id: "1", stashInstanceId: "aaa-111" }),
+      ]);
       const { logger } = await import("../../utils/logger.js");
 
       const result = await getEntityInstanceIds("scene", ["1", "missing-id"]);
@@ -237,9 +236,9 @@ describe("entityInstanceId", () => {
 
     it("handles batch lookup for performers", async () => {
       mockPrisma.stashPerformer.findMany.mockResolvedValue([
-        { id: "p1", stashInstanceId: "aaa-111" },
-        { id: "p2", stashInstanceId: "bbb-222" },
-      ] as any);
+        partialRow({ id: "p1", stashInstanceId: "aaa-111" }),
+        partialRow({ id: "p2", stashInstanceId: "bbb-222" }),
+      ]);
 
       const result = await getEntityInstanceIds("performer", ["p1", "p2"]);
 
@@ -263,8 +262,8 @@ describe("entityInstanceId", () => {
         vi.clearAllMocks();
         mockGetAllConfigs.mockReturnValue([INSTANCE_A]);
         mock.findMany.mockResolvedValue([
-          { id: "1", stashInstanceId: "aaa-111" },
-        ] as any);
+          partialRow({ id: "1", stashInstanceId: "aaa-111" }),
+        ]);
 
         const result = await getEntityInstanceIds(type, ["1"]);
         expect(result.get("1")).toBe("aaa-111");
@@ -274,9 +273,9 @@ describe("entityInstanceId", () => {
 
     it("warns about entities that exist in multiple instances", async () => {
       mockPrisma.stashPerformer.findMany.mockResolvedValue([
-        { id: "p1", stashInstanceId: "aaa-111" },
-        { id: "p1", stashInstanceId: "bbb-222" },
-      ] as any);
+        partialRow({ id: "p1", stashInstanceId: "aaa-111" }),
+        partialRow({ id: "p1", stashInstanceId: "bbb-222" }),
+      ]);
       const { logger } = await import("../../utils/logger.js");
 
       await getEntityInstanceIds("performer", ["p1"]);
@@ -293,9 +292,9 @@ describe("entityInstanceId", () => {
 
     it("skips entities with null stashInstanceId in batch results", async () => {
       mockPrisma.stashScene.findMany.mockResolvedValue([
-        { id: "1", stashInstanceId: "aaa-111" },
-        { id: "2", stashInstanceId: null },
-      ] as any);
+        partialRow({ id: "1", stashInstanceId: "aaa-111" }),
+        malformedRow({ id: "2", stashInstanceId: null }),
+      ]);
 
       const result = await getEntityInstanceIds("scene", ["1", "2"]);
 
@@ -306,9 +305,9 @@ describe("entityInstanceId", () => {
 
     it("skips null stashInstanceId entities in duplicate detection", async () => {
       mockPrisma.stashPerformer.findMany.mockResolvedValue([
-        { id: "p1", stashInstanceId: null },
-        { id: "p1", stashInstanceId: "aaa-111" },
-      ] as any);
+        malformedRow({ id: "p1", stashInstanceId: null }),
+        partialRow({ id: "p1", stashInstanceId: "aaa-111" }),
+      ]);
       const { logger } = await import("../../utils/logger.js");
 
       const result = await getEntityInstanceIds("performer", ["p1"]);

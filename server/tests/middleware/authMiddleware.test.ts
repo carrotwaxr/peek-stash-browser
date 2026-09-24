@@ -6,6 +6,7 @@
  * Covers proxy auth flow, JWT token validation, token refresh, role checks,
  * and cache readiness.
  */
+import type { User } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import fs from "fs";
 import jwt from "jsonwebtoken";
@@ -29,6 +30,7 @@ import {
 import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
 import { logger } from "../../utils/logger.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -57,7 +59,8 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockEntityService = vi.mocked(stashEntityService);
 
-const MOCK_USER = {
+/** The fields the middleware's user lookup selects. */
+const MOCK_USER: User = partialRow({
   id: 1,
   username: "testuser",
   role: "USER",
@@ -70,9 +73,9 @@ const MOCK_USER = {
   landingPagePreference: null,
   setupCompleted: true,
   passwordChangedAt: null,
-};
+});
 
-const MOCK_ADMIN = {
+const MOCK_ADMIN: User = {
   ...MOCK_USER,
   id: 2,
   username: "admin",
@@ -145,7 +148,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -167,7 +170,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ header: headerFn } as any);
       const { res } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -230,7 +233,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: {}, header: headerFn } as any);
       const { res, cookieFn } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -257,7 +260,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res, cookieFn } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -282,7 +285,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res, cookieFn } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -317,7 +320,7 @@ describe("Auth Middleware", () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         ...MOCK_USER,
         passwordChangedAt: new Date(),
-      } as any);
+      });
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -337,7 +340,7 @@ describe("Auth Middleware", () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         ...MOCK_USER,
         passwordChangedAt: new Date(iat * 1000 + 999),
-      } as any);
+      });
 
       await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -349,7 +352,7 @@ describe("Auth Middleware", () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         ...MOCK_USER,
         passwordChangedAt,
-      } as any);
+      });
 
       // Token path
       const tokenReq = createMockReq({ cookies: { token: signToken({}) } });
@@ -389,7 +392,7 @@ describe("Auth Middleware", () => {
         const req = createMockReq({ cookies: { token } });
         const { res, statusFn } = createMockRes();
 
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
         await authenticateToken(req as Request, res as Response, nextFn);
 
@@ -429,7 +432,7 @@ describe("Auth Middleware", () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(T);
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
     });
 
     afterEach(() => {
@@ -496,7 +499,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ header: headerFn } as any);
       const { res } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticate(req as Request, res as Response, nextFn);
 
@@ -571,7 +574,7 @@ describe("Auth Middleware", () => {
 
       it("honours the header from an address in PROXY_AUTH_TRUSTED_IPS", async () => {
         process.env.PROXY_AUTH_TRUSTED_IPS = "10.0.0.5, 192.168.1.0/24";
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
         const req = proxyReq("testuser", "192.168.1.5");
         const { res } = createMockRes();
 
@@ -586,7 +589,7 @@ describe("Auth Middleware", () => {
 
       it("ignores the header from any other address and falls back to cookie auth", async () => {
         process.env.PROXY_AUTH_TRUSTED_IPS = "192.168.1.0/24";
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
         for (let i = 0; i < 3; i++) {
           const req = proxyReq("testuser", "10.0.0.9");
@@ -617,7 +620,7 @@ describe("Auth Middleware", () => {
       });
 
       it("honours the header from any address when PROXY_AUTH_TRUSTED_IPS is unset", async () => {
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
         const req = proxyReq("testuser", "203.0.113.7", "172.18.0.3");
         const { res } = createMockRes();
 
@@ -629,7 +632,7 @@ describe("Auth Middleware", () => {
 
       it("honours the header from no address when PROXY_AUTH_TRUSTED_IPS has an invalid entry", async () => {
         process.env.PROXY_AUTH_TRUSTED_IPS = "192.168.1.0/24, nope";
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
         const req = proxyReq("testuser", "192.168.1.5");
         const { res, statusFn } = createMockRes();
 
@@ -674,7 +677,7 @@ describe("Auth Middleware", () => {
       });
 
       it("logs the first header sign-in per user at info, with the peer address", async () => {
-        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
         for (let i = 0; i < 2; i++) {
           const { res } = createMockRes();
@@ -719,7 +722,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res } = createMockRes();
 
-      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+      mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
       await authenticate(req as Request, res as Response, nextFn);
 

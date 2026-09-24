@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock stashInstanceManager to provide a default instance for entityInstanceId lookups
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -95,19 +96,21 @@ describe("MergeReconciliationService", () => {
 
   describe("findPhashMatches", () => {
     it("should find scenes with matching phash", async () => {
-      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue({
-        phash: "abc123",
-        phashes: null,
-      } as never);
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
+        partialRow({
+          phash: "abc123",
+          phashes: null,
+        })
+      );
 
       vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        {
+        partialRow({
           id: "scene-2",
           title: "Match Scene",
           phash: "abc123",
           stashUpdatedAt: new Date(),
-        },
-      ] as never);
+        }),
+      ]);
 
       const result =
         await mergeReconciliationService.findPhashMatches("scene-1");
@@ -119,10 +122,12 @@ describe("MergeReconciliationService", () => {
     });
 
     it("should return empty array if scene has no phash", async () => {
-      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue({
-        phash: null,
-        phashes: null,
-      } as never);
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
+        partialRow({
+          phash: null,
+          phashes: null,
+        })
+      );
 
       const result =
         await mergeReconciliationService.findPhashMatches("scene-1");
@@ -134,25 +139,29 @@ describe("MergeReconciliationService", () => {
   describe("transferUserData", () => {
     it("should transfer watch history to target without existing data", async () => {
       vi.mocked(prisma.watchHistory.findUnique)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "source",
-          playCount: 5,
-          playDuration: 1000,
-          oCount: 2,
-          oHistory: "[]",
-          playHistory: "[]",
-          resumeTime: 100,
-          lastPlayedAt: new Date(),
-        } as never)
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "source",
+            playCount: 5,
+            playDuration: 1000,
+            oCount: 2,
+            oHistory: "[]",
+            playHistory: "[]",
+            resumeTime: 100,
+            lastPlayedAt: new Date(),
+          })
+        )
         .mockResolvedValueOnce(null); // No target history
 
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.watchHistory.create).mockResolvedValue({} as never);
+      vi.mocked(prisma.watchHistory.create).mockResolvedValue(partialRow({}));
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
-        id: "mr-1",
-      } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue(
+        partialRow({
+          id: "mr-1",
+        })
+      );
 
       const result = await mergeReconciliationService.transferUserData(
         "source",
@@ -178,35 +187,41 @@ describe("MergeReconciliationService", () => {
 
     it("should merge watch history with existing target data", async () => {
       vi.mocked(prisma.watchHistory.findUnique)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "source",
-          playCount: 5,
-          playDuration: 1000,
-          oCount: 2,
-          oHistory: '["2025-01-01"]',
-          playHistory: "[]",
-          resumeTime: 100,
-          lastPlayedAt: new Date("2025-01-01"),
-        } as never)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "target",
-          playCount: 3,
-          playDuration: 500,
-          oCount: 1,
-          oHistory: '["2025-01-02"]',
-          playHistory: "[]",
-          resumeTime: 200,
-          lastPlayedAt: new Date("2025-01-02"),
-        } as never);
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "source",
+            playCount: 5,
+            playDuration: 1000,
+            oCount: 2,
+            oHistory: '["2025-01-01"]',
+            playHistory: "[]",
+            resumeTime: 100,
+            lastPlayedAt: new Date("2025-01-01"),
+          })
+        )
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "target",
+            playCount: 3,
+            playDuration: 500,
+            oCount: 1,
+            oHistory: '["2025-01-02"]',
+            playHistory: "[]",
+            resumeTime: 200,
+            lastPlayedAt: new Date("2025-01-02"),
+          })
+        );
 
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.watchHistory.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.watchHistory.update).mockResolvedValue(partialRow({}));
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
-        id: "mr-1",
-      } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue(
+        partialRow({
+          id: "mr-1",
+        })
+      );
 
       const result = await mergeReconciliationService.transferUserData(
         "source",
@@ -233,35 +248,41 @@ describe("MergeReconciliationService", () => {
       const update = vi.mocked(prisma.watchHistory.update);
       const create = vi.mocked(prisma.watchHistory.create);
       findUnique
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "source",
-          playCount: 1,
-          playDuration: 100,
-          oCount: 1,
-          // Written by the old updates: a JSON-encoded string
-          oHistory: '["2025-01-01T00:00:00.000Z"]',
-          playHistory: ["2025-01-03T00:00:00.000Z"],
-          resumeTime: 10,
-          lastPlayedAt: new Date("2025-01-03"),
-        } as never)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "target",
-          playCount: 1,
-          playDuration: 50,
-          oCount: 1,
-          oHistory: ["2025-01-02T00:00:00.000Z"],
-          playHistory: "[]",
-          resumeTime: 20,
-          lastPlayedAt: new Date("2025-01-02"),
-        } as never);
-      update.mockResolvedValue({} as never);
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "source",
+            playCount: 1,
+            playDuration: 100,
+            oCount: 1,
+            // Written by the old updates: a JSON-encoded string
+            oHistory: '["2025-01-01T00:00:00.000Z"]',
+            playHistory: ["2025-01-03T00:00:00.000Z"],
+            resumeTime: 10,
+            lastPlayedAt: new Date("2025-01-03"),
+          })
+        )
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "target",
+            playCount: 1,
+            playDuration: 50,
+            oCount: 1,
+            oHistory: ["2025-01-02T00:00:00.000Z"],
+            playHistory: "[]",
+            resumeTime: 20,
+            lastPlayedAt: new Date("2025-01-02"),
+          })
+        );
+      update.mockResolvedValue(partialRow({}));
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
-        id: "mr-1",
-      } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue(
+        partialRow({
+          id: "mr-1",
+        })
+      );
 
       // Count the watch-history calls made while the transaction callback runs
       let inTransaction = { finds: 0, writes: 0 };
@@ -307,24 +328,30 @@ describe("MergeReconciliationService", () => {
     it("should use OR logic for favorites", async () => {
       vi.mocked(prisma.watchHistory.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.sceneRating.findUnique)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "source",
-          rating: 80,
-          favorite: true,
-        } as never)
-        .mockResolvedValueOnce({
-          userId: 1,
-          sceneId: "target",
-          rating: 90,
-          favorite: false,
-        } as never);
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "source",
+            rating: 80,
+            favorite: true,
+          })
+        )
+        .mockResolvedValueOnce(
+          partialRow({
+            userId: 1,
+            sceneId: "target",
+            rating: 90,
+            favorite: false,
+          })
+        );
 
-      vi.mocked(prisma.sceneRating.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.sceneRating.update).mockResolvedValue(partialRow({}));
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
-        id: "mr-1",
-      } as never);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue(
+        partialRow({
+          id: "mr-1",
+        })
+      );
 
       await mergeReconciliationService.transferUserData(
         "source",

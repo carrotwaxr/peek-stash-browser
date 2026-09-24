@@ -25,7 +25,9 @@ import {
   formatRecoveryKey,
   generateRecoveryKey,
 } from "../../utils/recoveryKey.js";
+import { userRow } from "../helpers/fixtures.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -80,15 +82,17 @@ describe("auth routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.user.update.mockResolvedValue({} as any);
+    mockPrisma.user.update.mockResolvedValue(userRow());
   });
 
   describe("POST /forgot-password/reset", () => {
     it("forgot-password/reset accepts the key by its hash and stamps passwordChangedAt", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 7,
-        recoveryKeyHash: KEY_HASH,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 7,
+          recoveryKeyHash: KEY_HASH,
+        })
+      );
 
       const res = await post("/forgot-password/reset", {
         username: "alice",
@@ -107,10 +111,12 @@ describe("auth routes", () => {
     });
 
     it("forgot-password/reset rejects the stored hash used as a key", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 7,
-        recoveryKeyHash: KEY_HASH,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 7,
+          recoveryKeyHash: KEY_HASH,
+        })
+      );
 
       const res = await post("/forgot-password/reset", {
         username: "alice",
@@ -125,10 +131,12 @@ describe("auth routes", () => {
 
   describe("POST /forgot-password/init", () => {
     it("forgot-password/init reports hasRecoveryKey from the hash column", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 7,
-        recoveryKeyHash: KEY_HASH,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 7,
+          recoveryKeyHash: KEY_HASH,
+        })
+      );
 
       const res = await post("/forgot-password/init", { username: "alice" });
 
@@ -148,14 +156,16 @@ describe("auth routes", () => {
 
   describe("POST /login", () => {
     beforeEach(() => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 7,
-        username: "alice",
-        password: fixtureHash,
-        role: "USER",
-        landingPagePreference: null,
-        setupCompleted: true,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 7,
+          username: "alice",
+          password: fixtureHash,
+          role: "USER",
+          landingPagePreference: null,
+          setupCompleted: true,
+        })
+      );
     });
 
     it("login no longer writes a recovery key", async () => {

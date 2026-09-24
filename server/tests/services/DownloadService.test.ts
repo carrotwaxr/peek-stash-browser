@@ -5,34 +5,15 @@ import {
   entityRefKey,
   getVisibleEntityKeys,
 } from "../../services/EntityAccessService.js";
+import { type PlaylistWithItems, downloadRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    download: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    stashScene: {
-      findFirst: vi.fn(), // Changed from findUnique for composite primary key
-      findMany: vi.fn(),
-    },
-    stashImage: {
-      findFirst: vi.fn(), // Changed from findUnique for composite primary key
-    },
-    playlist: {
-      findUnique: vi.fn(),
-    },
-    playlistItem: {
-      findMany: vi.fn(),
-    },
-    $queryRawUnsafe: vi.fn(),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../services/EntityAccessService.js", async (importOriginal) => {
   const actual =
@@ -59,25 +40,27 @@ describe("DownloadService", () => {
       };
 
       vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(
-        mockScene as any
+        partialRow(mockScene)
       );
-      vi.mocked(prisma.download.create).mockResolvedValue({
-        id: 1,
-        userId: 1,
-        type: "SCENE",
-        status: "COMPLETED",
-        entityType: "scene",
-        entityId: "scene-123",
-        fileName: "Test Scene.mp4",
-        fileSize: BigInt(1000000),
-        progress: 100,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        playlistId: null,
-        filePath: null,
-        error: null,
-        expiresAt: null,
-      } as any);
+      vi.mocked(prisma.download.create).mockResolvedValue(
+        downloadRow({
+          id: 1,
+          userId: 1,
+          type: "SCENE",
+          status: "COMPLETED",
+          entityType: "scene",
+          entityId: "scene-123",
+          fileName: "Test Scene.mp4",
+          fileSize: BigInt(1000000),
+          progress: 100,
+          createdAt: new Date(),
+          completedAt: new Date(),
+          playlistId: null,
+          filePath: null,
+          error: null,
+          expiresAt: null,
+        })
+      );
 
       const result = await service.createSceneDownload(
         1,
@@ -120,25 +103,27 @@ describe("DownloadService", () => {
       };
 
       vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(
-        mockImage as any
+        partialRow(mockImage)
       );
-      vi.mocked(prisma.download.create).mockResolvedValue({
-        id: 2,
-        userId: 1,
-        type: "IMAGE",
-        status: "COMPLETED",
-        entityType: "image",
-        entityId: "image-123",
-        fileName: "Test Image.jpg",
-        fileSize: BigInt(500000),
-        progress: 100,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        playlistId: null,
-        filePath: null,
-        error: null,
-        expiresAt: null,
-      } as any);
+      vi.mocked(prisma.download.create).mockResolvedValue(
+        downloadRow({
+          id: 2,
+          userId: 1,
+          type: "IMAGE",
+          status: "COMPLETED",
+          entityType: "image",
+          entityId: "image-123",
+          fileName: "Test Image.jpg",
+          fileSize: BigInt(500000),
+          progress: 100,
+          createdAt: new Date(),
+          completedAt: new Date(),
+          playlistId: null,
+          filePath: null,
+          error: null,
+          expiresAt: null,
+        })
+      );
 
       const result = await service.createImageDownload(
         1,
@@ -174,32 +159,32 @@ describe("DownloadService", () => {
 
   describe("createPlaylistDownload", () => {
     it("should create a PENDING download for a playlist", async () => {
-      const mockPlaylist = {
+      const mockPlaylist = partialRow<PlaylistWithItems>({
         id: 1,
         name: "My Playlist",
-        items: [{ sceneId: "s1" }, { sceneId: "s2" }],
-      };
+        items: [partialRow({ sceneId: "s1" }), partialRow({ sceneId: "s2" })],
+      });
 
-      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(
-        mockPlaylist as any
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist);
+      vi.mocked(prisma.download.create).mockResolvedValue(
+        downloadRow({
+          id: 3,
+          userId: 1,
+          type: "PLAYLIST",
+          status: "PENDING",
+          playlistId: 1,
+          entityType: null,
+          entityId: null,
+          fileName: "My Playlist.zip",
+          fileSize: null,
+          progress: 0,
+          createdAt: new Date(),
+          completedAt: null,
+          filePath: null,
+          error: null,
+          expiresAt: null,
+        })
       );
-      vi.mocked(prisma.download.create).mockResolvedValue({
-        id: 3,
-        userId: 1,
-        type: "PLAYLIST",
-        status: "PENDING",
-        playlistId: 1,
-        entityType: null,
-        entityId: null,
-        fileName: "My Playlist.zip",
-        fileSize: null,
-        progress: 0,
-        createdAt: new Date(),
-        completedAt: null,
-        filePath: null,
-        error: null,
-        expiresAt: null,
-      } as any);
 
       const result = await service.createPlaylistDownload(1, 1);
 
@@ -276,11 +261,11 @@ describe("DownloadService", () => {
   describe("getDownloadablePlaylistItems", () => {
     it("keeps the visible items in position order", async () => {
       vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([
-        { sceneId: "s1", instanceId: "inst-b" },
-        { sceneId: "s1", instanceId: "inst-a" },
-        { sceneId: "s2", instanceId: "inst-a" },
-        { sceneId: "s3", instanceId: "inst-a" },
-      ] as never);
+        partialRow({ sceneId: "s1", instanceId: "inst-b" }),
+        partialRow({ sceneId: "s1", instanceId: "inst-a" }),
+        partialRow({ sceneId: "s2", instanceId: "inst-a" }),
+        partialRow({ sceneId: "s3", instanceId: "inst-a" }),
+      ]);
       vi.mocked(getVisibleEntityKeys).mockResolvedValue(
         new Set([
           entityRefKey("s3", "inst-a"),
@@ -312,16 +297,14 @@ describe("DownloadService", () => {
 
   describe("getDownload", () => {
     it("should return download by id", async () => {
-      const mockDownload = {
+      const mockDownload = downloadRow({
         id: 1,
         userId: 1,
         type: "SCENE",
         status: "COMPLETED",
-      };
+      });
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(
-        mockDownload as any
-      );
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload);
 
       const result = await service.getDownload(1);
 
@@ -335,13 +318,11 @@ describe("DownloadService", () => {
   describe("getUserDownloads", () => {
     it("should return downloads for user sorted by createdAt desc", async () => {
       const mockDownloads = [
-        { id: 2, createdAt: new Date("2024-01-02") },
-        { id: 1, createdAt: new Date("2024-01-01") },
+        downloadRow({ id: 2, createdAt: new Date("2024-01-02") }),
+        downloadRow({ id: 1, createdAt: new Date("2024-01-01") }),
       ];
 
-      vi.mocked(prisma.download.findMany).mockResolvedValue(
-        mockDownloads as any
-      );
+      vi.mocked(prisma.download.findMany).mockResolvedValue(mockDownloads);
 
       const result = await service.getUserDownloads(1);
 
@@ -368,13 +349,13 @@ describe("DownloadService", () => {
 
   describe("updateProgress", () => {
     it("should update download progress", async () => {
-      const mockDownload = {
+      const mockDownload = downloadRow({
         id: 1,
         progress: 50,
         status: "PROCESSING",
-      };
+      });
 
-      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload);
 
       const result = await service.updateProgress(1, 50);
 
@@ -393,7 +374,7 @@ describe("DownloadService", () => {
       vi.setSystemTime(now);
 
       const expectedExpiry = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const mockDownload = {
+      const mockDownload = downloadRow({
         id: 1,
         status: "COMPLETED",
         progress: 100,
@@ -401,9 +382,9 @@ describe("DownloadService", () => {
         fileSize: BigInt(5000000),
         completedAt: now,
         expiresAt: expectedExpiry,
-      };
+      });
 
-      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload);
 
       const result = await service.markCompleted(
         1,
@@ -421,13 +402,13 @@ describe("DownloadService", () => {
 
   describe("markFailed", () => {
     it("should mark download as failed with error message", async () => {
-      const mockDownload = {
+      const mockDownload = downloadRow({
         id: 1,
         status: "FAILED",
         error: "Something went wrong",
-      };
+      });
 
-      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.update).mockResolvedValue(mockDownload);
 
       const result = await service.markFailed(1, "Something went wrong");
 
@@ -442,15 +423,10 @@ describe("DownloadService", () => {
 
   describe("deleteDownload", () => {
     it("should delete download if user owns it", async () => {
-      const mockDownload = {
-        id: 1,
-        userId: 1,
-      };
+      const mockDownload = downloadRow({ id: 1, userId: 1 });
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(
-        mockDownload as any
-      );
-      vi.mocked(prisma.download.delete).mockResolvedValue(mockDownload as any);
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload);
+      vi.mocked(prisma.download.delete).mockResolvedValue(mockDownload);
 
       await service.deleteDownload(1, 1);
 
@@ -468,14 +444,12 @@ describe("DownloadService", () => {
     });
 
     it("should throw if user does not own the download", async () => {
-      const mockDownload = {
+      const mockDownload = downloadRow({
         id: 1,
         userId: 2, // Different user
-      };
+      });
 
-      vi.mocked(prisma.download.findUnique).mockResolvedValue(
-        mockDownload as any
-      );
+      vi.mocked(prisma.download.findUnique).mockResolvedValue(mockDownload);
 
       await expect(service.deleteDownload(1, 1)).rejects.toThrow(
         "Not authorized to delete this download"

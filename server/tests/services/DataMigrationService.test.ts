@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -68,7 +69,11 @@ describe("DataMigrationService", () => {
   describe("runPendingMigrations", () => {
     it("does nothing when all migrations are already applied", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
         {
           id: 2,
           name: "002_rebuild_stats_multi_instance",
@@ -84,7 +89,7 @@ describe("DataMigrationService", () => {
           name: "004_recompute_exclusions_reason_precedence",
           appliedAt: new Date(),
         },
-      ] as any);
+      ]);
 
       const { logger } = await import("../../utils/logger.js");
       const service = await importFresh();
@@ -100,12 +105,12 @@ describe("DataMigrationService", () => {
     it("runs pending migration 001 and marks it applied", async () => {
       // No migrations applied yet
       mockPrisma.dataMigration.findMany.mockResolvedValue([]);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
       // Mock 001 dependencies
       mockPrisma.user.findMany.mockResolvedValue([
-        { id: 1, username: "admin" },
-      ] as any);
+        partialRow({ id: 1, username: "admin" }),
+      ]);
       mockStatsService.rebuildAllStatsForUser.mockResolvedValue();
       mockStatsService.rebuildAllStats.mockResolvedValue();
       mockExclusionService.recomputeAllUsers.mockResolvedValue({
@@ -136,9 +141,13 @@ describe("DataMigrationService", () => {
     it("skips already-applied migration and only runs pending ones", async () => {
       // 001 already applied, 002, 003 and 004 pending
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
-      ] as any);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
+      ]);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockStatsService.rebuildAllStats.mockResolvedValue();
       mockExclusionService.recomputeAllUsers.mockResolvedValue({
         success: 0,
@@ -164,7 +173,11 @@ describe("DataMigrationService", () => {
 
     it("recomputes every user's exclusions in migration 003 (item 13)", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
         {
           id: 2,
           name: "002_rebuild_stats_multi_instance",
@@ -175,8 +188,8 @@ describe("DataMigrationService", () => {
           name: "004_recompute_exclusions_reason_precedence",
           appliedAt: new Date(),
         },
-      ] as any);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      ]);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockExclusionService.recomputeAllUsers.mockResolvedValue({
         success: 2,
         failed: 0,
@@ -195,7 +208,11 @@ describe("DataMigrationService", () => {
 
     it("recomputes every user's exclusions in migration 004 (reason precedence)", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
         {
           id: 2,
           name: "002_rebuild_stats_multi_instance",
@@ -206,8 +223,8 @@ describe("DataMigrationService", () => {
           name: "003_recompute_exclusions_restriction_semantics",
           appliedAt: new Date(),
         },
-      ] as any);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      ]);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
       const service = await importFresh();
       await service.runPendingMigrations();
@@ -221,7 +238,11 @@ describe("DataMigrationService", () => {
 
     it("does not mark 004 as applied when the recompute throws", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
         {
           id: 2,
           name: "002_rebuild_stats_multi_instance",
@@ -232,7 +253,7 @@ describe("DataMigrationService", () => {
           name: "003_recompute_exclusions_restriction_semantics",
           appliedAt: new Date(),
         },
-      ] as any);
+      ]);
       mockExclusionService.recomputeAllUsers.mockRejectedValue(
         new Error("recompute failed")
       );
@@ -246,9 +267,13 @@ describe("DataMigrationService", () => {
 
     it("calls rebuildAllStats for migration 002", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
-      ] as any);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
+      ]);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockStatsService.rebuildAllStats.mockResolvedValue();
 
       const service = await importFresh();
@@ -259,12 +284,12 @@ describe("DataMigrationService", () => {
 
     it("calls rebuildAllStatsForUser for each user in migration 001", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([]);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockPrisma.user.findMany.mockResolvedValue([
-        { id: 1, username: "admin" },
-        { id: 2, username: "user1" },
-        { id: 3, username: "user2" },
-      ] as any);
+        partialRow({ id: 1, username: "admin" }),
+        partialRow({ id: 2, username: "user1" }),
+        partialRow({ id: 3, username: "user2" }),
+      ]);
       mockStatsService.rebuildAllStatsForUser.mockResolvedValue();
       mockStatsService.rebuildAllStats.mockResolvedValue();
 
@@ -279,12 +304,12 @@ describe("DataMigrationService", () => {
 
     it("continues with other users if one user's stats rebuild fails in 001", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([]);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
       mockPrisma.user.findMany.mockResolvedValue([
-        { id: 1, username: "admin" },
-        { id: 2, username: "broken_user" },
-        { id: 3, username: "user2" },
-      ] as any);
+        partialRow({ id: 1, username: "admin" }),
+        partialRow({ id: 2, username: "broken_user" }),
+        partialRow({ id: 3, username: "user2" }),
+      ]);
       mockStatsService.rebuildAllStatsForUser
         .mockResolvedValueOnce() // user 1 succeeds
         .mockRejectedValueOnce(new Error("DB error")) // user 2 fails
@@ -304,9 +329,13 @@ describe("DataMigrationService", () => {
 
     it("does not mark 002 as applied when rebuildAllStats throws", async () => {
       mockPrisma.dataMigration.findMany.mockResolvedValue([
-        { id: 1, name: "001_rebuild_user_stats", appliedAt: new Date() },
-      ] as any);
-      mockPrisma.dataMigration.create.mockResolvedValue({} as any);
+        {
+          id: 1,
+          name: "001_rebuild_user_stats",
+          appliedAt: new Date(),
+        },
+      ]);
+      mockPrisma.dataMigration.create.mockResolvedValue(partialRow({}));
 
       mockStatsService.rebuildAllStats.mockRejectedValue(
         new Error("Stats rebuild failed")
@@ -347,7 +376,7 @@ describe("DataMigrationService", () => {
           appliedAt: new Date("2026-02-11"),
         },
       ];
-      mockPrisma.dataMigration.findMany.mockResolvedValue(migrations as any);
+      mockPrisma.dataMigration.findMany.mockResolvedValue(migrations);
 
       const service = await importFresh();
       const result = await service.getAppliedMigrations();

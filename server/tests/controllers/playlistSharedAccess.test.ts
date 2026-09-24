@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addSceneToPlaylist } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
+import { type PlaylistWithItems } from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -93,24 +95,28 @@ describe("addSceneToPlaylist - shared access", () => {
 
     // Playlist exists (owned by user 1)
     mockPrisma.playlist.findFirst.mockResolvedValue(null); // NOT owner
-    mockPrisma.playlist.findUnique.mockResolvedValue({
-      id: 1,
-      userId: 1, // Different user
-      name: "Shared Playlist",
-      items: [],
-    } as any);
+    mockPrisma.playlist.findUnique.mockResolvedValue(
+      partialRow<PlaylistWithItems>({
+        id: 1,
+        userId: 1, // Different user
+        name: "Shared Playlist",
+        items: [],
+      })
+    );
 
     // Scene not already in playlist
     mockPrisma.playlistItem.findUnique.mockResolvedValue(null);
 
     // Create succeeds
-    mockPrisma.playlistItem.create.mockResolvedValue({
-      id: 1,
-      playlistId: 1,
-      sceneId: "scene-123",
-      instanceId: "instance-1",
-      position: 0,
-    } as any);
+    mockPrisma.playlistItem.create.mockResolvedValue(
+      partialRow({
+        id: 1,
+        playlistId: 1,
+        sceneId: "scene-123",
+        instanceId: "instance-1",
+        position: 0,
+      })
+    );
 
     const mockReq = createMockRequest({
       params: { id: "1" },

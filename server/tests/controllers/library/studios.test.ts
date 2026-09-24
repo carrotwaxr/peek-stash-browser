@@ -128,7 +128,7 @@ describe("Studios Controller", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ]);
       mockUserStatsService.getStudioStats.mockResolvedValue(new Map());
 
       const studios = [createMockStudio({ id: "s1", instanceId: "default" })];
@@ -474,7 +474,7 @@ describe("Studios Controller", () => {
         gallery_count: 10,
         performer_count: 25,
         group_count: 5,
-      } as any);
+      });
       mockStashEntityService.getAllStudios.mockResolvedValue([studio]);
 
       const req = mockReq(

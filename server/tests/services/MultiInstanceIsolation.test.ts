@@ -1,4 +1,5 @@
 // server/tests/services/MultiInstanceIsolation.test.ts
+import type { StashPerformer } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
@@ -43,6 +44,48 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
+/** A cached `StashPerformer` row with id "perf1"; override any column. */
+function stashPerformerRow(
+  overrides: Partial<StashPerformer> = {}
+): StashPerformer {
+  return {
+    id: "perf1",
+    stashInstanceId: "inst-a",
+    stashIds: "[]",
+    name: "Performer",
+    disambiguation: null,
+    gender: null,
+    birthdate: null,
+    favorite: false,
+    rating100: null,
+    sceneCount: 0,
+    imageCount: 0,
+    galleryCount: 0,
+    groupCount: 0,
+    details: null,
+    aliasList: "[]",
+    country: null,
+    ethnicity: null,
+    hairColor: null,
+    eyeColor: null,
+    heightCm: null,
+    weightKg: null,
+    measurements: null,
+    fakeTits: null,
+    tattoos: null,
+    piercings: null,
+    careerLength: null,
+    deathDate: null,
+    url: null,
+    imagePath: null,
+    stashCreatedAt: new Date("2024-01-01"),
+    stashUpdatedAt: new Date("2024-01-01"),
+    syncedAt: new Date("2024-01-01"),
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
 const createEmptyPrefs = (): EntityPreferences => ({
   favoritePerformers: new Set(),
   highlyRatedPerformers: new Set(),
@@ -67,46 +110,13 @@ describe("Multi-Instance Isolation", () => {
   describe("StashEntityService.getPerformer with instanceId", () => {
     it("returns the correct performer when same ID exists in two instances", async () => {
       // Instance A has performer "perf1" named "Alice"
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue({
-        id: "perf1",
-        stashInstanceId: "inst-a",
-        name: "Alice",
-        disambiguation: null,
-        url: null,
-        gender: null,
-        birthdate: null,
-        ethnicity: null,
-        country: null,
-        hair_color: null,
-        eye_color: null,
-        height_cm: null,
-        weight: null,
-        measurements: null,
-        fake_tits: null,
-        career_length: null,
-        tattoos: null,
-        piercings: null,
-        alias_list: "[]",
-        details: null,
-        death_date: null,
-        image_path: null,
-        favorite: false,
-        rating100: null,
-        ignore_auto_tag: false,
-        scene_count: 5,
-        image_count: 0,
-        gallery_count: 0,
-        group_count: 0,
-        performer_count: 0,
-        o_counter: 0,
-        tags: undefined,
-        stash_ids: "[]",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
-        deletedAt: null,
-        circumcised: null,
-        penis_length: null,
-      } as any);
+      mockPrisma.stashPerformer.findFirst.mockResolvedValue(
+        stashPerformerRow({
+          stashInstanceId: "inst-a",
+          name: "Alice",
+          sceneCount: 5,
+        })
+      );
       mockPrisma.scenePerformer.count.mockResolvedValue(5);
       mockPrisma.galleryPerformer.count.mockResolvedValue(0);
       mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
@@ -131,46 +141,13 @@ describe("Multi-Instance Isolation", () => {
     });
 
     it("always filters by instanceId when specified (required parameter)", async () => {
-      mockPrisma.stashPerformer.findFirst.mockResolvedValue({
-        id: "perf1",
-        stashInstanceId: "inst-b",
-        name: "Bob",
-        disambiguation: null,
-        url: null,
-        gender: null,
-        birthdate: null,
-        ethnicity: null,
-        country: null,
-        hair_color: null,
-        eye_color: null,
-        height_cm: null,
-        weight: null,
-        measurements: null,
-        fake_tits: null,
-        career_length: null,
-        tattoos: null,
-        piercings: null,
-        alias_list: "[]",
-        details: null,
-        death_date: null,
-        image_path: null,
-        favorite: false,
-        rating100: null,
-        ignore_auto_tag: false,
-        scene_count: 3,
-        image_count: 0,
-        gallery_count: 0,
-        group_count: 0,
-        performer_count: 0,
-        o_counter: 0,
-        tags: undefined,
-        stash_ids: "[]",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
-        deletedAt: null,
-        circumcised: null,
-        penis_length: null,
-      } as any);
+      mockPrisma.stashPerformer.findFirst.mockResolvedValue(
+        stashPerformerRow({
+          stashInstanceId: "inst-b",
+          name: "Bob",
+          sceneCount: 3,
+        })
+      );
       mockPrisma.scenePerformer.count.mockResolvedValue(3);
       mockPrisma.galleryPerformer.count.mockResolvedValue(0);
       mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
@@ -195,9 +172,17 @@ describe("Multi-Instance Isolation", () => {
   describe("Studio name map composite keys", () => {
     it("returns correct names when same studio ID has different names across instances", async () => {
       mockPrisma.stashStudio.findMany.mockResolvedValue([
-        { id: "studio1", stashInstanceId: "inst-a", name: "Studio Alpha" },
-        { id: "studio1", stashInstanceId: "inst-b", name: "Studio Beta" },
-      ] as any);
+        partialRow({
+          id: "studio1",
+          stashInstanceId: "inst-a",
+          name: "Studio Alpha",
+        }),
+        partialRow({
+          id: "studio1",
+          stashInstanceId: "inst-b",
+          name: "Studio Beta",
+        }),
+      ]);
 
       const nameMap = await stashEntityService.getStudioNameMap();
 
@@ -301,7 +286,7 @@ describe("Multi-Instance Isolation", () => {
     beforeEach(() => {
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
       mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
-      mockPrisma.userExcludedEntity.upsert.mockResolvedValue({} as any);
+      mockPrisma.userExcludedEntity.upsert.mockResolvedValue(partialRow({}));
       mockPrisma.$transaction.mockImplementation((async (callback: any) => {
         return callback(mockPrisma);
       }) as any);

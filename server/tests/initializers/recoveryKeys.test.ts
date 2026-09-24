@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hashLegacyRecoveryKeys } from "../../initializers/recoveryKeys.js";
 import prisma from "../../prisma/singleton.js";
 import { hashRecoveryKey } from "../../utils/recoveryKey.js";
+import { userRow } from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -26,10 +28,10 @@ describe("hashLegacyRecoveryKeys", () => {
   it("hashLegacyRecoveryKeys hashes plaintext keys and leaves hashes alone", async () => {
     const legacyKey = "ABCDEFGHJKMNPQRSTUVWXYZ23456";
     mockPrisma.user.findMany.mockResolvedValue([
-      { id: 1, recoveryKey: null, recoveryKeyHash: legacyKey },
-      { id: 2, recoveryKey: null, recoveryKeyHash: "a".repeat(64) },
-    ] as any);
-    mockPrisma.user.update.mockResolvedValue({} as any);
+      partialRow({ id: 1, recoveryKey: null, recoveryKeyHash: legacyKey }),
+      partialRow({ id: 2, recoveryKey: null, recoveryKeyHash: "a".repeat(64) }),
+    ]);
+    mockPrisma.user.update.mockResolvedValue(userRow());
 
     const count = await hashLegacyRecoveryKeys();
 
@@ -46,11 +48,15 @@ describe("hashLegacyRecoveryKeys", () => {
     // sign-in; it is newer than any stored hash, so it wins
     const downgradeKey = "ZYXWVUTSRQPNMKJHGFEDCBA65432";
     mockPrisma.user.findMany.mockResolvedValue([
-      { id: 1, recoveryKey: downgradeKey, recoveryKeyHash: "b".repeat(64) },
-      { id: 2, recoveryKey: downgradeKey, recoveryKeyHash: null },
-      { id: 3, recoveryKey: null, recoveryKeyHash: "c".repeat(64) },
-    ] as any);
-    mockPrisma.user.update.mockResolvedValue({} as any);
+      partialRow({
+        id: 1,
+        recoveryKey: downgradeKey,
+        recoveryKeyHash: "b".repeat(64),
+      }),
+      partialRow({ id: 2, recoveryKey: downgradeKey, recoveryKeyHash: null }),
+      partialRow({ id: 3, recoveryKey: null, recoveryKeyHash: "c".repeat(64) }),
+    ]);
+    mockPrisma.user.update.mockResolvedValue(userRow());
 
     const count = await hashLegacyRecoveryKeys();
 

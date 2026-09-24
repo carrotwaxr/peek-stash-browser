@@ -10,7 +10,9 @@ import { getUserStats } from "../../controllers/userStats.js";
 import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
+import type { UserStatsResponse } from "../../types/api/index.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/UserStatsAggregationService.js", () => ({
@@ -40,12 +42,31 @@ const mockPrisma = vi.mocked(prisma, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
-const SAMPLE_STATS = {
-  totalScenes: 50,
-  totalPlayTime: 3600,
+const SAMPLE_STATS: UserStatsResponse = {
+  library: {
+    sceneCount: 50,
+    performerCount: 0,
+    studioCount: 0,
+    tagCount: 0,
+    galleryCount: 0,
+    imageCount: 0,
+    clipCount: 0,
+  },
+  engagement: {
+    totalWatchTime: 3600,
+    totalPlayCount: 0,
+    totalOCount: 0,
+    totalImagesViewed: 0,
+    uniqueScenesWatched: 0,
+  },
+  topScenes: [],
   topPerformers: [],
   topStudios: [],
   topTags: [],
+  mostWatchedScene: null,
+  mostViewedImage: null,
+  mostOdScene: null,
+  mostOdPerformer: null,
 };
 
 describe("UserStats Controller", () => {
@@ -53,12 +74,14 @@ describe("UserStats Controller", () => {
     vi.clearAllMocks();
 
     // Default: rankings are fresh (updated just now)
-    mockPrisma.userEntityRanking.findFirst.mockResolvedValue({
-      updatedAt: new Date(),
-    } as any);
+    mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+      partialRow({
+        updatedAt: new Date(),
+      })
+    );
 
-    mockRankingService.recomputeAllRankings.mockResolvedValue(undefined as any);
-    mockStatsService.getUserStats.mockResolvedValue(SAMPLE_STATS as any);
+    mockRankingService.recomputeAllRankings.mockResolvedValue(undefined);
+    mockStatsService.getUserStats.mockResolvedValue(SAMPLE_STATS);
   });
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -139,9 +162,11 @@ describe("UserStats Controller", () => {
 
   describe("ranking freshness", () => {
     it("does not recompute when rankings are fresh (< 1 hour old)", async () => {
-      mockPrisma.userEntityRanking.findFirst.mockResolvedValue({
-        updatedAt: new Date(), // just now — fresh
-      } as any);
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+        partialRow({
+          updatedAt: new Date(), // just now — fresh
+        })
+      );
 
       const req = mockReq({}, {}, USER, {});
       const res = mockRes();
@@ -153,9 +178,11 @@ describe("UserStats Controller", () => {
 
     it("recomputes when rankings are stale (> 1 hour old)", async () => {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      mockPrisma.userEntityRanking.findFirst.mockResolvedValue({
-        updatedAt: twoHoursAgo,
-      } as any);
+      mockPrisma.userEntityRanking.findFirst.mockResolvedValue(
+        partialRow({
+          updatedAt: twoHoursAgo,
+        })
+      );
 
       const req = mockReq({}, {}, USER, {});
       const res = mockRes();

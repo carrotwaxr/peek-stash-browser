@@ -155,9 +155,11 @@ describe("UserStatsService", () => {
         studio: null,
         tags: [],
       });
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "resolved-instance",
-      } as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "resolved-instance",
+        })
+      );
 
       await userStatsService.updateStatsForScene(
         1,
@@ -359,12 +361,16 @@ describe("UserStatsService", () => {
 
   describe("rebuildAllStatsForUser", () => {
     beforeEach(() => {
-      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({} as any);
-      mockPrisma.userStudioStats.deleteMany.mockResolvedValue({} as any);
-      mockPrisma.userTagStats.deleteMany.mockResolvedValue({} as any);
-      mockPrisma.userPerformerStats.createMany.mockResolvedValue({} as any);
-      mockPrisma.userStudioStats.createMany.mockResolvedValue({} as any);
-      mockPrisma.userTagStats.createMany.mockResolvedValue({} as any);
+      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue(
+        partialRow({})
+      );
+      mockPrisma.userStudioStats.deleteMany.mockResolvedValue(partialRow({}));
+      mockPrisma.userTagStats.deleteMany.mockResolvedValue(partialRow({}));
+      mockPrisma.userPerformerStats.createMany.mockResolvedValue(
+        partialRow({})
+      );
+      mockPrisma.userStudioStats.createMany.mockResolvedValue(partialRow({}));
+      mockPrisma.userTagStats.createMany.mockResolvedValue(partialRow({}));
     });
 
     it("clears existing stats before rebuilding", async () => {
@@ -387,23 +393,23 @@ describe("UserStatsService", () => {
     it("separates stats by instanceId from watch history", async () => {
       // Two watch history entries from different instances for the same performer
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "instance-a",
           oCount: 2,
           playCount: 3,
           oHistory: "[]",
           playHistory: "[]",
-        },
-        {
+        }),
+        partialRow({
           sceneId: "scene-2",
           instanceId: "instance-b",
           oCount: 1,
           playCount: 1,
           oHistory: "[]",
           playHistory: "[]",
-        },
-      ] as any);
+        }),
+      ]);
 
       // Both scenes have the same performer (same ID, different instances)
       mockGetScenesByIdsWithRelations.mockResolvedValue([
@@ -453,23 +459,23 @@ describe("UserStatsService", () => {
     it("aggregates stats within same instance correctly", async () => {
       // Two watch entries for different scenes but same instance and performer
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "instance-a",
           oCount: 2,
           playCount: 3,
           oHistory: "[]",
           playHistory: "[]",
-        },
-        {
+        }),
+        partialRow({
           sceneId: "scene-2",
           instanceId: "instance-a",
           oCount: 5,
           playCount: 10,
           oHistory: "[]",
           playHistory: "[]",
-        },
-      ] as any);
+        }),
+      ]);
 
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
@@ -505,15 +511,15 @@ describe("UserStatsService", () => {
     it("uses empty string as instanceId when watch history has no instanceId", async () => {
       // Legacy watch history without instanceId
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: null,
           oCount: 1,
           playCount: 2,
           oHistory: "[]",
           playHistory: "[]",
-        },
-      ] as any);
+        }),
+      ]);
 
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
@@ -547,7 +553,7 @@ describe("UserStatsService", () => {
 
     it("tracks lastPlayedAt and lastOAt from play/o history", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "inst-a",
           oCount: 2,
@@ -561,8 +567,8 @@ describe("UserStatsService", () => {
             "2026-01-20T08:00:00Z",
             "2026-02-05T20:00:00Z",
           ]),
-        },
-      ] as any);
+        }),
+      ]);
 
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
@@ -592,15 +598,15 @@ describe("UserStatsService", () => {
 
     it("handles watch history with oHistory/playHistory as arrays (already parsed)", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "inst-a",
           oCount: 1,
           playCount: 1,
           oHistory: ["2026-01-10T12:00:00Z"], // Already an array
           playHistory: ["2026-01-10T12:00:00Z"],
-        },
-      ] as any);
+        }),
+      ]);
 
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
@@ -622,23 +628,23 @@ describe("UserStatsService", () => {
 
     it("skips scenes not found in cache", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "inst-a",
           oCount: 1,
           playCount: 1,
           oHistory: "[]",
           playHistory: "[]",
-        },
-        {
+        }),
+        partialRow({
           sceneId: "scene-deleted",
           instanceId: "inst-a",
           oCount: 5,
           playCount: 10,
           oHistory: "[]",
           playHistory: "[]",
-        },
-      ] as any);
+        }),
+      ]);
 
       // Only scene-1 found in cache, scene-deleted is missing
       mockGetScenesByIdsWithRelations.mockResolvedValue([
@@ -665,23 +671,23 @@ describe("UserStatsService", () => {
 
     it("builds separate studio stats per instance", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           sceneId: "scene-1",
           instanceId: "instance-a",
           oCount: 1,
           playCount: 2,
           oHistory: "[]",
           playHistory: "[]",
-        },
-        {
+        }),
+        partialRow({
           sceneId: "scene-2",
           instanceId: "instance-b",
           oCount: 3,
           playCount: 4,
           oHistory: "[]",
           playHistory: "[]",
-        },
-      ] as any);
+        }),
+      ]);
 
       // Same studio ID from different instances
       mockGetScenesByIdsWithRelations.mockResolvedValue([
@@ -726,17 +732,24 @@ describe("UserStatsService", () => {
 
   describe("rebuildAllStats", () => {
     it("rebuilds stats for all users", async () => {
-      mockPrisma.user.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }] as any);
+      mockPrisma.user.findMany.mockResolvedValue([
+        partialRow({ id: 1 }),
+        partialRow({ id: 2 }),
+      ]);
 
       // Mock the rebuild for each user
-      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({} as any);
-      mockPrisma.userStudioStats.deleteMany.mockResolvedValue({} as any);
-      mockPrisma.userTagStats.deleteMany.mockResolvedValue({} as any);
+      mockPrisma.userPerformerStats.deleteMany.mockResolvedValue(
+        partialRow({})
+      );
+      mockPrisma.userStudioStats.deleteMany.mockResolvedValue(partialRow({}));
+      mockPrisma.userTagStats.deleteMany.mockResolvedValue(partialRow({}));
       mockPrisma.watchHistory.findMany.mockResolvedValue([]);
       mockGetScenesByIdsWithRelations.mockResolvedValue([]);
-      mockPrisma.userPerformerStats.createMany.mockResolvedValue({} as any);
-      mockPrisma.userStudioStats.createMany.mockResolvedValue({} as any);
-      mockPrisma.userTagStats.createMany.mockResolvedValue({} as any);
+      mockPrisma.userPerformerStats.createMany.mockResolvedValue(
+        partialRow({})
+      );
+      mockPrisma.userStudioStats.createMany.mockResolvedValue(partialRow({}));
+      mockPrisma.userTagStats.createMany.mockResolvedValue(partialRow({}));
 
       await userStatsService.rebuildAllStats();
 
@@ -750,23 +763,23 @@ describe("UserStatsService", () => {
   describe("getPerformerStats", () => {
     it("returns Map of performer stats for a user", async () => {
       mockPrisma.userPerformerStats.findMany.mockResolvedValue([
-        {
+        partialRow({
           performerId: "perf-1",
           instanceId: "inst-a",
           oCounter: 5,
           playCount: 10,
           lastPlayedAt: new Date("2026-02-01"),
           lastOAt: new Date("2026-01-15"),
-        },
-        {
+        }),
+        partialRow({
           performerId: "perf-2",
           instanceId: "inst-a",
           oCounter: 0,
           playCount: 3,
           lastPlayedAt: new Date("2026-01-20"),
           lastOAt: null,
-        },
-      ] as any);
+        }),
+      ]);
 
       const result = await userStatsService.getPerformerStats(1);
 
@@ -815,13 +828,13 @@ describe("UserStatsService", () => {
   describe("getStudioStats", () => {
     it("returns Map of studio stats for a user", async () => {
       mockPrisma.userStudioStats.findMany.mockResolvedValue([
-        {
+        partialRow({
           studioId: "studio-1",
           instanceId: "inst-a",
           oCounter: 2,
           playCount: 5,
-        },
-      ] as any);
+        }),
+      ]);
 
       const result = await userStatsService.getStudioStats(1);
 
@@ -859,9 +872,19 @@ describe("UserStatsService", () => {
   describe("getTagStats", () => {
     it("returns Map of tag stats for a user", async () => {
       mockPrisma.userTagStats.findMany.mockResolvedValue([
-        { tagId: "tag-1", instanceId: "inst-a", oCounter: 3, playCount: 7 },
-        { tagId: "tag-2", instanceId: "inst-a", oCounter: 0, playCount: 1 },
-      ] as any);
+        partialRow({
+          tagId: "tag-1",
+          instanceId: "inst-a",
+          oCounter: 3,
+          playCount: 7,
+        }),
+        partialRow({
+          tagId: "tag-2",
+          instanceId: "inst-a",
+          oCounter: 0,
+          playCount: 1,
+        }),
+      ]);
 
       const result = await userStatsService.getTagStats(1);
 

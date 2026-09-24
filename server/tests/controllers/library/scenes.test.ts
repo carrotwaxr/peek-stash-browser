@@ -29,6 +29,7 @@ import {
   createMockStudio,
   createMockTag,
 } from "../../helpers/mockDataGenerators.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — must precede imports of the module under test
@@ -1455,7 +1456,7 @@ describe("mergeScenesWithUserData", () => {
   it("merges watch history into scenes", async () => {
     const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
     mockPrisma.watchHistory.findMany.mockResolvedValue([
-      {
+      partialRow({
         id: 1,
         userId: 1,
         sceneId: "s1",
@@ -1467,10 +1468,8 @@ describe("mergeScenesWithUserData", () => {
         playHistory: JSON.stringify(["2025-06-01T00:00:00Z"]),
         oHistory: JSON.stringify(["2025-05-01T00:00:00Z"]),
         lastPlayedAt: new Date("2025-06-01"),
-        lastOAt: new Date("2025-05-01"),
-        updatedAt: new Date(),
-      },
-    ] as any);
+      }),
+    ]);
     mockPrisma.sceneRating.findMany.mockResolvedValue([]);
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
     mockPrisma.studioRating.findMany.mockResolvedValue([]);
@@ -1499,7 +1498,7 @@ describe("mergeScenesWithUserData", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ] as any);
+    ]);
     mockPrisma.performerRating.findMany.mockResolvedValue([]);
     mockPrisma.studioRating.findMany.mockResolvedValue([]);
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
@@ -1531,7 +1530,7 @@ describe("mergeScenesWithUserData", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ] as any);
+    ]);
     mockPrisma.studioRating.findMany.mockResolvedValue([]);
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
 
@@ -1557,7 +1556,7 @@ describe("mergeScenesWithUserData", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ] as any);
+    ]);
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
 
     const result = await mergeScenesWithUserData(scenes, 1);
@@ -1584,7 +1583,7 @@ describe("mergeScenesWithUserData", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ] as any);
+    ]);
 
     const result = await mergeScenesWithUserData(scenes, 1);
     expect(result[0]!.tags[0]!.favorite).toBe(true);

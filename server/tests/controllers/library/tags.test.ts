@@ -23,6 +23,7 @@ import { userStatsService } from "../../../services/UserStatsService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -132,7 +133,7 @@ describe("Tags Controller", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ]);
       mockUserStatsService.getTagStats.mockResolvedValue(new Map());
 
       const tags = [createMockTag({ id: "t1", instanceId: "default" })];
@@ -314,12 +315,12 @@ describe("Tags Controller", () => {
 
     it("filters by performers (tags used by matching performers)", async () => {
       mockStashEntityService.getAllPerformers.mockResolvedValue([
-        {
+        partialRow({
           id: "p1",
           name: "Perf 1",
-          tags: [{ id: "t1", name: "Tag1" }],
-        },
-      ] as any);
+          tags: [partialRow({ id: "t1", name: "Tag1" })],
+        }),
+      ]);
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
@@ -331,12 +332,12 @@ describe("Tags Controller", () => {
 
     it("filters by studios (tags directly on matching studios)", async () => {
       mockStashEntityService.getAllStudios.mockResolvedValue([
-        {
+        partialRow({
           id: "s1",
           name: "Studio 1",
-          tags: [{ id: "t2", name: "Tag2" }],
-        },
-      ] as any);
+          tags: [partialRow({ id: "t2", name: "Tag2" })],
+        }),
+      ]);
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
@@ -348,12 +349,12 @@ describe("Tags Controller", () => {
 
     it("filters by scenes_filter.id (tags on matching scenes)", async () => {
       mockStashEntityService.getAllScenes.mockResolvedValue([
-        {
+        partialRow({
           id: "sc1",
-          tags: [{ id: "t1", name: "Tag1" }],
+          tags: [partialRow({ id: "t1", name: "Tag1" })],
           performers: [],
-        },
-      ] as any);
+        }),
+      ]);
       mockStashEntityService.getAllPerformers.mockResolvedValue([]);
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
@@ -371,13 +372,13 @@ describe("Tags Controller", () => {
 
     it("filters by scenes_filter.groups (tags on scenes in those groups)", async () => {
       mockStashEntityService.getAllScenes.mockResolvedValue([
-        {
+        partialRow({
           id: "sc1",
-          tags: [{ id: "t1", name: "Tag1" }],
+          tags: [partialRow({ id: "t1", name: "Tag1" })],
           performers: [],
-          groups: [{ id: "g1" }],
-        },
-      ] as any);
+          groups: [partialRow({ id: "g1" })],
+        }),
+      ]);
       mockStashEntityService.getAllPerformers.mockResolvedValue([]);
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
@@ -493,7 +494,7 @@ describe("Tags Controller", () => {
         studio_count: 2,
         group_count: 1,
         scene_marker_count: 7,
-      } as any);
+      });
       mockStashEntityService.getAllTags.mockResolvedValue([tag]);
 
       const req = mockReq(

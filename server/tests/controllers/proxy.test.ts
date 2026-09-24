@@ -15,7 +15,9 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { stashInstanceRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // =============================================================================
 // Mocks (must be before imports)
@@ -138,12 +140,12 @@ function setupHttpGetSuccess(headers: Record<string, string> = {}) {
 }
 
 function restoreDefaults() {
-  mockInstanceManager.get.mockReturnValue({ id: "inst-a" } as any);
+  mockInstanceManager.get.mockReturnValue(partialRow({}));
   mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
   mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
-  mockInstanceManager.getDefaultConfig.mockReturnValue({
-    id: "inst-default",
-  } as any);
+  mockInstanceManager.getDefaultConfig.mockReturnValue(
+    stashInstanceRow({ id: "inst-default" })
+  );
   mockCanUserAccessEntity.mockResolvedValue(true);
 }
 
@@ -330,7 +332,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 500 when instance credentials fail", async () => {
-      mockInstanceManager.get.mockReturnValue(undefined as any);
+      mockInstanceManager.get.mockReturnValue(undefined);
       mockInstanceManager.getBaseUrl.mockImplementation(() => {
         throw new Error("Stash instance not found: bad-id");
       });
@@ -510,9 +512,11 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "inst-a",
+        })
+      );
       mockCanUserAccessEntity.mockResolvedValue(false);
       setupHttpGetSuccess();
 
@@ -532,10 +536,12 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 500 when instance credentials fail", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "bad-instance",
-      } as any);
-      mockInstanceManager.get.mockReturnValue(undefined as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "bad-instance",
+        })
+      );
+      mockInstanceManager.get.mockReturnValue(undefined);
       mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
         if (id === "bad-instance") throw new Error("Stash instance not found");
         return "http://stash:9999";
@@ -553,9 +559,11 @@ describe("Proxy Controller", () => {
     });
 
     it("constructs correct Stash URL with preview path", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({ params: { id: "42" } });
@@ -638,9 +646,11 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "inst-a",
+        })
+      );
       mockCanUserAccessEntity.mockResolvedValue(false);
       setupHttpGetSuccess();
 
@@ -660,9 +670,11 @@ describe("Proxy Controller", () => {
     });
 
     it("constructs correct Stash URL with webp path", async () => {
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({ params: { id: "7" } });
@@ -743,11 +755,13 @@ describe("Proxy Controller", () => {
     });
 
     it("checks the clip with canUserAccessEntity(userId, 'clip', id, instanceId)", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue({
-        streamPath: "http://stash:9999/scene/1/scene_marker/429/stream",
-        screenshotPath: null,
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashClip.findFirst.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash:9999/scene/1/scene_marker/429/stream",
+          screenshotPath: null,
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({ params: { id: "429" } });
@@ -770,11 +784,13 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when clip has no media path (both streamPath and screenshotPath null)", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue({
-        streamPath: null,
-        screenshotPath: null,
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashClip.findFirst.mockResolvedValue(
+        partialRow({
+          streamPath: null,
+          screenshotPath: null,
+          stashInstanceId: "inst-a",
+        })
+      );
 
       const req = createMockReq({ params: { id: "1" } });
       const res = createMockRes();
@@ -788,11 +804,13 @@ describe("Proxy Controller", () => {
     });
 
     it("uses streamPath when available", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue({
-        streamPath: "http://stash:9999/scene/1/stream?start=10&end=30",
-        screenshotPath: "http://stash:9999/scene/1/screenshot?t=10",
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashClip.findFirst.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash:9999/scene/1/stream?start=10&end=30",
+          screenshotPath: "http://stash:9999/scene/1/screenshot?t=10",
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({ params: { id: "1" } });
@@ -809,11 +827,13 @@ describe("Proxy Controller", () => {
     });
 
     it("falls back to screenshotPath when streamPath is null", async () => {
-      mockPrisma.stashClip.findFirst.mockResolvedValue({
-        streamPath: null,
-        screenshotPath: "http://stash:9999/scene/1/screenshot",
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashClip.findFirst.mockResolvedValue(
+        partialRow({
+          streamPath: null,
+          screenshotPath: "http://stash:9999/scene/1/screenshot",
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({ params: { id: "2" } });
@@ -917,12 +937,14 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when canUserAccessEntity is false", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: "/image/1/thumbnail",
-        pathPreview: null,
-        pathImage: null,
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "/image/1/thumbnail",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "inst-a",
+        })
+      );
       mockCanUserAccessEntity.mockResolvedValue(false);
       setupHttpGetSuccess();
 
@@ -944,12 +966,14 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 404 when image path for type is null", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: null,
-        pathPreview: "/some/path",
-        pathImage: "/some/path",
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: null,
+          pathPreview: "/some/path",
+          pathImage: "/some/path",
+          stashInstanceId: "inst-a",
+        })
+      );
 
       const req = createMockReq({
         params: { imageId: "1", type: "thumbnail" },
@@ -965,12 +989,14 @@ describe("Proxy Controller", () => {
     });
 
     it("handles full URL paths (starting with http)", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: "http://stash:9999/image/1/thumbnail",
-        pathPreview: null,
-        pathImage: null,
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "http://stash:9999/image/1/thumbnail",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({
@@ -989,12 +1015,14 @@ describe("Proxy Controller", () => {
     });
 
     it("handles relative paths (prepends stashUrl)", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: null,
-        pathPreview: "/image/2/preview",
-        pathImage: null,
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: null,
+          pathPreview: "/image/2/preview",
+          pathImage: null,
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({
@@ -1013,12 +1041,14 @@ describe("Proxy Controller", () => {
     });
 
     it("handles full https URL paths", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: null,
-        pathPreview: null,
-        pathImage: "https://stash-cdn.example.com/image/3/full",
-        stashInstanceId: "inst-a",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: null,
+          pathPreview: null,
+          pathImage: "https://stash-cdn.example.com/image/3/full",
+          stashInstanceId: "inst-a",
+        })
+      );
       setupHttpGetSuccess();
 
       const req = createMockReq({
@@ -1074,7 +1104,7 @@ describe("Proxy Controller", () => {
       for (const { type, expectedPath } of typeMappings) {
         vi.clearAllMocks();
         restoreDefaults();
-        mockPrisma.stashImage.findFirst.mockResolvedValue(pathData as any);
+        mockPrisma.stashImage.findFirst.mockResolvedValue(partialRow(pathData));
         setupHttpGetSuccess();
 
         const req = createMockReq({
@@ -1093,12 +1123,14 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 500 when instance credentials fail", async () => {
-      mockPrisma.stashImage.findFirst.mockResolvedValue({
-        pathThumbnail: "/thumb",
-        pathPreview: null,
-        pathImage: null,
-        stashInstanceId: "bad-instance",
-      } as any);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "/thumb",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "bad-instance",
+        })
+      );
       mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
         if (id === "bad-instance") throw new Error("Stash instance not found");
         return "http://stash:9999";

@@ -145,7 +145,7 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
       createdAt: new Date(),
       completedAt: new Date(),
       expiresAt: null,
-    } as never);
+    });
 
     const res = await fetch(`${peekUrl}/api/downloads/7/file`);
 
@@ -174,7 +174,7 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
       createdAt: new Date(),
       completedAt: new Date(),
       expiresAt: null,
-    } as never);
+    });
 
     const res = await fetch(`${peekUrl}/api/downloads/8/file`);
 

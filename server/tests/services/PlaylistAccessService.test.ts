@@ -10,6 +10,11 @@ import {
   getPlaylistAccess,
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
+import {
+  type MembershipWithGroup,
+  type PlaylistShareWithGroup,
+} from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -33,22 +38,30 @@ describe("PlaylistAccessService", () => {
     });
 
     it("returns 'owner' when user owns the playlist", async () => {
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        userId: 1,
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({
+          userId: 1,
+        })
+      );
 
       const result = await getPlaylistAccess(1, 1);
       expect(result.level).toBe("owner");
     });
 
     it("returns 'shared' with group names when shared via group", async () => {
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        userId: 2, // Different user
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({
+          userId: 2, // Different user
+        })
+      );
       mockPrisma.playlistShare.findMany.mockResolvedValue([
-        { group: { name: "Family" } },
-        { group: { name: "Friends" } },
-      ] as any);
+        partialRow<PlaylistShareWithGroup>({
+          group: partialRow({ name: "Family" }),
+        }),
+        partialRow<PlaylistShareWithGroup>({
+          group: partialRow({ name: "Friends" }),
+        }),
+      ]);
 
       const result = await getPlaylistAccess(1, 1);
       expect(result.level).toBe("shared");
@@ -58,9 +71,11 @@ describe("PlaylistAccessService", () => {
     });
 
     it("returns 'none' when user does not own and has no shared access", async () => {
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        userId: 2, // Different user
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({
+          userId: 2, // Different user
+        })
+      );
       mockPrisma.playlistShare.findMany.mockResolvedValue([]);
 
       const result = await getPlaylistAccess(1, 1);
@@ -68,9 +83,11 @@ describe("PlaylistAccessService", () => {
     });
 
     it("does not check shares when user is owner", async () => {
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        userId: 5,
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow({
+          userId: 5,
+        })
+      );
 
       const result = await getPlaylistAccess(1, 5);
       expect(result.level).toBe("owner");
@@ -82,9 +99,13 @@ describe("PlaylistAccessService", () => {
   describe("getUserGroups", () => {
     it("returns groups the user belongs to", async () => {
       mockPrisma.userGroupMembership.findMany.mockResolvedValue([
-        { group: { id: 1, name: "Family" } },
-        { group: { id: 2, name: "Friends" } },
-      ] as any);
+        partialRow<MembershipWithGroup>({
+          group: partialRow({ id: 1, name: "Family" }),
+        }),
+        partialRow<MembershipWithGroup>({
+          group: partialRow({ id: 2, name: "Friends" }),
+        }),
+      ]);
 
       const result = await getUserGroups(1);
       expect(result).toEqual([

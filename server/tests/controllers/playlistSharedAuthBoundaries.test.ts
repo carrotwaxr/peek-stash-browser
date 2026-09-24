@@ -20,6 +20,7 @@ import {
   updatePlaylist,
 } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -157,8 +158,8 @@ describe("Shared playlist authorization boundaries", () => {
 
     it("allows owner to remove a scene (control test)", async () => {
       // Owner's findFirst returns the playlist
-      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST as any);
-      mockPrisma.playlistItem.delete.mockResolvedValue({} as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
+      mockPrisma.playlistItem.delete.mockResolvedValue(partialRow({}));
 
       const mockReq = createMockRequest({
         params: { id: "1", sceneId: "scene-123" },
@@ -322,8 +323,8 @@ describe("Shared playlist authorization boundaries", () => {
     });
 
     it("allows owner to delete (control test)", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST as any);
-      mockPrisma.playlist.delete.mockResolvedValue(SHARED_PLAYLIST as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(SHARED_PLAYLIST);
+      mockPrisma.playlist.delete.mockResolvedValue(SHARED_PLAYLIST);
 
       const mockReq = createMockRequest({
         params: { id: "1" },

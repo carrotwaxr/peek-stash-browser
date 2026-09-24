@@ -18,7 +18,9 @@ import {
   isStreamLinkSignatureValid,
 } from "../../utils/streamLink.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import { stashInstanceRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks (must come before imports)
@@ -104,29 +106,30 @@ function createMockRes() {
 
 function makeFetchResponse(
   body: string,
-  options: {
-    ok?: boolean;
-    status?: number;
-    contentType?: string;
-    cacheControl?: string;
-  } = {}
-) {
-  const {
-    ok = true,
-    status = 200,
-    contentType = "application/vnd.apple.mpegurl",
-    cacheControl,
-  } = options;
+  options: { contentType?: string; cacheControl?: string } = {}
+): Response {
+  const { contentType = "application/vnd.apple.mpegurl", cacheControl } =
+    options;
   const headers = new Headers({ "content-type": contentType });
   if (cacheControl) headers.set("cache-control", cacheControl);
-  return {
-    ok,
-    status,
-    statusText: ok ? "OK" : "Error",
-    headers,
-    text: vi.fn().mockResolvedValue(body),
-    body: new ReadableStream(),
-  };
+  return new Response(body, { status: 200, statusText: "OK", headers });
+}
+
+/** The URL of the first fetch to Stash; the controller passes a string. */
+function fetchedUrl(): string {
+  const url = must(vi.mocked(global.fetch).mock.calls[0], "a fetch call")[0];
+  if (typeof url !== "string") throw new Error("expected a string URL");
+  return url;
+}
+
+/** The headers of the first fetch to Stash; the controller passes an object. */
+function fetchedHeaders(): Record<string, string> {
+  const init = must(vi.mocked(global.fetch).mock.calls[0], "a fetch call")[1];
+  const headers = init?.headers;
+  if (!headers || Array.isArray(headers) || headers instanceof Headers) {
+    throw new Error("expected fetch headers as a plain object");
+  }
+  return headers;
 }
 
 /** Non-tag lines of a rewritten playlist, as [streamPath, subPath] pairs. */
@@ -143,9 +146,7 @@ function proxiedPaths(playlist: string): Array<[string, string | undefined]> {
 
 /** The playlist proxyStashStream sends for an upstream HLS body. */
 async function rewrittenPlaylist(upstream: string): Promise<string> {
-  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-    makeFetchResponse(upstream)
-  );
+  vi.mocked(global.fetch).mockResolvedValue(makeFetchResponse(upstream));
   const res = createMockRes();
   await proxyStashStream(createMockReq(), res);
   return res.send.mock.calls[0][0];
@@ -169,12 +170,12 @@ describe("Video Controller", () => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
     // Default: instance exists
-    mockInstanceManager.get.mockReturnValue({} as any);
+    mockInstanceManager.get.mockReturnValue(partialRow({}));
     mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
     mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
-    mockInstanceManager.getDefaultConfig.mockReturnValue({
-      id: "inst-default",
-    } as any);
+    mockInstanceManager.getDefaultConfig.mockReturnValue(
+      stashInstanceRow({ id: "inst-default" })
+    );
     mockCanUserAccessEntity.mockResolvedValue(true);
   });
 
@@ -201,7 +202,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -229,7 +230,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -253,7 +254,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -281,7 +282,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -308,7 +309,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -326,7 +327,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("#EXTM3U\n")
         );
 
@@ -352,7 +353,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -383,7 +384,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(hlsContent)
         );
 
@@ -539,7 +540,7 @@ describe("Video Controller", () => {
           "  </Period>",
           "</MPD>",
         ].join("\n");
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(mpd, {
             contentType: "application/dash+xml",
             cacheControl: "public, max-age=60",
@@ -574,7 +575,7 @@ describe("Video Controller", () => {
           '<S c="c.webm?x=1&apikey=K5"/>',
           "<U>d.webm?ApiKey=K6&x=1</U>",
         ].join("\n");
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(mpd, { contentType: "application/dash+xml" })
         );
         const res = createMockRes();
@@ -592,7 +593,7 @@ describe("Video Controller", () => {
       });
 
       it("refuses a DASH manifest that still names apikey after stripping", async () => {
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse(
             "<MPD><BaseURL>/x?path=%2Fy%3Fapikey%3DSECRET</BaseURL></MPD>",
             { contentType: "application/dash+xml" }
@@ -613,7 +614,7 @@ describe("Video Controller", () => {
     it("never forwards Range on a manifest request", async () => {
       for (const streamPath of ["stream.m3u8", "stream.mpd"]) {
         vi.mocked(global.fetch).mockClear();
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("#EXTM3U\n")
         );
 
@@ -626,10 +627,7 @@ describe("Video Controller", () => {
           createMockRes()
         );
 
-        const fetchCall = must(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-        );
-        expect(fetchCall[1].headers, streamPath).not.toHaveProperty("Range");
+        expect(fetchedHeaders(), streamPath).not.toHaveProperty("Range");
       }
     });
 
@@ -647,7 +645,7 @@ describe("Video Controller", () => {
         const fetchResp = makeFetchResponse("binary data", {
           contentType: "video/mp4",
         });
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(fetchResp);
+        vi.mocked(global.fetch).mockResolvedValue(fetchResp);
 
         await proxyStashStream(req, res);
 
@@ -675,16 +673,13 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", { contentType: "video/mp4" })
         );
 
         await proxyStashStream(req, res);
 
-        const fetchCall = must(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-        );
-        expect(fetchCall[1].headers).toEqual(
+        expect(fetchedHeaders()).toEqual(
           expect.objectContaining({ Range: "bytes=0-1024" })
         );
       });
@@ -777,7 +772,7 @@ describe("Video Controller", () => {
           query: {},
           url: "/api/scene/123/proxy-stream/stream.m3u8",
         });
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("#EXTM3U\n")
         );
 
@@ -798,15 +793,13 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", { contentType: "video/mp4" })
         );
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = must(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-        )[0];
+        const stashUrl = fetchedUrl();
         expect(stashUrl).toBe(
           "http://stash:9999/scene/123/stream.mp4?resolution=LOW&start=12.5"
         );
@@ -814,7 +807,7 @@ describe("Video Controller", () => {
 
       it("sets private Cache-Control on direct streams and on HLS playlists", async () => {
         // HLS playlist
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("#EXTM3U\n", { cacheControl: "public, max-age=60" })
         );
         const hlsRes = createMockRes();
@@ -825,7 +818,7 @@ describe("Video Controller", () => {
         );
 
         // Direct stream with an upstream public value
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", {
             contentType: "video/mp4",
             cacheControl: "public, max-age=60",
@@ -853,7 +846,7 @@ describe("Video Controller", () => {
     // -----------------------------------------------------------------------
     describe("error handling", () => {
       it("returns 500 when instance not found", async () => {
-        mockInstanceManager.get.mockReturnValue(undefined as any);
+        mockInstanceManager.get.mockReturnValue(undefined);
         mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
           if (id === "bad-inst")
             throw new Error("Stash instance not found: bad-inst");
@@ -876,12 +869,9 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-          ok: false,
-          status: 404,
-          statusText: "Not Found",
-          headers: new Headers(),
-        });
+        vi.mocked(global.fetch).mockResolvedValue(
+          new Response(null, { status: 404, statusText: "Not Found" })
+        );
 
         await proxyStashStream(req, res);
 
@@ -897,12 +887,9 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-          ok: false,
-          status: 404,
-          statusText: "Not Found",
-          headers: new Headers(),
-        });
+        vi.mocked(global.fetch).mockResolvedValue(
+          new Response(null, { status: 404, statusText: "Not Found" })
+        );
 
         await proxyStashStream(req, res);
 
@@ -915,9 +902,7 @@ describe("Video Controller", () => {
         const req = createMockReq();
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("Network failure")
-        );
+        vi.mocked(global.fetch).mockRejectedValue(new Error("Network failure"));
 
         await proxyStashStream(req, res);
 
@@ -930,9 +915,7 @@ describe("Video Controller", () => {
         const res = createMockRes();
         res.headersSent = true;
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("Network failure")
-        );
+        vi.mocked(global.fetch).mockRejectedValue(new Error("Network failure"));
 
         await proxyStashStream(req, res);
 
@@ -953,15 +936,13 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", { contentType: "video/mp4" })
         );
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = must(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-        )[0];
+        const stashUrl = fetchedUrl();
         expect(stashUrl).not.toContain("instanceId");
         expect(stashUrl).toContain("resolution=FULL_HD");
       });
@@ -977,15 +958,13 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", { contentType: "video/mp2t" })
         );
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = must(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-        )[0];
+        const stashUrl = fetchedUrl();
         expect(stashUrl).toBe("http://stash:9999/scene/123/stream.m3u8/0.ts");
       });
 
@@ -996,7 +975,7 @@ describe("Video Controller", () => {
         });
         const res = createMockRes();
 
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        vi.mocked(global.fetch).mockResolvedValue(
           makeFetchResponse("", { contentType: "video/mp4" })
         );
 
@@ -1011,12 +990,8 @@ describe("Video Controller", () => {
   // getCaption
   // =========================================================================
   describe("getCaption", () => {
-    function captionResponse(body = "WEBVTT\n\n") {
-      return {
-        ok: true,
-        text: vi.fn().mockResolvedValue(body),
-        headers: new Headers(),
-      };
+    function captionResponse(body = "WEBVTT\n\n"): Response {
+      return new Response(body);
     }
 
     it("returns 400 when lang is missing", async () => {
@@ -1111,15 +1086,13 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      vi.mocked(global.fetch).mockResolvedValue(
         captionResponse("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello")
       );
 
       await getCaption(req, res);
 
-      const fetchUrl: string = must(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-      )[0];
+      const fetchUrl = fetchedUrl();
       expect(fetchUrl).toBe(
         "http://stash:9999/scene/456/caption?lang=en&type=srt"
       );
@@ -1132,9 +1105,7 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        captionResponse()
-      );
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
 
       await getCaption(req, res);
 
@@ -1158,15 +1129,11 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        captionResponse()
-      );
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
 
       await getCaption(req, res);
 
-      const fetchUrl: string = must(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-      )[0];
+      const fetchUrl = fetchedUrl();
       const url = new URL(fetchUrl);
       expect(url.pathname).toBe("/scene/456/caption");
       expect([...url.searchParams.entries()]).toEqual([
@@ -1182,9 +1149,7 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        captionResponse()
-      );
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
 
       await getCaption(req, res);
 
@@ -1201,9 +1166,7 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        captionResponse()
-      );
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
 
       await getCaption(req, res);
 
@@ -1220,11 +1183,9 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: false,
-        status: 404,
-        headers: new Headers(),
-      });
+      vi.mocked(global.fetch).mockResolvedValue(
+        new Response(null, { status: 404 })
+      );
 
       await getCaption(req, res);
 
@@ -1239,20 +1200,14 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        captionResponse()
-      );
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
 
       await getCaption(req, res);
 
-      const fetchCall = must(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-      );
-      const fetchUrl: string = fetchCall[0];
-      const fetchOptions = fetchCall[1];
+      const fetchUrl = fetchedUrl();
 
       // API key must be in the header
-      expect(fetchOptions.headers).toEqual(
+      expect(fetchedHeaders()).toEqual(
         expect.objectContaining({ ApiKey: "test-api-key" })
       );
       // API key must NOT be in the URL
@@ -1261,7 +1216,7 @@ describe("Video Controller", () => {
     });
 
     it("returns 500 when instance not found", async () => {
-      mockInstanceManager.get.mockReturnValue(undefined as any);
+      mockInstanceManager.get.mockReturnValue(undefined);
 
       const req = createMockReq({
         params: { sceneId: "123" },
@@ -1286,9 +1241,11 @@ describe("Video Controller", () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW);
-      mockPrisma.user.findUnique.mockResolvedValue({
-        passwordChangedAt: PASSWORD_CHANGED_AT,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          passwordChangedAt: PASSWORD_CHANGED_AT,
+        })
+      );
     });
 
     afterEach(() => {
@@ -1341,9 +1298,11 @@ describe("Video Controller", () => {
     });
 
     it("signs passwordChangedAt as 0 for a user who never changed it", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        passwordChangedAt: null,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          passwordChangedAt: null,
+        })
+      );
       const req = createMockReq({
         params: { sceneId: "123" },
         query: {},
@@ -1432,20 +1391,16 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      vi.mocked(global.fetch).mockResolvedValue(
         makeFetchResponse("", { contentType: "video/mp4" })
       );
 
       await proxyStashStream(req, res);
 
-      const fetchCall = must(
-        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-      );
-      const fetchUrl: string = fetchCall[0];
-      const fetchOptions = fetchCall[1];
+      const fetchUrl = fetchedUrl();
 
       // API key sent in header
-      expect(fetchOptions.headers.ApiKey).toBe("test-api-key");
+      expect(fetchedHeaders().ApiKey).toBe("test-api-key");
       // API key NOT in the URL
       expect(fetchUrl).not.toContain("test-api-key");
       expect(fetchUrl).not.toMatch(/apikey/i);
@@ -1466,9 +1421,7 @@ describe("Video Controller", () => {
       const req = createMockReq();
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        makeFetchResponse(hlsContent)
-      );
+      vi.mocked(global.fetch).mockResolvedValue(makeFetchResponse(hlsContent));
 
       await proxyStashStream(req, res);
 

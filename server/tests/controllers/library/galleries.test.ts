@@ -367,7 +367,7 @@ describe("Galleries Controller", () => {
       mockStashEntityService.getGallery.mockResolvedValue({
         ...gallery,
         image_count: 42,
-      } as any);
+      });
 
       const req = mockReq(
         { ids: ["g1"], filter: {}, gallery_filter: {} },

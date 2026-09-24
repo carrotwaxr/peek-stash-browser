@@ -5,6 +5,7 @@
  * connection testing) and multi-instance CRUD operations. Focuses on the
  * safety guards that protect public endpoints and destructive operations.
  */
+import type { StashInstance } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CONNECTION_TEST_FAILED,
@@ -81,7 +82,7 @@ describe("Setup Controller", () => {
     mockPrisma.stashInstance.count.mockResolvedValue(0);
     mockPrisma.stashInstance.findMany.mockResolvedValue([]);
     mockPrisma.stashInstance.aggregate.mockResolvedValue(
-      partialRow({ _max: partialRow({ priority: null }) })
+      partialRow({ _max: { priority: null } })
     );
   });
 
@@ -138,12 +139,14 @@ describe("Setup Controller", () => {
   describe("createFirstAdmin", () => {
     it("creates admin user when no users exist", async () => {
       mockPrisma.user.count.mockResolvedValue(0);
-      mockPrisma.user.create.mockResolvedValue({
-        id: 1,
-        username: "admin",
-        role: "ADMIN",
-        createdAt: new Date(),
-      } as any);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          username: "admin",
+          role: "ADMIN",
+          createdAt: new Date(),
+        })
+      );
 
       const res = mockRes();
       await createFirstAdmin(
@@ -341,14 +344,16 @@ describe("Setup Controller", () => {
   describe("createFirstStashInstance", () => {
     it("creates instance when none exist", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
-      mockPrisma.stashInstance.create.mockResolvedValue({
-        id: "inst-1",
-        name: "Default",
-        url: "http://stash:9999/graphql",
-        uiUrl: "https://stash.example.com",
-        enabled: true,
-        createdAt: new Date(),
-      } as any);
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        partialRow({
+          id: "inst-1",
+          name: "Default",
+          url: "http://stash:9999/graphql",
+          uiUrl: "https://stash.example.com",
+          enabled: true,
+          createdAt: new Date(),
+        })
+      );
 
       const res = mockRes();
       await createFirstStashInstance(
@@ -400,14 +405,16 @@ describe("Setup Controller", () => {
 
     it("uses 'Default' name when none provided", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
-      mockPrisma.stashInstance.create.mockResolvedValue({
-        id: "inst-1",
-        name: "Default",
-        url: "http://stash:9999/graphql",
-        uiUrl: null,
-        enabled: true,
-        createdAt: new Date(),
-      } as any);
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        partialRow({
+          id: "inst-1",
+          name: "Default",
+          url: "http://stash:9999/graphql",
+          uiUrl: null,
+          enabled: true,
+          createdAt: new Date(),
+        })
+      );
 
       const res = mockRes();
       await createFirstStashInstance(
@@ -446,11 +453,11 @@ describe("Setup Controller", () => {
 
   describe("getAllStashInstances", () => {
     it("returns instances ordered by priority", async () => {
-      const instances = [
-        { id: "a", name: "Primary", priority: 0 },
-        { id: "b", name: "Secondary", priority: 1 },
+      const instances: StashInstance[] = [
+        partialRow({ id: "a", name: "Primary", priority: 0 }),
+        partialRow({ id: "b", name: "Secondary", priority: 1 }),
       ];
-      mockPrisma.stashInstance.findMany.mockResolvedValue(instances as any);
+      mockPrisma.stashInstance.findMany.mockResolvedValue(instances);
 
       const res = mockRes();
       await getAllStashInstances(mockReq(), res);
@@ -466,10 +473,12 @@ describe("Setup Controller", () => {
 
   describe("deleteStashInstance", () => {
     it("deletes an instance that is not the last enabled", async () => {
-      mockPrisma.stashInstance.findUnique.mockResolvedValue({
-        id: "inst-b",
-        name: "Secondary",
-      } as any);
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-b",
+          name: "Secondary",
+        })
+      );
       mockPrisma.stashInstance.count.mockResolvedValue(2);
 
       const res = mockRes();
@@ -491,14 +500,18 @@ describe("Setup Controller", () => {
     });
 
     it("returns 400 when trying to delete the last enabled instance", async () => {
-      mockPrisma.stashInstance.findUnique.mockResolvedValue({
-        id: "inst-a",
-        name: "Primary",
-      } as any);
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Primary",
+        })
+      );
       mockPrisma.stashInstance.count.mockResolvedValue(1);
-      mockPrisma.stashInstance.findFirst.mockResolvedValue({
-        id: "inst-a",
-      } as any);
+      mockPrisma.stashInstance.findFirst.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+        })
+      );
 
       const res = mockRes();
       await deleteStashInstance(mockReq({}, { id: "inst-a" }), res);
@@ -511,22 +524,26 @@ describe("Setup Controller", () => {
 
   describe("updateStashInstance", () => {
     it("updates instance fields", async () => {
-      mockPrisma.stashInstance.findUnique.mockResolvedValue({
-        id: "inst-a",
-        name: "Old Name",
-        url: "http://stash:9999/graphql",
-        apiKey: "old-key",
-        enabled: true,
-      } as any);
-      mockPrisma.stashInstance.update.mockResolvedValue({
-        id: "inst-a",
-        name: "New Name",
-        url: "http://stash:9999/graphql",
-        enabled: true,
-        priority: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "Old Name",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          name: "New Name",
+          url: "http://stash:9999/graphql",
+          enabled: true,
+          priority: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      );
 
       const res = mockRes();
       await updateStashInstance(
