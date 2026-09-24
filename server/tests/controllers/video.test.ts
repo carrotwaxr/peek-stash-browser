@@ -141,6 +141,25 @@ function proxiedPaths(playlist: string): Array<[string, string | undefined]> {
     });
 }
 
+/** The playlist proxyStashStream sends for an upstream HLS body. */
+async function rewrittenPlaylist(upstream: string): Promise<string> {
+  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+    makeFetchResponse(upstream)
+  );
+  const res = createMockRes();
+  await proxyStashStream(createMockReq(), res);
+  return res.send.mock.calls[0][0];
+}
+
+/** A request for the scene's DASH manifest. */
+function createMpdReq(overrides = {}) {
+  return createMockReq({
+    params: { sceneId: "123", streamPath: "stream.mpd" },
+    url: "/api/scene/123/proxy-stream/stream.mpd?resolution=LOW&instanceId=inst-a",
+    ...overrides,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Test suites
 // ---------------------------------------------------------------------------
@@ -378,6 +397,239 @@ describe("Video Controller", () => {
           );
         }
       });
+
+      it("never returns a line that fails to parse, even with apikey in it", async () => {
+        const sent = await rewrittenPlaylist(
+          [
+            "#EXTM3U",
+            "#EXTINF:10.0,",
+            "http://[bad/scene/1/stream.m3u8/0.ts?apikey=SECRET",
+            "#EXTINF:10.0,",
+            "http://stash:9999/scene/123/stream.m3u8/1.ts?resolution=LOW",
+          ].join("\n")
+        );
+
+        expect(sent).not.toContain("SECRET");
+        expect(sent).not.toMatch(/apikey/i);
+        // The bad line is dropped; the good one is still rewritten
+        expect(sent.split("\n")).toEqual([
+          "#EXTM3U",
+          "#EXTINF:10.0,",
+          "",
+          "#EXTINF:10.0,",
+          "/api/scene/123/proxy-stream/stream.m3u8/1.ts?resolution=LOW&instanceId=inst-a",
+        ]);
+        expect(logger.warn).toHaveBeenCalled();
+        expect(allLogged()).not.toContain("SECRET");
+      });
+
+      it("rewrites URI attributes in tags and strips the key", async () => {
+        const sent = await rewrittenPlaylist(
+          [
+            "#EXTM3U",
+            '#EXT-X-KEY:METHOD=AES-128,URI="http://stash:9999/scene/123/stream.m3u8/key?apikey=SECRET"',
+            '#EXT-X-MAP:URI="init.mp4?apikey=SECRET"',
+            '#EXT-X-MAP:URI="http://[bad/init.mp4?apikey=SECRET"',
+            "#EXTINF:10.0,",
+            "stream.m3u8/0.ts?resolution=LOW",
+          ].join("\n")
+        );
+
+        expect(sent.split("\n")).toEqual([
+          "#EXTM3U",
+          '#EXT-X-KEY:METHOD=AES-128,URI="/api/scene/123/proxy-stream/stream.m3u8/key?instanceId=inst-a"',
+          '#EXT-X-MAP:URI="/api/scene/123/proxy-stream/init.mp4?instanceId=inst-a"',
+          // A URI that cannot be rewritten drops its whole tag
+          "",
+          "#EXTINF:10.0,",
+          "/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=inst-a",
+        ]);
+        expect(allLogged()).not.toContain("SECRET");
+      });
+
+      it("strips apikey in any casing", async () => {
+        const sent = await rewrittenPlaylist(
+          [
+            "#EXTM3U",
+            "#EXTINF:10.0,",
+            "http://stash:9999/scene/123/stream.m3u8/0.ts?apiKey=SECRET&resolution=LOW",
+            "#EXTINF:10.0,",
+            "/scene/123/stream.m3u8/1.ts?APIKey=SECRET&resolution=LOW",
+            "#EXTINF:10.0,",
+            "stream.m3u8/2.ts?resolution=LOW&aPiKeY=SECRET",
+          ].join("\n")
+        );
+
+        // Stripped, not dropped: every segment line survives
+        const lines = sent.split("\n");
+        for (const [index, segment] of [
+          [2, 0],
+          [4, 1],
+          [6, 2],
+        ] as const) {
+          expect(lines[index]).toBe(
+            `/api/scene/123/proxy-stream/stream.m3u8/${segment}.ts?resolution=LOW&instanceId=inst-a`
+          );
+        }
+        expect(sent).not.toContain("SECRET");
+      });
+
+      it("no output line ever contains apikey", async () => {
+        const hostilePlaylists: string[][] = [
+          // Tags carrying URI attributes
+          [
+            '#EXT-X-SESSION-DATA:DATA-ID="com.stash",URI="http://stash:9999/data.json?apikey=SECRET"',
+            '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="en",URI="audio.m3u8?APIKEY=SECRET"',
+            '#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=1,URI="/scene/1/iframe.m3u8?ApiKey=SECRET"',
+            '#EXT-X-KEY:METHOD=AES-128,URI="http://[bad/key?apikey=SECRET"',
+            '#EXT-X-KEY:METHOD=AES-128,URI="key?resolution=LOW",KEYFORMAT="x?apikey=SECRET"',
+          ],
+          // Tags naming the key outside a URI attribute
+          [
+            '#EXT-X-FOO:BAR="apikey=SECRET"',
+            "#EXT-X-FOO:APIKEY=SECRET",
+            "#apikey SECRET",
+          ],
+          // Segment lines: absolute, path, relative, repeated, encoded, in the path
+          [
+            "http://stash:9999/scene/1/stream.m3u8/0.ts?a=1&aPiKeY=SECRET&b=2",
+            "/scene/1/stream.m3u8/1.ts?apikey=SECRET&APIKEY=SECRET",
+            "stream.m3u8/2.ts?resolution=LOW#apikey=SECRET",
+            "3.ts?apikey%3DSECRET",
+            "/scene/1/apikey=SECRET/4.ts",
+            "http://stash:9999/scene/1/stream.m3u8/5.ts?api%4Bey=SECRET",
+          ],
+          // Malformed lines
+          [
+            "http://[bad/scene/1/stream.m3u8/0.ts?apikey=SECRET",
+            "http://stash:99999/scene/1/stream.m3u8/1.ts?APIKEY=SECRET",
+            "  ?apikey=SECRET",
+            "apikey=SECRET\r",
+          ],
+        ];
+
+        for (const playlist of hostilePlaylists) {
+          const sent = await rewrittenPlaylist(
+            ["#EXTM3U", ...playlist].join("\n")
+          );
+          for (const line of sent.split("\n")) {
+            expect(line, playlist.join(" | ")).not.toMatch(/apikey/i);
+            expect(line, playlist.join(" | ")).not.toContain("SECRET");
+          }
+        }
+        expect(allLogged()).not.toContain("SECRET");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // DASH manifest. Stash echoes apikey into segment templates when the key
+    // arrives as a query parameter; Peek sends it as a header, but the
+    // manifest must never carry it whatever Stash does.
+    // -----------------------------------------------------------------------
+    describe("DASH manifest", () => {
+      it("a DASH manifest never carries apikey", async () => {
+        const mpd = [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">',
+          "  <BaseURL>/scene/1/stream.mpd/?apikey=SECRET</BaseURL>",
+          "  <Period>",
+          '    <AdaptationSet mimeType="video/webm">',
+          '      <SegmentTemplate initialization="init_v.webm?apikey=SECRET&amp;resolution=LOW" media="$Number$_v.webm?resolution=LOW&amp;apikey=SECRET"></SegmentTemplate>',
+          "    </AdaptationSet>",
+          "  </Period>",
+          "</MPD>",
+        ].join("\n");
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse(mpd, {
+            contentType: "application/dash+xml",
+            cacheControl: "public, max-age=60",
+          })
+        );
+        const res = createMockRes();
+
+        await proxyStashStream(createMpdReq(), res);
+
+        const body: string = res.send.mock.calls[0][0];
+        expect(body).not.toContain("SECRET");
+        expect(body).not.toMatch(/apikey/i);
+        expect(body).toContain("<BaseURL>/scene/1/stream.mpd/</BaseURL>");
+        expect(body).toContain('initialization="init_v.webm?resolution=LOW"');
+        expect(body).toContain('media="$Number$_v.webm?resolution=LOW"');
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.setHeader).toHaveBeenCalledWith(
+          "content-type",
+          "application/dash+xml"
+        );
+        expect(res.setHeader).toHaveBeenCalledWith(
+          "cache-control",
+          "private, max-age=60"
+        );
+        expect(mockPipeResponseToClient).not.toHaveBeenCalled();
+      });
+
+      it("strips repeated and middle apikey parameters and keeps the rest of each query", async () => {
+        const mpd = [
+          '<S a="a.webm?x=1&amp;apikey=K1&amp;APIKEY=K2&amp;y=2"/>',
+          '<S b="b.webm?apiKey=K3&amp;apikey=K4&amp;y=2"/>',
+          '<S c="c.webm?x=1&apikey=K5"/>',
+          "<U>d.webm?ApiKey=K6&x=1</U>",
+        ].join("\n");
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse(mpd, { contentType: "application/dash+xml" })
+        );
+        const res = createMockRes();
+
+        await proxyStashStream(createMpdReq(), res);
+
+        expect(res.send.mock.calls[0][0]).toBe(
+          [
+            '<S a="a.webm?x=1&amp;y=2"/>',
+            '<S b="b.webm?y=2"/>',
+            '<S c="c.webm?x=1"/>',
+            "<U>d.webm?x=1</U>",
+          ].join("\n")
+        );
+      });
+
+      it("refuses a DASH manifest that still names apikey after stripping", async () => {
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse(
+            "<MPD><BaseURL>/x?path=%2Fy%3Fapikey%3DSECRET</BaseURL></MPD>",
+            { contentType: "application/dash+xml" }
+          )
+        );
+        const res = createMockRes();
+
+        await proxyStashStream(createMpdReq(), res);
+
+        expect(res.status).toHaveBeenLastCalledWith(502);
+        expect(JSON.stringify(res.send.mock.calls)).not.toContain("SECRET");
+        expect(allLogged()).not.toContain("SECRET");
+      });
+    });
+
+    // A ranged manifest request would let a slice start past "apikey=" and
+    // carry the bare key through every rewrite; Stash honours Range there.
+    it("never forwards Range on a manifest request", async () => {
+      for (const streamPath of ["stream.m3u8", "stream.mpd"]) {
+        vi.mocked(global.fetch).mockClear();
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse("#EXTM3U\n")
+        );
+
+        await proxyStashStream(
+          createMockReq({
+            params: { sceneId: "123", streamPath },
+            url: `/api/scene/123/proxy-stream/${streamPath}?instanceId=inst-a`,
+            headers: { range: "bytes=40-" },
+          }),
+          createMockRes()
+        );
+
+        const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock
+          .calls[0];
+        expect(fetchCall[1].headers, streamPath).not.toHaveProperty("Range");
+      }
     });
 
     // -----------------------------------------------------------------------
