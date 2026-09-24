@@ -26,6 +26,10 @@ export default defineConfig({
     outDir: "dist",
     assetsDir: "assets",
     sourcemap: false,
+    // Never inline fonts into the render-blocking CSS: as separate files the
+    // browser fetches each unicode-range subset only when a page uses it
+    assetsInlineLimit: (filePath) =>
+      /\.(woff2?|ttf|otf)$/.test(filePath) ? false : undefined,
     // Optimize production build
     minify: "terser",
     terserOptions: {

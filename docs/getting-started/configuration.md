@@ -129,6 +129,12 @@ The image trusts its own nginx, so sign-in lockouts and rate limits see each vis
 !!! warning
     Never set `TRUST_PROXY` higher than the real number of proxies. A higher value lets anyone fake their address and get around lockouts and rate limits.
 
+### Security headers and third parties
+
+The bundled nginx sends a Content Security Policy and four other security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy`) on every response. A reverse proxy in front should pass them through unchanged. Peek sends no HSTS header, because it usually runs over plain HTTP on a LAN: if you serve it over HTTPS, set HSTS on that proxy.
+
+Peek serves its own fonts. The browser loads nothing from third parties, apart from the admin-only update check, which asks the GitHub API for the latest release.
+
 ## Proxy Authentication
 
 Peek supports delegating authentication to your reverse proxy (e.g., Nginx, Traefik, Caddy, Authelia, Authentik). This is useful when you already have an authentication system in place and want Peek to trust the authenticated user from the proxy.
