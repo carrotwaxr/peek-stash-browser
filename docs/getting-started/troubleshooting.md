@@ -28,6 +28,14 @@ docker logs peek-stash-browser
 
 **Solution:** Recreate the container with correct configuration. See [Installation](../getting-started/installation.md).
 
+**`[entrypoint] ERROR: /app/data is not writable by UID:GID`**
+
+The data directory could not be given to Peek's user, usually because it cannot change owner (NFS with root squash, SMB/CIFS, a read-only mount). Set `PUID`/`PGID` to the owner that `ls -ln` shows for your data directory. On rootless Docker or Podman, set `PUID=0`. See [File ownership](installation.md#file-ownership-puidpgid).
+
+**`[entrypoint] ERROR: this image manages its own user: remove --user ...`**
+
+Remove `--user` from `docker run` (or `user:` from your Compose file) and set `PUID`/`PGID` instead.
+
 ## Can't Connect to Stash
 
 **Symptoms:** Empty library, "Connection failed" errors, sync fails.

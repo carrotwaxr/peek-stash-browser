@@ -1,13 +1,45 @@
-# Dependencies (will be installed fresh in container)
-**/node_modules
+# Patterns match from the context root. Only those written with **/ match at
+# every depth; bare names (plugins, docs, site, e2e ...) stay root-only, so
+# client/src/components/video-player/plugins/ still reaches the build.
 
-# Build outputs
+# Secrets and user data
+**/.env
+**/.env.*
+.peek-data
+**/*.db
+**/*.db-*
+**/*.db.*
+
+# Repository, tooling and local environments
+.git
+.gitignore
+.github
+.claude
+.worktrees
+.venv
+
+# Documentation and site build
+site
+docs
+**/*.md
+
+# Root-level test, report and plugin directories
+e2e
+playwright-report
+test-results
+screenshots
+plugins
+
+# Dependencies (installed fresh in the image) and build outputs
+**/node_modules
 **/dist
 **/.next
 **/build
+**/coverage
+**/*.log
 **/tsconfig.tsbuildinfo
 
-# Test files (not needed for production build)
+# Test files (not needed for the production build)
 **/tests
 **/integration
 **/__tests__
@@ -16,27 +48,12 @@
 **/*.spec.ts
 **/*.spec.js
 
-# Git
-.git
-.gitignore
-
 # IDE and editor files
 .vscode
 .idea
-*.swp
-*.swo
-
-# Documentation (not needed in container)
-docs/
-*.md
-!README.md
-
-# Development files
-.env.local
-.env.development
-*.log
-coverage/
+**/*.swp
+**/*.swo
 
 # OS files
-.DS_Store
-Thumbs.db
+**/.DS_Store
+**/Thumbs.db
