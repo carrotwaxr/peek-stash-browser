@@ -28,7 +28,7 @@ Peek maintains a local cache of your Stash library for fast queries. Three sync 
 
 - **Smart Sync** (automatic) - Runs on startup and periodically, only syncing what changed
 - **Incremental Sync** - Manual option to sync recent changes since a specific time
-- **Full Sync** - Complete refresh, runs automatically when upgrading Peek versions
+- **Full Sync** - Complete refresh, from the Full Sync button. When an upgrade changes how Peek stores part of the library, the next sync refetches that part whole on its own
 
 **Key points:**
 

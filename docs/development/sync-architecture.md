@@ -26,7 +26,8 @@ Peek provides three sync strategies, each optimized for different use cases:
 - Initial setup (first sync)
 - Manual "Full Sync" button in UI
 - Recovery from corrupted state
-- **Database schema migrations** (automatic on startup when upgrading versions)
+
+An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
 **Process:**
 1. Sync all entity types in dependency order: studios, tags, performers, groups, galleries, scenes, images
@@ -173,7 +174,7 @@ CREATE TABLE SyncState (
 );
 ```
 
-Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastIncrementalSyncTimestamp` for each entity type independently.
+Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastIncrementalSyncTimestamp` for each entity type independently. A type with neither is fetched whole, by every sync mode; that is how a migration asks for a refetch.
 
 ---
 
