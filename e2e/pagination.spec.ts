@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
+import { requireData } from "./support/data";
 
 /**
  * E2E tests for pagination behavior across library list pages.
@@ -71,7 +72,7 @@ test.describe("Pagination", () => {
 });
 
 test.describe("Scroll position", () => {
-  // Each test skips when the library is too small, so the empty CI database passes.
+  // The replay library has 361 scenes; a smaller dev-stack library skips.
   const loadScenes = async (page: Page) => {
     const listPage = new ListPage(page);
     await listPage.goto("/scenes?per_page=24");
@@ -95,7 +96,7 @@ test.describe("Scroll position", () => {
     const nextPage = page.locator('button[aria-label="Next Page"]').last();
     const hasMorePages =
       hasCards && (await nextPage.count()) > 0 && (await nextPage.isEnabled());
-    test.skip(!hasMorePages, "needs more than one page of scenes");
+    requireData(hasMorePages, "more than one page of scenes");
 
     // The bottom per-page select (the id is duplicated top and bottom)
     const perPage = page.locator("#perPage").last();
@@ -114,7 +115,7 @@ test.describe("Scroll position", () => {
     page,
   }) => {
     const { cards, hasCards } = await loadScenes(page);
-    test.skip(!hasCards || (await cards.count()) < 16, "needs 16 scenes");
+    requireData(hasCards && (await cards.count()) >= 16, "16 scenes");
 
     const card = cards.nth(15);
     await card.scrollIntoViewIfNeeded();
@@ -136,7 +137,7 @@ test.describe("Scroll position", () => {
     page,
   }) => {
     const { cards, hasCards } = await loadScenes(page);
-    test.skip(!hasCards, "needs a scene");
+    requireData(hasCards, "scenes");
 
     const lengthBefore = await page.evaluate(() => history.length);
     await titleLinkOf(cards.first()).click();
@@ -149,7 +150,7 @@ test.describe("Scroll position", () => {
     page,
   }) => {
     const { cards, hasCards } = await loadScenes(page);
-    test.skip(!hasCards, "needs a scene");
+    requireData(hasCards, "scenes");
 
     const link = titleLinkOf(cards.first());
     const [newPage] = await Promise.all([

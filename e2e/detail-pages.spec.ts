@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { requireData } from "./support/data";
 
 /**
  * E2E tests for entity detail pages.
@@ -210,7 +211,7 @@ test.describe("Detail Pages", () => {
         () => true,
         () => false
       );
-    test.skip(!hasPerformers, "needs a performer");
+    requireData(hasPerformers, "performers");
 
     // The count beside "Images:" is a button only when the performer has
     // images, so open the first listed performer that has some.
@@ -234,7 +235,7 @@ test.describe("Detail Pages", () => {
         break;
       }
     }
-    test.skip(!found, "no listed performer has images");
+    requireData(found, "listed performers with images");
 
     await stat.scrollIntoViewIfNeeded();
     const before = await page.evaluate(() => window.scrollY);
@@ -243,7 +244,7 @@ test.describe("Detail Pages", () => {
         document.documentElement.scrollHeight - window.innerHeight >= y + 100,
       before
     );
-    test.skip(!canScroll, "the performer page is too short to scroll");
+    requireData(canScroll, "performer pages tall enough to scroll");
 
     await statButton.click();
 

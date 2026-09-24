@@ -6,10 +6,14 @@
  * remain. Each user's playlists, history, ratings, carousels and presets go
  * with it (every per-user relation cascades).
  *
- * Hermetic mode: nothing to do, since the next run replaces the database.
+ * Hermetic mode: the next run replaces the database, so nothing is deleted.
+ * Teardown reads the Stash replay's stats and fails the run if Peek sent it a
+ * write or a request it could not answer (a media path it does not serve, a
+ * query field it does not know): those would otherwise pass as a silent
+ * error or 404. The replay's stderr line above names each one.
  */
 import { request } from "@playwright/test";
-import { bootstrapAdmin, logIn } from "./global-setup";
+import { bootstrapAdmin, logIn, readReplayStats } from "./global-setup";
 import {
   deleteGroups,
   deleteUsers,
@@ -19,9 +23,23 @@ import {
 import { baseURL, devStack } from "./support/env";
 import { runPrefix } from "./support/names";
 
+/** Hermetic mode: the replay saw no write and answered every request */
+async function checkReplayStats(): Promise<void> {
+  const { mutations, unsupported } = await readReplayStats();
+  const seen = JSON.stringify({ mutations, unsupported });
+  if (mutations.length > 0 || unsupported.length > 0) {
+    throw new Error(`the replay saw writes or unserved requests: ${seen}`);
+  }
+  console.log(`Stash replay stats: ${seen}`);
+}
+
 async function globalTeardown() {
+  if (!devStack) {
+    await checkReplayStats();
+    return;
+  }
   // Global setup failed before it created anything for this run
-  if (!devStack || !process.env.E2E_RUN_ID || !process.env.E2E_ADMIN_USERNAME) {
+  if (!process.env.E2E_RUN_ID || !process.env.E2E_ADMIN_USERNAME) {
     return;
   }
 

@@ -1,12 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
-import { baseURL, dbFile, devStack, ports, runDir } from "./e2e/support/env";
+import {
+  REPLAY_API_KEY,
+  baseURL,
+  dbFile,
+  devStack,
+  ports,
+  replayStatsUrl,
+  runDir,
+} from "./e2e/support/env";
 
 /**
  * Playwright E2E test configuration for Peek Stash Browser.
  *
- * Hermetic by default, locally and in CI: Playwright starts its own server
- * (port 8100) and Vite client (port 5180) beside the dev stack, on a
- * throwaway database, and global setup creates the run admin.
+ * Hermetic by default, locally and in CI: Playwright starts the Stash replay
+ * (port 9100, serving item 83's second library), its own server (port 8100)
+ * and Vite client (port 5180) beside the dev stack, on a throwaway database.
+ * Global setup creates the run admin and the replay's instance, and waits for
+ * the sync.
  *
  * Dev-stack mode, for manual runs on real data: set E2E_BASE_URL (for example
  * http://localhost:6969). Nothing is started; .env.e2e names a bootstrap admin
@@ -65,11 +75,21 @@ export default defineConfig({
     },
   ],
 
-  // Hermetic mode starts the server on a fresh database, then the client.
-  // stdout is shown so the log names the ports and the database file.
+  // Hermetic mode starts the Stash replay (item 83), then the server on a
+  // fresh database, then the client. stdout is shown so the log names the
+  // ports, the database file and the sync.
   webServer: devStack
     ? undefined
     : [
+        {
+          // tsx straight from server/node_modules, not npx: Playwright's stop
+          // signal then reaches the replay rather than an npm wrapper
+          command: `cd server && node_modules/.bin/tsx integration/stash-replay/cli.ts --port ${ports.stash} --api-key ${REPLAY_API_KEY} --library second`,
+          url: replayStatsUrl,
+          reuseExistingServer: false,
+          timeout: 30_000,
+          stdout: "pipe",
+        },
         {
           command:
             "node e2e/support/reset-db.mjs && cd server && npx prisma migrate deploy && npx tsx index.ts",
@@ -85,7 +105,6 @@ export default defineConfig({
             JWT_SECRET: "e2e-test-secret",
             STASH_URL: "", // dotenv never overrides a set variable, so the root .env's Stash is not used
             STASH_API_KEY: "",
-            NODE_ENV: "test", // create-stash-instance skips its connection check: the placeholder Stash answers nothing
           },
         },
         {

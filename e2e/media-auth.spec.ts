@@ -1,11 +1,13 @@
 import { type Page, expect, request, test } from "@playwright/test";
+import { requireData } from "./support/data";
 
 /**
  * Media behind the session (item 2).
  *
  * Thumbnails, previews, streams and captions need a Peek session; the
  * external player gets a personal signed link that works without one. Every
- * test checks what data exists first and skips on the empty CI database.
+ * test plays the library's first scene (requireData: the replay library has
+ * one; on the dev stack an empty library skips).
  * Expiry itself is covered by the fake-clock unit tests: e2e cannot wait 12
  * hours.
  */
@@ -19,13 +21,13 @@ interface FindScenesBody {
   findScenes: { scenes: SceneRow[] };
 }
 
-async function firstScene(page: Page): Promise<SceneRow | null> {
+async function firstScene(page: Page): Promise<SceneRow> {
   const found = await page.request.post("/api/library/scenes", {
     data: { filter: { per_page: 1 } },
   });
-  if (!found.ok()) return null;
+  expect(found.ok(), await found.text()).toBeTruthy();
   const body = (await found.json()) as FindScenesBody;
-  return body.findScenes.scenes[0] ?? null;
+  return requireData(body.findScenes.scenes[0], "scenes");
 }
 
 const scenePath = (scene: SceneRow) =>
@@ -43,8 +45,7 @@ const anonymousContext = (baseURL: string | undefined) =>
   });
 
 test("grid thumbnails load with the session", async ({ page }) => {
-  const scene = await firstScene(page);
-  test.skip(!scene, "No scenes (empty database)");
+  await firstScene(page); // the grid has a thumbnail to load
 
   const proxied = page.waitForResponse(
     (r) => r.url().includes("/api/proxy/") && r.status() === 200,
@@ -66,7 +67,6 @@ test("grid thumbnails load with the session", async ({ page }) => {
 
 test("the scene page's first stream request succeeds", async ({ page }) => {
   const scene = await firstScene(page);
-  test.skip(!scene, "No scenes (empty database)");
 
   // Direct play, or for a scene without a Direct entry its first transcode
   const streamResponse = page.waitForResponse(
@@ -77,7 +77,7 @@ test("the scene page's first stream request succeeds", async ({ page }) => {
   );
   streamResponse.catch(() => undefined);
 
-  await page.goto(scenePath(scene!));
+  await page.goto(scenePath(scene));
   await page.locator(".vjs-big-play-button").click();
   await streamResponse;
 });
@@ -88,9 +88,8 @@ test("HLS playlist and first segment load with the session and 401 without", asy
 }) => {
   test.setTimeout(90_000); // Stash transcodes the playlist and segment on demand
   const scene = await firstScene(page);
-  test.skip(!scene, "No scenes (empty database)");
 
-  const playlistPath = `/api/scene/${scene!.id}/proxy-stream/stream.m3u8?resolution=LOW&instanceId=${encodeURIComponent(scene!.instanceId)}`;
+  const playlistPath = `/api/scene/${scene.id}/proxy-stream/stream.m3u8?resolution=LOW&instanceId=${encodeURIComponent(scene.instanceId)}`;
   const playlist = await page.request.get(playlistPath, { timeout: 30_000 });
   expect(playlist.status(), await playlist.text()).toBe(200);
 
@@ -120,9 +119,8 @@ test("the external-player link plays logged out and a tampered one fails", async
   baseURL,
 }) => {
   const scene = await firstScene(page);
-  test.skip(!scene, "No scenes (empty database)");
 
-  await page.goto(scenePath(scene!));
+  await page.goto(scenePath(scene));
   const vlc = page.locator('a[aria-label="Open in VLC"]');
   await expect(vlc).toHaveAttribute("href", /sig=/, { timeout: 15_000 });
   const url = (await vlc.getAttribute("href"))!.replace(/^vlc:\/\//, "");
@@ -147,9 +145,8 @@ test("a paused video whose session expired sends the user to login with a messag
   page,
 }) => {
   const scene = await firstScene(page);
-  test.skip(!scene, "No scenes (empty database)");
 
-  await page.goto(scenePath(scene!));
+  await page.goto(scenePath(scene));
   const playerEl = page.locator(".video-js").first();
   await expect(playerEl).toBeAttached({ timeout: 15_000 });
 
@@ -173,10 +170,14 @@ test("a paused video whose session expired sends the user to login with a messag
   await page.context().clearCookies();
 
   // Play again once the buffer is gone: the player has to ask the server for
-  // the media again, and the server now answers 401
+  // the media again, and the server now answers 401. The replay's test
+  // pattern is small enough to sit whole in Chromium's media cache, which
+  // answers a reload of the same URL itself, so the reload gets a new one.
   await playerEl.evaluate((el) => {
     const player = (el as any).player;
-    player.src(player.currentSource());
+    const source = player.currentSource();
+    const src = `${source.src}${source.src.includes("?") ? "&" : "?"}reload=${Date.now()}`;
+    player.src({ ...source, src });
     void player.play();
   });
 
