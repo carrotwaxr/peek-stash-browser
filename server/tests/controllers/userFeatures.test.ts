@@ -39,6 +39,10 @@ import {
   updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import {
+  canUserAccessEntity,
+  resolveAccessibleInstanceId,
+} from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -114,9 +118,16 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
+// Mock EntityAccessService (hiding requires visibility)
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn(),
+  resolveAccessibleInstanceId: vi.fn(),
+}));
+
 // Mock UserHiddenEntityService (dynamically imported)
 vi.mock("../../services/UserHiddenEntityService.js", () => ({
   userHiddenEntityService: {
+    isHiddenByUser: vi.fn(),
     hideEntity: vi.fn().mockResolvedValue(undefined),
     unhideEntity: vi.fn().mockResolvedValue(undefined),
     unhideAll: vi.fn().mockResolvedValue(5),
@@ -142,6 +153,9 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma);
+const mockCanAccess = vi.mocked(canUserAccessEntity);
+const mockResolveAccessible = vi.mocked(resolveAccessibleInstanceId);
+const mockIsHidden = vi.mocked(userHiddenEntityService.isHiddenByUser);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
 const mockExclusionService = vi.mocked(exclusionComputationService);
 
@@ -151,6 +165,10 @@ const USER = { id: 2, username: "testuser", role: "USER" };
 describe("User Controller — Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Every entity is visible and not yet hidden unless a test says otherwise
+    mockIsHidden.mockResolvedValue(false);
+    mockCanAccess.mockResolvedValue(true);
+    mockResolveAccessible.mockImplementation(async () => "inst-1");
   });
 
   // ─── Filter Presets ───
@@ -616,6 +634,62 @@ describe("User Controller — Features", () => {
       const res = mockRes();
       await hideEntity(req, res);
       expect(res._getBody().success).toBe(true);
+      // No instance: visible on some instance, stored for every instance
+      expect(mockResolveAccessible).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "42",
+        undefined
+      );
+      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "42",
+        ""
+      );
+    });
+
+    it("returns 404 and writes nothing for an entity the user cannot see", async () => {
+      mockResolveAccessible.mockResolvedValueOnce(null);
+      const req = mockReq({ entityType: "tag", entityId: "7" }, {}, USER);
+      const res = mockRes();
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(404);
+      expect(res._getBody()).toEqual({ error: "Not found" });
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("checks the given instance when the request names one", async () => {
+      mockCanAccess.mockResolvedValueOnce(false);
+      const req = mockReq(
+        { entityType: "scene", entityId: "42", instanceId: "inst-1" },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntity(req, res);
+      expect(mockCanAccess).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "42",
+        "inst-1"
+      );
+      expect(mockResolveAccessible).not.toHaveBeenCalled();
+      expect(res._getStatus()).toBe(404);
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("a repeat hide succeeds without writing", async () => {
+      mockIsHidden.mockResolvedValueOnce(true);
+      // Hidden entities are excluded for their owner, so access says no
+      mockResolveAccessible.mockResolvedValue(null);
+      const req = mockReq({ entityType: "scene", entityId: "42" }, {}, USER);
+      const res = mockRes();
+      await hideEntity(req, res);
+      expect(res._getStatus()).toBe(200);
+      expect(res._getBody().success).toBe(true);
+      expect(mockIsHidden).toHaveBeenCalledWith(USER.id, "scene", "42", "");
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
 
     it("returns 400 when entityId is not a numeric Stash id", async () => {
@@ -768,6 +842,59 @@ describe("User Controller — Features", () => {
       expect(res._getBody().success).toBe(true);
       expect(res._getBody().successCount).toBe(2);
       expect(res._getBody().failCount).toBe(0);
+      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns 404 and hides nothing when any target is not visible", async () => {
+      mockResolveAccessible.mockImplementation(async (_u, type) =>
+        type === "tag" ? null : "inst-1"
+      );
+      const req = mockReq(
+        {
+          entities: [
+            { entityType: "scene", entityId: "1" },
+            { entityType: "tag", entityId: "2" },
+            { entityType: "performer", entityId: "3" },
+          ],
+        },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntities(req, res);
+      expect(res._getStatus()).toBe(404);
+      expect(res._getBody()).toEqual({ error: "Not found" });
+      expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
+    });
+
+    it("counts a target already hidden as hidden without writing it again", async () => {
+      mockIsHidden.mockImplementation(
+        async (_u, _type, entityId) => entityId === "1"
+      );
+      mockResolveAccessible.mockImplementation(async (_u, _t, entityId) =>
+        entityId === "1" ? null : "inst-1"
+      );
+      const req = mockReq(
+        {
+          entities: [
+            { entityType: "scene", entityId: "1" },
+            { entityType: "scene", entityId: "2" },
+          ],
+        },
+        {},
+        USER
+      );
+      const res = mockRes();
+      await hideEntities(req, res);
+      expect(res._getBody().successCount).toBe(2);
+      expect(res._getBody().failCount).toBe(0);
+      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(1);
+      expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
+        USER.id,
+        "scene",
+        "2",
+        ""
+      );
     });
 
     it("returns 400 and hides nothing when any entityId is not a numeric Stash id", async () => {

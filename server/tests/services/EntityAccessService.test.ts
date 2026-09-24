@@ -15,6 +15,7 @@ import {
   getVisibleEntityKeys,
   keepVisibleConditions,
   resolveAccessibleInstanceId,
+  resolveVisibleApartFromOwnHides,
 } from "../../services/EntityAccessService.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
@@ -206,6 +207,73 @@ describe("EntityAccessService", () => {
         resolveAccessibleInstanceId(7, "scene", "42", undefined)
       ).resolves.toBeNull();
       expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("resolveVisibleApartFromOwnHides", () => {
+    it("returns [] without a query for no refs", async () => {
+      await expect(
+        resolveVisibleApartFromOwnHides(7, "scene", [])
+      ).resolves.toEqual(new Map());
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("binds the refs as one JSON parameter first, then the access params", async () => {
+      await resolveVisibleApartFromOwnHides(7, "tag", [
+        { id: "1", instanceId: "A" },
+        { id: "2", instanceId: "" },
+        { id: "1", instanceId: "A" },
+      ]);
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const { sql, params } = call();
+      expect(params).toEqual([
+        JSON.stringify([
+          ["1", "A"],
+          ["2", ""],
+        ]),
+        7,
+        7,
+        7,
+        "tag",
+      ]);
+      expect(sql).toContain("FROM json_each(?) j");
+      expect(sql).toContain("FROM StashTag x");
+      expect(sql).toContain("r.inst = '' OR x.stashInstanceId = r.inst");
+      expect(sql).toContain("ORDER BY si.priority, x.stashInstanceId");
+    });
+
+    it("ignores only the user's own hides: any other exclusion row still excludes", async () => {
+      await resolveVisibleApartFromOwnHides(7, "scene", [
+        { id: "1", instanceId: "A" },
+      ]);
+      const { sql } = call();
+      expect(sql).toContain("NOT EXISTS (SELECT 1 FROM UserExcludedEntity e");
+      expect(sql).toContain("AND e.reason <> 'hidden'");
+      expect(sql).toContain("x.deletedAt IS NULL");
+      expect(sql).toContain("si.enabled = 1");
+      expect(sql).toContain("FROM UserStashInstance usi");
+    });
+
+    it("maps each ref as passed in to its resolved instance, and drops the unresolved", async () => {
+      mockQuery.mockResolvedValueOnce([
+        { id: "1", requested: "A", instanceId: "A" },
+        { id: "2", requested: "", instanceId: "B" },
+        { id: "3", requested: "A", instanceId: null },
+      ] as never);
+
+      const resolved = await resolveVisibleApartFromOwnHides(7, "scene", [
+        { id: "1", instanceId: "A" },
+        { id: "2", instanceId: "" },
+        { id: "3", instanceId: "A" },
+      ]);
+
+      expect(resolved).toEqual(
+        new Map([
+          [entityRefKey("1", "A"), "A"],
+          [entityRefKey("2", ""), "B"],
+        ])
+      );
     });
   });
 

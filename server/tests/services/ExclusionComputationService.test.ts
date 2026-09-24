@@ -1446,6 +1446,149 @@ describe("computeEmptyExclusions", () => {
   });
 });
 
+describe("reason precedence (restrictions before hides)", () => {
+  beforeEach(() => setupPipeline());
+
+  const EDGE_PERFORMER_TAG = /FROM PerformerTag j/;
+  const EMPTY_UNDER_RESTRICTIONS = /FROM _peek_refs o CROSS JOIN Stash\w+ AS/;
+  const EMPTY_PERFORMER_UNDER_RESTRICTIONS =
+    /FROM _peek_refs o CROSS JOIN StashPerformer AS p ON/;
+
+  it("a restriction cascade reaching a hidden entity stores cascade", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"]),
+    ]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [RESOLVE_PERFORMER, [{ id: "p1", instanceId: "A" }]],
+      [EDGE_PERFORMER_TAG, [{ id: "p1", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["tag:2@A:restricted", "performer:p1@A:cascade"])
+    );
+  });
+
+  it("a content rule reaching a hidden scene stores restricted", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"], true),
+    ]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "scene", entityId: "s4", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [CONTENT_TAG_SCENE, [{ id: "s4", instanceId: "A" }]],
+      [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "s4", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["tag:2@A:restricted", "scene:s4@A:restricted"])
+    );
+  });
+
+  it("a hidden entity empty under the restrictions alone stores empty", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "performer", entityId: "p2", instanceId: "A" },
+      { userId: 1, entityType: "scene", entityId: "s1", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_PERFORMER, [{ id: "p2", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "s1", instanceId: "A" }]],
+      [
+        EMPTY_PERFORMER_UNDER_RESTRICTIONS,
+        [{ performerId: "p2", instanceId: "A" }],
+      ],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["performer:p2@A:empty", "scene:s1@A:hidden"])
+    );
+    // Checked only for the hidden organisational entities, driving from them
+    const targeted = queriesMatching(EMPTY_UNDER_RESTRICTIONS);
+    expect(targeted).toHaveLength(1);
+    expect(targeted[0][0]).toMatch(EMPTY_PERFORMER_UNDER_RESTRICTIONS);
+    const refsFill = execCalls().find(
+      ([sql, json]) =>
+        sql.includes("INSERT OR IGNORE INTO _peek_refs") &&
+        String(json).includes("p2")
+    );
+    expect(refsFill?.[1]).toBe(JSON.stringify([{ id: "p2", iid: "A" }]));
+  });
+
+  it("the empty check under the restrictions alone runs before the hides join the sets", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "gallery", entityId: "g1", instanceId: "A" },
+      { userId: 1, entityType: "image", entityId: "i1", instanceId: "A" },
+    ]);
+    const events: string[] = [];
+    mockPrisma.$executeRawUnsafe.mockImplementation(
+      async (sql: string, json?: string) => {
+        if (sql.includes("INSERT OR IGNORE INTO _peek_ex_image")) {
+          events.push(`image set += ${json}`);
+        }
+        return 0;
+      }
+    );
+    mockPrisma.$queryRawUnsafe.mockImplementation(async (sql: string) => {
+      if (/CROSS JOIN StashGallery AS g/.test(sql)) {
+        events.push("empty check for the hidden gallery");
+        return [];
+      }
+      if (RESOLVE_GALLERY.test(sql)) return [{ id: "g1", instanceId: "A" }];
+      if (RESOLVE_IMAGE.test(sql)) return [{ id: "i1", instanceId: "A" }];
+      return [];
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    // The hidden image joins the sets only after the check
+    expect(events).toEqual([
+      "empty check for the hidden gallery",
+      `image set += ${JSON.stringify([{ id: "i1", iid: "A" }])}`,
+    ]);
+  });
+
+  it("own hides stay hidden under their own cascades and emptiness", async () => {
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "studio", entityId: "st1", instanceId: "A" },
+      { userId: 1, entityType: "scene", entityId: "s1", instanceId: "A" },
+    ]);
+    fakeRaw([
+      [RESOLVE_STUDIO, [{ id: "st1", instanceId: "A" }]],
+      [RESOLVE_SCENE, [{ id: "s1", instanceId: "A" }]],
+      [EDGE_STUDIO_SCENE, [{ id: "s1", instanceId: "A" }]],
+      [EMPTY_STUDIO, [{ studioId: "st1", instanceId: "A" }]],
+    ]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(rowKeys(createdRows())).toEqual(
+      new Set(["studio:st1@A:hidden", "scene:s1@A:hidden"])
+    );
+  });
+
+  it("no hides, no empty check under the restrictions alone", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([
+      restriction("tags", "EXCLUDE", ["2:A"]),
+    ]);
+    fakeRaw([[RESOLVE_TAG, [{ id: "2", instanceId: "A" }]]]);
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    expect(queriesMatching(EMPTY_UNDER_RESTRICTIONS)).toHaveLength(0);
+  });
+});
+
 describe("admins (Rule 7)", () => {
   beforeEach(() => setupPipeline());
 
@@ -1499,7 +1642,8 @@ describe("addHiddenEntity", () => {
           },
         },
         create: expect.objectContaining({ reason: "hidden", instanceId: "A" }),
-        update: expect.objectContaining({ reason: "hidden" }),
+        // An existing row keeps its reason: a hide never masks a restriction
+        update: {},
       })
     );
     expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(

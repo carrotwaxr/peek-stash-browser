@@ -122,6 +122,35 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    name: "004_recompute_exclusions_reason_precedence",
+    description:
+      "Recompute every user's exclusions so a hidden item never masks a content restriction (the Hidden Items list reads the stored reason)",
+    run: async () => {
+      const startTime = Date.now();
+      logger.info(
+        "[Migration 004] Recomputing exclusions for all users after the reason precedence change"
+      );
+
+      try {
+        const result = await exclusionComputationService.recomputeAllUsers();
+        logger.info("[Migration 004] Exclusion recompute completed", {
+          durationMs: Date.now() - startTime,
+          success: result.success,
+          failed: result.failed,
+        });
+      } catch (error) {
+        logger.error(
+          "[Migration 004] Exclusion recompute failed - will retry on next startup",
+          {
+            durationMs: Date.now() - startTime,
+            error: error instanceof Error ? error.message : "Unknown error",
+          }
+        );
+        throw error;
+      }
+    },
+  },
 ];
 
 class DataMigrationService {

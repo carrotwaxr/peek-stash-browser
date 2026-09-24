@@ -25,6 +25,23 @@
  *
  * Who exclusions apply to lives in exclusionPolicy.ts: an admin's rows hold
  * only their own hides and cascades, so no read path needs a role check.
+ *
+ * Reason precedence. UserExcludedEntity holds one row per (user, type, id,
+ * instance); when an entity qualifies several ways, the first reason in this
+ * order is stored:
+ *   1. restricted: EXCLUDE closures and INCLUDE inversion (direct)
+ *   2. cascade: cascades of those EXCLUDE closures
+ *   3. restricted: content rules
+ *   4. empty: entities the user's hides cover that are empty under the
+ *      restrictions alone
+ *   5. hidden: the user's hides, their descendants and per-instance copies
+ *   6. cascade: cascades of the hides
+ *   7. empty: empty under every exclusion
+ * Rows 1 to 4 are exactly what a recompute with no hides would store for
+ * these keys, so a row whose reason is 'hidden' marks an entity the user
+ * would see if they had hidden nothing. EntityAccessService reads that for
+ * the Hidden Items list. addHiddenEntity keeps it true between recomputes by
+ * never overwriting an existing row.
  */
 import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { PrismaClient } from "@prisma/client";
@@ -461,20 +478,26 @@ class ExclusionComputationService {
       const hidden = await this.loadHidden(userId, tx);
 
       // Phase 1: direct exclusions (EXCLUDE closures, INCLUDE inversion, hides)
-      const { records: direct, cascadeSources } =
-        await this.computeDirectExclusions(
-          userId,
-          tx,
-          allowedInstanceIds,
-          rules,
-          hidden
-        );
+      const direct = await this.computeDirectExclusions(
+        userId,
+        tx,
+        allowedInstanceIds,
+        rules,
+        hidden
+      );
       const t1 = Date.now();
 
-      // Phase 2: cascades from EXCLUDE closures and hides only
-      const cascade = await this.computeCascadeExclusions(
+      // Phase 2: cascades from EXCLUDE closures and hides only, each source
+      // apart so the stored reason says where a row came from
+      const restrictionCascade = await this.computeCascadeExclusions(
         userId,
-        cascadeSources,
+        direct.restrictionSources,
+        tx,
+        allowedInstanceIds
+      );
+      const hideCascade = await this.computeCascadeExclusions(
+        userId,
+        direct.hideSources,
         tx,
         allowedInstanceIds
       );
@@ -489,26 +512,76 @@ class ExclusionComputationService {
       );
       const t3 = Date.now();
 
-      // Phase 4: empty organizational entities (skipped for admins, Q2)
-      const empty = applyRestrictions
-        ? await this.computeEmptyExclusions(
-            userId,
-            [...direct, ...cascade, ...content],
-            tx,
-            allowedInstanceIds
-          )
-        : [];
+      // Phase 4: empty organizational entities (skipped for admins, Q2).
+      // First under the restrictions alone, only for the entities the hides
+      // cover; then under every exclusion, as the lists apply it.
+      let emptyUnderRestrictions: ExclusionRecord[] = [];
+      let empty: ExclusionRecord[] = [];
+      if (applyRestrictions) {
+        await this.loadExclusionSets(
+          tx,
+          [...direct.restricted, ...restrictionCascade, ...content],
+          allowedInstanceIds,
+          { append: false }
+        );
+        emptyUnderRestrictions = await this.computeEmptyExclusions(
+          userId,
+          tx,
+          allowedInstanceIds,
+          direct.hideSources
+        );
+        await this.loadExclusionSets(
+          tx,
+          [...direct.hidden, ...hideCascade],
+          allowedInstanceIds,
+          { append: true }
+        );
+        empty = await this.computeEmptyExclusions(
+          userId,
+          tx,
+          allowedInstanceIds
+        );
+      }
       const t4 = Date.now();
 
-      return { direct, cascade, content, empty, t1, t2, t3, t4 };
+      return {
+        direct,
+        restrictionCascade,
+        hideCascade,
+        content,
+        emptyUnderRestrictions,
+        empty,
+        t1,
+        t2,
+        t3,
+        t4,
+      };
     });
-    const { direct, cascade, content, empty, t1, t2, t3, t4 } = computed;
+    const {
+      direct,
+      restrictionCascade,
+      hideCascade,
+      content,
+      emptyUnderRestrictions,
+      empty,
+      t1,
+      t2,
+      t3,
+      t4,
+    } = computed;
 
-    // Combine all exclusions and deduplicate.
-    // An entity can qualify through several paths (e.g. cascade from a tag
-    // and a content rule); the first reason in direct, cascade, content,
-    // empty order is the one stored. The key includes the instance.
-    const allExclusionsRaw = [...direct, ...cascade, ...content, ...empty];
+    // Combine all exclusions and deduplicate. An entity can qualify through
+    // several paths; the first reason in the order of "Reason precedence"
+    // (file header) is the one stored. The key includes the instance.
+    const allExclusionsRaw = [
+      ...direct.restricted,
+      ...restrictionCascade,
+      ...content,
+      ...emptyUnderRestrictions,
+      ...direct.hidden,
+      ...hideCascade,
+      ...empty,
+    ];
     const seen = new Set<string>();
     const allExclusions: ExclusionRecord[] = [];
     for (const excl of allExclusionsRaw) {
@@ -550,9 +623,12 @@ class ExclusionComputationService {
       totalExclusions: allExclusions.length,
       instanceCount: allowedInstanceIds.length,
       phaseCounts: {
-        direct: direct.length,
-        cascade: cascade.length,
+        restricted: direct.restricted.length,
+        hidden: direct.hidden.length,
+        restrictionCascade: restrictionCascade.length,
+        hideCascade: hideCascade.length,
         content: content.length,
+        emptyUnderRestrictions: emptyUnderRestrictions.length,
         empty: empty.length,
       },
       timing: {
@@ -927,11 +1003,12 @@ class ExclusionComputationService {
 
   /**
    * Compute direct exclusions from the resolved rules and the hidden rows.
-   * - Each EXCLUDE closure -> `restricted` rows, and a cascade source.
+   * - Each EXCLUDE closure -> `restricted` rows, and a restriction source.
    * - Each INCLUDE closure -> inversion in SQL: every entity of the type on
    *   an allowed instance that is not in the closure gets a `restricted`
    *   row. Inverted rows are NOT cascade sources (Rule 4).
-   * - Hides -> `hidden` rows through expandHides, and a cascade source.
+   * - Hides -> `hidden` rows through expandHides, and a hide source (the
+   *   resolved refs: every key a `hidden` row covers).
    */
   private async computeDirectExclusions(
     userId: number,
@@ -939,7 +1016,12 @@ class ExclusionComputationService {
     allowedInstanceIds: string[],
     rules: RestrictionRule[],
     hidden: Map<string, Ref[]>
-  ): Promise<{ records: ExclusionRecord[]; cascadeSources: CascadeSource[] }> {
+  ): Promise<{
+    restricted: ExclusionRecord[];
+    hidden: ExclusionRecord[];
+    restrictionSources: CascadeSource[];
+    hideSources: CascadeSource[];
+  }> {
     const records: ExclusionRecord[] = [];
     const cascadeSources: CascadeSource[] = [];
 
@@ -985,21 +1067,28 @@ class ExclusionComputationService {
       }
     }
 
+    const hiddenRecords: ExclusionRecord[] = [];
+    const hideSources: CascadeSource[] = [];
     for (const [entityType, hides] of hidden) {
-      const { records: hiddenRecords, refs } = await this.expandHides(
+      const { records: expanded, refs } = await this.expandHides(
         userId,
         entityType,
         hides,
         tx,
         allowedInstanceIds
       );
-      records.push(...hiddenRecords);
+      hiddenRecords.push(...expanded);
       if (refs.length > 0) {
-        cascadeSources.push({ entityType, refs });
+        hideSources.push({ entityType, refs });
       }
     }
 
-    return { records, cascadeSources };
+    return {
+      restricted: records,
+      hidden: hiddenRecords,
+      restrictionSources: cascadeSources,
+      hideSources,
+    };
   }
 
   // ─── Phase 2: cascades ───
@@ -1262,38 +1351,19 @@ class ExclusionComputationService {
   // ─── Phase 4: empty organisational entities ───
 
   /**
-   * Compute empty exclusions for organizational entities.
-   * An entity is "empty" if it has no visible content after the direct,
-   * cascade and content-rule exclusions.
-   *
-   * Empty rules:
-   * - Galleries: 0 visible images
-   * - Performers: 0 visible scenes AND 0 visible images
-   * - Studios: 0 visible scenes AND 0 visible images
-   * - Groups: 0 visible scenes
-   * - Tags: not attached to any visible scene, performer, studio, group,
-   *   gallery or image, and no live child tag on the same instance
-   *
-   * The prior exclusions are loaded into the _peek_ex_* TEMP tables (one
-   * INSERT per set), so every visibility probe is a primary-key lookup.
-   * We check the in-memory prior exclusions rather than UserExcludedEntity
-   * because the new rows haven't been written yet.
-   *
-   * @param userId - User ID
-   * @param priorExclusions - Direct + cascade + content-rule exclusions already computed
-   * @param tx - Transaction client
-   * @returns Array of empty exclusion records
+   * Load exclusion records into the _peek_ex_* TEMP tables (one INSERT per
+   * set) that the empty queries probe, so every visibility probe is a
+   * primary-key lookup. A "" instance (a stored hide) applies to every
+   * allowed instance. With append, the rows join the sets an earlier load
+   * created. The sets are loaded from the in-memory records rather than
+   * UserExcludedEntity because the new rows haven't been written yet.
    */
-  private async computeEmptyExclusions(
-    userId: number,
-    priorExclusions: ExclusionRecord[],
+  private async loadExclusionSets(
     tx: TransactionClient,
-    allowedInstanceIds: string[]
-  ): Promise<ExclusionRecord[]> {
-    const emptyExclusions: ExclusionRecord[] = [];
-
-    // Categorize excluded entities by type. A "" instance (a stored hide)
-    // applies to every allowed instance.
+    records: ExclusionRecord[],
+    allowedInstanceIds: string[],
+    { append }: { append: boolean }
+  ): Promise<void> {
     const sets: Record<ExclusionSetType, Map<string, ResolvedRef>> = {
       scene: new Map(),
       image: new Map(),
@@ -1302,7 +1372,7 @@ class ExclusionComputationService {
       group: new Map(),
       gallery: new Map(),
     };
-    for (const excl of priorExclusions) {
+    for (const excl of records) {
       if (!Object.prototype.hasOwnProperty.call(sets, excl.entityType))
         continue;
       const set = sets[excl.entityType as ExclusionSetType];
@@ -1315,22 +1385,76 @@ class ExclusionComputationService {
       }
     }
     for (const type of Object.keys(sets) as ExclusionSetType[]) {
-      await this.createTempSet(tx, EXCLUSION_SET_TABLES[type]);
+      if (!append) await this.createTempSet(tx, EXCLUSION_SET_TABLES[type]);
       await this.fillTempSet(tx, EXCLUSION_SET_TABLES[type], [
         ...sets[type].values(),
       ]);
     }
+  }
+
+  /**
+   * Compute empty exclusions for organizational entities against the
+   * exclusions loadExclusionSets loaded. An entity is "empty" if it has no
+   * visible content after those exclusions.
+   *
+   * Empty rules:
+   * - Galleries: 0 visible images
+   * - Performers: 0 visible scenes AND 0 visible images
+   * - Studios: 0 visible scenes AND 0 visible images
+   * - Groups: 0 visible scenes
+   * - Tags: not attached to any visible scene, performer, studio, group,
+   *   gallery or image, and no live child tag on the same instance
+   *
+   * With `only`, each query runs just for the listed refs of its type,
+   * driving from _peek_refs into the entity's primary key, and a type with
+   * no listed refs is skipped.
+   *
+   * @param userId - User ID
+   * @param tx - Transaction client
+   * @param only - Restrict the check to these refs
+   * @returns Array of empty exclusion records
+   */
+  private async computeEmptyExclusions(
+    userId: number,
+    tx: TransactionClient,
+    allowedInstanceIds: string[],
+    only?: CascadeSource[]
+  ): Promise<ExclusionRecord[]> {
+    const emptyExclusions: ExclusionRecord[] = [];
     const ex = EXCLUSION_SET_TABLES;
+
+    const onlyByType = new Map<string, Map<string, ResolvedRef>>();
+    for (const source of only ?? []) {
+      const merged =
+        onlyByType.get(source.entityType) ?? new Map<string, ResolvedRef>();
+      for (const ref of source.refs) merged.set(refKey(ref), ref);
+      onlyByType.set(source.entityType, merged);
+    }
+    /** The FROM for one query, or null to skip it. Fills _peek_refs. */
+    const fromFor = async (
+      entityType: string,
+      table: string,
+      alias: string
+    ): Promise<string | null> => {
+      if (!only) return `${table} ${alias}`;
+      const refs = onlyByType.get(entityType);
+      if (!refs || refs.size === 0) return null;
+      await this.fillRefs(tx, [...refs.values()]);
+      return `${REFS_TABLE} o CROSS JOIN ${table} AS ${alias} ON ${alias}.id = o.id AND ${alias}.stashInstanceId = o.inst`;
+    };
 
     // 1. Empty galleries - galleries with 0 visible images
     const galFilter = buildInstanceFilterClause(
       allowedInstanceIds,
       "g.stashInstanceId"
     );
-    const emptyGalleries = (await tx.$queryRawUnsafe(
-      `
+    const galFrom = await fromFor("gallery", "StashGallery", "g");
+    const emptyGalleries = !galFrom
+      ? []
+      : ((await tx.$queryRawUnsafe(
+          `
       SELECT g.id AS galleryId, g.stashInstanceId AS instanceId
-      FROM StashGallery g
+      FROM ${galFrom}
       WHERE g.deletedAt IS NULL
       AND ${galFilter.sql}
       AND NOT EXISTS (
@@ -1341,8 +1465,8 @@ class ExclusionComputationService {
           AND NOT EXISTS (SELECT 1 FROM ${ex.image} e WHERE e.id = i.id AND e.inst = i.stashInstanceId)
       )
     `,
-      ...galFilter.params
-    )) as Array<{ galleryId: string; instanceId: string }>;
+          ...galFilter.params
+        )) as Array<{ galleryId: string; instanceId: string }>);
 
     for (const row of emptyGalleries) {
       emptyExclusions.push({
@@ -1359,10 +1483,13 @@ class ExclusionComputationService {
       allowedInstanceIds,
       "p.stashInstanceId"
     );
-    const emptyPerformers = (await tx.$queryRawUnsafe(
-      `
+    const perfFrom = await fromFor("performer", "StashPerformer", "p");
+    const emptyPerformers = !perfFrom
+      ? []
+      : ((await tx.$queryRawUnsafe(
+          `
       SELECT p.id AS performerId, p.stashInstanceId AS instanceId
-      FROM StashPerformer p
+      FROM ${perfFrom}
       WHERE p.deletedAt IS NULL
       AND ${perfFilter.sql}
       AND NOT EXISTS (SELECT 1 FROM ${ex.performer} e WHERE e.id = p.id AND e.inst = p.stashInstanceId)
@@ -1381,8 +1508,8 @@ class ExclusionComputationService {
           AND NOT EXISTS (SELECT 1 FROM ${ex.image} e WHERE e.id = i.id AND e.inst = i.stashInstanceId)
       )
     `,
-      ...perfFilter.params
-    )) as Array<{ performerId: string; instanceId: string }>;
+          ...perfFilter.params
+        )) as Array<{ performerId: string; instanceId: string }>);
 
     for (const row of emptyPerformers) {
       emptyExclusions.push({
@@ -1402,10 +1529,13 @@ class ExclusionComputationService {
       allowedInstanceIds,
       "st.stashInstanceId"
     );
-    const emptyStudios = (await tx.$queryRawUnsafe(
-      `
+    const stuFrom = await fromFor("studio", "StashStudio", "st");
+    const emptyStudios = !stuFrom
+      ? []
+      : ((await tx.$queryRawUnsafe(
+          `
       SELECT st.id AS studioId, st.stashInstanceId AS instanceId
-      FROM StashStudio st
+      FROM ${stuFrom}
       WHERE st.deletedAt IS NULL
       AND ${stuFilter.sql}
       AND NOT EXISTS (SELECT 1 FROM ${ex.studio} e WHERE e.id = st.id AND e.inst = st.stashInstanceId)
@@ -1424,8 +1554,8 @@ class ExclusionComputationService {
           AND NOT EXISTS (SELECT 1 FROM ${ex.image} e WHERE e.id = i.id AND e.inst = i.stashInstanceId)
       )
     `,
-      ...stuFilter.params
-    )) as Array<{ studioId: string; instanceId: string }>;
+          ...stuFilter.params
+        )) as Array<{ studioId: string; instanceId: string }>);
 
     for (const row of emptyStudios) {
       emptyExclusions.push({
@@ -1442,10 +1572,13 @@ class ExclusionComputationService {
       allowedInstanceIds,
       "g.stashInstanceId"
     );
-    const emptyGroups = (await tx.$queryRawUnsafe(
-      `
+    const grpFrom = await fromFor("group", "StashGroup", "g");
+    const emptyGroups = !grpFrom
+      ? []
+      : ((await tx.$queryRawUnsafe(
+          `
       SELECT g.id AS groupId, g.stashInstanceId AS instanceId
-      FROM StashGroup g
+      FROM ${grpFrom}
       WHERE g.deletedAt IS NULL
       AND ${grpFilter.sql}
       AND NOT EXISTS (SELECT 1 FROM ${ex.group} e WHERE e.id = g.id AND e.inst = g.stashInstanceId)
@@ -1457,8 +1590,8 @@ class ExclusionComputationService {
           AND NOT EXISTS (SELECT 1 FROM ${ex.scene} e WHERE e.id = s.id AND e.inst = s.stashInstanceId)
       )
     `,
-      ...grpFilter.params
-    )) as Array<{ groupId: string; instanceId: string }>;
+          ...grpFilter.params
+        )) as Array<{ groupId: string; instanceId: string }>);
 
     for (const row of emptyGroups) {
       emptyExclusions.push({
@@ -1478,10 +1611,13 @@ class ExclusionComputationService {
       allowedInstanceIds,
       "t.stashInstanceId"
     );
-    const emptyTags = (await tx.$queryRawUnsafe(
-      `
+    const tagFrom = await fromFor("tag", "StashTag", "t");
+    const emptyTags = !tagFrom
+      ? []
+      : ((await tx.$queryRawUnsafe(
+          `
       SELECT t.id AS tagId, t.stashInstanceId AS instanceId
-      FROM StashTag t
+      FROM ${tagFrom}
       WHERE t.deletedAt IS NULL
       AND ${tagFilter.sql}
       AND NOT EXISTS (
@@ -1533,8 +1669,8 @@ class ExclusionComputationService {
           AND child.stashInstanceId = t.stashInstanceId
       )
     `,
-      ...tagFilter.params
-    )) as Array<{ tagId: string; instanceId: string }>;
+          ...tagFilter.params
+        )) as Array<{ tagId: string; instanceId: string }>);
 
     for (const row of emptyTags) {
       emptyExclusions.push({
@@ -1637,6 +1773,10 @@ class ExclusionComputationService {
    * (descendants, per-instance copies) and the cascades, through the same
    * expandHides and computeCascadeExclusions the full recompute uses.
    * Skips the empty phase and the stats update.
+   *
+   * Every write only fills a missing row: an existing row keeps its reason,
+   * so a restriction already stored for a key is never rewritten as
+   * `hidden` (Reason precedence, file header).
    */
   async addHiddenEntity(
     userId: number,
@@ -1674,7 +1814,7 @@ class ExclusionComputationService {
               instanceId,
               reason: "hidden",
             },
-            update: { reason: "hidden" },
+            update: {},
           });
 
           const { records: hiddenRecords, refs } = await this.expandHides(
@@ -1709,7 +1849,7 @@ class ExclusionComputationService {
                 },
               },
               create: record,
-              update: { reason: "hidden" },
+              update: {},
             });
           }
 

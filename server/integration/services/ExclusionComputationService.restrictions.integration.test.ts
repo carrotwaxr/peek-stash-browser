@@ -643,6 +643,112 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     ).toBe(true);
   }, 60000);
 
+  it("a hide never masks a restriction, and own hides never look like one", async () => {
+    await setRules(userId, [
+      {
+        entityType: "tags",
+        mode: "EXCLUDE",
+        entityIds: [`2:${A}`],
+        restrictEmpty: true,
+      },
+    ]);
+    const hides: Array<[string, string]> = [
+      ["tag", "2"], // restricted directly
+      ["performer", "p1"], // restricted through the cascade from tag 2
+      ["scene", "s4"], // restricted by the content rule (no tag)
+      ["performer", "p2"], // empty for the user: its one scene is s4
+      ["studio", "1"], // visible
+      ["scene", "s1"], // visible; in hidden studio 1, with hidden performer p1
+      ["gallery", "g1"], // visible; its image i7 is a cascade of the studio hide
+    ];
+    await prisma.userHiddenEntity.createMany({
+      data: hides.map(([entityType, entityId]) => ({
+        userId,
+        entityType,
+        entityId,
+        instanceId: A,
+      })),
+    });
+    await recompute(userId);
+
+    const reasons = new Map(
+      (
+        await prisma.userExcludedEntity.findMany({
+          where: { userId, instanceId: A },
+          select: { entityType: true, entityId: true, reason: true },
+        })
+      ).map((r) => [`${r.entityType}:${r.entityId}`, r.reason])
+    );
+    expect({
+      tag2: reasons.get("tag:2"),
+      p1: reasons.get("performer:p1"),
+      s4: reasons.get("scene:s4"),
+      p2: reasons.get("performer:p2"),
+      studio1: reasons.get("studio:1"),
+      studio3: reasons.get("studio:3"),
+      s1: reasons.get("scene:s1"),
+      g1: reasons.get("gallery:g1"),
+    }).toEqual({
+      tag2: "restricted",
+      p1: "cascade",
+      s4: "restricted",
+      p2: "empty",
+      studio1: "hidden",
+      studio3: "hidden",
+      s1: "hidden",
+      g1: "hidden",
+    });
+
+    const listed = await userHiddenEntityService.getHiddenEntities(userId);
+    const byKey = new Map(
+      listed.map((item) => [`${item.entityType}:${item.entityId}`, item])
+    );
+    expect(byKey.size).toBe(hides.length);
+    for (const key of ["tag:2", "performer:p1", "scene:s4", "performer:p2"]) {
+      expect(byKey.get(key)).toMatchObject({
+        instanceId: A,
+        restricted: true,
+        entity: null,
+      });
+    }
+    for (const key of ["studio:1", "scene:s1", "gallery:g1"]) {
+      expect(byKey.get(key)).toMatchObject({
+        instanceId: A,
+        restricted: false,
+      });
+      expect(byKey.get(key)?.entity).not.toBeNull();
+    }
+    expect(byKey.get("studio:1")?.entity).toMatchObject({ name: "Root" });
+  }, 60000);
+
+  it("hiding a restricted entity keeps its restriction reason", async () => {
+    await setRules(userId, [
+      { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
+    ]);
+    await recompute(userId);
+
+    // The service writes whatever it is given; the controller checks access
+    await userHiddenEntityService.hideEntity(userId, "tag", "2", A);
+
+    const tagRows = await rows(userId, "tag");
+    expect(
+      tagRows
+        .filter((r) => r.instanceId === A)
+        .map((r) => `${r.entityId}:${r.reason}`)
+        .sort()
+    ).toEqual(["2:restricted", "5:restricted"]);
+
+    const listed = await userHiddenEntityService.getHiddenEntities(userId);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      entityType: "tag",
+      entityId: "2",
+      instanceId: A,
+      restricted: true,
+      entity: null,
+    });
+  }, 60000);
+
   it("admin: same rules, hides only", async () => {
     await setRules(adminId, [
       { entityType: "tags", mode: "INCLUDE", entityIds: [`1:${A}`] },
@@ -679,6 +785,17 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
         `clip:c4@${A}:cascade`,
       ])
     );
+
+    // Restrictions never apply to an admin, so their own hide lists in full
+    const listed = await userHiddenEntityService.getHiddenEntities(adminId);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      entityType: "tag",
+      entityId: "2",
+      instanceId: A,
+      restricted: false,
+    });
+    expect(listed[0].entity).toMatchObject({ name: "Explicit" });
 
     await userHiddenEntityService.unhideEntity(adminId, "tag", "2", A);
     // unhide queues a background recompute; let it start, then coalesce with it
