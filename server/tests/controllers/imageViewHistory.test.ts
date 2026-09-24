@@ -17,6 +17,7 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted before imports. Interactive transactions run their
@@ -50,8 +51,8 @@ const USER = { id: 1, username: "testuser", role: "USER" };
 describe("Image View History Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolve.mockImplementation(
-      async (_userId, _type, _id, requested) => requested ?? "instance-1"
+    mockResolve.mockImplementation((_userId, _type, _id, requested) =>
+      Promise.resolve(requested ?? "instance-1")
     );
   });
 
@@ -176,7 +177,7 @@ describe("Image View History Controller", () => {
 
       expect(mockPrisma.imageViewHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             userId: 1,
             imageId: "img-1",
             instanceId: "instance-1",
@@ -271,8 +272,8 @@ describe("Image View History Controller", () => {
       );
       expect(mockPrisma.imageViewHistory.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            userId_instanceId_imageId: expect.objectContaining({
+          where: objectContaining({
+            userId_instanceId_imageId: objectContaining({
               instanceId: "custom-instance",
             }),
           }),
@@ -370,7 +371,7 @@ describe("Image View History Controller", () => {
       // Read through readHistory, written back as an array
       expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             oHistory: [
               "2024-01-01T00:00:00.000Z",
               "2024-01-02T00:00:00.000Z",
@@ -445,7 +446,7 @@ describe("Image View History Controller", () => {
 
       expect(mockPrisma.imageViewHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             userId: 1,
             imageId: "img-1",
             viewCount: 1,
@@ -492,7 +493,7 @@ describe("Image View History Controller", () => {
         data: {
           viewCount: { increment: 1 },
           viewHistory: [...existingHistory, expect.any(String)],
-          lastViewedAt: expect.any(Date),
+          lastViewedAt: anyOf(Date),
         },
       });
       const body = res._getOkBody();
@@ -638,8 +639,8 @@ describe("Image View History Controller", () => {
       expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
       expect(mockPrisma.imageViewHistory.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            userId_instanceId_imageId: expect.objectContaining({
+          where: objectContaining({
+            userId_instanceId_imageId: objectContaining({
               instanceId: "query-instance",
             }),
           }),

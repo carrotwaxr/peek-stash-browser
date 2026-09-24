@@ -59,6 +59,7 @@ import {
   userPermissions,
   userRow,
 } from "../helpers/fixtures.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -149,17 +150,17 @@ const mockAlreadyHidden = vi.mocked(userHiddenEntityService.findAlreadyHidden);
 
 /** Only these ids are visible, on any instance and on a named one. */
 function visibleIds(...ids: string[]) {
-  mockVisibleIds.mockImplementation(
-    async (_userId, _type, requested) =>
-      new Set(requested.filter((id) => ids.includes(id)))
+  mockVisibleIds.mockImplementation((_userId, _type, requested) =>
+    Promise.resolve(new Set(requested.filter((id) => ids.includes(id))))
   );
-  mockVisibleKeys.mockImplementation(
-    async (_userId, _type, refs) =>
+  mockVisibleKeys.mockImplementation((_userId, _type, refs) =>
+    Promise.resolve(
       new Set(
         refs
           .filter((r) => ids.includes(r.id))
           .map((r) => `${r.id}\0${r.instanceId}`)
       )
+    )
   );
 }
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);
@@ -172,15 +173,14 @@ describe("User Controller — Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Every entity is visible and not yet hidden unless a test says otherwise
-    mockAlreadyHidden.mockImplementation(async (_userId, targets) =>
-      targets.map(() => false)
+    mockAlreadyHidden.mockImplementation((_userId, targets) =>
+      Promise.resolve(targets.map(() => false))
     );
-    mockVisibleIds.mockImplementation(
-      async (_userId, _type, ids) => new Set(ids)
+    mockVisibleIds.mockImplementation((_userId, _type, ids) =>
+      Promise.resolve(new Set(ids))
     );
-    mockVisibleKeys.mockImplementation(
-      async (_userId, _type, refs) =>
-        new Set(refs.map((r) => `${r.id}\0${r.instanceId}`))
+    mockVisibleKeys.mockImplementation((_userId, _type, refs) =>
+      Promise.resolve(new Set(refs.map((r) => `${r.id}\0${r.instanceId}`)))
     );
   });
 
@@ -1369,7 +1369,7 @@ describe("User Controller — Features", () => {
       await completeSetup(req, res);
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
         where: { id: 2, setupCompleted: false },
-        data: expect.objectContaining({
+        data: objectContaining({
           setupCompleted: true,
           recoveryKeyHash: "hashed-key",
         }),

@@ -64,10 +64,10 @@ describe("PlaylistAccessService", () => {
       ]);
 
       const result = await getPlaylistAccess(1, 1);
-      expect(result.level).toBe("shared");
-      if (result.level === "shared") {
-        expect(result.groups).toEqual(["Family", "Friends"]);
-      }
+      expect(result).toEqual({
+        level: "shared",
+        groups: ["Family", "Friends"],
+      });
     });
 
     it("returns 'none' when user does not own and has no shared access", async () => {

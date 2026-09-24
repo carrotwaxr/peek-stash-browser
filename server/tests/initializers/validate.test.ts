@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { validateStartup } from "../../initializers/validate.js";
 import { logger } from "../../utils/logger.js";
+import { must } from "../helpers/must.js";
 
 vi.mock("../../utils/logger.js", () => ({
   logger: {
@@ -33,21 +34,14 @@ const warnings = () =>
   vi.mocked(logger.warn).mock.calls.map(([message]) => message);
 
 describe("validateStartup", () => {
-  const saved: Record<string, string | undefined> = {};
-
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const key of ENV_KEYS) {
-      saved[key] = process.env[key];
-      delete process.env[key];
-    }
+    // Unset each key; unstubAllEnvs restores the values from before the test
+    for (const key of ENV_KEYS) vi.stubEnv(key, undefined);
   });
 
   afterEach(() => {
-    for (const key of ENV_KEYS) {
-      if (saved[key] === undefined) delete process.env[key];
-      else process.env[key] = saved[key];
-    }
+    vi.unstubAllEnvs();
   });
 
   it("reports whether STASH_API_KEY is set, never its characters", () => {
@@ -115,7 +109,7 @@ describe("validateStartup", () => {
     validateStartup();
 
     expect(logger.error).toHaveBeenCalledTimes(1);
-    const [message] = vi.mocked(logger.error).mock.calls[0]!;
+    const [message] = must(vi.mocked(logger).error.mock.calls[0]);
     expect(message).toContain("PROXY_AUTH_TRUSTED_IPS");
     expect(message).toContain("nope");
     expect(message).toContain("300.1.1.1");

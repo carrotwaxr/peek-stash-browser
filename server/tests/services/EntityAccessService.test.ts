@@ -79,18 +79,29 @@ describe("EntityAccessService", () => {
       async (entityType, table) => {
         await canUserAccessEntity(7, entityType, "42", "inst-a");
 
-        const { sql, params } = call();
-        expect(sql).toContain(`FROM ${table} x`);
-        if (entityType === "clip") {
-          expect(sql).toContain("JOIN StashScene cs");
-          expect(sql).toContain("es.entityType = 'scene'");
-          expect(params).toEqual(["42", "inst-a", 7, 7, 7, "clip", 7]);
-        } else {
-          expect(sql).not.toContain("JOIN StashScene cs");
-          expect(params).toEqual(["42", "inst-a", 7, 7, 7, entityType]);
-        }
+        expect(call().sql).toContain(`FROM ${table} x`);
       }
     );
+
+    it.each(TABLES.filter(([entityType]) => entityType !== "clip"))(
+      "checks a %s against its own row only",
+      async (entityType) => {
+        await canUserAccessEntity(7, entityType, "42", "inst-a");
+
+        const { sql, params } = call();
+        expect(sql).not.toContain("JOIN StashScene cs");
+        expect(params).toEqual(["42", "inst-a", 7, 7, 7, entityType]);
+      }
+    );
+
+    it("checks a clip against its scene's exclusions as well", async () => {
+      await canUserAccessEntity(7, "clip", "42", "inst-a");
+
+      const { sql, params } = call();
+      expect(sql).toContain("JOIN StashScene cs");
+      expect(sql).toContain("es.entityType = 'scene'");
+      expect(params).toEqual(["42", "inst-a", 7, 7, 7, "clip", 7]);
+    });
 
     it("returns false without a query for an empty id or instance", async () => {
       await expect(canUserAccessEntity(7, "scene", "", "inst-a")).resolves.toBe(

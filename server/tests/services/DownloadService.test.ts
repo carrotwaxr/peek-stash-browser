@@ -226,7 +226,7 @@ describe("DownloadService", () => {
       expect(size).toBe(BigInt(3000000));
       expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
       const [sql, ...params] = must(
-        vi.mocked(prisma.$queryRawUnsafe).mock.calls[0]
+        vi.mocked(prisma).$queryRawUnsafe.mock.calls[0]
       );
       expect(params).toEqual([
         JSON.stringify([

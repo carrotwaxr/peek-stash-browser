@@ -103,11 +103,9 @@ describe("isEntityRef", () => {
 
   it("narrows the type to InstanceAwareId", () => {
     const value = "82:server-1";
-    if (isEntityRef(value)) {
-      // This assignment should compile — isEntityRef is a type guard
-      const _ref: InstanceAwareId = value;
-      expect(_ref).toBe("82:server-1");
-    }
+    // This assignment compiles only because isEntityRef is a type guard
+    const ref: InstanceAwareId | null = isEntityRef(value) ? value : null;
+    expect(ref).toBe("82:server-1");
   });
 });
 

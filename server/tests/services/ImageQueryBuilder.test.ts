@@ -552,11 +552,11 @@ describe("ImageQueryBuilder", () => {
       });
 
       // Different seeds should produce different orders (with enough images)
-      if (result1.images.length >= 2 && result2.images.length >= 2) {
-        const order1 = result1.images.map((i) => i.id).join(",");
-        const order2 = result2.images.map((i) => i.id).join(",");
-        expect(order1).not.toEqual(order2);
-      }
+      expect(result1.images.length).toBeGreaterThanOrEqual(2);
+      expect(result2.images.length).toBeGreaterThanOrEqual(2);
+      const order1 = result1.images.map((i) => i.id).join(",");
+      const order2 = result2.images.map((i) => i.id).join(",");
+      expect(order1).not.toEqual(order2);
     });
 
     it("reverses order when direction changes with same seed", async () => {
@@ -581,11 +581,10 @@ describe("ImageQueryBuilder", () => {
       });
 
       // Same seed with opposite directions should give reversed order
-      if (ascResult.images.length >= 2 && descResult.images.length >= 2) {
-        const ascIds = ascResult.images.map((i) => i.id);
-        const descIds = descResult.images.map((i) => i.id);
-        expect(ascIds).toEqual(descIds.reverse());
-      }
+      expect(ascResult.images.length).toBeGreaterThanOrEqual(2);
+      const ascIds = ascResult.images.map((i) => i.id);
+      const descIds = descResult.images.map((i) => i.id);
+      expect(ascIds).toEqual(descIds.reverse());
     });
   });
 

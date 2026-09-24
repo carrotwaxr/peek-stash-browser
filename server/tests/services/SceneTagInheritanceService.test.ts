@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import prisma from "../../services/../prisma/singleton.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
+
+/** A scene's inherited tag ids, stored as a JSON array of ids. */
+function inheritedTagIdsOf(
+  scene: { inheritedTagIds: string | null } | null
+): string[] {
+  return z.array(z.string()).parse(JSON.parse(scene?.inheritedTagIds || "[]"));
+}
 
 describe("SceneTagInheritanceService", () => {
   // Clean up test data
@@ -81,7 +89,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
@@ -122,7 +130,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
@@ -170,7 +178,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
     });
 
@@ -203,7 +211,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).not.toContain(`${PREFIX}tag-1`);
     });
 
@@ -267,7 +275,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       const tagCount = inheritedTagIds.filter(
         (id: string) => id === `${PREFIX}tag-1`
       ).length;
@@ -288,7 +296,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).toEqual([]);
     });
 
@@ -358,7 +366,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1` },
       });
-      const inheritedTagIds = JSON.parse(scene?.inheritedTagIds || "[]");
+      const inheritedTagIds = inheritedTagIdsOf(scene);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-1`);
       expect(inheritedTagIds).toContain(`${PREFIX}tag-2`);
     });
@@ -414,12 +422,8 @@ describe("SceneTagInheritanceService", () => {
       const sceneB = await prisma.stashScene.findFirst({
         where: { id: `${PREFIX}scene-1`, stashInstanceId: INSTANCE_B },
       });
-      expect(JSON.parse(sceneA?.inheritedTagIds || "[]")).toEqual([
-        `${PREFIX}tag-a`,
-      ]);
-      expect(JSON.parse(sceneB?.inheritedTagIds || "[]")).toEqual([
-        `${PREFIX}tag-b`,
-      ]);
+      expect(inheritedTagIdsOf(sceneA)).toEqual([`${PREFIX}tag-a`]);
+      expect(inheritedTagIdsOf(sceneB)).toEqual([`${PREFIX}tag-b`]);
     });
 
     it("writes inherited tags for a scene whose id contains a quote", async () => {
@@ -463,9 +467,7 @@ describe("SceneTagInheritanceService", () => {
       const scene = await prisma.stashScene.findFirst({
         where: { id: sceneId, stashInstanceId: INSTANCE_ID },
       });
-      expect(JSON.parse(scene?.inheritedTagIds || "[]")).toEqual([
-        `${PREFIX}tag-1`,
-      ]);
+      expect(inheritedTagIdsOf(scene)).toEqual([`${PREFIX}tag-1`]);
     });
   });
 });

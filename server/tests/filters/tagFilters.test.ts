@@ -373,7 +373,7 @@ describe("Tag Filters", () => {
 
       result.forEach((tag) => {
         expect(tag.created_at).toBeTruthy();
-        const tagDate = new Date(tag.created_at!);
+        const tagDate = new Date(must(tag.created_at));
         expect(tagDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });
@@ -393,7 +393,7 @@ describe("Tag Filters", () => {
 
       result.forEach((tag) => {
         expect(tag.created_at).toBeTruthy();
-        const tagDate = new Date(tag.created_at!);
+        const tagDate = new Date(must(tag.created_at));
         expect(tagDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(tagDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
@@ -412,7 +412,7 @@ describe("Tag Filters", () => {
 
       result.forEach((tag) => {
         expect(tag.updated_at).toBeTruthy();
-        const tagDate = new Date(tag.updated_at!);
+        const tagDate = new Date(must(tag.updated_at));
         expect(tagDate.getTime()).toBeLessThan(threshold.getTime());
       });
     });

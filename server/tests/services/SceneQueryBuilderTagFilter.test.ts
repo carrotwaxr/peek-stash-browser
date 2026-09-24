@@ -25,8 +25,8 @@ vi.mock("../../utils/logger.js", () => ({
 
 // Mock hierarchyUtils — expandTagIds should pass through IDs when depth=0
 vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn(async (ids: string[]) => ids),
-  expandStudioIds: vi.fn(async (ids: string[]) => ids),
+  expandTagIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
+  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
 }));
 
 describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {

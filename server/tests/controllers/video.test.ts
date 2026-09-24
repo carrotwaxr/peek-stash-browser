@@ -140,8 +140,8 @@ function proxiedPaths(playlist: string): Array<[string, string | undefined]> {
     .filter((line) => line.trim() && !line.startsWith("#"))
     .map((line) => {
       const afterProxy = line.split("/proxy-stream/")[1] ?? "";
-      const [streamPath, subPath] = afterProxy.split("?")[0]!.split("/");
-      return [streamPath!, subPath];
+      const [streamPath, subPath] = must(afterProxy.split("?")[0]).split("/");
+      return [must(streamPath), subPath];
     });
 }
 
@@ -837,7 +837,7 @@ describe("Video Controller", () => {
           "cache-control",
           "private, max-age=60"
         );
-        const forwarded = mockPipeResponseToClient.mock.calls[0]![3];
+        const forwarded = must(mockPipeResponseToClient.mock.calls[0])[3];
         expect(forwarded).not.toContain("cache-control");
       });
     });
@@ -1293,9 +1293,9 @@ describe("Video Controller", () => {
       );
       expect(body.expiresAt).toBe("2026-09-24T00:00:00.000Z");
 
-      const sig = new URL(body.url, "http://peek.test").searchParams.get(
-        "sig"
-      )!;
+      const sig = must(
+        new URL(body.url, "http://peek.test").searchParams.get("sig")
+      );
       expect(
         isStreamLinkSignatureValid(
           {
@@ -1328,9 +1328,9 @@ describe("Video Controller", () => {
       await createExternalPlayerLink(req, res);
 
       const body = res._getOkBody();
-      const sig = new URL(body.url, "http://peek.test").searchParams.get(
-        "sig"
-      )!;
+      const sig = must(
+        new URL(body.url, "http://peek.test").searchParams.get("sig")
+      );
       expect(
         isStreamLinkSignatureValid(
           {

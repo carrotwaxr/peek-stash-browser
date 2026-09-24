@@ -451,7 +451,7 @@ describe("Studio Filters", () => {
 
       result.forEach((studio) => {
         expect(studio.created_at).toBeTruthy();
-        const studioDate = new Date(studio.created_at!);
+        const studioDate = new Date(must(studio.created_at));
         expect(studioDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });
@@ -471,7 +471,7 @@ describe("Studio Filters", () => {
 
       result.forEach((studio) => {
         expect(studio.created_at).toBeTruthy();
-        const studioDate = new Date(studio.created_at!);
+        const studioDate = new Date(must(studio.created_at));
         expect(studioDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(studioDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
@@ -490,7 +490,7 @@ describe("Studio Filters", () => {
 
       result.forEach((studio) => {
         expect(studio.updated_at).toBeTruthy();
-        const studioDate = new Date(studio.updated_at!);
+        const studioDate = new Date(must(studio.updated_at));
         expect(studioDate.getTime()).toBeLessThan(threshold.getTime());
       });
     });

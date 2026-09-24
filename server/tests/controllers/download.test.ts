@@ -1,5 +1,4 @@
 import type { Download } from "@prisma/client";
-import type { Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deleteDownload,
@@ -17,8 +16,13 @@ import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
-import { reqFor } from "../helpers/controllerTestUtils.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { downloadRow } from "../helpers/fixtures.js";
+import {
+  anyOf,
+  objectContaining,
+  stringContaining,
+} from "../helpers/matchers.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -100,36 +104,8 @@ const okStream = () =>
   });
 
 describe("Download Controller", () => {
-  let mockResponse: Partial<Response>;
-  let responseJson: ReturnType<typeof vi.fn>;
-  let responseStatus: ReturnType<typeof vi.fn>;
-  let responseSendFile: ReturnType<typeof vi.fn>;
-  let responseRedirect: ReturnType<typeof vi.fn>;
-  let responseSetHeader: ReturnType<typeof vi.fn>;
-  let responseWrite: ReturnType<typeof vi.fn>;
-  let responseEnd: ReturnType<typeof vi.fn>;
-  let responseOn: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    responseJson = vi.fn();
-    responseSendFile = vi.fn();
-    responseRedirect = vi.fn();
-    responseSetHeader = vi.fn();
-    responseWrite = vi.fn();
-    responseEnd = vi.fn();
-    responseOn = vi.fn();
-    responseStatus = vi.fn(() => ({ json: responseJson }));
-    mockResponse = {
-      json: responseJson,
-      status: responseStatus,
-      sendFile: responseSendFile,
-      redirect: responseRedirect,
-      setHeader: responseSetHeader,
-      write: responseWrite,
-      end: responseEnd,
-      on: responseOn,
-    };
 
     // Mock global fetch for scene/image downloads
     global.fetch = vi.fn();
@@ -144,6 +120,8 @@ describe("Download Controller", () => {
 
   describe("startSceneDownload", () => {
     it("should return 403 if user does not have canDownloadFiles permission", async () => {
+      const res = resFor(startSceneDownload);
+
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: false,
@@ -160,16 +138,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { sceneId: "scene-123" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download files",
       });
     });
 
     it("should create scene download and return serialized download on success", async () => {
+      const res = resFor(startSceneDownload);
+
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: true,
@@ -206,7 +186,7 @@ describe("Download Controller", () => {
           params: { sceneId: "scene-123" },
           body: { instanceId: "inst-a" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.createSceneDownload).toHaveBeenCalledWith(
@@ -214,8 +194,8 @@ describe("Download Controller", () => {
         "scene-123",
         "inst-a"
       );
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({
           id: 1,
           type: "SCENE",
           instanceId: "inst-a",
@@ -225,23 +205,27 @@ describe("Download Controller", () => {
     });
 
     it("returns 400 without an instanceId", async () => {
+      const res = resFor(startSceneDownload);
+
       await startSceneDownload(
         reqFor(startSceneDownload, {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { sceneId: "scene-123" },
           body: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "instanceId is required",
       });
       expect(mockDownloadService.createSceneDownload).not.toHaveBeenCalled();
     });
 
     it("returns 404 when the user cannot see the scene", async () => {
+      const res = resFor(startSceneDownload);
+
       mockCanUserAccessEntity.mockResolvedValue(false);
 
       await startSceneDownload(
@@ -250,7 +234,7 @@ describe("Download Controller", () => {
           params: { sceneId: "scene-123" },
           body: { instanceId: "inst-b" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
@@ -259,12 +243,14 @@ describe("Download Controller", () => {
         "scene-123",
         "inst-b"
       );
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Scene not found" });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
       expect(mockDownloadService.createSceneDownload).not.toHaveBeenCalled();
     });
 
     it("passes the instance to the service", async () => {
+      const res = resFor(startSceneDownload);
+
       mockDownloadService.createSceneDownload.mockResolvedValue(
         downloadRow({ instanceId: "inst-b" })
       );
@@ -275,7 +261,7 @@ describe("Download Controller", () => {
           params: { sceneId: "scene-123" },
           body: { instanceId: "inst-b" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.createSceneDownload).toHaveBeenCalledWith(
@@ -283,31 +269,35 @@ describe("Download Controller", () => {
         "scene-123",
         "inst-b"
       );
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({ instanceId: "inst-b" }),
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ instanceId: "inst-b" }),
       });
     });
   });
 
   describe("startImageDownload", () => {
     it("returns 400 without an instanceId", async () => {
+      const res = resFor(startImageDownload);
+
       await startImageDownload(
         reqFor(startImageDownload, {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { imageId: "image-456" },
           body: {},
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "instanceId is required",
       });
       expect(mockDownloadService.createImageDownload).not.toHaveBeenCalled();
     });
 
     it("returns 404 when the user cannot see the image", async () => {
+      const res = resFor(startImageDownload);
+
       mockCanUserAccessEntity.mockResolvedValue(false);
 
       await startImageDownload(
@@ -316,7 +306,7 @@ describe("Download Controller", () => {
           params: { imageId: "image-456" },
           body: { instanceId: "inst-b" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
@@ -325,12 +315,14 @@ describe("Download Controller", () => {
         "image-456",
         "inst-b"
       );
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Image not found" });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Image not found" });
       expect(mockDownloadService.createImageDownload).not.toHaveBeenCalled();
     });
 
     it("passes the instance to the service", async () => {
+      const res = resFor(startImageDownload);
+
       mockDownloadService.createImageDownload.mockResolvedValue(
         downloadRow({
           type: "IMAGE",
@@ -346,7 +338,7 @@ describe("Download Controller", () => {
           params: { imageId: "image-456" },
           body: { instanceId: "inst-b" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.createImageDownload).toHaveBeenCalledWith(
@@ -354,14 +346,16 @@ describe("Download Controller", () => {
         "image-456",
         "inst-b"
       );
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({ type: "IMAGE" }),
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ type: "IMAGE" }),
       });
     });
   });
 
   describe("startPlaylistDownload", () => {
     it("should return 400 if playlist exceeds maximum size", async () => {
+      const res = resFor(startPlaylistDownload);
+
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: false,
@@ -383,17 +377,19 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Playlist exceeds maximum download size",
-        details: expect.stringContaining("max: 10240MB"),
+        details: stringContaining("max: 10240MB"),
       });
     });
 
     it("should return 403 if user does not have canDownloadPlaylists permission", async () => {
+      const res = resFor(startPlaylistDownload);
+
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: true,
@@ -410,16 +406,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download playlists",
       });
     });
 
     it("returns 404 when the playlist is not the user's or shared with them", async () => {
+      const res = resFor(startPlaylistDownload);
+
       mockGetPlaylistAccess.mockResolvedValue({ level: "none" });
 
       await startPlaylistDownload(
@@ -427,18 +425,20 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockGetPlaylistAccess).toHaveBeenCalledWith(5, 1);
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Playlist not found",
       });
       expect(mockDownloadService.createPlaylistDownload).not.toHaveBeenCalled();
     });
 
     it("lets a shared recipient download", async () => {
+      const res = resFor(startPlaylistDownload);
+
       mockGetPlaylistAccess.mockResolvedValue({
         level: "shared",
         groups: ["friends"],
@@ -464,19 +464,21 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.createPlaylistDownload).toHaveBeenCalledWith(
         1,
         5
       );
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({ type: "PLAYLIST", playlistId: 5 }),
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ type: "PLAYLIST", playlistId: 5 }),
       });
     });
 
     it("returns 400 when no scene is downloadable", async () => {
+      const res = resFor(startPlaylistDownload);
+
       mockDownloadService.getDownloadablePlaylistItems.mockResolvedValue([]);
 
       await startPlaylistDownload(
@@ -484,14 +486,14 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(
         mockDownloadService.getDownloadablePlaylistItems
       ).toHaveBeenCalledWith(1, 5);
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "This playlist has no scenes you can download",
       });
       expect(mockDownloadService.calculatePlaylistSize).not.toHaveBeenCalled();
@@ -499,6 +501,8 @@ describe("Download Controller", () => {
     });
 
     it("sizes only the downloadable items", async () => {
+      const res = resFor(startPlaylistDownload);
+
       const items = [
         { sceneId: "s1", instanceId: "inst-a" },
         { sceneId: "s1", instanceId: "inst-b" },
@@ -513,7 +517,7 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { playlistId: "5" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.calculatePlaylistSize).toHaveBeenCalledWith(
@@ -524,6 +528,8 @@ describe("Download Controller", () => {
 
   describe("getUserDownloads", () => {
     it("should return serialized downloads for the user", async () => {
+      const res = resFor(getUserDownloads);
+
       const mockDownloads: Download[] = [
         {
           id: 1,
@@ -568,11 +574,11 @@ describe("Download Controller", () => {
         reqFor(getUserDownloads, {
           user: { id: 1, username: "testuser", role: "USER" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.getUserDownloads).toHaveBeenCalledWith(1);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         downloads: [
           expect.objectContaining({
             id: 1,
@@ -590,20 +596,24 @@ describe("Download Controller", () => {
     });
 
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(getUserDownloads);
+
       await getUserDownloads(
         reqFor(getUserDownloads, {
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Unauthorized" });
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
     });
   });
 
   describe("getDownloadStatus", () => {
     it("should return download status for own download", async () => {
+      const res = resFor(getDownloadStatus);
+
       const mockDownload: Download = {
         id: 1,
         userId: 1,
@@ -629,15 +639,17 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({ id: 1 }),
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ id: 1 }),
       });
     });
 
     it("should return 403 if user does not own the download", async () => {
+      const res = resFor(getDownloadStatus);
+
       const mockDownload: Download = {
         id: 1,
         userId: 2, // Different user
@@ -663,14 +675,16 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Access denied" });
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: "Access denied" });
     });
 
     it("should return 404 if download not found", async () => {
+      const res = resFor(getDownloadStatus);
+
       mockDownloadService.getDownload.mockResolvedValue(null);
 
       await getDownloadStatus(
@@ -678,11 +692,11 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "999" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Download not found",
       });
     });
@@ -690,6 +704,8 @@ describe("Download Controller", () => {
 
   describe("getDownloadFile", () => {
     it("should proxy scene stream with Content-Disposition for SCENE downloads", async () => {
+      const res = resFor(getDownloadFile);
+
       const mockDownload: Download = {
         id: 1,
         userId: 1,
@@ -725,26 +741,28 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(global.fetch).toHaveBeenCalledWith(
         "http://stash-inst-a:9999/scene/scene-123/stream",
-        { headers: { ApiKey: "key-inst-a" }, signal: expect.any(AbortSignal) }
+        { headers: { ApiKey: "key-inst-a" }, signal: anyOf(AbortSignal) }
       );
-      expect(responseSetHeader).toHaveBeenCalledWith(
+      expect(res.setHeader).toHaveBeenCalledWith(
         "Content-Disposition",
         "attachment; filename=\"test.mp4\"; filename*=UTF-8''test.mp4"
       );
       expect(mockPipeResponseToClient).toHaveBeenCalledWith(
         expect.objectContaining({ ok: true }),
-        mockResponse,
+        res,
         "[DOWNLOAD]",
         ["content-type", "content-length"]
       );
     });
 
     it("should proxy image with Content-Disposition for IMAGE downloads", async () => {
+      const res = resFor(getDownloadFile);
+
       const mockDownload: Download = {
         id: 1,
         userId: 1,
@@ -780,26 +798,30 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(global.fetch).toHaveBeenCalledWith(
         "http://stash-inst-a:9999/image/image-456/image",
-        { headers: { ApiKey: "key-inst-a" }, signal: expect.any(AbortSignal) }
+        { headers: { ApiKey: "key-inst-a" }, signal: anyOf(AbortSignal) }
       );
-      expect(responseSetHeader).toHaveBeenCalledWith(
+      expect(res.setHeader).toHaveBeenCalledWith(
         "Content-Disposition",
         "attachment; filename=\"test.jpg\"; filename*=UTF-8''test.jpg"
       );
       expect(mockPipeResponseToClient).toHaveBeenCalledWith(
         expect.objectContaining({ ok: true }),
-        mockResponse,
+        res,
         "[DOWNLOAD]",
         ["content-type", "content-length"]
       );
     });
 
     it("should serve a completed PLAYLIST zip with an RFC 6266 Content-Disposition", async () => {
+      const res = resFor(getDownloadFile);
+      res.sendFile =
+        vi.fn<(path: string, options?: unknown, fn?: unknown) => void>();
+
       const mockDownload: Download = {
         id: 1,
         userId: 1,
@@ -825,10 +847,10 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseSendFile).toHaveBeenCalledWith("/tmp/p.zip", {
+      expect(res.sendFile).toHaveBeenCalledWith("/tmp/p.zip", {
         headers: {
           "Content-Disposition":
             "attachment; filename=\"Kate_s picks.zip\"; filename*=UTF-8''Kate%E2%80%99s%20picks.zip",
@@ -837,6 +859,8 @@ describe("Download Controller", () => {
     });
 
     it("should return 400 if download is not completed", async () => {
+      const res = resFor(getDownloadFile);
+
       const mockDownload: Download = {
         id: 1,
         userId: 1,
@@ -862,17 +886,19 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Download is not ready",
         details: "Current status: PROCESSING",
       });
     });
 
     it("streams a scene from its own instance", async () => {
+      const res = resFor(getDownloadFile);
+
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({ instanceId: "inst-b" })
       );
@@ -883,7 +909,7 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
@@ -894,11 +920,13 @@ describe("Download Controller", () => {
       );
       expect(global.fetch).toHaveBeenCalledWith(
         "http://stash-inst-b:9999/scene/scene-123/stream",
-        { headers: { ApiKey: "key-inst-b" }, signal: expect.any(AbortSignal) }
+        { headers: { ApiKey: "key-inst-b" }, signal: anyOf(AbortSignal) }
       );
     });
 
     it("returns 404 and fetches nothing when scene access was revoked", async () => {
+      const res = resFor(getDownloadFile);
+
       mockDownloadService.getDownload.mockResolvedValue(downloadRow());
       mockCanUserAccessEntity.mockResolvedValue(false);
 
@@ -907,17 +935,19 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Download not found",
       });
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("returns 403 when the files permission was revoked", async () => {
+      const res = resFor(getDownloadFile);
+
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({
           type: "IMAGE",
@@ -935,17 +965,19 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download files",
       });
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("returns 410 for a scene download with no stored instance", async () => {
+      const res = resFor(getDownloadFile);
+
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({ instanceId: "" })
       );
@@ -955,11 +987,11 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(410);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(410);
+      expect(res.json).toHaveBeenCalledWith({
         error: "This download has expired. Download it again.",
       });
       expect(global.fetch).not.toHaveBeenCalled();
@@ -968,6 +1000,10 @@ describe("Download Controller", () => {
     it.each(["SCENE", "IMAGE", "PLAYLIST"] as const)(
       "returns 410 for an EXPIRED download of any type, before the status check (%s)",
       async (type) => {
+        const res = resFor(getDownloadFile);
+        res.sendFile =
+          vi.fn<(path: string, options?: unknown, fn?: unknown) => void>();
+
         mockDownloadService.getDownload.mockResolvedValue(
           downloadRow({
             type,
@@ -982,19 +1018,23 @@ describe("Download Controller", () => {
             user: { id: 1, username: "testuser", role: "USER" },
             params: { id: "1" },
           }),
-          mockResponse as Response
+          res
         );
 
-        expect(responseStatus).toHaveBeenCalledWith(410);
-        expect(responseJson).toHaveBeenCalledWith({
+        expect(res.status).toHaveBeenCalledWith(410);
+        expect(res.json).toHaveBeenCalledWith({
           error: "This download has expired. Download it again.",
         });
         expect(global.fetch).not.toHaveBeenCalled();
-        expect(responseSendFile).not.toHaveBeenCalled();
+        expect(res.sendFile).not.toHaveBeenCalled();
       }
     );
 
     it("serves a zip only while the playlist is accessible", async () => {
+      const res = resFor(getDownloadFile);
+      res.sendFile =
+        vi.fn<(path: string, options?: unknown, fn?: unknown) => void>();
+
       const zipRow = downloadRow({
         type: "PLAYLIST",
         entityType: null,
@@ -1012,18 +1052,22 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockGetPlaylistAccess).toHaveBeenCalledWith(5, 1);
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Download not found",
       });
-      expect(responseSendFile).not.toHaveBeenCalled();
+      expect(res.sendFile).not.toHaveBeenCalled();
     });
 
     it("returns 403 for a zip when the playlist permission was revoked", async () => {
+      const res = resFor(getDownloadFile);
+      res.sendFile =
+        vi.fn<(path: string, options?: unknown, fn?: unknown) => void>();
+
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({
           type: "PLAYLIST",
@@ -1045,19 +1089,21 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download playlists",
       });
-      expect(responseSendFile).not.toHaveBeenCalled();
+      expect(res.sendFile).not.toHaveBeenCalled();
     });
   });
 
   describe("deleteDownload", () => {
     it("should delete download successfully", async () => {
+      const res = resFor(deleteDownload);
+
       mockDownloadService.deleteDownload.mockResolvedValue(undefined);
 
       await deleteDownload(
@@ -1065,17 +1111,19 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.deleteDownload).toHaveBeenCalledWith(1, 1);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: "Download deleted",
       });
     });
 
     it("should return 404 if download not found", async () => {
+      const res = resFor(deleteDownload);
+
       mockDownloadService.deleteDownload.mockRejectedValue(
         new Error("Download not found")
       );
@@ -1085,16 +1133,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "999" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Download not found",
       });
     });
 
     it("should return 403 if user not authorized", async () => {
+      const res = resFor(deleteDownload);
+
       mockDownloadService.deleteDownload.mockRejectedValue(
         new Error("Not authorized to delete this download")
       );
@@ -1104,16 +1154,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({ error: "Access denied" });
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: "Access denied" });
     });
   });
 
   describe("retryDownload", () => {
     it("should retry failed playlist download", async () => {
+      const res = resFor(retryDownload);
+
       const failedDownload: Download = {
         id: 1,
         userId: 1,
@@ -1150,16 +1202,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockDownloadService.updateProgress).toHaveBeenCalledWith(1, 0);
-      expect(responseJson).toHaveBeenCalledWith({
-        download: expect.objectContaining({ id: 1, status: "PROCESSING" }),
+      expect(res.json).toHaveBeenCalledWith({
+        download: objectContaining({ id: 1, status: "PROCESSING" }),
       });
     });
 
     it("should return 400 if download is not PLAYLIST type", async () => {
+      const res = resFor(retryDownload);
+
       // Need to clear mocks to remove previous mockResolvedValueOnce calls
       mockDownloadService.getDownload.mockReset();
 
@@ -1188,16 +1242,18 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Only playlist downloads can be retried",
       });
     });
 
     it("should return 400 if download status is not FAILED", async () => {
+      const res = resFor(retryDownload);
+
       mockDownloadService.getDownload.mockReset();
 
       const completedDownload: Download = {
@@ -1225,11 +1281,11 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Only failed downloads can be retried",
         details: "Current status: COMPLETED",
       });
@@ -1251,6 +1307,8 @@ describe("Download Controller", () => {
       });
 
     it("returns 404 when the playlist is no longer accessible", async () => {
+      const res = resFor(retryDownload);
+
       mockDownloadService.getDownload.mockReset();
       mockDownloadService.getDownload.mockResolvedValue(failedZip());
       mockGetPlaylistAccess.mockResolvedValue({ level: "none" });
@@ -1260,12 +1318,12 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockGetPlaylistAccess).toHaveBeenCalledWith(5, 1);
-      expect(responseStatus).toHaveBeenCalledWith(404);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Playlist not found",
       });
       expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();
@@ -1273,6 +1331,8 @@ describe("Download Controller", () => {
     });
 
     it("returns 403 when the playlist permission was revoked", async () => {
+      const res = resFor(retryDownload);
+
       mockDownloadService.getDownload.mockReset();
       mockDownloadService.getDownload.mockResolvedValue(failedZip());
       mockResolveUserPermissions.mockResolvedValue({
@@ -1285,11 +1345,11 @@ describe("Download Controller", () => {
           user: { id: 1, username: "testuser", role: "USER" },
           params: { id: "1" },
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "You do not have permission to download playlists",
       });
       expect(mockPlaylistZipService.createZip).not.toHaveBeenCalled();

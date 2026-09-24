@@ -15,6 +15,7 @@ import {
   parseStashMediaPath,
   pickStreamQuery,
 } from "../../utils/stashMediaPath.js";
+import { must } from "../helpers/must.js";
 
 describe("parseStashMediaPath", () => {
   it.each([
@@ -80,9 +81,9 @@ describe("parseStashMediaPath", () => {
   ])("accepts %s", (raw, entities, search) => {
     const target = parseStashMediaPath(raw);
     expect(target).not.toBeNull();
-    expect(target!.pathname).toBe(raw.split("?")[0]);
-    expect(target!.entities).toEqual(entities);
-    expect(target!.search.toString()).toBe(search);
+    expect(must(target).pathname).toBe(raw.split("?")[0]);
+    expect(must(target).entities).toEqual(entities);
+    expect(must(target).search.toString()).toBe(search);
   });
 
   it.each([
@@ -111,14 +112,14 @@ describe("parseStashMediaPath", () => {
       "/scene/1/screenshot?t=5&apikey=evil&x=1&default=maybe"
     );
     expect(target).not.toBeNull();
-    expect(target!.search.toString()).toBe("t=5");
+    expect(must(target).search.toString()).toBe("t=5");
   });
 
   it("rejects control characters and a non-numeric t", () => {
     expect(parseStashMediaPath("/scene/1/screenshot\n")).toBeNull();
-    expect(parseStashMediaPath("/scene/1/screenshot?t=abc")!.search.size).toBe(
-      0
-    );
+    expect(
+      must(parseStashMediaPath("/scene/1/screenshot?t=abc")).search.size
+    ).toBe(0);
   });
 });
 

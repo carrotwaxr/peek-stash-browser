@@ -223,13 +223,13 @@ describe("Stats Controller", () => {
   // ─── refreshCache ─────────────────────────────────────────────────────────
 
   describe("refreshCache", () => {
-    it("triggers fullSync and returns success", async () => {
+    it("triggers fullSync and returns success", () => {
       mockSyncService.fullSync.mockResolvedValue([]);
 
       const req = reqFor(refreshCache);
       const res = resFor(refreshCache);
 
-      await refreshCache(req, res);
+      refreshCache(req, res);
 
       expect(mockSyncService.fullSync).toHaveBeenCalled();
       expect(res._getStatus()).toBe(200);
@@ -239,7 +239,7 @@ describe("Stats Controller", () => {
       });
     });
 
-    it("returns 500 when fullSync throws synchronously", async () => {
+    it("returns 500 when fullSync throws synchronously", () => {
       mockSyncService.fullSync.mockImplementation(() => {
         throw new Error("Sync failed hard");
       });
@@ -247,7 +247,7 @@ describe("Stats Controller", () => {
       const req = reqFor(refreshCache);
       const res = resFor(refreshCache);
 
-      await refreshCache(req, res);
+      refreshCache(req, res);
 
       expect(res._getStatus()).toBe(500);
       expect(res._getBody()).toMatchObject({

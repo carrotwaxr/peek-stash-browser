@@ -36,7 +36,7 @@ describe("createPrismaMock", () => {
       prisma.$transaction([prisma.user.count(), prisma.user.findMany()])
     ).resolves.toEqual([3, []]);
     await expect(
-      prisma.$transaction(async (tx) => tx === prisma)
+      prisma.$transaction((tx) => Promise.resolve(tx === prisma))
     ).resolves.toBe(true);
 
     vi.resetAllMocks();
@@ -47,7 +47,7 @@ describe("createPrismaMock", () => {
       prisma.$transaction([prisma.user.findMany(), prisma.user.count()])
     ).resolves.toEqual([[], 5]);
     await expect(
-      prisma.$transaction(async (tx) => tx === prisma)
+      prisma.$transaction((tx) => Promise.resolve(tx === prisma))
     ).resolves.toBe(true);
   });
 

@@ -29,6 +29,11 @@ import {
   validateArrayResponse,
   validateResponse,
 } from "../../utils/schemaValidation.js";
+import {
+  anyOf,
+  arrayContaining,
+  objectContaining,
+} from "../helpers/matchers.js";
 
 describe("Reference Schemas", () => {
   describe("PerformerRefSchema", () => {
@@ -373,7 +378,7 @@ describe("Entity Schemas", () => {
     });
 
     it("rejects performer with missing name", () => {
-      const { name, ...invalidPerformer } = validPerformer;
+      const { name: _name, ...invalidPerformer } = validPerformer;
       expect(() => PerformerSchema.parse(invalidPerformer)).toThrow();
     });
   });
@@ -980,12 +985,9 @@ describe("Validation Utilities", () => {
       }
       expect(logger.error).toHaveBeenCalledWith(
         "Schema validation failed for test context",
-        expect.objectContaining({
-          issues: expect.arrayContaining([
-            expect.objectContaining({
-              path: "id",
-              code: expect.any(String),
-            }),
+        objectContaining({
+          issues: arrayContaining([
+            objectContaining({ path: "id", code: anyOf(String) }),
           ]),
         })
       );
@@ -995,7 +997,7 @@ describe("Validation Utilities", () => {
       const NestedSchema = z.object({
         user: z.object({
           profile: z.object({
-            email: z.string().email(),
+            email: z.email(),
           }),
         }),
       });
@@ -1007,11 +1009,9 @@ describe("Validation Utilities", () => {
       }
       expect(logger.error).toHaveBeenCalledWith(
         "Schema validation failed for nested",
-        expect.objectContaining({
-          issues: expect.arrayContaining([
-            expect.objectContaining({
-              path: "user.profile.email",
-            }),
+        objectContaining({
+          issues: arrayContaining([
+            objectContaining({ path: "user.profile.email" }),
           ]),
         })
       );

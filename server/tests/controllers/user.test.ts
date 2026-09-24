@@ -27,9 +27,9 @@ import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import type { UserRestriction } from "../../types/api/index.js";
 import { validatePassword } from "../../utils/passwordValidation.js";
-import { formatRecoveryKey } from "../../utils/recoveryKey.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { type UserWithGroups, userRow } from "../helpers/fixtures.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -44,11 +44,17 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-// Mock bcryptjs
+// Mock bcryptjs. `compare` is typed as its promise overload, the one the
+// controller calls (the mocked module's type is the callback overload).
+const { mockCompare } = vi.hoisted(() => ({
+  mockCompare: vi
+    .fn<(password: string, hash: string) => Promise<boolean>>()
+    .mockResolvedValue(true),
+}));
 vi.mock("bcryptjs", () => ({
   default: {
     hash: vi.fn().mockResolvedValue("hashed-password"),
-    compare: vi.fn().mockResolvedValue(true),
+    compare: mockCompare,
   },
 }));
 
@@ -315,7 +321,7 @@ describe("User Controller", () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 1 },
-          data: expect.objectContaining({ syncToStash: true }),
+          data: objectContaining({ syncToStash: true }),
         })
       );
     });
@@ -522,7 +528,7 @@ describe("User Controller", () => {
           password: "hashed",
         })
       );
-      mockBcrypt.compare.mockImplementation(async () => false);
+      mockCompare.mockResolvedValue(false);
       const req = reqFor(changePassword, {
         body: { currentPassword: "wrong", newPassword: "NewPass1" },
         user: USER,
@@ -541,7 +547,7 @@ describe("User Controller", () => {
           password: "hashed",
         })
       );
-      mockBcrypt.compare.mockImplementation(async () => true);
+      mockCompare.mockResolvedValue(true);
       mockPrisma.user.update.mockResolvedValue(userRow());
       const req = reqFor(changePassword, {
         body: { currentPassword: "OldPass1", newPassword: "NewPass1" },
@@ -556,7 +562,7 @@ describe("User Controller", () => {
           where: { id: 2 },
           data: {
             password: "hashed-password",
-            passwordChangedAt: expect.any(Date),
+            passwordChangedAt: anyOf(Date),
           },
         })
       );
@@ -645,7 +651,7 @@ describe("User Controller", () => {
           password: "hashed",
         })
       );
-      mockBcrypt.compare.mockImplementation(async () => false);
+      mockCompare.mockResolvedValue(false);
       const req = reqFor(regenerateRecoveryKey, {
         body: { currentPassword: "wrong" },
         user: USER,
@@ -665,7 +671,7 @@ describe("User Controller", () => {
           password: "hashed",
         })
       );
-      mockBcrypt.compare.mockImplementation(async () => true);
+      mockCompare.mockResolvedValue(true);
       mockPrisma.user.update.mockResolvedValue(userRow());
       const req = reqFor(regenerateRecoveryKey, {
         body: { currentPassword: "OldPass1" },
@@ -673,7 +679,7 @@ describe("User Controller", () => {
       });
       const res = resFor(regenerateRecoveryKey);
       await regenerateRecoveryKey(req, res);
-      expect(mockBcrypt.compare).toHaveBeenCalledWith("OldPass1", "hashed");
+      expect(mockCompare).toHaveBeenCalledWith("OldPass1", "hashed");
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: 2 },
         data: { recoveryKeyHash: "hashed-key" },
@@ -760,7 +766,7 @@ describe("User Controller", () => {
           where: { id: 3 },
           data: {
             password: "hashed-password",
-            passwordChangedAt: expect.any(Date),
+            passwordChangedAt: anyOf(Date),
           },
         })
       );
@@ -922,7 +928,7 @@ describe("User Controller", () => {
       expect(res._getOkBody().user.username).toBe("new");
       expect(mockPrisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ role: "USER" }),
+          data: objectContaining({ role: "USER" }),
         })
       );
     });
@@ -1076,8 +1082,9 @@ describe("User Controller", () => {
           });
         })
       );
-      mockExclusions.recomputeForUser.mockImplementation(async () => {
+      mockExclusions.recomputeForUser.mockImplementation(() => {
         order.push("recompute");
+        return Promise.resolve();
       });
       const req = reqFor(updateUserRole, {
         body: { role: "USER" },
@@ -1333,8 +1340,9 @@ describe("User Controller", () => {
           return [{ count: 0 }, { count: 1 }];
         })
       );
-      mockExclusions.recomputeForUser.mockImplementation(async () => {
+      mockExclusions.recomputeForUser.mockImplementation(() => {
         order.push("recompute");
+        return Promise.resolve();
       });
       const req = reqFor(updateUserRestrictions, {
         body: { restrictions: [tagRule("EXCLUDE")] },

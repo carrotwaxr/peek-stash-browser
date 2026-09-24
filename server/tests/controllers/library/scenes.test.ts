@@ -20,10 +20,7 @@ import {
 } from "../../../graphql/generated/graphql.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
-import {
-  countUserCriteria,
-  hasAnyCriteria,
-} from "../../../services/RecommendationScoringService.js";
+import { hasAnyCriteria } from "../../../services/RecommendationScoringService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
@@ -196,7 +193,6 @@ const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
-const mockCountUserCriteria = vi.mocked(countUserCriteria);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -274,8 +270,8 @@ describe("addStreamabilityInfo", () => {
     const scenes = [createMockScene({ id: "a" }), createMockScene({ id: "b" })];
     const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
 
-    expect(result[0]!.isStreamable).toBe(true);
-    expect(result[1]!.isStreamable).toBe(false);
+    expect(must(result[0]).isStreamable).toBe(true);
+    expect(must(result[1]).isStreamable).toBe(false);
   });
 });
 
@@ -1581,8 +1577,8 @@ describe("mergeScenesWithUserData", () => {
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
 
     const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]!.performers[0]!.favorite).toBe(true);
-    expect(result[0]!.performers[1]!.favorite).toBe(false);
+    expect(must(must(result[0]).performers[0]).favorite).toBe(true);
+    expect(must(must(result[0]).performers[1]).favorite).toBe(false);
   });
 
   it("updates nested studio favorite", async () => {
@@ -1606,7 +1602,7 @@ describe("mergeScenesWithUserData", () => {
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
 
     const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]!.studio!.favorite).toBe(true);
+    expect(must(must(result[0]).studio).favorite).toBe(true);
   });
 
   it("updates nested tag favorites", async () => {
@@ -1632,7 +1628,7 @@ describe("mergeScenesWithUserData", () => {
     ]);
 
     const result = await mergeScenesWithUserData(scenes, 1);
-    expect(result[0]!.tags[0]!.favorite).toBe(true);
+    expect(must(must(result[0]).tags[0]).favorite).toBe(true);
   });
 
   it("uses targeted query for small scene sets (< 100)", async () => {

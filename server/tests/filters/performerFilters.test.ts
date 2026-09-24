@@ -550,7 +550,7 @@ describe("Performer Filters", () => {
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
-        const performerDate = new Date(performer.created_at!);
+        const performerDate = new Date(must(performer.created_at));
         expect(performerDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });
@@ -568,7 +568,7 @@ describe("Performer Filters", () => {
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
-        const performerDate = new Date(performer.created_at!);
+        const performerDate = new Date(must(performer.created_at));
         expect(performerDate.getTime()).toBeLessThan(threshold.getTime());
       });
     });
@@ -588,7 +588,7 @@ describe("Performer Filters", () => {
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
-        const performerDate = new Date(performer.created_at!);
+        const performerDate = new Date(must(performer.created_at));
         expect(performerDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(performerDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
@@ -607,7 +607,7 @@ describe("Performer Filters", () => {
 
       result.forEach((performer) => {
         expect(performer.updated_at).toBeTruthy();
-        const performerDate = new Date(performer.updated_at!);
+        const performerDate = new Date(must(performer.updated_at));
         expect(performerDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });

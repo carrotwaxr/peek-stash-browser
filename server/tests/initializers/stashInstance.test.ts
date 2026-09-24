@@ -7,6 +7,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initializeStashInstances } from "../../initializers/stashInstance.js";
 import prisma from "../../prisma/singleton.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -75,7 +76,7 @@ describe("initializeStashInstances", () => {
       instanceCount: 1,
     });
     expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: objectContaining({
         name: "Default",
         url: "http://stash:9999/graphql",
         apiKey: "test-key",

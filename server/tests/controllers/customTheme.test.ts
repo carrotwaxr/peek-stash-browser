@@ -18,6 +18,7 @@ import {
 } from "../../controllers/customTheme.js";
 import prisma from "../../prisma/singleton.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { objectContaining } from "../helpers/matchers.js";
 
 // Mock prisma — BEFORE imports
 vi.mock(
@@ -805,7 +806,7 @@ describe("Custom Theme Controller", () => {
       );
       expect(mockPrisma.customTheme.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ name: "Cyberpunk (Copy)" }),
+          data: objectContaining({ name: "Cyberpunk (Copy)" }),
         })
       );
     });
@@ -832,7 +833,7 @@ describe("Custom Theme Controller", () => {
       expect(res._getStatus()).toBe(201);
       expect(mockPrisma.customTheme.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ name: "Cyberpunk (Copy 2)" }),
+          data: objectContaining({ name: "Cyberpunk (Copy 2)" }),
         })
       );
     });
@@ -861,7 +862,7 @@ describe("Custom Theme Controller", () => {
       expect(res._getStatus()).toBe(201);
       expect(mockPrisma.customTheme.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ name: "Cyberpunk (Copy 3)" }),
+          data: objectContaining({ name: "Cyberpunk (Copy 3)" }),
         })
       );
     });

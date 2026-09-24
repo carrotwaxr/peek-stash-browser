@@ -11,7 +11,6 @@ import {
   CONNECTION_TEST_FAILED,
   createFirstAdmin,
   createFirstStashInstance,
-  createStashInstance,
   deleteStashInstance,
   getAllStashInstances,
   getSetupStatus,
@@ -26,6 +25,7 @@ import {
   resFor,
   testUser,
 } from "../helpers/controllerTestUtils.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -165,7 +165,7 @@ describe("Setup Controller", () => {
       expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             username: "admin",
             role: "ADMIN",
           }),
@@ -390,7 +390,7 @@ describe("Setup Controller", () => {
       expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             uiUrl: "https://stash.example.com",
           }),
         })
@@ -456,7 +456,7 @@ describe("Setup Controller", () => {
 
       expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ name: "Default" }),
+          data: objectContaining({ name: "Default" }),
         })
       );
     });

@@ -13,6 +13,7 @@
  * for an entity the user cannot see.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { TEST_CONFIG } from "../helpers/config.js";
 import {
@@ -128,7 +129,7 @@ describe("media security", () => {
     expect(response.status).toBe(200);
     expect(JSON.stringify(response.data)).not.toContain("apikey");
 
-    const stashHost = new URL(process.env.STASH_URL!).host;
+    const stashHost = new URL(must(process.env.STASH_URL, "STASH_URL")).host;
     for (const scene of response.data.findScenes.scenes) {
       for (const stream of scene.sceneStreams ?? []) {
         expect(stream.url).not.toContain(stashHost);
@@ -150,7 +151,7 @@ describe("media security", () => {
       expect(res.status).toBe(401);
     });
 
-    it("the same request with a session returns 400", async () => {
+    it("the same GraphQL request with a session returns 400", async () => {
       const res = await media(graphqlViaProxy, { cookie: adminCookie });
       expect(res.status).toBe(400);
     });
@@ -160,7 +161,7 @@ describe("media security", () => {
       expect(res.status).toBe(401);
     });
 
-    it("the same request with a session returns 400", async () => {
+    it("the same traversal with a session returns 400", async () => {
       const res = await media(traversalViaStream, { cookie: adminCookie });
       expect(res.status).toBe(400);
     });

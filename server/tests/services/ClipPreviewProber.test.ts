@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import http from "http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
@@ -71,17 +70,12 @@ describe("ClipPreviewProber", () => {
     let server: http.Server;
     let port: number;
 
-    // Known placeholder values
+    // Known placeholder size
     const PLACEHOLDER_SIZE = 1199;
-    const PLACEHOLDER_MD5 = "c4a2e6b6547057dd0ef0c7d7e3c420d4";
 
-    // Create a fake placeholder content that matches the MD5
-    // Since we don't have the actual placeholder, we'll test the logic with mock content
+    // Placeholder-sized mock content (the real placeholder, and so its MD5,
+    // is not available here)
     const mockPlaceholder = Buffer.alloc(PLACEHOLDER_SIZE, 0);
-    const mockPlaceholderHash = crypto
-      .createHash("md5")
-      .update(mockPlaceholder)
-      .digest("hex");
 
     beforeEach(() => {
       return new Promise<void>((resolve) => {
@@ -96,7 +90,7 @@ describe("ClipPreviewProber", () => {
                 "Content-Range": `bytes 0-0/${content.length}`,
                 "Content-Length": "1",
               });
-              res.end(content.slice(0, 1));
+              res.end(content.subarray(0, 1));
             } else {
               res.writeHead(200, {
                 "Content-Length": content.length.toString(),
@@ -111,7 +105,7 @@ describe("ClipPreviewProber", () => {
                 "Content-Range": `bytes 0-0/${content.length}`,
                 "Content-Length": "1",
               });
-              res.end(content.slice(0, 1));
+              res.end(content.subarray(0, 1));
             } else {
               res.writeHead(200, {
                 "Content-Length": content.length.toString(),
@@ -126,7 +120,7 @@ describe("ClipPreviewProber", () => {
                 "Content-Range": `bytes 0-0/${content.length}`,
                 "Content-Length": "1",
               });
-              res.end(content.slice(0, 1));
+              res.end(content.subarray(0, 1));
             } else {
               res.writeHead(200, {
                 "Content-Length": content.length.toString(),
@@ -141,7 +135,7 @@ describe("ClipPreviewProber", () => {
                 "Content-Range": `bytes 0-0/${mockPlaceholder.length}`,
                 "Content-Length": "1",
               });
-              res.end(mockPlaceholder.slice(0, 1));
+              res.end(mockPlaceholder.subarray(0, 1));
             } else {
               res.writeHead(200, {
                 "Content-Length": mockPlaceholder.length.toString(),

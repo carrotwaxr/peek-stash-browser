@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
 import { ClipService } from "../../services/ClipService.js";
+import { must } from "../helpers/must.js";
 
 describe("ClipService", () => {
   const clipService = new ClipService();
@@ -61,7 +62,7 @@ describe("ClipService", () => {
       const clip = await clipService.getClipById("marker-1", 1);
 
       expect(clip).not.toBeNull();
-      expect(clip!.screenshotUrl).toBe(
+      expect(must(clip).screenshotUrl).toBe(
         `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/42/screenshot")}`
       );
       // Raw screenshotPath should not be exposed
@@ -96,7 +97,7 @@ describe("ClipService", () => {
       const clip = await clipService.getClipById("marker-2", 1);
 
       expect(clip).not.toBeNull();
-      expect(clip!.screenshotUrl).toBeNull();
+      expect(must(clip).screenshotUrl).toBeNull();
     });
 
     it("should include instanceId in screenshot proxy URL for non-default instances", async () => {
@@ -127,7 +128,7 @@ describe("ClipService", () => {
       const clip = await clipService.getClipById("marker-3", 1);
 
       expect(clip).not.toBeNull();
-      expect(clip!.screenshotUrl).toBe(
+      expect(must(clip).screenshotUrl).toBe(
         `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/99/screenshot")}&instanceId=${encodeURIComponent("instance-2")}`
       );
     });

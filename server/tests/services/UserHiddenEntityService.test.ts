@@ -8,6 +8,7 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
+import { anyOf } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
@@ -56,14 +57,16 @@ const mockResolveVisible = vi.mocked(resolveVisibleApartFromOwnHides);
 
 /** Every ref visible: on its own instance, or "shown-instance" for "". */
 function everyRefVisible() {
-  mockResolveVisible.mockImplementation(async (_userId, _type, refs) => {
-    return new Map(
-      refs.map((r) => [
-        entityRefKey(r.id, r.instanceId),
-        r.instanceId || "shown-instance",
-      ])
-    );
-  });
+  mockResolveVisible.mockImplementation((_userId, _type, refs) =>
+    Promise.resolve(
+      new Map(
+        refs.map((r) => [
+          entityRefKey(r.id, r.instanceId),
+          r.instanceId || "shown-instance",
+        ])
+      )
+    )
+  );
 }
 
 describe("UserHiddenEntityService", () => {
@@ -97,7 +100,7 @@ describe("UserHiddenEntityService", () => {
           instanceId: "inst-a",
         },
         update: {
-          hiddenAt: expect.any(Date),
+          hiddenAt: anyOf(Date),
         },
       });
     });

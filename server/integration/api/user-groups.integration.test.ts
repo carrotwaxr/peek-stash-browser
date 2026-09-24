@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
-import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
+import { adminClient, guestClient } from "../helpers/testClient.js";
 
 /**
  * Integration tests for User Groups API
@@ -269,16 +269,18 @@ describe("User Groups API", () => {
         users: Array<{ id: number; username: string; role: string }>;
       }>("/api/user/all");
       expect(usersResponse.ok).toBe(true);
-      const adminUser = usersResponse.data.users.find(
-        (u) => u.username === TEST_ADMIN.username
+      const adminUser = must(
+        usersResponse.data.users.find(
+          (u) => u.username === TEST_ADMIN.username
+        ),
+        "the admin user"
       );
-      expect(adminUser).toBeDefined();
 
       // Add admin as a member
       const addResponse = await adminClient.post(
         `/api/groups/${groupId}/members`,
         {
-          userId: adminUser!.id,
+          userId: adminUser.id,
         }
       );
       expect(addResponse.ok).toBe(true);
@@ -290,10 +292,10 @@ describe("User Groups API", () => {
       expect(getResponse.ok).toBe(true);
       expect(getResponse.data.group.members).toHaveLength(1);
 
-      const member = must(getResponse.data.group.members![0]);
+      const member = must(getResponse.data.group.members?.[0]);
       // Must have nested user object — NOT flat userId/username
       expect(member.user).toBeDefined();
-      expect(member.user.id).toBe(adminUser!.id);
+      expect(member.user.id).toBe(adminUser.id);
       expect(member.user.username).toBe(TEST_ADMIN.username);
       expect(member.user.role).toBeDefined();
       expect(member.joinedAt).toBeDefined();

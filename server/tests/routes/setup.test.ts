@@ -20,6 +20,7 @@ import {
 } from "vitest";
 import type { StashClient } from "../../graphql/StashClient.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
+import { must } from "../helpers/must.js";
 import {
   type PrismaMock,
   partialRow,
@@ -177,7 +178,7 @@ describe("setup routes", () => {
     expect(res.status).toBe(201);
     const token = res.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1];
     expect(token).toBeDefined();
-    const claims = verifyToken(token!);
+    const claims = verifyToken(must(token));
     expect(claims.id).toBe(1);
     expect(claims.authTime).toEqual(expect.any(Number));
   });

@@ -71,12 +71,13 @@ describeWithDb("StashSyncService.cleanupDeletedEntities (integration)", () => {
     vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
       id === TEST_INSTANCE
         ? partialRow<StashClient>({
-            findSceneIDs: async () => ({
-              findScenes: {
-                scenes: keepSet.map((sceneId) => ({ id: sceneId })),
-                count: keepSet.length,
-              },
-            }),
+            findSceneIDs: () =>
+              Promise.resolve({
+                findScenes: {
+                  scenes: keepSet.map((sceneId) => ({ id: sceneId })),
+                  count: keepSet.length,
+                },
+              }),
           })
         : realGet(id)
     );
@@ -149,12 +150,13 @@ describeWithDb(
       vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
         id === QUOTED_INSTANCE
           ? partialRow<StashClient>({
-              findSceneIDs: async () => ({
-                findScenes: {
-                  scenes: keepSet.map((sceneId) => ({ id: sceneId })),
-                  count: keepSet.length,
-                },
-              }),
+              findSceneIDs: () =>
+                Promise.resolve({
+                  findScenes: {
+                    scenes: keepSet.map((sceneId) => ({ id: sceneId })),
+                    count: keepSet.length,
+                  },
+                }),
             })
           : realGet(id)
       );

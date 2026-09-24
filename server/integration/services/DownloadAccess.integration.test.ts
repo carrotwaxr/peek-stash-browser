@@ -27,6 +27,7 @@ import prisma from "../../prisma/singleton.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { must } from "../../tests/helpers/must.js";
 import {
   FX,
   FX_ID,
@@ -52,8 +53,10 @@ describe("Download access (integration)", () => {
   let playlistId: number;
   let configDir: string;
   const previousConfigDir = process.env.CONFIG_DIR;
-  const fetchMock = vi.fn(
-    async (url: string | URL | Request) => new Response("bytes:" + String(url))
+  const fetchMock = vi.fn((url: string | URL | Request) =>
+    Promise.resolve(
+      new Response(`bytes:${url instanceof Request ? url.url : url.toString()}`)
+    )
   );
 
   beforeAll(async () => {
@@ -178,7 +181,9 @@ describe("Download access (integration)", () => {
 
     // Zip entry names are stored uncompressed, and the entries themselves
     // are stored (zlib level 0), so the titles are plain bytes in the file.
-    const zip = fs.readFileSync(row!.filePath!).toString("latin1");
+    const zip = fs
+      .readFileSync(must(row?.filePath, "the zip's file path"))
+      .toString("latin1");
     expect(zip).toContain(`A-${FX_ID.SAME}`);
     expect(zip).not.toContain(`B-${FX_ID.SAME}`);
     expect(zip).not.toContain(`A-${FX_ID.GLOBAL}`);

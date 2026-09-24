@@ -19,6 +19,7 @@ import {
   transformStudio,
   transformTag,
 } from "../../utils/stashUrlProxy.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { untrusted } from "../helpers/untrusted.js";
 
@@ -153,7 +154,7 @@ describe("stashUrlProxy", () => {
       expect(result).toBe(bad);
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining("Error converting URL to proxy"),
-        expect.objectContaining({ error: expect.any(Error) })
+        objectContaining({ error: anyOf(Error) })
       );
     });
 
@@ -267,8 +268,8 @@ describe("stashUrlProxy", () => {
 
       const result = transformPerformer(performer);
 
-      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(must(result.tags![1]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[1]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles nested tag with null image_path", () => {
@@ -279,7 +280,7 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformPerformer(performer);
-      expect(must(result.tags![0]).image_path).toBeNull();
+      expect(must(result.tags?.[0]).image_path).toBeNull();
     });
 
     it("does not crash with no tags array", () => {
@@ -366,8 +367,8 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformStudio(studio);
-      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(must(result.tags![1]).image_path).toBeNull();
+      expect(must(result.tags?.[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[1]).image_path).toBeNull();
     });
 
     it("does not crash with no tags array", () => {
@@ -440,7 +441,7 @@ describe("stashUrlProxy", () => {
       const result = transformTag(tag);
       // transformTag does not recurse into nested tags
       // The nested tag's image_path should NOT be transformed
-      expect(must(result.tags![0]).image_path).toBe(stashUrl("/tag/t2/image"));
+      expect(must(result.tags?.[0]).image_path).toBe(stashUrl("/tag/t2/image"));
     });
 
     it("preserves extra fields", () => {
@@ -527,7 +528,7 @@ describe("stashUrlProxy", () => {
     it("converts all paths object values to proxy URLs", () => {
       const result = transformScene(makeScene());
 
-      for (const [key, val] of Object.entries(result.paths!)) {
+      for (const [key, val] of Object.entries(must(result.paths))) {
         expect(val, `paths.${key} should be proxied`).toMatch(
           /^\/api\/proxy\/stash\?path=/
         );
@@ -551,7 +552,7 @@ describe("stashUrlProxy", () => {
     it("SECURITY: strips apikey from sceneStreams URLs", () => {
       const result = transformScene(makeScene());
 
-      for (const stream of result.sceneStreams!) {
+      for (const stream of must(result.sceneStreams)) {
         expect(stream.url).not.toContain("apikey");
         expect(stream.url).not.toContain("SECRET_KEY_123");
       }
@@ -571,7 +572,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      const streamUrl = must(result.sceneStreams![0]).url;
+      const streamUrl = must(result.sceneStreams?.[0]).url;
 
       expect(streamUrl).not.toContain("apikey");
       expect(streamUrl).not.toContain("SECRET");
@@ -594,7 +595,7 @@ describe("stashUrlProxy", () => {
       // URL.searchParams.delete is case-sensitive for param names,
       // but our regex fallback handles case insensitivity
       // Test the actual behavior
-      const streamUrl = must(result.sceneStreams![0]).url;
+      const streamUrl = must(result.sceneStreams?.[0]).url;
       // "apikey" (lowercase) would be deleted by searchParams.delete("apikey")
       // "ApiKey" would NOT be deleted by searchParams.delete("apikey"),
       // but the URL constructor normalizes, so test against actual behavior
@@ -606,7 +607,7 @@ describe("stashUrlProxy", () => {
 
       // sceneStreams use stripApiKeyFromUrl, NOT convertToProxyUrl
       // So they should keep the full URL with host
-      for (const stream of result.sceneStreams!) {
+      for (const stream of must(result.sceneStreams)) {
         expect(stream.url).toContain(STASH_HOST);
         expect(stream.url).not.toMatch(/^\/api\/proxy\/stash/);
       }
@@ -615,9 +616,9 @@ describe("stashUrlProxy", () => {
     it("preserves sceneStreams mime_type and label", () => {
       const result = transformScene(makeScene());
 
-      expect(must(result.sceneStreams![0]).mime_type).toBe("video/mp4");
-      expect(must(result.sceneStreams![0]).label).toBe("Direct");
-      expect(must(result.sceneStreams![1]).mime_type).toBe(
+      expect(must(result.sceneStreams?.[0]).mime_type).toBe("video/mp4");
+      expect(must(result.sceneStreams?.[0]).label).toBe("Direct");
+      expect(must(result.sceneStreams?.[1]).mime_type).toBe(
         "application/x-mpegURL"
       );
     });
@@ -646,7 +647,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      expect(must(result.sceneStreams![0]).url).toBe(
+      expect(must(result.sceneStreams?.[0]).url).toBe(
         stashUrl("/scene/42/stream.mp4")
       );
     });
@@ -656,7 +657,7 @@ describe("stashUrlProxy", () => {
     it("transforms nested performers image_paths", () => {
       const result = transformScene(makeScene());
 
-      expect(must(result.performers![0]).image_path).toMatch(
+      expect(must(result.performers?.[0]).image_path).toMatch(
         /^\/api\/proxy\/stash/
       );
     });
@@ -664,7 +665,7 @@ describe("stashUrlProxy", () => {
     it("transforms nested performer tags image_paths", () => {
       const result = transformScene(makeScene());
 
-      expect(must(must(result.performers![0]).tags![0]).image_path).toMatch(
+      expect(must(must(result.performers?.[0]).tags?.[0]).image_path).toMatch(
         /^\/api\/proxy\/stash/
       );
     });
@@ -680,7 +681,7 @@ describe("stashUrlProxy", () => {
 
     it("transforms nested tags image_paths", () => {
       const result = transformScene(makeScene());
-      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles missing tags array", () => {
@@ -694,7 +695,7 @@ describe("stashUrlProxy", () => {
 
     it("transforms nested studio image_path", () => {
       const result = transformScene(makeScene());
-      expect(result.studio!.image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.studio).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles null studio", () => {
@@ -715,7 +716,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(makeScene());
 
       // Groups should be flattened from { group: {...}, scene_index } to { ...groupFields, scene_index }
-      const group = must((result.groups! as FlattenedSceneGroup[])[0]);
+      const group = must((must(result.groups) as FlattenedSceneGroup[])[0]);
       expect(group.front_image_path).toMatch(/^\/api\/proxy\/stash/);
       expect(group.back_image_path).toMatch(/^\/api\/proxy\/stash/);
     });
@@ -723,7 +724,7 @@ describe("stashUrlProxy", () => {
     it("flattens nested group structure and preserves scene_index", () => {
       const result = transformScene(makeScene());
 
-      const group = result.groups![0] as Record<string, unknown>;
+      const group = must(result.groups)[0] as Record<string, unknown>;
       expect(group.scene_index).toBe(2);
       expect(group.id).toBe("g1");
       expect(group.name).toBe("Group 1");
@@ -750,7 +751,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      const group = result.groups![0] as Record<string, unknown>;
+      const group = must(result.groups)[0] as Record<string, unknown>;
       const groupStudio = group.studio as { image_path: string };
       expect(groupStudio.image_path).toMatch(/^\/api\/proxy\/stash/);
     });
@@ -771,7 +772,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      const group = result.groups![0] as Record<string, unknown>;
+      const group = must(result.groups)[0] as Record<string, unknown>;
       const groupTags = group.tags as Array<{ image_path: string }>;
       expect(must(groupTags[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
@@ -802,7 +803,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      const group = result.groups![0] as Record<string, unknown>;
+      const group = must(result.groups)[0] as Record<string, unknown>;
       expect(group.scene_index).toBeUndefined();
     });
 
@@ -878,11 +879,10 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformScene(scene);
-      const json = JSON.stringify(result);
 
       // The raw SECRET value must not appear unencoded in sceneStream URLs
       // (sceneStreams use stripApiKeyFromUrl which removes apikey param entirely)
-      for (const stream of result.sceneStreams!) {
+      for (const stream of must(result.sceneStreams)) {
         expect(stream.url).not.toContain(SECRET);
         expect(stream.url).not.toContain("apikey");
       }
@@ -893,11 +893,13 @@ describe("stashUrlProxy", () => {
       // never sees the raw key in a directly-usable form.
 
       // But sceneStreams MUST have the key fully stripped
-      const streamUrls = result.sceneStreams!.map((s) => s.url).join(" ");
+      const streamUrls = must(result.sceneStreams)
+        .map((s) => s.url)
+        .join(" ");
       expect(streamUrls).not.toContain(SECRET);
 
       // Verify all paths were proxied (no raw Stash host exposure)
-      for (const val of Object.values(result.paths!)) {
+      for (const val of Object.values(must(result.paths))) {
         expect(val as string).toMatch(/^\/api\/proxy\/stash/);
         expect(val as string).not.toContain(STASH_HOST);
       }
@@ -972,7 +974,7 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformGroup(group);
-      expect(result.studio!.image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.studio).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles null studio", () => {
@@ -1007,8 +1009,8 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformGroup(group);
-      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(must(result.tags![1]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags?.[1]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles empty tags array", () => {
@@ -1076,7 +1078,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(
         makeStreamScene(stashUrl("/scene/1/stream.mp4?apikey=SECRET"))
       );
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
 
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1092,7 +1094,7 @@ describe("stashUrlProxy", () => {
           )
         )
       );
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
 
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1104,14 +1106,14 @@ describe("stashUrlProxy", () => {
       const original = stashUrl("/scene/1/stream.mp4?resolution=720");
       const result = transformScene(makeStreamScene(original));
 
-      expect(must(result.sceneStreams![0]).url).toContain("resolution=720");
+      expect(must(result.sceneStreams?.[0]).url).toContain("resolution=720");
     });
 
     it("handles URL with no query params (no-op)", () => {
       const original = stashUrl("/scene/1/stream.mp4");
       const result = transformScene(makeStreamScene(original));
 
-      expect(must(result.sceneStreams![0]).url).toBe(original);
+      expect(must(result.sceneStreams?.[0]).url).toBe(original);
     });
 
     it("handles malformed URL gracefully via regex fallback", () => {
@@ -1119,7 +1121,7 @@ describe("stashUrlProxy", () => {
       const malformed = "not-a-url?apikey=SECRET&other=value";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
       // Regex fallback should strip the apikey
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1129,7 +1131,7 @@ describe("stashUrlProxy", () => {
       const malformed = "broken-url?apikey=SECRET";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
     });
@@ -1138,7 +1140,7 @@ describe("stashUrlProxy", () => {
       const malformed = "broken-url?a=1&apikey=SECRET&b=2";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
       expect(url).not.toContain("SECRET");
     });
 
@@ -1149,7 +1151,7 @@ describe("stashUrlProxy", () => {
           stashUrl("/scene/1/stream.mp4?apikey=KEY1&other=val&apikey=KEY2")
         )
       );
-      const url = must(result.sceneStreams![0]).url;
+      const url = must(result.sceneStreams?.[0]).url;
 
       expect(url).not.toContain("KEY1");
       expect(url).not.toContain("KEY2");
@@ -1163,27 +1165,29 @@ describe("stashUrlProxy", () => {
   describe("error resilience", () => {
     it("transformScene returns original on internal error and logs", () => {
       // Create an object that will cause Object.entries to behave unexpectedly
-      const scene = {
-        id: "err",
-        paths: Object.create(null, {
-          screenshot: {
-            get() {
-              throw new Error("getter boom");
-            },
-            enumerable: true,
+      const paths: unknown = Object.create(null, {
+        screenshot: {
+          get() {
+            throw new Error("getter boom");
           },
-        }),
-      };
+          enumerable: true,
+        },
+      });
+      const scene = { id: "err", paths };
 
-      const result = transformScene(scene);
-      // Should return the original scene (or a partially transformed version)
-      // The important thing is it doesn't throw
-      expect(result).toBeDefined();
+      const result = transformScene(
+        untrusted<{ id: string; paths: Record<string, string> }>(scene)
+      );
+      expect(result).toBe(scene);
+      expect(logger.error).toHaveBeenCalledWith(
+        "Error transforming scene",
+        objectContaining({ error: anyOf(Error) })
+      );
     });
 
     it("transformPerformer returns original on error and logs", () => {
       // Force an error by providing a pathological object
-      const pathological = Object.create(null);
+      const pathological: unknown = Object.create(null);
       Object.defineProperty(pathological, "image_path", {
         get() {
           throw new Error("boom");
@@ -1191,16 +1195,18 @@ describe("stashUrlProxy", () => {
         enumerable: true,
       });
 
-      const result = transformPerformer(pathological);
+      const result = transformPerformer(
+        untrusted<{ image_path: string }>(pathological)
+      );
       expect(result).toBe(pathological);
       expect(logger.error).toHaveBeenCalledWith(
         "Error transforming performer",
-        expect.objectContaining({ error: expect.any(Error) })
+        objectContaining({ error: anyOf(Error) })
       );
     });
 
     it("transformStudio returns original on error and logs", () => {
-      const pathological = Object.create(null);
+      const pathological: unknown = Object.create(null);
       Object.defineProperty(pathological, "image_path", {
         get() {
           throw new Error("boom");
@@ -1208,16 +1214,18 @@ describe("stashUrlProxy", () => {
         enumerable: true,
       });
 
-      const result = transformStudio(pathological);
+      const result = transformStudio(
+        untrusted<{ image_path: string }>(pathological)
+      );
       expect(result).toBe(pathological);
       expect(logger.error).toHaveBeenCalledWith(
         "Error transforming studio",
-        expect.objectContaining({ error: expect.any(Error) })
+        objectContaining({ error: anyOf(Error) })
       );
     });
 
     it("transformTag returns original on error and logs", () => {
-      const pathological = Object.create(null);
+      const pathological: unknown = Object.create(null);
       Object.defineProperty(pathological, "image_path", {
         get() {
           throw new Error("boom");
@@ -1225,16 +1233,18 @@ describe("stashUrlProxy", () => {
         enumerable: true,
       });
 
-      const result = transformTag(pathological);
+      const result = transformTag(
+        untrusted<{ image_path: string }>(pathological)
+      );
       expect(result).toBe(pathological);
       expect(logger.error).toHaveBeenCalledWith(
         "Error transforming tag",
-        expect.objectContaining({ error: expect.any(Error) })
+        objectContaining({ error: anyOf(Error) })
       );
     });
 
     it("transformGroup returns original on error and logs", () => {
-      const pathological = Object.create(null);
+      const pathological: unknown = Object.create(null);
       Object.defineProperty(pathological, "front_image_path", {
         get() {
           throw new Error("boom");
@@ -1242,11 +1252,13 @@ describe("stashUrlProxy", () => {
         enumerable: true,
       });
 
-      const result = transformGroup(pathological);
+      const result = transformGroup(
+        untrusted<{ front_image_path: string }>(pathological)
+      );
       expect(result).toBe(pathological);
       expect(logger.error).toHaveBeenCalledWith(
         "Error transforming group",
-        expect.objectContaining({ error: expect.any(Error) })
+        objectContaining({ error: anyOf(Error) })
       );
     });
   });

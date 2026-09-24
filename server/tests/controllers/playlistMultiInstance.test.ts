@@ -56,7 +56,7 @@ vi.mock("../../services/StashEntityService.js", () => ({
 
 vi.mock("../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
-    filterExcluded: vi.fn(async (scenes: unknown[]) => scenes),
+    filterExcluded: vi.fn((scenes: unknown[]) => Promise.resolve(scenes)),
   },
 }));
 
@@ -70,7 +70,7 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 }));
 
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(async () => ({})),
+  resolveUserPermissions: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock("../../utils/entityInstanceId.js", () => ({
@@ -84,7 +84,9 @@ vi.mock("../../utils/logger.js", () => ({
 
 // Dynamic import mock for mergeScenesWithUserData (used in getPlaylist)
 vi.mock("../../controllers/library/scenes.js", () => ({
-  mergeScenesWithUserData: vi.fn(async (scenes: unknown[]) => scenes),
+  mergeScenesWithUserData: vi.fn((scenes: unknown[]) =>
+    Promise.resolve(scenes)
+  ),
 }));
 
 vi.mock("../../utils/instanceUtils.js", async (importOriginal) => {

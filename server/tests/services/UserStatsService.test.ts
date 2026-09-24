@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { logger } from "../../utils/logger.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -116,7 +117,7 @@ describe("UserStatsService", () => {
               performerId: "perf-1",
             },
           },
-          create: expect.objectContaining({
+          create: objectContaining({
             instanceId: "instance-aaa",
           }),
         })
@@ -788,8 +789,8 @@ describe("UserStatsService", () => {
       expect(result.get("perf-1\0inst-a")).toEqual({
         oCounter: 5,
         playCount: 10,
-        lastPlayedAt: expect.any(String),
-        lastOAt: expect.any(String),
+        lastPlayedAt: anyOf(String),
+        lastOAt: anyOf(String),
       });
       expect(result.get("perf-2\0inst-a")?.lastOAt).toBeNull();
     });

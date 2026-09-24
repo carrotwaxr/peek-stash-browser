@@ -42,7 +42,7 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items) => items),
+    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
   },
 }));
 
@@ -61,11 +61,13 @@ vi.mock("../../../services/UserStatsService.js", () => ({
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
-  disambiguateEntityNames: vi.fn().mockImplementation((entities) => entities),
+  disambiguateEntityNames: vi
+    .fn()
+    .mockImplementation((entities: unknown[]) => entities),
 }));
 
 vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids) => ids),
+  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
@@ -79,7 +81,7 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field) => ({
+  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
     sortField: field,
     randomSeed: undefined,
   })),
@@ -88,8 +90,13 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id, _inst, viewer) =>
-      viewer?.role === "ADMIN" ? `http://stash/performers/${id}` : null
+    .mockImplementation(
+      (
+        _type: string,
+        id: string | number,
+        _inst: string | undefined,
+        viewer: { role: string } | undefined
+      ) => (viewer?.role === "ADMIN" ? `http://stash/performers/${id}` : null)
     ),
 }));
 
@@ -188,13 +195,17 @@ describe("mergePerformersWithUserData", () => {
       }),
     ]);
 
-    const statsMap = new Map();
-    statsMap.set("p1\0inst1", {
-      oCounter: 5,
-      playCount: 12,
-      lastPlayedAt: "2026-01-01T00:00:00Z",
-      lastOAt: "2026-01-02T00:00:00Z",
-    });
+    const statsMap = new Map([
+      [
+        "p1\0inst1",
+        {
+          oCounter: 5,
+          playCount: 12,
+          lastPlayedAt: "2026-01-01T00:00:00Z",
+          lastOAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+    ]);
     vi.mocked(userStatsService.getPerformerStats).mockResolvedValue(statsMap);
 
     const result = await mergePerformersWithUserData([performer], 1);
@@ -219,9 +230,9 @@ describe("mergePerformersWithUserData", () => {
 
     const result = await mergePerformersWithUserData([performer], 1);
 
-    expect(result[0]!.o_counter).toBe(0);
-    expect(result[0]!.play_count).toBe(0);
-    expect(result[0]!.last_played_at).toBeNull();
+    expect(must(result[0]).o_counter).toBe(0);
+    expect(must(result[0]).play_count).toBe(0);
+    expect(must(result[0]).last_played_at).toBeNull();
   });
 
   it("returns empty array for empty input", async () => {
@@ -271,7 +282,7 @@ describe("applyPerformerFilters", () => {
     ];
     const result = await applyPerformerFilters(performers, { favorite: true });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("fav");
+    expect(must(result[0]).id).toBe("fav");
   });
 
   // --- gender ---
@@ -284,7 +295,7 @@ describe("applyPerformerFilters", () => {
       gender: { value: GenderEnum.Female, modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("f");
+    expect(must(result[0]).id).toBe("f");
   });
 
   it("filters gender with NOT_EQUALS", async () => {
@@ -296,7 +307,7 @@ describe("applyPerformerFilters", () => {
       gender: { value: GenderEnum.Male, modifier: CriterionModifier.NotEquals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("f");
+    expect(must(result[0]).id).toBe("f");
   });
 
   // --- tags ---
@@ -318,7 +329,7 @@ describe("applyPerformerFilters", () => {
       },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("t1");
+    expect(must(result[0]).id).toBe("t1");
   });
 
   it("filters tags with INCLUDES_ALL", async () => {
@@ -342,7 +353,7 @@ describe("applyPerformerFilters", () => {
       },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("both");
+    expect(must(result[0]).id).toBe("both");
   });
 
   it("filters tags with EXCLUDES", async () => {
@@ -360,7 +371,7 @@ describe("applyPerformerFilters", () => {
       },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("clean");
+    expect(must(result[0]).id).toBe("clean");
   });
 
   // --- studios (async dependency) ---
@@ -376,7 +387,7 @@ describe("applyPerformerFilters", () => {
       studios: { value: ["studio1"], modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("p1");
+    expect(must(result[0]).id).toBe("p1");
   });
 
   // --- groups (async dependency) ---
@@ -392,7 +403,7 @@ describe("applyPerformerFilters", () => {
       groups: { value: ["group1"], modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("p2");
+    expect(must(result[0]).id).toBe("p2");
   });
 
   // --- rating100 ---
@@ -405,7 +416,7 @@ describe("applyPerformerFilters", () => {
       rating100: { value: 50, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("high");
+    expect(must(result[0]).id).toBe("high");
   });
 
   it("filters rating100 with BETWEEN", async () => {
@@ -417,7 +428,7 @@ describe("applyPerformerFilters", () => {
       rating100: { value: 50, value2: 70, modifier: CriterionModifier.Between },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("in");
+    expect(must(result[0]).id).toBe("in");
   });
 
   // --- scene_count ---
@@ -430,7 +441,7 @@ describe("applyPerformerFilters", () => {
       scene_count: { value: 10, modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("match");
+    expect(must(result[0]).id).toBe("match");
   });
 
   // --- name (text) ---
@@ -443,7 +454,7 @@ describe("applyPerformerFilters", () => {
       name: { value: "bob", modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("bob");
+    expect(must(result[0]).id).toBe("bob");
   });
 
   it("filters name with EQUALS (exact match on name only)", async () => {
@@ -455,7 +466,7 @@ describe("applyPerformerFilters", () => {
       name: { value: "alice", modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("exact");
+    expect(must(result[0]).id).toBe("exact");
   });
 
   // --- eye_color (enum) ---
@@ -468,7 +479,7 @@ describe("applyPerformerFilters", () => {
       eye_color: { value: "blue", modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("blue");
+    expect(must(result[0]).id).toBe("blue");
   });
 
   it("filters eye_color with NOT_EQUALS", async () => {
@@ -480,7 +491,7 @@ describe("applyPerformerFilters", () => {
       eye_color: { value: "blue", modifier: CriterionModifier.NotEquals },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("brown");
+    expect(must(result[0]).id).toBe("brown");
   });
 
   // --- height (numeric) ---
@@ -493,7 +504,7 @@ describe("applyPerformerFilters", () => {
       height: { value: 170, modifier: "GREATER_THAN" },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("tall");
+    expect(must(result[0]).id).toBe("tall");
   });
 
   // --- age (computed from birthdate) ---
@@ -508,7 +519,7 @@ describe("applyPerformerFilters", () => {
       age: { value: 30, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("old");
+    expect(must(result[0]).id).toBe("old");
   });
 
   // --- career_length (uses parseCareerLength) ---
@@ -521,7 +532,7 @@ describe("applyPerformerFilters", () => {
       career_length: { value: 10, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("long");
+    expect(must(result[0]).id).toBe("long");
   });
 
   // --- birth_year ---
@@ -538,7 +549,7 @@ describe("applyPerformerFilters", () => {
       },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("in");
+    expect(must(result[0]).id).toBe("in");
   });
 
   // --- created_at (date) ---
@@ -554,7 +565,7 @@ describe("applyPerformerFilters", () => {
       },
     });
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe("new");
+    expect(must(result[0]).id).toBe("new");
   });
 });
 

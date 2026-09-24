@@ -14,9 +14,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { vi } from "vitest";
 
-const deepMocked = (client: PrismaClient) => vi.mocked(client, true);
-export type PrismaMock = ReturnType<typeof deepMocked>;
-
 /** An object whose members are created by `make` on first access, then kept. */
 function lazyMembers(make: (key: string) => unknown): object {
   const members = new Map<string, unknown>();
@@ -34,19 +31,22 @@ function lazyMembers(make: (key: string) => unknown): object {
   );
 }
 
-export function createPrismaMock(): PrismaMock {
+export function createPrismaMock() {
   const client = lazyMembers((key) => {
     if (key === "$transaction") {
       return vi.fn((arg: unknown) =>
         Array.isArray(arg)
           ? Promise.all(arg)
-          : (arg as (tx: PrismaMock) => unknown)(client)
+          : (arg as (tx: PrismaClient) => unknown)(client)
       );
     }
     return key.startsWith("$") ? vi.fn() : lazyMembers(() => vi.fn());
-  }) as PrismaMock;
-  return client;
+  }) as PrismaClient;
+  // The same object at runtime, typed with vitest's deep mock types
+  return vi.mocked(client, true);
 }
+
+export type PrismaMock = ReturnType<typeof createPrismaMock>;
 
 /**
  * A row with only the fields a test needs, typed as the full row. `T` is
@@ -72,14 +72,4 @@ export function prismaImpl<F extends (...args: never[]) => unknown>(
   const answer = (...args: Parameters<F>) => Promise.resolve(impl(...args));
   // The one cast: a plain promise in place of the PrismaPromise
   return answer as unknown as F;
-}
-
-/**
- * A row the database cannot return, such as a null in a NOT NULL column, for a
- * test of the code's defensive handling of it. Typed as the full row like
- * `partialRow`, but its fields are not checked, so use it only for rows that
- * are invalid on purpose (as `malformed()` does for request input).
- */
-export function malformedRow<T>(fields: Record<string, unknown>): T {
-  return fields as T;
 }

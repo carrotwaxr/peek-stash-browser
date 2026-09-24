@@ -24,14 +24,6 @@ interface FindScenesResponse {
   };
 }
 
-interface UserExclusionsResponse {
-  exclusions: {
-    excludedTags: string[];
-    excludedPerformers: string[];
-    excludedStudios: string[];
-  };
-}
-
 describe("Exclusion Application", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);

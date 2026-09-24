@@ -47,15 +47,17 @@ describe("Tag Parent Name Hydration", () => {
     expect(response.data.findTags.count).toBeGreaterThan(0);
 
     // Find a tag that actually has parents in the response
-    const tagWithParents = response.data.findTags.tags.find(
-      (t) => t.parents && t.parents.length > 0
+    const tagWithParents = must(
+      response.data.findTags.tags.find(
+        (t) => t.parents && t.parents.length > 0
+      ),
+      "a tag with parents"
     );
-    expect(tagWithParents).toBeDefined();
-    expect(tagWithParents!.parents).toBeDefined();
-    expect(tagWithParents!.parents!.length).toBeGreaterThan(0);
+    const parents = must(tagWithParents.parents, "parents");
+    expect(parents.length).toBeGreaterThan(0);
 
     // Each parent should have a non-empty name
-    for (const parent of tagWithParents!.parents!) {
+    for (const parent of parents) {
       expect(parent.id).toBeDefined();
       expect(parent.name).toBeDefined();
       expect(parent.name.length).toBeGreaterThan(0);
@@ -80,16 +82,18 @@ describe("Tag Parent Name Hydration", () => {
     );
 
     expect(listResponse.ok).toBe(true);
-    const tagWithParents = listResponse.data.findTags.tags.find(
-      (t) => t.parents && t.parents.length > 0
+    const tagWithParents = must(
+      listResponse.data.findTags.tags.find(
+        (t) => t.parents && t.parents.length > 0
+      ),
+      "a tag with parents"
     );
-    expect(tagWithParents).toBeDefined();
 
     // Now request this specific tag by ID (single-tag detail request path)
     const detailResponse = await adminClient.post<FindTagsResponse>(
       "/api/library/tags",
       {
-        ids: [tagWithParents!.id],
+        ids: [tagWithParents.id],
       }
     );
 
@@ -97,11 +101,11 @@ describe("Tag Parent Name Hydration", () => {
     expect(detailResponse.data.findTags.tags).toHaveLength(1);
 
     const tag = must(detailResponse.data.findTags.tags[0]);
-    expect(tag.parents).toBeDefined();
-    expect(tag.parents!.length).toBeGreaterThan(0);
+    const parents = must(tag.parents, "parents");
+    expect(parents.length).toBeGreaterThan(0);
 
     // Each parent should have a non-empty name
-    for (const parent of tag.parents!) {
+    for (const parent of parents) {
       expect(parent.id).toBeDefined();
       expect(parent.name).toBeDefined();
       expect(parent.name.length).toBeGreaterThan(0);

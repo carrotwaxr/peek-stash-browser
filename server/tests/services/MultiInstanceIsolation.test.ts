@@ -127,8 +127,8 @@ describe("Multi-Instance Isolation", () => {
       );
 
       expect(performer).not.toBeNull();
-      expect(performer!.name).toBe("Alice");
-      expect(performer!.instanceId).toBe("inst-a");
+      expect(must(performer).name).toBe("Alice");
+      expect(must(performer).instanceId).toBe("inst-a");
 
       // Verify the query filtered by instanceId
       expect(mockPrisma.stashPerformer.findFirst).toHaveBeenCalledWith({
@@ -323,10 +323,10 @@ describe("Multi-Instance Isolation", () => {
         /CROSS JOIN StashPerformer t ON/.test(String(c[0]))
       );
       expect(resolve).toBeDefined();
-      expect(resolve!.slice(1)).toContain(
+      expect(must(resolve).slice(1)).toContain(
         JSON.stringify([{ id: "perf1", iid: INST_A }])
       );
-      expect(resolve!.slice(1)).toContain(JSON.stringify([]));
+      expect(must(resolve).slice(1)).toContain(JSON.stringify([]));
       // The cascade source is the A-scoped ref only
       expect(refsFill()).toBe(JSON.stringify([{ id: "perf1", iid: INST_A }]));
 
@@ -370,7 +370,7 @@ describe("Multi-Instance Isolation", () => {
       const resolve = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
         /CROSS JOIN StashPerformer t ON/.test(String(c[0]))
       );
-      expect(resolve!.slice(1)).toContain(JSON.stringify(["perf1"]));
+      expect(must(resolve).slice(1)).toContain(JSON.stringify(["perf1"]));
 
       // The stored "" row, a hidden row per instance, and scoped cascades
       expect(new Set(upsertKeys())).toEqual(
@@ -411,9 +411,9 @@ describe("Multi-Instance Isolation", () => {
         )
       );
       expect(edge).toBeDefined();
-      expect(String(edge![0])).toContain("x.deletedAt IS NULL");
-      expect(String(edge![0])).toContain("r.inst = x.stashInstanceId");
-      expect(edge!.slice(1)).toEqual([INST_A, INST_B]);
+      expect(String(must(edge)[0])).toContain("x.deletedAt IS NULL");
+      expect(String(must(edge)[0])).toContain("r.inst = x.stashInstanceId");
+      expect(must(edge).slice(1)).toEqual([INST_A, INST_B]);
       expect(refsFill()).toBe(JSON.stringify([{ id: "studio1", iid: INST_A }]));
 
       expect(upsertKeys()).toContain(`scene:scene1@${INST_A}:cascade`);
@@ -447,9 +447,11 @@ describe("Multi-Instance Isolation", () => {
         )
       );
       expect(inherited).toBeDefined();
-      expect(String(inherited![0])).toContain("s.stashInstanceId IN (?, ?)");
-      expect(String(inherited![0])).not.toContain("tag1");
-      expect(inherited!.slice(1)).toEqual([INST_A, INST_B]);
+      expect(String(must(inherited)[0])).toContain(
+        "s.stashInstanceId IN (?, ?)"
+      );
+      expect(String(must(inherited)[0])).not.toContain("tag1");
+      expect(must(inherited).slice(1)).toEqual([INST_A, INST_B]);
 
       // 1 hidden tag + 1 direct scene + 1 inherited scene + 1 performer = 4 upserts
       expect(new Set(upsertKeys())).toEqual(

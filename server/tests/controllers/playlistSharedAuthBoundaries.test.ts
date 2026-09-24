@@ -36,27 +36,27 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 
 // Mock entityInstanceId
 vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(async () => "instance-1"),
-  getEntityInstanceIds: vi.fn(async () => new Map()),
+  getEntityInstanceId: vi.fn(() => Promise.resolve("instance-1")),
+  getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
 }));
 
 // Mock StashEntityService
 vi.mock("../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getScenesByIdsWithRelations: vi.fn(async () => []),
+    getScenesByIdsWithRelations: vi.fn(() => Promise.resolve([])),
   },
 }));
 
 // Mock EntityExclusionHelper
 vi.mock("../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
-    filterExcluded: vi.fn(async (scenes: unknown[]) => scenes),
+    filterExcluded: vi.fn((scenes: unknown[]) => Promise.resolve(scenes)),
   },
 }));
 
 // Mock PermissionService
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(async () => ({})),
+  resolveUserPermissions: vi.fn(() => Promise.resolve({})),
 }));
 
 // Mock logger

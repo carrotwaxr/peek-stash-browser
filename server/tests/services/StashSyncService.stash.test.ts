@@ -124,8 +124,8 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
   beforeAll(() => {
     // Initialize Stash client directly for testing
     stash = new StashClient({
-      url: process.env.STASH_URL!,
-      apiKey: process.env.STASH_API_KEY!,
+      url: must(process.env.STASH_URL, "STASH_URL"),
+      apiKey: must(process.env.STASH_API_KEY, "STASH_API_KEY"),
     });
   });
 
@@ -218,13 +218,12 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (result.findScenes.scenes.length > 0) {
-        const scene = result.findScenes.scenes[0];
-        expect(scene).toHaveProperty("id");
-        expect(scene).toHaveProperty("title");
-        expect(scene).toHaveProperty("created_at");
-        expect(scene).toHaveProperty("updated_at");
-      }
+      expect(result.findScenes.scenes).not.toHaveLength(0);
+      const scene = must(result.findScenes.scenes[0]);
+      expect(scene).toHaveProperty("id");
+      expect(scene).toHaveProperty("title");
+      expect(scene).toHaveProperty("created_at");
+      expect(scene).toHaveProperty("updated_at");
     });
 
     it("should return performer data with expected structure", async () => {
@@ -232,11 +231,10 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (result.findPerformers.performers.length > 0) {
-        const performer = result.findPerformers.performers[0];
-        expect(performer).toHaveProperty("id");
-        expect(performer).toHaveProperty("name");
-      }
+      expect(result.findPerformers.performers).not.toHaveLength(0);
+      const performer = must(result.findPerformers.performers[0]);
+      expect(performer).toHaveProperty("id");
+      expect(performer).toHaveProperty("name");
     });
 
     it("should return studio data with expected structure", async () => {
@@ -244,11 +242,10 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (result.findStudios.studios.length > 0) {
-        const studio = result.findStudios.studios[0];
-        expect(studio).toHaveProperty("id");
-        expect(studio).toHaveProperty("name");
-      }
+      expect(result.findStudios.studios).not.toHaveLength(0);
+      const studio = must(result.findStudios.studios[0]);
+      expect(studio).toHaveProperty("id");
+      expect(studio).toHaveProperty("name");
     });
 
     it("should return tag data with expected structure", async () => {
@@ -256,11 +253,10 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (result.findTags.tags.length > 0) {
-        const tag = result.findTags.tags[0];
-        expect(tag).toHaveProperty("id");
-        expect(tag).toHaveProperty("name");
-      }
+      expect(result.findTags.tags).not.toHaveLength(0);
+      const tag = must(result.findTags.tags[0]);
+      expect(tag).toHaveProperty("id");
+      expect(tag).toHaveProperty("name");
     });
   });
 
@@ -310,16 +306,15 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (allScenes.findScenes.scenes.length > 0) {
-        const sceneId = must(allScenes.findScenes.scenes[0]).id;
+      expect(allScenes.findScenes.scenes).not.toHaveLength(0);
+      const sceneId = must(allScenes.findScenes.scenes[0]).id;
 
-        const result = await stash.findScenes({
-          ids: [sceneId],
-        });
+      const result = await stash.findScenes({
+        ids: [sceneId],
+      });
 
-        expect(result.findScenes.scenes.length).toBe(1);
-        expect(must(result.findScenes.scenes[0]).id).toBe(sceneId);
-      }
+      expect(result.findScenes.scenes.length).toBe(1);
+      expect(must(result.findScenes.scenes[0]).id).toBe(sceneId);
     });
 
     it("should be able to find a single performer by ID", async () => {
@@ -328,16 +323,15 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (allPerformers.findPerformers.performers.length > 0) {
-        const performerId = must(allPerformers.findPerformers.performers[0]).id;
+      expect(allPerformers.findPerformers.performers).not.toHaveLength(0);
+      const performerId = must(allPerformers.findPerformers.performers[0]).id;
 
-        const result = await stash.findPerformers({
-          ids: [performerId],
-        });
+      const result = await stash.findPerformers({
+        ids: [performerId],
+      });
 
-        expect(result.findPerformers.performers.length).toBe(1);
-        expect(must(result.findPerformers.performers[0]).id).toBe(performerId);
-      }
+      expect(result.findPerformers.performers.length).toBe(1);
+      expect(must(result.findPerformers.performers[0]).id).toBe(performerId);
     });
 
     it("should be able to find a single tag by ID", async () => {
@@ -346,16 +340,15 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 1 },
       });
 
-      if (allTags.findTags.tags.length > 0) {
-        const tagId = must(allTags.findTags.tags[0]).id;
+      expect(allTags.findTags.tags).not.toHaveLength(0);
+      const tagId = must(allTags.findTags.tags[0]).id;
 
-        const result = await stash.findTags({
-          ids: [tagId],
-        });
+      const result = await stash.findTags({
+        ids: [tagId],
+      });
 
-        expect(result.findTags.tags.length).toBe(1);
-        expect(must(result.findTags.tags[0]).id).toBe(tagId);
-      }
+      expect(result.findTags.tags.length).toBe(1);
+      expect(must(result.findTags.tags[0]).id).toBe(tagId);
     });
   });
 
@@ -374,15 +367,15 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
       // Total count should be consistent
       expect(page1.findScenes.count).toBe(page2.findScenes.count);
 
-      // If there are enough scenes, pages should have different content
-      if (page1.findScenes.count > 5 && page2.findScenes.scenes.length > 0) {
-        const page1Ids = page1.findScenes.scenes.map((s) => s.id);
-        const page2Ids = page2.findScenes.scenes.map((s) => s.id);
+      // The library has more than one page of scenes, so page 2 has content
+      expect(page1.findScenes.count).toBeGreaterThan(5);
+      expect(page2.findScenes.scenes).not.toHaveLength(0);
+      const page1Ids = page1.findScenes.scenes.map((s) => s.id);
+      const page2Ids = page2.findScenes.scenes.map((s) => s.id);
 
-        // No overlap between pages
-        const overlap = page1Ids.filter((id) => page2Ids.includes(id));
-        expect(overlap.length).toBe(0);
-      }
+      // No overlap between pages
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap.length).toBe(0);
     });
 
     it("should handle pagination past available data gracefully", async () => {

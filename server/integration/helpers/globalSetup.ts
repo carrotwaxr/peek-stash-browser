@@ -162,10 +162,7 @@ export async function setup() {
     const { default: prisma } = await import("../../prisma/singleton.js");
     const originalStderrWrite = process.stderr.write.bind(process.stderr);
     const teardownLog: string[] = [];
-    process.stderr.write = ((
-      chunk: string | Uint8Array,
-      ...args: unknown[]
-    ) => {
+    process.stderr.write = ((chunk: string | Uint8Array) => {
       teardownLog.push(String(chunk));
       return true;
     }) as typeof process.stderr.write;

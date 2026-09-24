@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import {
-  type UserPermissions,
-  resolveUserPermissions,
-} from "../../services/PermissionService.js";
+import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { type UserWithGroups } from "../helpers/fixtures.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
