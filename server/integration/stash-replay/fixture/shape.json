@@ -1,0 +1,687 @@
+{
+  "fields": {
+    "scene": ["captions.caption_type","captions.language_code","code","created_at","date","details","director","files.audio_codec","files.basename","files.bit_rate","files.created_at","files.duration","files.fingerprints.type","files.fingerprints.value","files.format","files.frame_rate","files.height","files.path","files.size","files.updated_at","files.video_codec","files.width","galleries","groups","groups.scene_index","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","performers","play_count","play_duration","rating100","resume_time","sceneStreams.label","studio","tags","title","updated_at","urls"],
+    "performer": ["alias_list","birthdate","career_length","circumcised","country","created_at","death_date","details","disambiguation","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","instagram","measurements","movie_count","name","o_counter","penis_length","piercings","rating100","scene_count","stash_ids.endpoint","stash_ids.stash_id","tags","tattoos","twitter","updated_at","url","urls","weight"],
+    "studio": ["aliases","child_studios","created_at","details","favorite","gallery_count","group_count","groups","id","ignore_auto_tag","image_count","image_path","movie_count","movies","name","parent_studio","performer_count","rating100","scene_count","stash_ids.endpoint","stash_ids.stash_id","tags","updated_at","url"],
+    "tag": ["aliases","child_count","children","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","parents","performer_count","scene_count","scene_marker_count","stash_ids.endpoint","stash_ids.stash_id","studio_count","updated_at"],
+    "group": ["aliases","back_image_path","containing_groups","containing_groups.description","created_at","date","director","duration","front_image_path","id","name","performer_count","rating100","scene_count","studio","sub_group_count","sub_groups","sub_groups.description","synopsis","tags","updated_at","urls"],
+    "gallery": ["chapters.id","chapters.image_index","chapters.title","code","cover","created_at","date","details","files.basename","files.created_at","files.path","files.size","files.updated_at","folder.path","id","image_count","organized","paths.cover","paths.preview","performers","photographer","rating100","scenes","studio","tags","title","updated_at","urls"],
+    "image": ["code","created_at","date","details","files.basename","files.height","files.id","files.path","files.size","files.width","galleries","id","o_counter","organized","paths.image","paths.preview","paths.thumbnail","performers","photographer","rating100","studio","tags","title","updated_at","urls"],
+    "clip": ["created_at","end_seconds","id","preview","primary_tag","scene","screenshot","seconds","stream","tags","title","updated_at"]
+  },
+  "entities": {
+    "scene": [
+      {
+        "id": "100001",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [{"id":"100001"}],
+          "groups": [{"id":"100001","present":[]}],
+          "performers": [{"id":"100006"}],
+          "studio": [{"id":"100007"}],
+          "tags": [{"id":"100001"},{"id":"100004"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":5,"urls":0},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100002",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [{"id":"100001","present":[]}],
+          "performers": [{"id":"100007"}],
+          "studio": [{"id":"100007"}],
+          "tags": [{"id":"100001"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":9,"urls":0},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100003",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [{"id":"100001"}],
+          "groups": [{"id":"100001","present":[]}],
+          "performers": [{"id":"100006"},{"id":"100007"}],
+          "studio": [{"id":"100007"}],
+          "tags": [{"id":"100001"},{"id":"100005"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":13,"urls":0},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          },
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100004",
+        "present": ["code","created_at","date","details","director","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100010"},{"id":"100011"}],
+          "studio": [{"id":"100010"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":13,"urls":1},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100005",
+        "present": ["code","created_at","date","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100008"},{"id":"100009"}],
+          "studio": [{"id":"100009"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":17,"urls":1},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100006",
+        "present": ["code","created_at","date","details","director","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100001"},{"id":"100002"}],
+          "studio": [{"id":"100001"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":17,"urls":1},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100007",
+        "present": ["code","created_at","date","details","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100003"},{"id":"100004"}],
+          "studio": [{"id":"100003"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":17,"urls":2},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100008",
+        "present": ["created_at","date","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100005"}],
+          "studio": [{"id":"100004"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":21,"urls":1},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100009",
+        "present": ["code","created_at","date","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100008"}],
+          "tags": []
+        },
+        "lengths": {"sceneStreams":16,"urls":1},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100010",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [{"id":"100006"}],
+          "studio": [{"id":"100005"}],
+          "tags": [{"id":"100002"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":9,"urls":0},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100011",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100005"}],
+          "tags": [{"id":"100002"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":5,"urls":0},
+        "files": [
+          {
+            "present": ["audio_codec","basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100012",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100006"}],
+          "tags": [{"id":"100004"},{"id":"100002"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":17,"urls":0},
+        "files": [
+          {
+            "present": ["basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100013",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100005"}],
+          "tags": [{"id":"100001"},{"id":"100002"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":17,"urls":0},
+        "files": [
+          {
+            "present": ["basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100014",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100005"}],
+          "tags": [{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":17,"urls":0},
+        "files": [
+          {
+            "present": ["basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100015",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100006"}],
+          "tags": [{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":17,"urls":0},
+        "files": [
+          {
+            "present": ["basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      },
+      {
+        "id": "100016",
+        "present": ["created_at","id","o_counter","organized","paths.caption","paths.preview","paths.screenshot","paths.sprite","paths.vtt","paths.webp","play_count","play_duration","resume_time","title","updated_at"],
+        "relations": {
+          "galleries": [],
+          "groups": [],
+          "performers": [],
+          "studio": [{"id":"100005"}],
+          "tags": [{"id":"100005"},{"id":"100003"}]
+        },
+        "lengths": {"sceneStreams":17,"urls":0},
+        "files": [
+          {
+            "present": ["basename","bit_rate","created_at","duration","format","frame_rate","height","path","size","updated_at","video_codec","width"],
+            "fingerprints": ["oshash","phash"]
+          }
+        ]
+      }
+    ],
+    "performer": [
+      {
+        "id": "100001",
+        "present": ["birthdate","career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","measurements","movie_count","name","o_counter","scene_count","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":8,"stash_ids":1,"urls":11}
+      },
+      {
+        "id": "100002",
+        "present": ["birthdate","career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","movie_count","name","o_counter","scene_count","twitter","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":3,"stash_ids":1,"urls":9}
+      },
+      {
+        "id": "100003",
+        "present": ["birthdate","career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","movie_count","name","o_counter","scene_count","twitter","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":2,"stash_ids":1,"urls":4}
+      },
+      {
+        "id": "100004",
+        "present": ["birthdate","career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","measurements","movie_count","name","o_counter","piercings","scene_count","tattoos","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":2,"stash_ids":1,"urls":13}
+      },
+      {
+        "id": "100005",
+        "present": ["birthdate","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","instagram","movie_count","name","o_counter","scene_count","twitter","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":2,"stash_ids":1,"urls":6}
+      },
+      {
+        "id": "100006",
+        "present": ["created_at","favorite","gallery_count","group_count","id","image_count","image_path","movie_count","name","o_counter","scene_count","updated_at"],
+        "relations": {"tags":[{"id":"100003"}]},
+        "lengths": {"alias_list":0,"stash_ids":0,"urls":0}
+      },
+      {
+        "id": "100007",
+        "present": ["created_at","favorite","gallery_count","group_count","id","image_count","image_path","movie_count","name","o_counter","scene_count","updated_at"],
+        "relations": {"tags":[{"id":"100004"}]},
+        "lengths": {"alias_list":0,"stash_ids":0,"urls":0}
+      },
+      {
+        "id": "100008",
+        "present": ["career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","instagram","measurements","movie_count","name","o_counter","scene_count","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":3,"stash_ids":1,"urls":23}
+      },
+      {
+        "id": "100009",
+        "present": ["career_length","country","created_at","ethnicity","eye_color","fake_tits","favorite","gallery_count","gender","group_count","hair_color","height_cm","id","image_count","image_path","movie_count","name","o_counter","scene_count","twitter","updated_at","url"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":3,"stash_ids":1,"urls":10}
+      },
+      {
+        "id": "100010",
+        "present": ["created_at","disambiguation","fake_tits","favorite","gallery_count","gender","group_count","hair_color","id","image_count","image_path","movie_count","name","o_counter","scene_count","updated_at"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":0,"stash_ids":1,"urls":0}
+      },
+      {
+        "id": "100011",
+        "present": ["created_at","disambiguation","fake_tits","favorite","gallery_count","gender","group_count","hair_color","id","image_count","image_path","movie_count","name","o_counter","scene_count","updated_at"],
+        "relations": {"tags":[]},
+        "lengths": {"alias_list":0,"stash_ids":1,"urls":0}
+      }
+    ],
+    "studio": [
+      {
+        "id": "100001",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100002",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at"],
+        "relations": {
+          "child_studios": [{"id":"100003"}],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100003",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [{"id":"100002"}],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100004",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100005",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100006",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100007",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": [{"id":"100003"}]
+        },
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100008",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100009",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100010",
+        "present": ["created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","performer_count","scene_count","updated_at","url"],
+        "relations": {
+          "child_studios": [],
+          "groups": [],
+          "movies": [],
+          "parent_studio": [],
+          "tags": []
+        },
+        "lengths": {"aliases":0,"stash_ids":1}
+      }
+    ],
+    "tag": [
+      {
+        "id": "100001",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100002",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100003",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100004",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100005",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[{"id":"100011"},{"id":"100009"}],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":0}
+      },
+      {
+        "id": "100006",
+        "present": ["child_count","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100007",
+        "present": ["child_count","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":17,"stash_ids":1}
+      },
+      {
+        "id": "100008",
+        "present": ["child_count","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":10,"stash_ids":1}
+      },
+      {
+        "id": "100009",
+        "present": ["child_count","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[{"id":"100005"}]},
+        "lengths": {"aliases":23,"stash_ids":1}
+      },
+      {
+        "id": "100010",
+        "present": ["child_count","created_at","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[]},
+        "lengths": {"aliases":0,"stash_ids":1}
+      },
+      {
+        "id": "100011",
+        "present": ["child_count","created_at","description","favorite","gallery_count","group_count","id","ignore_auto_tag","image_count","image_path","movie_count","name","parent_count","performer_count","scene_count","scene_marker_count","studio_count","updated_at"],
+        "relations": {"children":[],"parents":[{"id":"100005"}]},
+        "lengths": {"aliases":0,"stash_ids":1}
+      }
+    ],
+    "group": [
+      {
+        "id": "100001",
+        "present": ["created_at","front_image_path","id","name","performer_count","scene_count","sub_group_count","updated_at"],
+        "relations": {
+          "containing_groups": [],
+          "studio": [],
+          "sub_groups": [],
+          "tags": [{"id":"100003"}]
+        },
+        "lengths": {"urls":0}
+      }
+    ],
+    "gallery": [
+      {
+        "id": "100001",
+        "present": ["created_at","id","image_count","organized","paths.cover","paths.preview","title","updated_at"],
+        "relations": {
+          "cover": [{"id":"100004"}],
+          "performers": [{"id":"100006"}],
+          "scenes": [{"id":"100001"},{"id":"100003"}],
+          "studio": [{"id":"100007"}],
+          "tags": [{"id":"100003"}]
+        },
+        "lengths": {"chapters":0,"urls":0},
+        "files": []
+      },
+      {
+        "id": "100002",
+        "present": ["created_at","id","image_count","organized","paths.cover","paths.preview","title","updated_at"],
+        "relations": {
+          "cover": [{"id":"100001"}],
+          "performers": [],
+          "scenes": [],
+          "studio": [],
+          "tags": [{"id":"100004"}]
+        },
+        "lengths": {"chapters":0,"urls":0},
+        "files": []
+      }
+    ],
+    "image": [
+      {
+        "id": "100001",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {"galleries":[{"id":"100002"}],"performers":[],"studio":[],"tags":[]},
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      },
+      {
+        "id": "100002",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {"galleries":[{"id":"100002"}],"performers":[],"studio":[],"tags":[]},
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      },
+      {
+        "id": "100003",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {"galleries":[{"id":"100002"}],"performers":[],"studio":[],"tags":[]},
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      },
+      {
+        "id": "100004",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {"galleries":[{"id":"100001"}],"performers":[],"studio":[],"tags":[]},
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      },
+      {
+        "id": "100005",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {
+          "galleries": [{"id":"100001"}],
+          "performers": [],
+          "studio": [],
+          "tags": [{"id":"100001"}]
+        },
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      },
+      {
+        "id": "100006",
+        "present": ["created_at","id","o_counter","organized","paths.image","paths.thumbnail","updated_at"],
+        "relations": {"galleries":[{"id":"100001"}],"performers":[],"studio":[],"tags":[]},
+        "lengths": {"urls":0},
+        "files": [
+          {
+            "present": ["basename","height","id","path","size","width"],
+            "fingerprints": []
+          }
+        ]
+      }
+    ],
+    "clip": []
+  }
+}

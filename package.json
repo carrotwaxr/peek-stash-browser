@@ -12,7 +12,8 @@
     "docs": ".venv/bin/mkdocs serve --livereload -a localhost:8001",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "fixtures:generate": "npm --prefix server run fixtures:generate --"
+    "fixtures:generate": "npm --prefix server run fixtures:generate --",
+    "fixtures:record": "npm --prefix server run fixtures:record --"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
