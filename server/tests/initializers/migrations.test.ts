@@ -6,17 +6,14 @@ import { exec, execFile } from "child_process";
 import { readdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  initializeDatabase,
-  migrationsAppliedThisBoot,
-  wereMigrationsApplied,
-} from "../../initializers/database.js";
+import { initializeDatabase } from "../../initializers/database.js";
 import {
   type MigrationRow,
   planMigrations,
   runPrismaCli,
 } from "../../initializers/migrations.js";
 import prisma from "../../prisma/singleton.js";
+import { logger } from "../../utils/logger.js";
 import {
   anyOf,
   arrayContaining,
@@ -177,7 +174,6 @@ describe("initializeDatabase", () => {
     expect(vi.mocked(execFile)).not.toHaveBeenCalled();
     expect(vi.mocked(exec)).not.toHaveBeenCalled();
     expect(mockPrisma.$disconnect).not.toHaveBeenCalled();
-    expect(wereMigrationsApplied()).toBe(false);
   });
 
   it("runs one migrate deploy after closing the pool when a migration is pending", async () => {
@@ -206,8 +202,9 @@ describe("initializeDatabase", () => {
     expect(
       must(mockPrisma.$disconnect.mock.invocationCallOrder[0])
     ).toBeLessThan(must(vi.mocked(execFile).mock.invocationCallOrder[0]));
-    expect(migrationsAppliedThisBoot()).toEqual([last]);
-    expect(wereMigrationsApplied()).toBe(true);
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      `Applying 1 pending migration: ${last}`
+    );
   });
 });
 

@@ -388,11 +388,6 @@
       "count": 16
     }
   },
-  "services/SyncScheduler.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "services/TagQueryBuilder.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
       "count": 4
