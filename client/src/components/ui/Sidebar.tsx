@@ -57,42 +57,44 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
 
-  // User menu sub-items (static definition)
+  // User menu sub-items (static definition). `as const` keeps the names
+  // literal, so checking an item's name narrows its path
   const userMenuSubItems = useMemo(
-    () => [
-      {
-        name: "Watch History",
-        path: "/watch-history",
-        icon: "history",
-        isSubItem: true,
-      },
-      {
-        name: "My Stats",
-        path: "/user-stats",
-        icon: "bar-chart-3",
-        isSubItem: true,
-      },
-      {
-        name: "Downloads",
-        path: "/downloads",
-        icon: "download",
-        isSubItem: true,
-      },
-      {
-        name: "TV Mode",
-        path: null,
-        isToggle: true,
-        icon: "tv",
-        isSubItem: true,
-      },
-      {
-        name: "Sign Out",
-        path: null,
-        isButton: true,
-        icon: "logout",
-        isSubItem: true,
-      },
-    ],
+    () =>
+      [
+        {
+          name: "Watch History",
+          path: "/watch-history",
+          icon: "history",
+          isSubItem: true,
+        },
+        {
+          name: "My Stats",
+          path: "/user-stats",
+          icon: "bar-chart-3",
+          isSubItem: true,
+        },
+        {
+          name: "Downloads",
+          path: "/downloads",
+          icon: "download",
+          isSubItem: true,
+        },
+        {
+          name: "TV Mode",
+          path: null,
+          isToggle: true,
+          icon: "tv",
+          isSubItem: true,
+        },
+        {
+          name: "Sign Out",
+          path: null,
+          isButton: true,
+          icon: "logout",
+          isSubItem: true,
+        },
+      ] as const,
     []
   );
 
@@ -145,8 +147,8 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
 
   // Listen for zone change events from page components
   useEffect(() => {
-    const handleZoneChange = (e: Event) => {
-      const zone = (e as CustomEvent).detail.zone;
+    const handleZoneChange = (e: WindowEventMap["tvZoneChange"]) => {
+      const zone = e.detail.zone;
       // zone === null means page doesn't support TV navigation (e.g., Scene player page)
       // In this case, deactivate mainNav so keyboard events don't get intercepted
       setIsMainNavActive(zone === "mainNav");
@@ -553,7 +555,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                                 ref={(el: HTMLElement | null) => {
                                   itemRefs.current[subItemIndex] = el;
                                 }}
-                                to={subItem.path!}
+                                to={subItem.path}
                                 className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}
                               >

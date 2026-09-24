@@ -55,7 +55,7 @@ export const BaseGrid = ({
   if (loading) {
     return (
       <div className={`${gridClasses} ${className}`}>
-        {[...Array(skeletonCount)].map((_, i) => (
+        {Array.from({ length: skeletonCount }).map((_, i) => (
           <div key={i}>{skeletonRenderer()}</div>
         ))}
       </div>

@@ -1,3 +1,4 @@
+import type { MouseEvent, ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -8,9 +9,15 @@ import {
   CardTitle,
 } from "../../../src/components/ui/CardComponents";
 
+/** The props of the overlay's root element */
+interface OverlayRootProps {
+  className: string;
+  children: ReactNode;
+}
+
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "bottom-left",
       children: "Test Content",
     });
@@ -21,7 +28,7 @@ describe("CardOverlay", () => {
   });
 
   it("applies correct position classes for bottom-left", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "bottom-left",
       children: "Content",
     });
@@ -32,7 +39,7 @@ describe("CardOverlay", () => {
   });
 
   it("applies correct position classes for top-left", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "top-left",
       children: "Content",
     });
@@ -43,7 +50,7 @@ describe("CardOverlay", () => {
   });
 
   it("applies correct position classes for bottom-right", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "bottom-right",
       children: "Content",
     });
@@ -54,7 +61,7 @@ describe("CardOverlay", () => {
   });
 
   it("applies correct position classes for full", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "full",
       children: "Content",
     });
@@ -64,7 +71,7 @@ describe("CardOverlay", () => {
   });
 
   it("applies additional className when provided", () => {
-    const element = CardOverlay({
+    const element: ReactElement<OverlayRootProps> = CardOverlay({
       position: "bottom-left",
       children: "Content",
       className: "custom-class",
@@ -96,7 +103,9 @@ describe("CardImage", () => {
   });
 
   it("calls onClickOverride when clicking Link", () => {
-    const onClickOverride = vi.fn((e) => e.preventDefault());
+    const onClickOverride = vi.fn((e: MouseEvent) => {
+      e.preventDefault();
+    });
 
     render(
       <MemoryRouter>
@@ -123,7 +132,9 @@ describe("CardDescription", () => {
 
 describe("CardTitle", () => {
   it("calls onClickOverride when clicking title Link", () => {
-    const onClickOverride = vi.fn((e) => e.preventDefault());
+    const onClickOverride = vi.fn((e: MouseEvent) => {
+      e.preventDefault();
+    });
 
     render(
       <MemoryRouter>
@@ -140,7 +151,9 @@ describe("CardTitle", () => {
   });
 
   it("calls onClickOverride when clicking subtitle Link", () => {
-    const onClickOverride = vi.fn((e) => e.preventDefault());
+    const onClickOverride = vi.fn((e: MouseEvent) => {
+      e.preventDefault();
+    });
 
     render(
       <MemoryRouter>

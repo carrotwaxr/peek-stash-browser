@@ -11,8 +11,8 @@ import { UnitPreferenceProvider } from "@/contexts/UnitPreferenceProvider";
 import { UNITS } from "@/utils/unitConversions";
 
 const { mockGet, mockPut } = vi.hoisted(() => ({
-  mockGet: vi.fn(),
-  mockPut: vi.fn(),
+  mockGet: vi.fn<(...args: unknown[]) => unknown>(),
+  mockPut: vi.fn<(...args: unknown[]) => unknown>(),
 }));
 
 vi.mock("@/api", () => ({

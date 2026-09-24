@@ -40,18 +40,18 @@ const FolderTreeSidebar = ({
   className = "",
 }: Props) => {
   // Build tree from tags
-  const tree = useMemo(
+  const tree: TreeNodeData[] = useMemo(
     () =>
       buildTagTree(tags, {
         sortField: "name",
         sortDirection: "ASC",
-      }) as TreeNodeData[],
+      }),
     [tags]
   );
 
   // Create a map of tag IDs to names for breadcrumb display
   const tagNameMap = useMemo(() => {
-    const map = new Map();
+    const map = new Map<string, string>();
     const addToMap = (
       nodes: Array<{ id: string; name: string; children?: unknown[] }>
     ) => {
@@ -223,7 +223,8 @@ const TreeNode = ({
   currentPath,
   onNavigate,
 }: TreeNodeProps) => {
-  const hasChildren = node.children && node.children.length > 0;
+  const children = node.children ?? [];
+  const hasChildren = children.length > 0;
   const isExpanded = expanded.has(node.id);
   const isInPath = currentPath.includes(node.id);
   // Check if this exact path matches the current path (handles multi-parent tags)
@@ -285,7 +286,7 @@ const TreeNode = ({
       {/* Children */}
       {hasChildren && isExpanded && (
         <div>
-          {node.children!.map((child) => (
+          {children.map((child) => (
             <TreeNode
               key={child.id}
               node={child}

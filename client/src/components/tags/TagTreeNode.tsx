@@ -87,7 +87,8 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
   ) => {
     const navigate = useNavigate();
     const { hasMultipleInstances } = useConfig();
-    const hasChildren = tag.children && tag.children.length > 0;
+    const children = tag.children ?? [];
+    const hasChildren = children.length > 0;
     const isFocused = focusedId === tag.id;
 
     const handleClick = useCallback(
@@ -134,10 +135,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     );
 
     // Subtitle: child count or nothing
-    const subtitle =
-      (tag.children?.length ?? 0) > 0
-        ? `${tag.children!.length} subtag${tag.children!.length !== 1 ? "s" : ""}`
-        : null;
+    const subtitle = hasChildren
+      ? `${children.length} subtag${children.length !== 1 ? "s" : ""}`
+      : null;
 
     // Generate placeholder color from tag id
     const placeholderHue = (parseInt(tag.id, 10) * 137.5) % 360;
@@ -276,8 +276,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
             {/* Rating badge - metallic medal style */}
             {(tag.rating100 ?? 0) > 0 &&
               (() => {
-                const ratingStyle = getRatingStyle(tag.rating100);
-                if (!ratingStyle) return null;
+                const rating100 = tag.rating100;
+                const ratingStyle = getRatingStyle(rating100);
+                if (!ratingStyle || rating100 == null) return null;
                 return (
                   <span
                     className="text-xs px-2 py-0.5 rounded font-bold"
@@ -285,9 +286,9 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
                       background: ratingStyle.background,
                       color: ratingStyle.color,
                     }}
-                    title={`Rating: ${(tag.rating100! / 10).toFixed(1)}`}
+                    title={`Rating: ${(rating100 / 10).toFixed(1)}`}
                   >
-                    {(tag.rating100! / 10).toFixed(1)}
+                    {(rating100 / 10).toFixed(1)}
                   </span>
                 );
               })()}
@@ -339,7 +340,7 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
         {/* Children (recursive) */}
         {hasChildren && isExpanded && (
           <div role="group">
-            {tag.children!.map((child) => (
+            {children.map((child) => (
               <TagTreeNode
                 key={`${tag.id}-${child.id}`}
                 tag={child}

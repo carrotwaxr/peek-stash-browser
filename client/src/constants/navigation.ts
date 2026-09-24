@@ -1,3 +1,4 @@
+import type { LandingPagePreference } from "@peek/shared-types";
 import { ENTITY_ICON_NAMES } from "./entityIcons";
 
 /**
@@ -102,7 +103,7 @@ export const LANDING_PAGE_OPTIONS = [
  * @param {string} key - Landing page key
  * @returns {string} Path for the landing page, defaults to "/"
  */
-export const getLandingPagePath = (key: string) => {
+export const getLandingPagePath = (key: string | undefined) => {
   const option = LANDING_PAGE_OPTIONS.find((opt) => opt.key === key);
   return option?.path || "/";
 };
@@ -113,7 +114,10 @@ export const getLandingPagePath = (key: string) => {
  * @param {string} [currentPath] - Current path to exclude from random selection
  * @returns {string} Path to navigate to
  */
-export const getLandingPage = (preference: any, currentPath?: string) => {
+export const getLandingPage = (
+  preference: LandingPagePreference | null | undefined,
+  currentPath?: string
+) => {
   // Default fallback
   if (!preference || !preference.pages?.length) {
     return "/";
@@ -127,9 +131,7 @@ export const getLandingPage = (preference: any, currentPath?: string) => {
         (opt) => opt.path === currentPath
       )?.key;
       if (currentKey) {
-        availablePages = preference.pages.filter(
-          (key: string) => key !== currentKey
-        );
+        availablePages = preference.pages.filter((key) => key !== currentKey);
       }
     }
 
@@ -181,9 +183,10 @@ export const migrateNavPreferences = (savedPreferences: NavPreference[]) => {
 
     // Rebuild prefs array in NAV_DEFINITIONS order
     prefs = NAV_DEFINITIONS.map((def, definitionIndex) => {
-      if (prefsMap.has(def.key)) {
+      const existing = prefsMap.get(def.key);
+      if (existing) {
         // Keep existing preference
-        return prefsMap.get(def.key)!;
+        return existing;
       } else {
         // Add new item at its proper position, enabled by default
         return {

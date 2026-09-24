@@ -1,11 +1,12 @@
 import { createContext } from "react";
+import type { LandingPagePreference } from "@peek/shared-types";
 
 export interface AuthUser {
   id: number;
   username: string;
   role: string;
   setupCompleted?: boolean;
-  landingPagePreference?: string;
+  landingPagePreference?: LandingPagePreference | null;
   hideConfirmationDisabled?: boolean;
   preferredPreviewQuality?: string;
   syncToStash?: boolean;

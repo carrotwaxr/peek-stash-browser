@@ -1,7 +1,24 @@
 // client/src/hooks/__tests__/useCardSelection.test.js
+import type { MouseEvent, TouchEvent } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCardSelection } from "../../src/hooks/useCardSelection";
+
+/** A mouse event with only the fields the hook reads */
+const mouseEvent = (
+  fields: Partial<
+    Pick<MouseEvent, "target" | "currentTarget" | "preventDefault">
+  >
+) => fields as MouseEvent;
+
+/**
+ * A touch event with only the target and touch points the hook reads; the
+ * points are a plain array, which the hook reads by index like a TouchList.
+ */
+const touchEvent = (fields: {
+  target?: EventTarget;
+  touches: Array<Pick<Touch, "clientX" | "clientY">>;
+}) => fields as unknown as TouchEvent;
 
 describe("useCardSelection", () => {
   beforeEach(() => {
@@ -26,9 +43,11 @@ describe("useCardSelection", () => {
 
     // Simulate mousedown
     act(() => {
-      result.current.selectionHandlers.onMouseDown({
-        target: document.body,
-      } as any);
+      result.current.selectionHandlers.onMouseDown(
+        mouseEvent({
+          target: document.body,
+        })
+      );
     });
 
     // Advance 500ms
@@ -48,9 +67,11 @@ describe("useCardSelection", () => {
     );
 
     act(() => {
-      result.current.selectionHandlers.onMouseDown({
-        target: document.body,
-      } as any);
+      result.current.selectionHandlers.onMouseDown(
+        mouseEvent({
+          target: document.body,
+        })
+      );
     });
 
     act(() => {
@@ -77,10 +98,12 @@ describe("useCardSelection", () => {
     );
 
     act(() => {
-      result.current.selectionHandlers.onTouchStart({
-        target: document.body,
-        touches: [{ clientX: 100, clientY: 100 }],
-      } as any);
+      result.current.selectionHandlers.onTouchStart(
+        touchEvent({
+          target: document.body,
+          touches: [{ clientX: 100, clientY: 100 }],
+        })
+      );
     });
 
     act(() => {
@@ -88,9 +111,11 @@ describe("useCardSelection", () => {
     });
 
     act(() => {
-      result.current.selectionHandlers.onTouchMove({
-        touches: [{ clientX: 115, clientY: 100 }],
-      } as any);
+      result.current.selectionHandlers.onTouchMove(
+        touchEvent({
+          touches: [{ clientX: 115, clientY: 100 }],
+        })
+      );
     });
 
     act(() => {
@@ -139,11 +164,13 @@ describe("useCardSelection", () => {
     document.body.appendChild(link);
 
     act(() => {
-      result.current.handleNavigationClick({
-        preventDefault,
-        target: button,
-        currentTarget: link,
-      } as any);
+      result.current.handleNavigationClick(
+        mouseEvent({
+          preventDefault,
+          target: button,
+          currentTarget: link,
+        })
+      );
     });
 
     // Should prevent navigation when click came from button inside link
@@ -168,11 +195,13 @@ describe("useCardSelection", () => {
     document.body.appendChild(link);
 
     act(() => {
-      result.current.handleNavigationClick({
-        preventDefault,
-        target: link,
-        currentTarget: link,
-      } as any);
+      result.current.handleNavigationClick(
+        mouseEvent({
+          preventDefault,
+          target: link,
+          currentTarget: link,
+        })
+      );
     });
 
     // Should NOT prevent navigation - this is a normal link click
@@ -192,7 +221,7 @@ describe("useCardSelection", () => {
     );
 
     act(() => {
-      result.current.handleNavigationClick({ preventDefault } as any);
+      result.current.handleNavigationClick(mouseEvent({ preventDefault }));
     });
 
     expect(preventDefault).toHaveBeenCalled();
@@ -210,9 +239,11 @@ describe("useCardSelection", () => {
 
     // Simulate long-press: mousedown, wait 500ms for selection to fire
     act(() => {
-      result.current.selectionHandlers.onMouseDown({
-        target: document.body,
-      } as any);
+      result.current.selectionHandlers.onMouseDown(
+        mouseEvent({
+          target: document.body,
+        })
+      );
     });
 
     act(() => {
@@ -226,7 +257,7 @@ describe("useCardSelection", () => {
     // Now the click event fires (browser behavior after mouseup)
     // This should be blocked to prevent navigation
     act(() => {
-      result.current.handleNavigationClick({ preventDefault } as any);
+      result.current.handleNavigationClick(mouseEvent({ preventDefault }));
     });
 
     expect(preventDefault).toHaveBeenCalled();

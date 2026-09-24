@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SkeletonSceneCard from "../../../src/components/ui/SkeletonSceneCard";
 import { useCardDisplaySettings } from "../../../src/contexts/CardDisplaySettingsContext";
@@ -46,7 +47,9 @@ describe("SkeletonSceneCard", () => {
       expect(ratingRow).toBeTruthy();
 
       // Should have rating badge placeholder
-      const ratingBadge = ratingRow!.querySelector('[style*="width: 3.5rem"]');
+      const ratingBadge = must(ratingRow).querySelector(
+        '[style*="width: 3.5rem"]'
+      );
       expect(ratingBadge).toBeTruthy();
     });
 
@@ -121,7 +124,9 @@ describe("SkeletonSceneCard", () => {
       expect(ratingRow).toBeTruthy();
 
       // Should have rating badge placeholder
-      const ratingBadge = ratingRow!.querySelector('[style*="width: 3.5rem"]');
+      const ratingBadge = must(ratingRow).querySelector(
+        '[style*="width: 3.5rem"]'
+      );
       expect(ratingBadge).toBeTruthy();
     });
 

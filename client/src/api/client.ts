@@ -81,7 +81,7 @@ export async function apiFetch<T = unknown>(
   if (!response.ok) {
     let errorData: Record<string, unknown>;
     try {
-      errorData = await response.json();
+      errorData = (await response.json()) as Record<string, unknown>;
     } catch {
       errorData = { error: `HTTP error! status: ${response.status}` };
     }

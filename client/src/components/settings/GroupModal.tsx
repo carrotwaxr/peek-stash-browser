@@ -63,17 +63,17 @@ const GroupModal = ({
   // Load group details when editing
   useEffect(() => {
     if (isEditMode && group?.id) {
-      void loadGroupDetails();
+      void loadGroupDetails(group.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group?.id]);
 
-  const loadGroupDetails = async () => {
+  const loadGroupDetails = async (groupId: number) => {
     try {
       setLoadingMembers(true);
       setError(null);
 
-      const response = await getGroup(String(group!.id));
+      const response = await getGroup(String(groupId));
       const groupData = response.group as Record<string, unknown>;
 
       // Populate form fields
@@ -93,12 +93,13 @@ const GroupModal = ({
   };
 
   const handleAddMember = async () => {
-    if (!selectedUserId) return;
+    // Members are edited only in edit mode, where the group is set
+    if (!selectedUserId || !group) return;
 
     const userId = parseInt(selectedUserId, 10);
     const addedUser = users.find((u) => u.id === userId);
     try {
-      await addGroupMember(String(group!.id), userId);
+      await addGroupMember(String(group.id), userId);
       // Find the user details from the users list
       if (addedUser) {
         setMembers((prev) => [
@@ -123,9 +124,10 @@ const GroupModal = ({
   };
 
   const handleRemoveMember = async (userId: number) => {
+    if (!group) return;
     const removedMember = members.find((m) => m.user.id === userId);
     try {
-      await removeGroupMember(String(group!.id), String(userId));
+      await removeGroupMember(String(group.id), String(userId));
       setMembers((prev) => prev.filter((m) => m.user.id !== userId));
       onMessage?.(
         `Removed ${removedMember?.user?.username || "member"} from group`

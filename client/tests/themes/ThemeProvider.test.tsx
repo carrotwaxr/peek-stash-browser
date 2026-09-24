@@ -10,7 +10,9 @@ import { ThemeProvider } from "@/themes/ThemeProvider";
 import { themes as builtInThemes } from "@/themes/themes";
 import { useTheme } from "@/themes/useTheme";
 
-const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }));
+const { mockGet } = vi.hoisted(() => ({
+  mockGet: vi.fn<(...args: unknown[]) => unknown>(),
+}));
 
 vi.mock("@/api", () => ({
   apiGet: (...args: unknown[]) => mockGet(...args),

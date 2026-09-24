@@ -80,7 +80,7 @@ const SceneCarousel = ({
           {title}
         </h2>
         <div className="grid grid-flow-col auto-cols-[280px] gap-4 overflow-hidden py-4">
-          {[...Array(6)].map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <div key={i}>
               <SkeletonSceneCard />
             </div>

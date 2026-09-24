@@ -1,4 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +50,7 @@ vi.mock("../../../src/components/ui/SceneCardPreview", () => ({
 }));
 
 describe("SceneCard respects card display settings", () => {
+  // A partial scene: the fields SceneCard shows
   const mockScene = {
     id: "scene-123",
     title: "Test Scene Title",
@@ -64,7 +66,7 @@ describe("SceneCard respects card display settings", () => {
     tags: [{ id: "t1", name: "Tag1" }],
     studio: { id: "s1", name: "Test Studio" },
     details: "This is a test scene description that should be visible.",
-  } as any;
+  } as unknown as NormalizedScene;
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

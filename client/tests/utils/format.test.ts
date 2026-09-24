@@ -1,3 +1,4 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
 import {
   formatBitRate,
@@ -14,7 +15,7 @@ import {
 describe("format utilities", () => {
   describe("formatDurationHumanReadable", () => {
     it("returns '0m' for null input", () => {
-      expect(formatDurationHumanReadable(null as any)).toBe("0m");
+      expect(formatDurationHumanReadable(untrusted(null))).toBe("0m");
     });
 
     it("returns '0m' for 0 seconds", () => {
@@ -63,11 +64,11 @@ describe("format utilities", () => {
 
   describe("getFilenameFromPath", () => {
     it("returns null for null input", () => {
-      expect(getFilenameFromPath(null as any)).toBeNull();
+      expect(getFilenameFromPath(untrusted(null))).toBeNull();
     });
 
     it("returns null for undefined input", () => {
-      expect(getFilenameFromPath(undefined as any)).toBeNull();
+      expect(getFilenameFromPath(untrusted(undefined))).toBeNull();
     });
 
     it("returns null for empty string", () => {
@@ -108,8 +109,8 @@ describe("format utilities", () => {
 
   describe("formatDuration (MM:SS format)", () => {
     it("returns '0:00' for null/undefined", () => {
-      expect(formatDuration(null as any)).toBe("0:00");
-      expect(formatDuration(undefined as any)).toBe("0:00");
+      expect(formatDuration(untrusted(null))).toBe("0:00");
+      expect(formatDuration(untrusted(undefined))).toBe("0:00");
     });
 
     it("formats seconds less than a minute", () => {
@@ -132,8 +133,8 @@ describe("format utilities", () => {
 
   describe("formatDurationCompact", () => {
     it("returns '0s' for null/undefined", () => {
-      expect(formatDurationCompact(null as any)).toBe("0s");
-      expect(formatDurationCompact(undefined as any)).toBe("0s");
+      expect(formatDurationCompact(untrusted(null))).toBe("0s");
+      expect(formatDurationCompact(untrusted(undefined))).toBe("0s");
     });
 
     it("formats seconds only", () => {
@@ -156,8 +157,8 @@ describe("format utilities", () => {
 
   describe("formatFileSize", () => {
     it("returns '0 B' for null/undefined/zero", () => {
-      expect(formatFileSize(null as any)).toBe("0 B");
-      expect(formatFileSize(undefined as any)).toBe("0 B");
+      expect(formatFileSize(untrusted(null))).toBe("0 B");
+      expect(formatFileSize(untrusted(undefined))).toBe("0 B");
       expect(formatFileSize(0)).toBe("0 B");
     });
 
@@ -183,8 +184,8 @@ describe("format utilities", () => {
 
   describe("formatBitRate", () => {
     it("returns '0 bps' for null/undefined/zero", () => {
-      expect(formatBitRate(null as any)).toBe("0 bps");
-      expect(formatBitRate(undefined as any)).toBe("0 bps");
+      expect(formatBitRate(untrusted(null))).toBe("0 bps");
+      expect(formatBitRate(untrusted(undefined))).toBe("0 bps");
       expect(formatBitRate(0)).toBe("0 bps");
     });
 
@@ -200,8 +201,8 @@ describe("format utilities", () => {
 
   describe("getSceneTitle", () => {
     it("returns 'Unknown Scene' for null/undefined", () => {
-      expect(getSceneTitle(null as any)).toBe("Unknown Scene");
-      expect(getSceneTitle(undefined as any)).toBe("Unknown Scene");
+      expect(getSceneTitle(untrusted(null))).toBe("Unknown Scene");
+      expect(getSceneTitle(untrusted(undefined))).toBe("Unknown Scene");
     });
 
     it("returns title if present", () => {
@@ -239,7 +240,7 @@ describe("format utilities", () => {
     });
 
     it("returns empty string for undefined scene", () => {
-      expect(getSceneDescription(undefined as any)).toBe("");
+      expect(getSceneDescription(untrusted(undefined))).toBe("");
     });
 
     it("returns empty string when no details", () => {
@@ -262,7 +263,7 @@ describe("format utilities", () => {
 
   describe("formatResolution", () => {
     it("returns empty string for null/undefined/zero dimensions", () => {
-      expect(formatResolution(null as any, null as any)).toBe("");
+      expect(formatResolution(untrusted(null), untrusted(null))).toBe("");
       expect(formatResolution(0, 0)).toBe("");
       expect(formatResolution(1920, 0)).toBe("");
       expect(formatResolution(0, 1080)).toBe("");

@@ -24,6 +24,23 @@ interface SelectOption {
   name: string;
 }
 
+/** An entity as the search endpoints return it (the fields read here) */
+interface EntityResult {
+  id: string;
+  instanceId?: string;
+  name?: string;
+  title?: string;
+}
+
+/** The body of a /library/<entity> search (the lists read here) */
+interface FindResponse {
+  findPerformers?: { performers?: EntityResult[] };
+  findStudios?: { studios?: EntityResult[] };
+  findTags?: { tags?: EntityResult[] };
+  findGroups?: { groups?: EntityResult[] };
+  findGalleries?: { galleries?: EntityResult[] };
+}
+
 interface Props {
   entityType: "performers" | "studios" | "tags" | "groups" | "galleries";
   value: string | string[];
@@ -82,13 +99,15 @@ const SearchableSelect = ({
 
       // Parse composite keys and group by instanceId
       const parsed = compositeKeys.map(parseCompositeKey);
-      const groups = new Map(); // instanceId (or "__bare__") -> [bareId, ...]
+      const groups = new Map<string, Array<string | number>>(); // instanceId (or "__bare__") -> [bareId, ...]
       for (const { id, instanceId } of parsed) {
         const groupKey = instanceId || "__bare__";
-        if (!groups.has(groupKey)) {
-          groups.set(groupKey, []);
+        const bareIds = groups.get(groupKey);
+        if (bareIds) {
+          bareIds.push(id);
+        } else {
+          groups.set(groupKey, [id]);
         }
-        groups.get(groupKey).push(id);
       }
 
       // Entity filter key per entity type
@@ -101,12 +120,15 @@ const SearchableSelect = ({
       };
 
       // Response extractor per entity type
-      const extractResults: Record<string, (r: any) => any[]> = {
-        performers: (r: any) => r?.findPerformers?.performers || [],
-        studios: (r: any) => r?.findStudios?.studios || [],
-        tags: (r: any) => r?.findTags?.tags || [],
-        groups: (r: any) => r?.findGroups?.groups || [],
-        galleries: (r: any) => r?.findGalleries?.galleries || [],
+      const extractResults: Record<
+        string,
+        (r: FindResponse | null) => EntityResult[]
+      > = {
+        performers: (r) => r?.findPerformers?.performers || [],
+        studios: (r) => r?.findStudios?.studios || [],
+        tags: (r) => r?.findTags?.tags || [],
+        groups: (r) => r?.findGroups?.groups || [],
+        galleries: (r) => r?.findGalleries?.galleries || [],
       };
 
       // API method per entity type
@@ -141,12 +163,12 @@ const SearchableSelect = ({
           }
 
           const response = await apiMethod(params as Record<string, unknown>);
-          return extract(response);
+          return extract(response as FindResponse | null);
         }
       );
 
       const settled = await Promise.allSettled(promises);
-      const allResults = [];
+      const allResults: EntityResult[] = [];
       for (const result of settled) {
         if (result.status === "fulfilled") {
           allResults.push(...result.value);
@@ -192,7 +214,7 @@ const SearchableSelect = ({
       try {
         const cached = getCache(entityType);
         if (cached?.data) {
-          const selected = cached.data.filter((opt: { id: string }) =>
+          const selected = cached.data.filter((opt) =>
             valueArray.includes(opt.id)
           );
 

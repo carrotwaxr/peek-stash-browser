@@ -211,7 +211,7 @@ describe("useUpdateRating", () => {
 
     await actAsync(() => {
       result.current.mutate({
-        entityType: "unknown" as any,
+        entityType: "unknown",
         entityId: "id-1",
         rating: 50,
       });

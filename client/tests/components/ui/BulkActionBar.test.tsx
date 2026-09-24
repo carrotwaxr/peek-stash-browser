@@ -1,12 +1,17 @@
 import { MemoryRouter } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BulkActionBar from "../../../src/components/ui/BulkActionBar";
 
+/** BulkActionBar reads only a scene's id and title; the rest is left out */
+const partialScene = (fields: Pick<NormalizedScene, "id" | "title">) =>
+  fields as NormalizedScene;
+
 const mockScenes = [
-  { id: "scene-1", title: "Scene 1" },
-  { id: "scene-2", title: "Scene 2" },
-] as any[];
+  partialScene({ id: "scene-1", title: "Scene 1" }),
+  partialScene({ id: "scene-2", title: "Scene 2" }),
+];
 
 describe("BulkActionBar", () => {
   const defaultProps = {
@@ -35,7 +40,7 @@ describe("BulkActionBar", () => {
       <MemoryRouter>
         <BulkActionBar
           {...defaultProps}
-          selectedScenes={[{ id: "scene-1", title: "Scene 1" }] as any}
+          selectedScenes={[partialScene({ id: "scene-1", title: "Scene 1" })]}
         />
       </MemoryRouter>
     );

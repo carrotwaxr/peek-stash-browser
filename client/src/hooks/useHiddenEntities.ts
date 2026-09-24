@@ -3,6 +3,11 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../api";
 import { showError, showSuccess } from "../utils/toast";
 import { useAuth } from "./useAuth";
 
+/** The server's error message on a failed request (`ApiError.data`) */
+interface ApiErrorBody {
+  data?: { error?: string };
+}
+
 /**
  * Hook for managing hidden entities
  */
@@ -49,10 +54,11 @@ export const useHiddenEntities = () => {
         }
 
         return true;
-      } catch (error: any) {
+      } catch (error) {
         console.error("Failed to hide entity:", error);
         showError(
-          error.data?.error || "Failed to hide entity. Please try again."
+          (error as ApiErrorBody).data?.error ||
+            "Failed to hide entity. Please try again."
         );
         return false;
       } finally {
@@ -138,10 +144,11 @@ export const useHiddenEntities = () => {
         );
         showSuccess(`${entityName} has been restored`);
         return true;
-      } catch (error: any) {
+      } catch (error) {
         console.error("Failed to unhide entity:", error);
         showError(
-          error.data?.error || "Failed to restore entity. Please try again."
+          (error as ApiErrorBody).data?.error ||
+            "Failed to restore entity. Please try again."
         );
         return false;
       }
@@ -180,10 +187,11 @@ export const useHiddenEntities = () => {
       const typeLabel = entityType ? `${entityType}s` : "items";
       showSuccess(`All hidden ${typeLabel} have been restored`);
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to unhide all entities:", error);
       showError(
-        error.data?.error || "Failed to restore all items. Please try again."
+        (error as ApiErrorBody).data?.error ||
+          "Failed to restore all items. Please try again."
       );
       return false;
     }

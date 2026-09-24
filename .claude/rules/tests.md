@@ -15,6 +15,7 @@ paths:
 - `tests/setup.ts` stubs `matchMedia`, `IntersectionObserver`, `ResizeObserver` and `scrollIntoView`.
 - `tests/testUtils.tsx` has `createQueryWrapper`, needed by anything that renders a TanStack Query hook (including `OCounterButton`). `renderWithProviders` wraps only a router, with no QueryClient. Also there: `createAuthValue` for code that calls `useAuth`, `createRouterWrapper`, `createMockApi`, `setupPresetMocks` for `useFilterState`, `flushPromises`, `waitForCondition`.
 - Also in `tests/testUtils.tsx`: `actAsync(() => { ... })` replaces `await act(async () => { ... })` when the step awaits nothing (an async callback without an await fails `require-await`); React still flushes the updates, effects and promises the step started. `must(value, what)` reads index access the test relies on, as on the server.
+- Input that breaks its declared type on purpose (a `null` the type rules out, a string where a number belongs) goes through `untrusted(value)` from `tests/helpers/untrusted.ts`, as on the server. Lint holds tests to the source rules: no `any`, no non-null assertion (`eslint-suppressions.json` still allows them in the files later PRs rewrite).
 - Page tests mock `@/api/hooks` rather than the network.
 
 ## Server unit (`server/tests/`)

@@ -49,7 +49,10 @@ export const showSuccess = (message: string, options: ToastOptions = {}) => {
   );
 };
 
-export const showError = (error: any, options: ToastOptions = {}) => {
+export const showError = (
+  error: string | Error | null | undefined,
+  options: ToastOptions = {}
+) => {
   return toast.custom(
     () => (
       <ErrorMessage
@@ -106,7 +109,7 @@ const showInfo = (message: string, options: ToastOptions = {}) => {
  * Example: showPromise(fetchData(), { loading: 'Saving...', success: 'Saved!', error: 'Failed' })
  */
 const showPromise = (
-  promise: Promise<any>,
+  promise: Promise<unknown>,
   messages: PromiseMessages,
   options: ToastOptions = {}
 ) => {

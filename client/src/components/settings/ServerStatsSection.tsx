@@ -38,12 +38,9 @@ interface ServerStats {
   };
 }
 
-interface ReprobeResult {
-  success: boolean;
-  checked?: number;
-  updated?: number;
-  message?: string;
-}
+type ReprobeResult =
+  | { success: true; checked: number; updated: number }
+  | { success: false; message: string };
 
 const ServerStatsSection = () => {
   const { user } = useAuth();
@@ -122,6 +119,8 @@ const ServerStatsSection = () => {
   if (!stats) {
     return null; // Silently fail if stats unavailable
   }
+
+  const ungeneratedClips = stats.cache?.counts?.ungeneratedClips ?? 0;
 
   return (
     <Paper className="mb-6">
@@ -274,7 +273,7 @@ const ServerStatsSection = () => {
         </div>
 
         {/* Clips Maintenance Section - show if there are ungenerated clips */}
-        {isAdmin && (stats.cache?.counts?.ungeneratedClips ?? 0) > 0 && (
+        {isAdmin && ungeneratedClips > 0 && (
           <>
             <hr
               className="my-6"
@@ -293,9 +292,9 @@ const ServerStatsSection = () => {
                     className="text-xs mt-1"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {stats.cache!.counts.ungeneratedClips.toLocaleString()} clip
-                    {stats.cache!.counts.ungeneratedClips !== 1 ? "s" : ""}{" "}
-                    pending preview generation
+                    {ungeneratedClips.toLocaleString()} clip
+                    {ungeneratedClips !== 1 ? "s" : ""} pending preview
+                    generation
                   </p>
                 </div>
                 <Button
@@ -338,7 +337,7 @@ const ServerStatsSection = () => {
                   }}
                 >
                   {reprobeResult.success
-                    ? `Checked ${reprobeResult.checked!.toLocaleString()} clips, ${reprobeResult.updated!.toLocaleString()} now have previews`
+                    ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
                     : reprobeResult.message}
                 </div>
               )}

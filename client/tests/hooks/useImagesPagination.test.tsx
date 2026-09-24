@@ -1,7 +1,18 @@
 // client/src/hooks/__tests__/useImagesPagination.test.jsx
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it, vi } from "vitest";
 import { useImagesPagination } from "../../src/hooks/useImagesPagination";
+
+type PaginationOptions = Parameters<typeof useImagesPagination>[0];
+
+/**
+ * Options without an external page, so the hook keeps the page itself. The
+ * type requires an external page; these tests cover the hook without one.
+ */
+const withoutExternalPage = (
+  options: Omit<PaginationOptions, "externalPage" | "onExternalPageChange">
+) => untrusted<PaginationOptions>(options);
 
 describe("useImagesPagination", () => {
   const createMockFetchImages = (images: unknown[] = [], count = 0) => {
@@ -14,10 +25,12 @@ describe("useImagesPagination", () => {
       const fetchImages = createMockFetchImages(mockImages, 2);
 
       const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-        } as any)
+        useImagesPagination(
+          withoutExternalPage({
+            fetchImages,
+            perPage: 10,
+          })
+        )
       );
 
       await waitFor(() => {
@@ -34,11 +47,13 @@ describe("useImagesPagination", () => {
 
       const { rerender } = renderHook(
         ({ dep }) =>
-          useImagesPagination({
-            fetchImages,
-            perPage: 10,
-            dependencies: [dep],
-          } as any),
+          useImagesPagination(
+            withoutExternalPage({
+              fetchImages,
+              perPage: 10,
+              dependencies: [dep],
+            })
+          ),
         { initialProps: { dep: "value1" } }
       );
 
@@ -58,10 +73,12 @@ describe("useImagesPagination", () => {
       const fetchImages = vi.fn().mockRejectedValue(fetchError);
 
       const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-        } as any)
+        useImagesPagination(
+          withoutExternalPage({
+            fetchImages,
+            perPage: 10,
+          })
+        )
       );
 
       await waitFor(() => {
@@ -150,10 +167,12 @@ describe("useImagesPagination", () => {
       const fetchImages = createMockFetchImages([], 100);
 
       const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-        } as any)
+        useImagesPagination(
+          withoutExternalPage({
+            fetchImages,
+            perPage: 10,
+          })
+        )
       );
 
       await waitFor(() => {
@@ -176,10 +195,12 @@ describe("useImagesPagination", () => {
       const fetchImages = createMockFetchImages(mockImages, 1);
 
       const { result } = renderHook(() =>
-        useImagesPagination({
-          fetchImages,
-          perPage: 10,
-        } as any)
+        useImagesPagination(
+          withoutExternalPage({
+            fetchImages,
+            perPage: 10,
+          })
+        )
       );
 
       await waitFor(() => {

@@ -1,3 +1,4 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
 import {
   makeCompositeKey,
@@ -51,14 +52,14 @@ describe("compositeKey utilities", () => {
     });
 
     it("returns { id: null, instanceId: undefined } for null input", () => {
-      expect(parseCompositeKey(null as any)).toEqual({
+      expect(parseCompositeKey(untrusted(null))).toEqual({
         id: null,
         instanceId: undefined,
       });
     });
 
     it("returns { id: undefined, instanceId: undefined } for undefined input", () => {
-      expect(parseCompositeKey(undefined as any)).toEqual({
+      expect(parseCompositeKey(untrusted(undefined))).toEqual({
         id: undefined,
         instanceId: undefined,
       });
@@ -93,7 +94,7 @@ describe("compositeKey utilities", () => {
     });
 
     it("coerces numeric input to string before parsing", () => {
-      expect(parseCompositeKey(42 as any)).toEqual({
+      expect(parseCompositeKey(untrusted(42))).toEqual({
         id: "42",
         instanceId: undefined,
       });

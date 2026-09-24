@@ -1,3 +1,4 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
 import {
   UNITS,
@@ -34,8 +35,11 @@ describe("unitConversions", () => {
     });
 
     it("returns zeros for null/undefined input", () => {
-      expect(cmToFeetInches(null as any)).toEqual({ feet: 0, inches: 0 });
-      expect(cmToFeetInches(undefined as any)).toEqual({ feet: 0, inches: 0 });
+      expect(cmToFeetInches(untrusted(null))).toEqual({ feet: 0, inches: 0 });
+      expect(cmToFeetInches(untrusted(undefined))).toEqual({
+        feet: 0,
+        inches: 0,
+      });
     });
 
     it("returns zeros for zero input", () => {
@@ -72,8 +76,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatHeight(null as any, UNITS.METRIC)).toBeNull();
-      expect(formatHeight(undefined as any, UNITS.IMPERIAL)).toBeNull();
+      expect(formatHeight(untrusted(null), UNITS.METRIC)).toBeNull();
+      expect(formatHeight(untrusted(undefined), UNITS.IMPERIAL)).toBeNull();
     });
   });
 
@@ -103,8 +107,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatWeight(null as any, UNITS.METRIC)).toBeNull();
-      expect(formatWeight(undefined as any, UNITS.IMPERIAL)).toBeNull();
+      expect(formatWeight(untrusted(null), UNITS.METRIC)).toBeNull();
+      expect(formatWeight(untrusted(undefined), UNITS.IMPERIAL)).toBeNull();
     });
   });
 
@@ -135,8 +139,8 @@ describe("unitConversions", () => {
     });
 
     it("returns null for null/undefined input", () => {
-      expect(formatLength(null as any, UNITS.METRIC)).toBeNull();
-      expect(formatLength(undefined as any, UNITS.IMPERIAL)).toBeNull();
+      expect(formatLength(untrusted(null), UNITS.METRIC)).toBeNull();
+      expect(formatLength(untrusted(undefined), UNITS.IMPERIAL)).toBeNull();
     });
   });
 });

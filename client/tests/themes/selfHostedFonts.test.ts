@@ -15,6 +15,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(__dirname, "../..");
 const fontsPath = resolve(clientRoot, "src/themes/fonts.ts");
 
+/** The part of vite.config.js this test reads: a function of the mode */
+interface ViteConfigModule {
+  default: (env: { command: string; mode: string }) => {
+    build: { assetsInlineLimit: unknown };
+  };
+}
+
 /** "'Space Grotesk', -apple-system, sans-serif" gives "space-grotesk". */
 function fontsourceSlug(fontStack: string): string {
   const first = fontStack.split(",")[0] ?? "";
@@ -56,7 +63,7 @@ describe("self-hosted fonts", () => {
   it("the build never inlines font files into the CSS", async () => {
     // A file URL keeps tsc from resolving the untyped JS config
     const configUrl = pathToFileURL(resolve(clientRoot, "vite.config.js")).href;
-    const { default: configFn } = await import(configUrl);
+    const { default: configFn } = (await import(configUrl)) as ViteConfigModule;
     // The config is a function of the mode, as Vite calls it for `vite build`
     const viteConfig = configFn({ command: "build", mode: "production" });
     const inline = viteConfig.build.assetsInlineLimit as (

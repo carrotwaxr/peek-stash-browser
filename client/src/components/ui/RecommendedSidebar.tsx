@@ -79,7 +79,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
           Recommended
         </h3>
         <div className="space-y-3">
-          {[...Array(6)].map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
               className="animate-pulse"

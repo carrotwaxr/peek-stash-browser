@@ -1,24 +1,43 @@
 // client/tests/hooks/useMediaQuery.test.js
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type Mock,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { useMediaQuery } from "../../src/hooks/useMediaQuery";
 
+/** The change listener the hook registers; tests call it with just matches */
+type ChangeListener = (event: Pick<MediaQueryListEvent, "matches">) => void;
+
+/** The MediaQueryList fields the hook uses */
+interface FakeMediaQueryList {
+  matches: boolean;
+  media?: string;
+  addEventListener: Mock<(event: string, handler: ChangeListener) => void>;
+  removeEventListener: Mock<(event: string, handler: ChangeListener) => void>;
+}
+
 describe("useMediaQuery", () => {
-  let matchMediaMock: any;
-  let listeners: any[];
+  let matchMediaMock: Mock<(query: string) => FakeMediaQueryList>;
+  let listeners: ChangeListener[];
 
   beforeEach(() => {
     listeners = [];
 
-    matchMediaMock = vi.fn((query) => ({
+    matchMediaMock = vi.fn((query: string) => ({
       matches: false,
       media: query,
-      addEventListener: vi.fn((event, handler) => {
+      addEventListener: vi.fn((event: string, handler: ChangeListener) => {
         if (event === "change") {
           listeners.push(handler);
         }
       }),
-      removeEventListener: vi.fn((event, handler) => {
+      removeEventListener: vi.fn((event: string, handler: ChangeListener) => {
         if (event === "change") {
           const index = listeners.indexOf(handler);
           if (index > -1) {
@@ -28,7 +47,8 @@ describe("useMediaQuery", () => {
       }),
     }));
 
-    window.matchMedia = matchMediaMock;
+    // Only the fields the hook uses
+    window.matchMedia = matchMediaMock as unknown as typeof window.matchMedia;
   });
 
   afterEach(() => {
@@ -68,11 +88,12 @@ describe("useMediaQuery", () => {
   });
 
   it("removes event listener on unmount", () => {
-    const removeEventListener = vi.fn();
+    const removeEventListener =
+      vi.fn<(event: string, handler: ChangeListener) => void>();
 
     matchMediaMock.mockReturnValue({
       matches: false,
-      addEventListener: vi.fn((event, handler) => {
+      addEventListener: vi.fn((event: string, handler: ChangeListener) => {
         if (event === "change") {
           listeners.push(handler);
         }

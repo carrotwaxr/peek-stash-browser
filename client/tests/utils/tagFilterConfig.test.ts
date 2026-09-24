@@ -7,10 +7,10 @@
 import { describe, expect, it } from "vitest";
 import { buildTagFilter as _buildTagFilter } from "../../src/utils/filterConfig";
 
-// Cast return type for test assertions — buildTagFilter returns a dynamically-built filter object
-const buildTagFilter = (
-  filters: Record<string, unknown>
-): Record<string, any> => _buildTagFilter(filters);
+// buildTagFilter builds its filter object dynamically, typed Record<string, any>
+// in filterConfig.ts
+const buildTagFilter = (filters: Record<string, unknown>) =>
+  _buildTagFilter(filters);
 
 describe("buildTagFilter", () => {
   describe("Boolean Filters", () => {

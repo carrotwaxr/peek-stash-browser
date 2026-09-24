@@ -148,9 +148,12 @@ describe("useUserStats", () => {
       apiGetMock.mockResolvedValue(mockStats);
 
       const { rerender } = renderHook(
-        ({ sortBy }: { sortBy: string }) => useUserStats({ sortBy } as any),
+        ({ sortBy }: { sortBy: "engagement" | "oCount" }) =>
+          useUserStats({ sortBy }),
         {
-          initialProps: { sortBy: "engagement" },
+          initialProps: {
+            sortBy: "engagement" as "engagement" | "oCount",
+          },
           wrapper: createQueryWrapper(),
         }
       );

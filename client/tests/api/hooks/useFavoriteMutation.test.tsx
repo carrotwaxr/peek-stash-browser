@@ -167,7 +167,7 @@ describe("useUpdateFavorite", () => {
 
     await actAsync(() => {
       result.current.mutate({
-        entityType: "unknown" as any,
+        entityType: "unknown",
         entityId: "id-1",
         favorite: true,
       });

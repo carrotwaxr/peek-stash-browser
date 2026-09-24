@@ -1,10 +1,11 @@
 import React from "react";
 import { act, waitFor } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../src/contexts/AuthContext";
 import { useAuth } from "../../src/hooks/useAuth";
-import { actAsync } from "../testUtils";
+import { actAsync, must } from "../testUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -107,7 +108,7 @@ describe("AuthProvider", () => {
   // 4. Loading state
   it("starts with isLoading=true and transitions to false after auth check", async () => {
     // Use a deferred promise so we can observe the loading state
-    let resolveAuth: (value: unknown) => void;
+    let resolveAuth: ((value: unknown) => void) | undefined;
     globalThis.fetch = vi.fn().mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -123,7 +124,10 @@ describe("AuthProvider", () => {
 
     // Resolve the auth check
     await actAsync(() => {
-      resolveAuth!({
+      must(
+        resolveAuth,
+        "the auth check's resolver"
+      )({
         ok: true,
         json: () => Promise.resolve({ user: mockUser }),
       });
@@ -306,7 +310,7 @@ describe("updateUser()", () => {
     expect(result.current.user).toEqual(mockUser);
 
     act(() => {
-      result.current.updateUser({ displayName: "New Name" } as any);
+      result.current.updateUser(untrusted({ displayName: "New Name" }));
     });
 
     expect(result.current.user).toEqual({
@@ -328,7 +332,7 @@ describe("updateUser()", () => {
     expect(result.current.user).toBeNull();
 
     act(() => {
-      result.current.updateUser({ displayName: "New Name" } as any);
+      result.current.updateUser(untrusted({ displayName: "New Name" }));
     });
 
     expect(result.current.user).toBeNull();

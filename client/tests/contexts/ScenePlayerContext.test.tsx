@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
@@ -16,7 +17,7 @@ import { getEntityPath } from "@/utils/entityLinks";
 // Mocks (must be defined before imports that use them)
 // ---------------------------------------------------------------------------
 
-const mockPost = vi.fn();
+const mockPost = vi.fn<(...args: unknown[]) => unknown>();
 vi.mock("@/api", () => ({
   apiPost: (...args: unknown[]) => mockPost(...args),
 }));
@@ -50,8 +51,13 @@ const mockApiResponse = (scene: Record<string, unknown> = mockScene) => ({
 /**
  * Wrapper factory that provides ScenePlayerProvider with configurable props.
  */
-function createWrapper(props = {}) {
-  const defaults: Record<string, unknown> = {
+type ProviderProps = Omit<
+  ComponentProps<typeof ScenePlayerProvider>,
+  "children"
+>;
+
+function createWrapper(props: Partial<ProviderProps> = {}) {
+  const defaults: ProviderProps = {
     sceneId: "scene-42",
     instanceId: "inst-1",
     playlist: null,
@@ -60,12 +66,10 @@ function createWrapper(props = {}) {
     initialQuality: "direct",
     initialShouldAutoplay: false,
   };
-  const merged = { ...defaults, ...props };
+  const merged: ProviderProps = { ...defaults, ...props };
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <ScenePlayerProvider {...(merged as any)}>{children}</ScenePlayerProvider>
-    );
+    return <ScenePlayerProvider {...merged}>{children}</ScenePlayerProvider>;
   };
 }
 

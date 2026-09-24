@@ -9,10 +9,11 @@ vi.mock("../../../src/hooks/useAuth", () => ({
 }));
 
 // Mock the typed API client
-const mockApiGet = vi.fn();
-const mockApiPost = vi.fn();
-const mockApiPut = vi.fn();
-const mockApiDelete = vi.fn();
+type ApiMock = (...args: unknown[]) => Promise<unknown>;
+const mockApiGet = vi.fn<ApiMock>();
+const mockApiPost = vi.fn<ApiMock>();
+const mockApiPut = vi.fn<ApiMock>();
+const mockApiDelete = vi.fn<ApiMock>();
 vi.mock("../../../src/api", () => ({
   apiGet: (...args: unknown[]) => mockApiGet(...args),
   apiPost: (...args: unknown[]) => mockApiPost(...args),

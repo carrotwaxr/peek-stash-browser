@@ -1,4 +1,5 @@
 // client/tests/components/timeline/TimelineStrip.test.jsx
+import type { ComponentProps } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ describe("TimelineStrip", () => {
     { period: "2024-03", count: 15 },
   ];
 
-  const defaultProps = {
+  const defaultProps: ComponentProps<typeof TimelineStrip> = {
     distribution: defaultDistribution,
     maxCount: 20,
     zoomLevel: "months",
@@ -19,7 +20,7 @@ describe("TimelineStrip", () => {
     onSelectPeriod: vi.fn(),
     onKeyboardNavigate: vi.fn(),
     onVisibleRangeChange: vi.fn(),
-  } as any;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -247,7 +248,7 @@ describe("TimelineStrip", () => {
       render(
         <TimelineStrip
           {...defaultProps}
-          selectedPeriod={{ period: "2024-02" }}
+          selectedPeriod={{ period: "2024-02", count: 20 }}
         />
       );
 
@@ -261,7 +262,7 @@ describe("TimelineStrip", () => {
       render(
         <TimelineStrip
           {...defaultProps}
-          selectedPeriod={{ period: "2024-02" }}
+          selectedPeriod={{ period: "2024-02", count: 20 }}
         />
       );
 
@@ -275,7 +276,7 @@ describe("TimelineStrip", () => {
       const { container } = render(
         <TimelineStrip
           {...defaultProps}
-          selectedPeriod={{ period: "2024-02" }}
+          selectedPeriod={{ period: "2024-02", count: 20 }}
         />
       );
 
@@ -467,7 +468,7 @@ describe("TimelineStrip", () => {
       render(
         <TimelineStrip
           {...defaultProps}
-          selectedPeriod={{ period: "2024-02" }}
+          selectedPeriod={{ period: "2024-02", count: 20 }}
         />
       );
 

@@ -34,7 +34,7 @@ const CONTAINER_MIME_TYPES: Record<string, string> = {
 };
 
 // Cache for codec support tests
-const codecSupportCache = new Map();
+const codecSupportCache = new Map<string, boolean>();
 
 /**
  * Test if browser can play a specific codec combination

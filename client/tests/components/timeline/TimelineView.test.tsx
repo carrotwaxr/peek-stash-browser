@@ -1,23 +1,35 @@
 // client/tests/components/timeline/TimelineView.test.jsx
+import type { ComponentProps } from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type TimelineControls from "../../../src/components/timeline/TimelineControls";
+import type TimelineMobileSheet from "../../../src/components/timeline/TimelineMobileSheet";
+import type TimelineStrip from "../../../src/components/timeline/TimelineStrip";
 import TimelineView from "../../../src/components/timeline/TimelineView";
 
-// Mock the useTimelineState hook
-const mockUseTimelineState = vi.fn();
+type TimelineViewProps = ComponentProps<typeof TimelineView>;
+type RenderItem = TimelineViewProps["renderItem"];
+
+// Mock the useTimelineState hook (each test sets the state it returns)
+const mockUseTimelineState = vi.fn<(options: unknown) => unknown>();
 vi.mock("../../../src/components/timeline/useTimelineState", () => ({
-  useTimelineState: (...args: any[]) => mockUseTimelineState(...args),
+  useTimelineState: (options: unknown) => mockUseTimelineState(options),
 }));
 
 // Mock useMediaQuery - default to desktop (false = not mobile)
-const mockUseMediaQuery = vi.fn((..._args: any[]) => false);
+const mockUseMediaQuery = vi.fn((_query: string) => false);
 vi.mock("../../../src/hooks/useMediaQuery", () => ({
-  useMediaQuery: (...args: any[]) => mockUseMediaQuery(...args),
+  useMediaQuery: (query: string) => mockUseMediaQuery(query),
 }));
 
 // Mock TimelineMobileSheet with expand/collapse support
 vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
-  default: ({ isOpen, selectedPeriod, itemCount, children }: any) =>
+  default: ({
+    isOpen,
+    selectedPeriod,
+    itemCount,
+    children,
+  }: ComponentProps<typeof TimelineMobileSheet>) =>
     isOpen ? (
       <div data-testid="timeline-mobile-sheet">
         {selectedPeriod && (
@@ -31,7 +43,10 @@ vi.mock("../../../src/components/timeline/TimelineMobileSheet", () => ({
 
 // Mock TimelineControls to simplify testing
 vi.mock("../../../src/components/timeline/TimelineControls", () => ({
-  default: ({ zoomLevel, onZoomLevelChange }: any) => (
+  default: ({
+    zoomLevel,
+    onZoomLevelChange,
+  }: ComponentProps<typeof TimelineControls>) => (
     <div data-testid="timeline-controls">
       <span data-testid="current-zoom">{zoomLevel}</span>
       <button
@@ -46,7 +61,11 @@ vi.mock("../../../src/components/timeline/TimelineControls", () => ({
 
 // Mock TimelineStrip to simplify testing
 vi.mock("../../../src/components/timeline/TimelineStrip", () => ({
-  default: ({ distribution, maxCount, selectedPeriod }: any) => (
+  default: ({
+    distribution,
+    maxCount,
+    selectedPeriod,
+  }: ComponentProps<typeof TimelineStrip>) => (
     <div data-testid="timeline-strip">
       <span data-testid="distribution-count">{distribution?.length ?? 0}</span>
       <span data-testid="max-count">{maxCount}</span>
@@ -72,14 +91,16 @@ describe("TimelineView", () => {
     ZOOM_LEVELS: ["years", "months", "weeks", "days"],
   };
 
-  const defaultProps = {
+  const defaultProps: TimelineViewProps = {
     entityType: "scene",
     items: [],
-    renderItem: vi.fn((item: any) => <div key={item.id}>{item.title}</div>),
+    renderItem: vi.fn<RenderItem>((item) => (
+      <div key={String(item.id)}>{String(item.title)}</div>
+    )),
     onItemClick: vi.fn(),
     onDateFilterChange: vi.fn(),
     onPeriodChange: vi.fn(),
-  } as any;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -139,7 +160,7 @@ describe("TimelineView", () => {
         <TimelineView
           {...defaultProps}
           entityType="scene"
-          initialPeriod={"2024-03" as any}
+          initialPeriod={"2024-03"}
         />
       );
 
@@ -156,7 +177,7 @@ describe("TimelineView", () => {
         <TimelineView
           {...defaultProps}
           entityType="image"
-          initialPeriod={"2024-W15" as any}
+          initialPeriod={"2024-W15"}
         />
       );
 
@@ -279,9 +300,9 @@ describe("TimelineView", () => {
     });
 
     it("calls renderItem with item, index, and context", () => {
-      const renderItem = vi.fn((item, index) => (
-        <div key={item.id} data-testid={`item-${index}`}>
-          {item.title}
+      const renderItem = vi.fn<RenderItem>((item, index) => (
+        <div key={String(item.id)} data-testid={`item-${index}`}>
+          {String(item.title)}
         </div>
       ));
 
@@ -312,14 +333,14 @@ describe("TimelineView", () => {
         0,
         expect.objectContaining({
           onItemClick: defaultProps.onItemClick,
-          dateFilter: expect.any(Object),
+          dateFilter: expect.any(Object) as unknown,
         })
       );
     });
 
     it("passes dateFilter to renderItem context", () => {
-      const renderItem = vi.fn((item, index, context) => (
-        <div key={item.id}>
+      const renderItem = vi.fn<RenderItem>((item, _index, context) => (
+        <div key={String(item.id)}>
           <span data-testid="date-filter">
             {JSON.stringify(context.dateFilter)}
           </span>
@@ -714,7 +735,7 @@ describe("TimelineView", () => {
       render(
         <TimelineView
           {...defaultProps}
-          initialPeriod={"2024-01" as any}
+          initialPeriod={"2024-01"}
           onPeriodChange={onPeriodChange}
         />
       );

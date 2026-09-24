@@ -1,6 +1,7 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
-import { buildTagTree } from "../../src/utils/buildTagTree";
+import { type TagTreeSource, buildTagTree } from "../../src/utils/buildTagTree";
 
 describe("buildTagTree", () => {
   it("returns empty array for empty input", () => {
@@ -37,7 +38,7 @@ describe("buildTagTree", () => {
     expect(result).toHaveLength(1);
     expect(must(result[0]).id).toBe("1");
     expect(must(result[0]).children).toHaveLength(1);
-    expect(must(result[0]).children[0].id).toBe("2");
+    expect(must(must(result[0]).children[0]).id).toBe("2");
   });
 
   it("duplicates tags under multiple parents", () => {
@@ -68,9 +69,9 @@ describe("buildTagTree", () => {
     expect(result).toHaveLength(2);
     // Child appears under both parents
     expect(must(result[0]).children).toHaveLength(1);
-    expect(must(result[0]).children[0].id).toBe("3");
+    expect(must(must(result[0]).children[0]).id).toBe("3");
     expect(must(result[1]).children).toHaveLength(1);
-    expect(must(result[1]).children[0].id).toBe("3");
+    expect(must(must(result[1]).children[0]).id).toBe("3");
   });
 
   it("handles deep nesting (grandchildren)", () => {
@@ -96,7 +97,7 @@ describe("buildTagTree", () => {
     ];
     const result = buildTagTree(tags);
     expect(result).toHaveLength(1);
-    expect(must(result[0]).children[0].children[0].id).toBe("3");
+    expect(must(must(must(result[0]).children[0]).children[0]).id).toBe("3");
   });
 
   it("preserves original tag properties", () => {
@@ -142,8 +143,8 @@ describe("buildTagTree with filter", () => {
     expect(result).toHaveLength(1);
     expect(must(result[0]).id).toBe("1"); // Genre (ancestor)
     expect(must(result[0]).isAncestorOnly).toBe(true);
-    expect(must(result[0]).children[0].id).toBe("2"); // Action (match)
-    expect(must(result[0]).children[0].isAncestorOnly).toBeUndefined();
+    expect(must(must(result[0]).children[0]).id).toBe("2"); // Action (match)
+    expect(must(must(result[0]).children[0]).isAncestorOnly).toBeUndefined();
   });
 
   it("marks ancestors as isAncestorOnly", () => {
@@ -169,9 +170,9 @@ describe("buildTagTree with filter", () => {
     ];
     const result = buildTagTree(tags, { filterQuery: "leaf" });
     expect(must(result[0]).isAncestorOnly).toBe(true); // Root
-    expect(must(result[0]).children[0].isAncestorOnly).toBe(true); // Middle
+    expect(must(must(result[0]).children[0]).isAncestorOnly).toBe(true); // Middle
     expect(
-      must(result[0]).children[0].children[0].isAncestorOnly
+      must(must(must(result[0]).children[0]).children[0]).isAncestorOnly
     ).toBeUndefined(); // Leaf (match)
   });
 });
@@ -235,8 +236,8 @@ describe("buildTagTree with sorting", () => {
       sortField: "name",
       sortDirection: "ASC",
     });
-    expect(must(result[0]).children[0].name).toBe("Apple");
-    expect(must(result[0]).children[1].name).toBe("Zebra");
+    expect(must(must(result[0]).children[0]).name).toBe("Apple");
+    expect(must(must(result[0]).children[1]).name).toBe("Zebra");
   });
 
   it("sorts by scene_count field (alternate key)", () => {
@@ -365,15 +366,15 @@ describe("buildTagTree with sorting", () => {
 
 describe("buildTagTree edge cases", () => {
   it("returns empty array for null input", () => {
-    expect(buildTagTree(null as any)).toEqual([]);
+    expect(buildTagTree(untrusted<TagTreeSource[]>(null))).toEqual([]);
   });
 
   it("returns empty array for undefined input", () => {
-    expect(buildTagTree(undefined as any)).toEqual([]);
+    expect(buildTagTree(untrusted<TagTreeSource[]>(undefined))).toEqual([]);
   });
 
   it("handles tags without parents property (treated as root)", () => {
-    const tags = [{ id: "1", name: "Root" } as any];
+    const tags = [{ id: "1", name: "Root" }];
     const result = buildTagTree(tags);
     expect(result).toHaveLength(1);
     expect(must(result[0]).name).toBe("Root");

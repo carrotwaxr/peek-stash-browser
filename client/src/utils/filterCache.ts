@@ -13,6 +13,18 @@ const CACHE_KEYS: Record<string, string> = {
 
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+/** A cached dropdown option: its "id:instanceId" key and display name */
+export interface CachedOption {
+  id: string;
+  name: string;
+}
+
+/** A cached list as stored in localStorage */
+interface CacheEntry {
+  timestamp: number;
+  data: CachedOption[];
+}
+
 /**
  * Check if cached data is still valid
  * @param {number} timestamp - Cache timestamp
@@ -27,7 +39,7 @@ const isCacheFresh = (timestamp: number) => {
  * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @returns {{data: Array, timestamp: number}|null} Cached data or null if stale/missing
  */
-export const getCache = (cacheKey: string) => {
+export const getCache = (cacheKey: string): CacheEntry | null => {
   try {
     // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
     const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;
@@ -37,7 +49,7 @@ export const getCache = (cacheKey: string) => {
       return null;
     }
 
-    const parsed = JSON.parse(cached);
+    const parsed = JSON.parse(cached) as CacheEntry;
 
     // Check if cache is still fresh
     if (!isCacheFresh(parsed.timestamp)) {
@@ -58,7 +70,7 @@ export const getCache = (cacheKey: string) => {
  * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @param {Array} data - Array of {id, name} objects
  */
-export const setCache = (cacheKey: string, data: unknown) => {
+export const setCache = (cacheKey: string, data: CachedOption[]) => {
   try {
     // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
     const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;

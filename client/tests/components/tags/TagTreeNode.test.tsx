@@ -10,11 +10,9 @@
  */
 import { MemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
-import TagTreeNodeComponent from "../../../src/components/tags/TagTreeNode";
-
-// Cast to FC<any> since TagTreeNode is an untyped forwardRef
-const TagTreeNode = TagTreeNodeComponent as unknown as React.FC<any>;
+import TagTreeNode from "../../../src/components/tags/TagTreeNode";
 
 // Wrapper to provide router context
 const renderWithRouter = (ui: React.ReactElement) => {
@@ -198,7 +196,7 @@ describe("TagTreeNode", () => {
       // When expanded, multiple treeitems exist - get the parent by its name
       const allTreeItems = screen.getAllByRole("treeitem");
       const parentItem = allTreeItems.find((item) =>
-        item.textContent!.includes("Parent Tag")
+        must(item.textContent).includes("Parent Tag")
       );
       expect(parentItem).toHaveAttribute("aria-expanded", "true");
     });

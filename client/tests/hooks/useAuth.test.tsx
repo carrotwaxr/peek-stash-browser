@@ -1,4 +1,5 @@
 import { renderHook } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
   AuthContext,
@@ -30,7 +31,7 @@ describe("useAuth", () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     expect(result.current).toBe(mockValue);
-    expect(result.current.user!.username).toBe("testuser");
+    expect(must(result.current.user).username).toBe("testuser");
     expect(result.current.isAuthenticated).toBe(true);
   });
 

@@ -16,8 +16,8 @@ import {
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const { mockGet, mockPut } = vi.hoisted(() => {
   return {
-    mockGet: vi.fn(),
-    mockPut: vi.fn(),
+    mockGet: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+    mockPut: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   };
 });
 

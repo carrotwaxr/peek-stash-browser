@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import type { AuthContextValue } from "@/contexts/AuthContextProvider";
 
 // ============================================================================
@@ -170,10 +170,10 @@ export const createMockApi = () => ({
  * @param {object} options.defaults - Default preset IDs by artifact type
  */
 export const setupPresetMocks = (
-  apiGet: any,
+  apiGet: Mock<(url: string) => Promise<unknown>>,
   { presets = {}, defaults = {} } = {}
 ) => {
-  apiGet.mockImplementation((url: any) => {
+  apiGet.mockImplementation((url) => {
     if (url === "/user/filter-presets") {
       return Promise.resolve({ presets });
     }

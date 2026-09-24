@@ -119,7 +119,7 @@ const Galleries = () => {
   }, []);
 
   const handleGalleryClick = useCallback(
-    (gallery: { id: string; stashInstanceId?: string }) => {
+    (gallery: Record<string, unknown>) => {
       void navigate(getEntityPath("gallery", gallery, hasMultipleInstances), {
         state: { fromPageTitle: "Galleries" },
       });
@@ -258,11 +258,7 @@ const Galleries = () => {
                     zoomLevel as unknown as "small" | "medium" | "large"
                   }
                   playbackMode={wallPlayback as "static" | "autoplay" | "hover"}
-                  onItemClick={
-                    handleGalleryClick as (
-                      item: Record<string, unknown>
-                    ) => void
-                  }
+                  onItemClick={handleGalleryClick}
                   loading={isLoading}
                   emptyMessage="No galleries found"
                 />

@@ -2,13 +2,45 @@
 
 export const UNTAGGED_FOLDER_ID = "__untagged__";
 
-type FolderItem = Record<string, any>;
-type FolderTag = Record<string, any>;
+/** The fields the folder tree reads from a scene, gallery or image */
+export interface FolderTreeItem {
+  tags?: readonly { id: string }[] | null;
+  paths?: { screenshot?: string | null; thumbnail?: string | null } | null;
+  cover?: { paths?: { thumbnail?: string | null } | null } | null;
+}
+
+/** The fields the folder view reads from a tag (the server sends full tags) */
+export interface FolderTreeTag {
+  id: string;
+  name: string;
+  parents?: { id: string }[];
+  children?: { id: string }[];
+  image_count?: number | null;
+  scene_count?: number | null;
+  gallery_count?: number | null;
+  image_path?: string | null;
+}
+
+/** A folder at the current level: a tag, or the Untagged folder (tag null) */
+export interface FolderNode<T extends FolderTreeTag> {
+  id: string;
+  tag: T | null;
+  name: string;
+  thumbnail: string | null;
+  totalCount: number;
+  isFolder: true;
+}
+
+export interface FolderTree<I extends FolderTreeItem, T extends FolderTreeTag> {
+  folders: FolderNode<T>[];
+  items: I[];
+  breadcrumbs: { id: string; name: string }[];
+}
 
 /**
  * Get thumbnail from an item (scene, gallery, or image)
  */
-const getItemThumbnail = (item: FolderItem): string | null => {
+const getItemThumbnail = (item: FolderTreeItem): string | null => {
   // Scene
   if (item.paths?.screenshot) return item.paths.screenshot;
   // Gallery
@@ -29,18 +61,21 @@ const getItemThumbnail = (item: FolderItem): string | null => {
  * @param {Array} currentPath - Array of tag IDs representing current navigation path
  * @returns {Object} { folders: FolderNode[], items: Item[], breadcrumbs: Breadcrumb[] }
  */
-export function buildFolderTree(
-  items: FolderItem[],
-  tags: FolderTag[],
+export function buildFolderTree<
+  I extends FolderTreeItem,
+  T extends FolderTreeTag,
+>(
+  items: readonly I[],
+  tags: readonly T[],
   currentPath: string[] = []
-) {
+): FolderTree<I, T> {
   if (!items || !tags) {
     return { folders: [], items: [], breadcrumbs: [] };
   }
 
   // Build tag lookup map
-  const tagMap = new Map();
-  tags.forEach((tag: FolderTag) => tagMap.set(tag.id, tag));
+  const tagMap = new Map<string, T>();
+  tags.forEach((tag) => tagMap.set(tag.id, tag));
 
   // Build breadcrumbs from path
   const breadcrumbs = currentPath.map((id) => {
@@ -53,28 +88,33 @@ export function buildFolderTree(
   const currentTag = currentTagId ? tagMap.get(currentTagId) : null;
 
   // Get child tag IDs for current level
-  let childTagIds;
+  let childTagIds: Set<string>;
   if (currentTag) {
     // Inside a tag - show its children
-    childTagIds = new Set(
-      (currentTag.children || []).map((c: FolderTag) => c.id)
-    );
+    childTagIds = new Set((currentTag.children || []).map((c) => c.id));
   } else {
     // At root - show top-level tags (no parents)
     childTagIds = new Set(
-      tags
-        .filter((t: FolderTag) => !t.parents || t.parents.length === 0)
-        .map((t: FolderTag) => t.id)
+      tags.filter((t) => !t.parents || t.parents.length === 0).map((t) => t.id)
     );
   }
 
   // Group items by which folder they belong to at this level
-  const folderContents = new Map<string, FolderItem[]>(); // tagId -> items[] (for recursive counts)
-  const leafItems: FolderItem[] = []; // Items that appear directly at this level
-  const untaggedItems: FolderItem[] = [];
+  const folderContents = new Map<string, I[]>(); // tagId -> items[] (for recursive counts)
+  const leafItems: I[] = []; // Items that appear directly at this level
+  const untaggedItems: I[] = [];
 
-  items.forEach((item: FolderItem) => {
-    const itemTagIds = new Set((item.tags || []).map((t: FolderTag) => t.id));
+  const addToFolder = (tagId: string, item: I) => {
+    const contents = folderContents.get(tagId);
+    if (contents) {
+      contents.push(item);
+    } else {
+      folderContents.set(tagId, [item]);
+    }
+  };
+
+  items.forEach((item) => {
+    const itemTagIds = new Set((item.tags || []).map((t) => t.id));
 
     // Check if item has no tags
     if (itemTagIds.size === 0) {
@@ -91,10 +131,7 @@ export function buildFolderTree(
       // Add to each root-level folder the item belongs to (for counts)
       childTagIds.forEach((childId) => {
         if (itemHasTagOrDescendant(item, childId, tagMap)) {
-          if (!folderContents.has(childId)) {
-            folderContents.set(childId, []);
-          }
-          folderContents.get(childId)!.push(item);
+          addToFolder(childId, item);
         }
       });
       return;
@@ -102,15 +139,12 @@ export function buildFolderTree(
 
     // INSIDE a tag folder: determine where this item should appear
     // Item must have the current tag directly to appear at this level
-    if (!itemTagIds.has(currentTagId)) {
+    if (currentTagId === null || !itemTagIds.has(currentTagId)) {
       // Item doesn't have current tag directly - it's here via a deeper descendant
       // Still add to child folder counts, but don't show as leaf
       childTagIds.forEach((childId) => {
         if (itemHasTagOrDescendant(item, childId, tagMap)) {
-          if (!folderContents.has(childId)) {
-            folderContents.set(childId, []);
-          }
-          folderContents.get(childId)!.push(item);
+          addToFolder(childId, item);
         }
       });
       return;
@@ -120,10 +154,7 @@ export function buildFolderTree(
     let hasChildTag = false;
     for (const childId of childTagIds) {
       if (itemHasTagOrDescendant(item, childId, tagMap)) {
-        if (!folderContents.has(childId)) {
-          folderContents.set(childId, []);
-        }
-        folderContents.get(childId)!.push(item);
+        addToFolder(childId, item);
         hasChildTag = true;
       }
     }
@@ -137,7 +168,7 @@ export function buildFolderTree(
   // Build folder nodes
   // Show ALL folders from tag hierarchy that have content (pre-computed count > 0)
   // This ensures folders appear even when current page has no items for them
-  const folders = [];
+  const folders: FolderNode<T>[] = [];
 
   childTagIds.forEach((tagId) => {
     const tag = tagMap.get(tagId);
@@ -206,15 +237,15 @@ export function buildFolderTree(
  * Check if an item has a tag or any of its descendants
  */
 function itemHasTagOrDescendant(
-  item: FolderItem,
+  item: FolderTreeItem,
   tagId: string,
-  tagMap: Map<string, FolderTag>,
+  tagMap: Map<string, FolderTreeTag>,
   visited = new Set<string>()
 ): boolean {
   if (visited.has(tagId)) return false;
   visited.add(tagId);
 
-  const itemTagIds = new Set((item.tags || []).map((t: FolderTag) => t.id));
+  const itemTagIds = new Set((item.tags || []).map((t) => t.id));
 
   // Direct match
   if (itemTagIds.has(tagId)) return true;

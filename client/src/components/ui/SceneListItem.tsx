@@ -83,12 +83,13 @@ const SceneListItem = ({
     try {
       const oHistory = Array.isArray(watchHistory.oHistory)
         ? watchHistory.oHistory
-        : JSON.parse(watchHistory.oHistory);
+        : (JSON.parse(watchHistory.oHistory) as string[]);
 
-      if (oHistory.length === 0) return false;
+      // The most recent O timestamp; none when the history is empty
+      const lastO = oHistory[oHistory.length - 1];
+      if (lastO === undefined) return false;
 
-      // Get the most recent O timestamp
-      const lastOTimestamp = new Date(oHistory[oHistory.length - 1]);
+      const lastOTimestamp = new Date(lastO);
       const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
 
       // Check if the last O was within 5 minutes of the last play session
@@ -234,7 +235,7 @@ const SceneListItem = ({
             )}
             {exists ? (
               <SceneThumbnail
-                scene={scene!}
+                scene={scene}
                 watchHistory={
                   watchHistory as Parameters<
                     typeof SceneThumbnail
@@ -295,25 +296,27 @@ const SceneListItem = ({
                               {formatRelativeTime(watchHistory.lastPlayedAt)}
                             </span>
                           )}
-                          {(watchHistory.resumeTime ?? 0) > 0 &&
+                          {watchHistory.resumeTime !== undefined &&
+                            watchHistory.resumeTime > 0 &&
                             scene.files?.[0]?.duration && (
                               <span>
                                 ⏸️ Resume at:{" "}
-                                {formatResumeTime(watchHistory.resumeTime!)} (
+                                {formatResumeTime(watchHistory.resumeTime)} (
                                 {Math.round(
-                                  (watchHistory.resumeTime! /
+                                  (watchHistory.resumeTime /
                                     scene.files[0].duration) *
                                     100
                                 )}
                                 %)
                               </span>
                             )}
-                          {(watchHistory.playDuration ?? 0) > 0 && (
-                            <span>
-                              ⏱️ Watched:{" "}
-                              {formatDuration(watchHistory.playDuration!)}
-                            </span>
-                          )}
+                          {watchHistory.playDuration !== undefined &&
+                            watchHistory.playDuration > 0 && (
+                              <span>
+                                ⏱️ Watched:{" "}
+                                {formatDuration(watchHistory.playDuration)}
+                              </span>
+                            )}
                         </div>
                       )}
 

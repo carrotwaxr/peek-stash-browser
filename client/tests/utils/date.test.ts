@@ -1,3 +1,4 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
 import { formatDate, formatRelativeTime } from "../../src/utils/date";
 
@@ -25,8 +26,8 @@ describe("date utilities", () => {
     });
 
     it("returns 'Unknown' for null-like input", () => {
-      expect(formatDate(null as any)).toBe("Unknown");
-      expect(formatDate(undefined as any)).toBe("Unknown");
+      expect(formatDate(untrusted(null))).toBe("Unknown");
+      expect(formatDate(untrusted(undefined))).toBe("Unknown");
     });
 
     it("handles date-only string for each month", () => {
