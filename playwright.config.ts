@@ -36,7 +36,8 @@ export default defineConfig({
 
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 1 : 0,
+  failOnFlakyTests: isCI,
   workers: isCI ? "50%" : undefined,
 
   reporter: isCI
