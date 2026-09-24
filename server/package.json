@@ -30,6 +30,7 @@
     "stash:codegen": "graphql-codegen --config codegen.yml",
     "stash:replay": "tsx integration/stash-replay/cli.ts",
     "fixtures:generate": "tsx integration/stash-replay/generate.ts",
+    "fixtures:record": "tsx integration/stash-replay/record.ts",
     "stash:refresh": "echo 'Copy schema.json from stashapp-api or run introspection, then run npm run stash:codegen'"
   },
   "prisma": {
