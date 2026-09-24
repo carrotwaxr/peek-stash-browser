@@ -8,7 +8,7 @@
     "build": "tsc",
     "serve": "node dist/index.js",
     "start": "node dist/index.js",
-    "dev": "npx prisma migrate deploy && nodemon",
+    "dev": "prisma generate && prisma migrate deploy && nodemon",
     "lint": "eslint .",
     "format": "cd .. && prettier --write server",
     "format:check": "cd .. && prettier --check server",

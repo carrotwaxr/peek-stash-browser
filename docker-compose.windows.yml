@@ -1,5 +1,5 @@
 # Windows development override
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.windows.yml up
+# Usage: docker compose -f docker-compose.yml -f docker-compose.windows.yml up
 #
 # Fixes two Windows Docker Desktop issues:
 # 1. Slow SQLite: Uses named volume instead of bind mount (WSL2's 9P has poor I/O)
