@@ -51,11 +51,16 @@ vi.mock("@/utils/entityLinks", () => ({
 }));
 
 // Mock API
-const mockUsePerformerList = vi.fn(() => ({
-  data: null as Record<string, unknown> | null,
-  isLoading: false,
-  error: null as Error | null,
-}));
+interface MockListResult {
+  data: Record<string, unknown> | null;
+  isLoading: boolean;
+  error: Error | null;
+  isPlaceholderData?: boolean;
+}
+const mockUsePerformerList = vi.fn(
+  (): MockListResult => ({ data: null, isLoading: false, error: null })
+);
+const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   usePerformerList: (..._args: unknown[]) => mockUsePerformerList(),
 }));
@@ -81,6 +86,7 @@ vi.mock("@/api", () => ({}));
 // Mock child components
 vi.mock("@/components/ui/index", () => ({
   SearchControls: (props: Record<string, unknown>) => {
+    mockSearchControlsProps(props);
     const { children, onQueryChange, ...rest } = props;
     // Use useEffect to simulate SearchControls calling onQueryChange on mount
     const React = require("react");
@@ -229,6 +235,22 @@ describe("Performers", () => {
       const cards = screen.getAllByTestId("performer-card");
       expect(cards).toHaveLength(2);
       expect(cards[0]).toHaveTextContent("Test Performer");
+    });
+  });
+
+  describe("Stale results", () => {
+    it("passes the list's placeholder state to SearchControls as isRefreshing", () => {
+      mockUsePerformerList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: null,
+        isPlaceholderData: true,
+      });
+
+      render(<Performers />);
+
+      const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
+      expect(props).toMatchObject({ isRefreshing: true });
     });
   });
 });

@@ -51,11 +51,16 @@ vi.mock("@/utils/entityLinks", () => ({
 }));
 
 // Mock API
-const mockUseGroupList = vi.fn(() => ({
-  data: null as Record<string, unknown> | null,
-  isLoading: false,
-  error: null as Error | null,
-}));
+interface MockListResult {
+  data: Record<string, unknown> | null;
+  isLoading: boolean;
+  error: Error | null;
+  isPlaceholderData?: boolean;
+}
+const mockUseGroupList = vi.fn(
+  (): MockListResult => ({ data: null, isLoading: false, error: null })
+);
+const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   useGroupList: (..._args: unknown[]) => mockUseGroupList(),
 }));
@@ -81,6 +86,7 @@ vi.mock("@/api", () => ({}));
 // Mock child components
 vi.mock("@/components/ui/index", () => ({
   SearchControls: (props: Record<string, unknown>) => {
+    mockSearchControlsProps(props);
     const { children, onQueryChange, ...rest } = props;
     const React = require("react");
     React.useEffect(() => {
@@ -230,6 +236,22 @@ describe("Groups", () => {
       const cards = screen.getAllByTestId("group-card");
       expect(cards).toHaveLength(2);
       expect(cards[0]).toHaveTextContent("Test Collection");
+    });
+  });
+
+  describe("Stale results", () => {
+    it("passes the list's placeholder state to SearchControls as isRefreshing", () => {
+      mockUseGroupList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: null,
+        isPlaceholderData: true,
+      });
+
+      render(<Groups />);
+
+      const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
+      expect(props).toMatchObject({ isRefreshing: true });
     });
   });
 });

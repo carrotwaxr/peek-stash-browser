@@ -57,11 +57,16 @@ vi.mock("@/utils/entityLinks", () => ({
 }));
 
 // Mock API
-const mockUseGalleryList = vi.fn(() => ({
-  data: null as Record<string, unknown> | null,
-  isLoading: false,
-  error: null as Error | null,
-}));
+interface MockListResult {
+  data: Record<string, unknown> | null;
+  isLoading: boolean;
+  error: Error | null;
+  isPlaceholderData?: boolean;
+}
+const mockUseGalleryList = vi.fn(
+  (): MockListResult => ({ data: null, isLoading: false, error: null })
+);
+const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   useGalleryList: (..._args: unknown[]) => mockUseGalleryList(),
 }));
@@ -98,6 +103,7 @@ vi.mock("@/components/ui/index", () => ({
     onQueryChange,
     ...props
   }: Record<string, unknown>) => {
+    mockSearchControlsProps(props);
     // Call onQueryChange once on mount to set queryParams (simulates SearchControls behavior)
     const calledRef = React.useRef(false);
     React.useEffect(() => {
@@ -278,6 +284,22 @@ describe("Galleries", () => {
       expect(screen.getByTestId("search-controls")).toBeInTheDocument();
       // The component defines VIEW_MODES with 5 entries: grid, wall, table, timeline, folder
       // This is validated by the component rendering without error with the SearchControls mock
+    });
+  });
+
+  describe("Stale results", () => {
+    it("passes the list's placeholder state to SearchControls as isRefreshing", () => {
+      mockUseGalleryList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: null,
+        isPlaceholderData: true,
+      });
+
+      render(<Galleries />);
+
+      const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
+      expect(props).toMatchObject({ isRefreshing: true });
     });
   });
 });

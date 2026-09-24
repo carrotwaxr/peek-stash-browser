@@ -55,6 +55,7 @@ const Performers = () => {
     data,
     isLoading: queryLoading,
     error,
+    isPlaceholderData,
   } = usePerformerList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
@@ -141,6 +142,7 @@ const Performers = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="performer"
+          isRefreshing={isPlaceholderData}
           initialSort="o_counter"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}

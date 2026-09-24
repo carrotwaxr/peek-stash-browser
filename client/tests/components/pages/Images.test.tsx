@@ -75,11 +75,16 @@ vi.mock("@tanstack/react-query", async () => {
 });
 
 // Mock API
-const mockUseImageList = vi.fn(() => ({
-  data: null as Record<string, unknown> | null,
-  isLoading: false,
-  error: null as Error | null,
-}));
+interface MockListResult {
+  data: Record<string, unknown> | null;
+  isLoading: boolean;
+  error: Error | null;
+  isPlaceholderData?: boolean;
+}
+const mockUseImageList = vi.fn(
+  (): MockListResult => ({ data: null, isLoading: false, error: null })
+);
+const mockSearchControlsProps = vi.fn();
 vi.mock("@/api/hooks", () => ({
   useImageList: (..._args: unknown[]) => mockUseImageList(),
 }));
@@ -128,6 +133,7 @@ vi.mock("@/components/ui/index", () => ({
     onQueryChange,
     ...props
   }: Record<string, unknown>) => {
+    mockSearchControlsProps(props);
     // Call onQueryChange once on mount to set queryParams (simulates SearchControls behavior)
     const calledRef = React.useRef(false);
     React.useEffect(() => {
@@ -335,6 +341,22 @@ describe("Images", () => {
       // We verify the component renders successfully with the SearchControls mock
       render(<Images />);
       expect(screen.getByTestId("search-controls")).toBeInTheDocument();
+    });
+  });
+
+  describe("Stale results", () => {
+    it("passes the list's placeholder state to SearchControls as isRefreshing", () => {
+      mockUseImageList.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: null,
+        isPlaceholderData: true,
+      });
+
+      render(<Images />);
+
+      const props = mockSearchControlsProps.mock.calls.at(-1)?.[0];
+      expect(props).toMatchObject({ isRefreshing: true });
     });
   });
 });

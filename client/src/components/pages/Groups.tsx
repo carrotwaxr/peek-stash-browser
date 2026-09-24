@@ -51,7 +51,12 @@ const Groups = () => {
   const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
     null
   );
-  const { data, isLoading: queryLoading, error } = useGroupList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useGroupList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -116,6 +121,7 @@ const Groups = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="group"
+          isRefreshing={isPlaceholderData}
           initialSort="name"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}

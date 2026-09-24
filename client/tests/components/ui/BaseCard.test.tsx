@@ -1,7 +1,11 @@
 import { createElement } from "react";
-import { MemoryRouter } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import {
+  MemoryRouter,
+  RouterProvider,
+  createMemoryRouter,
+} from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BaseCard,
   type BaseCardProps,
@@ -289,5 +293,61 @@ describe("BaseCard menu placement logic", () => {
     expect(
       (element.props.ratingControlsProps as any)?.showMenu
     ).toBeUndefined();
+  });
+});
+
+describe("BaseCard navigation", () => {
+  const renderCard = (onNavigate: (e: unknown) => void) => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/scenes",
+          element: (
+            <BaseCard
+              entityType="scene"
+              entity={{ id: "1" }}
+              title="Test Title"
+              linkTo="/scene/1"
+              onNavigate={onNavigate}
+            />
+          ),
+        },
+        { path: "/scene/:id", element: <div>scene page</div> },
+      ],
+      { initialEntries: ["/scenes"] }
+    );
+    render(<RouterProvider router={router} />);
+    const titleLink = screen.getByText("Test Title").closest("a")!;
+    return { router, titleLink };
+  };
+
+  // happy-dom follows an unprevented link click by changing window.location
+  const startUrl = window.location.href;
+  afterEach(() => {
+    window.history.replaceState(null, "", startUrl);
+  });
+
+  it("a plain click on the title calls onNavigate once and keeps the Link from navigating", () => {
+    const onNavigate = vi.fn();
+    const { router, titleLink } = renderCard(onNavigate);
+
+    fireEvent.click(titleLink);
+
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(router.state.location.pathname).toBe("/scenes");
+  });
+
+  it("a ctrl, meta or shift click leaves the link to the browser and skips onNavigate", () => {
+    const onNavigate = vi.fn();
+    const { router, titleLink } = renderCard(onNavigate);
+
+    const notPrevented = (["ctrlKey", "metaKey", "shiftKey"] as const).map(
+      (modifier) => fireEvent.click(titleLink, { [modifier]: true })
+    );
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    // Not prevented: the browser's own new-tab or new-window handling runs
+    expect(notPrevented).toEqual([true, true, true]);
+    expect(router.state.location.pathname).toBe("/scenes");
   });
 });

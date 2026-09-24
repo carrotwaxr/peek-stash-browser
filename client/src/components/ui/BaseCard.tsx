@@ -142,11 +142,14 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
     const wrappedNavigationClick = (e: MouseEvent<HTMLElement>) => {
       // First let selection hook handle its logic
       handleNavigationClick(e);
-      // If selection hook didn't prevent default and we have a custom navigate handler
-      if (!e.defaultPrevented && onNavigate) {
-        e.preventDefault();
-        onNavigate(e);
+      // Selection took the click, or there is no custom navigate handler
+      if (e.defaultPrevented || !onNavigate) return;
+      // Leave modified and non-primary clicks (new tab, new window) to the browser
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+        return;
       }
+      e.preventDefault();
+      onNavigate(e);
     };
 
     // Keyboard navigation hook
