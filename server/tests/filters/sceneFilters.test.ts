@@ -21,6 +21,7 @@ import {
   createMockStudios,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 // Mock StashInstanceManager to provide a default config for stream URL generation
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -92,7 +93,10 @@ describe("Scene Filters - Quick Filters", () => {
 
   describe("Performer Filter", () => {
     it("should filter scenes with INCLUDES modifier (any performer)", async () => {
-      const performerIds = [mockPerformers[0].id, mockPerformers[1].id];
+      const performerIds = [
+        must(mockPerformers[0]).id,
+        must(mockPerformers[1]).id,
+      ];
       const filter: PeekSceneFilter = {
         performers: {
           value: coerceEntityRefs(performerIds),
@@ -113,7 +117,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter scenes with INCLUDES_ALL modifier (all performers)", async () => {
-      const performerIds = [mockPerformers[0].id];
+      const performerIds = [must(mockPerformers[0]).id];
       const filter: PeekSceneFilter = {
         performers: {
           value: coerceEntityRefs(performerIds),
@@ -134,7 +138,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter scenes with EXCLUDES modifier", async () => {
-      const performerIds = [mockPerformers[0].id];
+      const performerIds = [must(mockPerformers[0]).id];
       const filter: PeekSceneFilter = {
         performers: {
           value: coerceEntityRefs(performerIds),
@@ -157,7 +161,7 @@ describe("Scene Filters - Quick Filters", () => {
 
   describe("Tag Filter (Squashed - Scene + Performers + Studio)", () => {
     it("should filter by scene tags with INCLUDES modifier", async () => {
-      const tagIds = [mockTags[0].id];
+      const tagIds = [must(mockTags[0]).id];
       const filter: PeekSceneFilter = {
         tags: {
           value: coerceEntityRefs(tagIds),
@@ -182,7 +186,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter by tags with INCLUDES_ALL modifier", async () => {
-      const tagIds = [mockTags[0].id, mockTags[1].id];
+      const tagIds = [must(mockTags[0]).id, must(mockTags[1]).id];
       const filter: PeekSceneFilter = {
         tags: {
           value: coerceEntityRefs(tagIds),
@@ -207,7 +211,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter by tags with EXCLUDES modifier", async () => {
-      const tagIds = [mockTags[0].id];
+      const tagIds = [must(mockTags[0]).id];
       const filter: PeekSceneFilter = {
         tags: {
           value: coerceEntityRefs(tagIds),
@@ -234,7 +238,7 @@ describe("Scene Filters - Quick Filters", () => {
 
   describe("Studio Filter", () => {
     it("should filter scenes by studio with INCLUDES modifier", async () => {
-      const studioIds = [mockStudios[0].id];
+      const studioIds = [must(mockStudios[0]).id];
       const filter: PeekSceneFilter = {
         studios: {
           value: coerceEntityRefs(studioIds),
@@ -251,7 +255,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter scenes by studio with EXCLUDES modifier", async () => {
-      const studioIds = [mockStudios[0].id];
+      const studioIds = [must(mockStudios[0]).id];
       const filter: PeekSceneFilter = {
         studios: {
           value: coerceEntityRefs(studioIds),
@@ -269,7 +273,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should include scenes without studio when EXCLUDES modifier is used", async () => {
-      const studioIds = [mockStudios[0].id];
+      const studioIds = [must(mockStudios[0]).id];
       const filter: PeekSceneFilter = {
         studios: {
           value: coerceEntityRefs(studioIds),
@@ -293,7 +297,7 @@ describe("Scene Filters - Quick Filters", () => {
 
   describe("Group Filter", () => {
     it("should filter scenes by group with INCLUDES modifier", async () => {
-      const groupIds = [mockGroups[0].id];
+      const groupIds = [must(mockGroups[0]).id];
       const filter: PeekSceneFilter = {
         groups: {
           value: coerceEntityRefs(groupIds),
@@ -311,7 +315,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter scenes by group with INCLUDES_ALL modifier", async () => {
-      const groupIds = [mockGroups[0].id];
+      const groupIds = [must(mockGroups[0]).id];
       const filter: PeekSceneFilter = {
         groups: {
           value: coerceEntityRefs(groupIds),
@@ -329,7 +333,7 @@ describe("Scene Filters - Quick Filters", () => {
     });
 
     it("should filter scenes by group with EXCLUDES modifier", async () => {
-      const groupIds = [mockGroups[0].id];
+      const groupIds = [must(mockGroups[0]).id];
       const filter: PeekSceneFilter = {
         groups: {
           value: coerceEntityRefs(groupIds),
@@ -543,7 +547,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("landscape_1");
+      expect(must(result[0]).id).toBe("landscape_1");
       result.forEach((scene) => {
         const width = scene.files?.[0]?.width || 0;
         const height = scene.files?.[0]?.height || 0;
@@ -610,7 +614,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("portrait_1");
+      expect(must(result[0]).id).toBe("portrait_1");
       result.forEach((scene) => {
         const width = scene.files?.[0]?.width || 0;
         const height = scene.files?.[0]?.height || 0;
@@ -677,7 +681,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("square_1");
+      expect(must(result[0]).id).toBe("square_1");
       result.forEach((scene) => {
         const width = scene.files?.[0]?.width || 0;
         const height = scene.files?.[0]?.height || 0;
@@ -929,8 +933,8 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene_720p");
-      expect(result[0].files?.[0]?.height).toBe(720);
+      expect(must(result[0]).id).toBe("scene_720p");
+      expect(must(result[0]).files?.[0]?.height).toBe(720);
     });
 
     it("should filter scenes with NOT_EQUALS modifier", async () => {
@@ -978,8 +982,8 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene_1080p");
-      expect(result[0].files?.[0]?.height).toBe(1080);
+      expect(must(result[0]).id).toBe("scene_1080p");
+      expect(must(result[0]).files?.[0]?.height).toBe(1080);
     });
 
     it("should filter scenes with GREATER_THAN modifier (> 720p)", async () => {
@@ -1043,7 +1047,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene_1080p");
+      expect(must(result[0]).id).toBe("scene_1080p");
       result.forEach((scene) => {
         const height = scene.files?.[0]?.height || 0;
         expect(height).toBeGreaterThan(720);
@@ -1111,7 +1115,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(testScenes, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene_480p");
+      expect(must(result[0]).id).toBe("scene_480p");
       result.forEach((scene) => {
         const height = scene.files?.[0]?.height || 0;
         expect(height).toBeLessThan(720);
@@ -1178,7 +1182,7 @@ describe("Scene Filters - Quick Filters", () => {
       };
       const result360p = await applyQuickSceneFilters(testScenes, filter360p);
       expect(result360p).toHaveLength(1);
-      expect(result360p[0].id).toBe("scene_360p");
+      expect(must(result360p[0]).id).toBe("scene_360p");
 
       // Test STANDARD (480p)
       const filter480p: PeekSceneFilter = {
@@ -1189,7 +1193,7 @@ describe("Scene Filters - Quick Filters", () => {
       };
       const result480p = await applyQuickSceneFilters(testScenes, filter480p);
       expect(result480p).toHaveLength(1);
-      expect(result480p[0].id).toBe("scene_480p");
+      expect(must(result480p[0]).id).toBe("scene_480p");
 
       // Test FOUR_K (2160p)
       const filter4k: PeekSceneFilter = {
@@ -1200,7 +1204,7 @@ describe("Scene Filters - Quick Filters", () => {
       };
       const result4k = await applyQuickSceneFilters(testScenes, filter4k);
       expect(result4k).toHaveLength(1);
-      expect(result4k[0].id).toBe("scene_4k");
+      expect(must(result4k[0]).id).toBe("scene_4k");
     });
 
     it("should handle scenes with missing height data", async () => {
@@ -1249,14 +1253,14 @@ describe("Scene Filters - Quick Filters", () => {
 
       // Should only match the 720p scene, not the one with missing height
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene_720p");
+      expect(must(result[0]).id).toBe("scene_720p");
     });
   });
 
   describe("Multiple Filters Combined", () => {
     it("should apply multiple filters together (AND logic)", async () => {
-      const performerIds = [mockPerformers[0].id];
-      const studioIds = [mockStudios[0].id];
+      const performerIds = [must(mockPerformers[0]).id];
+      const studioIds = [must(mockStudios[0]).id];
       const minDuration = 600;
 
       const filter: PeekSceneFilter = {
@@ -1314,7 +1318,7 @@ describe("Scene Filters - Quick Filters", () => {
 
       const filter: PeekSceneFilter = {
         studios: {
-          value: coerceEntityRefs([mockStudios[0].id]),
+          value: coerceEntityRefs([must(mockStudios[0]).id]),
           modifier: CriterionModifier.Excludes,
         },
       };

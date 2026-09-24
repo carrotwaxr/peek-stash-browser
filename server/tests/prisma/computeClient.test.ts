@@ -9,6 +9,7 @@ import {
   getComputeClient,
   singleConnectionUrl,
 } from "../../prisma/computeClient.js";
+import { must } from "../helpers/must.js";
 
 const { PrismaClientMock, instances } = vi.hoisted(() => {
   const instances: Array<{
@@ -70,7 +71,7 @@ describe("getComputeClient", () => {
     expect(PrismaClientMock).toHaveBeenCalledWith({
       datasourceUrl: "file:/data/peek.db?connection_limit=1",
     });
-    expect(instances[0].$queryRawUnsafe.mock.calls).toEqual([
+    expect(must(instances[0]).$queryRawUnsafe.mock.calls).toEqual([
       ["PRAGMA busy_timeout = 5000"],
       ["PRAGMA temp_store = MEMORY"],
     ]);
@@ -106,7 +107,7 @@ describe("getComputeClient", () => {
     });
 
     await expect(getComputeClient()).rejects.toThrow("locked");
-    expect(instances[0].$disconnect).toHaveBeenCalledTimes(1);
+    expect(must(instances[0]).$disconnect).toHaveBeenCalledTimes(1);
 
     await expect(getComputeClient()).resolves.toBe(instances[1]);
   });
@@ -116,7 +117,7 @@ describe("getComputeClient", () => {
 
     await disconnectComputeClient();
 
-    expect(instances[0].$disconnect).toHaveBeenCalledTimes(1);
+    expect(must(instances[0]).$disconnect).toHaveBeenCalledTimes(1);
     const second = await getComputeClient();
     expect(second).not.toBe(first);
     expect(PrismaClientMock).toHaveBeenCalledTimes(2);

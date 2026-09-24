@@ -6,6 +6,7 @@
  * multi-instance configuration.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { must } from "../helpers/must.js";
 
 // Mock PrismaClient constructor
 const mockFindMany = vi.fn();
@@ -270,8 +271,8 @@ describe("StashInstanceManager", () => {
 
       const all = manager.getAll();
       expect(all).toHaveLength(2);
-      expect(all[0][0]).toBe(INSTANCE_A.id);
-      expect(all[1][0]).toBe(INSTANCE_B.id);
+      expect(must(all[0])[0]).toBe(INSTANCE_A.id);
+      expect(must(all[1])[0]).toBe(INSTANCE_B.id);
     });
 
     it("returns empty array when no instances", async () => {
@@ -320,8 +321,8 @@ describe("StashInstanceManager", () => {
 
       const configs = manager.getAllConfigs();
       expect(configs).toHaveLength(2);
-      expect(configs[0].apiKey).toBe("key-a");
-      expect(configs[1].apiKey).toBe("key-b");
+      expect(must(configs[0]).apiKey).toBe("key-a");
+      expect(must(configs[1]).apiKey).toBe("key-b");
     });
   });
 

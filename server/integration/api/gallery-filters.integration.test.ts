@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
@@ -606,7 +607,7 @@ describe("Gallery Filters", () => {
       ).toBeGreaterThanOrEqual(1);
 
       // Use first gallery for validation
-      const gallery = response.data.findGalleries.galleries[0];
+      const gallery = must(response.data.findGalleries.galleries[0]);
 
       // Gallery should have cover field
       expect("cover" in gallery).toBe(true);

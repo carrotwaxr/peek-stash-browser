@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -363,7 +364,7 @@ describe("Tag Filters", () => {
         t.name.toLowerCase()
       );
       for (let i = 1; i < names.length; i++) {
-        expect(names[i] >= names[i - 1]).toBe(true);
+        expect(must(names[i]) >= must(names[i - 1])).toBe(true);
       }
     });
 
@@ -384,7 +385,7 @@ describe("Tag Filters", () => {
 
       const counts = response.data.findTags.tags.map((t) => t.scene_count || 0);
       for (let i = 1; i < counts.length; i++) {
-        expect(counts[i]).toBeLessThanOrEqual(counts[i - 1]);
+        expect(counts[i]).toBeLessThanOrEqual(must(counts[i - 1]));
       }
     });
   });
@@ -456,7 +457,7 @@ describe("Tag Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findTags).toBeDefined();
       expect(response.data.findTags.tags.length).toBe(1);
-      expect(response.data.findTags.tags[0].id).toBe(
+      expect(must(response.data.findTags.tags[0]).id).toBe(
         TEST_ENTITIES.tagWithEntities
       );
     });

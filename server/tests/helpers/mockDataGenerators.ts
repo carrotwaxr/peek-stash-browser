@@ -13,6 +13,7 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "../../types/index.js";
+import { must } from "./must.js";
 
 /**
  * Create a mock NormalizedPerformer
@@ -391,7 +392,7 @@ export function createMockScenes(
     const performerCount = (i % 3) + 1;
     const scenePerformers = [];
     for (let j = 0; j < performerCount && j < performers.length; j++) {
-      scenePerformers.push(performers[(i + j) % performers.length]);
+      scenePerformers.push(must(performers[(i + j) % performers.length]));
     }
 
     // Assign a studio (or null for some scenes)
@@ -401,14 +402,14 @@ export function createMockScenes(
     const tagCount = (i % 5) + 1;
     const sceneTags = [];
     for (let j = 0; j < tagCount && j < tags.length; j++) {
-      sceneTags.push(tags[(i + j) % tags.length]);
+      sceneTags.push(must(tags[(i + j) % tags.length]));
     }
 
     // Assign 0-2 random groups
     const groupCount = i % 3;
     const sceneGroups = [];
     for (let j = 0; j < groupCount && j < groups.length; j++) {
-      const g = groups[(i + j) % groups.length];
+      const g = must(groups[(i + j) % groups.length]);
       const groupWithIndex: GroupRef & { scene_index: number } = {
         id: g.id,
         instanceId: g.instanceId,

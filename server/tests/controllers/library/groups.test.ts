@@ -20,6 +20,7 @@ import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockGroup } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -134,7 +135,7 @@ describe("Groups Controller", () => {
       ];
       const result = await applyGroupFilters(groups, { favorite: true });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by tags INCLUDES", async () => {
@@ -155,7 +156,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by tags INCLUDES_ALL", async () => {
@@ -179,7 +180,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by tags EXCLUDES", async () => {
@@ -200,7 +201,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g2");
+      expect(must(result[0]).id).toBe("g2");
     });
 
     it("filters by performers via getGroupIdsByPerformers", async () => {
@@ -219,7 +220,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
       expect(
         mockStashEntityService.getGroupIdsByPerformers
       ).toHaveBeenCalledWith(["p1", "p2"]);
@@ -244,7 +245,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by rating100 GREATER_THAN", async () => {
@@ -256,7 +257,7 @@ describe("Groups Controller", () => {
         rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by rating100 BETWEEN", async () => {
@@ -273,7 +274,7 @@ describe("Groups Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by rating100 EQUALS", async () => {
@@ -285,7 +286,7 @@ describe("Groups Controller", () => {
         rating100: { modifier: CriterionModifier.Equals, value: 80 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g2");
+      expect(must(result[0]).id).toBe("g2");
     });
   });
 

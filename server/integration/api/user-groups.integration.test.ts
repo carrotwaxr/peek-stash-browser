@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -289,7 +290,7 @@ describe("User Groups API", () => {
       expect(getResponse.ok).toBe(true);
       expect(getResponse.data.group.members).toHaveLength(1);
 
-      const member = getResponse.data.group.members![0];
+      const member = must(getResponse.data.group.members![0]);
       // Must have nested user object — NOT flat userId/username
       expect(member.user).toBeDefined();
       expect(member.user.id).toBe(adminUser!.id);

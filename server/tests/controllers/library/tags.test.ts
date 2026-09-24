@@ -22,6 +22,7 @@ import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -115,8 +116,8 @@ describe("Tags Controller", () => {
       const result = await mergeTagsWithUserData(tags, 1);
 
       expect(result).toHaveLength(1);
-      expect(result[0].o_counter).toBe(0);
-      expect(result[0].play_count).toBe(0);
+      expect(must(result[0]).o_counter).toBe(0);
+      expect(must(result[0]).play_count).toBe(0);
     });
 
     it("merges ratings via composite key (id + instanceId)", async () => {
@@ -137,9 +138,9 @@ describe("Tags Controller", () => {
       const tags = [createMockTag({ id: "t1", instanceId: "default" })];
       const result = await mergeTagsWithUserData(tags, 1);
 
-      expect(result[0].rating).toBe(80);
-      expect(result[0].rating100).toBe(80);
-      expect(result[0].favorite).toBe(true);
+      expect(must(result[0]).rating).toBe(80);
+      expect(must(result[0]).rating100).toBe(80);
+      expect(must(result[0]).favorite).toBe(true);
     });
 
     it("merges pre-computed stats from UserStatsService", async () => {
@@ -152,8 +153,8 @@ describe("Tags Controller", () => {
       const tags = [createMockTag({ id: "t1", instanceId: "default" })];
       const result = await mergeTagsWithUserData(tags, 1);
 
-      expect(result[0].o_counter).toBe(5);
-      expect(result[0].play_count).toBe(10);
+      expect(must(result[0]).o_counter).toBe(5);
+      expect(must(result[0]).play_count).toBe(10);
     });
   });
 
@@ -192,7 +193,7 @@ describe("Tags Controller", () => {
       ];
       const result = await applyTagFilters(tags, { favorite: true });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by rating100 GREATER_THAN", async () => {
@@ -218,7 +219,7 @@ describe("Tags Controller", () => {
         rating100: { modifier: "BETWEEN", value: 40, value2: 60 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by o_counter EQUALS", async () => {
@@ -230,7 +231,7 @@ describe("Tags Controller", () => {
         o_counter: { modifier: "EQUALS", value: 5 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by play_count LESS_THAN", async () => {
@@ -242,7 +243,7 @@ describe("Tags Controller", () => {
         play_count: { modifier: "LESS_THAN", value: 5 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by scene_count GREATER_THAN", async () => {
@@ -254,7 +255,7 @@ describe("Tags Controller", () => {
         scene_count: { modifier: CriterionModifier.GreaterThan, value: 10 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by name text search (case insensitive)", async () => {
@@ -266,7 +267,7 @@ describe("Tags Controller", () => {
         name: { value: "act", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by description text search", async () => {
@@ -278,7 +279,7 @@ describe("Tags Controller", () => {
         description: { value: "energy", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by created_at GREATER_THAN", async () => {
@@ -293,7 +294,7 @@ describe("Tags Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by updated_at LESS_THAN", async () => {
@@ -308,7 +309,7 @@ describe("Tags Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by performers (tags used by matching performers)", async () => {
@@ -325,7 +326,7 @@ describe("Tags Controller", () => {
         performers: { value: coerceEntityRefs(["p1"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by studios (tags directly on matching studios)", async () => {
@@ -342,7 +343,7 @@ describe("Tags Controller", () => {
         studios: { value: coerceEntityRefs(["s1"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t2");
+      expect(must(result[0]).id).toBe("t2");
     });
 
     it("filters by scenes_filter.id (tags on matching scenes)", async () => {
@@ -365,7 +366,7 @@ describe("Tags Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
 
     it("filters by scenes_filter.groups (tags on scenes in those groups)", async () => {
@@ -389,7 +390,7 @@ describe("Tags Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("t1");
+      expect(must(result[0]).id).toBe("t1");
     });
   });
 
@@ -520,7 +521,7 @@ describe("Tags Controller", () => {
       await findTags(req, res);
 
       expect(mockTagQueryBuilder.execute).toHaveBeenCalledTimes(1);
-      const call = mockTagQueryBuilder.execute.mock.calls[0][0];
+      const call = must(mockTagQueryBuilder.execute.mock.calls[0])[0];
       expect(call.applyExclusions).not.toBe(false);
     });
   });

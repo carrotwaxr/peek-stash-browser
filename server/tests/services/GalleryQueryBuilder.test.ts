@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -57,14 +58,17 @@ describe("GalleryQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("g.stashInstanceId = ?");
 
       // The instance ID must be in the params
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("instance-abc");
     });
 
@@ -77,8 +81,9 @@ describe("GalleryQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("g.stashInstanceId = ?");
@@ -94,15 +99,18 @@ describe("GalleryQueryBuilder", () => {
         allowedInstanceIds: ["inst-a", "inst-b"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should contain IN clause for allowed instances
       expect(mainQuerySql).toContain("g.stashInstanceId IN (?, ?)");
       // Should include NULL fallback
       expect(mainQuerySql).toContain("g.stashInstanceId IS NULL");
 
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("inst-a");
       expect(mainQueryParams).toContain("inst-b");
     });
@@ -117,8 +125,9 @@ describe("GalleryQueryBuilder", () => {
         allowedInstanceIds: [],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).not.toContain("g.stashInstanceId IN");
     });
@@ -134,8 +143,9 @@ describe("GalleryQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("UserExcludedEntity");
       expect(mainQuerySql).toContain("entityType = 'gallery'");
@@ -152,8 +162,9 @@ describe("GalleryQueryBuilder", () => {
         applyExclusions: false,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).not.toContain("UserExcludedEntity");
       expect(mainQuerySql).not.toContain("e.id IS NULL");
@@ -171,8 +182,9 @@ describe("GalleryQueryBuilder", () => {
         searchQuery: "vacation",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("LOWER(g.title) LIKE");
       expect(mainQuerySql).toContain("LOWER(g.details) LIKE");

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -69,8 +70,9 @@ describe("PerformerQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // The Stats JOIN (UserPerformerStats) must match on instanceId
       expect(mainQuerySql).toContain("p.stashInstanceId = s.instanceId");
@@ -89,8 +91,9 @@ describe("PerformerQueryBuilder", () => {
       });
 
       // The count query (second call) also uses the same FROM clause with JOINs
-      const countQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[1][0] as string;
+      const countQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[1]
+      )[0] as string;
       expect(countQuerySql).toContain("p.stashInstanceId = s.instanceId");
       expect(countQuerySql).toContain("p.stashInstanceId = r.instanceId");
     });
@@ -105,14 +108,17 @@ describe("PerformerQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("p.stashInstanceId = ?");
 
       // The instance ID must be in the params
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("instance-abc");
     });
 
@@ -125,8 +131,9 @@ describe("PerformerQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("p.stashInstanceId = ?");

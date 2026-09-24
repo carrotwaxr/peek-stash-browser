@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   TestClient,
@@ -69,7 +70,7 @@ describe("Tag API", () => {
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags.tags).toHaveLength(1);
-      expect(response.data.findTags.tags[0].id).toBe(
+      expect(must(response.data.findTags.tags[0]).id).toBe(
         TEST_ENTITIES.tagWithEntities
       );
     });
@@ -83,7 +84,7 @@ describe("Tag API", () => {
       );
 
       expect(response.ok).toBe(true);
-      const tag = response.data.findTags.tags[0];
+      const tag = must(response.data.findTags.tags[0]);
 
       // Performers should exist with tooltip data
       expect(tag).toHaveProperty("performers");

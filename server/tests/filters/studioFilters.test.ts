@@ -13,6 +13,7 @@ import {
   createMockStudios,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Studio Filters", () => {
   let mockTags: ReturnType<typeof createMockTags>;
@@ -27,7 +28,7 @@ describe("Studio Filters", () => {
     it("should filter studios by single ID", () => {
       const filter: PeekStudioFilter = {
         ids: {
-          value: coerceEntityRefs([mockStudios[0].id]),
+          value: coerceEntityRefs([must(mockStudios[0]).id]),
           modifier: "INCLUDES",
         },
       };
@@ -35,14 +36,14 @@ describe("Studio Filters", () => {
       const result = applyStudioFilters(mockStudios, filter);
 
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(mockStudios[0].id);
+      expect(must(result[0]).id).toBe(must(mockStudios[0]).id);
     });
 
     it("should filter studios by multiple IDs", () => {
       const targetIds = [
-        mockStudios[0].id,
-        mockStudios[5].id,
-        mockStudios[10].id,
+        must(mockStudios[0]).id,
+        must(mockStudios[5]).id,
+        must(mockStudios[10]).id,
       ];
       const filter: PeekStudioFilter = {
         ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
@@ -118,7 +119,7 @@ describe("Studio Filters", () => {
 
   describe("Tags Filter", () => {
     it("should filter studios by tags with INCLUDES modifier", () => {
-      const tagId = mockTags[0].id;
+      const tagId = must(mockTags[0]).id;
       const filter: PeekStudioFilter = {
         tags: {
           value: [tagId],
@@ -135,7 +136,7 @@ describe("Studio Filters", () => {
     });
 
     it("should filter studios by tags with INCLUDES_ALL modifier", () => {
-      const tagIds = [mockTags[0].id, mockTags[1].id];
+      const tagIds = [must(mockTags[0]).id, must(mockTags[1]).id];
       const filter: PeekStudioFilter = {
         tags: {
           value: tagIds,
@@ -154,7 +155,7 @@ describe("Studio Filters", () => {
     });
 
     it("should filter studios by tags with EXCLUDES modifier", () => {
-      const tagId = mockTags[0].id;
+      const tagId = must(mockTags[0]).id;
       const filter: PeekStudioFilter = {
         tags: {
           value: [tagId],

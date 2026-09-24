@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -363,7 +364,7 @@ describe("Text Search Filters", () => {
       );
 
       if (initial.data.findTags.tags.length > 0) {
-        const tagName = initial.data.findTags.tags[0].name;
+        const tagName = must(initial.data.findTags.tags[0]).name;
 
         const response = await adminClient.post<FindTagsResponse>(
           "/api/library/tags",

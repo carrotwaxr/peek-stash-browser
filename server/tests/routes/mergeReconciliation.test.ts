@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate, requireAdmin } from "../../middleware/auth.js";
 // Import after mocks are set up
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
+import { must } from "../helpers/must.js";
 
 // Mock MergeReconciliationService - hoisted to top level
 vi.mock("../../services/MergeReconciliationService.js", () => ({
@@ -295,7 +296,7 @@ describe("Merge Reconciliation Routes", () => {
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
 
-      const id = mockReq.params!.id;
+      const id = must(mockReq.params!.id);
       const matches = await mockService.findPhashMatches(id);
       mockRes.json({ matches });
 
@@ -310,7 +311,7 @@ describe("Merge Reconciliation Routes", () => {
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
 
-      const id = mockReq.params!.id;
+      const id = must(mockReq.params!.id);
       const matches = await mockService.findPhashMatches(id);
       mockRes.json({ matches });
 
@@ -330,7 +331,7 @@ describe("Merge Reconciliation Routes", () => {
       } as unknown as Response;
 
       try {
-        await mockService.findPhashMatches(mockReq.params!.id);
+        await mockService.findPhashMatches(must(mockReq.params!.id));
       } catch (error) {
         mockRes.status(500).json({
           error: "Failed to fetch matches",
@@ -392,7 +393,7 @@ describe("Merge Reconciliation Routes", () => {
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
 
-      const id = mockReq.params!.id;
+      const id = must(mockReq.params!.id);
       const { targetSceneId } = mockReq.body as { targetSceneId: string };
       const userId = (mockReq as { user: { id: number } }).user.id;
 
@@ -476,7 +477,7 @@ describe("Merge Reconciliation Routes", () => {
       const { responseJson } = createMockResponse();
       const mockRes = { json: responseJson } as unknown as Response;
 
-      const id = mockReq.params!.id;
+      const id = must(mockReq.params!.id);
       const result = await mockService.discardOrphanedData(id);
 
       mockRes.json({
@@ -505,7 +506,7 @@ describe("Merge Reconciliation Routes", () => {
       } as unknown as Response;
 
       try {
-        await mockService.discardOrphanedData(mockReq.params!.id);
+        await mockService.discardOrphanedData(must(mockReq.params!.id));
       } catch (error) {
         mockRes.status(500).json({
           error: "Failed to discard orphaned data",

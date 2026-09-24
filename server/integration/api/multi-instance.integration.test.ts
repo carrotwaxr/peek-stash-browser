@@ -14,6 +14,7 @@
  * IMPORTANT: Production Stash tests are READ-ONLY. No modifications allowed.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -54,7 +55,7 @@ describe("Multi-Instance Support", () => {
     expect(instancesResponse.data.instances.length).toBeGreaterThan(0);
 
     // Find test instance (should be first/primary)
-    testInstanceId = instancesResponse.data.instances[0].id;
+    testInstanceId = must(instancesResponse.data.instances[0]).id;
 
     // Check if production instance already exists
     const existingProduction = instancesResponse.data.instances.find(
@@ -184,7 +185,7 @@ describe("Multi-Instance Support", () => {
       expect(Array.isArray(response.data.instances)).toBe(true);
       expect(response.data.instances.length).toBeGreaterThan(0);
 
-      const instance = response.data.instances[0];
+      const instance = must(response.data.instances[0]);
       expect(instance.id).toBeDefined();
       expect(instance.name).toBeDefined();
       expect(instance.url).toBeDefined();
@@ -247,7 +248,7 @@ describe("Multi-Instance Support", () => {
       const getResponse = await adminClient.get<{
         availableInstances: Array<{ id: string }>;
       }>("/api/user/stash-instances");
-      const instanceId = getResponse.data.availableInstances[0].id;
+      const instanceId = must(getResponse.data.availableInstances[0]).id;
 
       const updateResponse = await adminClient.put<{
         success: boolean;
@@ -407,7 +408,7 @@ describe("Multi-Instance Support", () => {
       }>("/api/library/scenes", { filter: { per_page: 1 } });
 
       expect(response.ok).toBe(true);
-      const scene = response.data.findScenes.scenes[0];
+      const scene = must(response.data.findScenes.scenes[0]);
       if (scene.paths.screenshot) {
         expect(scene.paths.screenshot).toContain("/api/proxy/stash");
       }

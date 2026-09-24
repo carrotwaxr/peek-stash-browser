@@ -20,6 +20,7 @@ import {
   createMockPerformers,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Performer Filters", () => {
   let mockTags: ReturnType<typeof createMockTags>;
@@ -33,7 +34,7 @@ describe("Performer Filters", () => {
 
   describe("ID Filter", () => {
     it("should filter performers by single ID", async () => {
-      const targetId = mockPerformers[0].id;
+      const targetId = must(mockPerformers[0]).id;
       const filter: PeekPerformerFilter = {
         ids: { value: coerceEntityRefs([targetId]), modifier: "INCLUDES" },
       };
@@ -41,14 +42,14 @@ describe("Performer Filters", () => {
       const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(targetId);
+      expect(must(result[0]).id).toBe(targetId);
     });
 
     it("should filter performers by multiple IDs", async () => {
       const targetIds = [
-        mockPerformers[0].id,
-        mockPerformers[5].id,
-        mockPerformers[10].id,
+        must(mockPerformers[0]).id,
+        must(mockPerformers[5]).id,
+        must(mockPerformers[10]).id,
       ];
       const filter: PeekPerformerFilter = {
         ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
@@ -173,21 +174,21 @@ describe("Performer Filters", () => {
     it("should filter by tags with INCLUDES_ALL modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
-        tags: [mockTags[0], mockTags[1], mockTags[2]],
+        tags: [must(mockTags[0]), must(mockTags[1]), must(mockTags[2])],
       });
       const performer2 = createMockPerformer({
         id: "p2",
-        tags: [mockTags[0], mockTags[1]],
+        tags: [must(mockTags[0]), must(mockTags[1])],
       });
       const performer3 = createMockPerformer({
         id: "p3",
-        tags: [mockTags[1]],
+        tags: [must(mockTags[1])],
       });
       const testPerformers = [performer1, performer2, performer3];
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id, must(mockTags[1]).id]),
           modifier: CriterionModifier.IncludesAll,
         },
       };
@@ -202,21 +203,21 @@ describe("Performer Filters", () => {
     it("should filter by tags with INCLUDES modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
-        tags: [mockTags[0], mockTags[1]],
+        tags: [must(mockTags[0]), must(mockTags[1])],
       });
       const performer2 = createMockPerformer({
         id: "p2",
-        tags: [mockTags[1]],
+        tags: [must(mockTags[1])],
       });
       const performer3 = createMockPerformer({
         id: "p3",
-        tags: [mockTags[5]],
+        tags: [must(mockTags[5])],
       });
       const testPerformers = [performer1, performer2, performer3];
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id, must(mockTags[1]).id]),
           modifier: CriterionModifier.Includes,
         },
       };
@@ -231,11 +232,11 @@ describe("Performer Filters", () => {
     it("should filter by tags with EXCLUDES modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
-        tags: [mockTags[0], mockTags[1]],
+        tags: [must(mockTags[0]), must(mockTags[1])],
       });
       const performer2 = createMockPerformer({
         id: "p2",
-        tags: [mockTags[5]],
+        tags: [must(mockTags[5])],
       });
       const performer3 = createMockPerformer({
         id: "p3",
@@ -245,7 +246,7 @@ describe("Performer Filters", () => {
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id, must(mockTags[1]).id]),
           modifier: CriterionModifier.Excludes,
         },
       };
@@ -654,17 +655,17 @@ describe("Performer Filters", () => {
       const performer1 = createMockPerformer({
         id: "p1",
         gender: "FEMALE",
-        tags: [mockTags[0], mockTags[1]],
+        tags: [must(mockTags[0]), must(mockTags[1])],
       });
       const performer2 = createMockPerformer({
         id: "p2",
         gender: "FEMALE",
-        tags: [mockTags[2]],
+        tags: [must(mockTags[2])],
       });
       const performer3 = createMockPerformer({
         id: "p3",
         gender: "MALE",
-        tags: [mockTags[0]],
+        tags: [must(mockTags[0])],
       });
       const testPerformers = [performer1, performer2, performer3];
 
@@ -674,7 +675,7 @@ describe("Performer Filters", () => {
           modifier: CriterionModifier.Equals,
         },
         tags: {
-          value: coerceEntityRefs([mockTags[0].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id]),
           modifier: CriterionModifier.Includes,
         },
       };
@@ -682,7 +683,7 @@ describe("Performer Filters", () => {
       const result = await applyPerformerFilters(testPerformers, filter);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("p1");
+      expect(must(result[0]).id).toBe("p1");
     });
   });
 
@@ -735,7 +736,7 @@ describe("Performer Filters", () => {
       );
 
       expect(result).toHaveLength(1);
-      expect(result[0].scene_count).toBe(0);
+      expect(must(result[0]).scene_count).toBe(0);
     });
   });
 });
@@ -961,7 +962,7 @@ describe("Career Length Filter", () => {
 
     // Should only include p1 (parseable and > 0)
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("p1");
+    expect(must(result[0]).id).toBe("p1");
   });
 
   it("should parse year-range format correctly in filter", async () => {
@@ -978,6 +979,6 @@ describe("Career Length Filter", () => {
 
     // Should only include p1 (8 years > 6)
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("p1");
+    expect(must(result[0]).id).toBe("p1");
   });
 });

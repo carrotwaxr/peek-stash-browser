@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { must } from "../../tests/helpers/must.js";
 
 // Skip if no database connection
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -156,7 +157,7 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     // In a truly random order, very few should be sequential
     let sequentialPairs = 0;
     for (let i = 0; i < ids.length - 1; i++) {
-      if (Math.abs(ids[i] - ids[i + 1]) === 1) {
+      if (Math.abs(must(ids[i]) - must(ids[i + 1])) === 1) {
         sequentialPairs++;
       }
     }

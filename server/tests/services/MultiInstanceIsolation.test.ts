@@ -10,6 +10,7 @@ import {
 } from "../../services/RecommendationScoringService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -502,13 +503,13 @@ describe("Multi-Instance Isolation", () => {
       }));
 
       // inst-a scene1 → Scene A
-      expect(resolved[0].scene?.title).toBe("Scene A");
+      expect(must(resolved[0]).scene?.title).toBe("Scene A");
       // inst-b scene1 → Scene B (different scene despite same ID)
-      expect(resolved[1].scene?.title).toBe("Scene B");
+      expect(must(resolved[1]).scene?.title).toBe("Scene B");
       // inst-a scene2 → Scene C
-      expect(resolved[2].scene?.title).toBe("Scene C");
+      expect(must(resolved[2]).scene?.title).toBe("Scene C");
       // inst-b scene2 → null (no scene in inst-b)
-      expect(resolved[3].scene).toBeNull();
+      expect(must(resolved[3]).scene).toBeNull();
     });
 
     it("plain ID lookup would incorrectly match cross-instance scenes", () => {

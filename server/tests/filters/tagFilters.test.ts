@@ -12,6 +12,7 @@ import {
   createMockTag,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Tag Filters", () => {
   let mockTags: NormalizedTag[];
@@ -24,7 +25,7 @@ describe("Tag Filters", () => {
     it("should filter tags by single ID", async () => {
       const filter: PeekTagFilter = {
         ids: {
-          value: coerceEntityRefs([mockTags[0].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id]),
           modifier: "INCLUDES",
         },
       };
@@ -32,11 +33,15 @@ describe("Tag Filters", () => {
       const result = await applyTagFilters(mockTags, filter);
 
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(mockTags[0].id);
+      expect(must(result[0]).id).toBe(must(mockTags[0]).id);
     });
 
     it("should filter tags by multiple IDs", async () => {
-      const targetIds = [mockTags[0].id, mockTags[5].id, mockTags[10].id];
+      const targetIds = [
+        must(mockTags[0]).id,
+        must(mockTags[5]).id,
+        must(mockTags[10]).id,
+      ];
       const filter: PeekTagFilter = {
         ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };

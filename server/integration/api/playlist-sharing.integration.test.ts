@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -409,7 +410,7 @@ describe("Playlist Sharing API", () => {
       expect(sharesResponse.data.shares).toBeDefined();
       expect(Array.isArray(sharesResponse.data.shares)).toBe(true);
       expect(sharesResponse.data.shares.length).toBe(1);
-      expect(sharesResponse.data.shares[0].groupId).toBe(
+      expect(must(sharesResponse.data.shares[0]).groupId).toBe(
         groupWithSharePermission
       );
     });
@@ -568,7 +569,7 @@ describe("Playlist Sharing API", () => {
         );
       expect(firstShareResponse.ok).toBe(true);
       expect(firstShareResponse.data.shares.length).toBe(1);
-      expect(firstShareResponse.data.shares[0].groupId).toBe(
+      expect(must(firstShareResponse.data.shares[0]).groupId).toBe(
         groupWithSharePermission
       );
 
@@ -580,7 +581,9 @@ describe("Playlist Sharing API", () => {
         );
       expect(secondShareResponse.ok).toBe(true);
       expect(secondShareResponse.data.shares.length).toBe(1);
-      expect(secondShareResponse.data.shares[0].groupId).toBe(secondGroupId);
+      expect(must(secondShareResponse.data.shares[0]).groupId).toBe(
+        secondGroupId
+      );
 
       // Verify first group share is gone
       const sharesResponse = await adminClient.get<GetPlaylistSharesResponse>(
@@ -588,7 +591,7 @@ describe("Playlist Sharing API", () => {
       );
       expect(sharesResponse.ok).toBe(true);
       expect(sharesResponse.data.shares.length).toBe(1);
-      expect(sharesResponse.data.shares[0].groupId).toBe(secondGroupId);
+      expect(must(sharesResponse.data.shares[0]).groupId).toBe(secondGroupId);
     });
 
     it("empty groupIds array clears all shares", async () => {

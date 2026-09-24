@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
+import { must } from "../helpers/must.js";
 
 // Mock stashInstanceManager to provide a default instance for entityInstanceId lookups
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -85,10 +86,10 @@ describe("MergeReconciliationService", () => {
         await mergeReconciliationService.findOrphanedScenesWithActivity();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("scene-1");
-      expect(result[0].userActivityCount).toBe(3);
-      expect(result[0].hasRatings).toBe(true);
-      expect(result[0].hasFavorites).toBe(true);
+      expect(must(result[0]).id).toBe("scene-1");
+      expect(must(result[0]).userActivityCount).toBe(3);
+      expect(must(result[0]).hasRatings).toBe(true);
+      expect(must(result[0]).hasFavorites).toBe(true);
     });
   });
 
@@ -112,9 +113,9 @@ describe("MergeReconciliationService", () => {
         await mergeReconciliationService.findPhashMatches("scene-1");
 
       expect(result).toHaveLength(1);
-      expect(result[0].sceneId).toBe("scene-2");
-      expect(result[0].similarity).toBe("exact");
-      expect(result[0].recommended).toBe(true);
+      expect(must(result[0]).sceneId).toBe("scene-2");
+      expect(must(result[0]).similarity).toBe("exact");
+      expect(must(result[0]).recommended).toBe(true);
     });
 
     it("should return empty array if scene has no phash", async () => {

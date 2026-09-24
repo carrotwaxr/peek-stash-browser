@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 import { assertBenchmark, measureEndpoint } from "./measureEndpoint.js";
@@ -304,7 +305,7 @@ describe("Carousel Benchmarks", () => {
       return;
     }
 
-    const carouselId = listRes.data[0].id;
+    const carouselId = must(listRes.data[0]).id;
     const result = await measureEndpoint("carousel-execute", async () => {
       const res = await adminClient.get(`/api/carousels/${carouselId}/execute`);
       expect(res.ok).toBe(true);

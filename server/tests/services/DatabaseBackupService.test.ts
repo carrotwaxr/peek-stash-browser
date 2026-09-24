@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { must } from "../helpers/must.js";
 
 // Mock fs/promises
 vi.mock("fs/promises");
@@ -81,11 +82,11 @@ describe("DatabaseBackupService", () => {
       const backups = await databaseBackupService.listBackups();
 
       expect(backups).toHaveLength(2);
-      expect(backups[0].filename).toBe(
+      expect(must(backups[0]).filename).toBe(
         "peek-stash-browser.db.backup-20260118-104532"
       );
-      expect(backups[0].size).toBe(246747136);
-      expect(backups[1].filename).toBe(
+      expect(must(backups[0]).size).toBe(246747136);
+      expect(must(backups[1]).filename).toBe(
         "peek-stash-browser.db.backup-20260117-093045"
       );
     });
@@ -114,8 +115,8 @@ describe("DatabaseBackupService", () => {
         await import("../../services/DatabaseBackupService.js");
       const backups = await databaseBackupService.listBackups();
 
-      expect(backups[0].filename).toContain("20260118");
-      expect(backups[1].filename).toContain("20260117");
+      expect(must(backups[0]).filename).toContain("20260118");
+      expect(must(backups[1]).filename).toContain("20260117");
     });
 
     it("should log error and rethrow when directory read fails", async () => {
@@ -169,10 +170,10 @@ describe("DatabaseBackupService", () => {
 
       // Should return 2 backups, skipping the deleted one
       expect(backups).toHaveLength(2);
-      expect(backups[0].filename).toBe(
+      expect(must(backups[0]).filename).toBe(
         "peek-stash-browser.db.backup-20260118-104532"
       );
-      expect(backups[1].filename).toBe(
+      expect(must(backups[1]).filename).toBe(
         "peek-stash-browser.db.backup-20260116-080000"
       );
     });

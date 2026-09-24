@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -65,7 +66,7 @@ describe("Scene API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
 
-      const scene = response.data.findScenes.scenes[0];
+      const scene = must(response.data.findScenes.scenes[0]);
       expect(scene.id).toBe(TEST_ENTITIES.sceneWithRelations);
       expect(scene.title).toBeDefined();
       // Note: performers/tags may or may not be included depending on API design
@@ -337,7 +338,7 @@ describe("Scene API", () => {
         expect(sceneResponse.ok).toBe(true);
         expect(sceneResponse.data.findScenes.scenes).toHaveLength(1);
 
-        const scene = sceneResponse.data.findScenes.scenes[0];
+        const scene = must(sceneResponse.data.findScenes.scenes[0]);
 
         if (!scene.inheritedTagIds || scene.inheritedTagIds.length === 0) {
           console.log(
@@ -347,7 +348,7 @@ describe("Scene API", () => {
         }
 
         // Use the first inherited tag for testing
-        inheritedTagId = scene.inheritedTagIds[0];
+        inheritedTagId = must(scene.inheritedTagIds[0]);
         console.log(`Auto-discovered inherited tag ID: ${inheritedTagId}`);
       }
 
@@ -379,7 +380,7 @@ describe("Scene API", () => {
       // This test FAILS if scene tag inheritance didn't run during sync
       // or if the tag filter doesn't check inheritedTagIds
       expect(response.data.findScenes.count).toBe(1);
-      expect(response.data.findScenes.scenes[0].id).toBe(sceneId);
+      expect(must(response.data.findScenes.scenes[0]).id).toBe(sceneId);
     });
 
     it("verifies scene has both direct tags and inherited tags", async () => {
@@ -402,7 +403,7 @@ describe("Scene API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
 
-      const scene = response.data.findScenes.scenes[0];
+      const scene = must(response.data.findScenes.scenes[0]);
 
       // Scene should have direct tags
       expect(scene.tags).toBeDefined();
@@ -413,7 +414,7 @@ describe("Scene API", () => {
       expect(scene.inheritedTagIds!.length).toBeGreaterThan(0);
 
       // Verify the scene is filterable by BOTH a direct tag AND an inherited tag
-      const directTagId = scene.tags![0].id;
+      const directTagId = must(scene.tags![0]).id;
       const inheritedTagId = scene.inheritedTagIds![0];
 
       // Filter by direct tag AND scene ID - should find the scene
@@ -429,7 +430,7 @@ describe("Scene API", () => {
       );
       expect(directResponse.ok).toBe(true);
       expect(directResponse.data.findScenes.count).toBe(1);
-      expect(directResponse.data.findScenes.scenes[0].id).toBe(sceneId);
+      expect(must(directResponse.data.findScenes.scenes[0]).id).toBe(sceneId);
 
       // Filter by inherited tag AND scene ID - should also find the scene
       const inheritedResponse = await adminClient.post<FindScenesResponse>(
@@ -444,7 +445,9 @@ describe("Scene API", () => {
       );
       expect(inheritedResponse.ok).toBe(true);
       expect(inheritedResponse.data.findScenes.count).toBe(1);
-      expect(inheritedResponse.data.findScenes.scenes[0].id).toBe(sceneId);
+      expect(must(inheritedResponse.data.findScenes.scenes[0]).id).toBe(
+        sceneId
+      );
     });
 
     it("verifies inherited tags from same instance are filterable", async () => {
@@ -465,7 +468,7 @@ describe("Scene API", () => {
       );
 
       expect(response.ok).toBe(true);
-      const scene = response.data.findScenes.scenes[0];
+      const scene = must(response.data.findScenes.scenes[0]);
 
       if (!scene.inheritedTagIds || scene.inheritedTagIds.length === 0) {
         console.log(
@@ -493,7 +496,7 @@ describe("Scene API", () => {
         expect(filterResponse.ok).toBe(true);
         if (
           filterResponse.data.findScenes.count === 1 &&
-          filterResponse.data.findScenes.scenes[0].id === sceneId
+          must(filterResponse.data.findScenes.scenes[0]).id === sceneId
         ) {
           filterableTagCount++;
         }
@@ -515,14 +518,14 @@ describe("Scene API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes.scenes).toHaveLength(1);
 
-      const scene = response.data.findScenes.scenes[0];
+      const scene = must(response.data.findScenes.scenes[0]);
 
       // Scene should have tags (either direct or inherited)
       expect(scene.tags).toBeDefined();
 
       // If we have a configured test, verify the scene is findable by its tags
       if (scene.tags && scene.tags.length > 0) {
-        const tagId = scene.tags[0].id;
+        const tagId = must(scene.tags[0]).id;
 
         const filterResponse = await adminClient.post<FindScenesResponse>(
           "/api/library/scenes",

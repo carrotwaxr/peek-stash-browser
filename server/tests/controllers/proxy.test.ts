@@ -15,6 +15,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { must } from "../helpers/must.js";
 
 // =============================================================================
 // Mocks (must be before imports)
@@ -1199,7 +1200,7 @@ describe("Proxy Controller", () => {
 
         expect(res.status, path).not.toHaveBeenCalledWith(400);
         expect(mockHttpGet, path).toHaveBeenCalledTimes(1);
-        const url: string = mockHttpGet.mock.calls[0][0] as string;
+        const url: string = must(mockHttpGet.mock.calls[0])[0] as string;
         expect(url.startsWith(`http://stash:9999${path.split("?")[0]}?`)).toBe(
           true
         );
