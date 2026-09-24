@@ -1,129 +1,48 @@
-import { exec } from "child_process";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "fs";
-import path from "path";
-import { promisify } from "util";
 import { logger } from "../utils/logger.js";
+import { type MigrationResult, migrateDatabase } from "./migrations.js";
 import { runSchemaCatchup } from "./schemaCatchup.js";
 
-const execAsync = promisify(exec);
+// This startup's migration run, and what it applied
+let migrationRun: Promise<MigrationResult> | null = null;
+let appliedThisBoot: readonly string[] = [];
 
-// Track whether migrations were applied during startup
-let migrationsApplied = false;
+/** The migrations applied during this startup, in the order they ran. */
+export const migrationsAppliedThisBoot = (): readonly string[] =>
+  appliedThisBoot;
 
 /**
  * Check if database migrations were applied during this startup.
  * Used to determine if a full sync should be triggered.
  */
-export const wereMigrationsApplied = (): boolean => migrationsApplied;
+export const wereMigrationsApplied = (): boolean =>
+  migrationsAppliedThisBoot().length > 0;
 
 /**
- * Execute a SQLite query and return the result
+ * Resolves once this startup's migration run has finished or failed, and at
+ * once when none has started.
  */
-async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
-  // Scratch files go in tmp/ beside the database, whose directory is writable
-  // wherever Peek runs: /app/data/tmp in the image
-  const tmpDir = path.join(path.dirname(dbPath), "tmp");
-  mkdirSync(tmpDir, { recursive: true });
-  const tmpFile = path.join(tmpDir, `sql_${Date.now()}.sql`);
-  try {
-    writeFileSync(tmpFile, sql);
-    const { stdout } = await execAsync(
-      `sqlite3 "${dbPath}" < "${tmpFile}" 2>/dev/null || true`
-    );
-    return stdout.trim();
-  } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      // Ignore cleanup errors
-    }
-  }
-}
-
-/**
- * Count applied migrations in the database.
- * Returns 0 if database doesn't exist or table doesn't exist.
- */
-const countAppliedMigrations = async (dbPath: string): Promise<number> => {
-  if (!existsSync(dbPath)) {
-    return 0;
-  }
-
-  try {
-    // Check if _prisma_migrations table exists
-    const tableCheck = await sqliteQuery(
-      dbPath,
-      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_prisma_migrations';"
-    );
-
-    if (tableCheck !== "1") {
-      return 0;
-    }
-
-    // Count applied migrations (finished_at is not null)
-    const result = await sqliteQuery(
-      dbPath,
-      "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL;"
-    );
-
-    return parseInt(result, 10) || 0;
-  } catch (error) {
-    logger.warn("Could not count migrations, assuming fresh database", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return 0;
-  }
+export const whenMigrationsSettled = async (): Promise<void> => {
+  await migrationRun?.catch(() => undefined);
 };
+
+/** The database file, for the legacy schema check that reads it directly. */
+function databaseFilePath(): string {
+  const url = process.env.DATABASE_URL;
+  return url === undefined || url === ""
+    ? "/app/data/peek-stash-browser.db"
+    : url.replace("file:", "");
+}
 
 export const initializeDatabase = async (): Promise<void> => {
   logger.info("Initializing database");
 
-  const dbPath =
-    process.env.DATABASE_URL?.replace("file:", "") ||
-    "/app/data/peek-stash-browser.db";
-
   try {
-    // Prisma client is pre-generated in Docker build or by start.sh
-    // No need to regenerate here
-
     // Handle legacy databases that need schema catchup
     // See schemaCatchup.ts for details on why this is needed
-    await runSchemaCatchup(dbPath);
+    await runSchemaCatchup(databaseFilePath());
 
-    // Count migrations before running migrate deploy
-    // This is best-effort - if it fails, we'll just do normal startup sync
-    let migrationCountBefore = 0;
-    try {
-      migrationCountBefore = await countAppliedMigrations(dbPath);
-    } catch (error) {
-      logger.warn("Could not count migrations before deploy", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    // Run migrations (safe for both new and existing databases)
-    logger.info("Running database migrations");
-    await execAsync("npx prisma migrate deploy");
-
-    // Count migrations after to detect if any were applied
-    // If this fails, fall back to incremental sync (don't set migrationsApplied)
-    try {
-      const migrationCountAfter = await countAppliedMigrations(dbPath);
-      migrationsApplied = migrationCountAfter > migrationCountBefore;
-
-      if (migrationsApplied) {
-        logger.info("Database migrations applied", {
-          before: migrationCountBefore,
-          after: migrationCountAfter,
-          newMigrations: migrationCountAfter - migrationCountBefore,
-        });
-      }
-    } catch (error) {
-      logger.warn(
-        "Could not count migrations after deploy, falling back to incremental sync",
-        { error: error instanceof Error ? error.message : String(error) }
-      );
-    }
+    migrationRun = migrateDatabase();
+    appliedThisBoot = (await migrationRun).applied;
 
     logger.info("Database initialization complete");
   } catch (error) {

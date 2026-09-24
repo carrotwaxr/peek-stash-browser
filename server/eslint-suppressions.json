@@ -155,11 +155,6 @@
       "count": 5
     }
   },
-  "initializers/database.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "initializers/validate.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 5

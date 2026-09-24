@@ -210,23 +210,38 @@ try {
     }
   );
 
-  await check(`start.sh applied all ${migrations.length} migrations`, () => {
-    const applied = sql(
-      "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY 1"
-    ).split("\n");
-    const missing = migrations.filter((m) => !applied.includes(m));
-    const unexpected = applied.filter((m) => !migrations.includes(m));
-    if (missing.length || unexpected.length) {
-      throw new Error(`missing [${missing}], not in the repo [${unexpected}]`);
+  await check(
+    `the server applied all ${migrations.length} migrations in one deploy`,
+    () => {
+      const applying = execFileSync("docker", ["logs", name], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      })
+        .split("\n")
+        .filter((line) => /Applying \d+ pending migrations?:/.test(line));
+      expectEqual(applying.length, 1, "'Applying N pending migrations' lines");
+      if (!applying[0].includes(`Applying ${migrations.length} pending`)) {
+        throw new Error(`expected ${migrations.length}: ${applying[0]}`);
+      }
+      const applied = sql(
+        "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY 1"
+      ).split("\n");
+      const missing = migrations.filter((m) => !applied.includes(m));
+      const unexpected = applied.filter((m) => !migrations.includes(m));
+      if (missing.length || unexpected.length) {
+        throw new Error(
+          `missing [${missing}], not in the repo [${unexpected}]`
+        );
+      }
+      expectEqual(
+        sql(
+          "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL"
+        ),
+        "0",
+        "unfinished or rolled-back migrations"
+      );
     }
-    expectEqual(
-      sql(
-        "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL"
-      ),
-      "0",
-      "unfinished or rolled-back migrations"
-    );
-  });
+  );
 
   await check(
     "@peek/shared-types is a package directory in /app/node_modules",
@@ -265,10 +280,11 @@ try {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
       });
-      if (!log.includes("No pending migrations to apply")) {
-        throw new Error(
-          "no 'No pending migrations to apply' after the restart"
-        );
+      if (!log.includes("Database schema is up to date")) {
+        throw new Error("no 'Database schema is up to date' after the restart");
+      }
+      if (log.includes("Applying")) {
+        throw new Error("the restart applied migrations");
       }
     }
   );
