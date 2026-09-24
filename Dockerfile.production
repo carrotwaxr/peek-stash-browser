@@ -1,84 +1,69 @@
 # syntax=docker/dockerfile:1
-# Production Single Container Dockerfile
-# Combines frontend and backend with SQLite database
-# Optimized for size and build performance
+# Production image: nginx, the Node server and SQLite in one container.
+# Platform-independent work (the Vite build, tsc) runs on the build platform;
+# only the production dependencies and the Prisma engines are per target.
 
 # ===========================
-# Stage 1: Frontend Build
+# Package manifests without the release version. The release bump edits
+# client/package.json and server/package.json; stripped of it, the manifests
+# (and so every npm ci layer below) change only when dependencies do.
+# ===========================
+FROM --platform=$BUILDPLATFORM node:22-slim AS manifests
+WORKDIR /m
+COPY client/package.json client/package-lock.json ./client/
+COPY server/package.json server/package-lock.json ./server/
+COPY shared/package.json shared/package-lock.json ./shared/
+RUN node -e 'const fs = require("fs"); \
+  for (const dir of ["client", "server", "shared"]) { \
+    for (const file of ["package.json", "package-lock.json"]) { \
+      const path = `${dir}/${file}`; \
+      const json = JSON.parse(fs.readFileSync(path, "utf8")); \
+      delete json.version; \
+      if (json.packages && json.packages[""]) delete json.packages[""].version; \
+      fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n"); \
+    } \
+  }'
+
+# ===========================
+# Frontend: static files, built once on the build platform
 # ===========================
 FROM --platform=$BUILDPLATFORM node:22-slim AS frontend-build
-
-WORKDIR /app
-
-# Copy shared types package (needed for file: dependency and vite alias)
-COPY shared/package.json shared/tsconfig.json ./shared/
-COPY shared/types ./shared/types
-
 WORKDIR /app/client
-
-# Copy package files first for better layer caching
-COPY client/package*.json ./
-
-# Use npm ci for reproducible builds
-RUN npm ci --no-audit --prefer-offline
-
-# Copy source and build
+COPY --from=manifests /m/shared/package.json /app/shared/
+COPY --from=manifests /m/client/ ./
+RUN npm ci --no-audit
+COPY shared/tsconfig.json /app/shared/
+COPY shared/types /app/shared/types
+# The real package.json (with the version the settings page shows) comes back here
 COPY client/ ./
 RUN npm run build
 
 # ===========================
-# Stage 2: Backend Build
+# Server and shared types: tsc output is platform-independent
 # ===========================
-FROM node:22-slim AS backend-build
-
-# Build shared type declarations first
+FROM --platform=$BUILDPLATFORM node:22-slim AS server-build
 WORKDIR /app/shared
-COPY shared/package*.json ./
-RUN npm ci --no-audit --prefer-offline
-COPY shared/ ./
-RUN rm -f tsconfig.tsbuildinfo && npm run build
-
+COPY --from=manifests /m/shared/ ./
+RUN npm ci --no-audit
 WORKDIR /app/server
-
-# Prisma picks its engine by the OpenSSL it finds at install time; without the
-# openssl CLI it guesses 1.1.x and the runtime stage (OpenSSL 3) cannot start.
-# No dependency compiles native code, so no C toolchain.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    apt-get install -y --no-install-recommends openssl
-
-# Copy package files first for better layer caching
-COPY server/package*.json ./
-
-# Install all dependencies (including dev) for build
-RUN npm ci --no-audit --prefer-offline
-
-# Copy Prisma schema and generate client
-COPY server/prisma ./prisma
+COPY --from=manifests /m/server/ ./
+RUN npm ci --no-audit
+# The generated client's types, for tsc; the runtime client comes from server-deps
+COPY server/prisma/schema.prisma ./prisma/
 RUN npx prisma generate
-
-# Copy source and build (remove test config from dist)
+COPY shared/ /app/shared/
+RUN cd /app/shared && rm -f tsconfig.tsbuildinfo && npm run build
 COPY server/ ./
 RUN npm run build && rm -f dist/vitest.config.js
 
-# Prune dev dependencies for production. Keep the prisma CLI for runtime
-# migrations; drop typescript (a peer dependency). npm links @peek/shared-types
-# to ../shared, a link that would point at /shared in the runtime stage:
-# replace it with the built package (package.json and dist only).
-RUN npm prune --omit=dev && \
-    rm -rf node_modules/typescript node_modules/@peek/shared-types && \
-    mkdir -p node_modules/@peek/shared-types && \
-    cp -R /app/shared/package.json /app/shared/dist node_modules/@peek/shared-types/
-
 # ===========================
-# Stage 3: Production Runtime
+# Runtime base: the system packages, one apt step per platform. Per-platform
+# cache ids stop a two-platform build from queueing on one apt lock.
 # ===========================
-FROM node:22-slim AS production
-
-# Install runtime dependencies (cached with BuildKit)
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+FROM node:22-slim AS runtime-base
+ARG TARGETARCH
+RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib-$TARGETARCH,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         nginx \
@@ -86,6 +71,29 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ca-certificates \
         curl \
     && rm -f /etc/nginx/sites-enabled/default
+
+# ===========================
+# Production node_modules for the target platform. Prisma picks its engines by
+# the OpenSSL it finds at install time: ca-certificates brings the openssl
+# package, so it finds 3.0.x, as the runtime needs (CI-10). No dependency
+# compiles native code, so no C toolchain. prisma (the CLI, for runtime
+# migrations) stays: it is a peer of @prisma/client. typescript is an
+# optional peer, not needed at runtime. The @peek/shared-types link would
+# point at /shared in the runtime stage; the built package replaces it (CI-9).
+# ===========================
+FROM runtime-base AS server-deps
+WORKDIR /app/server
+COPY --from=manifests /m/shared/package.json /app/shared/
+COPY --from=manifests /m/server/ ./
+RUN npm ci --omit=dev --no-audit && \
+    rm -rf node_modules/typescript node_modules/@peek/shared-types
+COPY server/prisma/schema.prisma ./prisma/
+RUN npx prisma generate
+
+# ===========================
+# Runtime
+# ===========================
+FROM runtime-base AS production
 
 # App user, created as 99:100 (unRAID nobody:users, the PUID/PGID defaults).
 # docker/entrypoint.sh remaps it when PUID/PGID differ.
@@ -95,25 +103,27 @@ RUN userdel --remove node \
 
 WORKDIR /app
 
-# Copy package file
-COPY server/package.json ./
+# Largest and least-changing first: this layer is reused across releases
+# whose lockfiles and Prisma schema are unchanged
+COPY --from=server-deps /app/server/node_modules ./node_modules
+# The shared types as a real package directory (package.json and dist only)
+COPY --from=server-build /app/shared/package.json ./node_modules/@peek/shared-types/package.json
+COPY --from=server-build /app/shared/dist ./node_modules/@peek/shared-types/dist
 
-# Copy pruned node_modules from build stage (already has prisma client generated)
-COPY --from=backend-build /app/server/node_modules ./node_modules
-
-# Copy Prisma schema and migrations (for runtime migrations)
+# Prisma schema and migrations (for runtime migrations)
 COPY server/prisma/schema.prisma ./prisma/
 COPY server/prisma/migrations ./prisma/migrations
 
-# Copy built backend from build stage
-COPY --from=backend-build /app/server/dist ./backend/
-
-# Copy built frontend from build stage
+COPY --from=server-build /app/server/dist ./backend/
 COPY --from=frontend-build /app/client/dist ./frontend/
 
 # nginx main config, entrypoint (root: maps the user, starts nginx) and start script (app user)
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=0755 docker/entrypoint.sh docker/start.sh /app/
+
+# The version utils/serverVersion.ts reads. Last among the files, because
+# every release changes it
+COPY server/package.json ./
 
 # Check the nginx config, then create the data directory owned by the app user
 RUN mkdir -p /tmp/nginx && nginx -t -e stderr -g "user peek peek;" && rm -rf /tmp/nginx \
