@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:analyze": "vite build && open dist/stats.html",
+    "build:analyze": "vite build --mode analyze && open dist/stats.html",
     "lint": "eslint .",
     "format": "cd .. && prettier --write client",
     "format:check": "cd .. && prettier --check client",

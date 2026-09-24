@@ -7,20 +7,22 @@ import { defineConfig } from "vite";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       babel: {
         plugins: [["babel-plugin-react-compiler"]],
       },
     }),
-    // Bundle analyzer - generates stats.html in dist folder
-    visualizer({
-      filename: "dist/stats.html",
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
+    // Bundle analyzer, only for `npm run build:analyze` (--mode analyze):
+    // writes dist/stats.html
+    mode === "analyze" &&
+      visualizer({
+        filename: "dist/stats.html",
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+      }),
   ],
   build: {
     outDir: "dist",
@@ -91,4 +93,4 @@ export default defineConfig({
     port: 4173,
     host: true,
   },
-});
+}));
