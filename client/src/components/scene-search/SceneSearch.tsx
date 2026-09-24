@@ -101,7 +101,12 @@ const SceneSearch = ({
     null
   );
   const queryClient = useQueryClient();
-  const { data, isLoading: queryLoading, error } = useSceneList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useSceneList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -252,7 +257,6 @@ const SceneSearch = ({
     navigate(getEntityPath("scene", scene, hasMultipleInstances), {
       state: navigationState,
     });
-    return true; // Prevent fallback navigation in SceneCard
   };
 
   const handleQueryChange = useCallback((newQuery: LibrarySearchParams) => {
@@ -304,6 +308,7 @@ const SceneSearch = ({
 
       <SearchControls
         artifactType="scene"
+        isRefreshing={isPlaceholderData}
         context={context}
         initialSort={initialSort}
         onQueryChange={handleQueryChange}

@@ -84,4 +84,24 @@ describe("useImageList", () => {
       .calls[0];
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
+
+  it("keeps the previous page's data while the next page loads", async () => {
+    const page1 = { findImages: { images: [{ id: "1" }], count: 2 } };
+    (libraryApi.findImages as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(page1)
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const { result, rerender } = renderHook(
+      ({ page }: { page: number }) =>
+        useImageList({ filter: { page, per_page: 1 } }),
+      { wrapper: createWrapper(), initialProps: { page: 1 } }
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    rerender({ page: 2 });
+    await waitFor(() => expect(libraryApi.findImages).toHaveBeenCalledTimes(2));
+
+    expect(result.current.data).toEqual(page1);
+    expect(result.current.isPlaceholderData).toBe(true);
+  });
 });

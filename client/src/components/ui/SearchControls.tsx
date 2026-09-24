@@ -145,6 +145,8 @@ interface SearchControlsProps {
   tvSearchZoneActive?: boolean;
   tvTopPaginationZoneActive?: boolean;
   tvBottomPaginationZoneActive?: boolean;
+  /** The list query is showing the previous results while the next ones load */
+  isRefreshing?: boolean;
 }
 
 const SearchControls = ({
@@ -172,6 +174,7 @@ const SearchControls = ({
   tvSearchZoneActive = false,
   tvTopPaginationZoneActive = false,
   tvBottomPaginationZoneActive = false,
+  isRefreshing = false,
 }: SearchControlsProps) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
@@ -1351,20 +1354,32 @@ const SearchControls = ({
           );
         })}
       </FilterPanel>
-      {/* Children: render prop or direct children */}
-      {typeof children === "function"
-        ? (children as Function)({
-            viewMode,
-            zoomLevel,
-            gridDensity,
-            wallPlayback,
-            sortField,
-            sortDirection,
-            onSort: handleSortChange,
-            timelinePeriod,
-            setTimelinePeriod,
-          })
-        : children}
+      {/* Children: render prop or direct children. Stale results stay
+          clickable but dim while the next ones load. The important flag lets
+          reduced motion override the inline transition. */}
+      <div
+        data-testid="search-results"
+        aria-busy={isRefreshing || undefined}
+        className="motion-reduce:!transition-none"
+        style={{
+          opacity: isRefreshing ? 0.6 : 1,
+          transition: "opacity 0.2s ease",
+        }}
+      >
+        {typeof children === "function"
+          ? (children as Function)({
+              viewMode,
+              zoomLevel,
+              gridDensity,
+              wallPlayback,
+              sortField,
+              sortDirection,
+              onSort: handleSortChange,
+              timelinePeriod,
+              setTimelinePeriod,
+            })
+          : children}
+      </div>
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
         <div className="mt-4">

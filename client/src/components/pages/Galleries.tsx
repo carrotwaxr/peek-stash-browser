@@ -60,7 +60,12 @@ const Galleries = () => {
   const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
     null
   );
-  const { data, isLoading: queryLoading, error } = useGalleryList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useGalleryList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -170,6 +175,7 @@ const Galleries = () => {
 
         <SearchControls
           artifactType="gallery"
+          isRefreshing={isPlaceholderData}
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}

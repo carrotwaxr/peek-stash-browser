@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
@@ -13,6 +13,8 @@ export function usePerformerList(
     ),
     queryFn: ({ signal }) => libraryApi.findPerformers(params!, signal),
     enabled: params !== null,
+    // Keep the current results on screen while the next page loads
+    placeholderData: keepPreviousData,
   });
 }
 

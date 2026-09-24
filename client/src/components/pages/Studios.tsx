@@ -50,7 +50,12 @@ const Studios = () => {
   const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
     null
   );
-  const { data, isLoading: queryLoading, error } = useStudioList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useStudioList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -116,6 +121,7 @@ const Studios = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="studio"
+          isRefreshing={isPlaceholderData}
           initialSort="scenes_count"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}

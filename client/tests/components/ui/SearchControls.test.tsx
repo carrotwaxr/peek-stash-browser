@@ -600,4 +600,26 @@ describe("SearchControls", () => {
       });
     });
   });
+
+  describe("Stale results", () => {
+    it("dims the results and marks them busy while isRefreshing", () => {
+      renderSearchControls({
+        isRefreshing: true,
+        children: <div>result cards</div>,
+      });
+
+      const results = screen.getByTestId("search-results");
+      expect(results).toHaveTextContent("result cards");
+      expect(results).toHaveAttribute("aria-busy", "true");
+      expect(results.style.opacity).toBe("0.6");
+    });
+
+    it("shows the results at full opacity, not busy, otherwise", () => {
+      renderSearchControls({ children: <div>result cards</div> });
+
+      const results = screen.getByTestId("search-results");
+      expect(results).not.toHaveAttribute("aria-busy");
+      expect(results.style.opacity).toBe("1");
+    });
+  });
 });

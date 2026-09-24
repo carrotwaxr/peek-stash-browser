@@ -410,8 +410,12 @@ const SceneCard = forwardRef<HTMLDivElement, Props>(
         renderImageContent={renderImageContent}
         // Standard props
         className={className}
-        onClick={
-          onClick as ((e: React.MouseEvent<HTMLDivElement>) => void) | undefined
+        onNavigate={
+          onClick
+            ? () => {
+                onClick(scene);
+              }
+            : undefined
         }
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}

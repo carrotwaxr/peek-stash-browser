@@ -1,5 +1,5 @@
 import type { ExternalPlayerLinkResponse } from "@peek/shared-types";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiPost } from "..";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
@@ -15,6 +15,8 @@ export function useSceneList(
     ),
     queryFn: ({ signal }) => libraryApi.findScenes(params!, signal),
     enabled: params !== null,
+    // Keep the current results on screen while the next page loads
+    placeholderData: keepPreviousData,
   });
 }
 

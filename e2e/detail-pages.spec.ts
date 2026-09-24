@@ -193,4 +193,62 @@ test.describe("Detail Pages", () => {
       });
     }
   });
+
+  test("a statistic on a performer page scrolls down to its tab", async ({
+    page,
+  }) => {
+    await page.goto("/performers");
+    await expect(page.getByPlaceholder("Search...")).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const performerLinks = page.locator('a[href*="/performer/"]');
+    const hasPerformers = await performerLinks
+      .first()
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(
+        () => true,
+        () => false
+      );
+    test.skip(!hasPerformers, "needs a performer");
+
+    // The count beside "Images:" is a button only when the performer has
+    // images, so open the first listed performer that has some.
+    const hrefs = [
+      ...new Set(
+        await performerLinks.evaluateAll((links) =>
+          links.map((a) => a.getAttribute("href") ?? "")
+        )
+      ),
+    ].slice(0, 10);
+    const stat = page.getByText("Images:", { exact: true });
+    const statButton = stat.locator("..").getByRole("button");
+    let found = false;
+    for (const href of hrefs) {
+      await page.goto(href);
+      await expect(page.getByText("Scenes:", { exact: true })).toBeVisible({
+        timeout: 10_000,
+      });
+      if ((await statButton.count()) > 0) {
+        found = true;
+        break;
+      }
+    }
+    test.skip(!found, "no listed performer has images");
+
+    await stat.scrollIntoViewIfNeeded();
+    const before = await page.evaluate(() => window.scrollY);
+    const canScroll = await page.evaluate(
+      (y) =>
+        document.documentElement.scrollHeight - window.innerHeight >= y + 100,
+      before
+    );
+    test.skip(!canScroll, "the performer page is too short to scroll");
+
+    await statButton.click();
+
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 5_000 })
+      .toBeGreaterThan(before);
+  });
 });

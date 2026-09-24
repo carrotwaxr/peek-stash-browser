@@ -122,7 +122,12 @@ const Images = () => {
     null
   );
   const queryClient = useQueryClient();
-  const { data, isLoading: queryLoading, error } = useImageList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useImageList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -272,6 +277,7 @@ const Images = () => {
 
         <SearchControls
           artifactType="image"
+          isRefreshing={isPlaceholderData}
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}

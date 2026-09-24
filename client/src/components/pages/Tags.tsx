@@ -60,7 +60,12 @@ const Tags = () => {
   const [queryParams, setQueryParams] = useState<LibrarySearchParams | null>(
     null
   );
-  const { data, isLoading: queryLoading, error } = useTagList(queryParams);
+  const {
+    data,
+    isLoading: queryLoading,
+    error,
+    isPlaceholderData,
+  } = useTagList(queryParams);
   const initMessage =
     error instanceof ApiError && error.isInitializing
       ? "Server is syncing library, please wait..."
@@ -144,6 +149,7 @@ const Tags = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="tag"
+          isRefreshing={isPlaceholderData}
           initialSort="scenes_count"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
