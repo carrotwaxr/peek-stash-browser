@@ -5,10 +5,10 @@ import path from "node:path";
 /**
  * Where an E2E run points, and as whom.
  *
- * Hermetic mode (the default, locally and in CI): Playwright starts its own
- * Peek server and Vite client on their own ports, beside the dev stack, with
- * a throwaway database in `runDir`. The run admin is HERMETIC_ADMIN, the
- * throwaway database's only admin.
+ * Hermetic mode (the default, locally and in CI): Playwright starts the Stash
+ * replay, its own Peek server and Vite client on their own ports, beside the
+ * dev stack, with a throwaway database in `runDir`. The run admin is
+ * HERMETIC_ADMIN, the throwaway database's only admin.
  *
  * Dev-stack mode (`E2E_BASE_URL` set in the shell, for manual runs on real
  * data): the run uses the Peek at that URL. `.env.e2e` names a bootstrap admin
@@ -49,6 +49,16 @@ export const ports = {
 
 export const baseURL =
   process.env.E2E_BASE_URL || `http://localhost:${ports.client}`;
+
+/**
+ * Hermetic mode's Stash: item 83's replay server (server/integration/
+ * stash-replay), serving its derived second library, which Peek syncs through
+ * the real sync path. It refuses writes; /__replay/stats (no key) lists any it
+ * saw, the requests it could not answer, and the library's entity counts.
+ */
+export const REPLAY_API_KEY = "e2e-dummy-key";
+export const replayUrl = `http://localhost:${ports.stash}/graphql`;
+export const replayStatsUrl = `http://localhost:${ports.stash}/__replay/stats`;
 
 // The throwaway database belongs on tmpfs: a fresh `prisma migrate deploy`
 // takes about 1 s on /dev/shm and over 30 s on a slow disk (it is all fsync)

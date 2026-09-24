@@ -51,6 +51,6 @@ paths:
 - Helpers live in `e2e/support/`; names go through `uniqueName`; list pages go through `ListPage`.
 - `auth.setup.ts` logs in through the API and injects the cookie, because filling the login form breaks on special characters in headless Chromium.
 - Global setup fails when Peek does not answer (`GET /api/setup/status answered ...: is Peek running at ...?`), and each API call it makes goes through `mustOk`, which names the status and body.
-- Tests must pass on both the populated dev database and the empty CI one: check which state exists, then assert.
+- Hermetic E2E syncs item 83's replay library (`--library second`). Find subjects through the UI or API and pass them through `requireData`, which fails in hermetic mode and skips on the dev stack. A test that changes per-user state on a library entity (rating, O, hide, restriction) does it as a throwaway user from `e2e/support/users.ts`, because every other test shares the run admin. The replay refuses writes, and teardown fails on any write or unserved media path.
 - Settings tabs are `role="tab"`, not buttons.
 - In dev-stack runs, a few failed logins lock the account for 15 minutes; `docker compose restart peek-server` clears it.

@@ -6,7 +6,9 @@
  *
  * Hermetic mode (the default): the server Playwright started runs on a fresh
  * database. Setup creates the first admin (HERMETIC_ADMIN) and a Stash
- * instance, which completes the setup wizard.
+ * instance on the replay server Playwright started (item 83), which completes
+ * the setup wizard and starts a full sync. It then waits until the library
+ * holds every scene and image the replay serves.
  *
  * Dev-stack mode (E2E_BASE_URL): the bootstrap admin from .env.e2e creates a
  * throwaway admin for this run, which global-teardown.ts deletes. No test runs
@@ -18,7 +20,15 @@ import { type APIRequestContext, request } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { mustOk } from "./support/api";
 import { deleteGroups, deleteUsers } from "./support/cleanup";
-import { HERMETIC_ADMIN, baseURL, dbFile, devStack } from "./support/env";
+import {
+  HERMETIC_ADMIN,
+  REPLAY_API_KEY,
+  baseURL,
+  dbFile,
+  devStack,
+  replayStatsUrl,
+  replayUrl,
+} from "./support/env";
 
 interface SetupStatus {
   setupComplete: boolean;
@@ -26,8 +36,32 @@ interface SetupStatus {
   hasStashInstance: boolean;
 }
 
-/** Hermetic mode's Stash: nothing listens there (port 9 is discard) */
-const PLACEHOLDER_STASH_URL = "http://127.0.0.1:9/graphql";
+/**
+ * GET /__replay/stats: the writes the replay refused, the requests it could
+ * not answer, and the served library's entity counts
+ */
+export interface ReplayStats {
+  mutations: string[];
+  unsupported: string[];
+  counts: Record<string, number>;
+}
+
+/** How long a full sync of the replay library may take */
+const LIBRARY_TIMEOUT_MS = 120_000;
+
+/** The Stash replay's stats, read without Peek's session cookie */
+export async function readReplayStats(): Promise<ReplayStats> {
+  const replay = await request.newContext();
+  try {
+    const response = await mustOk(
+      await replay.get(replayStatsUrl),
+      `GET ${replayStatsUrl}`
+    );
+    return (await response.json()) as ReplayStats;
+  } finally {
+    await replay.dispose();
+  }
+}
 
 /**
  * The setup wizard's status. A Peek that is down behind the Vite proxy
@@ -90,7 +124,61 @@ async function createStashInstance(
   );
 }
 
-/** Hermetic mode: the first admin and a Stash instance on a fresh database */
+/** A library list's status and total, or null before it answers 200 */
+async function libraryCount(
+  api: APIRequestContext,
+  type: "scenes" | "images"
+): Promise<{ status: number; count: number | null }> {
+  const response = await api.post(`/api/library/${type}`, {
+    data: { filter: { per_page: 1 } },
+  });
+  if (!response.ok()) return { status: response.status(), count: null };
+  const body = (await response.json()) as Record<
+    string,
+    { count?: number } | undefined
+  >;
+  const key = type === "scenes" ? "findScenes" : "findImages";
+  return { status: response.status(), count: body[key]?.count ?? null };
+}
+
+/**
+ * Waits, polling every second, until the sync that creating the instance
+ * started is done and the library holds every scene and image the replay
+ * serves. `api` carries the admin's session.
+ */
+async function waitForLibrary(api: APIRequestContext): Promise<void> {
+  const { counts } = await readReplayStats();
+  const want = { scenes: counts.scene, images: counts.image };
+  const deadline = Date.now() + LIBRARY_TIMEOUT_MS;
+  let last = "no answer yet";
+  for (;;) {
+    const sync = await api.get("/api/sync/status");
+    const inProgress = sync.ok()
+      ? ((await sync.json()) as { inProgress: boolean }).inProgress
+      : null;
+    const scenes = await libraryCount(api, "scenes");
+    const images = await libraryCount(api, "images");
+    if (
+      inProgress === false &&
+      scenes.count === want.scenes &&
+      images.count === want.images
+    ) {
+      return;
+    }
+    last = `sync status ${sync.status()} inProgress=${String(inProgress)}, scenes ${scenes.status} count ${String(scenes.count)} of ${String(want.scenes)}, images ${images.status} count ${String(images.count)} of ${String(want.images)}`;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Peek did not sync the replay library within ${LIBRARY_TIMEOUT_MS / 1000} s: ${last}`
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+}
+
+/**
+ * Hermetic mode: the first admin and the replay's Stash instance on a fresh
+ * database, then the synced library
+ */
 async function setUpHermetic(
   api: APIRequestContext
 ): Promise<{ username: string; password: string }> {
@@ -101,17 +189,13 @@ async function setUpHermetic(
     );
   }
 
-  // Its session cookie stays in `api` for the instance step
+  // Its session cookie stays in `api` for the instance step and the wait
   await mustOk(
     await api.post("/api/setup/create-admin", { data: HERMETIC_ADMIN }),
     `Creating the admin ${HERMETIC_ADMIN.username}`
   );
-  await createStashInstance(
-    api,
-    "E2E placeholder Stash",
-    PLACEHOLDER_STASH_URL,
-    "e2e-dummy-key"
-  );
+  await createStashInstance(api, "E2E replay Stash", replayUrl, REPLAY_API_KEY);
+  await waitForLibrary(api);
   return HERMETIC_ADMIN;
 }
 

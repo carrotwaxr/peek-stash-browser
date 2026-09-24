@@ -165,7 +165,7 @@ npm ci                                # root: Playwright
 npx playwright install chromium
 ```
 
-`npm run test:e2e` from the root is hermetic, locally and in CI. Playwright starts its own server and Vite client beside the dev stack, on a throwaway database (in `/dev/shm` when it exists) that is replaced at every run, and signs in as that database's only admin. The dev stack can keep running, and nothing the suite does reaches it or a real Stash.
+`npm run test:e2e` from the root is hermetic, locally and in CI. Playwright starts the Stash replay on port 9100, serving a larger variant of the integration tests' synthetic library, then its own server and Vite client beside the dev stack, on a throwaway database (in `/dev/shm` when it exists) that is replaced at every run. Global setup creates that database's only admin, points its one Stash instance at the replay and waits for the sync, and the tests sign in as that admin. The replay refuses writes, and the run fails at teardown if Peek sent it one or asked for something it does not serve. The dev stack can keep running, and nothing the suite does reaches it or a real Stash.
 
 `E2E_BASE_URL=http://localhost:6969 npm run test:e2e` runs the suite against the dev stack instead, for manual runs on real data. Nothing is started. `.env.e2e` in the root (gitignored) names an admin of that stack:
 
@@ -180,6 +180,7 @@ That account only creates a throwaway admin for the run (`e2e-<run id>-admin`) a
 | ----------------- | ----------------------------- | ------------------------------------------------ |
 | `E2E_SERVER_PORT` | `8100`                        | The hermetic run's server                        |
 | `E2E_CLIENT_PORT` | `5180`                        | The hermetic run's Vite client                   |
+| `E2E_STASH_PORT`  | `9100`                        | The hermetic run's Stash replay                  |
 | `E2E_TMP_DIR`     | `/dev/shm`, else the temp dir | Where the run's database directory is created    |
 | `E2E_BASE_URL`    | unset                         | Set: dev-stack mode against the Peek at this URL |
 
