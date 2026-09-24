@@ -102,7 +102,7 @@ describe("Merge Reconciliation Routes", () => {
       } as unknown as Response;
 
       // Configure authenticate to return 401
-      mockAuthenticate.mockImplementation((_req, res, _next) => {
+      mockAuthenticate.mockImplementation(async (_req, res, _next) => {
         return res
           .status(401)
           .json({ error: "Access denied. No token provided." });
@@ -157,6 +157,7 @@ describe("Merge Reconciliation Routes", () => {
         if (authReq.user?.role === "ADMIN") {
           next();
         }
+        return undefined;
       });
 
       await mockRequireAdmin(mockReq as Request, mockRes, mockNext);

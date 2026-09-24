@@ -216,19 +216,19 @@ describe("Images Controller", () => {
       await findImages(req, res);
 
       const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
-      expect(callArgs.filters.performers).toEqual({
+      expect(callArgs.filters?.performers).toEqual({
         value: ["p1"],
         modifier: "INCLUDES",
       });
-      expect(callArgs.filters.tags).toEqual({
+      expect(callArgs.filters?.tags).toEqual({
         value: ["t1"],
         modifier: "INCLUDES",
       });
-      expect(callArgs.filters.studios).toEqual({
+      expect(callArgs.filters?.studios).toEqual({
         value: ["s1"],
         modifier: "INCLUDES",
       });
-      expect(callArgs.filters.galleries).toEqual({
+      expect(callArgs.filters?.galleries).toEqual({
         value: ["g1"],
         modifier: "INCLUDES",
       });
@@ -250,7 +250,7 @@ describe("Images Controller", () => {
       await findImages(req, res);
 
       const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
-      expect(callArgs.filters.ids).toEqual({
+      expect(callArgs.filters?.ids).toEqual({
         value: ["img1", "img2"],
         modifier: "INCLUDES",
       });

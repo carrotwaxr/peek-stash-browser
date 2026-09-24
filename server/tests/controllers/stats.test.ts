@@ -7,7 +7,7 @@
  * through response assertions.
  */
 import { promises as fs } from "fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, refreshCache } from "../../controllers/stats.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
@@ -60,8 +60,8 @@ describe("Stats Controller", () => {
       images: 200,
       groups: 3,
     } as any);
-    mockEntityService.isReady.mockReturnValue(true);
-    mockEntityService.getLastRefreshed.mockReturnValue(
+    mockEntityService.isReady.mockResolvedValue(true);
+    mockEntityService.getLastRefreshed.mockResolvedValue(
       new Date("2026-01-15T12:00:00Z")
     );
     mockSyncService.isSyncing.mockReturnValue(false);

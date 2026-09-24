@@ -614,7 +614,10 @@ describe("Gallery Filters", () => {
       expect("coverHeight" in gallery).toBe(true);
 
       // If both dimensions exist, they should allow aspect ratio calculation
-      if (gallery.coverWidth !== null && gallery.coverHeight !== null) {
+      if (
+        typeof gallery.coverWidth === "number" &&
+        typeof gallery.coverHeight === "number"
+      ) {
         const aspectRatio = gallery.coverWidth / gallery.coverHeight;
         expect(aspectRatio).toBeGreaterThan(0);
         expect(Number.isFinite(aspectRatio)).toBe(true);

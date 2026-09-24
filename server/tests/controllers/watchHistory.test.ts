@@ -28,6 +28,11 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import {
+  authReq,
+  malformed,
+  testUser,
+} from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted to top level. Interactive transactions run their
@@ -84,7 +89,6 @@ const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 
 describe("Watch History Controller", () => {
-  let mockRequest: Partial<AuthenticatedRequest>;
   let mockResponse: Partial<Response>;
   let responseJson: ReturnType<typeof vi.fn>;
   let responseStatus: ReturnType<typeof vi.fn>;
@@ -117,13 +121,11 @@ describe("Watch History Controller", () => {
 
   describe("saveActivity", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
-        user: undefined,
-      };
-
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -132,13 +134,11 @@ describe("Watch History Controller", () => {
     });
 
     it("should return 400 if sceneId is missing", async () => {
-      mockRequest = {
-        body: { resumeTime: 60, playDuration: 10 },
-        user: { id: 1 },
-      };
-
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: malformed({ resumeTime: 60, playDuration: 10 }),
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -149,11 +149,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new watch history record if none exists (upsert)", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -172,7 +167,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -211,11 +209,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should update existing record with incremented playDuration", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 120, playDuration: 10 },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -234,7 +227,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 120, playDuration: 10 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -247,11 +243,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should handle zero playDuration gracefully", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 60, playDuration: 0 },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -270,7 +261,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 60, playDuration: 0 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -280,11 +274,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should handle null/undefined playDuration", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 60 },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -303,7 +292,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 60 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -323,13 +315,11 @@ describe("Watch History Controller", () => {
 
   describe("incrementPlayCount", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: undefined,
-      };
-
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -337,13 +327,11 @@ describe("Watch History Controller", () => {
     });
 
     it("should return 400 if sceneId is missing", async () => {
-      mockRequest = {
-        body: {},
-        user: { id: 1 },
-      };
-
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: malformed({}),
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -351,11 +339,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new record with playCount=1 if none exists", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -375,7 +358,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -399,11 +385,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should increment existing playCount using atomic increment", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -429,7 +410,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -444,11 +428,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should add timestamp to playHistory", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
@@ -470,7 +449,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -491,13 +473,11 @@ describe("Watch History Controller", () => {
 
   describe("incrementOCounter", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: undefined,
-      };
-
       await incrementOCounter(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -505,13 +485,11 @@ describe("Watch History Controller", () => {
     });
 
     it("should return 400 if sceneId is missing", async () => {
-      mockRequest = {
-        body: {},
-        user: { id: 1 },
-      };
-
       await incrementOCounter(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: malformed({}),
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -519,11 +497,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new record with oCount=1 if none exists", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -536,7 +509,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementOCounter(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -558,11 +534,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should increment existing oCount", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -579,7 +550,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementOCounter(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -604,13 +578,11 @@ describe("Watch History Controller", () => {
 
   describe("getWatchHistory", () => {
     it("should return 400 if sceneId is missing", async () => {
-      mockRequest = {
-        params: {},
-        user: { id: 1 },
-      };
-
       await getWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          params: malformed({}),
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -618,13 +590,11 @@ describe("Watch History Controller", () => {
     });
 
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        params: { sceneId: "123" },
-        user: undefined,
-      };
-
       await getWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          params: { sceneId: "123" },
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -632,15 +602,13 @@ describe("Watch History Controller", () => {
     });
 
     it("should return exists:false when no watch history found", async () => {
-      mockRequest = {
-        params: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
 
       await getWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          params: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -653,11 +621,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should return full watch history when record exists", async () => {
-      mockRequest = {
-        params: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.watchHistory.findUnique.mockResolvedValue({
         id: 1,
         resumeTime: 120,
@@ -670,7 +633,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await getWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          params: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -692,13 +658,11 @@ describe("Watch History Controller", () => {
 
   describe("getAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        query: {},
-        user: undefined,
-      };
-
       await getAllWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          query: {},
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -706,11 +670,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should return all watch history for user", async () => {
-      mockRequest = {
-        query: { limit: "20" },
-        user: { id: 1 },
-      };
-
       mockPrisma.watchHistory.findMany.mockResolvedValue([
         {
           id: 1,
@@ -731,7 +690,10 @@ describe("Watch History Controller", () => {
       ] as never);
 
       await getAllWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          query: { limit: "20" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -752,15 +714,13 @@ describe("Watch History Controller", () => {
     });
 
     it("should filter by inProgress when requested", async () => {
-      mockRequest = {
-        query: { limit: "20", inProgress: "true" },
-        user: { id: 1 },
-      };
-
       mockPrisma.watchHistory.findMany.mockResolvedValue([] as never);
 
       await getAllWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          query: { limit: "20", inProgress: "true" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -781,12 +741,10 @@ describe("Watch History Controller", () => {
 
   describe("clearAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        user: undefined,
-      };
-
       await clearAllWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -794,10 +752,6 @@ describe("Watch History Controller", () => {
     });
 
     it("should delete all watch history and stats for user", async () => {
-      mockRequest = {
-        user: { id: 1 },
-      };
-
       mockPrisma.watchHistory.deleteMany.mockResolvedValue({
         count: 10,
       } as never);
@@ -815,7 +769,9 @@ describe("Watch History Controller", () => {
       } as never);
 
       await clearAllWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -879,13 +835,12 @@ describe("Watch History Controller", () => {
           syncToStash: true,
         } as never);
         mockResolve.mockResolvedValueOnce(null);
-        mockRequest = {
-          body: { sceneId: "123", instanceId: "inst-b", ...extra },
-          user: { id: 1 } as never,
-        };
 
         await handler(
-          mockRequest as AuthenticatedRequest,
+          authReq({
+            body: { sceneId: "123", instanceId: "inst-b", ...extra },
+            user: testUser({ id: 1 }),
+          }),
           mockResponse as Response
         );
 
@@ -913,18 +868,17 @@ describe("Watch History Controller", () => {
         resumeTime: 5,
         lastPlayedAt: new Date(),
       } as never);
-      mockRequest = {
-        body: {
-          sceneId: "123",
-          instanceId: "inst-b",
-          resumeTime: 5,
-          playDuration: 5,
-        },
-        user: { id: 1 } as never,
-      };
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: {
+            sceneId: "123",
+            instanceId: "inst-b",
+            resumeTime: 5,
+            playDuration: 5,
+          },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -945,13 +899,11 @@ describe("Watch History Controller", () => {
     it.each([[5], [""]])(
       "returns 400 when instanceId is %j",
       async (instanceId) => {
-        mockRequest = {
-          body: { sceneId: "123", instanceId },
-          user: { id: 1 } as never,
-        };
-
         await incrementOCounter(
-          mockRequest as AuthenticatedRequest,
+          authReq({
+            body: malformed({ sceneId: "123", instanceId }),
+            user: testUser({ id: 1 }),
+          }),
           mockResponse as Response
         );
 
@@ -983,13 +935,12 @@ describe("Watch History Controller", () => {
       };
       mockPrisma.watchHistory.create.mockResolvedValue(record as never);
       mockPrisma.watchHistory.update.mockResolvedValue(record as never);
-      mockRequest = {
-        body: { sceneId: "scene-1", currentTime: 1 },
-        user: { id: 1 } as never,
-      };
 
       await pingWatchHistory(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "scene-1", currentTime: 1 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -1070,11 +1021,6 @@ describe("Watch History Controller", () => {
 
   describe("Race Condition Prevention", () => {
     it("saveActivity should use upsert to handle concurrent calls", async () => {
-      mockRequest = {
-        body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -1091,7 +1037,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await saveActivity(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 
@@ -1103,11 +1052,6 @@ describe("Watch History Controller", () => {
     });
 
     it("incrementPlayCount reads and writes in one transaction", async () => {
-      mockRequest = {
-        body: { sceneId: "123" },
-        user: { id: 1 },
-      };
-
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 1,
         syncToStash: false,
@@ -1125,7 +1069,10 @@ describe("Watch History Controller", () => {
       } as never);
 
       await incrementPlayCount(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          body: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
         mockResponse as Response
       );
 

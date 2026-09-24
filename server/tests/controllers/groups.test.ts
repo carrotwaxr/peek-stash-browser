@@ -10,8 +10,12 @@ import {
   removeMember,
   updateGroup,
 } from "../../controllers/groups.js";
-import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import {
+  authReq,
+  malformed,
+  testUser,
+} from "../helpers/controllerTestUtils.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -21,7 +25,6 @@ vi.mock(
 const mockPrisma = vi.mocked(prisma, true);
 
 describe("Groups Controller", () => {
-  let mockRequest: Partial<AuthenticatedRequest>;
   let mockResponse: Partial<Response>;
   let responseJson: ReturnType<typeof vi.fn>;
   let responseStatus: ReturnType<typeof vi.fn>;
@@ -35,10 +38,8 @@ describe("Groups Controller", () => {
 
   describe("getAllGroups", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = { user: { id: 1, role: "USER" } };
-
       await getAllGroups(
-        mockRequest as AuthenticatedRequest,
+        authReq({ user: testUser({ id: 1, role: "USER" }) }),
         mockResponse as Response
       );
 
@@ -46,7 +47,6 @@ describe("Groups Controller", () => {
     });
 
     it("should return all groups with member counts", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" } };
       mockPrisma.userGroup.findMany.mockResolvedValue([
         {
           id: 1,
@@ -62,7 +62,7 @@ describe("Groups Controller", () => {
       ] as never);
 
       await getAllGroups(
-        mockRequest as AuthenticatedRequest,
+        authReq({ user: testUser({ id: 1, role: "ADMIN" }) }),
         mockResponse as Response
       );
 
@@ -76,10 +76,11 @@ describe("Groups Controller", () => {
 
   describe("getGroup", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = { user: { id: 1, role: "USER" }, params: { id: "1" } };
-
       await getGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -87,11 +88,13 @@ describe("Groups Controller", () => {
     });
 
     it("should return 404 if group not found", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "999" } };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
       await getGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "999" },
+        }),
         mockResponse as Response
       );
 
@@ -99,7 +102,6 @@ describe("Groups Controller", () => {
     });
 
     it("should return group with members containing nested user objects", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "1" } };
       const createdAt = new Date();
       mockPrisma.userGroup.findUnique.mockResolvedValue({
         id: 1,
@@ -122,7 +124,10 @@ describe("Groups Controller", () => {
       } as never);
 
       await getGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -143,10 +148,11 @@ describe("Groups Controller", () => {
 
   describe("createGroup", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = { user: { id: 1, role: "USER" }, body: { name: "Test" } };
-
       await createGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          body: { name: "Test" },
+        }),
         mockResponse as Response
       );
 
@@ -154,10 +160,11 @@ describe("Groups Controller", () => {
     });
 
     it("should return 400 if name is missing", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, body: {} };
-
       await createGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          body: malformed({}),
+        }),
         mockResponse as Response
       );
 
@@ -165,14 +172,13 @@ describe("Groups Controller", () => {
     });
 
     it("should return 409 if name already exists", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        body: { name: "Family" },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
 
       await createGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          body: { name: "Family" },
+        }),
         mockResponse as Response
       );
 
@@ -180,15 +186,6 @@ describe("Groups Controller", () => {
     });
 
     it("should create group with permissions", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        body: {
-          name: "Friends",
-          description: "Close friends",
-          canShare: true,
-          canDownloadFiles: true,
-        },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
       mockPrisma.userGroup.create.mockResolvedValue({
         id: 2,
@@ -202,7 +199,15 @@ describe("Groups Controller", () => {
       } as never);
 
       await createGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          body: {
+            name: "Friends",
+            description: "Close friends",
+            canShare: true,
+            canDownloadFiles: true,
+          },
+        }),
         mockResponse as Response
       );
 
@@ -219,14 +224,12 @@ describe("Groups Controller", () => {
 
   describe("updateGroup", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = {
-        user: { id: 1, role: "USER" },
-        params: { id: "1" },
-        body: { name: "Updated" },
-      };
-
       await updateGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          params: { id: "1" },
+          body: { name: "Updated" },
+        }),
         mockResponse as Response
       );
 
@@ -234,15 +237,14 @@ describe("Groups Controller", () => {
     });
 
     it("should return 404 if group not found", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "999" },
-        body: { name: "Updated" },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
       await updateGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "999" },
+          body: { name: "Updated" },
+        }),
         mockResponse as Response
       );
 
@@ -250,11 +252,6 @@ describe("Groups Controller", () => {
     });
 
     it("should update group", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1" },
-        body: { name: "Updated Family", canShare: true },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({
         id: 1,
         name: "Family",
@@ -271,7 +268,11 @@ describe("Groups Controller", () => {
       } as never);
 
       await updateGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+          body: { name: "Updated Family", canShare: true },
+        }),
         mockResponse as Response
       );
 
@@ -290,10 +291,11 @@ describe("Groups Controller", () => {
 
   describe("deleteGroup", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = { user: { id: 1, role: "USER" }, params: { id: "1" } };
-
       await deleteGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -301,11 +303,13 @@ describe("Groups Controller", () => {
     });
 
     it("should return 404 if group not found", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "999" } };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
       await deleteGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "999" },
+        }),
         mockResponse as Response
       );
 
@@ -313,7 +317,6 @@ describe("Groups Controller", () => {
     });
 
     it("should delete group by id", async () => {
-      mockRequest = { user: { id: 1, role: "ADMIN" }, params: { id: "1" } };
       mockPrisma.userGroup.findUnique.mockResolvedValue({
         id: 1,
         name: "Family",
@@ -321,7 +324,10 @@ describe("Groups Controller", () => {
       mockPrisma.userGroup.delete.mockResolvedValue({ id: 1 } as never);
 
       await deleteGroup(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -334,14 +340,12 @@ describe("Groups Controller", () => {
 
   describe("addMember", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = {
-        user: { id: 1, role: "USER" },
-        params: { id: "1" },
-        body: { userId: 2 },
-      };
-
       await addMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          params: { id: "1" },
+          body: { userId: 2 },
+        }),
         mockResponse as Response
       );
 
@@ -349,15 +353,14 @@ describe("Groups Controller", () => {
     });
 
     it("should return 404 if group not found", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "999" },
-        body: { userId: 2 },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue(null);
 
       await addMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "999" },
+          body: { userId: 2 },
+        }),
         mockResponse as Response
       );
 
@@ -365,15 +368,14 @@ describe("Groups Controller", () => {
     });
 
     it("should return 400 if userId is missing", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1" },
-        body: {},
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
 
       await addMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+          body: malformed({}),
+        }),
         mockResponse as Response
       );
 
@@ -381,11 +383,6 @@ describe("Groups Controller", () => {
     });
 
     it("should add user to group", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1" },
-        body: { userId: 2 },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue(null);
       mockPrisma.userGroupMembership.create.mockResolvedValue({
@@ -395,7 +392,11 @@ describe("Groups Controller", () => {
       } as never);
 
       await addMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+          body: { userId: 2 },
+        }),
         mockResponse as Response
       );
 
@@ -406,18 +407,17 @@ describe("Groups Controller", () => {
     });
 
     it("should return 409 if user already in group", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1" },
-        body: { userId: 2 },
-      };
       mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
         id: 1,
       } as never);
 
       await addMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1" },
+          body: { userId: 2 },
+        }),
         mockResponse as Response
       );
 
@@ -427,13 +427,11 @@ describe("Groups Controller", () => {
 
   describe("removeMember", () => {
     it("should return 403 if user is not admin", async () => {
-      mockRequest = {
-        user: { id: 1, role: "USER" },
-        params: { id: "1", userId: "2" },
-      };
-
       await removeMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "USER" }),
+          params: { id: "1", userId: "2" },
+        }),
         mockResponse as Response
       );
 
@@ -441,14 +439,13 @@ describe("Groups Controller", () => {
     });
 
     it("should return 404 if membership not found", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1", userId: "2" },
-      };
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue(null);
 
       await removeMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1", userId: "2" },
+        }),
         mockResponse as Response
       );
 
@@ -456,10 +453,6 @@ describe("Groups Controller", () => {
     });
 
     it("should remove user from group", async () => {
-      mockRequest = {
-        user: { id: 1, role: "ADMIN" },
-        params: { id: "1", userId: "2" },
-      };
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
         id: 1,
       } as never);
@@ -468,7 +461,10 @@ describe("Groups Controller", () => {
       } as never);
 
       await removeMember(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: testUser({ id: 1, role: "ADMIN" }),
+          params: { id: "1", userId: "2" },
+        }),
         mockResponse as Response
       );
 
@@ -479,10 +475,8 @@ describe("Groups Controller", () => {
 
   describe("getUserGroups", () => {
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = { user: undefined };
-
       await getUserGroups(
-        mockRequest as AuthenticatedRequest,
+        authReq({ user: undefined }),
         mockResponse as Response
       );
 
@@ -491,7 +485,6 @@ describe("Groups Controller", () => {
     });
 
     it("should return user's groups when authenticated", async () => {
-      mockRequest = { user: { id: 2, role: "USER" } };
       mockPrisma.userGroupMembership.findMany.mockResolvedValue([
         {
           id: 1,
@@ -524,7 +517,7 @@ describe("Groups Controller", () => {
       ] as never);
 
       await getUserGroups(
-        mockRequest as AuthenticatedRequest,
+        authReq({ user: testUser({ id: 2, role: "USER" }) }),
         mockResponse as Response
       );
 

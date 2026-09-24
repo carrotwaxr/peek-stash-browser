@@ -4,7 +4,7 @@
  * Tests the startup initializer that checks for existing Stash instance configs
  * and migrates from environment variables when needed.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initializeStashInstances } from "../../initializers/stashInstance.js";
 import prisma from "../../prisma/singleton.js";
 

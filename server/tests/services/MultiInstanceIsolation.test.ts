@@ -10,6 +10,7 @@ import {
 } from "../../services/RecommendationScoringService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 // Mock prisma before importing service
@@ -212,23 +213,23 @@ describe("Multi-Instance Isolation", () => {
     const INST_A = "inst-a";
     const INST_B = "inst-b";
 
-    const sceneFromA = {
+    const sceneFromA = partialRow<NormalizedScene>({
       id: "scene1",
       title: "Scene A",
       instanceId: INST_A,
-      performers: [{ id: "perf1", name: "Performer 1", tags: [] }],
+      performers: [partialRow({ id: "perf1", name: "Performer 1", tags: [] })],
       studio: { id: "studio1", name: "Studio 1", tags: [] },
-      tags: [{ id: "tag1", name: "Tag 1" }],
-    } as NormalizedScene;
+      tags: [partialRow({ id: "tag1", name: "Tag 1" })],
+    });
 
-    const sceneFromB = {
+    const sceneFromB = partialRow<NormalizedScene>({
       id: "scene2",
       title: "Scene B",
       instanceId: INST_B,
-      performers: [{ id: "perf1", name: "Performer 1", tags: [] }], // same performer ID
+      performers: [partialRow({ id: "perf1", name: "Performer 1", tags: [] })], // same performer ID
       studio: { id: "studio1", name: "Studio 1", tags: [] }, // same studio ID
-      tags: [{ id: "tag1", name: "Tag 1" }],
-    } as NormalizedScene;
+      tags: [partialRow({ id: "tag1", name: "Tag 1" })],
+    });
 
     it("favorite from instance A does not boost scenes from instance B with same performer ID", () => {
       const prefs = createEmptyPrefs();

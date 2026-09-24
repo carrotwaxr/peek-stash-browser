@@ -49,6 +49,16 @@ const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 
+/** Any of the seven rating handlers; each takes its own id param. */
+type RatingHandler =
+  | typeof updateSceneRating
+  | typeof updatePerformerRating
+  | typeof updateStudioRating
+  | typeof updateTagRating
+  | typeof updateGalleryRating
+  | typeof updateGroupRating
+  | typeof updateImageRating;
+
 /** Standard mock for a successful upsert */
 const UPSERT_RESULT = {
   id: 1,
@@ -224,20 +234,16 @@ describe("Ratings Controller", () => {
   // ─── Entity access ───
 
   describe("entity access", () => {
-    const handlers: [
-      string,
-      typeof updateSceneRating,
-      string,
-      keyof typeof mockPrisma,
-    ][] = [
-      ["scene", updateSceneRating, "sceneId", "sceneRating"],
-      ["performer", updatePerformerRating, "performerId", "performerRating"],
-      ["studio", updateStudioRating, "studioId", "studioRating"],
-      ["tag", updateTagRating, "tagId", "tagRating"],
-      ["gallery", updateGalleryRating, "galleryId", "galleryRating"],
-      ["group", updateGroupRating, "groupId", "groupRating"],
-      ["image", updateImageRating, "imageId", "imageRating"],
-    ];
+    const handlers: [string, RatingHandler, string, keyof typeof mockPrisma][] =
+      [
+        ["scene", updateSceneRating, "sceneId", "sceneRating"],
+        ["performer", updatePerformerRating, "performerId", "performerRating"],
+        ["studio", updateStudioRating, "studioId", "studioRating"],
+        ["tag", updateTagRating, "tagId", "tagRating"],
+        ["gallery", updateGalleryRating, "galleryId", "galleryRating"],
+        ["group", updateGroupRating, "groupId", "groupRating"],
+        ["image", updateImageRating, "imageId", "imageRating"],
+      ];
 
     it.each(handlers)(
       "%s returns 404 and writes nothing when the user cannot see the entity",
@@ -613,7 +619,7 @@ describe("Ratings Controller", () => {
   // ─── All entity endpoints: missing ID validation ───
 
   describe("per-entity missing ID validation", () => {
-    const cases: [string, typeof updateSceneRating, string][] = [
+    const cases: [string, RatingHandler, string][] = [
       ["performer", updatePerformerRating, "Missing performerId"],
       ["studio", updateStudioRating, "Missing studioId"],
       ["tag", updateTagRating, "Missing tagId"],
@@ -637,12 +643,7 @@ describe("Ratings Controller", () => {
   // ─── All entity endpoints: successful upsert ───
 
   describe("per-entity successful operations", () => {
-    const cases: [
-      string,
-      typeof updateSceneRating,
-      string,
-      keyof typeof mockPrisma,
-    ][] = [
+    const cases: [string, RatingHandler, string, keyof typeof mockPrisma][] = [
       ["performer", updatePerformerRating, "performerId", "performerRating"],
       ["studio", updateStudioRating, "studioId", "studioRating"],
       ["tag", updateTagRating, "tagId", "tagRating"],

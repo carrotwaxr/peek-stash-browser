@@ -82,7 +82,7 @@ describe("streamLink", () => {
 
   it("rejects a tampered signature and a wrong-length one without throwing", () => {
     const sig = signStreamLink(claims, key);
-    const last = sig.at(-1) === "A" ? "B" : "A";
+    const last = sig.slice(-1) === "A" ? "B" : "A";
     const tampered = sig.slice(0, -1) + last;
     expect(isStreamLinkSignatureValid(claims, tampered, key)).toBe(false);
     expect(isStreamLinkSignatureValid(claims, sig.slice(0, 20), key)).toBe(

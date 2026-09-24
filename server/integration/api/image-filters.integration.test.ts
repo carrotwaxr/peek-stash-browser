@@ -462,7 +462,6 @@ describe("Image Filters", () => {
   describe("gallery inheritance", () => {
     it("verifies image inherits all properties from gallery", async () => {
       // Skip if no test entity configured
-      // @ts-expect-error - imageWithGalleryInheritance may not exist in older testEntities
       const imageId = TEST_ENTITIES.imageWithGalleryInheritance;
 
       if (!imageId) {
@@ -540,7 +539,6 @@ describe("Image Filters", () => {
 
     it("filters images by tag inherited from gallery", async () => {
       // Skip if no test entity configured
-      // @ts-expect-error - imageWithGalleryInheritance may not exist in older testEntities
       const imageId = TEST_ENTITIES.imageWithGalleryInheritance;
 
       if (!imageId) {
@@ -593,7 +591,6 @@ describe("Image Filters", () => {
 
     it("filters images by studio inherited from gallery", async () => {
       // Skip if no test entity configured
-      // @ts-expect-error - imageWithGalleryInheritance may not exist in older testEntities
       const imageId = TEST_ENTITIES.imageWithGalleryInheritance;
 
       if (!imageId) {
@@ -644,7 +641,6 @@ describe("Image Filters", () => {
 
     it("verifies image with own properties is not overwritten by gallery", async () => {
       // Skip if no test entity configured
-      // @ts-expect-error - imageWithOwnProperties may not exist in older testEntities
       const imageId = TEST_ENTITIES.imageWithOwnProperties;
 
       if (!imageId) {

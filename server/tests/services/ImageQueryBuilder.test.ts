@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import type { NormalizedImage } from "../../types/index.js";
+
+/**
+ * The rows the builder returns carry the user's rating columns its query
+ * selects. hydrateImages casts the raw rows to NormalizedImage, which does not
+ * declare them (item 74).
+ */
+type ImageRowWithUserData = NormalizedImage & {
+  userRating: number | null;
+  userFavorite: boolean | number | null;
+};
 
 describe("ImageQueryBuilder", () => {
   const testUserId = 9999;
@@ -478,9 +489,10 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.images).toHaveLength(2);
 
-      const img1 = result.images.find((i: any) => i.id === "999001");
-      expect(img1.userRating).toBe(90);
-      expect(img1.userFavorite).toBeTruthy(); // SQLite may return 1 or true
+      const images = result.images as ImageRowWithUserData[];
+      const img1 = images.find((i: any) => i.id === "999001");
+      expect(img1?.userRating).toBe(90);
+      expect(img1?.userFavorite).toBeTruthy(); // SQLite may return 1 or true
     });
 
     afterEach(async () => {

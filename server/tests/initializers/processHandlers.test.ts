@@ -100,6 +100,9 @@ describe("processHandlers", () => {
 
   describe("installProcessHandlers", () => {
     const events = ["unhandledRejection", "uncaughtException"] as const;
+    // process.listeners() is typed one event name at a time; the plain
+    // EventEmitter signature takes either name from `events`.
+    const emitter: NodeJS.EventEmitter = process;
     let before: Record<(typeof events)[number], Function[]>;
 
     beforeEach(() => {
@@ -111,7 +114,7 @@ describe("processHandlers", () => {
 
     afterEach(() => {
       for (const event of events) {
-        for (const listener of process.listeners(event)) {
+        for (const listener of emitter.listeners(event)) {
           if (!before[event].includes(listener)) {
             process.removeListener(
               event,
@@ -126,7 +129,7 @@ describe("processHandlers", () => {
       installProcessHandlers();
 
       for (const event of events) {
-        const added = process
+        const added = emitter
           .listeners(event)
           .filter((listener) => !before[event].includes(listener));
         expect(added).toHaveLength(1);

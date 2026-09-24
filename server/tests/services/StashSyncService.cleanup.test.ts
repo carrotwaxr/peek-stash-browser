@@ -175,7 +175,7 @@ describe("StashSyncService Cleanup", () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (cb: unknown) =>
       (cb as (tx: typeof prisma) => unknown)(prisma)
     );
-    vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(undefined);
+    vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(0);
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
   });
 

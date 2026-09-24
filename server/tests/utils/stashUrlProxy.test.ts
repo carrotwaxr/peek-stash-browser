@@ -40,6 +40,33 @@ const STASH_HOST = "http://stash-server:9999";
 /** Build a typical Stash image URL */
 const stashUrl = (path: string) => `${STASH_HOST}${path}`;
 
+/**
+ * Inputs typed as each transform's own constraint (plus the fields a test
+ * reads back), so a result exposes every field the transform may set.
+ */
+type ImageEntityInput = Parameters<typeof transformPerformer>[0] & {
+  id: string;
+};
+type SceneInput = Parameters<typeof transformScene>[0] & {
+  id: string;
+  title: string;
+};
+type GroupInput = Parameters<typeof transformGroup>[0] & {
+  id: string;
+  name?: string;
+};
+
+/**
+ * transformScene flattens each `{ group, scene_index }` into
+ * `{ ...group, scene_index }`; its declared return type (the input's) does not
+ * show that.
+ */
+type FlattenedSceneGroup = {
+  front_image_path?: string | null;
+  back_image_path?: string | null;
+  scene_index?: number | null;
+};
+
 /** Extract the decoded `path` query param from a proxy URL */
 const decodedPath = (proxyUrl: string): string => {
   const match = proxyUrl.match(/\?path=(.+)$/);
@@ -257,7 +284,7 @@ describe("stashUrlProxy", () => {
     });
 
     it("does not crash with no tags array", () => {
-      const performer = {
+      const performer: ImageEntityInput = {
         id: "1",
         image_path: stashUrl("/performer/1/image"),
       };
@@ -345,7 +372,7 @@ describe("stashUrlProxy", () => {
     });
 
     it("does not crash with no tags array", () => {
-      const studio = {
+      const studio: ImageEntityInput = {
         id: "s1",
         image_path: stashUrl("/studio/s1/image"),
       };
@@ -502,9 +529,8 @@ describe("stashUrlProxy", () => {
       const result = transformScene(makeScene());
 
       for (const [key, val] of Object.entries(result.paths!)) {
-        expect(val).toMatch(
-          /^\/api\/proxy\/stash\?path=/,
-          `paths.${key} should be proxied`
+        expect(val, `paths.${key} should be proxied`).toMatch(
+          /^\/api\/proxy\/stash\?path=/
         );
       }
     });
@@ -686,7 +712,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(makeScene());
 
       // Groups should be flattened from { group: {...}, scene_index } to { ...groupFields, scene_index }
-      const group = result.groups![0];
+      const group = (result.groups! as FlattenedSceneGroup[])[0];
       expect(group.front_image_path).toMatch(/^\/api\/proxy\/stash/);
       expect(group.back_image_path).toMatch(/^\/api\/proxy\/stash/);
     });
@@ -780,7 +806,7 @@ describe("stashUrlProxy", () => {
     // --- Minimal scene (all optional fields missing) ---
 
     it("handles a minimal scene with no optional fields", () => {
-      const minimal = { id: "1", title: "Minimal" };
+      const minimal: SceneInput = { id: "1", title: "Minimal" };
       const result = transformScene(minimal);
 
       expect(result.id).toBe("1");
@@ -926,7 +952,7 @@ describe("stashUrlProxy", () => {
     });
 
     it("handles missing image paths", () => {
-      const group = { id: "g1", name: "Group" };
+      const group: GroupInput = { id: "g1", name: "Group" };
       const result = transformGroup(group);
       expect(result.front_image_path).toBeUndefined();
       expect(result.back_image_path).toBeUndefined();
@@ -958,7 +984,7 @@ describe("stashUrlProxy", () => {
     });
 
     it("handles missing studio", () => {
-      const group = {
+      const group: GroupInput = {
         id: "g1",
         front_image_path: stashUrl("/group/g1/front"),
       };
@@ -994,7 +1020,7 @@ describe("stashUrlProxy", () => {
     });
 
     it("handles missing tags", () => {
-      const group = {
+      const group: GroupInput = {
         id: "g1",
         front_image_path: stashUrl("/group/g1/front"),
       };

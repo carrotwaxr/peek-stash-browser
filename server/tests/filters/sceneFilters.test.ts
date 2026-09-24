@@ -68,6 +68,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by specific IDs", async () => {
       const targetIds = ["scene_0", "scene_5", "scene_10"];
       const filter: PeekSceneFilter = {
+        // @ts-expect-error legacy array shape; the live API sends { value, modifier } (item 73)
         ids: targetIds,
       };
 
@@ -79,6 +80,7 @@ describe("Scene Filters - Quick Filters", () => {
 
     it("should return empty array when no scenes match IDs", async () => {
       const filter: PeekSceneFilter = {
+        // @ts-expect-error legacy array shape; the live API sends { value, modifier } (item 73)
         ids: ["nonexistent_1", "nonexistent_2"],
       };
 
@@ -435,7 +437,8 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneDate = new Date(scene.created_at);
+        // A scene without a date fails the bound
+        const sceneDate = new Date(scene.created_at ?? NaN);
         expect(sceneDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });
@@ -454,7 +457,8 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneDate = new Date(scene.created_at);
+        // A scene without a date fails the bound
+        const sceneDate = new Date(scene.created_at ?? NaN);
         expect(sceneDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(sceneDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
@@ -472,7 +476,8 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneDate = new Date(scene.updated_at);
+        // A scene without a date fails the bound
+        const sceneDate = new Date(scene.updated_at ?? NaN);
         expect(sceneDate.getTime()).toBeLessThan(threshold.getTime());
       });
     });
@@ -485,9 +490,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "landscape_1",
         files: [
           {
-            id: "file_landscape",
             path: "/path/to/landscape.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -495,8 +499,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -504,9 +506,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "portrait_1",
         files: [
           {
-            id: "file_portrait",
             path: "/path/to/portrait.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -514,8 +515,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1280,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -523,9 +522,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "square_1",
         files: [
           {
-            id: "file_square",
             path: "/path/to/square.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -533,8 +531,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -561,9 +557,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "landscape_1",
         files: [
           {
-            id: "file_landscape",
             path: "/path/to/landscape.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -571,8 +566,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -580,9 +573,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "portrait_1",
         files: [
           {
-            id: "file_portrait",
             path: "/path/to/portrait.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -590,8 +582,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1280,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -599,9 +589,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "square_1",
         files: [
           {
-            id: "file_square",
             path: "/path/to/square.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -609,8 +598,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -637,9 +624,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "landscape_1",
         files: [
           {
-            id: "file_landscape",
             path: "/path/to/landscape.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -647,8 +633,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -656,9 +640,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "portrait_1",
         files: [
           {
-            id: "file_portrait",
             path: "/path/to/portrait.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -666,8 +649,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1280,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -675,9 +656,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "square_1",
         files: [
           {
-            id: "file_square",
             path: "/path/to/square.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -685,8 +665,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -713,9 +691,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "landscape_1",
         files: [
           {
-            id: "file_landscape",
             path: "/path/to/landscape.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -723,8 +700,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -732,9 +707,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "portrait_1",
         files: [
           {
-            id: "file_portrait",
             path: "/path/to/portrait.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -742,8 +716,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1280,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -751,9 +723,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "square_1",
         files: [
           {
-            id: "file_square",
             path: "/path/to/square.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -761,8 +732,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -798,9 +767,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "landscape_1",
         files: [
           {
-            id: "file_landscape",
             path: "/path/to/landscape.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -808,8 +776,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -817,9 +783,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "portrait_1",
         files: [
           {
-            id: "file_portrait",
             path: "/path/to/portrait.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -827,8 +792,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1280,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -836,9 +799,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "square_1",
         files: [
           {
-            id: "file_square",
             path: "/path/to/square.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -846,8 +808,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -874,7 +834,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        expect(scene.title.toLowerCase()).toContain(searchTerm.toLowerCase());
+        expect(scene.title?.toLowerCase()).toContain(searchTerm.toLowerCase());
       });
     });
 
@@ -887,7 +847,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        expect(scene.title.toLowerCase()).not.toContain(
+        expect(scene.title?.toLowerCase()).not.toContain(
           searchTerm.toLowerCase()
         );
       });
@@ -902,7 +862,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        expect(scene.title.toLowerCase()).toBe(exactTitle.toLowerCase());
+        expect(scene.title?.toLowerCase()).toBe(exactTitle.toLowerCase());
       });
     });
 
@@ -929,9 +889,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_720p",
         files: [
           {
-            id: "file_720p",
             path: "/path/to/720p.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -939,8 +898,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 720,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -948,9 +905,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_1080p",
         files: [
           {
-            id: "file_1080p",
             path: "/path/to/1080p.mp4",
-            size: "2000000000",
+            size: 2000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -958,8 +914,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 8000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -984,9 +938,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_720p",
         files: [
           {
-            id: "file_720p",
             path: "/path/to/720p.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -994,8 +947,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 720,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1003,9 +954,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_1080p",
         files: [
           {
-            id: "file_1080p",
             path: "/path/to/1080p.mp4",
-            size: "2000000000",
+            size: 2000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1013,8 +963,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 8000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1039,9 +987,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_480p",
         files: [
           {
-            id: "file_480p",
             path: "/path/to/480p.mp4",
-            size: "500000000",
+            size: 500000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1049,8 +996,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 480,
             frame_rate: 30,
             bit_rate: 2500000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1058,9 +1003,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_720p",
         files: [
           {
-            id: "file_720p",
             path: "/path/to/720p.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1068,8 +1012,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 720,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1077,9 +1019,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_1080p",
         files: [
           {
-            id: "file_1080p",
             path: "/path/to/1080p.mp4",
-            size: "2000000000",
+            size: 2000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1087,8 +1028,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 8000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1116,9 +1055,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_480p",
         files: [
           {
-            id: "file_480p",
             path: "/path/to/480p.mp4",
-            size: "500000000",
+            size: 500000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1126,8 +1064,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 480,
             frame_rate: 30,
             bit_rate: 2500000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1135,9 +1071,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_720p",
         files: [
           {
-            id: "file_720p",
             path: "/path/to/720p.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1145,8 +1080,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 720,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1154,9 +1087,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_1080p",
         files: [
           {
-            id: "file_1080p",
             path: "/path/to/1080p.mp4",
-            size: "2000000000",
+            size: 2000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1164,8 +1096,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 1080,
             frame_rate: 30,
             bit_rate: 8000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1193,9 +1123,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_360p",
         files: [
           {
-            id: "file_360p",
             path: "/path/to/360p.mp4",
-            size: "300000000",
+            size: 300000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1203,8 +1132,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 360,
             frame_rate: 30,
             bit_rate: 1500000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1212,9 +1139,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_480p",
         files: [
           {
-            id: "file_480p",
             path: "/path/to/480p.mp4",
-            size: "500000000",
+            size: 500000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1222,8 +1148,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 480,
             frame_rate: 30,
             bit_rate: 2500000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1231,9 +1155,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_4k",
         files: [
           {
-            id: "file_4k",
             path: "/path/to/4k.mp4",
-            size: "5000000000",
+            size: 5000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1241,8 +1164,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 2160,
             frame_rate: 60,
             bit_rate: 20000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1287,9 +1208,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_no_height",
         files: [
           {
-            id: "file_no_height",
             path: "/path/to/noheight.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1297,8 +1217,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 0,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });
@@ -1306,9 +1224,8 @@ describe("Scene Filters - Quick Filters", () => {
         id: "scene_720p",
         files: [
           {
-            id: "file_720p",
             path: "/path/to/720p.mp4",
-            size: "1000000000",
+            size: 1000000000,
             duration: 3600,
             video_codec: "h264",
             audio_codec: "aac",
@@ -1316,8 +1233,6 @@ describe("Scene Filters - Quick Filters", () => {
             height: 720,
             frame_rate: 30,
             bit_rate: 5000000,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           },
         ],
       });

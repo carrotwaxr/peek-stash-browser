@@ -297,8 +297,8 @@ describe("User Groups API", () => {
       expect(member.user.role).toBeDefined();
       expect(member.joinedAt).toBeDefined();
       // Ensure old flat shape is NOT present
-      expect((member as Record<string, unknown>).userId).toBeUndefined();
-      expect((member as Record<string, unknown>).username).toBeUndefined();
+      expect(member).not.toHaveProperty("userId");
+      expect(member).not.toHaveProperty("username");
     });
 
     it("returns 404 for non-existent group", async () => {
