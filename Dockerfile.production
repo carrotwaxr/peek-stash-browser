@@ -84,17 +84,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl \
     && rm -f /etc/nginx/sites-enabled/default
 
+# App user, created as 99:100 (unRAID nobody:users, the PUID/PGID defaults).
+# docker/entrypoint.sh remaps it when PUID/PGID differ.
+RUN userdel --remove node \
+    && groupadd --non-unique --gid 100 peek \
+    && useradd --system --uid 99 --gid 100 --home-dir /home/peek --create-home --shell /usr/sbin/nologin peek
+
 WORKDIR /app
 
-# Copy package files
-COPY server/package*.json ./
+# Copy package file
+COPY server/package.json ./
 
 # Copy pruned node_modules from build stage (already has prisma client generated)
 COPY --from=backend-build /app/server/node_modules ./node_modules
 
-# Replace file: symlink with actual shared-types package
-# (npm ci creates a symlink to ../../../shared which resolves differently between stages)
-COPY --from=backend-build /app/shared ./node_modules/@peek/shared-types
+# Only the built shared types: the whole /app/shared carried shared/node_modules/typescript (~23 MB)
+COPY --from=backend-build /app/shared/package.json ./node_modules/@peek/shared-types/package.json
+COPY --from=backend-build /app/shared/dist ./node_modules/@peek/shared-types/dist
 
 # Copy Prisma schema and migrations (for runtime migrations)
 COPY server/prisma/schema.prisma ./prisma/
@@ -106,28 +112,39 @@ COPY --from=backend-build /app/server/dist ./backend/
 # Copy built frontend from build stage
 COPY --from=frontend-build /app/client/dist ./frontend/
 
-# Copy nginx configuration and startup script
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+# nginx main config, entrypoint (root: maps the user, starts nginx) and start script (app user)
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY --chmod=0755 docker/entrypoint.sh docker/start.sh /app/
 
-# Create directories for database and temp files
-RUN mkdir -p /app/data /app/data/tmp
+# Check the nginx config, then create the data directory owned by the app user
+RUN mkdir -p /tmp/nginx && nginx -t -e stderr -g "user peek peek;" && rm -rf /tmp/nginx \
+    && mkdir -p /app/data/tmp && chown -R peek:peek /app/data
 
 # Expose port 80
 EXPOSE 80
 
-# Set environment variables
+# Set environment variables. CHECKPOINT_DISABLE stops the Prisma CLI's update
+# check from writing to $HOME/.cache.
 ENV DATABASE_URL="file:/app/data/peek-stash-browser.db" \
     NODE_ENV="production" \
-    NODE_OPTIONS="--max-old-space-size=2048"
+    NODE_OPTIONS="--max-old-space-size=2048" \
+    PUID=99 \
+    PGID=100 \
+    CHECKPOINT_DISABLE=1 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Health check
+# Health check: proves Node answers through nginx (no database query)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+    CMD curl -fsS --max-time 8 http://127.0.0.1/api/health > /dev/null || exit 1
 
 # Create volumes for persistence
 VOLUME ["/app/data"]
 
-# Start the combined application
+# No USER line: the entrypoint needs root to map PUID/PGID and start nginx,
+# then runs start.sh as the app user
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["/app/start.sh"]
+
+# Last, so a new date invalidates no earlier layer
+ARG BUILD_DATE
+ENV BUILD_DATE=${BUILD_DATE}

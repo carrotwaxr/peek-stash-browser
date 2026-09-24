@@ -46,7 +46,7 @@ Before major upgrades, back up your database. Your Peek database is a single SQL
 !!! tip "Hot Backup (While Running)"
     If you can't stop the container:
     ```bash
-    docker exec peek-stash-browser sqlite3 /app/data/peek-stash-browser.db ".backup '/app/data/backup.db'"
+    docker exec -u peek peek-stash-browser sqlite3 /app/data/peek-stash-browser.db ".backup '/app/data/backup.db'"
     docker cp peek-stash-browser:/app/data/backup.db ./peek-stash-browser.db.backup
     ```
 
@@ -67,6 +67,18 @@ docker start peek-stash-browser
 ---
 
 ## Version Notes
+
+### Version 3.3.7
+
+**Migration:** Automatic. Peek no longer runs as root.
+
+- On first start, Peek gives `/app/data` to `PUID:PGID`, default `99:100` (unRAID's `nobody:users`), then runs the server as that user. If you manage a bind-mounted data directory from the host, set `PUID`/`PGID` to your own IDs (`id -u`, `id -g`). See [File ownership](installation.md#file-ownership-puidpgid).
+- If the data directory cannot change owner and `PUID:PGID` cannot write to it, the container stops and says why (`/app/data is not writable by UID:GID`):
+    - **NFS with root squash**: set `PUID`/`PGID` to the owner that `ls -ln` shows for the directory.
+    - **SMB/CIFS**: ownership comes from the mount options. Set `PUID`/`PGID` to the `uid=` and `gid=` of the mount.
+    - **Rootless Docker or Podman**: set `PUID=0`. Peek then runs as the container's root, which is your own user on the host, and logs a warning.
+- `docker run --user` (or `user:` in Compose) is refused. Remove it and set `PUID`/`PGID`. It never worked before.
+- **unRAID:** edit the container and remove the `DATABASE_URL` and `CONFIG_DIR` variables. Both were misleading: the database was always `/app/data/peek-stash-browser.db`, and a leftover `DATABASE_URL` logs a warning until you remove it. Keep `CONFIG_DIR` only if you pointed it outside `/app/data` on purpose: backups, download zips and `.jwt-secret` live there, and Peek gives that directory to `PUID:PGID` as well.
 
 ### Version 3.1.0
 

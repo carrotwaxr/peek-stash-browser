@@ -1,9 +1,6 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { getClipsForScene } from "../controllers/clips.js";
 import {
   proxyClipPreview,
@@ -47,11 +44,8 @@ import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import { logger } from "../utils/logger.js";
 import { authenticated } from "../utils/routeHelpers.js";
+import { getBuildDate, getServerVersion } from "../utils/serverVersion.js";
 import { resolveTrustProxy } from "../utils/trustProxy.js";
-
-// ES module equivalent of __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export const setupAPI = () => {
   const app = express();
@@ -69,39 +63,20 @@ export const setupAPI = () => {
   app.use(express.json()); // Add JSON body parsing for POST/PUT requests
   app.use(cookieParser()); // Parse cookies for JWT
 
-  // Health check endpoint (no auth required)
+  // Health check (no auth). Proves Node answers through nginx and nothing
+  // more: no database query, per the homelab health-check convention.
   app.get("/api/health", (req, res) => {
     res.json({
       status: "healthy",
+      version: getServerVersion(),
+      buildDate: getBuildDate(),
       timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || "1.0.0",
     });
   });
 
   // Version endpoint (no auth required)
   app.get("/api/version", (req, res) => {
-    // Read version from package.json (use process.cwd() for reliable path resolution)
-    const packagePath = path.join(process.cwd(), "package.json");
-
-    let version = "1.0.0";
-    try {
-      const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
-        version?: string;
-      };
-      version = packageJson.version ?? version;
-    } catch (err) {
-      logger.error("Failed to read package.json version:", {
-        error: err,
-        packagePath,
-        cwd: process.cwd(),
-        __dirname,
-      });
-    }
-
-    res.json({
-      server: version,
-      buildDate: process.env.BUILD_DATE || new Date().toISOString(),
-    });
+    res.json({ server: getServerVersion(), buildDate: getBuildDate() });
   });
 
   // Server stats endpoint (admin only - authenticated)

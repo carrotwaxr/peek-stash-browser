@@ -50,8 +50,10 @@ https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-temp
 1. Go to Docker tab → Add Container
 2. Select "Peek" from User Templates dropdown
 3. Configure required settings:
-   - **JWT Secret**: Generate with `openssl rand -hex 32` in unRAID terminal
    - **App Data Directory**: Path for Peek data (e.g., `/mnt/user/appdata/peek-stash-browser`)
+   - Under "Show more settings" (advanced, all optional):
+     - **JWT Secret Key**: leave empty and Peek generates one in `/app/data/.jwt-secret` on first start
+     - **PUID** / **PGID**: the user and group that own the App Data Directory. They default to `99` and `100` (unRAID's `nobody:users`), which suits a folder under `/mnt/user/appdata`. See [File ownership](#file-ownership-puidpgid)
 4. Click Apply
 5. Access at `http://your-unraid-ip:6969`
 6. Complete the Setup Wizard to connect to your Stash server
@@ -88,6 +90,24 @@ docker run -d \
 **Environment Variables**: none are required.
 
 - `JWT_SECRET` (optional) - Signs login sessions. When unset, Peek generates one on first start and keeps it in `/app/data/.jwt-secret`
+- `PUID` / `PGID` (optional) - The user and group that own `/app/data`, default `99` and `100`. See [File ownership](#file-ownership-puidpgid)
+
+!!! tip "Bind mounts you manage from the host"
+    If you mount a host directory instead of a named volume (`-v /home/you/peek:/app/data`), add `-e PUID=$(id -u) -e PGID=$(id -g)` to the `docker run` command so the files stay owned by you. In Docker Compose, the same goes under `environment:`:
+
+    ```yaml
+    services:
+      peek:
+        image: carrotwaxr/peek-stash-browser:latest
+        ports:
+          - "6969:80"
+        volumes:
+          - /home/you/peek:/app/data
+        environment:
+          - PUID=1000 # the output of id -u
+          - PGID=1000 # the output of id -g
+        restart: unless-stopped
+    ```
 
 > **Note**: Stash URL and API key are configured via the Setup Wizard on first access - no environment variables needed!
 
@@ -186,6 +206,18 @@ docker pull carrotwaxr/peek-stash-browser:latest
 
 !!! success "Data persists across updates!"
     Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
+
+## File ownership (PUID/PGID)
+
+Peek does not run as root. The container starts as root only long enough to set up its app user, then runs the server as `PUID:PGID`:
+
+- `PUID` and `PGID` default to `99` and `100`, unRAID's `nobody:users`. With a named volume, nothing else is needed.
+- On every start, the entrypoint gives `/app/data` to `PUID:PGID`. It changes only files with a different owner, so later starts are quick, and it keeps file modes (`0600` on `.jwt-secret`).
+- If you set `CONFIG_DIR` to a directory outside `/app/data`, that directory is given to `PUID:PGID` too.
+- nginx's master process stays root to listen on port 80; its workers run as `PUID:PGID`.
+- If the data directory cannot change owner (NFS with root squash, SMB/CIFS, a read-only mount) and `PUID:PGID` cannot write to it, the container stops with `[entrypoint] ERROR: /app/data is not writable by UID:GID`. Set `PUID`/`PGID` to the owner that `ls -ln` shows for the directory.
+- `PUID=0` keeps the server running as root. Use it only where the data directory cannot change owner, such as rootless Docker or Podman. Peek logs a warning at every start.
+- `docker run --user` (or `user:` in Compose) is refused: the container exits with `this image manages its own user`. Remove it and set `PUID`/`PGID` instead.
 
 ## First Access & Setup Wizard
 

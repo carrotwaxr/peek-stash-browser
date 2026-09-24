@@ -72,8 +72,11 @@ These settings have sensible defaults but can be customized:
 | Variable             | Description                | Default                                | Notes                        |
 | -------------------- | -------------------------- | -------------------------------------- | ---------------------------- |
 | `JWT_SECRET`         | Signs login sessions       | Generated on first start, kept in `/app/data/.jwt-secret` | Set it only to control the value. Values copied from examples in these docs are ignored, with a warning in the log |
-| `DATABASE_URL`       | SQLite database file       | `file:/app/data/peek-stash-browser.db` | Path inside container        |
-| `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database location            |
+| `DATABASE_URL`       | SQLite database file       | `file:/app/data/peek-stash-browser.db` | Fixed in the Docker image; ignored with a warning if set |
+| `CONFIG_DIR`         | Where backups and download zips go | `/app/data`                    | The database stays in `/app/data`. A directory outside `/app/data` is given to `PUID:PGID` on start |
+| `PUID`               | User that owns `/app/data` and runs the server | `99` (unRAID's `nobody`) | See [File ownership](installation.md#file-ownership-puidpgid). `0` runs as root, with a warning |
+| `PGID`               | Group that owns `/app/data` | `100` (unRAID's `users`)              | See [File ownership](installation.md#file-ownership-puidpgid) |
+| `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE` |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 | `TRUST_PROXY`        | Reverse proxies in front of Peek | Unset (trusts only the image's own nginx) | Set to the number of reverse proxies between browsers and Peek. See [Behind a reverse proxy](#behind-a-reverse-proxy) |
@@ -252,9 +255,12 @@ When `PROXY_AUTH_HEADER` is set but the header is not present in a request, Peek
 ### Complete Production Configuration
 
 ```bash
-# Database (Optional - defaults shown)
-DATABASE_URL=file:/app/data/peek-stash-browser.db
+# Backups and download zips (Optional - default shown)
 CONFIG_DIR=/app/data
+
+# File ownership (Optional - defaults shown)
+PUID=99
+PGID=100
 
 # Security (Optional)
 SECURE_COOKIES=true
