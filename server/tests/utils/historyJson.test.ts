@@ -62,6 +62,11 @@ describe("readHistory", () => {
       expect(readHistory([session(A), B, session(C)])).toEqual([A, B, C]);
     });
 
+    it("falls back to an entry's time when its startTime is empty", () => {
+      expect(readHistory([{ startTime: "", time: A }, B])).toEqual([A, B]);
+      expect(readHistory([{ startTime: "", time: "" }, B])).toEqual([B]);
+    });
+
     it("falls back to an entry's time when it has no startTime", () => {
       expect(readHistory([{ time: A }, B])).toEqual([A, B]);
     });
