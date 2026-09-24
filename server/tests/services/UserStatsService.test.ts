@@ -8,9 +8,11 @@
  * - Composite key behavior (performerId + instanceId)
  * - Edge cases: missing instanceId, empty string fallback
  */
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { logger } from "../../utils/logger.js";
 
 // Hoist mock functions so they can be referenced in vi.mock factories
 const { mockGetScene, mockGetScenesByIdsWithRelations } = vi.hoisted(() => ({
@@ -313,8 +315,71 @@ describe("UserStatsService", () => {
 
       // Should not throw
       await expect(
-        userStatsService.updateStatsForScene(1, "scene-1", 0, 1)
+        userStatsService.updateStatsForScene(
+          1,
+          "scene-1",
+          0,
+          1,
+          undefined,
+          undefined,
+          "inst-a"
+        )
       ).resolves.toBeUndefined();
+      expect(logger.error).toHaveBeenCalledWith(
+        "Error updating stats for scene",
+        expect.objectContaining({
+          userId: 1,
+          sceneId: "scene-1",
+          instanceId: "inst-a",
+          oCountDelta: 0,
+          playCountDelta: 1,
+          error: "DB error",
+        })
+      );
+    });
+
+    it("logs a failed stats write with its entity and still makes the others", async () => {
+      mockGetScene.mockResolvedValue({
+        id: "scene-1",
+        performers: [{ id: "perf-1", name: "Jane" }],
+        studio: { id: "studio-1", name: "Studio A" },
+        tags: [{ id: "tag-1", name: "Tag A" }],
+      });
+      mockPrisma.userStudioStats.upsert.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Foreign key failed", {
+          code: "P2003",
+          clientVersion: "test",
+        })
+      );
+
+      await expect(
+        userStatsService.updateStatsForScene(
+          1,
+          "scene-1",
+          1,
+          0,
+          undefined,
+          new Date(),
+          "inst-a"
+        )
+      ).resolves.toBeUndefined();
+
+      expect(mockPrisma.userPerformerStats.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.userTagStats.upsert).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        "Error updating stats for scene",
+        expect.objectContaining({
+          userId: 1,
+          sceneId: "scene-1",
+          instanceId: "inst-a",
+          entityType: "studio",
+          entityId: "studio-1",
+          oCountDelta: 1,
+          playCountDelta: 0,
+          code: "P2003",
+        })
+      );
     });
   });
 
