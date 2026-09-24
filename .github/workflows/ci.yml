@@ -214,16 +214,13 @@ jobs:
     with:
       browser-checks: true
 
-  # Integration tests require access to a Stash test instance on the local network.
-  # This job only runs on self-hosted runners with network access to the test server.
-  # To enable: add a self-hosted runner on the same network as the Stash test instance,
-  # configure STASH_TEST_URL and STASH_TEST_API_KEY as repository secrets,
-  # and change 'if: false' to 'if: true' (or use a different condition).
+  # Integration tests run against a synthetic replay of the test Stash
+  # (server/integration/stash-replay), served on localhost: no secrets and no
+  # network, so pull requests from forks run them too.
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    if: false # Disabled until self-hosted runner or VPN is configured
-    needs: [server]
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: server
@@ -235,15 +232,29 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            shared/package-lock.json
 
       - run: npm ci
+
+      - name: Build shared types
+        working-directory: shared
+        run: npm ci && npm run build
 
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run Integration Tests
-        run: npm run test:integration
-        env:
-          STASH_TEST_URL: ${{ secrets.STASH_TEST_URL }}
-          STASH_TEST_API_KEY: ${{ secrets.STASH_TEST_API_KEY }}
+      - name: Integration tests (replayed Stash)
+        run: npm run test:integration:replay
+
+      - name: No skipped or failed tests
+        run: node -e "const s=require('./integration/results/summary.json'); console.log(s); if (s.failed !== 0 || s.skipped !== 0) process.exit(1)"
+
+      - name: Upload integration results
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: integration-results
+          path: server/integration/results/
+          retention-days: 14

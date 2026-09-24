@@ -65,7 +65,7 @@ Expected: Each exits 0 (no high or critical advisory in runtime dependencies)
 ### 2e. E2E Tests (CI: `E2E Tests`)
 Covered by Step 0: CI ran the suite on this commit.
 
-### 2f. Integration Tests (CI: `Integration Tests`, skipped there: CI has no test Stash)
+### 2f. Integration Tests (CI: `Integration Tests`)
 ```bash
 (cd server && npm run test:integration:replay)
 ```
