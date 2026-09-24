@@ -18,6 +18,8 @@ import {
   signStreamLink,
 } from "../../utils/streamLink.js";
 
+const _probe: number = "x";
+
 vi.mock("../../utils/jwtSecret.js", () => ({
   getJwtSecret: vi.fn().mockReturnValue("test-secret"),
 }));
