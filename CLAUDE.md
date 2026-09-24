@@ -9,7 +9,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - Test: `npm run test:run` in `client/` and `server/` (`npm test` starts watch mode in a terminal)
 - Coverage gate: `npm run test:coverage` in both; CI enforces the thresholds in each `vitest.config`
 - Integration, in `server/`: `npm run test:integration:replay` runs against the synthetic replay of the test Stash and needs no setup. `npm run test:integration` runs against the live test Stash (`STASH_TEST_*` in the root `.env`; `STASH_URL` only with `ALLOW_PROD_STASH=1` in the shell). From the root, `npm run fixtures:generate` rebuilds the fixture offline after a query change; `npm run fixtures:record` (owner) re-records after the test Stash changes. `-- --check` reports drift.
-- E2E: `npm run test:e2e` from the root, against the running compose stack
+- E2E: `npm run test:e2e` from the root. It is hermetic: it starts a Stash replay, its own server and client, and a throwaway database, on ports 9100/8100/5180 beside the dev stack. `E2E_BASE_URL=http://localhost:6969` runs it against the dev stack for manual runs on real data, as a throwaway run admin deleted afterwards; `.env.e2e` then names the bootstrap admin that creates it.
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
 - Types: `cd server && npm run typecheck` (source, then tests) and `cd client && npm run typecheck` (CI runs both)
@@ -34,4 +34,4 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - A filter or restriction also matches another instance's entities: the value was parsed to a bare ID and the instance dropped (#390, #437).
 - The dev server runs code with a TypeScript error: tsx strips types without checking them, so only `cd server && npx tsc --noEmit` (also run in CI) reports it. After a schema change, a Prisma `Invalid ... invocation` error ending in `Unknown argument` is the container's stale Prisma client: `docker compose restart peek-server` regenerates it (a host `npx prisma generate` does not reach the container's `node_modules`).
 - A replay run fails with "stash-replay cannot answer …": the message names the operation and the field. Run the command it gives.
-- E2E logins fail for 15 minutes after a few bad attempts: the account lockout lives in server memory. `docker compose restart peek-server` clears it.
+- In dev-stack E2E runs (`E2E_BASE_URL`), logins fail for 15 minutes after a few bad attempts: the account lockout lives in server memory. `docker compose restart peek-server` clears it.

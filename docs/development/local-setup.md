@@ -87,6 +87,8 @@ DATABASE_URL=file:./data/peek-db.db
 # Optional
 NODE_ENV=development
 LOG_LEVEL=debug
+# Development and tests only; the Docker image's nginx expects 8000
+PEEK_SERVER_PORT=8000
 # JWT_SECRET is optional: when unset, Peek generates one into CONFIG_DIR
 # (default /app/data). Outside Docker, set CONFIG_DIR to a writable folder
 # or set JWT_SECRET.
@@ -150,6 +152,36 @@ npm test
 ### Integration Tests
 
 `cd server && npm run test:integration:replay` runs the integration tests against a synthetic replay of the test Stash, with no setup. `npm run test:integration` runs them against a live test Stash (`STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env`). See the [Regression Testing Guide](regression-testing.md) for manual checks.
+
+### End-to-end tests
+
+The Playwright suite lives in `e2e/`. Before the first run:
+
+```bash
+npm ci                                # root: Playwright
+(cd client && npm ci)
+(cd server && npm ci && npx prisma generate)
+(cd shared && npm ci && npm run build)
+npx playwright install chromium
+```
+
+`npm run test:e2e` from the root is hermetic, locally and in CI. Playwright starts its own server and Vite client beside the dev stack, on a throwaway database (in `/dev/shm` when it exists) that is replaced at every run, and signs in as that database's only admin. The dev stack can keep running, and nothing the suite does reaches it or a real Stash.
+
+`E2E_BASE_URL=http://localhost:6969 npm run test:e2e` runs the suite against the dev stack instead, for manual runs on real data. Nothing is started. `.env.e2e` in the root (gitignored) names an admin of that stack:
+
+```bash
+E2E_USERNAME=your-admin
+E2E_PASSWORD=your-password
+```
+
+That account only creates a throwaway admin for the run (`e2e-<run id>-admin`) and deletes it afterwards, with the users and groups the run created. No test signs in as it.
+
+| Variable          | Default                       | Purpose                                          |
+| ----------------- | ----------------------------- | ------------------------------------------------ |
+| `E2E_SERVER_PORT` | `8100`                        | The hermetic run's server                        |
+| `E2E_CLIENT_PORT` | `5180`                        | The hermetic run's Vite client                   |
+| `E2E_TMP_DIR`     | `/dev/shm`, else the temp dir | Where the run's database directory is created    |
+| `E2E_BASE_URL`    | unset                         | Set: dev-stack mode against the Peek at this URL |
 
 ## Debugging
 

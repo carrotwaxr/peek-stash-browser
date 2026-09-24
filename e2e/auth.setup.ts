@@ -1,4 +1,5 @@
 import { expect, request, test as setup } from "@playwright/test";
+import { mustOk } from "./global-setup";
 
 const AUTH_FILE = "e2e/.auth/user.json";
 
@@ -11,12 +12,17 @@ const AUTH_FILE = "e2e/.auth/user.json";
  * filling (special characters in passwords can behave differently in
  * headed vs headless mode).
  *
- * Credentials come from environment variables (E2E_USERNAME / E2E_PASSWORD)
- * or fall back to the default admin account.
+ * It signs in as the run admin that global setup created and named in
+ * E2E_ADMIN_USERNAME and E2E_ADMIN_PASSWORD, never as a real account.
  */
 setup("authenticate", async ({ page, baseURL }) => {
-  const username = process.env.E2E_USERNAME || "admin";
-  const password = process.env.E2E_PASSWORD || "admin123";
+  const username = process.env.E2E_ADMIN_USERNAME;
+  const password = process.env.E2E_ADMIN_PASSWORD;
+  if (!username || !password) {
+    throw new Error(
+      "E2E_ADMIN_USERNAME and E2E_ADMIN_PASSWORD are unset: global setup (e2e/global-setup.ts) sets them"
+    );
+  }
 
   // Login via API to get the auth cookie reliably
   const api = await request.newContext({ baseURL });
@@ -28,34 +34,45 @@ setup("authenticate", async ({ page, baseURL }) => {
     if (!loginResponse.ok()) {
       const body = await loginResponse.text();
       throw new Error(
-        `API login failed (${loginResponse.status()}): ${body}\n` +
-          `Credentials: ${username} / ${"*".repeat(password.length)}\n` +
-          `Set E2E_USERNAME and E2E_PASSWORD environment variables for your dev instance.`
+        `API login failed (${loginResponse.status()}) for the run admin ${username}: ${body}`
       );
     }
 
     // Extract token from the Set-Cookie header
     const setCookie = loginResponse.headers()["set-cookie"] || "";
-    const tokenMatch = setCookie.match(/token=([^;]+)/);
+    const token = setCookie.match(/token=([^;]+)/)?.[1];
 
-    if (tokenMatch) {
+    if (token) {
       // Inject the auth cookie into the browser context
       const url = new URL(baseURL!);
       await page.context().addCookies([
         {
           name: "token",
-          value: tokenMatch[1],
+          value: token,
           domain: url.hostname,
           path: "/",
         },
       ]);
     }
 
-    // Complete first-login setup if needed (dismisses UserSetupModal overlay)
-    await api.post("/api/user/complete-setup", {
-      headers: { Cookie: setCookie.split(",")[0] },
-      data: { selectedInstanceIds: [] },
-    });
+    // Complete first-login setup (dismisses the UserSetupModal overlay). With
+    // two or more instances it needs a selection: all of them, as a new admin
+    // would pick to see the whole library.
+    const cookie = { Cookie: setCookie.split(",")[0] ?? "" };
+    const status = await mustOk(
+      await api.get("/api/user/setup-status", { headers: cookie }),
+      "GET /api/user/setup-status"
+    );
+    const { instances } = (await status.json()) as {
+      instances: { id: string }[];
+    };
+    await mustOk(
+      await api.post("/api/user/complete-setup", {
+        headers: cookie,
+        data: { selectedInstanceIds: instances.map((i) => i.id) },
+      }),
+      "POST /api/user/complete-setup"
+    );
   } finally {
     await api.dispose();
   }

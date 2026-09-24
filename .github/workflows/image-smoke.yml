@@ -112,12 +112,19 @@ jobs:
           docker run -d --name peek-browser -p 127.0.0.1:8080:80 -e NODE_ENV=test peek:smoke
           timeout 180 sh -c 'until curl -fsS http://127.0.0.1:8080/api/health > /dev/null; do sleep 2; done'
 
+      # E2E_BASE_URL makes this a dev-stack run against the fresh image: global
+      # setup creates the bootstrap admin and the dummy instance, then a
+      # throwaway run admin that the tests sign in as
       - name: Browser checks against the image
         if: inputs.browser-checks && matrix.arch == 'amd64'
         run: npx playwright test e2e/privacy-and-headers.spec.ts
         env:
           E2E_BASE_URL: http://127.0.0.1:8080
           E2E_PROD_IMAGE: "1"
+          E2E_USERNAME: smoke-admin
+          E2E_PASSWORD: smoke-Admin-1
+          E2E_STASH_URL: http://127.0.0.1:9/graphql
+          E2E_STASH_API_KEY: unused
 
       - name: Upload Playwright report
         if: ${{ !cancelled() && inputs.browser-checks && matrix.arch == 'amd64' }}
