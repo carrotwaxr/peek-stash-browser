@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Server } from "lucide-react";
 import { userSetupApi } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
+import { showError } from "../../utils/toast";
 import { Button } from "../ui/index";
+
+const COPY_FAILED = "Copy failed: the key is selected, press Ctrl+C";
 
 interface StashInstance {
   id: string;
@@ -31,6 +34,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
   const [copied, setCopied] = useState(false);
 
   const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+  const keyRef = useRef<HTMLElement>(null);
   const [instances, setInstances] = useState<StashInstance[]>([]);
   const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
   const [showInstanceSelection, setShowInstanceSelection] = useState(false);
@@ -58,14 +62,32 @@ const UserSetupModal = ({ onComplete }: Props) => {
     fetchSetupStatus();
   }, []);
 
+  // Select the key for a manual copy when the clipboard API is missing
+  // (plain HTTP) or refuses the write
+  const selectKeyForManualCopy = () => {
+    const keyElement = keyRef.current;
+    if (keyElement) {
+      window.getSelection()?.selectAllChildren(keyElement);
+    }
+    showError(COPY_FAILED);
+  };
+
   const handleCopyKey = async () => {
     if (!recoveryKey) return;
+
+    const clipboard = navigator.clipboard;
+    if (!clipboard || typeof clipboard.writeText !== "function") {
+      selectKeyForManualCopy();
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(recoveryKey);
+      await clipboard.writeText(recoveryKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      console.error("Failed to copy recovery key:", err);
+      selectKeyForManualCopy();
     }
   };
 
@@ -192,6 +214,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
 
               <div className="flex items-center gap-2">
                 <code
+                  ref={keyRef}
                   className="flex-1 p-3 rounded font-mono text-sm break-all"
                   style={{
                     backgroundColor: "var(--bg-secondary)",
@@ -203,7 +226,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={handleCopyKey}
+                  onClick={() => void handleCopyKey()}
                   className="shrink-0"
                   aria-label="Copy recovery key"
                 >

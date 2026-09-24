@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userSetupApi } from "../../../src/api";
 import UserSetupModal from "../../../src/components/modals/UserSetupModal";
+import { showError } from "../../../src/utils/toast";
 
 // Mock the API
 vi.mock("../../../src/api", () => ({
@@ -15,6 +16,11 @@ vi.mock("../../../src/api", () => ({
     getSetupStatus: vi.fn(),
     completeSetup: vi.fn(),
   },
+}));
+
+vi.mock("../../../src/utils/toast", () => ({
+  showError: vi.fn(),
+  showSuccess: vi.fn(),
 }));
 
 const { mockUpdateUser } = vi.hoisted(() => ({ mockUpdateUser: vi.fn() }));
@@ -31,6 +37,7 @@ const mockGetSetupStatus = vi.mocked(userSetupApi.getSetupStatus);
 const mockCompleteSetup = vi.mocked(userSetupApi.completeSetup);
 
 const KEY = "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2-3456";
+const COPY_FAILED = "Copy failed: the key is selected, press Ctrl+C";
 
 describe("UserSetupModal", () => {
   beforeEach(() => {
@@ -243,6 +250,7 @@ describe("UserSetupModal", () => {
       } else {
         delete (navigator as unknown as { clipboard?: unknown }).clipboard;
       }
+      window.getSelection()?.removeAllRanges();
     });
 
     async function showKey() {
@@ -280,9 +288,60 @@ describe("UserSetupModal", () => {
         vi.advanceTimersByTime(2000);
       });
       expect(copyButton.querySelector(".lucide-copy")).not.toBeNull();
+      expect(showError).not.toHaveBeenCalled();
     });
 
-    it("keeps the copy icon when the clipboard refuses", async () => {
+    it("shows the tick only after the write resolves", async () => {
+      let resolveWrite: () => void = () => {};
+      const writeText = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveWrite = resolve;
+          })
+      );
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true,
+      });
+      await showKey();
+      const copyButton = screen.getByRole("button", {
+        name: "Copy recovery key",
+      });
+
+      fireEvent.click(copyButton);
+      await act(async () => {});
+
+      expect(writeText).toHaveBeenCalledWith(KEY);
+      expect(copyButton.querySelector(".lucide-check")).toBeNull();
+
+      await act(async () => {
+        resolveWrite();
+      });
+
+      expect(copyButton.querySelector(".lucide-check")).not.toBeNull();
+      expect(showError).not.toHaveBeenCalled();
+    });
+
+    it("selects the key and shows a hint when the clipboard API is missing", async () => {
+      // A plain-HTTP origin has no navigator.clipboard
+      Object.defineProperty(navigator, "clipboard", {
+        value: undefined,
+        configurable: true,
+      });
+      await showKey();
+      const copyButton = screen.getByRole("button", {
+        name: "Copy recovery key",
+      });
+
+      fireEvent.click(copyButton);
+      await act(async () => {});
+
+      expect(copyButton.querySelector(".lucide-check")).toBeNull();
+      expect(window.getSelection()?.toString()).toBe(KEY);
+      expect(showError).toHaveBeenCalledWith(COPY_FAILED);
+    });
+
+    it("keeps the copy icon, selects the key and reports failure when the clipboard refuses", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const writeText = vi.fn().mockRejectedValue(new Error("denied"));
       Object.defineProperty(navigator, "clipboard", {
@@ -300,6 +359,8 @@ describe("UserSetupModal", () => {
       expect(writeText).toHaveBeenCalledWith(KEY);
       expect(copyButton.querySelector(".lucide-check")).toBeNull();
       expect(screen.getByText(KEY)).toBeInTheDocument();
+      expect(window.getSelection()?.toString()).toBe(KEY);
+      expect(showError).toHaveBeenCalledWith(COPY_FAILED);
       errorSpy.mockRestore();
     });
   });
