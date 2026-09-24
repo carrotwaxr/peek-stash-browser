@@ -115,18 +115,21 @@ export const setupAPI = () => {
     statsController.refreshCache
   );
 
-  // Media proxy (public - no auth required for images)
-  app.get("/api/proxy/stash", proxyStashMedia);
+  // Media proxies require a Peek session; per-entity access in the handler
+  app.use("/api/proxy", authenticate);
 
-  // Scene preview proxy routes (public - no auth for performance)
-  app.get("/api/proxy/scene/:id/preview", proxyScenePreview);
-  app.get("/api/proxy/scene/:id/webp", proxySceneWebp);
+  // Media proxy (requires a Peek session; per-entity access in the handler)
+  app.get("/api/proxy/stash", authenticated(proxyStashMedia));
 
-  // Image proxy route (public - no auth for performance)
-  app.get("/api/proxy/image/:imageId/:type", proxyImage);
+  // Scene preview proxy routes (requires a Peek session; per-entity access in the handler)
+  app.get("/api/proxy/scene/:id/preview", authenticated(proxyScenePreview));
+  app.get("/api/proxy/scene/:id/webp", authenticated(proxySceneWebp));
 
-  // Clip preview proxy route (public - no auth for performance)
-  app.get("/api/proxy/clip/:id/preview", proxyClipPreview);
+  // Image proxy route (requires a Peek session; per-entity access in the handler)
+  app.get("/api/proxy/image/:imageId/:type", authenticated(proxyImage));
+
+  // Clip preview proxy route (requires a Peek session; per-entity access in the handler)
+  app.get("/api/proxy/clip/:id/preview", authenticated(proxyClipPreview));
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);

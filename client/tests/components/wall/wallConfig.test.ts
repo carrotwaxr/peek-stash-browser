@@ -188,6 +188,16 @@ describe("wallConfig", () => {
       expect(config.getPreviewUrl(clip)).toBeNull();
     });
 
+    it("carries the clip's instance on both URLs", () => {
+      const clip = { id: "clip-1", instanceId: "inst-1", isGenerated: true };
+      expect(config.getImageUrl(clip)).toBe(
+        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
+      );
+      expect(config.getPreviewUrl(clip)).toBe(
+        "/api/proxy/clip/clip-1/preview?instanceId=inst-1"
+      );
+    });
+
     it("calculates aspect ratio from parent scene file dimensions", () => {
       const clip = { scene: { files: [{ width: 1920, height: 1080 }] } };
       expect(config.getAspectRatio(clip)).toBeCloseTo(16 / 9, 2);

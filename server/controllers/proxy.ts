@@ -1,12 +1,21 @@
+import type { Response } from "express";
 import http from "http";
 import https from "https";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
+import { canUserAccessEntity } from "../services/EntityAccessService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
-import type { TypedRequest, TypedResponse } from "../types/api/express.js";
+import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { ProxyOptions } from "../types/api/proxy.js";
+import { privateCacheControl } from "../utils/cacheControl.js";
 import { logger } from "../utils/logger.js";
+import { canUserLoadMedia } from "../utils/mediaAccess.js";
+import {
+  INSTANCE_ID_PATTERN,
+  SCENE_ID_PATTERN,
+  parseStashMediaPath,
+} from "../utils/stashMediaPath.js";
 
 // =============================================================================
 // Connection Pooling
@@ -67,6 +76,20 @@ function getAgentForUrl(urlObj: URL): http.Agent | https.Agent {
 }
 
 /**
+ * True once the browser has moved on (page closed, next page loaded): Node
+ * marks the response destroyed when the client's socket closes. A media
+ * request waits on the session check, the access check and the upstream
+ * slot queue, and a grid of thumbnails is often abandoned mid-wait.
+ * Forwarding such a request would pipe Stash's response into a dead
+ * response: the write returns false, the upstream body pauses, `end` never
+ * fires and the slot is held until the upstream timeout, and a backlog of
+ * those starves every later request.
+ */
+function isClientGone(res: Response): boolean {
+  return res.destroyed || res.writableEnded;
+}
+
+/**
  * Get credentials for a specific Stash instance
  * @param instanceId - Optional instance ID. If not provided, uses default instance.
  * @returns Object with baseUrl and apiKey
@@ -93,6 +116,19 @@ function getInstanceCredentials(instanceId?: string): {
   };
 }
 
+/**
+ * The optional `?instanceId=` on the by-id routes narrows the row lookup, so
+ * a multi-instance setup checks the row it will serve. Absent (or the legacy
+ * "default"), the bare id picks the first row.
+ */
+function rowInstanceFilter(
+  instanceId: string | undefined
+): { stashInstanceId: string } | Record<never, never> {
+  return instanceId && instanceId !== "default"
+    ? { stashInstanceId: instanceId }
+    : {};
+}
+
 // =============================================================================
 // Shared proxy helper
 // =============================================================================
@@ -104,6 +140,8 @@ function getInstanceCredentials(instanceId?: string): {
  * - Client disconnect cleanup (destroys upstream request)
  * - Double-release guard for concurrency slots
  * - Timeout handling
+ * - Private Cache-Control: media belongs to a signed-in user, so a shared
+ *   cache must never store it (privateCacheControl keeps Stash's freshness)
  */
 function proxyHttpRequest({
   fullUrl,
@@ -120,6 +158,13 @@ function proxyHttpRequest({
     }
   };
 
+  // The client left while this request waited for its slot: free the slot
+  // at once rather than fetching a response nobody will read
+  if (isClientGone(res)) {
+    releaseOnce();
+    return;
+  }
+
   const urlObj = new URL(fullUrl);
   const httpModule = urlObj.protocol === "https:" ? https : http;
   const agent = getAgentForUrl(urlObj);
@@ -132,11 +177,13 @@ function proxyHttpRequest({
     if (proxyRes.headers["content-length"]) {
       res.setHeader("Content-Length", proxyRes.headers["content-length"]);
     }
-    if (proxyRes.headers["cache-control"]) {
-      res.setHeader("Cache-Control", proxyRes.headers["cache-control"]);
-    } else {
-      res.setHeader("Cache-Control", defaultCacheControl);
-    }
+    res.setHeader(
+      "Cache-Control",
+      privateCacheControl(
+        proxyRes.headers["cache-control"],
+        defaultCacheControl
+      )
+    );
 
     // Set status code
     res.status(proxyRes.statusCode || 200);
@@ -188,27 +235,44 @@ function proxyHttpRequest({
 
 /**
  * Proxy scene video preview (MP4)
- * GET /api/proxy/scene/:id/preview
+ * GET /api/proxy/scene/:id/preview?instanceId=
+ * Requires a Peek session; the scene must be visible to the user.
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
 export const proxyScenePreview = async (
-  req: TypedRequest<never, { id: string }>,
+  req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
   res: TypedResponse<ApiErrorResponse>
 ) => {
   const { id } = req.params;
+  const { instanceId } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
   }
+  if (!SCENE_ID_PATTERN.test(id)) {
+    return res.status(400).json({ error: "Invalid scene ID" });
+  }
 
   // Get scene from database to find its stashInstanceId
   const scene = await prisma.stashScene.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
     select: { stashInstanceId: true },
   });
 
   if (!scene) {
     return res.status(404).json({ error: "Scene not found" });
+  }
+
+  // The check uses the row actually served
+  if (
+    !(await canUserAccessEntity(
+      req.user.id,
+      "scene",
+      id,
+      scene.stashInstanceId
+    ))
+  ) {
+    return res.status(404).json({ error: "Not found" });
   }
 
   let stashUrl: string;
@@ -226,21 +290,21 @@ export const proxyScenePreview = async (
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(res)) return;
+
   await acquireConcurrencySlot();
 
   try {
     const fullUrl = `${stashUrl}/scene/${id}/preview?apikey=${apiKey}`;
 
-    logger.debug("Proxying scene preview", {
-      sceneId: id,
-      url: fullUrl.replace(apiKey, "***"),
-    });
+    logger.debug("Proxying scene preview", { sceneId: id });
 
     proxyHttpRequest({
       fullUrl,
       res,
       label: "[PROXY scene preview]",
-      defaultCacheControl: "public, max-age=86400",
+      defaultCacheControl: "private, max-age=86400",
       timeoutMs: 60000,
     });
   } catch (error) {
@@ -254,27 +318,43 @@ export const proxyScenePreview = async (
 
 /**
  * Proxy scene WebP animated preview
- * GET /api/proxy/scene/:id/webp
+ * GET /api/proxy/scene/:id/webp?instanceId=
+ * Requires a Peek session; the scene must be visible to the user.
  * Uses the scene's stashInstanceId to route to correct Stash server.
  */
 export const proxySceneWebp = async (
-  req: TypedRequest<never, { id: string }>,
+  req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
   res: TypedResponse<ApiErrorResponse>
 ) => {
   const { id } = req.params;
+  const { instanceId } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
   }
+  if (!SCENE_ID_PATTERN.test(id)) {
+    return res.status(400).json({ error: "Invalid scene ID" });
+  }
 
   // Get scene from database to find its stashInstanceId
   const scene = await prisma.stashScene.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
     select: { stashInstanceId: true },
   });
 
   if (!scene) {
     return res.status(404).json({ error: "Scene not found" });
+  }
+
+  if (
+    !(await canUserAccessEntity(
+      req.user.id,
+      "scene",
+      id,
+      scene.stashInstanceId
+    ))
+  ) {
+    return res.status(404).json({ error: "Not found" });
   }
 
   let stashUrl: string;
@@ -292,21 +372,21 @@ export const proxySceneWebp = async (
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(res)) return;
+
   await acquireConcurrencySlot();
 
   try {
     const fullUrl = `${stashUrl}/scene/${id}/webp?apikey=${apiKey}`;
 
-    logger.debug("Proxying scene webp", {
-      sceneId: id,
-      url: fullUrl.replace(apiKey, "***"),
-    });
+    logger.debug("Proxying scene webp", { sceneId: id });
 
     proxyHttpRequest({
       fullUrl,
       res,
       label: "[PROXY scene webp]",
-      defaultCacheControl: "public, max-age=86400",
+      defaultCacheControl: "private, max-age=86400",
       timeoutMs: 60000,
     });
   } catch (error) {
@@ -322,9 +402,15 @@ export const proxySceneWebp = async (
  * Proxy Stash media requests to avoid exposing API keys to clients
  * Handles images, sprites, and other static media
  * GET /api/proxy/stash?path=/xxx&instanceId=yyy
+ *
+ * Requires a Peek session. The path must be one of Stash's media routes for
+ * a numeric id (utils/stashMediaPath.ts); only the `t` and `default` query
+ * keys go upstream. Every entity the path names must be visible to the user
+ * (a scene_marker path names its scene and its clip). Rejecting `#` and `%`
+ * also closes fragment and double-encoding tricks.
  */
 export const proxyStashMedia = async (
-  req: TypedRequest<
+  req: TypedAuthRequest<
     never,
     Record<string, string>,
     { path?: string; instanceId?: string }
@@ -337,9 +423,20 @@ export const proxyStashMedia = async (
     return res.status(400).json({ error: "Missing or invalid path parameter" });
   }
 
-  // Validate path to prevent traversal attacks
-  if (!path.startsWith("/") || path.includes("..") || path.includes("://")) {
+  const target = parseStashMediaPath(path);
+  if (!target) {
     return res.status(400).json({ error: "Invalid path parameter" });
+  }
+
+  if (
+    instanceId !== undefined &&
+    (typeof instanceId !== "string" || !INSTANCE_ID_PATTERN.test(instanceId))
+  ) {
+    return res.status(400).json({ error: "Invalid instanceId parameter" });
+  }
+
+  if (!(await canUserLoadMedia(req.user.id, target.entities, instanceId))) {
+    return res.status(404).json({ error: "Not found" });
   }
 
   let stashUrl: string;
@@ -357,21 +454,25 @@ export const proxyStashMedia = async (
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(res)) return;
+
   await acquireConcurrencySlot();
 
   try {
-    const fullUrl = `${stashUrl}${path}${path.includes("?") ? "&" : "?"}apikey=${apiKey}`;
-
-    logger.debug("Proxying Stash media request", {
-      path,
-      stashUrl: fullUrl.replace(apiKey, "***"),
+    const url = new URL(`${stashUrl}${target.pathname}`);
+    target.search.forEach((value, key) => {
+      url.searchParams.set(key, value);
     });
+    url.searchParams.set("apikey", apiKey);
+
+    logger.debug("Proxying Stash media request", { path: target.pathname });
 
     proxyHttpRequest({
-      fullUrl,
+      fullUrl: url.toString(),
       res,
       label: "[PROXY stash media]",
-      defaultCacheControl: "public, max-age=31536000, immutable",
+      defaultCacheControl: "private, max-age=31536000, immutable",
       timeoutMs: 30000,
     });
   } catch (error) {
@@ -385,17 +486,20 @@ export const proxyStashMedia = async (
 
 /**
  * Proxy clip preview video (MP4 stream)
- * GET /api/proxy/clip/:id/preview
+ * GET /api/proxy/clip/:id/preview?instanceId=
  *
  * Returns the marker stream video for hover previews.
  * Falls back to screenshot if stream is unavailable.
+ * Requires a Peek session; the clip and its scene must be visible to the
+ * user (EntityAccessService's "clip" type covers both).
  * Uses the clip's stashInstanceId to route to correct Stash server.
  */
 export const proxyClipPreview = async (
-  req: TypedRequest<never, { id: string }>,
+  req: TypedAuthRequest<never, { id: string }, { instanceId?: string }>,
   res: TypedResponse<ApiErrorResponse>
 ) => {
   const { id } = req.params;
+  const { instanceId } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: "Missing clip ID" });
@@ -403,12 +507,22 @@ export const proxyClipPreview = async (
 
   // Get clip from database - include stashInstanceId for routing
   const clip = await prisma.stashClip.findFirst({
-    where: { id },
+    where: { id, deletedAt: null, ...rowInstanceFilter(instanceId) },
     select: { streamPath: true, screenshotPath: true, stashInstanceId: true },
   });
 
+  if (!clip) {
+    return res.status(404).json({ error: "Clip preview not found" });
+  }
+
+  if (
+    !(await canUserAccessEntity(req.user.id, "clip", id, clip.stashInstanceId))
+  ) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
   // Use streamPath (video) if available, otherwise screenshotPath (image)
-  const mediaPath = clip?.streamPath || clip?.screenshotPath;
+  const mediaPath = clip.streamPath || clip.screenshotPath;
 
   if (!mediaPath) {
     return res.status(404).json({ error: "Clip preview not found" });
@@ -427,21 +541,21 @@ export const proxyClipPreview = async (
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(res)) return;
+
   await acquireConcurrencySlot();
 
   try {
     const fullUrl = `${mediaPath}${mediaPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
 
-    logger.debug("Proxying clip preview", {
-      clipId: id,
-      url: fullUrl.replace(apiKey, "***"),
-    });
+    logger.debug("Proxying clip preview", { clipId: id });
 
     proxyHttpRequest({
       fullUrl,
       res,
       label: "[PROXY clip preview]",
-      defaultCacheControl: "public, max-age=86400",
+      defaultCacheControl: "private, max-age=86400",
       timeoutMs: 30000,
     });
   } catch (error) {
@@ -455,18 +569,27 @@ export const proxyClipPreview = async (
 
 /**
  * Proxy image requests by image ID and type
- * GET /api/proxy/image/:imageId/:type
+ * GET /api/proxy/image/:imageId/:type?instanceId=
  * :type = "thumbnail" | "preview" | "image"
+ * Requires a Peek session; the image must be visible to the user.
  * Uses the image's stashInstanceId to route to correct Stash server.
  */
 export const proxyImage = async (
-  req: TypedRequest<never, { imageId: string; type: string }>,
+  req: TypedAuthRequest<
+    never,
+    { imageId: string; type: string },
+    { instanceId?: string }
+  >,
   res: TypedResponse<ApiErrorResponse>
 ) => {
   const { imageId, type } = req.params;
+  const { instanceId } = req.query;
 
   if (!imageId) {
     return res.status(400).json({ error: "Missing image ID" });
+  }
+  if (!SCENE_ID_PATTERN.test(imageId)) {
+    return res.status(400).json({ error: "Invalid image ID" });
   }
 
   const validTypes = ["thumbnail", "preview", "image"];
@@ -478,7 +601,7 @@ export const proxyImage = async (
 
   // Get image from database - include stashInstanceId for routing
   const image = await prisma.stashImage.findFirst({
-    where: { id: imageId, deletedAt: null },
+    where: { id: imageId, deletedAt: null, ...rowInstanceFilter(instanceId) },
     select: {
       pathThumbnail: true,
       pathPreview: true,
@@ -489,6 +612,17 @@ export const proxyImage = async (
 
   if (!image) {
     return res.status(404).json({ error: "Image not found" });
+  }
+
+  if (
+    !(await canUserAccessEntity(
+      req.user.id,
+      "image",
+      imageId,
+      image.stashInstanceId
+    ))
+  ) {
+    return res.status(404).json({ error: "Not found" });
   }
 
   // Get the appropriate path
@@ -518,6 +652,9 @@ export const proxyImage = async (
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
+  // Nothing to send to a browser that has moved on; skip the queue entirely
+  if (isClientGone(res)) return;
+
   await acquireConcurrencySlot();
 
   try {
@@ -530,17 +667,13 @@ export const proxyImage = async (
       fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
     }
 
-    logger.debug("Proxying image request", {
-      imageId,
-      type,
-      url: fullUrl.replace(apiKey, "***"),
-    });
+    logger.debug("Proxying image request", { imageId, type });
 
     proxyHttpRequest({
       fullUrl,
       res,
       label: "[PROXY image]",
-      defaultCacheControl: "public, max-age=86400",
+      defaultCacheControl: "private, max-age=86400",
       timeoutMs: 30000,
     });
   } catch (error) {

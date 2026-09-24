@@ -18,3 +18,4 @@ export * from "./groups.js";
 export * from "./clips.js";
 export * from "./timeline.js";
 export * from "./stats.js";
+export * from "./video.js";

@@ -6,6 +6,10 @@ import {
   getEvenlySpacedSprites,
 } from "../../utils/spriteSheet";
 
+/** The instance lets the server check the row it will serve on a multi-instance setup. */
+const withInstance = (url: string, instanceId?: string | null): string =>
+  instanceId ? `${url}?instanceId=${encodeURIComponent(instanceId)}` : url;
+
 interface Props {
   scene: NormalizedScene;
   autoplayOnScroll?: boolean;
@@ -175,10 +179,12 @@ const SceneCardPreview = ({
         }
 
         // Handle high quality preferences (webp/mp4) with 404 fallback to sprite
-        const previewUrl =
+        const previewUrl = withInstance(
           preferredPreviewType === "mp4"
             ? `/api/proxy/scene/${scene.id}/preview`
-            : `/api/proxy/scene/${scene.id}/webp`;
+            : `/api/proxy/scene/${scene.id}/webp`,
+          scene.instanceId
+        );
 
         // Test if high quality preview exists by doing a HEAD request
         const response = await fetch(previewUrl, { method: "HEAD" });
@@ -244,6 +250,7 @@ const SceneCardPreview = ({
     scene?.paths?.vtt,
     scene?.paths?.sprite,
     scene?.id,
+    scene?.instanceId,
     spriteCount,
   ]);
 
@@ -335,10 +342,16 @@ const SceneCardPreview = ({
   // Build preview URL for video/webp (proxied through backend to hide API keys)
   const getPreviewUrl = () => {
     if (activePreviewType === "mp4" && scene?.id) {
-      return `/api/proxy/scene/${scene.id}/preview`;
+      return withInstance(
+        `/api/proxy/scene/${scene.id}/preview`,
+        scene.instanceId
+      );
     }
     if (activePreviewType === "webp" && scene?.id) {
-      return `/api/proxy/scene/${scene.id}/webp`;
+      return withInstance(
+        `/api/proxy/scene/${scene.id}/webp`,
+        scene.instanceId
+      );
     }
     return null;
   };

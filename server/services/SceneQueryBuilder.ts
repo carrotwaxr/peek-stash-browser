@@ -1491,7 +1491,9 @@ class SceneQueryBuilder {
       paths: {
         screenshot: this.transformUrl(row.pathScreenshot, row.stashInstanceId),
         preview: this.transformUrl(row.pathPreview, row.stashInstanceId),
-        stream: this.transformUrl(row.pathStream, row.stashInstanceId),
+        // Always null: Peek serves streams and captions through its own
+        // routes, and the media proxy refuses both Stash routes
+        stream: null,
         sprite: this.transformUrl(
           row.pathSprite ? `/scene/${row.id}/vtt/sprite` : null,
           row.stashInstanceId
@@ -1504,7 +1506,7 @@ class SceneQueryBuilder {
           row.pathChaptersVtt,
           row.stashInstanceId
         ),
-        caption: this.transformUrl(row.pathCaption, row.stashInstanceId),
+        caption: null,
       },
 
       // Lists carry no streams; single-scene lookups add them

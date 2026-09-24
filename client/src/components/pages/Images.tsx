@@ -468,16 +468,21 @@ const Images = () => {
             images={
               currentImages.map((img: Record<string, unknown>) => {
                 const paths = img.paths as Record<string, string> | undefined;
+                // The instance lets the server check the row it will serve
+                const instanceQuery =
+                  typeof img.instanceId === "string" && img.instanceId
+                    ? `?instanceId=${encodeURIComponent(img.instanceId)}`
+                    : "";
                 return {
                   ...(img as Record<string, unknown>),
                   paths: {
                     image:
                       paths?.image ||
-                      `/api/proxy/image/${img.id as string}/image`,
+                      `/api/proxy/image/${img.id as string}/image${instanceQuery}`,
                     preview: paths?.preview || paths?.thumbnail,
                     thumbnail:
                       paths?.thumbnail ||
-                      `/api/proxy/image/${img.id as string}/thumbnail`,
+                      `/api/proxy/image/${img.id as string}/thumbnail${instanceQuery}`,
                   },
                   oCounter: (img.oCounter as number) ?? 0,
                 };
