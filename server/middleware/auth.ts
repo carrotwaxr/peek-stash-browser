@@ -5,6 +5,13 @@ import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
+import { shouldLogOnce } from "../utils/logThrottle.js";
+import { logger } from "../utils/logger.js";
+import {
+  getProxyAuthTrust,
+  isTrustedAddress,
+  proxyPeerAddress,
+} from "../utils/proxyAuthTrust.js";
 
 // Token expires after 2 hours, but we refresh it if older than 1 hour
 // This gives users a 1-hour inactivity window before session expires
@@ -93,6 +100,9 @@ export const sessionPastMaxAge = (
   now = nowSeconds()
 ): boolean => now - (authTime ?? iat ?? 0) > MAX_SESSION_AGE_SECONDS;
 
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 export const authenticate = async (
   req: Request,
   res: Response,
@@ -102,7 +112,21 @@ export const authenticate = async (
   if (proxyAuthHeader) {
     const username = req.header(proxyAuthHeader);
     if (username) {
-      return await authenticateUser(username, req, res, next);
+      const peer = proxyPeerAddress(req);
+      const trust = getProxyAuthTrust();
+      const trusted =
+        trust.mode === "any" ||
+        (trust.mode === "list" && isTrustedAddress(trust.list, peer));
+      if (trusted) {
+        return await authenticateUser(username, peer, req, res, next);
+      }
+      if (shouldLogOnce(`proxy-auth-untrusted\0${peer}`, TEN_MINUTES_MS)) {
+        logger.warn(
+          trust.mode === "none"
+            ? `Proxy auth: ignored the ${proxyAuthHeader} header from ${peer}, because PROXY_AUTH_TRUSTED_IPS has an invalid entry`
+            : `Proxy auth: ignored the ${proxyAuthHeader} header from ${peer}, which is not in PROXY_AUTH_TRUSTED_IPS`
+        );
+      }
     }
   }
 
@@ -128,29 +152,52 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
     },
   });
 
+/** Sign in the user the trusted proxy's header names; any failure falls back to the session cookie. */
 const authenticateUser = async (
   username: string,
+  peer: string,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  let user: Awaited<ReturnType<typeof lookupUser>>;
   try {
-    const user = await lookupUser({ username });
-    if (!user) {
-      throw new Error(
-        "Unable to locate user. Falling back to authenticateToken"
-      );
-    }
-
-    // The proxy owns this session's length: no token, so no 30-day cap here
-    const { passwordChangedAt: _passwordChangedAt, ...requestUser } = user;
-
-    // Cast to AuthenticatedRequest to set user property
-    (req as AuthenticatedRequest).user = requestUser;
-    next();
-  } catch {
+    user = await lookupUser({ username });
+  } catch (error) {
+    logger.error("Proxy auth: user lookup failed", {
+      username: username.slice(0, 64),
+      peer,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return await authenticateToken(req, res, next);
   }
+
+  if (!user) {
+    const shortName = username.slice(0, 64);
+    if (
+      shouldLogOnce(`proxy-auth-unknown\0${shortName}\0${peer}`, TEN_MINUTES_MS)
+    ) {
+      logger.warn("Proxy auth: the header names no Peek user", {
+        username: shortName,
+        peer,
+      });
+    }
+    return await authenticateToken(req, res, next);
+  }
+
+  if (shouldLogOnce(`proxy-auth-signin\0${user.username}`, ONE_HOUR_MS)) {
+    logger.info("Proxy auth: signed in from header", {
+      username: user.username,
+      peer,
+    });
+  }
+
+  // The proxy owns this session's length: no token, so no 30-day cap here
+  const { passwordChangedAt: _passwordChangedAt, ...requestUser } = user;
+
+  // Cast to AuthenticatedRequest to set user property
+  (req as AuthenticatedRequest).user = requestUser;
+  next();
 };
 
 export const authenticateToken = async (

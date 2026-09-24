@@ -197,17 +197,20 @@ export async function mergeScenesWithUserData(
 /**
  * Add streamability information to scenes
  * This adds codec detection metadata to determine if scenes can be directly played
- * in browsers without transcoding
+ * in browsers without transcoding, and the View in Stash link, which only an
+ * admin viewer gets
  */
 export function addStreamabilityInfo(
-  scenes: NormalizedScene[]
+  scenes: NormalizedScene[],
+  viewer: { role: string } | undefined
 ): NormalizedScene[] {
   return scenes.map((scene) => {
     const streamabilityInfo = isSceneStreamable(scene);
     const stashUrl = buildStashEntityUrl(
       "scene",
       scene.id,
-      scene.instanceId || undefined
+      scene.instanceId || undefined,
+      viewer
     );
 
     return {
@@ -1021,7 +1024,7 @@ export const findScenes = async (
       }
 
       // Add streamability info
-      let scenes = addStreamabilityInfo(result.scenes);
+      let scenes = addStreamabilityInfo(result.scenes, req.user);
 
       // The Scene page loads one scene by id: only then build its stream
       // list. Lists keep sceneStreams empty.
@@ -1116,7 +1119,10 @@ export const findScenes = async (
       );
 
       // Add streamability info
-      const scenesWithStreamability = addStreamabilityInfo(scenesWithUserData);
+      const scenesWithStreamability = addStreamabilityInfo(
+        scenesWithUserData,
+        req.user
+      );
 
       logger.info(
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (FAST PATH)`
@@ -1251,7 +1257,10 @@ export const findScenes = async (
       const paginatedScenes = scenes.slice(startIndex, endIndex);
 
       // Step 8: Add streamability information
-      const scenesWithStreamability = addStreamabilityInfo(paginatedScenes);
+      const scenesWithStreamability = addStreamabilityInfo(
+        paginatedScenes,
+        req.user
+      );
 
       logger.info(
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (expensive pipeline)`
@@ -1331,7 +1340,10 @@ export const findScenes = async (
       );
 
       // Step 9: Add streamability information
-      const scenesWithStreamability = addStreamabilityInfo(finalScenes);
+      const scenesWithStreamability = addStreamabilityInfo(
+        finalScenes,
+        req.user
+      );
 
       logger.info(
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (optimized pipeline)`

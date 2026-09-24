@@ -139,7 +139,7 @@ interface CreateFirstStashInstanceResponse {
 
 ### GET /api/setup/stash-instance
 
-**Authentication:** None
+**Authentication:** Admin
 
 **Response:**
 

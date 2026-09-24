@@ -86,7 +86,9 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/tags/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/tags/${id}` : null
+    ),
 }));
 
 const mockPrisma = vi.mocked(prisma);
@@ -398,6 +400,38 @@ describe("Tags Controller", () => {
       const body = res._getBody();
       expect(body.findTags.count).toBe(1);
       expect(body.findTags.tags).toHaveLength(1);
+    });
+
+    it("adds stashUrl to each tag for an admin", async () => {
+      mockTagQueryBuilder.execute.mockResolvedValue({
+        tags: [createMockTag({ id: "t1" })],
+        total: 1,
+      });
+
+      const req = mockReq({ filter: {}, tag_filter: {} }, {}, adminUser);
+      const res = mockRes();
+
+      await findTags(req, res);
+
+      expect(res._getBody().findTags.tags[0].stashUrl).toBe(
+        "http://stash/tags/t1"
+      );
+    });
+
+    it("does not send stashUrl to a regular user", async () => {
+      mockTagQueryBuilder.execute.mockResolvedValue({
+        tags: [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })],
+        total: 2,
+      });
+
+      const req = mockReq({ filter: {}, tag_filter: {} }, {}, defaultUser);
+      const res = mockRes();
+
+      await findTags(req, res);
+
+      const tags = res._getBody().findTags.tags;
+      expect(tags).toHaveLength(2);
+      for (const tag of tags) expect(tag.stashUrl).toBeNull();
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {

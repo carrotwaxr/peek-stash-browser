@@ -11,6 +11,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { logger } from "../../utils/logger.js";
 import { isAllowedStreamPath } from "../../utils/stashMediaPath.js";
 import {
   deriveStreamLinkKey,
@@ -62,6 +63,14 @@ const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 const mockPrisma = vi.mocked(prisma);
 const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
+
+/** Every logger call so far, at any level, as one string. */
+const allLogged = () =>
+  JSON.stringify(
+    (["debug", "info", "warn", "error"] as const).map(
+      (level) => vi.mocked(logger[level]).mock.calls
+    )
+  );
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -625,6 +634,28 @@ describe("Video Controller", () => {
         expect(res.send).toHaveBeenCalledWith("Stash stream error: Not Found");
       });
 
+      it("the stream proxy logs no query string", async () => {
+        const req = createMockReq({
+          params: { sceneId: "123", streamPath: "stream.mp4" },
+          query: { sig: "SECRETSIG", exp: "1" },
+          url: "/api/scene/123/proxy-stream/stream.mp4?sig=SECRETSIG&exp=1",
+        });
+        const res = createMockRes();
+
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+          headers: new Headers(),
+        });
+
+        await proxyStashStream(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(allLogged()).toContain("stream.mp4");
+        expect(allLogged()).not.toContain("SECRETSIG");
+      });
+
       it("returns 500 and sends error when fetch throws (headers not sent)", async () => {
         const req = createMockReq();
         const res = createMockRes();
@@ -833,6 +864,32 @@ describe("Video Controller", () => {
         .calls[0][0];
       expect(fetchUrl).toBe(
         "http://stash:9999/scene/456/caption?lang=en&type=srt"
+      );
+    });
+
+    it("caption requests log at debug, not info", async () => {
+      const req = createMockReq({
+        params: { sceneId: "456" },
+        query: { lang: "en", type: "srt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse()
+      );
+
+      await getCaption(req, res);
+
+      expect(res.send).toHaveBeenCalledWith("WEBVTT\n\n");
+      expect(logger.info).not.toHaveBeenCalled();
+      const debugMessages = vi
+        .mocked(logger.debug)
+        .mock.calls.map(([message]) => message);
+      expect(debugMessages).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("[CAPTION] Request: scene=456"),
+          expect.stringContaining("[CAPTION] Served caption: scene=456"),
+        ])
       );
     });
 

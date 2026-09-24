@@ -26,6 +26,8 @@ import {
   _resetJwtSecretForTesting,
   getJwtSecret,
 } from "../../utils/jwtSecret.js";
+import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
+import { logger } from "../../utils/logger.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -111,6 +113,8 @@ describe("Auth Middleware", () => {
     nextFn = vi.fn();
     // Reset env
     delete process.env.PROXY_AUTH_HEADER;
+    delete process.env.PROXY_AUTH_TRUSTED_IPS;
+    _resetLogThrottleForTesting();
   });
 
   afterEach(() => {
@@ -536,6 +540,173 @@ describe("Auth Middleware", () => {
       // Falls back to authenticateToken → 401
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(nextFn).not.toHaveBeenCalled();
+    });
+
+    describe("proxy auth trusted addresses", () => {
+      const HEADER = "X-Forwarded-User";
+
+      /** A request as the bundled nginx forwards it: loopback socket, X-Real-IP set. */
+      const proxyReq = (
+        username: string,
+        realIp: string,
+        socketAddress = "127.0.0.1"
+      ) => {
+        const headers: Record<string, string> = {
+          "x-forwarded-user": username,
+          "x-real-ip": realIp,
+        };
+        return createMockReq({
+          header: vi.fn((name: string) => headers[name.toLowerCase()]),
+          socket: { remoteAddress: socketAddress },
+          cookies: {},
+        } as any);
+      };
+
+      const warnMessages = () =>
+        vi.mocked(logger.warn).mock.calls.map(([message]) => message);
+
+      beforeEach(() => {
+        process.env.PROXY_AUTH_HEADER = HEADER;
+      });
+
+      it("honours the header from an address in PROXY_AUTH_TRUSTED_IPS", async () => {
+        process.env.PROXY_AUTH_TRUSTED_IPS = "10.0.0.5, 192.168.1.0/24";
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        const req = proxyReq("testuser", "192.168.1.5");
+        const { res } = createMockRes();
+
+        await authenticate(req as Request, res as Response, nextFn);
+
+        expect(nextFn).toHaveBeenCalled();
+        expect((req as any).user.username).toBe("testuser");
+        expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { username: "testuser" } })
+        );
+      });
+
+      it("ignores the header from any other address and falls back to cookie auth", async () => {
+        process.env.PROXY_AUTH_TRUSTED_IPS = "192.168.1.0/24";
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+
+        for (let i = 0; i < 3; i++) {
+          const req = proxyReq("testuser", "10.0.0.9");
+          const { res, statusFn } = createMockRes();
+          await authenticate(req as Request, res as Response, nextFn);
+          expect(statusFn).toHaveBeenCalledWith(401);
+        }
+
+        expect(nextFn).not.toHaveBeenCalled();
+        expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+        // One warning for three requests, naming the address to add
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(warnMessages()[0]).toBe(
+          `Proxy auth: ignored the ${HEADER} header from 10.0.0.9, which is not in PROXY_AUTH_TRUSTED_IPS`
+        );
+      });
+
+      it("checks the socket address, not X-Real-IP, when the peer is not loopback", async () => {
+        process.env.PROXY_AUTH_TRUSTED_IPS = "192.168.1.0/24";
+        const req = proxyReq("testuser", "192.168.1.5", "172.18.0.3");
+        const { res, statusFn } = createMockRes();
+
+        await authenticate(req as Request, res as Response, nextFn);
+
+        expect(statusFn).toHaveBeenCalledWith(401);
+        expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+        expect(warnMessages()[0]).toContain("from 172.18.0.3,");
+      });
+
+      it("honours the header from any address when PROXY_AUTH_TRUSTED_IPS is unset", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        const req = proxyReq("testuser", "203.0.113.7", "172.18.0.3");
+        const { res } = createMockRes();
+
+        await authenticate(req as Request, res as Response, nextFn);
+
+        expect(nextFn).toHaveBeenCalled();
+        expect((req as any).user.username).toBe("testuser");
+      });
+
+      it("honours the header from no address when PROXY_AUTH_TRUSTED_IPS has an invalid entry", async () => {
+        process.env.PROXY_AUTH_TRUSTED_IPS = "192.168.1.0/24, nope";
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+        const req = proxyReq("testuser", "192.168.1.5");
+        const { res, statusFn } = createMockRes();
+
+        await authenticate(req as Request, res as Response, nextFn);
+
+        expect(statusFn).toHaveBeenCalledWith(401);
+        expect(nextFn).not.toHaveBeenCalled();
+        expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+      });
+
+      it("warns once per window when the header names an unknown user", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+        try {
+          for (let i = 0; i < 2; i++) {
+            const { res, statusFn } = createMockRes();
+            await authenticate(
+              proxyReq("ghost", "192.168.1.5") as Request,
+              res as Response,
+              nextFn
+            );
+            expect(statusFn).toHaveBeenCalledWith(401);
+          }
+          expect(logger.warn).toHaveBeenCalledTimes(1);
+          expect(logger.warn).toHaveBeenCalledWith(
+            "Proxy auth: the header names no Peek user",
+            { username: "ghost", peer: "192.168.1.5" }
+          );
+
+          // Ten minutes later it warns again
+          nowSpy.mockReturnValue(1_000_000 + 10 * 60 * 1000);
+          const { res } = createMockRes();
+          await authenticate(
+            proxyReq("ghost", "192.168.1.5") as Request,
+            res as Response,
+            nextFn
+          );
+          expect(logger.warn).toHaveBeenCalledTimes(2);
+        } finally {
+          nowSpy.mockRestore();
+        }
+      });
+
+      it("logs the first header sign-in per user at info, with the peer address", async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER as any);
+
+        for (let i = 0; i < 2; i++) {
+          const { res } = createMockRes();
+          await authenticate(
+            proxyReq("testuser", "192.168.1.5") as Request,
+            res as Response,
+            nextFn
+          );
+        }
+
+        expect(nextFn).toHaveBeenCalledTimes(2);
+        expect(logger.info).toHaveBeenCalledTimes(1);
+        expect(logger.info).toHaveBeenCalledWith(
+          "Proxy auth: signed in from header",
+          { username: "testuser", peer: "192.168.1.5" }
+        );
+      });
+
+      it("logs an error and falls back to cookie auth when the user lookup throws", async () => {
+        mockPrisma.user.findUnique.mockRejectedValue(new Error("db locked"));
+        const req = proxyReq("testuser", "192.168.1.5");
+        const { res, statusFn } = createMockRes();
+
+        await authenticate(req as Request, res as Response, nextFn);
+
+        expect(statusFn).toHaveBeenCalledWith(401);
+        expect(nextFn).not.toHaveBeenCalled();
+        expect(logger.error).toHaveBeenCalledWith(
+          "Proxy auth: user lookup failed",
+          expect.objectContaining({ username: "testuser", error: "db locked" })
+        );
+      });
     });
 
     it("uses JWT auth when PROXY_AUTH_HEADER is not set", async () => {

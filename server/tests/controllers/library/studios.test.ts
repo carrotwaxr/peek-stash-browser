@@ -81,7 +81,9 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/studios/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/studios/${id}` : null
+    ),
 }));
 
 const mockPrisma = vi.mocked(prisma);
@@ -381,6 +383,41 @@ describe("Studios Controller", () => {
       const body = res._getBody();
       expect(body.findStudios.count).toBe(1);
       expect(body.findStudios.studios).toHaveLength(1);
+    });
+
+    it("adds stashUrl to each studio for an admin", async () => {
+      mockStudioQueryBuilder.execute.mockResolvedValue({
+        studios: [createMockStudio({ id: "s1" })],
+        total: 1,
+      });
+
+      const req = mockReq({ filter: {}, studio_filter: {} }, {}, adminUser);
+      const res = mockRes();
+
+      await findStudios(req, res);
+
+      expect(res._getBody().findStudios.studios[0].stashUrl).toBe(
+        "http://stash/studios/s1"
+      );
+    });
+
+    it("does not send stashUrl to a regular user", async () => {
+      mockStudioQueryBuilder.execute.mockResolvedValue({
+        studios: [
+          createMockStudio({ id: "s1" }),
+          createMockStudio({ id: "s2" }),
+        ],
+        total: 2,
+      });
+
+      const req = mockReq({ filter: {}, studio_filter: {} }, {}, defaultUser);
+      const res = mockRes();
+
+      await findStudios(req, res);
+
+      const studios = res._getBody().findStudios.studios;
+      expect(studios).toHaveLength(2);
+      for (const studio of studios) expect(studio.stashUrl).toBeNull();
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {

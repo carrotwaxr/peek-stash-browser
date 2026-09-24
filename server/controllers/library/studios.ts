@@ -218,7 +218,8 @@ export const findStudios = async (
       stashUrl: buildStashEntityUrl(
         "studio",
         studio.id,
-        studio.instanceId || undefined
+        studio.instanceId || undefined,
+        req.user
       ),
     }));
 

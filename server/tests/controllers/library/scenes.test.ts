@@ -153,7 +153,12 @@ vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
     .mockImplementation(
-      (_type: string, id: string) => `http://stash/scenes/${id}`
+      (
+        type: string,
+        id: string,
+        _inst: string | undefined,
+        viewer: { role: string } | undefined
+      ) => (viewer?.role === "ADMIN" ? `http://stash/${type}s/${id}` : null)
     ),
 }));
 
@@ -195,9 +200,11 @@ beforeEach(() => {
 
 // ===== 1. addStreamabilityInfo =====
 
+const ADMIN_VIEWER = { role: "ADMIN" };
+
 describe("addStreamabilityInfo", () => {
   it("returns empty array when given empty scenes", () => {
-    expect(addStreamabilityInfo([])).toEqual([]);
+    expect(addStreamabilityInfo([], ADMIN_VIEWER)).toEqual([]);
   });
 
   it("attaches isStreamable, streamabilityReasons, and stashUrl to each scene", () => {
@@ -207,7 +214,7 @@ describe("addStreamabilityInfo", () => {
     });
 
     const scenes = [createMockScene({ id: "s1" })];
-    const result = addStreamabilityInfo(scenes);
+    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
@@ -217,6 +224,15 @@ describe("addStreamabilityInfo", () => {
     });
   });
 
+  it("gives a regular user no stashUrl", () => {
+    mockIsSceneStreamable.mockReturnValue({ isStreamable: true, reasons: [] });
+
+    const scenes = [createMockScene({ id: "s1" })];
+    const result = addStreamabilityInfo(scenes, { role: "USER" });
+
+    expect(result[0]).toMatchObject({ isStreamable: true, stashUrl: null });
+  });
+
   it("propagates non-streamable info with reasons", () => {
     mockIsSceneStreamable.mockReturnValue({
       isStreamable: false,
@@ -224,7 +240,7 @@ describe("addStreamabilityInfo", () => {
     });
 
     const scenes = [createMockScene({ id: "s2" })];
-    const result = addStreamabilityInfo(scenes);
+    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
 
     expect(result[0]).toMatchObject({
       isStreamable: false,
@@ -241,7 +257,7 @@ describe("addStreamabilityInfo", () => {
       });
 
     const scenes = [createMockScene({ id: "a" }), createMockScene({ id: "b" })];
-    const result = addStreamabilityInfo(scenes);
+    const result = addStreamabilityInfo(scenes, ADMIN_VIEWER);
 
     expect(result[0]!.isStreamable).toBe(true);
     expect(result[1]!.isStreamable).toBe(false);
@@ -1599,6 +1615,46 @@ describe("findScenes", () => {
     const body = res._getBody();
     expect(body.findScenes.count).toBe(1);
     expect(body.findScenes.scenes).toHaveLength(1);
+  });
+
+  it("does not send stashUrl to a regular user", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
+      total: 2,
+    });
+
+    const req = mockReq(
+      { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      {},
+      { id: 1, role: "USER" }
+    );
+    const res = mockRes();
+
+    await findScenes(req, res);
+
+    const scenes = res._getBody().findScenes.scenes;
+    expect(scenes).toHaveLength(2);
+    for (const scene of scenes) expect(scene.stashUrl).toBeNull();
+  });
+
+  it("adds stashUrl for an admin", async () => {
+    mockSceneQueryBuilder.execute.mockResolvedValue({
+      scenes: [createMockScene({ id: "s1" })],
+      total: 1,
+    });
+
+    const req = mockReq(
+      { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      {},
+      { id: 1, role: "ADMIN" }
+    );
+    const res = mockRes();
+
+    await findScenes(req, res);
+
+    expect(res._getBody().findScenes.scenes[0].stashUrl).toBe(
+      "http://stash/scenes/s1"
+    );
   });
 
   it("attaches playback streams to a single-id lookup", async () => {

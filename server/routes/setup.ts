@@ -33,8 +33,9 @@ router.post(
   createFirstStashInstance
 );
 
-// Protected routes (require authentication)
-router.get("/stash-instance", authenticate, getStashInstance);
+// The instance record carries Stash's address: admin only, like the
+// Server settings tab that shows it
+router.get("/stash-instance", authenticate, requireAdmin, getStashInstance);
 
 // Multi-instance management (admin only)
 router.get(

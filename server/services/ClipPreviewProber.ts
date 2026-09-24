@@ -2,6 +2,7 @@ import crypto from "crypto";
 import http from "http";
 import https from "https";
 import { URL } from "url";
+import { redactUrl } from "../utils/logRedaction.js";
 import { logger } from "../utils/logger.js";
 
 const MIN_PREVIEW_SIZE = 5 * 1024; // 5KB - below this is likely a placeholder
@@ -51,7 +52,10 @@ export class ClipPreviewProber {
       // Size matches placeholder exactly - need to verify via hash
       return await this.verifyNotPlaceholder(url);
     } catch (err) {
-      logger.debug("Preview probe error", { url, error: String(err) });
+      logger.debug("Preview probe error", {
+        url: redactUrl(url),
+        error: String(err),
+      });
       return false;
     }
   }
@@ -107,7 +111,7 @@ export class ClipPreviewProber {
 
         req.on("error", (err) => {
           logger.debug("Preview size check failed", {
-            url,
+            url: redactUrl(url),
             error: err.message,
           });
           resolve(null);
@@ -120,7 +124,10 @@ export class ClipPreviewProber {
 
         req.end();
       } catch (err) {
-        logger.debug("Preview size check error", { url, error: String(err) });
+        logger.debug("Preview size check error", {
+          url: redactUrl(url),
+          error: String(err),
+        });
         resolve(null);
       }
     });
@@ -163,7 +170,7 @@ export class ClipPreviewProber {
               // If hash doesn't match, it's a real preview that happens to be 1199 bytes
               const isGenerated = hash !== PLACEHOLDER_MD5;
               logger.debug("Placeholder hash check", {
-                url,
+                url: redactUrl(url),
                 size: content.length,
                 hash,
                 isGenerated,
@@ -176,7 +183,7 @@ export class ClipPreviewProber {
 
         req.on("error", (err) => {
           logger.debug("Placeholder verification failed", {
-            url,
+            url: redactUrl(url),
             error: err.message,
           });
           resolve(false);
@@ -190,7 +197,7 @@ export class ClipPreviewProber {
         req.end();
       } catch (err) {
         logger.debug("Placeholder verification error", {
-          url,
+          url: redactUrl(url),
           error: String(err),
         });
         resolve(false);

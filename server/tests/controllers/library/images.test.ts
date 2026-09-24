@@ -37,7 +37,9 @@ vi.mock("../../../utils/logger.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/images/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/images/${id}` : null
+    ),
 }));
 
 const mockPrisma = vi.mocked(prisma);
@@ -123,14 +125,14 @@ describe("Images Controller", () => {
       });
     });
 
-    it("adds stashUrl to each image", async () => {
+    it("adds stashUrl to each image for an admin", async () => {
       const images = [createQueryBuilderImage({ id: "img1" })];
       mockImageQueryBuilder.execute.mockResolvedValue({
         images: images as any,
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, adminUser);
       const res = mockRes();
 
       await findImages(req, res);
@@ -139,6 +141,25 @@ describe("Images Controller", () => {
       expect(body.findImages.images[0].stashUrl).toBe(
         "http://stash/images/img1"
       );
+    });
+
+    it("does not send stashUrl to a regular user", async () => {
+      mockImageQueryBuilder.execute.mockResolvedValue({
+        images: [
+          createQueryBuilderImage({ id: "img1" }),
+          createQueryBuilderImage({ id: "img2" }),
+        ] as any,
+        total: 2,
+      });
+
+      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
+      const res = mockRes();
+
+      await findImages(req, res);
+
+      const images = res._getBody().findImages.images;
+      expect(images).toHaveLength(2);
+      for (const image of images) expect(image.stashUrl).toBeNull();
     });
 
     it("passes filter parameters to query builder", async () => {

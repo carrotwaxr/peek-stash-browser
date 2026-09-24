@@ -2,7 +2,7 @@
  * Sync Routes
  *
  * Handles sync-related API endpoints:
- * - GET /api/sync/status - Get current sync status
+ * - GET /api/sync/status - Get current sync status and settings (admin only)
  * - POST /api/sync/trigger - Trigger manual sync (admin only)
  * - POST /api/sync/notify - Webhook for Stash plugin (admin only)
  * - PUT /api/sync/settings - Update sync settings (admin only)
@@ -20,10 +20,12 @@ router.use(authenticate);
 
 /**
  * GET /api/sync/status
- * Get current sync status for all entity types
+ * Get current sync status and settings for all entity types (admin only:
+ * only the Server settings tab shows them)
  */
 router.get(
   "/status",
+  requireAdmin,
   authenticated(async (req, res) => {
     try {
       const status = await stashSyncService.getSyncStatus();

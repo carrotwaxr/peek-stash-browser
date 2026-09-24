@@ -76,9 +76,10 @@ These settings have sensible defaults but can be customized:
 | `CONFIG_DIR`         | Where backups and download zips go | `/app/data`                    | The database stays in `/app/data`. A directory outside `/app/data` is given to `PUID:PGID` on start |
 | `PUID`               | User that owns `/app/data` and runs the server | `99` (unRAID's `nobody`) | See [File ownership](installation.md#file-ownership-puidpgid). `0` runs as root, with a warning |
 | `PGID`               | Group that owns `/app/data` | `100` (unRAID's `users`)              | See [File ownership](installation.md#file-ownership-puidpgid) |
-| `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE` |
+| `LOG_LEVEL`          | Server log detail          | `INFO`                                 | `ERROR`, `WARN`, `INFO`, `DEBUG` or `VERBOSE`. No level logs Stash API keys or signed stream links, so a `DEBUG` log is safe to share |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
+| `PROXY_AUTH_TRUSTED_IPS` | Addresses allowed to send `PROXY_AUTH_HEADER` | Unset (any address, with a startup warning) | Comma-separated IPs and CIDR ranges of your auth proxy. See [Trusted proxy addresses](#trusted-proxy-addresses) |
 | `TRUST_PROXY`        | Reverse proxies in front of Peek | Unset (trusts only the image's own nginx) | Set to the number of reverse proxies between browsers and Peek. See [Behind a reverse proxy](#behind-a-reverse-proxy) |
 
 ### Generating a JWT Secret
@@ -116,11 +117,11 @@ This is a significant simplification from v1.x which required mounting media dir
 | `SECURE_COOKIES` | Enable secure cookie flag      | `false` | Set to `true` when using HTTPS reverse proxy |
 
 !!! warning "Security Best Practices"
-    - Keep `/app/data` private: it holds the database and the generated session secret
+    - Keep `/app/data` private: it holds the database, which stores each Stash API key in plain text, and the generated session secret
     - Set `SECURE_COOKIES=true` when using HTTPS
     - **Never expose Peek directly to the internet** - always use a reverse proxy
     - Admin credentials are created during setup wizard (no default passwords)
-    - Stash API key is stored securely in the database (not in environment variables)
+    - Stash API keys are stored in the database in plain text (not in environment variables): anyone who can read `/app/data` can read them
 
 ### Behind a reverse proxy
 
@@ -143,7 +144,7 @@ Peek supports delegating authentication to your reverse proxy (e.g., Nginx, Trae
 
 1. Your reverse proxy handles authentication (SSO, OAuth, basic auth, etc.)
 2. The proxy adds a header with the authenticated username to all requests
-3. Peek reads this header and looks up the corresponding user in its database
+3. Peek reads this header, from the proxy's address only when `PROXY_AUTH_TRUSTED_IPS` is set, and looks up the corresponding user in its database
 4. If no header is present, Peek falls back to standard JWT token authentication
 
 ### Configuration
@@ -160,6 +161,24 @@ Common header names:
 - `Remote-User` (common with Nginx auth_request)
 - `X-Auth-Request-User` (oauth2-proxy)
 
+### Trusted proxy addresses
+
+Set `PROXY_AUTH_TRUSTED_IPS` to your proxy's address, so Peek honours the header only from there:
+
+```bash
+PROXY_AUTH_TRUSTED_IPS=172.18.0.5
+```
+
+It takes comma-separated IP addresses and CIDR ranges, IPv4 or IPv6 (for example `172.18.0.5, 192.168.1.0/24`). Use the address the proxy connects to Peek from, as Peek sees it. When the proxy and Peek share a Docker network, that is the proxy container's address on that network; when the proxy runs on the host and reaches a published port, it is usually the Docker network's gateway (`172.17.0.1` on the default bridge). `TRUST_PROXY` does not change which address is checked.
+
+Peek logs the address for you:
+
+- `Proxy auth: ignored the Remote-User header from 172.18.0.5, which is not in PROXY_AUTH_TRUSTED_IPS` (a warning, at most once every 10 minutes per address): the request carried the header from an address outside the list, so Peek ignored the header and fell back to the session cookie. If that address is your proxy, add it.
+- `Proxy auth: signed in from header` (info, the first time and then at most once an hour per user) gives the username and the proxy's address as `peer`.
+- `Proxy auth: the header names no Peek user` (a warning, at most once every 10 minutes per username and address): the proxy passed a username that has no Peek account.
+
+Without `PROXY_AUTH_TRUSTED_IPS`, Peek honours the header from any address, as earlier versions did, and logs a warning at startup: anyone who can reach Peek's port can sign in as any user by sending the header. If an entry is not an address or a range, Peek logs an error naming it at startup and honours the header from no address until you fix it.
+
 ### External player links
 
 External players (VLC, Android video apps) cannot pass your single-sign-on login to the proxy. The external player button therefore gives each user a personal, signed link, and Peek checks the signature itself. Let requests to `GET /api/scene/*/proxy-stream/stream` that carry a `sig` query parameter through the proxy without authentication; everything else stays behind it. Peek still rejects an expired, tampered or foreign link with 401, and applies that user's hidden items and content restrictions.
@@ -169,9 +188,10 @@ External players (VLC, Android video apps) cannot pass your single-sign-on login
 !!! danger "Critical Security Requirements"
     When using proxy authentication, you **MUST** ensure:
     
-    1. **Peek is NOT accessible directly** - Only allow access through the reverse proxy
+    1. **Peek is NOT accessible directly** - Publish Peek's port only to the proxy: put both on one Docker network and publish no port, or bind the port to the proxy's host only (`-p 127.0.0.1:6969:80`)
     2. **The proxy sanitizes the authentication header** - The proxy must strip any user-supplied headers with the same name to prevent header injection attacks
     3. **Network isolation** - Peek should only listen on localhost or a private network, not on public interfaces
+    4. **`PROXY_AUTH_TRUSTED_IPS` names the proxy** - so a request that reaches Peek any other way is not signed in from the header
     
     **Failure to follow these requirements will allow anyone to impersonate any user by setting the header in their request.**
 
@@ -200,6 +220,9 @@ location / {
 ```bash
 # Peek configuration
 PROXY_AUTH_HEADER=Remote-User
+# Where nginx connects from, as Peek sees it (the default bridge's gateway
+# here); the "ignored the Remote-User header from" log line names yours
+PROXY_AUTH_TRUSTED_IPS=172.17.0.1
 ```
 
 ### Example: Traefik with ForwardAuth (Authelia)
@@ -215,6 +238,8 @@ services:
   peek:
     environment:
       - PROXY_AUTH_HEADER=Remote-User
+      # Traefik's address on the network it shares with Peek
+      - PROXY_AUTH_TRUSTED_IPS=172.18.0.2
     labels:
       - "traefik.http.routers.peek.middlewares=authelia@docker"
 ```
@@ -242,6 +267,11 @@ When `PROXY_AUTH_HEADER` is set but the header is not present in a request, Peek
 - Verify the user exists in Peek's database
 - Check that usernames match exactly (case-sensitive)
 - Verify the proxy is passing the correct header name
+- Look for `Proxy auth: the header names no Peek user` in the log, with the username Peek received
+
+**The header is ignored and Peek shows its login page**
+- Look for `Proxy auth: ignored the ... header from <address>` in the log and add that address to `PROXY_AUTH_TRUSTED_IPS` if it is your proxy
+- An invalid entry turns header sign-in off: the startup log names it
 
 **Users being logged in as wrong user**
 - **CRITICAL**: Your proxy is not sanitizing the header properly

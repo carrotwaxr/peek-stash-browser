@@ -76,7 +76,9 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/galleries/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/galleries/${id}` : null
+    ),
 }));
 
 const mockPrisma = vi.mocked(prisma);
@@ -268,6 +270,41 @@ describe("Galleries Controller", () => {
       const body = res._getBody();
       expect(body.findGalleries.count).toBe(1);
       expect(body.findGalleries.galleries).toHaveLength(1);
+    });
+
+    it("adds stashUrl to each gallery for an admin", async () => {
+      mockGalleryQueryBuilder.execute.mockResolvedValue({
+        galleries: [createMockGallery({ id: "g1" })],
+        total: 1,
+      });
+
+      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, adminUser);
+      const res = mockRes();
+
+      await findGalleries(req, res);
+
+      expect(res._getBody().findGalleries.galleries[0].stashUrl).toBe(
+        "http://stash/galleries/g1"
+      );
+    });
+
+    it("does not send stashUrl to a regular user", async () => {
+      mockGalleryQueryBuilder.execute.mockResolvedValue({
+        galleries: [
+          createMockGallery({ id: "g1" }),
+          createMockGallery({ id: "g2" }),
+        ],
+        total: 2,
+      });
+
+      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, defaultUser);
+      const res = mockRes();
+
+      await findGalleries(req, res);
+
+      const galleries = res._getBody().findGalleries.galleries;
+      expect(galleries).toHaveLength(2);
+      for (const gallery of galleries) expect(gallery.stashUrl).toBeNull();
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
