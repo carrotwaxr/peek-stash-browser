@@ -2,10 +2,13 @@ name: Image Smoke Test
 
 # Builds Dockerfile.production natively on each architecture and boots it
 # against an empty data volume (item 80, TCI-10). Called by ci.yml on every
-# pull request and push to main, and by docker-build.yml before publishing.
+# pull request and push to main, and by docker-build.yml on release tags.
 # ci.yml sets browser-checks, so amd64 also runs the production-image
 # Playwright specs against the image; publishing leaves it off and waits on
-# the deterministic checks only.
+# the deterministic checks only. docker-build.yml sets publish: each
+# architecture then pushes the image it booted by digest, and its publish job
+# tags the two digests once both pass. ci.yml passes no secrets and never
+# sets publish, so pull requests and main never log in or push.
 on:
   workflow_call:
     inputs:
@@ -13,6 +16,14 @@ on:
         description: Also run the production-image Playwright specs (amd64)
         type: boolean
         default: false
+      publish:
+        description: Push the image by digest once it passes (docker-build.yml)
+        type: boolean
+        default: false
+      build-date:
+        description: BUILD_DATE build argument; defaults to smoke-<sha>
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -30,6 +41,8 @@ jobs:
             runner: ubuntu-latest
           - arch: arm64
             runner: ubuntu-24.04-arm
+    env:
+      BUILD_DATE: ${{ inputs.build-date || format('smoke-{0}', github.sha) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -39,6 +52,16 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
+      # The semver rule makes the version label 3.4.0 rather than v3.4.0, as
+      # the images published before this workflow were labelled
+      - name: Image labels
+        if: inputs.publish
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: carrotwaxr/peek-stash-browser
+          tags: type=semver,pattern={{version}}
+
       - name: Build the production image
         uses: docker/build-push-action@v7
         with:
@@ -46,7 +69,8 @@ jobs:
           file: ./Dockerfile.production
           load: true
           tags: peek:smoke
-          build-args: BUILD_DATE=smoke-${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: BUILD_DATE=${{ env.BUILD_DATE }}
           cache-from: type=gha,scope=image-${{ matrix.arch }}
           # Only main writes. GitHub keeps a cache under the ref that saved it,
           # and a run can read only its own ref's entries and main's, so a
@@ -56,7 +80,7 @@ jobs:
       - name: Boot it against an empty volume
         run: node docker/smoke-test.mjs peek:smoke
         env:
-          EXPECT_BUILD_DATE: smoke-${{ github.sha }}
+          EXPECT_BUILD_DATE: ${{ env.BUILD_DATE }}
 
       # The browser checks run on amd64 only: the CSP test needs installed
       # Google Chrome (channel "chrome"), which has no Linux arm64 build
@@ -102,3 +126,43 @@ jobs:
           name: playwright-report-image
           path: playwright-report/
           retention-days: 14
+
+      # Publishing: the same build again. Every layer is cached in this builder,
+      # so it only exports and uploads. Pushed by digest only; no tag points at
+      # it until docker-build.yml's publish job, which runs only if both
+      # architectures passed.
+      - name: Log in to Docker Hub
+        if: inputs.publish
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push the tested image by digest
+        if: inputs.publish
+        id: push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.production
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: BUILD_DATE=${{ env.BUILD_DATE }}
+          outputs: type=image,name=carrotwaxr/peek-stash-browser,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Record the digest
+        if: inputs.publish
+        run: |
+          test -n "$DIGEST"
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+
+      - name: Upload the digest
+        if: inputs.publish
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
