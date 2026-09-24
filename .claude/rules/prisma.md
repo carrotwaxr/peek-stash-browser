@@ -2,6 +2,7 @@
 paths:
   - "server/prisma/**"
   - "server/initializers/database.ts"
+  - "server/initializers/migrations.ts"
   - "server/initializers/schemaCatchup.ts"
   - "docker/start.sh"
 ---
@@ -20,8 +21,10 @@ paths:
 
 ## How migrations run
 
-- In the container, `docker/start.sh` first marks `0_baseline` as applied for databases from the `db push` era, then runs `prisma migrate deploy`, then starts the server.
-- On startup the server (`server/initializers/database.ts`) runs `runSchemaCatchup`, which adds tables and columns those old databases lack, then `prisma migrate deploy` again. Outside Docker only this second part runs.
+- The server owns migrations, in Docker, development and E2E alike; `docker/start.sh` only starts Node, and the dev script only generates the client.
+- At startup, before it listens, the server (`server/initializers/database.ts`) runs `runSchemaCatchup`, which adds the tables and columns databases from the `db push` era lack and marks their baseline applied. Then `migrateDatabase` (`server/initializers/migrations.ts`) reads `_prisma_migrations` through Prisma and compares it with the folders in `prisma/migrations/`.
+- Nothing pending: it logs `Database schema is up to date (N migrations)` and starts no process. Otherwise it logs `Applying N pending migrations: <names>`, closes the Prisma pool, and runs `prisma migrate deploy` once, with Node on `node_modules/prisma/build/index.js` (no `npx`: the image's `node_modules` is read-only).
+- Applied migrations with no folder (a newer Peek migrated the database) get a warning; startup continues.
 
 Every past release upgrades through this path, so a migration must work on a populated database, not only an empty one.
 

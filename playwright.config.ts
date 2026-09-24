@@ -77,8 +77,8 @@ export default defineConfig({
   ],
 
   // Hermetic mode starts the Stash replay (item 83), then the server on a
-  // fresh database, then the client. stdout is shown so the log names the
-  // ports, the database file and the sync.
+  // fresh database, which it migrates itself, then the client. stdout is
+  // shown so the log names the ports, the database file and the sync.
   webServer: devStack
     ? undefined
     : [
@@ -93,7 +93,7 @@ export default defineConfig({
         },
         {
           command:
-            "node e2e/support/reset-db.mjs && cd server && npx prisma migrate deploy && npx tsx index.ts",
+            "node e2e/support/reset-db.mjs && cd server && npx tsx index.ts",
           url: `http://localhost:${ports.server}/api/health`,
           reuseExistingServer: false,
           timeout: 120_000, // slow disks without /dev/shm
