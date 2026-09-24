@@ -37,8 +37,13 @@ vi.mock("../../../utils/logger.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id, _inst, viewer) =>
-      viewer?.role === "ADMIN" ? `http://stash/images/${id}` : null
+    .mockImplementation(
+      (
+        _type: string,
+        id: string | number,
+        _inst: string | undefined,
+        viewer: { role: string } | undefined
+      ) => (viewer?.role === "ADMIN" ? `http://stash/images/${id}` : null)
     ),
 }));
 

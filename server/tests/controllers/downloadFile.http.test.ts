@@ -37,24 +37,26 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 }));
 
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(async () => ({
-    canShare: false,
-    canDownloadFiles: true,
-    canDownloadPlaylists: true,
-    sources: {
-      canShare: "default",
-      canDownloadFiles: "override",
-      canDownloadPlaylists: "override",
-    },
-  })),
+  resolveUserPermissions: vi.fn(() =>
+    Promise.resolve({
+      canShare: false,
+      canDownloadFiles: true,
+      canDownloadPlaylists: true,
+      sources: {
+        canShare: "default",
+        canDownloadFiles: "override",
+        canDownloadPlaylists: "override",
+      },
+    })
+  ),
 }));
 
 vi.mock("../../services/EntityAccessService.js", () => ({
-  canUserAccessEntity: vi.fn(async () => true),
+  canUserAccessEntity: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("../../services/PlaylistAccessService.js", () => ({
-  getPlaylistAccess: vi.fn(async () => ({ level: "owner" })),
+  getPlaylistAccess: vi.fn(() => Promise.resolve({ level: "owner" })),
 }));
 
 vi.mock("../../services/PlaylistZipService.js", () => ({

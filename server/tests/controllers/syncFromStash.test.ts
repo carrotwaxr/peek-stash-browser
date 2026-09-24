@@ -10,6 +10,7 @@ import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { stringContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Build a mock StashClient using vi.hoisted so it's available in vi.mock factories
@@ -1209,7 +1210,7 @@ describe("syncFromStash", () => {
       const body = res._getBody();
       expect(body).toEqual({
         success: true,
-        message: expect.stringContaining("Successfully synced"),
+        message: stringContaining("Successfully synced"),
         stats: {
           scenes: { checked: 0, updated: 0, created: 0 },
           performers: { checked: 0, updated: 0, created: 0 },

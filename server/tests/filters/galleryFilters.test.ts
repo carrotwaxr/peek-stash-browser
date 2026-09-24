@@ -309,7 +309,7 @@ describe("Gallery Filters", () => {
 
       result.forEach((gallery) => {
         expect(gallery.studio).toBeTruthy();
-        expect(gallery.studio!.id).toBe(studioId);
+        expect(must(gallery.studio).id).toBe(studioId);
       });
     });
 
@@ -337,7 +337,7 @@ describe("Gallery Filters", () => {
 
       result.forEach((gallery) => {
         expect(gallery.studio).toBeTruthy();
-        expect(studioIds).toContain(gallery.studio!.id);
+        expect(studioIds).toContain(must(gallery.studio).id);
       });
     });
 

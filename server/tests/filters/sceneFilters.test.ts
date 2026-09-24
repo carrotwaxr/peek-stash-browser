@@ -250,7 +250,7 @@ describe("Scene Filters - Quick Filters", () => {
 
       result.forEach((scene) => {
         expect(scene.studio).toBeTruthy();
-        expect(studioIds.includes(scene.studio!.id)).toBe(true);
+        expect(studioIds.includes(must(scene.studio).id)).toBe(true);
       });
     });
 
@@ -265,11 +265,11 @@ describe("Scene Filters - Quick Filters", () => {
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
-      result.forEach((scene) => {
-        if (scene.studio) {
-          expect(studioIds.includes(scene.studio.id)).toBe(false);
-        }
-      });
+      expect(result).not.toHaveLength(0);
+      const withExcludedStudio = result.filter(
+        (scene) => scene.studio && studioIds.includes(scene.studio.id)
+      );
+      expect(withExcludedStudio).toEqual([]);
     });
 
     it("should include scenes without studio when EXCLUDES modifier is used", async () => {
@@ -1289,7 +1289,7 @@ describe("Scene Filters - Quick Filters", () => {
 
         // Check studio
         expect(scene.studio).toBeTruthy();
-        expect(studioIds.includes(scene.studio!.id)).toBe(true);
+        expect(studioIds.includes(must(scene.studio).id)).toBe(true);
 
         // Check duration
         const duration = scene.files?.[0]?.duration || 0;

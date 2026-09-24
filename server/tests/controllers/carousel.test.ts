@@ -28,6 +28,7 @@ import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { PeekSceneFilter } from "../../types/peekFilters.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
+import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { createMockScene } from "../helpers/mockDataGenerators.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -294,7 +295,7 @@ describe("Carousel Controller", () => {
       expect(res._getStatus()).toBe(201);
       expect(mockPrisma.userCarousel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             userId: 1,
             title: "New Carousel",
           }),
@@ -330,7 +331,7 @@ describe("Carousel Controller", () => {
 
       expect(mockPrisma.userCarousel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             icon: "Film",
             sort: "random",
             direction: "DESC",
@@ -366,8 +367,8 @@ describe("Carousel Controller", () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 1 },
-          data: expect.objectContaining({
-            carouselPreferences: expect.arrayContaining([
+          data: objectContaining({
+            carouselPreferences: arrayContaining([
               expect.objectContaining({ id: "custom-42" }),
             ]),
           }),

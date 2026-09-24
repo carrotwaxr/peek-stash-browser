@@ -3,20 +3,22 @@
  *
  * Tests the cached entity query service using mocked Prisma client
  */
-import {
-  type Mock,
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
 // Import mocked module
-import prisma from "../../services/../prisma/singleton.js";
+import type {
+  Prisma,
+  StashGallery,
+  StashGroup,
+  StashPerformer,
+  StashScene,
+  StashStudio,
+  StashTag,
+} from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
 // Import service after mocking
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock StashInstanceManager to provide a default config for stream URL generation
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -34,103 +36,22 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       apiKey: "test-api-key",
     }),
     getAllConfigs: () => [],
-    loadFromDatabase: async () => undefined,
+    loadFromDatabase: () => Promise.resolve(),
   },
 }));
 
-// Mock the prisma module with inline factory
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    stashScene: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashPerformer: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashStudio: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashTag: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashGallery: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashGroup: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashImage: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-    },
-    stashClip: {
-      count: vi.fn(),
-    },
-    // Junction table mocks for count queries
-    scenePerformer: {
-      count: vi.fn(),
-    },
-    sceneTag: {
-      count: vi.fn(),
-    },
-    sceneGroup: {
-      count: vi.fn(),
-    },
-    sceneGallery: {
-      count: vi.fn(),
-    },
-    imageGallery: {
-      count: vi.fn(),
-    },
-    imagePerformer: {
-      count: vi.fn(),
-    },
-    imageTag: {
-      count: vi.fn(),
-    },
-    galleryPerformer: {
-      count: vi.fn(),
-    },
-    performerTag: {
-      count: vi.fn(),
-    },
-    studioTag: {
-      count: vi.fn(),
-    },
-    groupTag: {
-      count: vi.fn(),
-    },
-    galleryTag: {
-      count: vi.fn(),
-    },
-    syncState: {
-      findFirst: vi.fn(),
-    },
-    $queryRaw: vi.fn(),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
-// Type-safe mock access helper
-const getMock = (fn: unknown): Mock => fn as Mock;
+const mockPrisma = vi.mocked(prisma, true);
 
 // Sample test data using individual columns (matching new schema after JSON blob elimination)
 // These mock the actual database row structure, not the normalized API response
 
 // Cached database row format (individual columns)
-const mockCachedScene = {
+const mockCachedScene = partialRow<StashScene>({
   id: "scene-1",
   stashInstanceId: "test-instance",
   title: "Test Scene",
@@ -164,9 +85,9 @@ const mockCachedScene = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
-const mockCachedPerformer = {
+const mockCachedPerformer = partialRow<StashPerformer>({
   id: "performer-1",
   name: "Test Performer",
   disambiguation: null,
@@ -183,15 +104,11 @@ const mockCachedPerformer = {
   tattoos: null,
   piercings: null,
   careerLength: null,
-  aliases: null,
   details: null,
   deathDate: null,
-  circumcised: null,
-  penisLength: null,
   rating100: null,
   favorite: false,
   imagePath: null,
-  oCounter: 0,
   sceneCount: 0,
   imageCount: 0,
   galleryCount: 0,
@@ -200,13 +117,12 @@ const mockCachedPerformer = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
-const mockCachedStudio = {
+const mockCachedStudio = partialRow<StashStudio>({
   id: "studio-1",
   name: "Test Studio",
   url: null,
-  parentStudioId: null,
   details: null,
   rating100: null,
   favorite: false,
@@ -215,22 +131,21 @@ const mockCachedStudio = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
-const mockCachedTag = {
+const mockCachedTag = partialRow<StashTag>({
   id: "tag-1",
   name: "Test Tag",
   description: "Test tag description",
-  parentTagId: null,
   favorite: false,
   imagePath: null,
   stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
-const mockCachedGallery = {
+const mockCachedGallery = partialRow<StashGallery>({
   id: "gallery-1",
   title: "Test Gallery",
   code: null,
@@ -238,20 +153,17 @@ const mockCachedGallery = {
   details: null,
   studioId: null,
   rating100: null,
-  organized: false,
   imageCount: 50,
-  pathCover: null,
   stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
-const mockCachedGroup = {
+const mockCachedGroup = partialRow<StashGroup>({
   id: "group-1",
   stashInstanceId: "test-instance",
   name: "Test Group",
-  aliases: null,
   duration: null,
   date: null,
   rating100: null,
@@ -264,13 +176,13 @@ const mockCachedGroup = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-};
+});
 
 describe("StashEntityService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default mock for studio name lookup (used by getAllScenes* methods)
-    getMock(prisma.stashStudio.findMany).mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -284,7 +196,7 @@ describe("StashEntityService", () => {
         { ...mockCachedScene, id: "scene-2", title: "Scene 2" },
       ];
 
-      getMock(prisma.stashScene.findMany).mockResolvedValue(mockCachedScenes);
+      mockPrisma.stashScene.findMany.mockResolvedValue(mockCachedScenes);
 
       const result = await stashEntityService.getAllScenes();
 
@@ -299,7 +211,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get a single scene by ID", async () => {
-      getMock(prisma.stashScene.findFirst).mockResolvedValue({
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
         ...mockCachedScene,
       });
 
@@ -309,12 +221,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("scene-1");
-      expect(result!.title).toBe("Test Scene");
+      expect(must(result).id).toBe("scene-1");
+      expect(must(result).title).toBe("Test Scene");
     });
 
     it("should return null for non-existent scene", async () => {
-      getMock(prisma.stashScene.findFirst).mockResolvedValue(null);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getScene(
         "non-existent",
@@ -330,7 +242,7 @@ describe("StashEntityService", () => {
         { ...mockCachedScene, id: "scene-3", title: "Scene 3" },
       ];
 
-      getMock(prisma.stashScene.findMany).mockResolvedValue(mockCachedScenes);
+      mockPrisma.stashScene.findMany.mockResolvedValue(mockCachedScenes);
 
       const result = await stashEntityService.getScenesByIds(
         ["scene-1", "scene-3"],
@@ -343,7 +255,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get scene count", async () => {
-      getMock(prisma.stashScene.count).mockResolvedValue(150);
+      mockPrisma.stashScene.count.mockResolvedValue(150);
 
       const count = await stashEntityService.getSceneCount();
 
@@ -355,7 +267,7 @@ describe("StashEntityService", () => {
     it("should get all performers with default user fields", async () => {
       const mockCachedPerformers = [{ ...mockCachedPerformer }];
 
-      getMock(prisma.stashPerformer.findMany).mockResolvedValue(
+      mockPrisma.stashPerformer.findMany.mockResolvedValue(
         mockCachedPerformers
       );
 
@@ -370,15 +282,15 @@ describe("StashEntityService", () => {
     });
 
     it("should get performer by ID", async () => {
-      getMock(prisma.stashPerformer.findFirst).mockResolvedValue({
+      mockPrisma.stashPerformer.findFirst.mockResolvedValue({
         ...mockCachedPerformer,
       });
       // Mock junction table counts for getPerformer
-      getMock(prisma.scenePerformer.count).mockResolvedValue(10);
-      getMock(prisma.imagePerformer.count).mockResolvedValue(5);
-      getMock(prisma.galleryPerformer.count).mockResolvedValue(3);
+      mockPrisma.scenePerformer.count.mockResolvedValue(10);
+      mockPrisma.imagePerformer.count.mockResolvedValue(5);
+      mockPrisma.galleryPerformer.count.mockResolvedValue(3);
       // Mock raw query for group count
-      getMock(prisma.$queryRaw).mockResolvedValue([{ count: 2 }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ count: 2 }]);
 
       const result = await stashEntityService.getPerformer(
         "performer-1",
@@ -386,12 +298,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("performer-1");
-      expect(result!.scene_count).toBe(10);
+      expect(must(result).id).toBe("performer-1");
+      expect(must(result).scene_count).toBe(10);
     });
 
     it("should return null for non-existent performer", async () => {
-      getMock(prisma.stashPerformer.findFirst).mockResolvedValue(null);
+      mockPrisma.stashPerformer.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getPerformer(
         "non-existent",
@@ -407,7 +319,7 @@ describe("StashEntityService", () => {
         { ...mockCachedPerformer, id: "performer-2", name: "Performer 2" },
       ];
 
-      getMock(prisma.stashPerformer.findMany).mockResolvedValue(
+      mockPrisma.stashPerformer.findMany.mockResolvedValue(
         mockCachedPerformers
       );
 
@@ -420,7 +332,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get performer count", async () => {
-      getMock(prisma.stashPerformer.count).mockResolvedValue(500);
+      mockPrisma.stashPerformer.count.mockResolvedValue(500);
 
       const count = await stashEntityService.getPerformerCount();
 
@@ -432,7 +344,7 @@ describe("StashEntityService", () => {
     it("should get all studios with default user fields", async () => {
       const mockCachedStudios = [{ ...mockCachedStudio }];
 
-      getMock(prisma.stashStudio.findMany).mockResolvedValue(mockCachedStudios);
+      mockPrisma.stashStudio.findMany.mockResolvedValue(mockCachedStudios);
 
       const result = await stashEntityService.getAllStudios();
 
@@ -445,15 +357,15 @@ describe("StashEntityService", () => {
     });
 
     it("should get studio by ID", async () => {
-      getMock(prisma.stashStudio.findFirst).mockResolvedValue({
+      mockPrisma.stashStudio.findFirst.mockResolvedValue({
         ...mockCachedStudio,
       });
       // Mock counts for getStudio
-      getMock(prisma.stashScene.count).mockResolvedValue(20);
-      getMock(prisma.stashImage.count).mockResolvedValue(15);
-      getMock(prisma.stashGallery.count).mockResolvedValue(5);
+      mockPrisma.stashScene.count.mockResolvedValue(20);
+      mockPrisma.stashImage.count.mockResolvedValue(15);
+      mockPrisma.stashGallery.count.mockResolvedValue(5);
       // Mock raw query results for performer and group counts
-      getMock(prisma.$queryRaw).mockResolvedValue([{ count: 10 }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ count: 10 }]);
 
       const result = await stashEntityService.getStudio(
         "studio-1",
@@ -461,12 +373,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("studio-1");
-      expect(result!.scene_count).toBe(20);
+      expect(must(result).id).toBe("studio-1");
+      expect(must(result).scene_count).toBe(20);
     });
 
     it("should return null for non-existent studio", async () => {
-      getMock(prisma.stashStudio.findFirst).mockResolvedValue(null);
+      mockPrisma.stashStudio.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getStudio(
         "non-existent",
@@ -477,7 +389,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get studio count", async () => {
-      getMock(prisma.stashStudio.count).mockResolvedValue(75);
+      mockPrisma.stashStudio.count.mockResolvedValue(75);
 
       const count = await stashEntityService.getStudioCount();
 
@@ -489,7 +401,7 @@ describe("StashEntityService", () => {
     it("should get all tags with default user fields", async () => {
       const mockCachedTags = [{ ...mockCachedTag }];
 
-      getMock(prisma.stashTag.findMany).mockResolvedValue(mockCachedTags);
+      mockPrisma.stashTag.findMany.mockResolvedValue(mockCachedTags);
 
       const result = await stashEntityService.getAllTags();
 
@@ -502,26 +414,26 @@ describe("StashEntityService", () => {
     });
 
     it("should get tag by ID", async () => {
-      getMock(prisma.stashTag.findFirst).mockResolvedValue({
+      mockPrisma.stashTag.findFirst.mockResolvedValue({
         ...mockCachedTag,
       });
       // Mock junction table counts for getTag
-      getMock(prisma.sceneTag.count).mockResolvedValue(25);
-      getMock(prisma.imageTag.count).mockResolvedValue(10);
-      getMock(prisma.galleryTag.count).mockResolvedValue(5);
-      getMock(prisma.performerTag.count).mockResolvedValue(8);
-      getMock(prisma.studioTag.count).mockResolvedValue(3);
-      getMock(prisma.groupTag.count).mockResolvedValue(2);
+      mockPrisma.sceneTag.count.mockResolvedValue(25);
+      mockPrisma.imageTag.count.mockResolvedValue(10);
+      mockPrisma.galleryTag.count.mockResolvedValue(5);
+      mockPrisma.performerTag.count.mockResolvedValue(8);
+      mockPrisma.studioTag.count.mockResolvedValue(3);
+      mockPrisma.groupTag.count.mockResolvedValue(2);
 
       const result = await stashEntityService.getTag("tag-1", "test-instance");
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("tag-1");
-      expect(result!.scene_count).toBe(25);
+      expect(must(result).id).toBe("tag-1");
+      expect(must(result).scene_count).toBe(25);
     });
 
     it("should return null for non-existent tag", async () => {
-      getMock(prisma.stashTag.findFirst).mockResolvedValue(null);
+      mockPrisma.stashTag.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getTag(
         "non-existent",
@@ -532,7 +444,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get tag count", async () => {
-      getMock(prisma.stashTag.count).mockResolvedValue(200);
+      mockPrisma.stashTag.count.mockResolvedValue(200);
 
       const count = await stashEntityService.getTagCount();
 
@@ -544,9 +456,7 @@ describe("StashEntityService", () => {
     it("should get all galleries with default user fields", async () => {
       const mockCachedGalleries = [{ ...mockCachedGallery }];
 
-      getMock(prisma.stashGallery.findMany).mockResolvedValue(
-        mockCachedGalleries
-      );
+      mockPrisma.stashGallery.findMany.mockResolvedValue(mockCachedGalleries);
 
       const result = await stashEntityService.getAllGalleries();
 
@@ -558,11 +468,11 @@ describe("StashEntityService", () => {
     });
 
     it("should get gallery by ID", async () => {
-      getMock(prisma.stashGallery.findFirst).mockResolvedValue({
+      mockPrisma.stashGallery.findFirst.mockResolvedValue({
         ...mockCachedGallery,
       });
       // Mock junction table counts for getGallery
-      getMock(prisma.imageGallery.count).mockResolvedValue(50);
+      mockPrisma.imageGallery.count.mockResolvedValue(50);
 
       const result = await stashEntityService.getGallery(
         "gallery-1",
@@ -570,12 +480,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("gallery-1");
-      expect(result!.image_count).toBe(50);
+      expect(must(result).id).toBe("gallery-1");
+      expect(must(result).image_count).toBe(50);
     });
 
     it("should return null for non-existent gallery", async () => {
-      getMock(prisma.stashGallery.findFirst).mockResolvedValue(null);
+      mockPrisma.stashGallery.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getGallery(
         "non-existent",
@@ -586,7 +496,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get gallery count", async () => {
-      getMock(prisma.stashGallery.count).mockResolvedValue(50);
+      mockPrisma.stashGallery.count.mockResolvedValue(50);
 
       const count = await stashEntityService.getGalleryCount();
 
@@ -598,7 +508,7 @@ describe("StashEntityService", () => {
     it("should get all groups with default user fields", async () => {
       const mockCachedGroups = [{ ...mockCachedGroup }];
 
-      getMock(prisma.stashGroup.findMany).mockResolvedValue(mockCachedGroups);
+      mockPrisma.stashGroup.findMany.mockResolvedValue(mockCachedGroups);
 
       const result = await stashEntityService.getAllGroups();
 
@@ -610,13 +520,13 @@ describe("StashEntityService", () => {
     });
 
     it("should get group by ID", async () => {
-      getMock(prisma.stashGroup.findFirst).mockResolvedValue({
+      mockPrisma.stashGroup.findFirst.mockResolvedValue({
         ...mockCachedGroup,
       });
       // Mock junction table counts for getGroup
-      getMock(prisma.sceneGroup.count).mockResolvedValue(15);
+      mockPrisma.sceneGroup.count.mockResolvedValue(15);
       // Mock raw query for performer count
-      getMock(prisma.$queryRaw).mockResolvedValue([{ count: 8 }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ count: 8 }]);
 
       const result = await stashEntityService.getGroup(
         "group-1",
@@ -624,12 +534,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("group-1");
-      expect(result!.scene_count).toBe(15);
+      expect(must(result).id).toBe("group-1");
+      expect(must(result).scene_count).toBe(15);
     });
 
     it("should return null for non-existent group", async () => {
-      getMock(prisma.stashGroup.findFirst).mockResolvedValue(null);
+      mockPrisma.stashGroup.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getGroup(
         "non-existent",
@@ -640,7 +550,7 @@ describe("StashEntityService", () => {
     });
 
     it("should get group count", async () => {
-      getMock(prisma.stashGroup.count).mockResolvedValue(25);
+      mockPrisma.stashGroup.count.mockResolvedValue(25);
 
       const count = await stashEntityService.getGroupCount();
 
@@ -650,14 +560,14 @@ describe("StashEntityService", () => {
 
   describe("Stats and Readiness", () => {
     it("should get stats for all entity types", async () => {
-      getMock(prisma.stashScene.count).mockResolvedValue(1000);
-      getMock(prisma.stashPerformer.count).mockResolvedValue(500);
-      getMock(prisma.stashStudio.count).mockResolvedValue(100);
-      getMock(prisma.stashTag.count).mockResolvedValue(300);
-      getMock(prisma.stashGallery.count).mockResolvedValue(50);
-      getMock(prisma.stashGroup.count).mockResolvedValue(25);
-      getMock(prisma.stashImage.count).mockResolvedValue(2000);
-      getMock(prisma.stashClip.count).mockResolvedValue(150);
+      mockPrisma.stashScene.count.mockResolvedValue(1000);
+      mockPrisma.stashPerformer.count.mockResolvedValue(500);
+      mockPrisma.stashStudio.count.mockResolvedValue(100);
+      mockPrisma.stashTag.count.mockResolvedValue(300);
+      mockPrisma.stashGallery.count.mockResolvedValue(50);
+      mockPrisma.stashGroup.count.mockResolvedValue(25);
+      mockPrisma.stashImage.count.mockResolvedValue(2000);
+      mockPrisma.stashClip.count.mockResolvedValue(150);
 
       const stats = await stashEntityService.getStats();
 
@@ -672,11 +582,13 @@ describe("StashEntityService", () => {
     });
 
     it("should return true for isReady when sync state exists with lastFullSyncTimestamp", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue({
-        entityType: "scene",
-        lastFullSyncTimestamp: "2024-01-01T00:00:00-08:00",
-        lastIncrementalSyncTimestamp: null,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          entityType: "scene",
+          lastFullSyncTimestamp: "2024-01-01T00:00:00-08:00",
+          lastIncrementalSyncTimestamp: null,
+        })
+      );
 
       const ready = await stashEntityService.isReady();
 
@@ -684,11 +596,13 @@ describe("StashEntityService", () => {
     });
 
     it("should return true for isReady when sync state exists with lastIncrementalSyncTimestamp", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue({
-        entityType: "scene",
-        lastFullSyncTimestamp: null,
-        lastIncrementalSyncTimestamp: "2024-01-02T00:00:00-08:00",
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          entityType: "scene",
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: "2024-01-02T00:00:00-08:00",
+        })
+      );
 
       const ready = await stashEntityService.isReady();
 
@@ -696,7 +610,7 @@ describe("StashEntityService", () => {
     });
 
     it("should return false for isReady when no sync state exists", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue(null);
+      mockPrisma.syncState.findFirst.mockResolvedValue(null);
 
       const ready = await stashEntityService.isReady();
 
@@ -704,11 +618,13 @@ describe("StashEntityService", () => {
     });
 
     it("should return false for isReady when sync state has no timestamps", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue({
-        entityType: "scene",
-        lastFullSyncTimestamp: null,
-        lastIncrementalSyncTimestamp: null,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          entityType: "scene",
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: null,
+        })
+      );
 
       const ready = await stashEntityService.isReady();
 
@@ -717,11 +633,13 @@ describe("StashEntityService", () => {
 
     it("should get last refreshed time", async () => {
       const lastSyncDate = new Date("2024-01-15T12:00:00Z");
-      getMock(prisma.syncState.findFirst).mockResolvedValue({
-        entityType: "scene",
-        lastFullSyncActual: lastSyncDate,
-        lastIncrementalSyncActual: null,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          entityType: "scene",
+          lastFullSyncActual: lastSyncDate,
+          lastIncrementalSyncActual: null,
+        })
+      );
 
       const lastRefreshed = await stashEntityService.getLastRefreshed();
 
@@ -729,7 +647,7 @@ describe("StashEntityService", () => {
     });
 
     it("should return null for last refreshed when no sync state", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue(null);
+      mockPrisma.syncState.findFirst.mockResolvedValue(null);
 
       const lastRefreshed = await stashEntityService.getLastRefreshed();
 
@@ -738,11 +656,13 @@ describe("StashEntityService", () => {
 
     it("should get cache version as timestamp", async () => {
       const syncDate = new Date("2024-01-15T12:00:00Z");
-      getMock(prisma.syncState.findFirst).mockResolvedValue({
-        entityType: "scene",
-        lastFullSyncActual: syncDate,
-        lastIncrementalSyncActual: null,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          entityType: "scene",
+          lastFullSyncActual: syncDate,
+          lastIncrementalSyncActual: null,
+        })
+      );
 
       const version = await stashEntityService.getCacheVersion();
 
@@ -750,7 +670,7 @@ describe("StashEntityService", () => {
     });
 
     it("should return 0 for cache version when no sync", async () => {
-      getMock(prisma.syncState.findFirst).mockResolvedValue(null);
+      mockPrisma.syncState.findFirst.mockResolvedValue(null);
 
       const version = await stashEntityService.getCacheVersion();
 
@@ -760,7 +680,7 @@ describe("StashEntityService", () => {
 
   describe("Transform instanceId inclusion (#390)", () => {
     it("transformScene includes instanceId from stashInstanceId", async () => {
-      getMock(prisma.stashScene.findFirst).mockResolvedValue({
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
         ...mockCachedScene,
         stashInstanceId: "instance-alpha",
       });
@@ -771,17 +691,16 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.instanceId).toBe("instance-alpha");
+      expect(must(result).instanceId).toBe("instance-alpha");
     });
 
     it("transformGroup includes instanceId from stashInstanceId", async () => {
-      getMock(prisma.stashGroup.findFirst).mockResolvedValue({
+      mockPrisma.stashGroup.findFirst.mockResolvedValue({
         ...mockCachedGroup,
         stashInstanceId: "instance-beta",
-        tags: [],
       });
       // getGroup calls $queryRaw for scene/performer counts
-      getMock(prisma.$queryRaw).mockResolvedValue([{ count: 0 }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
 
       const result = await stashEntityService.getGroup(
         "group-1",
@@ -789,11 +708,11 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.instanceId).toBe("instance-beta");
+      expect(must(result).instanceId).toBe("instance-beta");
     });
 
     it("scenes from different instances have distinct instanceIds", async () => {
-      getMock(prisma.stashScene.findFirst)
+      mockPrisma.stashScene.findFirst
         .mockResolvedValueOnce({
           ...mockCachedScene,
           id: "scene-1",
@@ -808,15 +727,15 @@ describe("StashEntityService", () => {
       const sceneA = await stashEntityService.getScene("scene-1", "instance-a");
       const sceneB = await stashEntityService.getScene("scene-1", "instance-b");
 
-      expect(sceneA!.instanceId).toBe("instance-a");
-      expect(sceneB!.instanceId).toBe("instance-b");
-      expect(sceneA!.instanceId).not.toBe(sceneB!.instanceId);
+      expect(must(sceneA).instanceId).toBe("instance-a");
+      expect(must(sceneB).instanceId).toBe("instance-b");
+      expect(must(sceneA).instanceId).not.toBe(must(sceneB).instanceId);
     });
   });
 
   describe("FTS Search", () => {
     it("searchScenes returns transformed results from FTS5", async () => {
-      getMock(prisma.$queryRaw).mockResolvedValue([
+      mockPrisma.$queryRaw.mockResolvedValue([
         { ...mockCachedScene, id: "scene-fts-1", title: "FTS Match" },
       ]);
 
@@ -829,11 +748,9 @@ describe("StashEntityService", () => {
 
     it("searchScenes falls back to LIKE on FTS error", async () => {
       // FTS fails
-      getMock(prisma.$queryRaw).mockRejectedValue(
-        new Error("fts5 syntax error")
-      );
+      mockPrisma.$queryRaw.mockRejectedValue(new Error("fts5 syntax error"));
       // LIKE fallback
-      getMock(prisma.stashScene.findMany).mockResolvedValue([
+      mockPrisma.stashScene.findMany.mockResolvedValue([
         { ...mockCachedScene, id: "scene-like-1", title: "LIKE Match" },
       ]);
 
@@ -844,7 +761,7 @@ describe("StashEntityService", () => {
     });
 
     it("searchPerformers returns transformed results from FTS5", async () => {
-      getMock(prisma.$queryRaw).mockResolvedValue([
+      mockPrisma.$queryRaw.mockResolvedValue([
         {
           ...mockCachedPerformer,
           id: "perf-fts-1",
@@ -861,8 +778,8 @@ describe("StashEntityService", () => {
     });
 
     it("searchPerformers falls back to LIKE on FTS error", async () => {
-      getMock(prisma.$queryRaw).mockRejectedValue(new Error("fts5 error"));
-      getMock(prisma.stashPerformer.findMany).mockResolvedValue([
+      mockPrisma.$queryRaw.mockRejectedValue(new Error("fts5 error"));
+      mockPrisma.stashPerformer.findMany.mockResolvedValue([
         {
           ...mockCachedPerformer,
           id: "perf-like-1",
@@ -879,7 +796,11 @@ describe("StashEntityService", () => {
   });
 
   describe("Image Queries", () => {
-    const mockCachedImage = {
+    const mockCachedImage = partialRow<
+      Prisma.StashImageGetPayload<{
+        include: { performers: true; tags: true; galleries: true };
+      }>
+    >({
       id: "image-1",
       stashInstanceId: "test-instance",
       title: "Test Image",
@@ -891,8 +812,8 @@ describe("StashEntityService", () => {
       organized: false,
       oCounter: 0,
       filePath: "/path/to/image.jpg",
-      fileWidth: 1920,
-      fileHeight: 1080,
+      width: 1920,
+      height: 1080,
       fileSize: BigInt(500000),
       pathThumbnail: null,
       pathPreview: null,
@@ -904,10 +825,10 @@ describe("StashEntityService", () => {
       performers: [],
       tags: [],
       galleries: [],
-    };
+    });
 
     it("getImage returns transformed image with relations", async () => {
-      getMock(prisma.stashImage.findFirst).mockResolvedValue(mockCachedImage);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(mockCachedImage);
 
       const result = await stashEntityService.getImage(
         "image-1",
@@ -915,12 +836,12 @@ describe("StashEntityService", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe("image-1");
-      expect(result!.instanceId).toBe("test-instance");
+      expect(must(result).id).toBe("image-1");
+      expect(must(result).instanceId).toBe("test-instance");
     });
 
     it("getImage returns null for non-existent image", async () => {
-      getMock(prisma.stashImage.findFirst).mockResolvedValue(null);
+      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
 
       const result = await stashEntityService.getImage(
         "nonexistent",
@@ -931,7 +852,7 @@ describe("StashEntityService", () => {
     });
 
     it("getImageCount returns count of non-deleted images", async () => {
-      getMock(prisma.stashImage.count).mockResolvedValue(42);
+      mockPrisma.stashImage.count.mockResolvedValue(42);
 
       const count = await stashEntityService.getImageCount();
 
@@ -952,7 +873,7 @@ describe("StashEntityService", () => {
     });
 
     it("getPerformerIdsByStudios returns performer IDs from studio scenes", async () => {
-      getMock(prisma.$queryRaw).mockResolvedValue([
+      mockPrisma.$queryRaw.mockResolvedValue([
         { performerId: "perf-1" },
         { performerId: "perf-2" },
       ]);
@@ -980,7 +901,7 @@ describe("StashEntityService", () => {
     });
 
     it("getGroupIdsByPerformers returns group IDs from performer scenes", async () => {
-      getMock(prisma.$queryRaw).mockResolvedValue([
+      mockPrisma.$queryRaw.mockResolvedValue([
         { groupId: "group-1" },
         { groupId: "group-2" },
       ]);
@@ -1001,12 +922,12 @@ describe("StashEntityService", () => {
       stashEntityService.invalidateStudioNameCache();
       vi.clearAllMocks();
       // Re-set default mock after clearAllMocks
-      getMock(prisma.stashStudio.findMany).mockResolvedValue([]);
+      mockPrisma.stashStudio.findMany.mockResolvedValue([]);
     });
 
     it("getStudioNameMap caches results across calls", async () => {
-      getMock(prisma.stashStudio.findMany).mockResolvedValue([
-        { id: "s1", stashInstanceId: "inst-a", name: "Studio A" },
+      mockPrisma.stashStudio.findMany.mockResolvedValue([
+        partialRow({ id: "s1", stashInstanceId: "inst-a", name: "Studio A" }),
       ]);
 
       const map1 = await stashEntityService.getStudioNameMap();
@@ -1018,8 +939,8 @@ describe("StashEntityService", () => {
     });
 
     it("invalidateStudioNameCache forces fresh query", async () => {
-      getMock(prisma.stashStudio.findMany).mockResolvedValue([
-        { id: "s1", stashInstanceId: "inst-a", name: "Studio A" },
+      mockPrisma.stashStudio.findMany.mockResolvedValue([
+        partialRow({ id: "s1", stashInstanceId: "inst-a", name: "Studio A" }),
       ]);
 
       await stashEntityService.getStudioNameMap();
@@ -1033,7 +954,7 @@ describe("StashEntityService", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty result sets gracefully", async () => {
-      getMock(prisma.stashScene.findMany).mockResolvedValue([]);
+      mockPrisma.stashScene.findMany.mockResolvedValue([]);
 
       const result = await stashEntityService.getAllScenes();
 
@@ -1042,7 +963,7 @@ describe("StashEntityService", () => {
     });
 
     it("should handle empty ID array in getByIds", async () => {
-      getMock(prisma.stashScene.findMany).mockResolvedValue([]);
+      mockPrisma.stashScene.findMany.mockResolvedValue([]);
 
       const result = await stashEntityService.getScenesByIds(
         [],
@@ -1153,15 +1074,17 @@ describe("StashEntityService", () => {
     });
 
     it("getPlaybackStreams reads the seven columns for (id, instance) and builds the list", async () => {
-      getMock(prisma.stashScene.findFirst).mockResolvedValueOnce({
-        streamDirect: false,
-        streamMkv: true,
-        streamResolutions: "ORIGINAL",
-        filePath: "/v/c.mkv",
-        fileAudioCodec: "ac3",
-        fileWidth: 1920,
-        fileHeight: 1080,
-      });
+      mockPrisma.stashScene.findFirst.mockResolvedValueOnce(
+        partialRow({
+          streamDirect: false,
+          streamMkv: true,
+          streamResolutions: "ORIGINAL",
+          filePath: "/v/c.mkv",
+          fileAudioCodec: "ac3",
+          fileWidth: 1920,
+          fileHeight: 1080,
+        })
+      );
 
       const streams = await stashEntityService.getPlaybackStreams(
         "42",
@@ -1191,7 +1114,7 @@ describe("StashEntityService", () => {
         "/api/scene/42/proxy-stream/stream.mkv?instanceId=inst-a"
       );
 
-      getMock(prisma.stashScene.findFirst).mockResolvedValueOnce(null);
+      mockPrisma.stashScene.findFirst.mockResolvedValueOnce(null);
       await expect(
         stashEntityService.getPlaybackStreams("43", "inst-a")
       ).resolves.toEqual([]);

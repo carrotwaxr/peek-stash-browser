@@ -124,7 +124,7 @@ describeWithDb("StashSyncService scene stream choices (integration)", () => {
     await syncScene();
 
     const row = await readRow();
-    const json = JSON.stringify(row, (_k, v) =>
+    const json = JSON.stringify(row, (_k, v: unknown) =>
       typeof v === "bigint" ? String(v) : v
     );
     expect(json).not.toContain("IT-SECRET");

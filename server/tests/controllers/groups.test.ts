@@ -18,6 +18,7 @@ import {
   testUser,
 } from "../helpers/controllerTestUtils.js";
 import { type MembershipWithGroup } from "../helpers/fixtures.js";
+import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 type GroupWithMemberCount = Prisma.UserGroupGetPayload<{
@@ -72,7 +73,7 @@ describe("Groups Controller", () => {
       );
 
       expect(res.json).toHaveBeenCalledWith({
-        groups: expect.arrayContaining([
+        groups: arrayContaining([
           expect.objectContaining({ name: "Family", memberCount: 3 }),
         ]),
       });
@@ -142,7 +143,7 @@ describe("Groups Controller", () => {
       );
 
       expect(res.json).toHaveBeenCalledWith({
-        group: expect.objectContaining({
+        group: objectContaining({
           name: "Family",
           members: [
             expect.objectContaining({
@@ -226,7 +227,7 @@ describe("Groups Controller", () => {
       );
 
       expect(mockPrisma.userGroup.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+        data: objectContaining({
           name: "Friends",
           canShare: true,
           canDownloadFiles: true,
@@ -297,13 +298,13 @@ describe("Groups Controller", () => {
 
       expect(mockPrisma.userGroup.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: expect.objectContaining({
+        data: objectContaining({
           name: "Updated Family",
           canShare: true,
         }),
       });
       expect(res.json).toHaveBeenCalledWith({
-        group: expect.objectContaining({ name: "Updated Family" }),
+        group: objectContaining({ name: "Updated Family" }),
       });
     });
   });

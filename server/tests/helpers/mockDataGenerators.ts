@@ -3,7 +3,6 @@
  *
  * Creates realistic test data matching Peek's standalone Normalized types.
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
   GroupRef,
   NormalizedGallery,

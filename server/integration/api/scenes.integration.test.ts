@@ -406,16 +406,19 @@ describe("Scene API", () => {
       const scene = must(response.data.findScenes.scenes[0]);
 
       // Scene should have direct tags
-      expect(scene.tags).toBeDefined();
-      expect(scene.tags!.length).toBeGreaterThan(0);
+      const tags = must(scene.tags, "scene.tags");
+      expect(tags.length).toBeGreaterThan(0);
 
       // Scene should also have inherited tags (from performers/studio)
-      expect(scene.inheritedTagIds).toBeDefined();
-      expect(scene.inheritedTagIds!.length).toBeGreaterThan(0);
+      const inheritedTagIds = must(
+        scene.inheritedTagIds,
+        "scene.inheritedTagIds"
+      );
+      expect(inheritedTagIds.length).toBeGreaterThan(0);
 
       // Verify the scene is filterable by BOTH a direct tag AND an inherited tag
-      const directTagId = must(scene.tags![0]).id;
-      const inheritedTagId = scene.inheritedTagIds![0];
+      const directTagId = must(tags[0]).id;
+      const inheritedTagId = inheritedTagIds[0];
 
       // Filter by direct tag AND scene ID - should find the scene
       const directResponse = await adminClient.post<FindScenesResponse>(

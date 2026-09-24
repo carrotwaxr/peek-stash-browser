@@ -9,6 +9,8 @@ import prisma from "../../services/../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 // Import after mocking
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { anyOf, objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { untrusted } from "../helpers/untrusted.js";
 
 // Mock prisma before any imports - define mock inline (vi.mock is hoisted)
@@ -81,8 +83,8 @@ vi.mock("../../prisma/singleton.js", () => {
   };
   // Interactive transaction: invoke the callback with the same mock acting as `tx`
   // so the scene cleanup's temp-table sequence runs against the mocked raw methods.
-  mockPrisma.$transaction = vi.fn(
-    async (cb: (tx: typeof mockPrisma) => unknown) => cb(mockPrisma)
+  mockPrisma.$transaction = vi.fn((cb: (tx: typeof mockPrisma) => unknown) =>
+    Promise.resolve(cb(mockPrisma))
   );
   return { default: mockPrisma };
 });
@@ -173,8 +175,8 @@ describe("StashSyncService Cleanup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-establish implementations that restoreAllMocks (afterEach) would wipe.
-    vi.mocked(prisma.$transaction).mockImplementation(async (cb: unknown) =>
-      (cb as (tx: typeof prisma) => unknown)(prisma)
+    vi.mocked(prisma.$transaction).mockImplementation((cb: unknown) =>
+      Promise.resolve((cb as (tx: typeof prisma) => unknown)(prisma))
     );
     vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(0);
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
@@ -304,7 +306,7 @@ describe("StashSyncService Cleanup", () => {
       // New implementation uses batched IN clauses for scenes to delete
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["4", "5"] }, stashInstanceId: "test-instance" },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: anyOf(Date) },
       });
     });
 
@@ -328,7 +330,7 @@ describe("StashSyncService Cleanup", () => {
           stashInstanceId: "test-instance",
           id: { notIn: ["p1", "p2"] },
         },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: anyOf(Date) },
       });
     });
 
@@ -361,7 +363,7 @@ describe("StashSyncService Cleanup", () => {
       // Verify the where clause includes deletedAt: null
       expect(prisma.stashTag.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ deletedAt: null }),
+          where: objectContaining({ deletedAt: null }),
         })
       );
     });
@@ -562,8 +564,8 @@ describe("StashSyncService Cleanup", () => {
 
       await stashSyncService["cleanupDeletedEntities"]("scene", "inst-'q");
 
-      const execCalls = vi.mocked(prisma.$executeRawUnsafe).mock.calls;
-      const queryCalls = vi.mocked(prisma.$queryRawUnsafe).mock.calls;
+      const execCalls = vi.mocked(prisma).$executeRawUnsafe.mock.calls;
+      const queryCalls = vi.mocked(prisma).$queryRawUnsafe.mock.calls;
       for (const call of [...execCalls, ...queryCalls]) {
         const sql = String(call[0]);
         expect(sql).not.toContain("inst-'q");
@@ -574,14 +576,14 @@ describe("StashSyncService Cleanup", () => {
         /INSERT OR IGNORE INTO _stash_scene_ids/.test(String(c[0]))
       );
       expect(insertCall).toBeDefined();
-      expect(insertCall!.slice(1)).toEqual([JSON.stringify(["1", "x'y"])]);
+      expect(must(insertCall).slice(1)).toEqual([JSON.stringify(["1", "x'y"])]);
 
       const selectCall = queryCalls.find((c) =>
         String(c[0]).includes("SELECT id, phash")
       );
       expect(selectCall).toBeDefined();
-      expect(String(selectCall![0])).toContain("stashInstanceId = ?");
-      expect(selectCall!.slice(1)).toEqual(["inst-'q"]);
+      expect(String(must(selectCall)[0])).toContain("stashInstanceId = ?");
+      expect(must(selectCall).slice(1)).toEqual(["inst-'q"]);
     });
   });
 });

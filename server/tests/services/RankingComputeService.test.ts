@@ -4,6 +4,7 @@
  * Tests the percentile ranking algorithm, engagement score calculation,
  * tie handling, edge cases, and BigInt/float rounding from SQLite.
  */
+import type { Prisma } from "@prisma/client";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
@@ -30,7 +31,24 @@ const mockPrisma = vi.mocked(prisma, true);
 
 /** A transaction client with only the ranking table, whose writes a test reads back. */
 interface RankingTx {
-  userEntityRanking: { deleteMany: Mock; createMany: Mock };
+  userEntityRanking: {
+    deleteMany: Mock<Prisma.UserEntityRankingDelegate["deleteMany"]>;
+    createMany: Mock<Prisma.UserEntityRankingDelegate["createMany"]>;
+  };
+}
+
+/** A ranking table whose writes resolve as Prisma would. */
+function rankingTx(): RankingTx {
+  return {
+    userEntityRanking: {
+      deleteMany: vi
+        .fn<Prisma.UserEntityRankingDelegate["deleteMany"]>()
+        .mockResolvedValue({ count: 0 }),
+      createMany: vi
+        .fn<Prisma.UserEntityRankingDelegate["createMany"]>()
+        .mockResolvedValue({ count: 1 }),
+    },
+  };
 }
 
 /** Run every transaction callback against `tx` instead of the client. */
@@ -50,20 +68,14 @@ function setupRankingMocks(opts: {
   tagStats?: unknown[];
   sceneStats?: unknown[];
 }) {
-  const queryRawMock = mockPrisma.$queryRaw;
-  queryRawMock
+  mockPrisma.$queryRaw
     .mockResolvedValueOnce([{ avgDuration: opts.avgDuration ?? 1200 }])
     .mockResolvedValueOnce(opts.performerStats ?? [])
     .mockResolvedValueOnce(opts.studioStats ?? [])
     .mockResolvedValueOnce(opts.tagStats ?? [])
     .mockResolvedValueOnce(opts.sceneStats ?? []);
 
-  const txMock: RankingTx = {
-    userEntityRanking: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      createMany: vi.fn().mockResolvedValue({ count: 1 }),
-    },
-  };
+  const txMock = rankingTx();
   runTransactionsOn(txMock);
 
   return txMock;
@@ -71,22 +83,14 @@ function setupRankingMocks(opts: {
 
 /** Extract ranking records written by createMany for a specific entity type */
 function getWrittenRankings(
-  txMock: ReturnType<typeof setupRankingMocks>,
+  txMock: RankingTx,
   entityType: string
-): Array<{
-  entityId: string;
-  instanceId: string;
-  percentileRank: number;
-  engagementScore: number;
-  engagementRate: number;
-  playCount: number;
-  oCount: number;
-  libraryPresence: number;
-}> {
-  for (const call of txMock.userEntityRanking.createMany.mock.calls) {
-    const data = call[0].data;
-    if (data.length > 0 && data[0].entityType === entityType) {
-      return data;
+): Prisma.UserEntityRankingCreateManyInput[] {
+  for (const [args] of txMock.userEntityRanking.createMany.mock.calls) {
+    const data = must(args, "createMany args").data;
+    const rows = Array.isArray(data) ? data : [data];
+    if (rows[0]?.entityType === entityType) {
+      return rows;
     }
   }
   return [];
@@ -312,7 +316,7 @@ describe("RankingComputeService", () => {
       );
       // c has lower engagement rate, so lower percentile
       expect(must(byId["c"]).percentileRank).toBeLessThan(
-        must(byId["a"]).percentileRank
+        must(must(byId["a"]).percentileRank)
       );
     });
   });
@@ -330,6 +334,7 @@ describe("RankingComputeService", () => {
 
       // When empty, upsertRankings calls deleteMany directly (not via transaction)
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalled();
+      expect(txMock.userEntityRanking.createMany).not.toHaveBeenCalled();
     });
 
     it("handles some entity types empty and others populated", async () => {
@@ -438,8 +443,7 @@ describe("RankingComputeService", () => {
 
   describe("average scene duration fallback", () => {
     it("defaults to 1200 when no scenes have duration", async () => {
-      const queryRawMock = mockPrisma.$queryRaw;
-      queryRawMock
+      mockPrisma.$queryRaw
         .mockResolvedValueOnce([{ avgDuration: null }]) // No scenes
         .mockResolvedValueOnce([
           {
@@ -455,12 +459,7 @@ describe("RankingComputeService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const txMock: RankingTx = {
-        userEntityRanking: {
-          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-          createMany: vi.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
+      const txMock = rankingTx();
       runTransactionsOn(txMock);
 
       await rankingComputeService.recomputeAllRankings(1);

@@ -82,10 +82,6 @@ interface UpdatePlaylistSharesResponse {
   shares: PlaylistShareInfo[];
 }
 
-interface SuccessResponse {
-  success: boolean;
-}
-
 interface ErrorResponse {
   error: string;
 }

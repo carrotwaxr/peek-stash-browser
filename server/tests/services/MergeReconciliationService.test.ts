@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -28,7 +29,9 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 // mock client.
 vi.mock("../../prisma/singleton.js", () => {
   const client = {
-    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
+    $transaction: vi.fn((fn: (tx: unknown) => unknown) =>
+      Promise.resolve(fn(client))
+    ),
     $queryRaw: vi.fn(),
     stashScene: {
       findFirst: vi.fn(), // Changed from findUnique for composite primary key
@@ -174,7 +177,7 @@ describe("MergeReconciliationService", () => {
       expect(result.success).toBe(true);
       expect(prisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             sceneId: "target",
             playCount: 5,
             // The source's JSON-encoded strings land as arrays
@@ -234,7 +237,7 @@ describe("MergeReconciliationService", () => {
       expect(result.success).toBe(true);
       expect(prisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             playCount: 8, // 5 + 3
             playDuration: 1500, // 1000 + 500
             oCount: 3, // 2 + 1
@@ -311,7 +314,7 @@ describe("MergeReconciliationService", () => {
 
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             oHistory: ["2025-01-01T00:00:00.000Z", "2025-01-02T00:00:00.000Z"],
             playHistory: ["2025-01-03T00:00:00.000Z"],
           }),
@@ -363,7 +366,7 @@ describe("MergeReconciliationService", () => {
 
       expect(prisma.sceneRating.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             rating: 90, // Survivor wins
             favorite: true, // OR logic
           }),

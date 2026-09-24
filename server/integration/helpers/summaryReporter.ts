@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import type { File, Reporter, Task } from "vitest";
+import type { RunnerTask, RunnerTestFile } from "vitest";
+import type { Reporter } from "vitest/reporters";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,7 +25,7 @@ interface TestSummary {
   failures: FailureDetail[];
 }
 
-function collectTests(task: Task): {
+function collectTests(task: RunnerTask): {
   passed: number;
   failed: number;
   skipped: number;
@@ -72,7 +73,7 @@ export default class SummaryReporter implements Reporter {
     this.startTime = Date.now();
   }
 
-  onFinished(files?: File[]) {
+  onFinished(files?: RunnerTestFile[]) {
     const duration_ms = Date.now() - this.startTime;
     let passed = 0;
     let failed = 0;

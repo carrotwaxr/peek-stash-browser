@@ -132,7 +132,7 @@ describe("UserStatsService.updateStatsForScene concurrency (integration)", () =>
     // The first tag upsert (t1) fails; every other write goes to the
     // database. vi.spyOn can't read the method through Prisma's delegate
     // proxy (its default would return undefined), so pass the real one on.
-    const realUpsert = prisma.userTagStats.upsert;
+    const realUpsert = prisma.userTagStats.upsert.bind(prisma.userTagStats);
     vi.spyOn(prisma.userTagStats, "upsert")
       .mockImplementation(realUpsert)
       .mockRejectedValueOnce(

@@ -33,8 +33,8 @@ vi.mock("../../utils/titleUtils.js", () => ({
 // Keep every tooltip relation, so the visibility query doesn't consume the
 // mocked $queryRawUnsafe sequences
 vi.mock("../../services/EntityAccessService.js", () => ({
-  keepVisibleConditions: vi.fn(
-    async (_u: number, _t: string, c: unknown[]) => c
+  keepVisibleConditions: vi.fn((_u: number, _t: string, c: unknown[]) =>
+    Promise.resolve(c)
   ),
 }));
 

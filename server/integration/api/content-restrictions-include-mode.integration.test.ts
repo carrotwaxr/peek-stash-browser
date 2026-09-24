@@ -281,7 +281,7 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
       expect(admin).toBeDefined();
 
       const setResponse = await adminClient.put<{ error?: string }>(
-        `/api/user/${admin!.id}/restrictions`,
+        `/api/user/${must(admin).id}/restrictions`,
         {
           restrictions: [
             { entityType: "tags", mode: "EXCLUDE", entityIds: [tag1Id] },

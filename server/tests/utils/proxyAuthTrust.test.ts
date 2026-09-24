@@ -11,6 +11,7 @@ import {
   proxyPeerAddress,
 } from "../../utils/proxyAuthTrust.js";
 import { reqFor } from "../helpers/controllerTestUtils.js";
+import { must } from "../helpers/must.js";
 
 const reqFrom = (remoteAddress: string | undefined, realIp?: string) =>
   reqFor(proxyPeerAddress, {
@@ -26,15 +27,15 @@ describe("parseTrustedAddresses", () => {
 
     expect(invalid).toEqual([]);
     expect(list).not.toBeNull();
-    expect(isTrustedAddress(list!, "10.0.0.5")).toBe(true);
-    expect(isTrustedAddress(list!, "192.168.1.7")).toBe(true);
-    expect(isTrustedAddress(list!, "::ffff:192.168.1.7")).toBe(true);
-    expect(isTrustedAddress(list!, "fd12::1")).toBe(true);
-    expect(isTrustedAddress(list!, "10.0.0.6")).toBe(false);
-    expect(isTrustedAddress(list!, "192.168.2.7")).toBe(false);
-    expect(isTrustedAddress(list!, "fe80::1")).toBe(false);
-    expect(isTrustedAddress(list!, "")).toBe(false);
-    expect(isTrustedAddress(list!, "not-an-ip")).toBe(false);
+    expect(isTrustedAddress(must(list), "10.0.0.5")).toBe(true);
+    expect(isTrustedAddress(must(list), "192.168.1.7")).toBe(true);
+    expect(isTrustedAddress(must(list), "::ffff:192.168.1.7")).toBe(true);
+    expect(isTrustedAddress(must(list), "fd12::1")).toBe(true);
+    expect(isTrustedAddress(must(list), "10.0.0.6")).toBe(false);
+    expect(isTrustedAddress(must(list), "192.168.2.7")).toBe(false);
+    expect(isTrustedAddress(must(list), "fe80::1")).toBe(false);
+    expect(isTrustedAddress(must(list), "")).toBe(false);
+    expect(isTrustedAddress(must(list), "not-an-ip")).toBe(false);
   });
 
   it("reports invalid entries", () => {

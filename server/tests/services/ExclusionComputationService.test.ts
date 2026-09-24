@@ -21,6 +21,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -81,8 +82,8 @@ vi.mock("../../prisma/singleton.js", () => ({
 vi.mock("../../prisma/computeClient.js", async () => {
   const { default: mocked } = await import("../../prisma/singleton.js");
   return {
-    getComputeClient: vi.fn(async () => mocked),
-    disconnectComputeClient: vi.fn(async () => undefined),
+    getComputeClient: vi.fn(() => Promise.resolve(mocked)),
+    disconnectComputeClient: vi.fn(() => Promise.resolve()),
   };
 });
 
@@ -92,7 +93,7 @@ const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 /** Route $queryRawUnsafe by SQL shape; unmatched queries return no rows. */
 function fakeRaw(routes: Array<[RegExp, unknown[]]>) {
   mockPrisma.$queryRawUnsafe.mockImplementation(
-    prismaImpl(async (sql: string) => {
+    prismaImpl((sql: string) => {
       const hit = routes.find(([re]) => re.test(sql));
       return hit ? hit[1] : [];
     })
@@ -250,7 +251,7 @@ describe("ExclusionComputationService", () => {
       // and the admin saves restrictions (triggering another recompute), the second
       // recompute should NOT be skipped - it must run to pick up the new restrictions.
       let computeCount = 0;
-      let resolveFirst: () => void;
+      let resolveFirst!: () => void;
       const firstBlocker = new Promise<void>((resolve) => {
         resolveFirst = resolve;
       });
@@ -295,7 +296,7 @@ describe("ExclusionComputationService", () => {
       const second = exclusionComputationService.recomputeForUser(1);
 
       // Unblock the first recompute
-      resolveFirst!();
+      resolveFirst();
 
       // Wait for both to complete
       await Promise.all([first, second]);
@@ -310,7 +311,7 @@ describe("ExclusionComputationService", () => {
       // mechanism should ensure at most 2 recomputes happen: the currently-
       // running one plus one queued recompute that picks up all pending changes.
       let computeCount = 0;
-      let resolveFirst: () => void;
+      let resolveFirst!: () => void;
       const firstBlocker = new Promise<void>((resolve) => {
         resolveFirst = resolve;
       });
@@ -357,7 +358,7 @@ describe("ExclusionComputationService", () => {
       const fifth = exclusionComputationService.recomputeForUser(2);
 
       // Unblock the first recompute
-      resolveFirst!();
+      resolveFirst();
 
       // Wait for all to complete
       await Promise.all([first, second, third, fourth, fifth]);
@@ -372,7 +373,7 @@ describe("ExclusionComputationService", () => {
       // The queued recompute must run after the first finishes, ensuring
       // it picks up the latest state (e.g., new restrictions saved mid-recompute).
       const executionOrder: string[] = [];
-      let resolveFirst: () => void;
+      let resolveFirst!: () => void;
       const firstBlocker = new Promise<void>((resolve) => {
         resolveFirst = resolve;
       });
@@ -418,7 +419,7 @@ describe("ExclusionComputationService", () => {
       const second = exclusionComputationService.recomputeForUser(3);
 
       // Unblock the first
-      resolveFirst!();
+      resolveFirst();
 
       await Promise.all([first, second]);
 
@@ -453,7 +454,7 @@ describe("ExclusionComputationService", () => {
 
       // Track per-user invocations via userContentRestriction.findMany calls
       mockPrisma.userContentRestriction.findMany.mockImplementation(
-        prismaImpl(async (args) => {
+        prismaImpl((args) => {
           if (args?.where?.userId === 10) user1Count++;
           if (args?.where?.userId === 11) user2Count++;
           return [];
@@ -486,7 +487,7 @@ describe("ExclusionComputationService", () => {
         releaseFirst = resolve;
       });
       mockPrisma.$executeRawUnsafe.mockImplementation(
-        prismaImpl(async (sql: string) => {
+        prismaImpl((sql: string) => {
           if (sql === "BEGIN" || sql === "ROLLBACK") events.push(sql);
           return 0;
         })
@@ -494,7 +495,7 @@ describe("ExclusionComputationService", () => {
       mockPrisma.userContentRestriction.findMany.mockImplementation(
         prismaImpl(async (args) => {
           const { userId } = must(args?.where);
-          events.push(`rules-${String(userId)}`);
+          events.push(`rules-${JSON.stringify(userId)}`);
           if (userId === 20) await firstBlocker;
           return [];
         })
@@ -524,13 +525,13 @@ describe("ExclusionComputationService", () => {
       setupPipeline();
       const events: string[] = [];
       mockPrisma.$executeRawUnsafe.mockImplementation(
-        prismaImpl(async (sql: string) => {
+        prismaImpl((sql: string) => {
           events.push(sql === "BEGIN" || sql === "ROLLBACK" ? sql : "exec");
           return 0;
         })
       );
       mockPrisma.$queryRawUnsafe.mockImplementation(
-        prismaImpl(async () => {
+        prismaImpl(() => {
           events.push("query");
           return [];
         })
@@ -582,8 +583,10 @@ describe("ExclusionComputationService", () => {
     it("a snapshot that cannot be ended drops the compute connection", async () => {
       setupPipeline();
       mockPrisma.$executeRawUnsafe.mockImplementation(
-        prismaImpl(async (sql: string) => {
-          if (sql === "ROLLBACK") throw new Error("cannot rollback");
+        prismaImpl((sql: string) => {
+          if (sql === "ROLLBACK") {
+            return Promise.reject(new Error("cannot rollback"));
+          }
           return 0;
         })
       );
@@ -707,13 +710,13 @@ describe("computeDirectExclusions", () => {
     fakeRaw([[RESOLVE_SCENE, [{ id: "scene1", instanceId: "A" }]]]);
     const order: string[] = [];
     mockPrisma.userExcludedEntity.deleteMany.mockImplementation(
-      prismaImpl(async () => {
+      prismaImpl(() => {
         order.push("delete");
         return { count: 1 };
       })
     );
     mockPrisma.userExcludedEntity.createMany.mockImplementation(
-      prismaImpl(async () => {
+      prismaImpl(() => {
         order.push("create");
         return { count: 1 };
       })
@@ -953,7 +956,7 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
         String(param).includes('"9"')
     );
     expect(fill).toBeDefined();
-    expect(fill![1]).toBe(
+    expect(must(fill)[1]).toBe(
       JSON.stringify([
         { id: "1", iid: "A" },
         { id: "9", iid: "A" },
@@ -1340,7 +1343,7 @@ describe("cascades (Rule 3)", () => {
     const fill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-    expect(fill![1]).toBe(
+    expect(must(fill)[1]).toBe(
       JSON.stringify([
         { id: "p1", iid: "A" },
         { id: "p1", iid: "B" },
@@ -1429,16 +1432,16 @@ describe("computeEmptyExclusions", () => {
       /INSERT OR IGNORE INTO _peek_ex_gallery/.test(sql)
     );
     expect(galleryFill).toBeDefined();
-    expect(galleryFill![1]).toBe(JSON.stringify([{ id: "g9", iid: "A" }]));
+    expect(must(galleryFill)[1]).toBe(JSON.stringify([{ id: "g9", iid: "A" }]));
     const imageFill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_ex_image/.test(sql)
     );
-    expect(imageFill![1]).toBe(JSON.stringify([{ id: "i9", iid: "A" }]));
+    expect(must(imageFill)[1]).toBe(JSON.stringify([{ id: "i9", iid: "A" }]));
     // The "" scene hide reaches every allowed instance through its per-instance copy
     const sceneFill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_ex_scene/.test(sql)
     );
-    expect(sceneFill![1]).toBe(JSON.stringify([{ id: "s9", iid: "A" }]));
+    expect(must(sceneFill)[1]).toBe(JSON.stringify([{ id: "s9", iid: "A" }]));
     // The empty queries probe the temp sets, not a bound JSON array
     for (const [sql] of queriesMatching(
       /FROM Stash(Gallery g|Performer p|Studio st|Group g|Tag t)/
@@ -1644,7 +1647,7 @@ describe("reason precedence (restrictions before hides)", () => {
     ]);
     const events: string[] = [];
     mockPrisma.$executeRawUnsafe.mockImplementation(
-      prismaImpl(async (sql: string, json?: string) => {
+      prismaImpl((sql: string, json?: string) => {
         if (sql.includes("INSERT OR IGNORE INTO _peek_ex_image")) {
           events.push(`image set += ${json}`);
         }
@@ -1652,7 +1655,7 @@ describe("reason precedence (restrictions before hides)", () => {
       })
     );
     mockPrisma.$queryRawUnsafe.mockImplementation(
-      prismaImpl(async (sql: string) => {
+      prismaImpl((sql: string) => {
         if (/CROSS JOIN StashGallery AS g/.test(sql)) {
           events.push("empty check for the hidden gallery");
           return [];
@@ -1770,7 +1773,7 @@ describe("addHiddenEntity", () => {
             instanceId: "A",
           },
         },
-        create: expect.objectContaining({ reason: "hidden", instanceId: "A" }),
+        create: objectContaining({ reason: "hidden", instanceId: "A" }),
         // An existing row keeps its reason: a hide never masks a restriction
         update: {},
       })
@@ -1785,7 +1788,7 @@ describe("addHiddenEntity", () => {
             instanceId: "A",
           },
         },
-        create: expect.objectContaining({
+        create: objectContaining({
           entityType: "gallery",
           entityId: "g2",
           instanceId: "A",
@@ -1823,7 +1826,7 @@ describe("addHiddenEntity", () => {
     const fill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-    expect(fill![1]).toBe(
+    expect(must(fill)[1]).toBe(
       JSON.stringify([
         { id: "2", iid: "A" },
         { id: "7", iid: "A" },
@@ -1866,7 +1869,7 @@ describe("addHiddenEntity", () => {
     const fill = execCalls().find(([sql]) =>
       /INSERT OR IGNORE INTO _peek_refs/.test(sql)
     );
-    expect(fill![1]).toBe(JSON.stringify([{ id: "perf1", iid: "A" }]));
+    expect(must(fill)[1]).toBe(JSON.stringify([{ id: "perf1", iid: "A" }]));
   });
 
   it("a full recompute and addHiddenEntity write the same rows for the same hide", async () => {
@@ -1941,15 +1944,11 @@ describe("removeHiddenEntity", () => {
     );
   });
 
-  it("should queue async recompute via setImmediate", async () => {
+  it("should queue async recompute via setImmediate", () => {
     // Spy on setImmediate
     const setImmediateSpy = vi.spyOn(global, "setImmediate");
 
-    await exclusionComputationService.removeHiddenEntity(
-      1,
-      "performer",
-      "perf1"
-    );
+    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
 
     // Verify setImmediate was called
     expect(setImmediateSpy).toHaveBeenCalled();
@@ -1961,11 +1960,7 @@ describe("removeHiddenEntity", () => {
     // Use fake timers to control setImmediate
     vi.useFakeTimers();
 
-    await exclusionComputationService.removeHiddenEntity(
-      1,
-      "performer",
-      "perf1"
-    );
+    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
 
     // Transaction should not have been called yet (async)
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
@@ -1986,11 +1981,7 @@ describe("removeHiddenEntity", () => {
     mockPrisma.$transaction.mockRejectedValue(new Error("Database error"));
 
     // This should not throw
-    await exclusionComputationService.removeHiddenEntity(
-      1,
-      "performer",
-      "perf1"
-    );
+    exclusionComputationService.removeHiddenEntity(1, "performer", "perf1");
 
     // Run the async callback - should not throw even if recompute fails
     await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
@@ -2054,10 +2045,10 @@ describe("recomputeAllUsers", () => {
 
     let callCount = 0;
     mockPrisma.userContentRestriction.findMany.mockImplementation(
-      prismaImpl(async () => {
+      prismaImpl(() => {
         callCount++;
         if (callCount === 2) {
-          throw new Error("DB error for user 2");
+          return Promise.reject(new Error("DB error for user 2"));
         }
         return [];
       })

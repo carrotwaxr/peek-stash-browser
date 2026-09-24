@@ -52,7 +52,7 @@ vi.mock("../../../services/UserStatsService.js", () => ({
 
 vi.mock("../../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
-    filterExcluded: vi.fn().mockImplementation((items) => items),
+    filterExcluded: vi.fn().mockImplementation((items: unknown[]) => items),
   },
 }));
 
@@ -61,11 +61,13 @@ vi.mock("../../../services/UserInstanceService.js", () => ({
 }));
 
 vi.mock("../../../utils/entityInstanceId.js", () => ({
-  disambiguateEntityNames: vi.fn().mockImplementation((entities) => entities),
+  disambiguateEntityNames: vi
+    .fn()
+    .mockImplementation((entities: unknown[]) => entities),
 }));
 
 vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
-  coerceEntityRefs: vi.fn().mockImplementation((ids) => ids),
+  coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
 
 vi.mock("../../../utils/hierarchyUtils.js", () => ({
@@ -79,7 +81,7 @@ vi.mock("../../../utils/logger.js", () => ({
 }));
 
 vi.mock("../../../utils/seededRandom.js", () => ({
-  parseRandomSort: vi.fn().mockImplementation((field) => ({
+  parseRandomSort: vi.fn().mockImplementation((field: string) => ({
     sortField: field,
     randomSeed: undefined,
   })),
@@ -88,8 +90,13 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id, _inst, viewer) =>
-      viewer?.role === "ADMIN" ? `http://stash/tags/${id}` : null
+    .mockImplementation(
+      (
+        _type: string,
+        id: string | number,
+        _inst: string | undefined,
+        viewer: { role: string } | undefined
+      ) => (viewer?.role === "ADMIN" ? `http://stash/tags/${id}` : null)
     ),
 }));
 

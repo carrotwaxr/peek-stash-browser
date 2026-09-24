@@ -26,6 +26,7 @@ import type {
   UpdateRatingResponse,
 } from "../../types/api/index.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -96,8 +97,8 @@ describe("Ratings Controller", () => {
     mockPrisma.user.findUnique.mockResolvedValue(
       partialRow({ syncToStash: false })
     );
-    mockResolve.mockImplementation(
-      async (_userId, _type, _id, requested) => requested ?? "instance-1"
+    mockResolve.mockImplementation((_userId, _type, _id, requested) =>
+      Promise.resolve(requested ?? "instance-1")
     );
   });
 
@@ -416,14 +417,14 @@ describe("Ratings Controller", () => {
 
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({
+          create: objectContaining({
             userId: 1,
             instanceId: "instance-1",
             sceneId: "1",
             rating: 75,
             favorite: false,
           }),
-          update: expect.objectContaining({ rating: 75 }),
+          update: objectContaining({ rating: 75 }),
         })
       );
     });
@@ -442,11 +443,11 @@ describe("Ratings Controller", () => {
 
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({
+          create: objectContaining({
             rating: null,
             favorite: true,
           }),
-          update: expect.objectContaining({ favorite: true }),
+          update: objectContaining({ favorite: true }),
         })
       );
     });

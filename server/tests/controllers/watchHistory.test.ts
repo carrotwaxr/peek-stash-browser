@@ -35,6 +35,7 @@ import {
   resFor,
   testUser,
 } from "../helpers/controllerTestUtils.js";
+import { arrayContaining, objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted to top level. Interactive transactions run their
@@ -96,8 +97,8 @@ describe("Watch History Controller", () => {
     mockPrisma.stashScene.findFirst.mockResolvedValue(
       partialRow({ duration: 600, stashInstanceId: "test-instance" })
     );
-    mockResolve.mockImplementation(
-      async (_userId, _type, _id, requested) => requested ?? "test-instance"
+    mockResolve.mockImplementation((_userId, _type, _id, requested) =>
+      Promise.resolve(requested ?? "test-instance")
     );
   });
 
@@ -180,14 +181,14 @@ describe("Watch History Controller", () => {
               sceneId: "123",
             },
           },
-          create: expect.objectContaining({
+          create: objectContaining({
             userId: 1,
             instanceId: "test-instance",
             sceneId: "123",
             playDuration: 10,
             resumeTime: 60,
           }),
-          update: expect.objectContaining({
+          update: objectContaining({
             resumeTime: 60,
             playDuration: { increment: 10 },
           }),
@@ -197,7 +198,7 @@ describe("Watch History Controller", () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          watchHistory: expect.objectContaining({
+          watchHistory: objectContaining({
             playDuration: 10,
             resumeTime: 60,
           }),
@@ -313,7 +314,7 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          update: expect.objectContaining({
+          update: objectContaining({
             playDuration: { increment: 0 },
           }),
         })
@@ -386,7 +387,7 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             playCount: 1,
             playHistory: [expect.any(String)],
           }),
@@ -396,7 +397,7 @@ describe("Watch History Controller", () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          watchHistory: expect.objectContaining({
+          watchHistory: objectContaining({
             playCount: 1,
           }),
         })
@@ -446,7 +447,7 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 1 },
-          data: expect.objectContaining({
+          data: objectContaining({
             playCount: { increment: 1 },
           }),
         })
@@ -492,7 +493,7 @@ describe("Watch History Controller", () => {
       // Stored as an array, never a JSON string
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             playHistory: ["2024-01-01T00:00:00.000Z", expect.any(String)],
           }),
         })
@@ -558,7 +559,7 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             oCount: 1,
           }),
         })
@@ -606,7 +607,7 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             oCount: { increment: 1 },
             oHistory: ["2024-01-01T00:00:00.000Z", expect.any(String)],
           }),
@@ -761,7 +762,7 @@ describe("Watch History Controller", () => {
       );
 
       expect(res.json).toHaveBeenCalledWith({
-        watchHistory: expect.arrayContaining([
+        watchHistory: arrayContaining([
           expect.objectContaining({ sceneId: "123" }),
           expect.objectContaining({ sceneId: "456" }),
         ]),
@@ -1028,7 +1029,7 @@ describe("Watch History Controller", () => {
       });
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ instanceId: "test-instance" }),
+          data: objectContaining({ instanceId: "test-instance" }),
         })
       );
     });

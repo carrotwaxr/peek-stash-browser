@@ -327,11 +327,8 @@ describe("ClipQueryBuilder", () => {
 
       expect(mainQuerySql).toContain("LIMIT ? OFFSET ?");
 
-      // Last two params are LIMIT and OFFSET
-      const limit = mainQueryParams[mainQueryParams.length - 2];
-      const offset = mainQueryParams[mainQueryParams.length - 1];
-      expect(limit).toBe(20);
-      expect(offset).toBe(20); // (2-1) * 20
+      // Last two params are LIMIT and OFFSET, (2-1) * 20
+      expect(mainQueryParams.slice(-2)).toEqual([20, 20]);
     });
   });
 });

@@ -13,7 +13,8 @@ import {
   getEntityInstanceIds,
 } from "../../utils/entityInstanceId.js";
 import { must } from "../helpers/must.js";
-import { malformedRow, partialRow } from "../helpers/prismaMock.js";
+import { partialRow } from "../helpers/prismaMock.js";
+import { malformedRow } from "../helpers/untrusted.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetAllConfigs } = vi.hoisted(() => ({

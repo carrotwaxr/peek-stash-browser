@@ -331,8 +331,8 @@ describe("Proxy Controller", () => {
       // Either entity hidden hides the clip media
       for (const hidden of ["scene", "clip"]) {
         mockHttpGet.mockClear();
-        mockCanUserAccessEntity.mockImplementation(
-          async (_u, entityType) => entityType !== hidden
+        mockCanUserAccessEntity.mockImplementation((_u, entityType) =>
+          Promise.resolve(entityType !== hidden)
         );
         const res = resFor(proxyStashMedia);
         await proxyStashMedia(req, res);

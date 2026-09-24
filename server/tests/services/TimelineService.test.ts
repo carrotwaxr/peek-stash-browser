@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TimelineService } from "../../services/TimelineService.js";
 import { untrusted } from "../helpers/untrusted.js";
 

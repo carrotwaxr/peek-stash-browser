@@ -498,7 +498,7 @@ describe("Image Filters", () => {
       // Image should have performers (either inherited from gallery or its own)
       // The inheritance test below verifies filtering by gallery performer works
       expect(image.performers).toBeDefined();
-      expect(image.performers!.length).toBeGreaterThan(0);
+      expect(must(image.performers).length).toBeGreaterThan(0);
 
       // Image should have inherited tags from gallery (if gallery has tags)
       // Note: Only inherited if image had NO tags originally
@@ -676,12 +676,12 @@ describe("Image Filters", () => {
       // Image has its own performers - inheritance should NOT have added gallery performers
       // (inheritance only adds performers if image has NONE)
       expect(image.performers).toBeDefined();
-      expect(image.performers!.length).toBeGreaterThan(0);
+      expect(must(image.performers).length).toBeGreaterThan(0);
 
       // Image has its own tags - including a tag the gallery doesn't have
       // This verifies inheritance didn't replace the image's tags
       expect(image.tags).toBeDefined();
-      expect(image.tags!.length).toBeGreaterThan(0);
+      expect(must(image.tags).length).toBeGreaterThan(0);
 
       // The key check: image has tags that are its OWN (not from gallery)
       // We can't assert specific tag IDs without knowing them, but we verify

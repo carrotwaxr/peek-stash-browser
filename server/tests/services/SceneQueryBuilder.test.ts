@@ -29,8 +29,8 @@ vi.mock("../../utils/logger.js", () => ({
 
 // Mock hierarchy utils
 vi.mock("../../utils/hierarchyUtils.js", () => ({
-  expandTagIds: vi.fn(async (ids: string[]) => ids),
-  expandStudioIds: vi.fn(async (ids: string[]) => ids),
+  expandTagIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
+  expandStudioIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
 }));
 
 // Mock titleUtils
@@ -273,10 +273,7 @@ describe("SceneQueryBuilder", () => {
       ).slice(1);
 
       // Last two params are LIMIT and OFFSET
-      const limit = mainQueryParams[mainQueryParams.length - 2];
-      const offset = mainQueryParams[mainQueryParams.length - 1];
-      expect(limit).toBe(25);
-      expect(offset).toBe(0);
+      expect(mainQueryParams.slice(-2)).toEqual([25, 0]);
     });
 
     it("passes correct OFFSET for page 3", async () => {
@@ -292,10 +289,8 @@ describe("SceneQueryBuilder", () => {
         mockPrisma.$queryRawUnsafe.mock.calls[0]
       ).slice(1);
 
-      const limit = mainQueryParams[mainQueryParams.length - 2];
-      const offset = mainQueryParams[mainQueryParams.length - 1];
-      expect(limit).toBe(10);
-      expect(offset).toBe(20); // (3-1) * 10
+      // Last two params are LIMIT and OFFSET, (3-1) * 10
+      expect(mainQueryParams.slice(-2)).toEqual([10, 20]);
     });
   });
 

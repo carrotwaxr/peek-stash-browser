@@ -8,7 +8,7 @@
  * The actual count logic is handled by the database, so we're primarily
  * testing that the service calls the correct Prisma methods.
  */
-import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { entityImageCountService } from "../../services/EntityImageCountService.js";
 
@@ -22,7 +22,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       apiKey: "test-api-key",
     }),
     getAllConfigs: () => [],
-    loadFromDatabase: async () => undefined,
+    loadFromDatabase: () => Promise.resolve(),
   },
 }));
 
@@ -33,8 +33,6 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-const getMock = (fn: unknown): Mock => fn as Mock;
-
 describe("EntityImageCountService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +40,7 @@ describe("EntityImageCountService", () => {
 
   describe("rebuildPerformerImageCountsSQL", () => {
     it("executes SQL to update performer image counts", async () => {
-      await entityImageCountService.rebuildPerformerImageCounts();
+      await entityImageCountService["rebuildPerformerImageCountsSQL"]();
 
       // Verify $executeRaw was called (the SQL aggregation query)
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
@@ -51,7 +49,7 @@ describe("EntityImageCountService", () => {
 
   describe("rebuildStudioImageCountsSQL", () => {
     it("executes SQL to update studio image counts", async () => {
-      await entityImageCountService.rebuildStudioImageCounts();
+      await entityImageCountService["rebuildStudioImageCountsSQL"]();
 
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     });
@@ -59,7 +57,7 @@ describe("EntityImageCountService", () => {
 
   describe("rebuildTagImageCountsSQL", () => {
     it("executes SQL to update tag image counts", async () => {
-      await entityImageCountService.rebuildTagImageCounts();
+      await entityImageCountService["rebuildTagImageCountsSQL"]();
 
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     });

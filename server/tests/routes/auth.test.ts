@@ -27,6 +27,8 @@ import {
 } from "../../utils/recoveryKey.js";
 import { userRow } from "../helpers/fixtures.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
+import { anyOf } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
@@ -104,8 +106,8 @@ describe("auth routes", () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: 7 },
         data: {
-          password: expect.any(String),
-          passwordChangedAt: expect.any(Date),
+          password: anyOf(String),
+          passwordChangedAt: anyOf(Date),
         },
       });
     });
@@ -187,7 +189,7 @@ describe("auth routes", () => {
       expect(res.status).toBe(200);
       const token = res.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1];
       expect(token).toBeDefined();
-      const claims = jwt.decode(token!) as { authTime?: number };
+      const claims = jwt.decode(must(token)) as { authTime?: number };
       const now = Date.now() / 1000;
       expect(claims.authTime).toBeGreaterThan(now - 5);
       expect(claims.authTime).toBeLessThanOrEqual(now + 5);

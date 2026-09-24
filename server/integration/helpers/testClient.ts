@@ -35,8 +35,14 @@ export class TestClient {
     this.captureToken(response);
 
     // Also check response body for token (some auth flows return it there)
-    const data = await response.json();
-    if (data.token) {
+    const data: unknown = await response.json();
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "token" in data &&
+      typeof data.token === "string" &&
+      data.token
+    ) {
       this.token = data.token;
     }
   }
@@ -86,7 +92,7 @@ export class TestClient {
     });
     this.captureToken(response);
 
-    const data = await response.json().catch(() => ({}));
+    const data: unknown = await response.json().catch(() => ({}));
     return {
       status: response.status,
       data: data as T,
@@ -106,7 +112,7 @@ export class TestClient {
     });
     this.captureToken(response);
 
-    const data = await response.json().catch(() => ({}));
+    const data: unknown = await response.json().catch(() => ({}));
     return {
       status: response.status,
       data: data as T,
@@ -126,7 +132,7 @@ export class TestClient {
     });
     this.captureToken(response);
 
-    const data = await response.json().catch(() => ({}));
+    const data: unknown = await response.json().catch(() => ({}));
     return {
       status: response.status,
       data: data as T,
@@ -144,7 +150,7 @@ export class TestClient {
     });
     this.captureToken(response);
 
-    const data = await response.json().catch(() => ({}));
+    const data: unknown = await response.json().catch(() => ({}));
     return {
       status: response.status,
       data: data as T,
@@ -208,14 +214,12 @@ export async function selectTestInstanceOnly(): Promise<string> {
 export async function selectTestInstanceForClient(
   client: TestClient
 ): Promise<string> {
-  if (!cachedTestInstanceId) {
-    // Ensure we discover the test instance first
-    await selectTestInstanceOnly();
-  }
+  // Discover the test instance first if no test has yet
+  const instanceId = cachedTestInstanceId ?? (await selectTestInstanceOnly());
   await client.put("/api/user/stash-instances", {
-    instanceIds: [cachedTestInstanceId],
+    instanceIds: [instanceId],
   });
-  return cachedTestInstanceId!;
+  return instanceId;
 }
 
 /**

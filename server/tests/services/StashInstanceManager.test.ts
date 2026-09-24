@@ -5,7 +5,7 @@
  * Covers initialization, instance lookup, reload, and edge cases around
  * multi-instance configuration.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { must } from "../helpers/must.js";
 
 // Mock PrismaClient constructor
@@ -526,7 +526,7 @@ describe("StashInstanceManager", () => {
 
       const config = manager.getConfig(INSTANCE_A.id);
       expect(config).toBeDefined();
-      expect(config!.name).toBe("Primary Stash");
+      expect(must(config).name).toBe("Primary Stash");
     });
 
     it("returns undefined for an unknown instance", async () => {

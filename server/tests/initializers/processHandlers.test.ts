@@ -8,6 +8,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { logger } from "../../utils/logger.js";
+import { objectContaining, stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
@@ -57,9 +58,7 @@ describe("processHandlers", () => {
     expect(exitSpy).not.toHaveBeenCalled();
     expect(mockLoggerError).toHaveBeenCalledWith(
       "Unhandled promise rejection",
-      expect.objectContaining({
-        error: expect.stringContaining("rejected boom"),
-      })
+      objectContaining({ error: stringContaining("rejected boom") })
     );
     const context = must(mockLoggerError.mock.calls[0])[1] as { error: string };
     expect(err.stack).toBeDefined();
@@ -74,9 +73,7 @@ describe("processHandlers", () => {
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
     expect(mockLoggerError).toHaveBeenCalledWith(
       "Uncaught exception, shutting down",
-      expect.objectContaining({
-        error: expect.stringContaining("thrown boom"),
-      })
+      objectContaining({ error: stringContaining("thrown boom") })
     );
     expect(mockAbort).toHaveBeenCalled();
     expect(mockDisconnect).toHaveBeenCalled();
@@ -104,7 +101,7 @@ describe("processHandlers", () => {
     // process.listeners() is typed one event name at a time; the plain
     // EventEmitter signature takes either name from `events`.
     const emitter: NodeJS.EventEmitter = process;
-    let before: Record<(typeof events)[number], Function[]>;
+    let before: Record<(typeof events)[number], readonly unknown[]>;
 
     beforeEach(() => {
       before = {

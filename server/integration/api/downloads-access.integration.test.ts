@@ -16,6 +16,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import {
   FX,
@@ -98,6 +99,14 @@ describe("Downloads access (integration)", () => {
       { headers: { Cookie: dlCookie } }
     );
     return { status: res.status, text: await res.text() };
+  }
+
+  /** The `error` field of a JSON body, or undefined. */
+  function errorOf(text: string): unknown {
+    const body: unknown = JSON.parse(text);
+    return typeof body === "object" && body !== null && "error" in body
+      ? body.error
+      : undefined;
   }
 
   beforeAll(async () => {
@@ -233,10 +242,10 @@ describe("Downloads access (integration)", () => {
 
     await hideFor(dl.id, "scene", FX_ID.SAME, FX.A);
     try {
-      const file = await getFile(created.data.download!.id);
+      const file = await getFile(must(created.data.download).id);
       expect(file.status).toBe(404);
       // Refused by Peek, not passed through from Stash
-      expect(JSON.parse(file.text).error).toBe("Download not found");
+      expect(errorOf(file.text)).toBe("Download not found");
     } finally {
       await unhideFor(dl.id, "scene", FX_ID.SAME, FX.A);
     }
@@ -251,7 +260,7 @@ describe("Downloads access (integration)", () => {
 
     await setPermissions(dl.id, { canDownloadFilesOverride: false });
     try {
-      const file = await getFile(created.data.download!.id);
+      const file = await getFile(must(created.data.download).id);
       expect(file.status).toBe(403);
     } finally {
       await setPermissions(dl.id, { canDownloadFilesOverride: true });
@@ -275,11 +284,11 @@ describe("Downloads access (integration)", () => {
 
     const completed = await getFile((await legacy("COMPLETED")).id);
     expect(completed.status).toBe(410);
-    expect(JSON.parse(completed.text).error).toMatch(/expired/);
+    expect(errorOf(completed.text)).toMatch(/expired/);
 
     const expired = await getFile((await legacy("EXPIRED")).id);
     expect(expired.status).toBe(410);
-    expect(JSON.parse(expired.text).error).toMatch(/expired/);
+    expect(errorOf(expired.text)).toMatch(/expired/);
   });
 
   it("a playlist not shared with the user is refused", async () => {
@@ -308,7 +317,7 @@ describe("Downloads access (integration)", () => {
     expect(res.data.download?.type).toBe("PLAYLIST");
     // The server's background zip then fails on the made-up instance, by
     // design. Let it settle so it doesn't outlive the fixture.
-    await waitForZipJob(res.data.download!.id);
+    await waitForZipJob(must(res.data.download).id);
   });
 
   it("a shared recipient without the permission is refused", async () => {

@@ -27,6 +27,7 @@ import {
   type PlaylistWithItems,
   userPermissions,
 } from "../helpers/fixtures.js";
+import { objectContaining } from "../helpers/matchers.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 type PlaylistWithItemCount = Prisma.PlaylistGetPayload<{
@@ -47,27 +48,27 @@ vi.mock("../../services/PlaylistAccessService.js", () => ({
 
 // Mock entityInstanceId
 vi.mock("../../utils/entityInstanceId.js", () => ({
-  getEntityInstanceId: vi.fn(async () => "instance-1"),
-  getEntityInstanceIds: vi.fn(async () => new Map()),
+  getEntityInstanceId: vi.fn(() => Promise.resolve("instance-1")),
+  getEntityInstanceIds: vi.fn(() => Promise.resolve(new Map())),
 }));
 
 // Mock StashEntityService
 vi.mock("../../services/StashEntityService.js", () => ({
   stashEntityService: {
-    getScenesByIdsWithRelations: vi.fn(async () => []),
+    getScenesByIdsWithRelations: vi.fn(() => Promise.resolve([])),
   },
 }));
 
 // Mock EntityExclusionHelper
 vi.mock("../../services/EntityExclusionHelper.js", () => ({
   entityExclusionHelper: {
-    filterExcluded: vi.fn(async (scenes: unknown[]) => scenes),
+    filterExcluded: vi.fn((scenes: unknown[]) => Promise.resolve(scenes)),
   },
 }));
 
 // Mock PermissionService
 vi.mock("../../services/PermissionService.js", () => ({
-  resolveUserPermissions: vi.fn(async () => ({ canShare: true })),
+  resolveUserPermissions: vi.fn(() => Promise.resolve({ canShare: true })),
 }));
 
 // Mock logger
@@ -128,7 +129,7 @@ describe("Playlist Controller Operations", () => {
 
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             name: "My Playlist",
             description: "A description",
           }),
@@ -206,7 +207,7 @@ describe("Playlist Controller Operations", () => {
 
       expect(res._getBody()).toEqual(
         expect.objectContaining({
-          playlist: expect.objectContaining({ name: "Updated" }),
+          playlist: objectContaining({ name: "Updated" }),
         })
       );
     });
@@ -316,7 +317,7 @@ describe("Playlist Controller Operations", () => {
       expect(res._getStatus()).toBe(201);
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             name: "Original (Copy)",
             userId: USER.id,
             isPublic: false,
@@ -357,7 +358,7 @@ describe("Playlist Controller Operations", () => {
       // Duplicate is owned by the duplicating user
       expect(mockPrisma.playlist.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: objectContaining({
             userId: USER.id,
           }),
         })

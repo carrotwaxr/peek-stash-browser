@@ -84,11 +84,11 @@ describe("Merge Reconciliation Routes", () => {
       const res = resFor(authenticate);
 
       // Configure authenticate to return 401
-      mockAuthenticate.mockImplementation(async (_req, res, _next) => {
-        return res
-          .status(401)
-          .json({ error: "Access denied. No token provided." });
-      });
+      mockAuthenticate.mockImplementation((_req, res, _next) =>
+        Promise.resolve(
+          res.status(401).json({ error: "Access denied. No token provided." })
+        )
+      );
 
       await mockAuthenticate(req, res, vi.fn());
 
@@ -100,7 +100,7 @@ describe("Merge Reconciliation Routes", () => {
   });
 
   describe("Admin Requirement", () => {
-    it("should have requireAdmin middleware that returns 403 for non-admin users", async () => {
+    it("should have requireAdmin middleware that returns 403 for non-admin users", () => {
       const req = reqFor(requireAdmin, {
         user: { id: 1, username: "user", role: "USER" },
       });
@@ -114,7 +114,7 @@ describe("Merge Reconciliation Routes", () => {
         }
       });
 
-      await mockRequireAdmin(req, res, vi.fn());
+      mockRequireAdmin(req, res, vi.fn());
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
@@ -122,7 +122,7 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
-    it("should allow admin users through requireAdmin middleware", async () => {
+    it("should allow admin users through requireAdmin middleware", () => {
       const req = reqFor(requireAdmin, { user: ADMIN });
       const res = resFor(requireAdmin);
       const mockNext = vi.fn();
@@ -136,7 +136,7 @@ describe("Merge Reconciliation Routes", () => {
         return undefined;
       });
 
-      await mockRequireAdmin(req, res, mockNext);
+      mockRequireAdmin(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
     });
@@ -440,25 +440,25 @@ describe("Merge Reconciliation Routes", () => {
       mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
 
       // First orphan has exact match, second has no exact match
-      mockService.findPhashMatches.mockImplementation(async (id: string) => {
+      mockService.findPhashMatches.mockImplementation((id: string) => {
         if (id === "orphan-1") {
-          return [
+          return Promise.resolve([
             {
               sceneId: "target-1",
               title: "Match 1",
               similarity: "exact" as const,
               recommended: true,
             },
-          ];
+          ]);
         }
-        return [
+        return Promise.resolve([
           {
             sceneId: "target-2",
             title: "Match 2",
             similarity: "similar" as const,
             recommended: true,
           },
-        ];
+        ]);
       });
 
       mockService.reconcileScene.mockResolvedValue({

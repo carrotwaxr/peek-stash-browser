@@ -4,6 +4,8 @@
  * Tests the incremental sync logic without requiring a real Stash instance.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Test the formatTimestampForStash logic directly (re-implemented here for testing)
 // This mirrors the function in StashSyncService.ts
@@ -51,23 +53,13 @@ describe("formatTimestampForStash", () => {
 });
 
 // Mock prisma before importing the service
-const mockPrisma = {
-  syncState: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    update: vi.fn(),
-    create: vi.fn(),
-  },
-  syncSettings: {
-    findFirst: vi.fn(),
-  },
-  $executeRawUnsafe: vi.fn(),
-  $executeRaw: vi.fn().mockResolvedValue(0),
-};
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: mockPrisma,
-}));
+const mockPrisma = vi.mocked(prisma, true);
+mockPrisma.$executeRaw.mockResolvedValue(0);
 
 // Mock the stash instance manager
 const mockStashClient = {
@@ -152,31 +144,34 @@ describe("StashSyncService", () => {
       const performerTimestamp = "2025-12-22T15:00:00-08:00";
       const sceneTimestamp = "2025-12-25T08:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockImplementation(({ where }) => {
-        if (where.entityType === "tag") {
-          return Promise.resolve({
-            lastIncrementalSyncTimestamp: tagTimestamp,
+      mockPrisma.syncState.findFirst.mockImplementation(
+        prismaImpl((args) => {
+          const entityType = args?.where?.entityType;
+          if (entityType === "tag") {
+            return partialRow({
+              lastIncrementalSyncTimestamp: tagTimestamp,
+              lastFullSyncTimestamp: null,
+            });
+          }
+          if (entityType === "performer") {
+            return partialRow({
+              lastIncrementalSyncTimestamp: performerTimestamp,
+              lastFullSyncTimestamp: null,
+            });
+          }
+          if (entityType === "scene") {
+            return partialRow({
+              lastIncrementalSyncTimestamp: sceneTimestamp,
+              lastFullSyncTimestamp: null,
+            });
+          }
+          // Return timestamps for other entity types
+          return partialRow({
+            lastIncrementalSyncTimestamp: "2025-12-24T12:00:00-08:00",
             lastFullSyncTimestamp: null,
           });
-        }
-        if (where.entityType === "performer") {
-          return Promise.resolve({
-            lastIncrementalSyncTimestamp: performerTimestamp,
-            lastFullSyncTimestamp: null,
-          });
-        }
-        if (where.entityType === "scene") {
-          return Promise.resolve({
-            lastIncrementalSyncTimestamp: sceneTimestamp,
-            lastFullSyncTimestamp: null,
-          });
-        }
-        // Return timestamps for other entity types
-        return Promise.resolve({
-          lastIncrementalSyncTimestamp: "2025-12-24T12:00:00-08:00",
-          lastFullSyncTimestamp: null,
-        });
-      });
+        })
+      );
 
       // Run incremental sync
       await stashSyncService.incrementalSync();
@@ -203,16 +198,19 @@ describe("StashSyncService", () => {
         await import("../../services/StashSyncService.js");
 
       // Tags have been synced, but performers have not
-      mockPrisma.syncState.findFirst.mockImplementation(({ where }) => {
-        if (where.entityType === "tag") {
-          return Promise.resolve({
-            lastIncrementalSyncTimestamp: "2025-12-20T10:00:00-08:00",
-            lastFullSyncTimestamp: null,
-          });
-        }
-        // No sync state for other entities
-        return Promise.resolve(null);
-      });
+      mockPrisma.syncState.findFirst.mockImplementation(
+        prismaImpl((args) => {
+          const entityType = args?.where?.entityType;
+          if (entityType === "tag") {
+            return partialRow({
+              lastIncrementalSyncTimestamp: "2025-12-20T10:00:00-08:00",
+              lastFullSyncTimestamp: null,
+            });
+          }
+          // No sync state for other entities
+          return null;
+        })
+      );
 
       await stashSyncService.incrementalSync();
 
@@ -228,10 +226,12 @@ describe("StashSyncService", () => {
       const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
       const incrementalSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: fullSyncTimestamp,
-        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: fullSyncTimestamp,
+          lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
+        })
+      );
 
       await stashSyncService.incrementalSync();
 
@@ -248,10 +248,12 @@ describe("StashSyncService", () => {
       const incrementalSyncTimestamp = "2025-12-20T10:00:00-08:00";
       const fullSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: fullSyncTimestamp,
-        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: fullSyncTimestamp,
+          lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
+        })
+      );
 
       await stashSyncService.incrementalSync();
 
@@ -265,10 +267,12 @@ describe("StashSyncService", () => {
 
       const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: fullSyncTimestamp,
-        lastIncrementalSyncTimestamp: null,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: fullSyncTimestamp,
+          lastIncrementalSyncTimestamp: null,
+        })
+      );
 
       await stashSyncService.incrementalSync();
 
@@ -281,10 +285,12 @@ describe("StashSyncService", () => {
 
       const incrementalSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: null,
-        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
+        })
+      );
 
       await stashSyncService.incrementalSync();
 
@@ -302,10 +308,12 @@ describe("StashSyncService", () => {
       const olderFullSync = "2025-12-17T08:00:00-08:00";
       const newerIncrementalSync = "2025-12-27T16:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: olderFullSync,
-        lastIncrementalSyncTimestamp: newerIncrementalSync,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: olderFullSync,
+          lastIncrementalSyncTimestamp: newerIncrementalSync,
+        })
+      );
 
       // Run the sync - we verify via the log output which shows the timestamp used
       // The logs above in the test output show:
@@ -326,10 +334,12 @@ describe("StashSyncService", () => {
       const olderIncrementalSync = "2025-12-17T08:00:00-08:00";
       const newerFullSync = "2025-12-27T16:00:00-08:00";
 
-      mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSyncTimestamp: newerFullSync,
-        lastIncrementalSyncTimestamp: olderIncrementalSync,
-      });
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: newerFullSync,
+          lastIncrementalSyncTimestamp: olderIncrementalSync,
+        })
+      );
 
       await stashSyncService.incrementalSync();
 

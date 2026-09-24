@@ -1,6 +1,6 @@
-import jwt from "jsonwebtoken";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { generateToken, verifyToken } from "../../middleware/auth.js";
+import { must } from "../helpers/must.js";
 
 // Mock the JWT secret to match what auth.ts uses
 vi.mock("../../middleware/auth.js", async (importOriginal) => {
@@ -56,7 +56,7 @@ describe("Auth Middleware - Token Refresh Logic", () => {
       const decoded = verifyToken(token);
 
       // Token just created, iat is now
-      const tokenAgeHours = (Date.now() / 1000 - decoded.iat!) / 3600;
+      const tokenAgeHours = (Date.now() / 1000 - must(decoded.iat)) / 3600;
 
       // Should be very close to 0 (just created)
       expect(tokenAgeHours).toBeLessThan(1);

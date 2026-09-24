@@ -52,7 +52,7 @@ async function getSetupStatus(): Promise<SetupStatus> {
   if (!response.ok) {
     throw new Error(`Failed to get setup status: ${response.status}`);
   }
-  return response.json();
+  return (await response.json()) as SetupStatus;
 }
 
 async function createAdminUser(): Promise<void> {

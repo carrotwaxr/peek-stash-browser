@@ -16,6 +16,7 @@ import {
   createMockStudios,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
   let mockPerformers: ReturnType<typeof createMockPerformers>;
@@ -312,7 +313,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
 
       result.forEach((scene) => {
         expect(scene.last_played_at).toBeTruthy();
-        const lastPlayedDate = new Date(scene.last_played_at!);
+        const lastPlayedDate = new Date(must(scene.last_played_at));
         expect(lastPlayedDate.getTime()).toBeGreaterThan(threshold.getTime());
       });
     });
@@ -332,7 +333,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
 
       result.forEach((scene) => {
         expect(scene.last_played_at).toBeTruthy();
-        const lastPlayedDate = new Date(scene.last_played_at!);
+        const lastPlayedDate = new Date(must(scene.last_played_at));
         expect(lastPlayedDate.getTime()).toBeGreaterThanOrEqual(min.getTime());
         expect(lastPlayedDate.getTime()).toBeLessThanOrEqual(max.getTime());
       });
@@ -370,7 +371,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
 
       result.forEach((scene) => {
         expect(scene.last_o_at).toBeTruthy();
-        const lastODate = new Date(scene.last_o_at!);
+        const lastODate = new Date(must(scene.last_o_at));
         expect(lastODate.getTime()).toBeLessThan(threshold.getTime());
       });
     });
@@ -420,7 +421,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
 
       result.forEach((scene) => {
         expect(scene.studio).toBeTruthy();
-        expect(scene.studio!.favorite).toBe(true);
+        expect(must(scene.studio).favorite).toBe(true);
       });
 
       expect(result.length).toBeGreaterThan(0);
@@ -473,7 +474,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
         );
         expect(hasFavoritePerformer).toBe(true);
         expect(scene.studio).toBeTruthy();
-        expect(scene.studio!.favorite).toBe(true);
+        expect(must(scene.studio).favorite).toBe(true);
       });
     });
   });

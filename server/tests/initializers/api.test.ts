@@ -5,6 +5,7 @@ import type { AddressInfo } from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { must } from "../helpers/must.js";
 
 type TrustFn = (addr: string, hop: number) => boolean;
 
@@ -86,7 +87,7 @@ describe("health and version", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     if (server) {
-      await new Promise<void>((resolve) => server!.close(() => resolve()));
+      await new Promise<void>((resolve) => must(server).close(() => resolve()));
       server = undefined;
     }
     process.env = originalEnv;
