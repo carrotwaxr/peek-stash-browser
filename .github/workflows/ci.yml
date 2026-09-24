@@ -234,3 +234,4 @@ jobs:
         env:
           STASH_TEST_URL: ${{ secrets.STASH_TEST_URL }}
           STASH_TEST_API_KEY: ${{ secrets.STASH_TEST_API_KEY }}
+# probe: second push to cancel the superseded run
