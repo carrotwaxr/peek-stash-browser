@@ -17,7 +17,7 @@ import {
   clipService,
 } from "../../services/ClipService.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
@@ -61,8 +61,8 @@ describe("Clips Controller", () => {
       ];
       mockClipService.getClips.mockResolvedValue({ clips, total: 2 });
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getClips, { user: USER });
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -94,21 +94,24 @@ describe("Clips Controller", () => {
       });
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = mockReq({}, {}, USER, {
-        page: "3",
-        perPage: "10",
-        sortBy: "title",
-        sortDir: "asc",
-        isGenerated: "false",
-        sceneId: "scene-42",
-        tagIds: "t1",
-        sceneTagIds: "st1",
-        performerIds: "p1",
-        studioId: "studio-7",
-        q: "search term",
-        instanceId: "inst-1",
+      const req = reqFor(getClips, {
+        user: USER,
+        query: {
+          page: "3",
+          perPage: "10",
+          sortBy: "title",
+          sortDir: "asc",
+          isGenerated: "false",
+          sceneId: "scene-42",
+          tagIds: "t1",
+          sceneTagIds: "st1",
+          performerIds: "p1",
+          studioId: "studio-7",
+          q: "search term",
+          instanceId: "inst-1",
+        },
       });
-      const res = mockRes();
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -135,12 +138,15 @@ describe("Clips Controller", () => {
     it("splits comma-separated tagIds, sceneTagIds, and performerIds", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = mockReq({}, {}, USER, {
-        tagIds: "t1,t2,t3",
-        sceneTagIds: "st1,st2",
-        performerIds: "p1,p2,p3,p4",
+      const req = reqFor(getClips, {
+        user: USER,
+        query: {
+          tagIds: "t1,t2,t3",
+          sceneTagIds: "st1,st2",
+          performerIds: "p1,p2,p3,p4",
+        },
       });
-      const res = mockRes();
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -161,8 +167,8 @@ describe("Clips Controller", () => {
       });
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = mockReq({}, {}, USER, { sortBy: "random" });
-      const res = mockRes();
+      const req = reqFor(getClips, { user: USER, query: { sortBy: "random" } });
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -179,8 +185,8 @@ describe("Clips Controller", () => {
     it("calculates totalPages correctly", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 50 });
 
-      const req = mockReq({}, {}, USER, { perPage: "24" });
-      const res = mockRes();
+      const req = reqFor(getClips, { user: USER, query: { perPage: "24" } });
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -190,8 +196,8 @@ describe("Clips Controller", () => {
     it("returns totalPages 0 when there are no results", async () => {
       mockClipService.getClips.mockResolvedValue({ clips: [], total: 0 });
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getClips, { user: USER });
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -201,8 +207,8 @@ describe("Clips Controller", () => {
     it("returns 500 when the service throws", async () => {
       mockClipService.getClips.mockRejectedValue(new Error("DB down"));
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getClips, { user: USER });
+      const res = resFor(getClips);
 
       await getClips(req, res);
 
@@ -220,8 +226,8 @@ describe("Clips Controller", () => {
       });
       mockClipService.getClipById.mockResolvedValue(clip);
 
-      const req = mockReq({}, { id: "c1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getClipById, { params: { id: "c1" }, user: USER });
+      const res = resFor(getClipById);
 
       await getClipById(req, res);
 
@@ -233,8 +239,11 @@ describe("Clips Controller", () => {
     it("returns 404 when clip is not found", async () => {
       mockClipService.getClipById.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "nonexistent" }, USER);
-      const res = mockRes();
+      const req = reqFor(getClipById, {
+        params: { id: "nonexistent" },
+        user: USER,
+      });
+      const res = resFor(getClipById);
 
       await getClipById(req, res);
 
@@ -245,8 +254,8 @@ describe("Clips Controller", () => {
     it("returns 500 when the service throws", async () => {
       mockClipService.getClipById.mockRejectedValue(new Error("Unexpected"));
 
-      const req = mockReq({}, { id: "c1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getClipById, { params: { id: "c1" }, user: USER });
+      const res = resFor(getClipById);
 
       await getClipById(req, res);
 
@@ -264,8 +273,11 @@ describe("Clips Controller", () => {
       ];
       mockClipService.getClipsForScene.mockResolvedValue(clips);
 
-      const req = mockReq({}, { id: "scene-1" }, USER, {});
-      const res = mockRes();
+      const req = reqFor(getClipsForScene, {
+        params: { id: "scene-1" },
+        user: USER,
+      });
+      const res = resFor(getClipsForScene);
 
       await getClipsForScene(req, res);
 
@@ -282,10 +294,14 @@ describe("Clips Controller", () => {
     it("passes includeUngenerated=true when query param is set", async () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
-      const req = mockReq({}, { id: "scene-1" }, USER, {
-        includeUngenerated: "true",
+      const req = reqFor(getClipsForScene, {
+        params: { id: "scene-1" },
+        user: USER,
+        query: {
+          includeUngenerated: "true",
+        },
       });
-      const res = mockRes();
+      const res = resFor(getClipsForScene);
 
       await getClipsForScene(req, res);
 
@@ -300,10 +316,14 @@ describe("Clips Controller", () => {
     it("wraps instanceId in an array when provided", async () => {
       mockClipService.getClipsForScene.mockResolvedValue([]);
 
-      const req = mockReq({}, { id: "scene-1" }, USER, {
-        instanceId: "inst-1",
+      const req = reqFor(getClipsForScene, {
+        params: { id: "scene-1" },
+        user: USER,
+        query: {
+          instanceId: "inst-1",
+        },
       });
-      const res = mockRes();
+      const res = resFor(getClipsForScene);
 
       await getClipsForScene(req, res);
 
@@ -318,8 +338,11 @@ describe("Clips Controller", () => {
     it("returns 500 when the service throws", async () => {
       mockClipService.getClipsForScene.mockRejectedValue(new Error("Failed"));
 
-      const req = mockReq({}, { id: "scene-1" }, USER, {});
-      const res = mockRes();
+      const req = reqFor(getClipsForScene, {
+        params: { id: "scene-1" },
+        user: USER,
+      });
+      const res = resFor(getClipsForScene);
 
       await getClipsForScene(req, res);
 

@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDateDistribution } from "../../controllers/timelineController.js";
 import { timelineService } from "../../services/TimelineService.js";
+import { reqFor, resFor, testUser } from "../helpers/controllerTestUtils.js";
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -37,16 +38,13 @@ describe("timelineController", () => {
         mockDistribution
       );
 
-      const req = {
+      const req = reqFor(getDateDistribution, {
         params: { entityType: "scene" },
         query: { granularity: "months" },
-        user: { id: 1 },
-      } as any;
+        user: testUser({ id: 1 }),
+      });
 
-      const res = {
-        json: vi.fn(),
-        status: vi.fn().mockReturnThis(),
-      } as any;
+      const res = resFor(getDateDistribution);
 
       await getDateDistribution(req, res);
 
@@ -62,16 +60,13 @@ describe("timelineController", () => {
     it("defaults granularity to months if not provided", async () => {
       vi.mocked(timelineService.getDistribution).mockResolvedValue([]);
 
-      const req = {
+      const req = reqFor(getDateDistribution, {
         params: { entityType: "scene" },
         query: {},
-        user: { id: 1 },
-      } as any;
+        user: testUser({ id: 1 }),
+      });
 
-      const res = {
-        json: vi.fn(),
-        status: vi.fn().mockReturnThis(),
-      } as any;
+      const res = resFor(getDateDistribution);
 
       await getDateDistribution(req, res);
 
@@ -84,16 +79,13 @@ describe("timelineController", () => {
     });
 
     it("returns 400 for invalid entity type", async () => {
-      const req = {
+      const req = reqFor(getDateDistribution, {
         params: { entityType: "invalid" },
         query: { granularity: "months" },
-        user: { id: 1 },
-      } as any;
+        user: testUser({ id: 1 }),
+      });
 
-      const res = {
-        json: vi.fn(),
-        status: vi.fn().mockReturnThis(),
-      } as any;
+      const res = resFor(getDateDistribution);
 
       await getDateDistribution(req, res);
 
@@ -102,16 +94,13 @@ describe("timelineController", () => {
     });
 
     it("returns 400 for invalid granularity", async () => {
-      const req = {
+      const req = reqFor(getDateDistribution, {
         params: { entityType: "scene" },
         query: { granularity: "invalid" },
-        user: { id: 1 },
-      } as any;
+        user: testUser({ id: 1 }),
+      });
 
-      const res = {
-        json: vi.fn(),
-        status: vi.fn().mockReturnThis(),
-      } as any;
+      const res = resFor(getDateDistribution);
 
       await getDateDistribution(req, res);
 
@@ -124,16 +113,13 @@ describe("timelineController", () => {
         new Error("Database connection failed")
       );
 
-      const req = {
+      const req = reqFor(getDateDistribution, {
         params: { entityType: "scene" },
         query: { granularity: "months" },
-        user: { id: 1 },
-      } as any;
+        user: testUser({ id: 1 }),
+      });
 
-      const res = {
-        json: vi.fn(),
-        status: vi.fn().mockReturnThis(),
-      } as any;
+      const res = resFor(getDateDistribution);
 
       await getDateDistribution(req, res);
 

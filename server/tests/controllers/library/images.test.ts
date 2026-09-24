@@ -12,7 +12,7 @@ import { findImages } from "../../../controllers/library/images.js";
 import prisma from "../../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
 import type { NormalizedImage } from "../../../types/index.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
@@ -45,8 +45,8 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 
-const defaultUser = { id: 1, role: "USER" };
-const adminUser = { id: 1, role: "ADMIN" };
+const defaultUser = testUser();
+const adminUser = testUser({ role: "ADMIN" });
 
 /**
  * A query builder result row. `execute` declares `NormalizedImage[]` but
@@ -93,13 +93,16 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.findImages.count).toBe(1);
       expect(body.findImages.images).toHaveLength(1);
     });
@@ -118,13 +121,16 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
-      const body = res._getBody();
-      const img = body.findImages.images[0];
+      const body = res._getOkBody();
+      const img = must(body.findImages.images[0]);
       expect(img.paths).toEqual({
         thumbnail: "/thumb",
         preview: "/prev",
@@ -139,13 +145,17 @@ describe("Images Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
-      const body = res._getBody();
-      expect(body.findImages.images[0].stashUrl).toBe(
+      const body = res._getOkBody();
+      expect(must(body.findImages.images[0])).toHaveProperty(
+        "stashUrl",
         "http://stash/images/img1"
       );
     });
@@ -159,14 +169,18 @@ describe("Images Controller", () => {
         total: 2,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
-      const images = res._getBody().findImages.images;
+      const images = res._getOkBody().findImages.images;
       expect(images).toHaveLength(2);
-      for (const image of images) expect(image.stashUrl).toBeNull();
+      for (const image of images)
+        expect(image).toHaveProperty("stashUrl", null);
     });
 
     it("passes filter parameters to query builder", async () => {
@@ -175,18 +189,17 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        {
+      const req = reqFor(findImages, {
+        body: {
           filter: { sort: "title", direction: "DESC", page: 2, per_page: 20 },
           image_filter: {
             favorite: true,
             rating100: { modifier: "GREATER_THAN", value: 50 },
           },
         },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -207,8 +220,8 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        {
+      const req = reqFor(findImages, {
+        body: {
           filter: {},
           image_filter: {
             performers: { value: ["p1"], modifier: "INCLUDES" },
@@ -217,10 +230,9 @@ describe("Images Controller", () => {
             galleries: { value: ["g1"] },
           },
         },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -249,12 +261,11 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        { filter: {}, ids: ["img1", "img2"] },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, ids: ["img1", "img2"] },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -271,12 +282,11 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        { filter: { sort: "random_12345" }, image_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: { sort: "random_12345" }, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -291,12 +301,11 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq(
-        { filter: { sort: "random" }, image_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: { sort: "random" }, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -312,8 +321,11 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -327,8 +339,11 @@ describe("Images Controller", () => {
         total: 0,
       });
 
-      const req = mockReq({ filter: {}, image_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {}, image_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
@@ -339,13 +354,16 @@ describe("Images Controller", () => {
     it("returns 500 when query builder throws", async () => {
       mockImageQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findImages, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findImages);
 
       await findImages(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find images");
+      expect(res._getErrorBody().error).toBe("Failed to find images");
     });
   });
 });

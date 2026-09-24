@@ -3,6 +3,7 @@ import { pipeline } from "stream/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../../utils/logger.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import { resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock("../../utils/logger.js", () => ({
@@ -19,20 +20,13 @@ vi.mock("stream", () => ({
 
 function makeFetchResponse(opts: {
   headers?: Record<string, string>;
-  body?: unknown;
+  body?: ReadableStream | null;
 }): globalThis.Response {
-  const headersMap = new Map(Object.entries(opts.headers ?? {}));
-  return {
-    headers: { get: (name: string) => headersMap.get(name) ?? null },
-    body: opts.body ?? null,
-  } as unknown as globalThis.Response;
+  return new Response(opts.body ?? null, { headers: opts.headers });
 }
 
 function makeExpressResponse() {
-  return {
-    setHeader: vi.fn(),
-    end: vi.fn(),
-  } as unknown as import("express").Response;
+  return resFor(pipeResponseToClient);
 }
 
 describe("pipeResponseToClient", () => {
@@ -83,7 +77,7 @@ describe("pipeResponseToClient", () => {
   });
 
   it("converts web stream to node stream and pipes via pipeline", async () => {
-    const fakeBody = { locked: false };
+    const fakeBody = new ReadableStream();
     const fakeNodeStream = { pipe: vi.fn() };
     vi.mocked(Readable.fromWeb).mockReturnValue(partialRow(fakeNodeStream));
     vi.mocked(pipeline).mockResolvedValue(undefined);
@@ -98,7 +92,7 @@ describe("pipeResponseToClient", () => {
   });
 
   it("silently swallows AbortError (logs debug, not error)", async () => {
-    const fakeBody = { locked: false };
+    const fakeBody = new ReadableStream();
     vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const abortError = new Error("The operation was aborted");
@@ -117,7 +111,7 @@ describe("pipeResponseToClient", () => {
   });
 
   it("silently swallows ERR_STREAM_PREMATURE_CLOSE", async () => {
-    const fakeBody = { locked: false };
+    const fakeBody = new ReadableStream();
     vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const prematureCloseError = new Error(
@@ -138,7 +132,7 @@ describe("pipeResponseToClient", () => {
   });
 
   it("logs error for unexpected pipeline errors", async () => {
-    const fakeBody = { locked: false };
+    const fakeBody = new ReadableStream();
     vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const unexpectedError = new Error("ECONNRESET");

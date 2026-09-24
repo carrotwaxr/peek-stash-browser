@@ -58,6 +58,23 @@ export function partialRow<T>(fields: Partial<NoInfer<NonNullable<T>>>): T {
 }
 
 /**
+ * An implementation for a mocked Prisma method (`mockImplementation`) that
+ * answers from `impl`, typed from the method: `impl` gets its arguments and
+ * returns or resolves its result. A Prisma method returns a `PrismaPromise`,
+ * whose query helpers the code under test does not call; a plain promise
+ * stands in for it.
+ */
+export function prismaImpl<F extends (...args: never[]) => unknown>(
+  impl: (
+    ...args: Parameters<F>
+  ) => Awaited<ReturnType<F>> | Promise<Awaited<ReturnType<F>>>
+): F {
+  const answer = (...args: Parameters<F>) => Promise.resolve(impl(...args));
+  // The one cast: a plain promise in place of the PrismaPromise
+  return answer as unknown as F;
+}
+
+/**
  * A row the database cannot return, such as a null in a NOT NULL column, for a
  * test of the code's defensive handling of it. Typed as the full row like
  * `partialRow`, but its fields are not checked, so use it only for rows that

@@ -4,7 +4,7 @@
 import { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { databaseBackupService } from "../../services/DatabaseBackupService.js";
-import { authReq, findHandler } from "../helpers/controllerTestUtils.js";
+import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
 // Mock DatabaseBackupService
 vi.mock("../../services/DatabaseBackupService.js", () => ({
@@ -36,31 +36,6 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockService = vi.mocked(databaseBackupService);
 
-function createMockRequest(
-  options: {
-    params?: Record<string, string>;
-    body?: Record<string, unknown>;
-    user?: { id: number; username: string; role: string };
-  } = {}
-): Request {
-  return authReq({
-    params: options.params || {},
-    body: options.body || {},
-    user: options.user,
-  });
-}
-
-function createMockResponse() {
-  const responseJson = vi.fn();
-  const responseStatus = vi.fn(() => ({ json: responseJson }));
-  return {
-    json: responseJson,
-    status: responseStatus,
-    responseJson,
-    responseStatus,
-  };
-}
-
 describe("Database Backup Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,19 +59,17 @@ describe("Database Backup Routes", () => {
       const { default: router } =
         await import("../../routes/databaseBackup.js");
 
-      const mockReq = createMockRequest({
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const { json, status } = createMockResponse();
-      const mockRes = { json, status } as unknown as Response;
-
       // Find and call the route handler
       const handler = findHandler(router, "get", "/database/backups");
+      const req = reqFor(handler, {
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
+      const res = resFor(handler);
 
-      await handler(mockReq, mockRes, () => {});
+      await handler(req, res, () => {});
 
       expect(mockService.listBackups).toHaveBeenCalled();
-      expect(json).toHaveBeenCalledWith({ backups: mockBackups });
+      expect(res.json).toHaveBeenCalledWith({ backups: mockBackups });
     });
 
     it("should return 500 on service error", async () => {
@@ -105,19 +78,16 @@ describe("Database Backup Routes", () => {
       const { default: router } =
         await import("../../routes/databaseBackup.js");
 
-      const mockReq = createMockRequest({
+      const handler = findHandler(router, "get", "/database/backups");
+      const req = reqFor(handler, {
         user: { id: 1, username: "admin", role: "ADMIN" },
       });
-      const { json, status, responseJson, responseStatus } =
-        createMockResponse();
-      const mockRes = { json, status } as unknown as Response;
+      const res = resFor(handler);
 
-      const handler = findHandler(router, "get", "/database/backups");
+      await handler(req, res, () => {});
 
-      await handler(mockReq, mockRes, () => {});
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to list backups",
         message: "Disk error",
       });
@@ -136,18 +106,16 @@ describe("Database Backup Routes", () => {
       const { default: router } =
         await import("../../routes/databaseBackup.js");
 
-      const mockReq = createMockRequest({
+      const handler = findHandler(router, "post", "/database/backup");
+      const req = reqFor(handler, {
         user: { id: 1, username: "admin", role: "ADMIN" },
       });
-      const { json, status } = createMockResponse();
-      const mockRes = { json, status } as unknown as Response;
+      const res = resFor(handler);
 
-      const handler = findHandler(router, "post", "/database/backup");
-
-      await handler(mockReq, mockRes, () => {});
+      await handler(req, res, () => {});
 
       expect(mockService.createBackup).toHaveBeenCalled();
-      expect(json).toHaveBeenCalledWith({ backup: mockBackup });
+      expect(res.json).toHaveBeenCalledWith({ backup: mockBackup });
     });
   });
 
@@ -158,25 +126,23 @@ describe("Database Backup Routes", () => {
       const { default: router } =
         await import("../../routes/databaseBackup.js");
 
-      const mockReq = createMockRequest({
-        params: { filename: "peek-stash-browser.db.backup-20260118-104532" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const { json, status } = createMockResponse();
-      const mockRes = { json, status } as unknown as Response;
-
       const handler = findHandler(
         router,
         "delete",
         "/database/backups/:filename"
       );
+      const req = reqFor(handler, {
+        params: { filename: "peek-stash-browser.db.backup-20260118-104532" },
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
+      const res = resFor(handler);
 
-      await handler(mockReq, mockRes, () => {});
+      await handler(req, res, () => {});
 
       expect(mockService.deleteBackup).toHaveBeenCalledWith(
         "peek-stash-browser.db.backup-20260118-104532"
       );
-      expect(json).toHaveBeenCalledWith({ ok: true });
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
     });
 
     it("should return 400 for invalid filename", async () => {
@@ -187,23 +153,20 @@ describe("Database Backup Routes", () => {
       const { default: router } =
         await import("../../routes/databaseBackup.js");
 
-      const mockReq = createMockRequest({
-        params: { filename: "../etc/passwd" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const { json, status, responseJson, responseStatus } =
-        createMockResponse();
-      const mockRes = { json, status } as unknown as Response;
-
       const handler = findHandler(
         router,
         "delete",
         "/database/backups/:filename"
       );
+      const req = reqFor(handler, {
+        params: { filename: "../etc/passwd" },
+        user: { id: 1, username: "admin", role: "ADMIN" },
+      });
+      const res = resFor(handler);
 
-      await handler(mockReq, mockRes, () => {});
+      await handler(req, res, () => {});
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(400);
     });
   });
 });

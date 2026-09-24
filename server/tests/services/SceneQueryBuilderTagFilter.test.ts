@@ -29,9 +29,6 @@ vi.mock("../../utils/hierarchyUtils.js", () => ({
   expandStudioIds: vi.fn(async (ids: string[]) => ids),
 }));
 
-// Access private method for unit testing
-const builder = sceneQueryBuilder as any;
-
 describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,7 +41,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).not.toBe("");
       // Params should contain bare IDs, NOT composite keys
@@ -61,7 +59,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES_ALL",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).not.toBe("");
       expect(result.params).not.toContain("284:instance-1");
@@ -76,7 +75,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "EXCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).not.toBe("");
       expect(result.params).not.toContain("284:instance-1");
@@ -89,7 +89,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).not.toBe("");
       expect(result.params).toContain("284");
@@ -102,7 +103,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).not.toBe("");
       expect(result.params).not.toContain("284:instance-1");
@@ -113,12 +115,13 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
 
   describe("empty/null handling", () => {
     it("returns empty clause for null filter", async () => {
-      const result = await builder.buildTagFilterWithHierarchy(null);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](null);
       expect(result.sql).toBe("");
     });
 
     it("returns empty clause for empty value array", async () => {
-      const result = await builder.buildTagFilterWithHierarchy({
+      const result = await sceneQueryBuilder["buildTagFilterWithHierarchy"]({
         value: [],
         modifier: "INCLUDES",
       });
@@ -126,7 +129,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
     });
 
     it("returns empty clause for undefined filter", async () => {
-      const result = await builder.buildTagFilterWithHierarchy(undefined);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](undefined);
       expect(result.sql).toBe("");
     });
   });
@@ -138,7 +142,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).toContain("SceneTag");
       expect(result.sql).toContain("EXISTS");
@@ -150,7 +155,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "INCLUDES_ALL",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).toContain("AND");
       expect(result.sql).toContain("SceneTag");
@@ -162,7 +168,8 @@ describe("SceneQueryBuilder.buildTagFilterWithHierarchy", () => {
         modifier: "EXCLUDES",
       };
 
-      const result = await builder.buildTagFilterWithHierarchy(filter);
+      const result =
+        await sceneQueryBuilder["buildTagFilterWithHierarchy"](filter);
 
       expect(result.sql).toContain("NOT EXISTS");
     });

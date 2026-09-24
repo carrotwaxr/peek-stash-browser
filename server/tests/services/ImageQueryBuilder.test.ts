@@ -418,7 +418,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(2);
-      expect(result.images.map((i: any) => i.id).sort()).toEqual(
+      expect(result.images.map((i) => i.id).sort()).toEqual(
         [testImageIds[0], testImageIds[2]].sort()
       );
     });
@@ -453,7 +453,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(2);
-      expect(result.images.map((i: any) => i.id)).not.toContain("999002");
+      expect(result.images.map((i) => i.id)).not.toContain("999002");
     });
 
     it("includes all images when applyExclusions is false", async () => {
@@ -467,7 +467,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(3);
-      expect(result.images.map((i: any) => i.id)).toContain("999002");
+      expect(result.images.map((i) => i.id)).toContain("999002");
     });
   });
 
@@ -491,7 +491,7 @@ describe("ImageQueryBuilder", () => {
       expect(result.images).toHaveLength(2);
 
       const images = result.images as ImageRowWithUserData[];
-      const img1 = images.find((i: any) => i.id === "999001");
+      const img1 = images.find((i) => i.id === "999001");
       expect(img1?.userRating).toBe(90);
       expect(img1?.userFavorite).toBeTruthy(); // SQLite may return 1 or true
     });
@@ -524,8 +524,8 @@ describe("ImageQueryBuilder", () => {
       });
 
       // Same seed should produce same order
-      expect(result1.images.map((i: any) => i.id)).toEqual(
-        result2.images.map((i: any) => i.id)
+      expect(result1.images.map((i) => i.id)).toEqual(
+        result2.images.map((i) => i.id)
       );
     });
 
@@ -553,8 +553,8 @@ describe("ImageQueryBuilder", () => {
 
       // Different seeds should produce different orders (with enough images)
       if (result1.images.length >= 2 && result2.images.length >= 2) {
-        const order1 = result1.images.map((i: any) => i.id).join(",");
-        const order2 = result2.images.map((i: any) => i.id).join(",");
+        const order1 = result1.images.map((i) => i.id).join(",");
+        const order2 = result2.images.map((i) => i.id).join(",");
         expect(order1).not.toEqual(order2);
       }
     });
@@ -582,8 +582,8 @@ describe("ImageQueryBuilder", () => {
 
       // Same seed with opposite directions should give reversed order
       if (ascResult.images.length >= 2 && descResult.images.length >= 2) {
-        const ascIds = ascResult.images.map((i: any) => i.id);
-        const descIds = descResult.images.map((i: any) => i.id);
+        const ascIds = ascResult.images.map((i) => i.id);
+        const descIds = descResult.images.map((i) => i.id);
         expect(ascIds).toEqual(descIds.reverse());
       }
     });

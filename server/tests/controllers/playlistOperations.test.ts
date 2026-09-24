@@ -21,7 +21,7 @@ import {
   getPlaylistAccess,
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import {
   type PlaylistShareWithGroup,
   type PlaylistWithItems,
@@ -103,8 +103,11 @@ describe("Playlist Controller Operations", () => {
       });
       mockPrisma.playlist.create.mockResolvedValue(createdPlaylist);
 
-      const req = mockReq({ name: "My Playlist" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createPlaylist, {
+        body: { name: "My Playlist" },
+        user: USER,
+      });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -115,12 +118,11 @@ describe("Playlist Controller Operations", () => {
     it("trims whitespace from name and description", async () => {
       mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 1 }));
 
-      const req = mockReq(
-        { name: "  My Playlist  ", description: "  A description  " },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createPlaylist, {
+        body: { name: "  My Playlist  ", description: "  A description  " },
+        user: USER,
+      });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -135,8 +137,8 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("rejects empty name", async () => {
-      const req = mockReq({ name: "" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createPlaylist, { body: { name: "" }, user: USER });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -147,8 +149,8 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("rejects whitespace-only name", async () => {
-      const req = mockReq({ name: "   " }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createPlaylist, { body: { name: "   " }, user: USER });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -159,8 +161,8 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("rejects missing name", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createPlaylist, { user: USER });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -168,8 +170,8 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ name: "Test" });
-      const res = mockRes();
+      const req = reqFor(createPlaylist, { body: { name: "Test" } });
+      const res = resFor(createPlaylist);
 
       await createPlaylist(req, res);
 
@@ -193,8 +195,12 @@ describe("Playlist Controller Operations", () => {
         })
       );
 
-      const req = mockReq({ name: "Updated" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylist, {
+        body: { name: "Updated" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylist);
 
       await updatePlaylist(req, res);
 
@@ -208,8 +214,12 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({ name: "Hijack" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylist, {
+        body: { name: "Hijack" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylist);
 
       await updatePlaylist(req, res);
 
@@ -218,8 +228,12 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("returns 400 for invalid playlist ID", async () => {
-      const req = mockReq({ name: "Test" }, { id: "abc" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylist, {
+        body: { name: "Test" },
+        params: { id: "abc" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylist);
 
       await updatePlaylist(req, res);
 
@@ -240,8 +254,8 @@ describe("Playlist Controller Operations", () => {
       );
       mockPrisma.playlist.delete.mockResolvedValue(partialRow({}));
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deletePlaylist, { params: { id: "1" }, user: USER });
+      const res = resFor(deletePlaylist);
 
       await deletePlaylist(req, res);
 
@@ -257,8 +271,8 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user is not owner", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deletePlaylist, { params: { id: "1" }, user: USER });
+      const res = resFor(deletePlaylist);
 
       await deletePlaylist(req, res);
 
@@ -291,8 +305,11 @@ describe("Playlist Controller Operations", () => {
         })
       );
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(duplicatePlaylist, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(duplicatePlaylist);
 
       await duplicatePlaylist(req, res);
 
@@ -328,8 +345,11 @@ describe("Playlist Controller Operations", () => {
         })
       );
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(duplicatePlaylist, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(duplicatePlaylist);
 
       await duplicatePlaylist(req, res);
 
@@ -347,8 +367,11 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 when user has no access", async () => {
       mockGetAccess.mockResolvedValue({ level: "none" });
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(duplicatePlaylist, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(duplicatePlaylist);
 
       await duplicatePlaylist(req, res);
 
@@ -372,8 +395,11 @@ describe("Playlist Controller Operations", () => {
         }),
       ]);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getPlaylistShares, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(getPlaylistShares);
 
       await getPlaylistShares(req, res);
 
@@ -391,8 +417,11 @@ describe("Playlist Controller Operations", () => {
     it("returns 404 for non-owned playlist", async () => {
       mockPrisma.playlist.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getPlaylistShares, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(getPlaylistShares);
 
       await getPlaylistShares(req, res);
 
@@ -423,8 +452,12 @@ describe("Playlist Controller Operations", () => {
         }),
       ]);
 
-      const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylistShares, {
+        body: { groupIds: [10] },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
 
       await updatePlaylistShares(req, res);
 
@@ -444,8 +477,12 @@ describe("Playlist Controller Operations", () => {
         userPermissions({ canShare: false })
       );
 
-      const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylistShares, {
+        body: { groupIds: [10] },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
 
       await updatePlaylistShares(req, res);
 
@@ -467,12 +504,12 @@ describe("Playlist Controller Operations", () => {
       );
       mockGetUserGroups.mockResolvedValue([{ id: 10, name: "Family" }]);
 
-      const req = mockReq(
-        { groupIds: [10, 99] }, // 99 is not a user's group
-        { id: "1" },
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(updatePlaylistShares, {
+        body: { groupIds: [10, 99] },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
 
       await updatePlaylistShares(req, res);
 
@@ -492,12 +529,12 @@ describe("Playlist Controller Operations", () => {
       mockPrisma.$transaction.mockResolvedValue([]);
       mockPrisma.playlistShare.findMany.mockResolvedValue([]);
 
-      const req = mockReq(
-        { groupIds: [] }, // Empty = clear all
-        { id: "1" },
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(updatePlaylistShares, {
+        body: { groupIds: [] },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
 
       await updatePlaylistShares(req, res);
 
@@ -514,8 +551,12 @@ describe("Playlist Controller Operations", () => {
         })
       );
 
-      const req = mockReq({ groupIds: "not-an-array" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updatePlaylistShares, {
+        body: malformed({ groupIds: "not-an-array" }),
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updatePlaylistShares);
 
       await updatePlaylistShares(req, res);
 

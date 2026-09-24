@@ -20,7 +20,12 @@ import {
 } from "../../controllers/setup.js";
 import prisma from "../../prisma/singleton.js";
 import { logger } from "../../utils/logger.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import {
+  malformed,
+  reqFor,
+  resFor,
+  testUser,
+} from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -91,11 +96,11 @@ describe("Setup Controller", () => {
       mockPrisma.user.count.mockResolvedValue(2);
       mockPrisma.stashInstance.count.mockResolvedValue(1);
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getSetupStatus);
+      const res = resFor(getSetupStatus);
       await getSetupStatus(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.setupComplete).toBe(true);
       expect(body.hasUsers).toBe(true);
       expect(body.hasStashInstance).toBe(true);
@@ -105,30 +110,30 @@ describe("Setup Controller", () => {
       mockPrisma.user.count.mockResolvedValue(0);
       mockPrisma.stashInstance.count.mockResolvedValue(1);
 
-      const res = mockRes();
-      await getSetupStatus(mockReq(), res);
+      const res = resFor(getSetupStatus);
+      await getSetupStatus(reqFor(getSetupStatus), res);
 
-      expect(res._getBody().setupComplete).toBe(false);
-      expect(res._getBody().hasUsers).toBe(false);
+      expect(res._getOkBody().setupComplete).toBe(false);
+      expect(res._getOkBody().hasUsers).toBe(false);
     });
 
     it("returns setupComplete: false when no instances exist", async () => {
       mockPrisma.user.count.mockResolvedValue(1);
       mockPrisma.stashInstance.count.mockResolvedValue(0);
 
-      const res = mockRes();
-      await getSetupStatus(mockReq(), res);
+      const res = resFor(getSetupStatus);
+      await getSetupStatus(reqFor(getSetupStatus), res);
 
-      expect(res._getBody().setupComplete).toBe(false);
-      expect(res._getBody().hasStashInstance).toBe(false);
+      expect(res._getOkBody().setupComplete).toBe(false);
+      expect(res._getOkBody().hasStashInstance).toBe(false);
     });
 
     it("counts only enabled instances", async () => {
       mockPrisma.user.count.mockResolvedValue(1);
       mockPrisma.stashInstance.count.mockResolvedValue(0);
 
-      const res = mockRes();
-      await getSetupStatus(mockReq(), res);
+      const res = resFor(getSetupStatus);
+      await getSetupStatus(reqFor(getSetupStatus), res);
 
       expect(mockPrisma.stashInstance.count).toHaveBeenCalledWith({
         where: { enabled: true },
@@ -148,14 +153,16 @@ describe("Setup Controller", () => {
         })
       );
 
-      const res = mockRes();
+      const res = resFor(createFirstAdmin);
       await createFirstAdmin(
-        mockReq({ username: "admin", password: "securepass1" }),
+        reqFor(createFirstAdmin, {
+          body: { username: "admin", password: "securepass1" },
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -174,70 +181,77 @@ describe("Setup Controller", () => {
     it("returns 403 when users already exist", async () => {
       mockPrisma.user.count.mockResolvedValue(1);
 
-      const res = mockRes();
+      const res = resFor(createFirstAdmin);
       await createFirstAdmin(
-        mockReq({ username: "admin", password: "securepass1" }),
+        reqFor(createFirstAdmin, {
+          body: { username: "admin", password: "securepass1" },
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res._getBody().error).toContain("Users already exist");
+      expect(res._getErrorBody().error).toContain("Users already exist");
       expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
 
     it("returns 400 when username is missing", async () => {
       mockPrisma.user.count.mockResolvedValue(0);
 
-      const res = mockRes();
-      await createFirstAdmin(mockReq({ password: "securepass1" }), res);
+      const res = resFor(createFirstAdmin);
+      await createFirstAdmin(
+        reqFor(createFirstAdmin, {
+          body: malformed({ password: "securepass1" }),
+        }),
+        res
+      );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("required");
+      expect(res._getErrorBody().error).toContain("required");
     });
 
     it("returns 400 when password is too short", async () => {
       mockPrisma.user.count.mockResolvedValue(0);
 
-      const res = mockRes();
+      const res = resFor(createFirstAdmin);
       await createFirstAdmin(
-        mockReq({ username: "admin", password: "short" }),
+        reqFor(createFirstAdmin, {
+          body: { username: "admin", password: "short" },
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("at least 6 characters");
+      expect(res._getErrorBody().error).toContain("at least 6 characters");
     });
   });
 
   describe("testStashConnection", () => {
     it("returns success for a valid connection", async () => {
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq(
-          { url: "http://stash:9999/graphql", apiKey: "test-key" },
-          {},
-          { role: "ADMIN" }
-        ),
+        reqFor(testStashConnection, {
+          body: { url: "http://stash:9999/graphql", apiKey: "test-key" },
+          user: testUser({ role: "ADMIN" }),
+        }),
         res
       );
 
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().version).toBe("0.27.0");
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().version).toBe("0.27.0");
     });
 
     it("logs the key length, never any of its characters", async () => {
       const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sig";
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq(
-          { url: "http://stash:9999/graphql", apiKey },
-          {},
-          { role: "ADMIN" }
-        ),
+        reqFor(testStashConnection, {
+          body: { url: "http://stash:9999/graphql", apiKey },
+          user: testUser({ role: "ADMIN" }),
+        }),
         res
       );
 
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       const logged = JSON.stringify(
         (["error", "warn", "info", "debug"] as const).map(
           (level) => vi.mocked(logger[level]).mock.calls
@@ -248,88 +262,92 @@ describe("Setup Controller", () => {
     });
 
     it("returns 400 when URL is missing", async () => {
-      const res = mockRes();
-      await testStashConnection(mockReq({ apiKey: "test-key" }), res);
+      const res = resFor(testStashConnection);
+      await testStashConnection(
+        reqFor(testStashConnection, {
+          body: malformed({ apiKey: "test-key" }),
+        }),
+        res
+      );
 
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
     it("returns 400 for invalid URL format", async () => {
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq({ url: "not-a-url", apiKey: "test-key" }),
+        reqFor(testStashConnection, {
+          body: { url: "not-a-url", apiKey: "test-key" },
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("Invalid URL");
+      expect(res._getErrorBody().error).toContain("Invalid URL");
     });
 
     it("returns friendly message for connection refused", async () => {
       const { StashClient } = await import("../../graphql/StashClient.js");
-      vi.mocked(StashClient).mockImplementationOnce(
-        () =>
-          ({
-            configuration: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-            version: vi.fn(),
-          }) as any
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+          version: vi.fn(),
+        })
       );
 
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq(
-          { url: "http://stash:9999/graphql", apiKey: "test-key" },
-          {},
-          { role: "ADMIN" }
-        ),
+        reqFor(testStashConnection, {
+          body: { url: "http://stash:9999/graphql", apiKey: "test-key" },
+          user: testUser({ role: "ADMIN" }),
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("Connection refused");
+      expect(res._getErrorBody().error).toContain("Connection refused");
     });
 
     it("returns friendly message for host not found", async () => {
       const { StashClient } = await import("../../graphql/StashClient.js");
-      vi.mocked(StashClient).mockImplementationOnce(
-        () =>
-          ({
-            configuration: vi
-              .fn()
-              .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
-            version: vi.fn(),
-          }) as any
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
+          version: vi.fn(),
+        })
       );
 
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq(
-          { url: "http://badhost:9999/graphql", apiKey: "test-key" },
-          {},
-          { role: "ADMIN" }
-        ),
+        reqFor(testStashConnection, {
+          body: { url: "http://badhost:9999/graphql", apiKey: "test-key" },
+          user: testUser({ role: "ADMIN" }),
+        }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("Host not found");
+      expect(res._getErrorBody().error).toContain("Host not found");
     });
 
     it("an anonymous caller gets the generic failure without details", async () => {
       const { StashClient } = await import("../../graphql/StashClient.js");
-      vi.mocked(StashClient).mockImplementationOnce(
-        () =>
-          ({
-            configuration: vi
-              .fn()
-              .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
-            version: vi.fn(),
-          }) as any
+      vi.mocked(StashClient).mockImplementationOnce(() =>
+        partialRow({
+          configuration: vi
+            .fn()
+            .mockRejectedValue(new Error("getaddrinfo ENOTFOUND badhost")),
+          version: vi.fn(),
+        })
       );
 
-      const res = mockRes();
+      const res = resFor(testStashConnection);
       await testStashConnection(
-        mockReq({ url: "http://badhost:9999/graphql", apiKey: "test-key" }),
+        reqFor(testStashConnection, {
+          body: { url: "http://badhost:9999/graphql", apiKey: "test-key" },
+        }),
         res
       );
 
@@ -355,19 +373,21 @@ describe("Setup Controller", () => {
         })
       );
 
-      const res = mockRes();
+      const res = resFor(createFirstStashInstance);
       await createFirstStashInstance(
-        mockReq({
-          name: "My Stash",
-          url: "http://stash:9999/graphql",
-          uiUrl: "https://stash.example.com",
-          apiKey: "test-key",
+        reqFor(createFirstStashInstance, {
+          body: {
+            name: "My Stash",
+            url: "http://stash:9999/graphql",
+            uiUrl: "https://stash.example.com",
+            apiKey: "test-key",
+          },
         }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.stashInstance.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -380,25 +400,32 @@ describe("Setup Controller", () => {
     it("returns 403 when instances already exist", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(1);
 
-      const res = mockRes();
+      const res = resFor(createFirstStashInstance);
       await createFirstStashInstance(
-        mockReq({
-          url: "http://stash:9999/graphql",
-          apiKey: "test-key",
+        reqFor(createFirstStashInstance, {
+          body: {
+            url: "http://stash:9999/graphql",
+            apiKey: "test-key",
+          },
         }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res._getBody().error).toContain("already exists");
+      expect(res._getErrorBody().error).toContain("already exists");
       expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
     });
 
     it("returns 400 when URL is missing", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
 
-      const res = mockRes();
-      await createFirstStashInstance(mockReq({ apiKey: "test-key" }), res);
+      const res = resFor(createFirstStashInstance);
+      await createFirstStashInstance(
+        reqFor(createFirstStashInstance, {
+          body: malformed({ apiKey: "test-key" }),
+        }),
+        res
+      );
 
       expect(res.status).toHaveBeenCalledWith(400);
     });
@@ -416,11 +443,13 @@ describe("Setup Controller", () => {
         })
       );
 
-      const res = mockRes();
+      const res = resFor(createFirstStashInstance);
       await createFirstStashInstance(
-        mockReq({
-          url: "http://stash:9999/graphql",
-          apiKey: "test-key",
+        reqFor(createFirstStashInstance, {
+          body: {
+            url: "http://stash:9999/graphql",
+            apiKey: "test-key",
+          },
         }),
         res
       );
@@ -435,18 +464,20 @@ describe("Setup Controller", () => {
     it("returns 400 for invalid uiUrl format", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(0);
 
-      const res = mockRes();
+      const res = resFor(createFirstStashInstance);
       await createFirstStashInstance(
-        mockReq({
-          url: "http://stash:9999/graphql",
-          uiUrl: "not-a-url",
-          apiKey: "test-key",
+        reqFor(createFirstStashInstance, {
+          body: {
+            url: "http://stash:9999/graphql",
+            uiUrl: "not-a-url",
+            apiKey: "test-key",
+          },
         }),
         res
       );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("Invalid UI URL");
+      expect(res._getErrorBody().error).toContain("Invalid UI URL");
       expect(mockPrisma.stashInstance.create).not.toHaveBeenCalled();
     });
   });
@@ -459,10 +490,10 @@ describe("Setup Controller", () => {
       ];
       mockPrisma.stashInstance.findMany.mockResolvedValue(instances);
 
-      const res = mockRes();
-      await getAllStashInstances(mockReq(), res);
+      const res = resFor(getAllStashInstances);
+      await getAllStashInstances(reqFor(getAllStashInstances), res);
 
-      expect(res._getBody().instances).toEqual(instances);
+      expect(res._getOkBody().instances).toEqual(instances);
       expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: { priority: "asc" },
@@ -481,10 +512,13 @@ describe("Setup Controller", () => {
       );
       mockPrisma.stashInstance.count.mockResolvedValue(2);
 
-      const res = mockRes();
-      await deleteStashInstance(mockReq({}, { id: "inst-b" }), res);
+      const res = resFor(deleteStashInstance);
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+        res
+      );
 
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.stashInstance.delete).toHaveBeenCalledWith({
         where: { id: "inst-b" },
       });
@@ -493,8 +527,11 @@ describe("Setup Controller", () => {
     it("returns 404 when instance does not exist", async () => {
       mockPrisma.stashInstance.findUnique.mockResolvedValue(null);
 
-      const res = mockRes();
-      await deleteStashInstance(mockReq({}, { id: "nonexistent" }), res);
+      const res = resFor(deleteStashInstance);
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "nonexistent" } }),
+        res
+      );
 
       expect(res.status).toHaveBeenCalledWith(404);
     });
@@ -513,11 +550,14 @@ describe("Setup Controller", () => {
         })
       );
 
-      const res = mockRes();
-      await deleteStashInstance(mockReq({}, { id: "inst-a" }), res);
+      const res = resFor(deleteStashInstance);
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "inst-a" } }),
+        res
+      );
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res._getBody().error).toContain("last enabled");
+      expect(res._getErrorBody().error).toContain("last enabled");
       expect(mockPrisma.stashInstance.delete).not.toHaveBeenCalled();
     });
   });
@@ -545,21 +585,27 @@ describe("Setup Controller", () => {
         })
       );
 
-      const res = mockRes();
+      const res = resFor(updateStashInstance);
       await updateStashInstance(
-        mockReq({ name: "New Name" }, { id: "inst-a" }),
+        reqFor(updateStashInstance, {
+          body: { name: "New Name" },
+          params: { id: "inst-a" },
+        }),
         res
       );
 
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("returns 404 when instance not found", async () => {
       mockPrisma.stashInstance.findUnique.mockResolvedValue(null);
 
-      const res = mockRes();
+      const res = resFor(updateStashInstance);
       await updateStashInstance(
-        mockReq({ name: "New" }, { id: "nonexistent" }),
+        reqFor(updateStashInstance, {
+          body: { name: "New" },
+          params: { id: "nonexistent" },
+        }),
         res
       );
 

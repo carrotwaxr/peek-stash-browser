@@ -11,7 +11,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, refreshCache } from "../../controllers/stats.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
@@ -79,8 +79,8 @@ describe("Stats Controller", () => {
 
   describe("getStats", () => {
     it("returns a response with system, process, cache, and database sections", async () => {
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
@@ -93,12 +93,12 @@ describe("Stats Controller", () => {
     });
 
     it("includes cache stats from stashEntityService", async () => {
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.cache).toMatchObject({
         isInitialized: true,
         isRefreshing: false,
@@ -111,8 +111,8 @@ describe("Stats Controller", () => {
         throw new Error("Service not initialized");
       });
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
@@ -125,12 +125,12 @@ describe("Stats Controller", () => {
     it("falls back to 0 database size when fs.stat fails", async () => {
       mockFsStat.mockRejectedValue(new Error("ENOENT"));
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(res._getStatus()).toBe(200);
       expect(body.database).toBeDefined();
       expect(body.database.size).toBe("0 B");
@@ -139,23 +139,23 @@ describe("Stats Controller", () => {
     it("formats database size correctly for a 1 MB file", async () => {
       mockFsStat.mockResolvedValue(partialRow({ size: 1048576 }));
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      expect(res._getBody().database.size).toBe("1.00 MB");
+      expect(res._getOkBody().database.size).toBe("1.00 MB");
     });
 
     it("formats database size correctly for a 1 KB file", async () => {
       mockFsStat.mockResolvedValue(partialRow({ size: 1024 }));
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      expect(res._getBody().database.size).toBe("1.00 KB");
+      expect(res._getOkBody().database.size).toBe("1.00 KB");
     });
 
     it("formats database size correctly for a 2.5 GB file", async () => {
@@ -163,32 +163,32 @@ describe("Stats Controller", () => {
         partialRow({ size: 2.5 * 1024 * 1024 * 1024 })
       );
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      expect(res._getBody().database.size).toBe("2.50 GB");
+      expect(res._getOkBody().database.size).toBe("2.50 GB");
     });
 
     it("formats 0 bytes as '0 B'", async () => {
       mockFsStat.mockResolvedValue(partialRow({ size: 0 }));
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      expect(res._getBody().database.size).toBe("0 B");
+      expect(res._getOkBody().database.size).toBe("0 B");
     });
 
     it("includes formatted uptime in system info", async () => {
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // process.uptime() returns a real number; just verify the field exists and is a string
       expect(typeof body.system.uptime).toBe("string");
     });
@@ -209,8 +209,8 @@ describe("Stats Controller", () => {
         throw new Error("isSyncing broken");
       });
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getStats);
+      const res = resFor(getStats);
 
       await getStats(req, res);
 
@@ -226,8 +226,8 @@ describe("Stats Controller", () => {
     it("triggers fullSync and returns success", async () => {
       mockSyncService.fullSync.mockResolvedValue([]);
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(refreshCache);
+      const res = resFor(refreshCache);
 
       await refreshCache(req, res);
 
@@ -244,8 +244,8 @@ describe("Stats Controller", () => {
         throw new Error("Sync failed hard");
       });
 
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(refreshCache);
+      const res = resFor(refreshCache);
 
       await refreshCache(req, res);
 

@@ -151,7 +151,7 @@ describe("StashInstanceManager", () => {
 
       const client = manager.getDefault();
       expect(client).toBeDefined();
-      expect((client as any).url).toBe(INSTANCE_A.url);
+      expect(client).toHaveProperty("url", INSTANCE_A.url);
     });
 
     it("throws when no instances are configured", async () => {
@@ -200,7 +200,7 @@ describe("StashInstanceManager", () => {
 
       const client = manager.get(INSTANCE_B.id);
       expect(client).toBeDefined();
-      expect((client as any).url).toBe(INSTANCE_B.url);
+      expect(client).toHaveProperty("url", INSTANCE_B.url);
     });
 
     it("returns undefined for an unknown instance ID", async () => {

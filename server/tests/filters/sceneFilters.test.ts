@@ -308,7 +308,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneGroupIds = scene.groups?.map((g: any) => g.id) || [];
+        const sceneGroupIds = scene.groups?.map((g) => g.id) || [];
         const hasGroup = groupIds.some((id) => sceneGroupIds.includes(id));
         expect(hasGroup).toBe(true);
       });
@@ -326,7 +326,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneGroupIds = scene.groups?.map((g: any) => g.id) || [];
+        const sceneGroupIds = scene.groups?.map((g) => g.id) || [];
         const hasAllGroups = groupIds.every((id) => sceneGroupIds.includes(id));
         expect(hasAllGroups).toBe(true);
       });
@@ -344,7 +344,7 @@ describe("Scene Filters - Quick Filters", () => {
       const result = await applyQuickSceneFilters(mockScenes, filter);
 
       result.forEach((scene) => {
-        const sceneGroupIds = scene.groups?.map((g: any) => g.id) || [];
+        const sceneGroupIds = scene.groups?.map((g) => g.id) || [];
         const hasExcludedGroup = groupIds.some((id) =>
           sceneGroupIds.includes(id)
         );

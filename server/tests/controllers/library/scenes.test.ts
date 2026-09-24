@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports — after all vi.mock() calls
 // ---------------------------------------------------------------------------
@@ -13,6 +14,10 @@ import {
   mergeScenesWithUserData,
   sortScenes,
 } from "../../../controllers/library/scenes.js";
+import {
+  OrientationEnum,
+  ResolutionEnum,
+} from "../../../graphql/generated/graphql.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import {
@@ -22,14 +27,16 @@ import {
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import {
   createMockPerformer,
   createMockScene,
   createMockStudio,
   createMockTag,
 } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 import { partialRow } from "../../helpers/prismaMock.js";
+import { untrusted } from "../../helpers/untrusted.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — must precede imports of the module under test
@@ -155,18 +162,21 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-vi.mock("../../../graphql/generated/graphql.js", async (importOriginal) => ({
-  CriterionModifier: (
+vi.mock("../../../graphql/generated/graphql.js", async (importOriginal) => {
+  const actual =
     await importOriginal<
       typeof import("../../../graphql/generated/graphql.js")
-    >()
-  ).CriterionModifier,
-  OrientationEnum: {
-    Landscape: "LANDSCAPE",
-    Portrait: "PORTRAIT",
-    Square: "SQUARE",
-  },
-}));
+    >();
+  return {
+    CriterionModifier: actual.CriterionModifier,
+    OrientationEnum: {
+      Landscape: "LANDSCAPE",
+      Portrait: "PORTRAIT",
+      Square: "SQUARE",
+    },
+    ResolutionEnum: actual.ResolutionEnum,
+  };
+});
 
 vi.mock("../../../utils/logger.js", () => ({
   logger: {
@@ -294,7 +304,7 @@ describe("applyQuickSceneFilters", () => {
       // The ids filter in applyQuickSceneFilters checks Array.isArray(filters.ids),
       // so it must be passed as a raw array, not EntityRefFilter shape
       const result = await applyQuickSceneFilters(scenes, {
-        ids: ["1", "3"] as any,
+        ids: untrusted(["1", "3"]),
       });
       expect(result.map((s) => s.id)).toEqual(["1", "3"]);
     });
@@ -306,7 +316,7 @@ describe("applyQuickSceneFilters", () => {
       ];
       // EntityRefFilter { value, modifier } is NOT an array, so the filter is skipped
       const result = await applyQuickSceneFilters(scenes, {
-        ids: { value: ["1"] as any, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(["1"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2); // All scenes returned — filter not applied
     });
@@ -317,7 +327,7 @@ describe("applyQuickSceneFilters", () => {
         createMockScene({ id: "2" }),
       ];
       const result = await applyQuickSceneFilters(scenes, {
-        ids: ["1", "2"] as any,
+        ids: untrusted(["1", "2"]),
       });
       expect(result.map((s) => s.id)).toEqual(["1", "2"]);
       expect(
@@ -340,7 +350,7 @@ describe("applyQuickSceneFilters", () => {
     it("INCLUDES: returns scenes with any matching performer", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         performers: {
-          value: ["p1"] as any,
+          value: coerceEntityRefs(["p1"]),
           modifier: CriterionModifier.Includes,
         },
       });
@@ -350,7 +360,7 @@ describe("applyQuickSceneFilters", () => {
     it("INCLUDES_ALL: returns only scenes containing all listed performers", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         performers: {
-          value: ["p2", "p3"] as any,
+          value: coerceEntityRefs(["p2", "p3"]),
           modifier: CriterionModifier.IncludesAll,
         },
       });
@@ -360,7 +370,7 @@ describe("applyQuickSceneFilters", () => {
     it("EXCLUDES: returns scenes without any listed performers", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         performers: {
-          value: ["p1", "p2"] as any,
+          value: coerceEntityRefs(["p1", "p2"]),
           modifier: CriterionModifier.Excludes,
         },
       });
@@ -381,7 +391,10 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: returns scenes with any matching tag", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        tags: { value: ["t1"] as any, modifier: CriterionModifier.Includes },
+        tags: {
+          value: coerceEntityRefs(["t1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s1"]);
     });
@@ -389,7 +402,7 @@ describe("applyQuickSceneFilters", () => {
     it("INCLUDES_ALL: returns scenes with all matching tags", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         tags: {
-          value: ["t2", "t3"] as any,
+          value: coerceEntityRefs(["t2", "t3"]),
           modifier: CriterionModifier.IncludesAll,
         },
       });
@@ -399,7 +412,7 @@ describe("applyQuickSceneFilters", () => {
     it("EXCLUDES: returns scenes without any listed tags", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         tags: {
-          value: ["t1", "t2"] as any,
+          value: coerceEntityRefs(["t1", "t2"]),
           modifier: CriterionModifier.Excludes,
         },
       });
@@ -420,7 +433,7 @@ describe("applyQuickSceneFilters", () => {
     it("INCLUDES: returns scenes with matching studio", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         studios: {
-          value: ["st1"] as any,
+          value: coerceEntityRefs(["st1"]),
           modifier: CriterionModifier.Includes,
         },
       });
@@ -430,7 +443,7 @@ describe("applyQuickSceneFilters", () => {
     it("EXCLUDES: returns scenes without matching studio (null studio passes)", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         studios: {
-          value: ["st1"] as any,
+          value: coerceEntityRefs(["st1"]),
           modifier: CriterionModifier.Excludes,
         },
       });
@@ -451,7 +464,7 @@ describe("applyQuickSceneFilters", () => {
             back_image_path: null,
             scene_index: 0,
           },
-        ] as any,
+        ],
       }),
       createMockScene({
         id: "s2",
@@ -472,14 +485,17 @@ describe("applyQuickSceneFilters", () => {
             back_image_path: null,
             scene_index: 1,
           },
-        ] as any,
+        ],
       }),
       createMockScene({ id: "s3", groups: [] }),
     ];
 
     it("INCLUDES: returns scenes in any listed group", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        groups: { value: ["g2"] as any, modifier: CriterionModifier.Includes },
+        groups: {
+          value: coerceEntityRefs(["g2"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
@@ -487,7 +503,7 @@ describe("applyQuickSceneFilters", () => {
     it("INCLUDES_ALL: returns scenes in all listed groups", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         groups: {
-          value: ["g1", "g2"] as any,
+          value: coerceEntityRefs(["g1", "g2"]),
           modifier: CriterionModifier.IncludesAll,
         },
       });
@@ -496,7 +512,10 @@ describe("applyQuickSceneFilters", () => {
 
     it("EXCLUDES: returns scenes not in any listed group", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        groups: { value: ["g1"] as any, modifier: CriterionModifier.Excludes },
+        groups: {
+          value: coerceEntityRefs(["g1"]),
+          modifier: CriterionModifier.Excludes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s3"]);
     });
@@ -556,29 +575,33 @@ describe("applyQuickSceneFilters", () => {
 
     it("GREATER_THAN", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        bitrate: { modifier: "GREATER_THAN", value: 5_000_000 },
-      } as any);
+        bitrate: { modifier: CriterionModifier.GreaterThan, value: 5_000_000 },
+      });
       expect(result.map((s) => s.id)).toEqual(["high"]);
     });
 
     it("LESS_THAN", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        bitrate: { modifier: "LESS_THAN", value: 5_000_000 },
-      } as any);
+        bitrate: { modifier: CriterionModifier.LessThan, value: 5_000_000 },
+      });
       expect(result.map((s) => s.id)).toEqual(["low"]);
     });
 
     it("EQUALS", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        bitrate: { modifier: "EQUALS", value: 5_000_000 },
-      } as any);
+        bitrate: { modifier: CriterionModifier.Equals, value: 5_000_000 },
+      });
       expect(result.map((s) => s.id)).toEqual(["mid"]);
     });
 
     it("BETWEEN", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        bitrate: { modifier: "BETWEEN", value: 2_000_000, value2: 8_000_000 },
-      } as any);
+        bitrate: {
+          modifier: CriterionModifier.Between,
+          value: 2_000_000,
+          value2: 8_000_000,
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["mid"]);
     });
   });
@@ -621,8 +644,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("GREATER_THAN filters by duration", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        duration: { modifier: "GREATER_THAN", value: 600 },
-      } as any);
+        duration: { modifier: CriterionModifier.GreaterThan, value: 600 },
+      });
       expect(result.map((s) => s.id)).toEqual(["long"]);
     });
   });
@@ -635,19 +658,22 @@ describe("applyQuickSceneFilters", () => {
 
     it("GREATER_THAN filters by date", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        created_at: { modifier: "GREATER_THAN", value: "2025-01-01T00:00:00Z" },
-      } as any);
+        created_at: {
+          modifier: CriterionModifier.GreaterThan,
+          value: "2025-01-01T00:00:00Z",
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["new"]);
     });
 
     it("BETWEEN filters by date range", async () => {
       const result = await applyQuickSceneFilters(scenes, {
         created_at: {
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
           value: "2023-01-01T00:00:00Z",
           value2: "2024-06-01T00:00:00Z",
         },
-      } as any);
+      });
       expect(result.map((s) => s.id)).toEqual(["old"]);
     });
   });
@@ -670,8 +696,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("EQUALS filters by exact performer count", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        performer_count: { modifier: "EQUALS", value: 3 },
-      } as any);
+        performer_count: { modifier: CriterionModifier.Equals, value: 3 },
+      });
       expect(result.map((s) => s.id)).toEqual(["trio"]);
     });
   });
@@ -714,8 +740,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("GREATER_THAN filters by framerate", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        framerate: { modifier: "GREATER_THAN", value: 30 },
-      } as any);
+        framerate: { modifier: CriterionModifier.GreaterThan, value: 30 },
+      });
       expect(result.map((s) => s.id)).toEqual(["60fps"]);
     });
   });
@@ -774,22 +800,24 @@ describe("applyQuickSceneFilters", () => {
 
     it("filters landscape scenes", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        orientation: { value: ["LANDSCAPE"] },
-      } as any);
+        orientation: { value: [OrientationEnum.Landscape] },
+      });
       expect(result.map((s) => s.id)).toEqual(["landscape"]);
     });
 
     it("filters portrait scenes", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        orientation: { value: ["PORTRAIT"] },
-      } as any);
+        orientation: { value: [OrientationEnum.Portrait] },
+      });
       expect(result.map((s) => s.id)).toEqual(["portrait"]);
     });
 
     it("filters multiple orientations", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        orientation: { value: ["LANDSCAPE", "SQUARE"] },
-      } as any);
+        orientation: {
+          value: [OrientationEnum.Landscape, OrientationEnum.Square],
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["landscape", "square"]);
     });
   });
@@ -848,15 +876,21 @@ describe("applyQuickSceneFilters", () => {
 
     it("EQUALS filters by resolution height", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        resolution: { value: "FULL_HD", modifier: "EQUALS" },
-      } as any);
+        resolution: {
+          value: ResolutionEnum.FullHd,
+          modifier: CriterionModifier.Equals,
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["1080p"]);
     });
 
     it("GREATER_THAN filters by resolution height", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        resolution: { value: "FULL_HD", modifier: "GREATER_THAN" },
-      } as any);
+        resolution: {
+          value: ResolutionEnum.FullHd,
+          modifier: CriterionModifier.GreaterThan,
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["4k"]);
     });
   });
@@ -870,22 +904,22 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: case-insensitive substring match", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        title: { value: "beach", modifier: "INCLUDES" },
-      } as any);
+        title: { value: "beach", modifier: CriterionModifier.Includes },
+      });
       expect(result.map((s) => s.id)).toEqual(["s1", "s3"]);
     });
 
     it("EXCLUDES: excludes substring matches", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        title: { value: "beach", modifier: "EXCLUDES" },
-      } as any);
+        title: { value: "beach", modifier: CriterionModifier.Excludes },
+      });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
 
     it("EQUALS: exact case-insensitive match", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        title: { value: "mountain hike", modifier: "EQUALS" },
-      } as any);
+        title: { value: "mountain hike", modifier: CriterionModifier.Equals },
+      });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
   });
@@ -898,8 +932,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: matches against details field", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        details: { value: "beach", modifier: "INCLUDES" },
-      } as any);
+        details: { value: "beach", modifier: CriterionModifier.Includes },
+      });
       expect(result.map((s) => s.id)).toEqual(["s1"]);
     });
   });
@@ -942,8 +976,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: filters by video codec", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        video_codec: { value: "h264", modifier: "INCLUDES" },
-      } as any);
+        video_codec: { value: "h264", modifier: CriterionModifier.Includes },
+      });
       expect(result.map((s) => s.id)).toEqual(["h264"]);
     });
   });
@@ -986,8 +1020,8 @@ describe("applyQuickSceneFilters", () => {
 
     it("EXCLUDES: filters out matching audio codec", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        audio_codec: { value: "aac", modifier: "EXCLUDES" },
-      } as any);
+        audio_codec: { value: "aac", modifier: CriterionModifier.Excludes },
+      });
       expect(result.map((s) => s.id)).toEqual(["opus"]);
     });
   });
@@ -1033,36 +1067,40 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("GREATER_THAN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        rating100: { modifier: "GREATER_THAN", value: 60 },
-      } as any);
+        rating100: { modifier: CriterionModifier.GreaterThan, value: 60 },
+      });
       expect(result.map((s) => s.id)).toEqual(["high"]);
     });
 
     it("LESS_THAN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        rating100: { modifier: "LESS_THAN", value: 60 },
-      } as any);
+        rating100: { modifier: CriterionModifier.LessThan, value: 60 },
+      });
       expect(result.map((s) => s.id)).toEqual(["low", "none"]);
     });
 
     it("EQUALS", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        rating100: { modifier: "EQUALS", value: 60 },
-      } as any);
+        rating100: { modifier: CriterionModifier.Equals, value: 60 },
+      });
       expect(result.map((s) => s.id)).toEqual(["mid"]);
     });
 
     it("NOT_EQUALS", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        rating100: { modifier: "NOT_EQUALS", value: 60 },
-      } as any);
+        rating100: { modifier: CriterionModifier.NotEquals, value: 60 },
+      });
       expect(result.map((s) => s.id)).toEqual(["low", "high", "none"]);
     });
 
     it("BETWEEN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        rating100: { modifier: "BETWEEN", value: 20, value2: 70 },
-      } as any);
+        rating100: {
+          modifier: CriterionModifier.Between,
+          value: 20,
+          value2: 70,
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["low", "mid"]);
     });
   });
@@ -1076,15 +1114,19 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("GREATER_THAN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        o_counter: { modifier: "GREATER_THAN", value: 5 },
-      } as any);
+        o_counter: { modifier: CriterionModifier.GreaterThan, value: 5 },
+      });
       expect(result.map((s) => s.id)).toEqual(["many"]);
     });
 
     it("BETWEEN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        o_counter: { modifier: "BETWEEN", value: 1, value2: 10 },
-      } as any);
+        o_counter: {
+          modifier: CriterionModifier.Between,
+          value: 1,
+          value2: 10,
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["some"]);
     });
   });
@@ -1097,8 +1139,8 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("EQUALS", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        play_count: { modifier: "EQUALS", value: 0 },
-      } as any);
+        play_count: { modifier: CriterionModifier.Equals, value: 0 },
+      });
       expect(result.map((s) => s.id)).toEqual(["unwatched"]);
     });
   });
@@ -1111,8 +1153,8 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("GREATER_THAN", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        play_duration: { modifier: "GREATER_THAN", value: 600 },
-      } as any);
+        play_duration: { modifier: CriterionModifier.GreaterThan, value: 600 },
+      });
       expect(result.map((s) => s.id)).toEqual(["long"]);
     });
   });
@@ -1127,10 +1169,10 @@ describe("applyExpensiveSceneFilters", () => {
     it("GREATER_THAN: excludes null and old dates", () => {
       const result = applyExpensiveSceneFilters(scenes, {
         last_played_at: {
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
           value: "2025-01-01T00:00:00Z",
         },
-      } as any);
+      });
       expect(result.map((s) => s.id)).toEqual(["recent"]);
     });
   });
@@ -1143,8 +1185,11 @@ describe("applyExpensiveSceneFilters", () => {
 
     it("GREATER_THAN: filters by last_o_at", () => {
       const result = applyExpensiveSceneFilters(scenes, {
-        last_o_at: { modifier: "GREATER_THAN", value: "2025-01-01T00:00:00Z" },
-      } as any);
+        last_o_at: {
+          modifier: CriterionModifier.GreaterThan,
+          value: "2025-01-01T00:00:00Z",
+        },
+      });
       expect(result.map((s) => s.id)).toEqual(["has_o"]);
     });
   });
@@ -1408,34 +1453,35 @@ describe("sortScenes", () => {
         title: "First",
         groups: [
           {
-            id: "g1",
+            id: "7",
             instanceId: "default",
             name: "G1",
             front_image_path: null,
             back_image_path: null,
             scene_index: 2,
           },
-        ] as any,
+        ],
       }),
       createMockScene({
         id: "s2",
         title: "Second",
         groups: [
           {
-            id: "g1",
+            id: "7",
             instanceId: "default",
             name: "G1",
             front_image_path: null,
             back_image_path: null,
             scene_index: 0,
           },
-        ] as any,
+        ],
       }),
     ];
-    const result = sortScenes(scenes, "scene_index", "ASC", 0 as any);
-    // Without matching groupId, both get 999999, so secondary sort by title
-    // Let's test with matching groupId:
-    const result2 = sortScenes(scenes, "scene_index", "ASC", "g1" as any);
+    // No group id (0): both sort last, then by title
+    const result = sortScenes(scenes, "scene_index", "ASC", 0);
+    expect(result.map((s) => s.id)).toEqual(["s1", "s2"]);
+    // Within group 7, by each scene's index in it
+    const result2 = sortScenes(scenes, "scene_index", "ASC", 7);
     expect(result2.map((s) => s.id)).toEqual(["s2", "s1"]);
   });
 
@@ -1613,8 +1659,8 @@ describe("mergeScenesWithUserData", () => {
 
 describe("findScenes", () => {
   it("returns 401 when user is not authenticated", async () => {
-    const req = mockReq({ filter: {}, scene_filter: {} }, {}, undefined);
-    const res = mockRes();
+    const req = reqFor(findScenes, { body: { filter: {}, scene_filter: {} } });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
@@ -1629,17 +1675,16 @@ describe("findScenes", () => {
       total: 1,
     });
 
-    const req = mockReq(
-      { filter: { page: 1, per_page: 40 }, scene_filter: {} },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     expect(body.findScenes.count).toBe(1);
     expect(body.findScenes.scenes).toHaveLength(1);
   });
@@ -1650,16 +1695,15 @@ describe("findScenes", () => {
       total: 2,
     });
 
-    const req = mockReq(
-      { filter: { page: 1, per_page: 40 }, scene_filter: {} },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
-    const scenes = res._getBody().findScenes.scenes;
+    const scenes = res._getOkBody().findScenes.scenes;
     expect(scenes).toHaveLength(2);
     for (const scene of scenes) expect(scene.stashUrl).toBeNull();
   });
@@ -1670,16 +1714,15 @@ describe("findScenes", () => {
       total: 1,
     });
 
-    const req = mockReq(
-      { filter: { page: 1, per_page: 40 }, scene_filter: {} },
-      {},
-      { id: 1, role: "ADMIN" }
-    );
-    const res = mockRes();
+    const req = reqFor(findScenes, {
+      body: { filter: { page: 1, per_page: 40 }, scene_filter: {} },
+      user: testUser({ role: "ADMIN" }),
+    });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
-    expect(res._getBody().findScenes.scenes[0].stashUrl).toBe(
+    expect(must(res._getOkBody().findScenes.scenes[0]).stashUrl).toBe(
       "http://stash/scenes/s1"
     );
   });
@@ -1699,8 +1742,8 @@ describe("findScenes", () => {
     ];
     mockStashEntityService.getPlaybackStreams.mockResolvedValueOnce(streams);
 
-    const req = mockReq({ ids: ["42"] }, {}, { id: 1, role: "USER" });
-    const res = mockRes();
+    const req = reqFor(findScenes, { body: { ids: ["42"] }, user: testUser() });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
@@ -1709,7 +1752,9 @@ describe("findScenes", () => {
       "42",
       "inst-a"
     );
-    expect(res._getBody().findScenes.scenes[0].sceneStreams).toEqual(streams);
+    expect(must(res._getOkBody().findScenes.scenes[0]).sceneStreams).toEqual(
+      streams
+    );
   });
 
   it("returns 400 for ambiguous single-ID lookup", async () => {
@@ -1728,17 +1773,17 @@ describe("findScenes", () => {
       total: 2,
     });
 
-    const req = mockReq(
-      { filter: {}, scene_filter: {}, ids: ["42"] },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findScenes, {
+      body: { filter: {}, scene_filter: {}, ids: ["42"] },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
     expect(res._getStatus()).toBe(400);
     const body = res._getBody();
+    assert("matches" in body, "expected an ambiguous-lookup body");
     expect(body.error).toBe("Ambiguous lookup");
     expect(body.matches).toHaveLength(2);
   });
@@ -1746,12 +1791,11 @@ describe("findScenes", () => {
   it("returns 500 on unexpected error", async () => {
     mockSceneQueryBuilder.execute.mockRejectedValue(new Error("DB down"));
 
-    const req = mockReq(
-      { filter: {}, scene_filter: {} },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findScenes, {
+      body: { filter: {}, scene_filter: {} },
+      user: testUser(),
+    });
+    const res = resFor(findScenes);
 
     await findScenes(req, res);
 
@@ -1762,8 +1806,11 @@ describe("findScenes", () => {
 
 describe("findSimilarScenes", () => {
   it("returns 401 when user is not authenticated", async () => {
-    const req = mockReq({}, { id: "s1" }, undefined, { page: "1" });
-    const res = mockRes();
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      query: { page: "1" },
+    });
+    const res = resFor(findSimilarScenes);
 
     await findSimilarScenes(req, res);
 
@@ -1773,18 +1820,17 @@ describe("findSimilarScenes", () => {
   it("returns empty result when no candidates found", async () => {
     mockStashEntityService.getSimilarSceneCandidates.mockResolvedValue([]);
 
-    const req = mockReq(
-      {},
-      { id: "s1" },
-      { id: 1, role: "USER" },
-      { page: "1" }
-    );
-    const res = mockRes();
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(findSimilarScenes);
 
     await findSimilarScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     expect(body.scenes).toEqual([]);
     expect(body.count).toBe(0);
   });
@@ -1805,20 +1851,19 @@ describe("findSimilarScenes", () => {
       total: 2,
     });
 
-    const req = mockReq(
-      {},
-      { id: "s1" },
-      { id: 1, role: "USER" },
-      { page: "1" }
-    );
-    const res = mockRes();
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(findSimilarScenes);
 
     await findSimilarScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     // Should preserve score order (c1 first, higher weight)
-    expect(body.scenes.map((s: any) => s.id)).toEqual(["c1", "c2"]);
+    expect(body.scenes.map((s) => s.id)).toEqual(["c1", "c2"]);
     expect(body.count).toBe(2);
   });
 
@@ -1827,13 +1872,12 @@ describe("findSimilarScenes", () => {
       new Error("DB error")
     );
 
-    const req = mockReq(
-      {},
-      { id: "s1" },
-      { id: 1, role: "USER" },
-      { page: "1" }
-    );
-    const res = mockRes();
+    const req = reqFor(findSimilarScenes, {
+      params: { id: "s1" },
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(findSimilarScenes);
 
     await findSimilarScenes(req, res);
 
@@ -1843,8 +1887,8 @@ describe("findSimilarScenes", () => {
 
 describe("getRecommendedScenes", () => {
   it("returns 401 when user is not authenticated", async () => {
-    const req = mockReq({}, {}, undefined, { page: "1" });
-    const res = mockRes();
+    const req = reqFor(getRecommendedScenes, { query: { page: "1" } });
+    const res = resFor(getRecommendedScenes);
 
     await getRecommendedScenes(req, res);
 
@@ -1854,13 +1898,16 @@ describe("getRecommendedScenes", () => {
   it("returns empty result with message when user has no criteria", async () => {
     mockHasAnyCriteria.mockReturnValue(false);
 
-    const req = mockReq({}, {}, { id: 1, role: "USER" }, { page: "1" });
-    const res = mockRes();
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(getRecommendedScenes);
 
     await getRecommendedScenes(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     expect(body.scenes).toEqual([]);
     expect(body.message).toBe("No recommendations yet");
   });
@@ -1869,8 +1916,11 @@ describe("getRecommendedScenes", () => {
     // Force an error by making prisma throw
     mockPrisma.performerRating.findMany.mockRejectedValue(new Error("DB down"));
 
-    const req = mockReq({}, {}, { id: 1, role: "USER" }, { page: "1" });
-    const res = mockRes();
+    const req = reqFor(getRecommendedScenes, {
+      user: testUser(),
+      query: { page: "1" },
+    });
+    const res = resFor(getRecommendedScenes);
 
     await getRecommendedScenes(req, res);
 

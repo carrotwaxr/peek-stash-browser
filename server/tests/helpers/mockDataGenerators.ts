@@ -268,7 +268,7 @@ export function createMockPerformers(count: number): NormalizedPerformer[] {
         id: `performer_${i}`,
         instanceId: "default",
         name: `Performer ${i}`,
-        gender: genders[i % genders.length] as any,
+        gender: must(genders[i % genders.length]),
         country: countries[i % countries.length],
         favorite: i % 5 === 0, // Every 5th performer is a favorite
         rating: i % 3 === 0 ? ((i % 5) + 1) * 20 : null, // Some have ratings

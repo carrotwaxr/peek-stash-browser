@@ -6,7 +6,7 @@
  * through findGroupsMinimal.
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyGroupFilters,
   findGroups,
@@ -18,7 +18,7 @@ import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../../services/GroupQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
@@ -91,8 +91,8 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGroupQueryBuilder = vi.mocked(groupQueryBuilder);
 
-const defaultUser = { id: 1, role: "USER" };
-const adminUser = { id: 1, role: "ADMIN" };
+const defaultUser = testUser();
+const adminUser = testUser({ role: "ADMIN" });
 
 describe("Groups Controller", () => {
   beforeEach(() => {
@@ -142,11 +142,11 @@ describe("Groups Controller", () => {
       const groups = [
         createMockGroup({
           id: "g1",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
         createMockGroup({
           id: "g2",
-          tags: [{ id: "t2", name: "B" }] as any,
+          tags: [{ id: "t2", name: "B", image_path: null }],
         }),
       ];
       const result = await applyGroupFilters(groups, {
@@ -164,13 +164,13 @@ describe("Groups Controller", () => {
         createMockGroup({
           id: "g1",
           tags: [
-            { id: "t1", name: "A" },
-            { id: "t2", name: "B" },
-          ] as any,
+            { id: "t1", name: "A", image_path: null },
+            { id: "t2", name: "B", image_path: null },
+          ],
         }),
         createMockGroup({
           id: "g2",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
       ];
       const result = await applyGroupFilters(groups, {
@@ -187,11 +187,11 @@ describe("Groups Controller", () => {
       const groups = [
         createMockGroup({
           id: "g1",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
         createMockGroup({
           id: "g2",
-          tags: [{ id: "t2", name: "B" }] as any,
+          tags: [{ id: "t2", name: "B", image_path: null }],
         }),
       ];
       const result = await applyGroupFilters(groups, {
@@ -230,11 +230,11 @@ describe("Groups Controller", () => {
       const groups = [
         createMockGroup({
           id: "g1",
-          studio: { id: "s1", name: "Studio1" } as any,
+          studio: { id: "s1", name: "Studio1" },
         }),
         createMockGroup({
           id: "g2",
-          studio: { id: "s2", name: "Studio2" } as any,
+          studio: { id: "s2", name: "Studio2" },
         }),
         createMockGroup({ id: "g3", studio: null }),
       ];
@@ -300,13 +300,16 @@ describe("Groups Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, group_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { filter: {}, group_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.findGroups.count).toBe(1);
       expect(body.findGroups.groups).toHaveLength(1);
     });
@@ -321,30 +324,34 @@ describe("Groups Controller", () => {
         total: 2,
       });
 
-      const req = mockReq(
-        { ids: ["g1"], filter: {}, group_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { ids: ["g1"], filter: {}, group_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Ambiguous lookup");
-      expect(res._getBody().matches).toHaveLength(2);
+      const body = res._getBody();
+      assert("matches" in body, "expected an ambiguous-lookup body");
+      expect(body.error).toBe("Ambiguous lookup");
+      expect(body.matches).toHaveLength(2);
     });
 
     it("returns 500 when query builder throws", async () => {
       mockGroupQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find groups");
+      expect(res._getErrorBody().error).toBe("Failed to find groups");
     });
 
     it("fetches detail counts and hydrates tags for single-ID lookup", async () => {
@@ -359,12 +366,11 @@ describe("Groups Controller", () => {
         performer_count: 8,
       });
 
-      const req = mockReq(
-        { ids: ["g1"], filter: {}, group_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { ids: ["g1"], filter: {}, group_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
@@ -382,13 +388,19 @@ describe("Groups Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, group_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { filter: {}, group_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
-      const body = res._getBody();
-      expect(body.findGroups.groups[0].stashUrl).toBe("http://stash/groups/g1");
+      const body = res._getOkBody();
+      expect(must(body.findGroups.groups[0])).toHaveProperty(
+        "stashUrl",
+        "http://stash/groups/g1"
+      );
     });
 
     it("does not send stashUrl to a regular user", async () => {
@@ -397,14 +409,18 @@ describe("Groups Controller", () => {
         total: 2,
       });
 
-      const req = mockReq({ filter: {}, group_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroups, {
+        body: { filter: {}, group_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
 
       await findGroups(req, res);
 
-      const groups = res._getBody().findGroups.groups;
+      const groups = res._getOkBody().findGroups.groups;
       expect(groups).toHaveLength(2);
-      for (const group of groups) expect(group.stashUrl).toBeNull();
+      for (const group of groups)
+        expect(group).toHaveProperty("stashUrl", null);
     });
   });
 
@@ -418,25 +434,31 @@ describe("Groups Controller", () => {
       ];
       mockStashEntityService.getAllGroups.mockResolvedValue(groups);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().groups).toHaveLength(2);
+      expect(res._getOkBody().groups).toHaveLength(2);
     });
 
     it("returns empty when cache is not initialized", async () => {
       mockStashEntityService.getAllGroups.mockResolvedValue([]);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().groups).toEqual([]);
+      expect(res._getOkBody().groups).toEqual([]);
     });
 
     it("applies search query filtering", async () => {
@@ -446,12 +468,15 @@ describe("Groups Controller", () => {
       ];
       mockStashEntityService.getAllGroups.mockResolvedValue(groups);
 
-      const req = mockReq({ filter: { q: "action" } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: { q: "action" } },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
-      expect(res._getBody().groups).toHaveLength(1);
+      expect(res._getOkBody().groups).toHaveLength(1);
     });
 
     it("applies count_filter with min_scene_count", async () => {
@@ -461,16 +486,15 @@ describe("Groups Controller", () => {
       ];
       mockStashEntityService.getAllGroups.mockResolvedValue(groups);
 
-      const req = mockReq(
-        { filter: {}, count_filter: { min_scene_count: 5 } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {}, count_filter: { min_scene_count: 5 } },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
-      expect(res._getBody().groups).toHaveLength(1);
+      expect(res._getOkBody().groups).toHaveLength(1);
     });
 
     it("applies count_filter with min_performer_count", async () => {
@@ -480,16 +504,15 @@ describe("Groups Controller", () => {
       ];
       mockStashEntityService.getAllGroups.mockResolvedValue(groups);
 
-      const req = mockReq(
-        { filter: {}, count_filter: { min_performer_count: 5 } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {}, count_filter: { min_performer_count: 5 } },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
-      expect(res._getBody().groups).toHaveLength(1);
+      expect(res._getOkBody().groups).toHaveLength(1);
     });
 
     it("sorts by name", async () => {
@@ -499,14 +522,17 @@ describe("Groups Controller", () => {
       ];
       mockStashEntityService.getAllGroups.mockResolvedValue(groups);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
-      const result = res._getBody().groups;
-      expect(result[0].name).toBe("Alpha");
-      expect(result[1].name).toBe("Zebra");
+      const result = res._getOkBody().groups;
+      expect(must(result[0]).name).toBe("Alpha");
+      expect(must(result[1]).name).toBe("Zebra");
     });
 
     it("merges user data (ratings/favorites) indirectly", async () => {
@@ -525,14 +551,17 @@ describe("Groups Controller", () => {
         },
       ]);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const result = res._getBody().groups;
-      expect(result[0].favorite).toBe(true);
+      const result = res._getOkBody().groups;
+      expect(must(result[0])).toHaveProperty("favorite", true);
     });
 
     it("returns 500 on error", async () => {
@@ -540,13 +569,16 @@ describe("Groups Controller", () => {
         new Error("cache failure")
       );
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGroupsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGroupsMinimal);
 
       await findGroupsMinimal(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find groups");
+      expect(res._getErrorBody().error).toBe("Failed to find groups");
     });
   });
 });

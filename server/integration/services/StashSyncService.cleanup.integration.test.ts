@@ -7,8 +7,8 @@
  * the #526 delete-ratio safety threshold.
  *
  * Strategy: seed scenes under a dedicated, isolated stashInstanceId (so the real
- * sync never touches them), stub getStashClient to return a controlled keep-set
- * for that instance only, run cleanup, and assert exactly which scenes got
+ * sync never touches them), stub that instance's Stash client to return a
+ * controlled keep-set, run cleanup, and assert exactly which scenes got
  * soft-deleted in the real DB.
  */
 import {
@@ -20,8 +20,11 @@ import {
   it,
   vi,
 } from "vitest";
+import type { StashClient } from "../../graphql/StashClient.js";
 import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { partialRow } from "../../tests/helpers/prismaMock.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -63,30 +66,20 @@ describeWithDb("StashSyncService.cleanupDeletedEntities (integration)", () => {
   beforeEach(async () => {
     await seedTestScenes();
 
-    // Capture the real implementation (bound) before spying so calls for any
-    // OTHER instance pass through untouched — only TEST_INSTANCE gets the stub.
-    const realGetStashClient = (
-      stashSyncService as unknown as {
-        getStashClient: (id?: string) => unknown;
-      }
-    ).getStashClient.bind(stashSyncService);
-
-    vi.spyOn(
-      stashSyncService as unknown as {
-        getStashClient: (id?: string) => unknown;
-      },
-      "getStashClient"
-    ).mockImplementation((id?: string) => {
-      if (id !== TEST_INSTANCE) return realGetStashClient(id);
-      return {
-        findSceneIDs: async () => ({
-          findScenes: {
-            scenes: keepSet.map((sceneId) => ({ id: sceneId })),
-            count: keepSet.length,
-          },
-        }),
-      };
-    });
+    // Only TEST_INSTANCE gets the stub; any other instance keeps its real client.
+    const realGet = stashInstanceManager.get.bind(stashInstanceManager);
+    vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
+      id === TEST_INSTANCE
+        ? partialRow<StashClient>({
+            findSceneIDs: async () => ({
+              findScenes: {
+                scenes: keepSet.map((sceneId) => ({ id: sceneId })),
+                count: keepSet.length,
+              },
+            }),
+          })
+        : realGet(id)
+    );
   });
 
   afterEach(() => {
@@ -101,11 +94,10 @@ describeWithDb("StashSyncService.cleanupDeletedEntities (integration)", () => {
     // Stash still has scenes 1..7; 8, 9, 10 were deleted → 3/10 = 30% (under threshold).
     keepSet = ["1", "2", "3", "4", "5", "6", "7"];
 
-    const deletedCount = await (
-      stashSyncService as unknown as {
-        cleanupDeletedEntities: (t: string, id: string) => Promise<number>;
-      }
-    ).cleanupDeletedEntities("scene", TEST_INSTANCE);
+    const deletedCount = await stashSyncService["cleanupDeletedEntities"](
+      "scene",
+      TEST_INSTANCE
+    );
 
     expect(deletedCount).toBe(3);
     const { alive, deleted } = await snapshot();
@@ -119,11 +111,10 @@ describeWithDb("StashSyncService.cleanupDeletedEntities (integration)", () => {
     // Stash returns only 2 of 10 → would delete 8/10 = 80% (over the 50% threshold).
     keepSet = ["1", "2"];
 
-    const deletedCount = await (
-      stashSyncService as unknown as {
-        cleanupDeletedEntities: (t: string, id: string) => Promise<number>;
-      }
-    ).cleanupDeletedEntities("scene", TEST_INSTANCE);
+    const deletedCount = await stashSyncService["cleanupDeletedEntities"](
+      "scene",
+      TEST_INSTANCE
+    );
 
     expect(deletedCount).toBe(0);
     const { alive, deleted } = await snapshot();
@@ -153,28 +144,20 @@ describeWithDb(
         data: SCENE_IDS.map((id) => ({ id, stashInstanceId: QUOTED_INSTANCE })),
       });
 
-      const realGetStashClient = (
-        stashSyncService as unknown as {
-          getStashClient: (id?: string) => unknown;
-        }
-      ).getStashClient.bind(stashSyncService);
-
-      vi.spyOn(
-        stashSyncService as unknown as {
-          getStashClient: (id?: string) => unknown;
-        },
-        "getStashClient"
-      ).mockImplementation((id?: string) => {
-        if (id !== QUOTED_INSTANCE) return realGetStashClient(id);
-        return {
-          findSceneIDs: async () => ({
-            findScenes: {
-              scenes: keepSet.map((sceneId) => ({ id: sceneId })),
-              count: keepSet.length,
-            },
-          }),
-        };
-      });
+      // Only QUOTED_INSTANCE gets the stub; any other instance keeps its real client.
+      const realGet = stashInstanceManager.get.bind(stashInstanceManager);
+      vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
+        id === QUOTED_INSTANCE
+          ? partialRow<StashClient>({
+              findSceneIDs: async () => ({
+                findScenes: {
+                  scenes: keepSet.map((sceneId) => ({ id: sceneId })),
+                  count: keepSet.length,
+                },
+              }),
+            })
+          : realGet(id)
+      );
     });
 
     afterEach(() => {
@@ -188,11 +171,10 @@ describeWithDb(
     it("soft-deletes exactly the missing scenes when the instance id and a Stash id contain quotes", async () => {
       keepSet = ["1", "2", "3", "4", "5", "6", "7", "it's-gone"];
 
-      const deletedCount = await (
-        stashSyncService as unknown as {
-          cleanupDeletedEntities: (t: string, id: string) => Promise<number>;
-        }
-      ).cleanupDeletedEntities("scene", QUOTED_INSTANCE);
+      const deletedCount = await stashSyncService["cleanupDeletedEntities"](
+        "scene",
+        QUOTED_INSTANCE
+      );
 
       expect(deletedCount).toBe(3);
       const rows = await prisma.stashScene.findMany({

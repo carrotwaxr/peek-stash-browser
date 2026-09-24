@@ -25,6 +25,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { partialRow } from "../../tests/helpers/prismaMock.js";
 import type { NormalizedScene } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
@@ -32,12 +33,13 @@ const INSTANCE = "stats-it";
 const USER_ID = 990_001;
 const SCENE_ID = "s1";
 
-const SCENE = {
+/** Only the fields the stats update reads */
+const SCENE = partialRow<NormalizedScene>({
   id: SCENE_ID,
-  performers: [{ id: "p1" }, { id: "p2" }],
-  studio: { id: "st1" },
-  tags: [{ id: "t1" }, { id: "t2" }],
-} as unknown as NormalizedScene;
+  performers: [partialRow({ id: "p1" }), partialRow({ id: "p2" })],
+  studio: partialRow({ id: "st1" }),
+  tags: [partialRow({ id: "t1" }), partialRow({ id: "t2" })],
+});
 
 async function clearStats(): Promise<void> {
   const where = { instanceId: INSTANCE };

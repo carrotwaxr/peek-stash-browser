@@ -77,7 +77,7 @@ describe("entityInstanceId", () => {
   });
 
   describe("getEntityInstanceId", () => {
-    const entityTypeMocks: Array<[string, any]> = [
+    const entityTypeMocks = [
       ["scene", () => mockPrisma.stashScene],
       ["performer", () => mockPrisma.stashPerformer],
       ["studio", () => mockPrisma.stashStudio],
@@ -85,14 +85,16 @@ describe("entityInstanceId", () => {
       ["gallery", () => mockPrisma.stashGallery],
       ["group", () => mockPrisma.stashGroup],
       ["image", () => mockPrisma.stashImage],
-    ];
+    ] as const;
 
     it.each(entityTypeMocks)(
       "returns correct instanceId for a %s",
       async (entityType, getMock) => {
-        getMock().findMany.mockResolvedValue([{ stashInstanceId: "aaa-111" }]);
+        getMock().findMany.mockResolvedValue([
+          partialRow({ stashInstanceId: "aaa-111" }),
+        ]);
 
-        const result = await getEntityInstanceId(entityType as any, "42");
+        const result = await getEntityInstanceId(entityType, "42");
         expect(result).toBe("aaa-111");
       }
     );

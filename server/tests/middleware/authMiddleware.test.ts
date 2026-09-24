@@ -7,12 +7,19 @@
  * and cache readiness.
  */
 import type { User } from "@prisma/client";
-import type { NextFunction, Request, Response } from "express";
 import fs from "fs";
 import jwt from "jsonwebtoken";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type Mock,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   authenticate,
   authenticateToken,
@@ -29,6 +36,11 @@ import {
 } from "../../utils/jwtSecret.js";
 import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
 import { logger } from "../../utils/logger.js";
+import {
+  type ReqParts,
+  reqFor,
+  resFor,
+} from "../helpers/controllerTestUtils.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -82,38 +94,23 @@ const MOCK_ADMIN: User = {
   role: "ADMIN",
 };
 
-function createMockReq(overrides: Partial<Request> = {}): Partial<Request> {
-  return {
-    cookies: {},
-    header: vi.fn().mockReturnValue(undefined),
-    ...overrides,
-  };
+/** A request as the auth middleware sees it (every one takes a plain `Request`). */
+function createMockReq(parts: ReqParts<typeof authenticate> = {}) {
+  return reqFor(authenticate, parts);
 }
 
-function createMockRes(): {
-  res: Partial<Response>;
-  statusFn: ReturnType<typeof vi.fn>;
-  jsonFn: ReturnType<typeof vi.fn>;
-  cookieFn: ReturnType<typeof vi.fn>;
-} {
-  const jsonFn = vi.fn();
-  const cookieFn = vi.fn();
-  const statusFn = vi.fn().mockReturnValue({ json: jsonFn });
-  return {
-    res: { status: statusFn, json: jsonFn, cookie: cookieFn } as any,
-    statusFn,
-    jsonFn,
-    cookieFn,
-  };
+function createMockRes() {
+  const res = resFor(authenticate);
+  return { res, statusFn: res.status, jsonFn: res.json, cookieFn: res.cookie };
 }
 
 describe("Auth Middleware", () => {
-  let nextFn: ReturnType<typeof vi.fn>;
+  let nextFn: Mock<() => void>;
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    nextFn = vi.fn();
+    nextFn = vi.fn<() => void>();
     // Reset env
     delete process.env.PROXY_AUTH_HEADER;
     delete process.env.PROXY_AUTH_TRUSTED_IPS;
@@ -130,7 +127,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq();
       const { res, statusFn, jsonFn } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(jsonFn).toHaveBeenCalledWith({
@@ -150,11 +147,11 @@ describe("Auth Middleware", () => {
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
-      expect((req as any).user.id).toBe(MOCK_USER.id);
-      expect((req as any).user.username).toBe(MOCK_USER.username);
+      expect(must(req.user).id).toBe(MOCK_USER.id);
+      expect(must(req.user).username).toBe(MOCK_USER.username);
     });
 
     it("authenticates via Authorization Bearer header", async () => {
@@ -163,19 +160,17 @@ describe("Auth Middleware", () => {
         username: MOCK_USER.username,
         role: MOCK_USER.role,
       });
-      const headerFn = vi.fn((name: string) => {
-        if (name === "Authorization") return `Bearer ${token}`;
-        return undefined;
+      const req = createMockReq({
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const req = createMockReq({ header: headerFn } as any);
       const { res } = createMockRes();
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
-      expect((req as any).user.id).toBe(MOCK_USER.id);
+      expect(must(req.user).id).toBe(MOCK_USER.id);
     });
 
     it("returns 401 when token user is not found in database", async () => {
@@ -189,7 +184,7 @@ describe("Auth Middleware", () => {
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(jsonFn).toHaveBeenCalledWith({
@@ -202,7 +197,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token: "invalid.jwt.token" } });
       const { res, statusFn, jsonFn } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(403);
       expect(jsonFn).toHaveBeenCalledWith({ error: "Invalid token." });
@@ -225,17 +220,16 @@ describe("Auth Middleware", () => {
         { expiresIn: "24h" }
       );
 
-      const headerFn = vi.fn((name: string) => {
-        if (name === "Authorization") return `Bearer ${token}`;
-        return undefined;
-      });
       // No cookies — Bearer auth
-      const req = createMockReq({ cookies: {}, header: headerFn } as any);
+      const req = createMockReq({
+        cookies: {},
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const { res, cookieFn } = createMockRes();
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
       // Should NOT set a new cookie — Bearer clients don't get cookie refresh
@@ -262,7 +256,7 @@ describe("Auth Middleware", () => {
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
       // Should set a new cookie — token is older than 1h threshold
@@ -287,7 +281,7 @@ describe("Auth Middleware", () => {
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
       // Fresh token — no refresh needed
@@ -322,7 +316,7 @@ describe("Auth Middleware", () => {
         passwordChangedAt: new Date(),
       });
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(jsonFn).toHaveBeenCalledWith({
@@ -342,7 +336,7 @@ describe("Auth Middleware", () => {
         passwordChangedAt: new Date(iat * 1000 + 999),
       });
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
     });
@@ -356,28 +350,18 @@ describe("Auth Middleware", () => {
 
       // Token path
       const tokenReq = createMockReq({ cookies: { token: signToken({}) } });
-      await authenticateToken(
-        tokenReq as Request,
-        createMockRes().res as Response,
-        nextFn
-      );
-      expect((tokenReq as any).user.id).toBe(MOCK_USER.id);
-      expect((tokenReq as any).user).not.toHaveProperty("passwordChangedAt");
+      await authenticateToken(tokenReq, createMockRes().res, nextFn);
+      expect(must(tokenReq.user).id).toBe(MOCK_USER.id);
+      expect(must(tokenReq.user)).not.toHaveProperty("passwordChangedAt");
 
       // Proxy-header path
       process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
       const proxyReq = createMockReq({
-        header: vi.fn((name: string) =>
-          name === "X-Forwarded-User" ? "testuser" : undefined
-        ),
-      } as any);
-      await authenticate(
-        proxyReq as Request,
-        createMockRes().res as Response,
-        nextFn
-      );
-      expect((proxyReq as any).user.id).toBe(MOCK_USER.id);
-      expect((proxyReq as any).user).not.toHaveProperty("passwordChangedAt");
+        headers: { "X-Forwarded-User": "testuser" },
+      });
+      await authenticate(proxyReq, createMockRes().res, nextFn);
+      expect(must(proxyReq.user).id).toBe(MOCK_USER.id);
+      expect(must(proxyReq.user)).not.toHaveProperty("passwordChangedAt");
       expect(nextFn).toHaveBeenCalledTimes(2);
     });
 
@@ -394,7 +378,7 @@ describe("Auth Middleware", () => {
 
         mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-        await authenticateToken(req as Request, res as Response, nextFn);
+        await authenticateToken(req, res, nextFn);
 
         expect(statusFn).toHaveBeenCalledWith(403);
         expect(nextFn).not.toHaveBeenCalled();
@@ -418,13 +402,15 @@ describe("Auth Middleware", () => {
         getJwtSecret(),
         { expiresIn: "24h" }
       );
-    const refreshedClaims = (cookieFn: ReturnType<typeof vi.fn>) => {
+    const refreshedClaims = (
+      cookieFn: ReturnType<typeof createMockRes>["cookieFn"]
+    ) => {
       expect(cookieFn).toHaveBeenCalledWith(
         "token",
         expect.any(String),
         expect.anything()
       );
-      return jwt.decode(must(cookieFn.mock.calls[0])[1] as string) as {
+      return jwt.decode(must(cookieFn.mock.calls[0])[1]) as {
         authTime?: number;
       };
     };
@@ -447,7 +433,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res, cookieFn } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
       expect(refreshedClaims(cookieFn).authTime).toBe(Tsec - 5 * 86400);
@@ -458,7 +444,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res, cookieFn } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
       expect(refreshedClaims(cookieFn).authTime).toBe(Tsec - 2 * 3600);
@@ -469,7 +455,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res, statusFn, jsonFn } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(401);
       expect(jsonFn).toHaveBeenCalledWith({
@@ -483,7 +469,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq({ cookies: { token } });
       const { res } = createMockRes();
 
-      await authenticateToken(req as Request, res as Response, nextFn);
+      await authenticateToken(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
     });
@@ -492,32 +478,26 @@ describe("Auth Middleware", () => {
   describe("authenticate", () => {
     it("uses proxy auth when PROXY_AUTH_HEADER is set and header present", async () => {
       process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
-      const headerFn = vi.fn((name: string) => {
-        if (name === "X-Forwarded-User") return "testuser";
-        return undefined;
+      const req = createMockReq({
+        headers: { "X-Forwarded-User": "testuser" },
       });
-      const req = createMockReq({ header: headerFn } as any);
       const { res } = createMockRes();
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticate(req as Request, res as Response, nextFn);
+      await authenticate(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
-      expect((req as any).user.id).toBe(MOCK_USER.id);
-      expect((req as any).user.username).toBe("testuser");
+      expect(must(req.user).id).toBe(MOCK_USER.id);
+      expect(must(req.user).username).toBe("testuser");
     });
 
     it("falls back to JWT when proxy header is set but not present in request", async () => {
       process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
-      const headerFn = vi.fn().mockReturnValue(undefined);
-      const req = createMockReq({
-        header: headerFn,
-        cookies: {},
-      } as any);
+      const req = createMockReq({ cookies: {} });
       const { res, statusFn } = createMockRes();
 
-      await authenticate(req as Request, res as Response, nextFn);
+      await authenticate(req, res, nextFn);
 
       // Falls back to authenticateToken which returns 401 (no token)
       expect(statusFn).toHaveBeenCalledWith(401);
@@ -526,19 +506,15 @@ describe("Auth Middleware", () => {
 
     it("falls back to JWT when proxy auth user not found in database", async () => {
       process.env.PROXY_AUTH_HEADER = "X-Forwarded-User";
-      const headerFn = vi.fn((name: string) => {
-        if (name === "X-Forwarded-User") return "unknown_user";
-        return undefined;
-      });
       const req = createMockReq({
-        header: headerFn,
+        headers: { "X-Forwarded-User": "unknown_user" },
         cookies: {},
-      } as any);
+      });
       const { res, statusFn } = createMockRes();
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      await authenticate(req as Request, res as Response, nextFn);
+      await authenticate(req, res, nextFn);
 
       // Falls back to authenticateToken → 401
       expect(statusFn).toHaveBeenCalledWith(401);
@@ -554,15 +530,11 @@ describe("Auth Middleware", () => {
         realIp: string,
         socketAddress = "127.0.0.1"
       ) => {
-        const headers: Record<string, string> = {
-          "x-forwarded-user": username,
-          "x-real-ip": realIp,
-        };
         return createMockReq({
-          header: vi.fn((name: string) => headers[name.toLowerCase()]),
-          socket: { remoteAddress: socketAddress },
+          headers: { "x-forwarded-user": username, "x-real-ip": realIp },
+          remoteAddress: socketAddress,
           cookies: {},
-        } as any);
+        });
       };
 
       const warnMessages = () =>
@@ -578,10 +550,10 @@ describe("Auth Middleware", () => {
         const req = proxyReq("testuser", "192.168.1.5");
         const { res } = createMockRes();
 
-        await authenticate(req as Request, res as Response, nextFn);
+        await authenticate(req, res, nextFn);
 
         expect(nextFn).toHaveBeenCalled();
-        expect((req as any).user.username).toBe("testuser");
+        expect(must(req.user).username).toBe("testuser");
         expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
           expect.objectContaining({ where: { username: "testuser" } })
         );
@@ -594,7 +566,7 @@ describe("Auth Middleware", () => {
         for (let i = 0; i < 3; i++) {
           const req = proxyReq("testuser", "10.0.0.9");
           const { res, statusFn } = createMockRes();
-          await authenticate(req as Request, res as Response, nextFn);
+          await authenticate(req, res, nextFn);
           expect(statusFn).toHaveBeenCalledWith(401);
         }
 
@@ -612,7 +584,7 @@ describe("Auth Middleware", () => {
         const req = proxyReq("testuser", "192.168.1.5", "172.18.0.3");
         const { res, statusFn } = createMockRes();
 
-        await authenticate(req as Request, res as Response, nextFn);
+        await authenticate(req, res, nextFn);
 
         expect(statusFn).toHaveBeenCalledWith(401);
         expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
@@ -624,10 +596,10 @@ describe("Auth Middleware", () => {
         const req = proxyReq("testuser", "203.0.113.7", "172.18.0.3");
         const { res } = createMockRes();
 
-        await authenticate(req as Request, res as Response, nextFn);
+        await authenticate(req, res, nextFn);
 
         expect(nextFn).toHaveBeenCalled();
-        expect((req as any).user.username).toBe("testuser");
+        expect(must(req.user).username).toBe("testuser");
       });
 
       it("honours the header from no address when PROXY_AUTH_TRUSTED_IPS has an invalid entry", async () => {
@@ -636,7 +608,7 @@ describe("Auth Middleware", () => {
         const req = proxyReq("testuser", "192.168.1.5");
         const { res, statusFn } = createMockRes();
 
-        await authenticate(req as Request, res as Response, nextFn);
+        await authenticate(req, res, nextFn);
 
         expect(statusFn).toHaveBeenCalledWith(401);
         expect(nextFn).not.toHaveBeenCalled();
@@ -649,11 +621,7 @@ describe("Auth Middleware", () => {
         try {
           for (let i = 0; i < 2; i++) {
             const { res, statusFn } = createMockRes();
-            await authenticate(
-              proxyReq("ghost", "192.168.1.5") as Request,
-              res as Response,
-              nextFn
-            );
+            await authenticate(proxyReq("ghost", "192.168.1.5"), res, nextFn);
             expect(statusFn).toHaveBeenCalledWith(401);
           }
           expect(logger.warn).toHaveBeenCalledTimes(1);
@@ -665,11 +633,7 @@ describe("Auth Middleware", () => {
           // Ten minutes later it warns again
           nowSpy.mockReturnValue(1_000_000 + 10 * 60 * 1000);
           const { res } = createMockRes();
-          await authenticate(
-            proxyReq("ghost", "192.168.1.5") as Request,
-            res as Response,
-            nextFn
-          );
+          await authenticate(proxyReq("ghost", "192.168.1.5"), res, nextFn);
           expect(logger.warn).toHaveBeenCalledTimes(2);
         } finally {
           nowSpy.mockRestore();
@@ -681,11 +645,7 @@ describe("Auth Middleware", () => {
 
         for (let i = 0; i < 2; i++) {
           const { res } = createMockRes();
-          await authenticate(
-            proxyReq("testuser", "192.168.1.5") as Request,
-            res as Response,
-            nextFn
-          );
+          await authenticate(proxyReq("testuser", "192.168.1.5"), res, nextFn);
         }
 
         expect(nextFn).toHaveBeenCalledTimes(2);
@@ -701,7 +661,7 @@ describe("Auth Middleware", () => {
         const req = proxyReq("testuser", "192.168.1.5");
         const { res, statusFn } = createMockRes();
 
-        await authenticate(req as Request, res as Response, nextFn);
+        await authenticate(req, res, nextFn);
 
         expect(statusFn).toHaveBeenCalledWith(401);
         expect(nextFn).not.toHaveBeenCalled();
@@ -724,30 +684,28 @@ describe("Auth Middleware", () => {
 
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-      await authenticate(req as Request, res as Response, nextFn);
+      await authenticate(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
-      expect((req as any).user.id).toBe(MOCK_USER.id);
+      expect(must(req.user).id).toBe(MOCK_USER.id);
     });
   });
 
   describe("requireAdmin", () => {
     it("calls next for admin users", () => {
-      const req = createMockReq();
-      (req as any).user = MOCK_ADMIN;
+      const req = createMockReq({ user: MOCK_ADMIN });
       const { res } = createMockRes();
 
-      requireAdmin(req as Request, res as Response, nextFn);
+      requireAdmin(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
     });
 
     it("returns 403 for non-admin users", () => {
-      const req = createMockReq();
-      (req as any).user = MOCK_USER;
+      const req = createMockReq({ user: MOCK_USER });
       const { res, statusFn, jsonFn } = createMockRes();
 
-      requireAdmin(req as Request, res as Response, nextFn);
+      requireAdmin(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(403);
       expect(jsonFn).toHaveBeenCalledWith({ error: "Admin access required." });
@@ -758,7 +716,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq();
       const { res, statusFn, jsonFn } = createMockRes();
 
-      requireAdmin(req as Request, res as Response, nextFn);
+      requireAdmin(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(403);
       expect(jsonFn).toHaveBeenCalledWith({ error: "Admin access required." });
@@ -772,7 +730,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq();
       const { res } = createMockRes();
 
-      await requireCacheReady(req as Request, res as Response, nextFn);
+      await requireCacheReady(req, res, nextFn);
 
       expect(nextFn).toHaveBeenCalled();
     });
@@ -782,7 +740,7 @@ describe("Auth Middleware", () => {
       const req = createMockReq();
       const { res, statusFn, jsonFn } = createMockRes();
 
-      await requireCacheReady(req as Request, res as Response, nextFn);
+      await requireCacheReady(req, res, nextFn);
 
       expect(statusFn).toHaveBeenCalledWith(503);
       expect(jsonFn).toHaveBeenCalledWith({
@@ -803,7 +761,7 @@ describe("Auth Middleware", () => {
         username: "test",
         role: "USER",
       });
-      setTokenCookie(res as Response, token);
+      setTokenCookie(res, token);
 
       expect(cookieFn).toHaveBeenCalledWith("token", token, {
         httpOnly: true,
@@ -822,7 +780,7 @@ describe("Auth Middleware", () => {
         username: "test",
         role: "USER",
       });
-      setTokenCookie(res as Response, token);
+      setTokenCookie(res, token);
 
       expect(cookieFn).toHaveBeenCalledWith(
         "token",

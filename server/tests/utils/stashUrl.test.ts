@@ -11,6 +11,7 @@ import {
   getStashBaseUrl,
   getStashUiUrl,
 } from "../../utils/stashUrl.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetBaseUrl, mockGetUiUrl } = vi.hoisted(() => ({
@@ -152,9 +153,8 @@ describe("stashUrl", () => {
     it("returns null for unknown entity type", () => {
       mockGetUiUrl.mockReturnValue(BASE_URL);
 
-      // Cast to bypass TypeScript type checking for the test
       const result = buildStashEntityUrl(
-        "unknown" as unknown as "scene",
+        untrusted("unknown"),
         "42",
         undefined,
         ADMIN

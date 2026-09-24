@@ -18,7 +18,14 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import type {
+  ApiErrorResponse,
+  TypedAuthRequest,
+  TypedResponse,
+  UpdateRatingRequest,
+  UpdateRatingResponse,
+} from "../../types/api/index.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
@@ -51,14 +58,28 @@ const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const USER = { id: 1, username: "testuser", role: "USER" };
 
 /** Any of the seven rating handlers; each takes its own id param. */
-type RatingHandler =
-  | typeof updateSceneRating
-  | typeof updatePerformerRating
-  | typeof updateStudioRating
-  | typeof updateTagRating
-  | typeof updateGalleryRating
-  | typeof updateGroupRating
-  | typeof updateImageRating;
+/**
+ * Any of the rating handlers. They share a body and response and differ only
+ * in the name of their one id param, which the tables below pass as data. A
+ * method signature (checked bivariantly) lets each handler's own params type
+ * stand in for that `Record<string, string>`.
+ */
+type RatingHandler = {
+  handle(
+    req: TypedAuthRequest<UpdateRatingRequest>,
+    res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
+  ): Promise<unknown>;
+}["handle"];
+
+/** The Prisma model each rating handler writes to */
+type RatingModel =
+  | "sceneRating"
+  | "performerRating"
+  | "studioRating"
+  | "tagRating"
+  | "galleryRating"
+  | "groupRating"
+  | "imageRating";
 
 /** Standard mock for a successful upsert */
 const UPSERT_RESULT = {
@@ -84,108 +105,150 @@ describe("Ratings Controller", () => {
 
   describe("shared validation (via updateSceneRating)", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, { sceneId: "1" }, {} as any);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        params: { sceneId: "1" },
+        user: malformed({}),
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(401);
-      expect(res._getBody().error).toBe("Unauthorized");
+      expect(res._getErrorBody().error).toBe("Unauthorized");
     });
 
     it("returns 401 when user is missing entirely", async () => {
-      const req = { body: {}, params: { sceneId: "1" } } as any;
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, { params: { sceneId: "1" } });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(401);
-      expect(res._getBody().error).toBe("Unauthorized");
+      expect(res._getErrorBody().error).toBe("Unauthorized");
     });
 
     it("returns 400 when entity ID is missing", async () => {
-      const req = mockReq({ rating: 50 }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Missing sceneId");
+      expect(res._getErrorBody().error).toBe("Missing sceneId");
     });
 
     it("returns 400 when rating is not a number", async () => {
-      const req = mockReq({ rating: "high" }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: malformed({ rating: "high" }),
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Rating must be a number/);
+      expect(res._getErrorBody().error).toMatch(/Rating must be a number/);
     });
 
     it("returns 400 when rating is below 0", async () => {
-      const req = mockReq({ rating: -1 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: -1 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Rating must be a number/);
+      expect(res._getErrorBody().error).toMatch(/Rating must be a number/);
     });
 
     it("returns 400 when rating is above 100", async () => {
-      const req = mockReq({ rating: 101 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 101 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Rating must be a number/);
+      expect(res._getErrorBody().error).toMatch(/Rating must be a number/);
     });
 
     it("accepts rating of 0 (boundary)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 0 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 0 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("accepts rating of 100 (boundary)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 100 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 100 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("accepts null rating (clearing a rating)", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: null }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: null },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("returns 400 when favorite is not a boolean", async () => {
-      const req = mockReq({ favorite: "yes" }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: malformed({ favorite: "yes" }),
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Favorite must be a boolean");
+      expect(res._getErrorBody().error).toBe("Favorite must be a boolean");
     });
 
     it("accepts favorite as true/false", async () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { favorite: true },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("returns 500 when database throws", async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error("DB down"));
-      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toMatch(/Failed to update/);
+      expect(res._getErrorBody().error).toMatch(/Failed to update/);
     });
   });
 
@@ -196,12 +259,12 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq(
-        { rating: 50, instanceId: "custom-instance" },
-        { sceneId: "1" },
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50, instanceId: "custom-instance" },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(
@@ -227,8 +290,12 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(1, "scene", "1", undefined);
@@ -249,16 +316,15 @@ describe("Ratings Controller", () => {
   // ─── Entity access ───
 
   describe("entity access", () => {
-    const handlers: [string, RatingHandler, string, keyof typeof mockPrisma][] =
-      [
-        ["scene", updateSceneRating, "sceneId", "sceneRating"],
-        ["performer", updatePerformerRating, "performerId", "performerRating"],
-        ["studio", updateStudioRating, "studioId", "studioRating"],
-        ["tag", updateTagRating, "tagId", "tagRating"],
-        ["gallery", updateGalleryRating, "galleryId", "galleryRating"],
-        ["group", updateGroupRating, "groupId", "groupRating"],
-        ["image", updateImageRating, "imageId", "imageRating"],
-      ];
+    const handlers: [string, RatingHandler, string, RatingModel][] = [
+      ["scene", updateSceneRating, "sceneId", "sceneRating"],
+      ["performer", updatePerformerRating, "performerId", "performerRating"],
+      ["studio", updateStudioRating, "studioId", "studioRating"],
+      ["tag", updateTagRating, "tagId", "tagRating"],
+      ["gallery", updateGalleryRating, "galleryId", "galleryRating"],
+      ["group", updateGroupRating, "groupId", "groupRating"],
+      ["image", updateImageRating, "imageId", "imageRating"],
+    ];
 
     it.each(handlers)(
       "%s returns 404 and writes nothing when the user cannot see the entity",
@@ -269,18 +335,18 @@ describe("Ratings Controller", () => {
           })
         );
         mockResolve.mockResolvedValueOnce(null);
-        const model = mockPrisma[modelKey] as any;
-        const req = mockReq(
-          { rating: 50, favorite: true, instanceId: "inst-b" },
-          { [paramKey]: "77" },
-          USER
-        );
-        const res = mockRes();
-        await handler(req as any, res);
+        const model = mockPrisma[modelKey];
+        const req = reqFor(handler, {
+          body: { rating: 50, favorite: true, instanceId: "inst-b" },
+          params: { [paramKey]: "77" },
+          user: USER,
+        });
+        const res = resFor(handler);
+        await handler(req, res);
 
         expect(mockResolve).toHaveBeenCalledWith(1, entityType, "77", "inst-b");
         expect(res._getStatus()).toBe(404);
-        expect(res._getBody().error).toMatch(/not found/);
+        expect(res._getErrorBody().error).toMatch(/not found/);
         expect(model.upsert).not.toHaveBeenCalled();
         expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
       }
@@ -290,12 +356,12 @@ describe("Ratings Controller", () => {
       mockPrisma.performerRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq(
-        { rating: 5, instanceId: "inst-b" },
-        { performerId: "77" },
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(updatePerformerRating, {
+        body: { rating: 5, instanceId: "inst-b" },
+        params: { performerId: "77" },
+        user: USER,
+      });
+      const res = resFor(updatePerformerRating);
       await updatePerformerRating(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(1, "performer", "77", "inst-b");
@@ -315,12 +381,16 @@ describe("Ratings Controller", () => {
     it.each([[{ instanceId: 5 }], [{ instanceId: "" }]])(
       "returns 400 when instanceId is not a non-empty string (%j)",
       async (body) => {
-        const req = mockReq({ rating: 50, ...body }, { sceneId: "1" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateSceneRating, {
+          body: malformed({ rating: 50, ...body }),
+          params: { sceneId: "1" },
+          user: USER,
+        });
+        const res = resFor(updateSceneRating);
         await updateSceneRating(req, res);
 
         expect(res._getStatus()).toBe(400);
-        expect(res._getBody().error).toBe(
+        expect(res._getErrorBody().error).toBe(
           "instanceId must be a non-empty string"
         );
         expect(mockResolve).not.toHaveBeenCalled();
@@ -336,8 +406,12 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 75 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 75 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
@@ -358,8 +432,12 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { favorite: true },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockPrisma.sceneRating.upsert).toHaveBeenCalledWith(
@@ -381,15 +459,15 @@ describe("Ratings Controller", () => {
         favorite: true,
       };
       mockPrisma.sceneRating.upsert.mockResolvedValue(partialRow(upsertResult));
-      const req = mockReq(
-        { rating: 85, favorite: true },
-        { sceneId: "1" },
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 85, favorite: true },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.rating).toEqual(upsertResult);
     });
@@ -426,12 +504,16 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockInstanceManager.getForSync).not.toHaveBeenCalled();
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("does not sync when getForSync returns null (no stash client)", async () => {
@@ -439,12 +521,16 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
       expect(mockStash.sceneUpdate).not.toHaveBeenCalled();
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("succeeds even when Stash sync throws (non-blocking)", async () => {
@@ -452,11 +538,15 @@ describe("Ratings Controller", () => {
       mockPrisma.sceneRating.upsert.mockResolvedValue(
         partialRow(UPSERT_RESULT)
       );
-      const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateSceneRating, {
+        body: { rating: 50 },
+        params: { sceneId: "1" },
+        user: USER,
+      });
+      const res = resFor(updateSceneRating);
       await updateSceneRating(req, res);
 
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     // Scene: syncs rating only, NOT favorite
@@ -468,8 +558,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash as rating100", async () => {
-        const req = mockReq({ rating: 85 }, { sceneId: "42" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateSceneRating, {
+          body: { rating: 85 },
+          params: { sceneId: "42" },
+          user: USER,
+        });
+        const res = resFor(updateSceneRating);
         await updateSceneRating(req, res);
 
         expect(mockStash.sceneUpdate).toHaveBeenCalledWith({
@@ -478,8 +572,12 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (scene policy)", async () => {
-        const req = mockReq({ favorite: true }, { sceneId: "42" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateSceneRating, {
+          body: { favorite: true },
+          params: { sceneId: "42" },
+          user: USER,
+        });
+        const res = resFor(updateSceneRating);
         await updateSceneRating(req, res);
 
         expect(mockStash.sceneUpdate).not.toHaveBeenCalled();
@@ -495,8 +593,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 90 }, { performerId: "10" }, USER);
-        const res = mockRes();
+        const req = reqFor(updatePerformerRating, {
+          body: { rating: 90 },
+          params: { performerId: "10" },
+          user: USER,
+        });
+        const res = resFor(updatePerformerRating);
         await updatePerformerRating(req, res);
 
         expect(mockStash.performerUpdate).toHaveBeenCalledWith({
@@ -505,8 +607,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs favorite to Stash", async () => {
-        const req = mockReq({ favorite: true }, { performerId: "10" }, USER);
-        const res = mockRes();
+        const req = reqFor(updatePerformerRating, {
+          body: { favorite: true },
+          params: { performerId: "10" },
+          user: USER,
+        });
+        const res = resFor(updatePerformerRating);
         await updatePerformerRating(req, res);
 
         expect(mockStash.performerUpdate).toHaveBeenCalledWith({
@@ -515,12 +621,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite together", async () => {
-        const req = mockReq(
-          { rating: 95, favorite: true },
-          { performerId: "10" },
-          USER
-        );
-        const res = mockRes();
+        const req = reqFor(updatePerformerRating, {
+          body: { rating: 95, favorite: true },
+          params: { performerId: "10" },
+          user: USER,
+        });
+        const res = resFor(updatePerformerRating);
         await updatePerformerRating(req, res);
 
         expect(mockStash.performerUpdate).toHaveBeenCalledWith({
@@ -538,12 +644,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs both rating and favorite", async () => {
-        const req = mockReq(
-          { rating: 80, favorite: true },
-          { studioId: "5" },
-          USER
-        );
-        const res = mockRes();
+        const req = reqFor(updateStudioRating, {
+          body: { rating: 80, favorite: true },
+          params: { studioId: "5" },
+          user: USER,
+        });
+        const res = resFor(updateStudioRating);
         await updateStudioRating(req, res);
 
         expect(mockStash.studioUpdate).toHaveBeenCalledWith({
@@ -561,8 +667,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs favorite to Stash", async () => {
-        const req = mockReq({ favorite: true }, { tagId: "7" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateTagRating, {
+          body: { favorite: true },
+          params: { tagId: "7" },
+          user: USER,
+        });
+        const res = resFor(updateTagRating);
         await updateTagRating(req, res);
 
         expect(mockStash.tagUpdate).toHaveBeenCalledWith({
@@ -571,8 +681,12 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync rating to Stash (tag policy)", async () => {
-        const req = mockReq({ rating: 60 }, { tagId: "7" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateTagRating, {
+          body: { rating: 60 },
+          params: { tagId: "7" },
+          user: USER,
+        });
+        const res = resFor(updateTagRating);
         await updateTagRating(req, res);
 
         expect(mockStash.tagUpdate).not.toHaveBeenCalled();
@@ -588,8 +702,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 70 }, { galleryId: "3" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateGalleryRating, {
+          body: { rating: 70 },
+          params: { galleryId: "3" },
+          user: USER,
+        });
+        const res = resFor(updateGalleryRating);
         await updateGalleryRating(req, res);
 
         expect(mockStash.galleryUpdate).toHaveBeenCalledWith({
@@ -598,8 +716,12 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (gallery policy)", async () => {
-        const req = mockReq({ favorite: true }, { galleryId: "3" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateGalleryRating, {
+          body: { favorite: true },
+          params: { galleryId: "3" },
+          user: USER,
+        });
+        const res = resFor(updateGalleryRating);
         await updateGalleryRating(req, res);
 
         expect(mockStash.galleryUpdate).not.toHaveBeenCalled();
@@ -615,8 +737,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 55 }, { groupId: "8" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateGroupRating, {
+          body: { rating: 55 },
+          params: { groupId: "8" },
+          user: USER,
+        });
+        const res = resFor(updateGroupRating);
         await updateGroupRating(req, res);
 
         expect(mockStash.groupUpdate).toHaveBeenCalledWith({
@@ -625,8 +751,12 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (group policy)", async () => {
-        const req = mockReq({ favorite: true }, { groupId: "8" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateGroupRating, {
+          body: { favorite: true },
+          params: { groupId: "8" },
+          user: USER,
+        });
+        const res = resFor(updateGroupRating);
         await updateGroupRating(req, res);
 
         expect(mockStash.groupUpdate).not.toHaveBeenCalled();
@@ -642,8 +772,12 @@ describe("Ratings Controller", () => {
       });
 
       it("syncs rating to Stash", async () => {
-        const req = mockReq({ rating: 40 }, { imageId: "99" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateImageRating, {
+          body: { rating: 40 },
+          params: { imageId: "99" },
+          user: USER,
+        });
+        const res = resFor(updateImageRating);
         await updateImageRating(req, res);
 
         expect(mockStash.imageUpdate).toHaveBeenCalledWith({
@@ -652,8 +786,12 @@ describe("Ratings Controller", () => {
       });
 
       it("does NOT sync favorite to Stash (image policy)", async () => {
-        const req = mockReq({ favorite: true }, { imageId: "99" }, USER);
-        const res = mockRes();
+        const req = reqFor(updateImageRating, {
+          body: { favorite: true },
+          params: { imageId: "99" },
+          user: USER,
+        });
+        const res = resFor(updateImageRating);
         await updateImageRating(req, res);
 
         expect(mockStash.imageUpdate).not.toHaveBeenCalled();
@@ -676,11 +814,11 @@ describe("Ratings Controller", () => {
     it.each(cases)(
       "returns 400 for missing %sId",
       async (_entity, handler, expectedError) => {
-        const req = mockReq({ rating: 50 }, {}, USER);
-        const res = mockRes();
-        await handler(req as any, res);
+        const req = reqFor(handler, { body: { rating: 50 }, user: USER });
+        const res = resFor(handler);
+        await handler(req, res);
         expect(res._getStatus()).toBe(400);
-        expect(res._getBody().error).toBe(expectedError);
+        expect(res._getErrorBody().error).toBe(expectedError);
       }
     );
   });
@@ -688,7 +826,7 @@ describe("Ratings Controller", () => {
   // ─── All entity endpoints: successful upsert ───
 
   describe("per-entity successful operations", () => {
-    const cases: [string, RatingHandler, string, keyof typeof mockPrisma][] = [
+    const cases: [string, RatingHandler, string, RatingModel][] = [
       ["performer", updatePerformerRating, "performerId", "performerRating"],
       ["studio", updateStudioRating, "studioId", "studioRating"],
       ["tag", updateTagRating, "tagId", "tagRating"],
@@ -700,12 +838,16 @@ describe("Ratings Controller", () => {
     it.each(cases)(
       "successfully upserts %s rating",
       async (_entity, handler, paramKey, modelKey) => {
-        const model = mockPrisma[modelKey] as any;
+        const model = mockPrisma[modelKey];
         model.upsert.mockResolvedValue(partialRow(UPSERT_RESULT));
-        const req = mockReq({ rating: 50 }, { [paramKey]: "1" }, USER);
-        const res = mockRes();
-        await handler(req as any, res);
-        expect(res._getBody().success).toBe(true);
+        const req = reqFor(handler, {
+          body: { rating: 50 },
+          params: { [paramKey]: "1" },
+          user: USER,
+        });
+        const res = resFor(handler);
+        await handler(req, res);
+        expect(res._getOkBody().success).toBe(true);
         expect(model.upsert).toHaveBeenCalledTimes(1);
       }
     );

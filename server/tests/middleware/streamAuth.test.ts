@@ -17,7 +17,8 @@ import {
   deriveStreamLinkKey,
   signStreamLink,
 } from "../../utils/streamLink.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -70,11 +71,11 @@ function signedReq(
   claims: StreamLinkClaims,
   overrides: {
     params?: Record<string, string>;
-    query?: Record<string, string>;
+    query?: Record<string, string | string[]>;
   } = {}
 ) {
   const sig = signStreamLink(claims, KEY);
-  return {
+  return reqFor(authenticateStreamRequest, {
     params: {
       sceneId: claims.sceneId,
       streamPath: "stream",
@@ -87,16 +88,11 @@ function signedReq(
       sig,
       ...overrides.query,
     },
-    headers: {},
-    cookies: {},
-  } as any;
+  });
 }
 
 function createMockRes() {
-  return {
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
-  } as any;
+  return resFor(authenticateStreamRequest);
 }
 
 describe("authenticateStreamRequest", () => {
@@ -112,12 +108,10 @@ describe("authenticateStreamRequest", () => {
   });
 
   it("delegates to authenticate when the request has no sig", async () => {
-    const req = {
+    const req = reqFor(authenticateStreamRequest, {
       params: { sceneId: "123", streamPath: "stream.m3u8" },
       query: { instanceId: "inst-a" },
-      headers: {},
-      cookies: {},
-    } as any;
+    });
     const res = createMockRes();
     const next = vi.fn();
 
@@ -232,15 +226,13 @@ describe("authenticateStreamRequest", () => {
 
   it("returns 401 for a tampered signature or malformed claims", async () => {
     // Only user 7 exists, so a foreign uid finds nobody
-    mockPrisma.user.findUnique.mockImplementation((async (args: {
-      where: { id: number };
-    }) => (args.where.id === 7 ? DB_USER : null)) as any);
-    const good = signedReq(claimsFor());
+    mockPrisma.user.findUnique.mockImplementation(
+      prismaImpl(({ where }) => (where.id === 7 ? DB_USER : null))
+    );
+    const goodSig = signStreamLink(claimsFor(), KEY);
     const cases: Array<Record<string, string>> = [
       {
-        sig:
-          good.query.sig.slice(0, -1) +
-          (good.query.sig.at(-1) === "A" ? "B" : "A"),
+        sig: goodSig.slice(0, -1) + (goodSig.endsWith("A") ? "B" : "A"),
       },
       { sig: "short" },
       { uid: "7a" },
@@ -263,8 +255,8 @@ describe("authenticateStreamRequest", () => {
   });
 
   it("rejects a sig array without throwing", async () => {
-    const req = signedReq(claimsFor());
-    req.query.sig = [req.query.sig, req.query.sig];
+    const sig = signStreamLink(claimsFor(), KEY);
+    const req = signedReq(claimsFor(), { query: { sig: [sig, sig] } });
     const res = createMockRes();
     const next = vi.fn();
 

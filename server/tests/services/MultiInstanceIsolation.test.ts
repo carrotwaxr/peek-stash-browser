@@ -12,7 +12,7 @@ import {
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 // Mock prisma before importing service
@@ -262,10 +262,12 @@ describe("Multi-Instance Isolation", () => {
 
     /** Route $queryRawUnsafe by SQL shape (resolution, edges); unmatched queries return nothing. */
     function fakeRaw(routes: Array<[RegExp, unknown[]]>) {
-      mockPrisma.$queryRawUnsafe.mockImplementation((async (sql: string) => {
-        const hit = routes.find(([re]) => re.test(sql));
-        return hit ? hit[1] : [];
-      }) as any);
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) => {
+          const hit = routes.find(([re]) => re.test(sql));
+          return hit ? hit[1] : [];
+        })
+      );
     }
 
     /** The closure loaded into the temp refs table before the edge queries. */
@@ -277,9 +279,9 @@ describe("Multi-Instance Isolation", () => {
     }
 
     function upsertKeys(): string[] {
-      return mockPrisma.userExcludedEntity.upsert.mock.calls.map((c: any) => {
-        const w = c[0].where.userId_entityType_entityId_instanceId;
-        return `${w.entityType}:${w.entityId}@${w.instanceId}:${c[0].create.reason}`;
+      return mockPrisma.userExcludedEntity.upsert.mock.calls.map(([args]) => {
+        const w = must(args.where.userId_entityType_entityId_instanceId);
+        return `${w.entityType}:${w.entityId}@${w.instanceId}:${args.create.reason}`;
       });
     }
 
@@ -287,9 +289,9 @@ describe("Multi-Instance Isolation", () => {
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
       mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
       mockPrisma.userExcludedEntity.upsert.mockResolvedValue(partialRow({}));
-      mockPrisma.$transaction.mockImplementation((async (callback: any) => {
-        return callback(mockPrisma);
-      }) as any);
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl((callback) => callback(mockPrisma))
+      );
     });
 
     it("hiding performer from instance A cascades only to instance A scenes", async () => {

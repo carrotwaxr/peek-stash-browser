@@ -7,6 +7,7 @@
 import { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 
 // Mock auth middleware
 vi.mock("../../middleware/auth.js", () => ({
@@ -48,40 +49,9 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockSyncService = vi.mocked(stashSyncService);
 
-function createMockRequest(
-  options: {
-    params?: Record<string, string>;
-    body?: Record<string, unknown> | undefined;
-    user?: { id: number; username: string; role: string };
-  } = {}
-): Partial<Request> {
-  return {
-    params: options.params || {},
-    body: options.body, // intentionally allow undefined
-    user: options.user,
-  } as Partial<Request>;
-}
-
-function createMockResponse() {
-  const responseJson = vi.fn();
-  const responseStatus = vi.fn(() => ({ json: responseJson }));
-  return {
-    json: responseJson,
-    status: responseStatus,
-    responseJson,
-    responseStatus,
-  };
-}
-
 async function getReprobeHandler() {
   const { default: router } = await import("../../routes/sync.js");
-  const layer = (router as any).stack.find(
-    (l: any) => l.route?.path === "/reprobe-clips" && l.route?.methods?.post
-  );
-  // The route has [requireAdmin, authenticated(handler)] — handler is the last in the stack
-  const routeStack = layer?.route?.stack;
-  const handler = routeStack?.[routeStack.length - 1]?.handle;
-  return handler;
+  return findHandler(router, "post", "/reprobe-clips");
 }
 
 describe("POST /api/sync/reprobe-clips", () => {
@@ -100,17 +70,16 @@ describe("POST /api/sync/reprobe-clips", () => {
 
   it("succeeds when request body is undefined (no body sent)", async () => {
     const handler = await getReprobeHandler();
-    const mockReq = createMockRequest({
+    const req = reqFor(handler, {
       body: undefined, // Simulates POST with no Content-Type / no body
       user: { id: 1, username: "admin", role: "ADMIN" },
     });
-    const { json, status } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(handler);
 
-    await handler(mockReq, mockRes, () => {});
+    await handler(req, res, () => {});
 
     // Should NOT return 500 — should default to first enabled instance
-    expect(json).toHaveBeenCalledWith(
+    expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         ok: true,
         checked: 10,
@@ -121,16 +90,15 @@ describe("POST /api/sync/reprobe-clips", () => {
 
   it("succeeds when request body is empty object (no instanceId)", async () => {
     const handler = await getReprobeHandler();
-    const mockReq = createMockRequest({
+    const req = reqFor(handler, {
       body: {},
       user: { id: 1, username: "admin", role: "ADMIN" },
     });
-    const { json, status } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(handler);
 
-    await handler(mockReq, mockRes, () => {});
+    await handler(req, res, () => {});
 
-    expect(json).toHaveBeenCalledWith(
+    expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         ok: true,
         checked: 10,
@@ -141,14 +109,13 @@ describe("POST /api/sync/reprobe-clips", () => {
 
   it("uses provided instanceId when given", async () => {
     const handler = await getReprobeHandler();
-    const mockReq = createMockRequest({
+    const req = reqFor(handler, {
       body: { instanceId: "custom-instance" },
       user: { id: 1, username: "admin", role: "ADMIN" },
     });
-    const { json, status } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(handler);
 
-    await handler(mockReq, mockRes, () => {});
+    await handler(req, res, () => {});
 
     expect(mockSyncService.reProbeUngeneratedClips).toHaveBeenCalledWith(
       "custom-instance"
@@ -158,17 +125,16 @@ describe("POST /api/sync/reprobe-clips", () => {
   it("returns 409 when sync is in progress", async () => {
     mockSyncService.isSyncing.mockReturnValue(true);
     const handler = await getReprobeHandler();
-    const mockReq = createMockRequest({
+    const req = reqFor(handler, {
       body: undefined,
       user: { id: 1, username: "admin", role: "ADMIN" },
     });
-    const { json, status, responseJson, responseStatus } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(handler);
 
-    await handler(mockReq, mockRes, () => {});
+    await handler(req, res, () => {});
 
-    expect(responseStatus).toHaveBeenCalledWith(409);
-    expect(responseJson).toHaveBeenCalledWith(
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ error: "Sync in progress" })
     );
   });

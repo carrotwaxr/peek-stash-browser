@@ -4,11 +4,11 @@
  * Issue #415: Users with shared access should be able to add scenes
  * to playlists shared with them.
  */
-import type { Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addSceneToPlaylist } from "../../controllers/playlist.js";
 import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { type PlaylistWithItems } from "../helpers/fixtures.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -57,29 +57,6 @@ vi.mock("../../utils/logger.js", () => ({
 const mockPrisma = vi.mocked(prisma, true);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 
-function createMockRequest(options: {
-  params?: Record<string, string>;
-  body?: Record<string, unknown>;
-  user?: { id: number; username: string; role: string };
-}): Partial<Request> {
-  return {
-    params: options.params || {},
-    body: options.body || {},
-    user: options.user,
-  } as Partial<Request>;
-}
-
-function createMockResponse() {
-  const responseJson = vi.fn();
-  const responseStatus = vi.fn(() => ({ json: responseJson }));
-  return {
-    json: responseJson,
-    status: responseStatus,
-    responseJson,
-    responseStatus,
-  };
-}
-
 describe("addSceneToPlaylist - shared access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,36 +95,34 @@ describe("addSceneToPlaylist - shared access", () => {
       })
     );
 
-    const mockReq = createMockRequest({
+    const req = reqFor(addSceneToPlaylist, {
       params: { id: "1" },
       body: { sceneId: "scene-123" },
       user: { id: 2, username: "shareduser", role: "USER" },
     });
-    const { json, status, responseStatus } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(addSceneToPlaylist);
 
-    await addSceneToPlaylist(mockReq as any, mockRes as any);
+    await addSceneToPlaylist(req, res);
 
     // Should succeed with 201, NOT 404
-    expect(responseStatus).not.toHaveBeenCalledWith(404);
+    expect(res.status).not.toHaveBeenCalledWith(404);
     expect(mockPrisma.playlistItem.create).toHaveBeenCalled();
   });
 
   it("rejects user with no access from adding scenes", async () => {
     mockGetAccess.mockResolvedValue({ level: "none" });
 
-    const mockReq = createMockRequest({
+    const req = reqFor(addSceneToPlaylist, {
       params: { id: "1" },
       body: { sceneId: "scene-123" },
       user: { id: 3, username: "stranger", role: "USER" },
     });
-    const { json, status, responseJson, responseStatus } = createMockResponse();
-    const mockRes = { json, status } as unknown as Response;
+    const res = resFor(addSceneToPlaylist);
 
-    await addSceneToPlaylist(mockReq as any, mockRes as any);
+    await addSceneToPlaylist(req, res);
 
     // Should be rejected
-    expect(responseStatus).toHaveBeenCalledWith(404);
+    expect(res.status).toHaveBeenCalledWith(404);
     expect(mockPrisma.playlistItem.create).not.toHaveBeenCalled();
   });
 });

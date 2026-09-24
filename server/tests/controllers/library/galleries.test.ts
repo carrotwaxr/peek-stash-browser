@@ -18,7 +18,7 @@ import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockGallery } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
@@ -85,8 +85,8 @@ const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGalleryQueryBuilder = vi.mocked(galleryQueryBuilder);
 
-const defaultUser = { id: 1, role: "USER" };
-const adminUser = { id: 1, role: "ADMIN" };
+const defaultUser = testUser();
+const adminUser = testUser({ role: "ADMIN" });
 
 describe("Galleries Controller", () => {
   beforeEach(() => {
@@ -203,11 +203,11 @@ describe("Galleries Controller", () => {
       const galleries = [
         createMockGallery({
           id: "g1",
-          studio: { id: "s1", name: "Studio1" } as any,
+          studio: { id: "s1", name: "Studio1" },
         }),
         createMockGallery({
           id: "g2",
-          studio: { id: "s2", name: "Studio2" } as any,
+          studio: { id: "s2", name: "Studio2" },
         }),
         createMockGallery({ id: "g3", studio: null }),
       ];
@@ -225,11 +225,15 @@ describe("Galleries Controller", () => {
       const galleries = [
         createMockGallery({
           id: "g1",
-          performers: [{ id: "p1", name: "Perf1" }] as any,
+          performers: [
+            { id: "p1", name: "Perf1", gender: null, image_path: null },
+          ],
         }),
         createMockGallery({
           id: "g2",
-          performers: [{ id: "p2", name: "Perf2" }] as any,
+          performers: [
+            { id: "p2", name: "Perf2", gender: null, image_path: null },
+          ],
         }),
       ];
       const result = await applyGalleryFilters(galleries, {
@@ -246,11 +250,11 @@ describe("Galleries Controller", () => {
       const galleries = [
         createMockGallery({
           id: "g1",
-          tags: [{ id: "t1", name: "Tag1" }] as any,
+          tags: [{ id: "t1", name: "Tag1", image_path: null }],
         }),
         createMockGallery({
           id: "g2",
-          tags: [{ id: "t2", name: "Tag2" }] as any,
+          tags: [{ id: "t2", name: "Tag2", image_path: null }],
         }),
       ];
       const result = await applyGalleryFilters(galleries, {
@@ -274,13 +278,16 @@ describe("Galleries Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { filter: {}, gallery_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.findGalleries.count).toBe(1);
       expect(body.findGalleries.galleries).toHaveLength(1);
     });
@@ -291,12 +298,16 @@ describe("Galleries Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { filter: {}, gallery_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
-      expect(res._getBody().findGalleries.galleries[0].stashUrl).toBe(
+      expect(must(res._getOkBody().findGalleries.galleries[0])).toHaveProperty(
+        "stashUrl",
         "http://stash/galleries/g1"
       );
     });
@@ -310,14 +321,18 @@ describe("Galleries Controller", () => {
         total: 2,
       });
 
-      const req = mockReq({ filter: {}, gallery_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { filter: {}, gallery_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
-      const galleries = res._getBody().findGalleries.galleries;
+      const galleries = res._getOkBody().findGalleries.galleries;
       expect(galleries).toHaveLength(2);
-      for (const gallery of galleries) expect(gallery.stashUrl).toBeNull();
+      for (const gallery of galleries)
+        expect(gallery).toHaveProperty("stashUrl", null);
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
@@ -330,29 +345,31 @@ describe("Galleries Controller", () => {
         total: 2,
       });
 
-      const req = mockReq(
-        { ids: ["g1"], filter: {}, gallery_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { ids: ["g1"], filter: {}, gallery_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Ambiguous lookup");
+      expect(res._getErrorBody().error).toBe("Ambiguous lookup");
     });
 
     it("returns 500 when query builder throws", async () => {
       mockGalleryQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find galleries");
+      expect(res._getErrorBody().error).toBe("Failed to find galleries");
     });
 
     it("fetches detail counts for single-ID lookup", async () => {
@@ -369,12 +386,11 @@ describe("Galleries Controller", () => {
         image_count: 42,
       });
 
-      const req = mockReq(
-        { ids: ["g1"], filter: {}, gallery_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGalleries, {
+        body: { ids: ["g1"], filter: {}, gallery_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleries);
 
       await findGalleries(req, res);
 
@@ -396,25 +412,31 @@ describe("Galleries Controller", () => {
       ];
       mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().galleries).toHaveLength(2);
+      expect(res._getOkBody().galleries).toHaveLength(2);
     });
 
     it("returns empty when cache is not initialized", async () => {
       mockStashEntityService.getAllGalleries.mockResolvedValue([]);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().galleries).toEqual([]);
+      expect(res._getOkBody().galleries).toEqual([]);
     });
 
     it("applies search query filtering", async () => {
@@ -424,12 +446,15 @@ describe("Galleries Controller", () => {
       ];
       mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
 
-      const req = mockReq({ filter: { q: "beach" } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: { q: "beach" } },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
-      expect(res._getBody().galleries).toHaveLength(1);
+      expect(res._getOkBody().galleries).toHaveLength(1);
     });
 
     it("applies count_filter with min_image_count", async () => {
@@ -439,16 +464,15 @@ describe("Galleries Controller", () => {
       ];
       mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
 
-      const req = mockReq(
-        { filter: {}, count_filter: { min_image_count: 10 } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: {}, count_filter: { min_image_count: 10 } },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
-      expect(res._getBody().galleries).toHaveLength(1);
+      expect(res._getOkBody().galleries).toHaveLength(1);
     });
 
     it("sorts by title", async () => {
@@ -458,14 +482,17 @@ describe("Galleries Controller", () => {
       ];
       mockStashEntityService.getAllGalleries.mockResolvedValue(galleries);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
-      const result = res._getBody().galleries;
-      expect(result[0].title).toBe("Alpha");
-      expect(result[1].title).toBe("Zebra");
+      const result = res._getOkBody().galleries;
+      expect(must(result[0]).title).toBe("Alpha");
+      expect(must(result[1]).title).toBe("Zebra");
     });
 
     it("returns 500 on error", async () => {
@@ -473,8 +500,11 @@ describe("Galleries Controller", () => {
         new Error("fail")
       );
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findGalleriesMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findGalleriesMinimal);
 
       await findGalleriesMinimal(req, res);
 
