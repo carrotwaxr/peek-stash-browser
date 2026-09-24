@@ -79,6 +79,7 @@ const ViewModeToggle = ({
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
+    return undefined;
   }, [isOpen]);
 
   // Close on Escape
@@ -93,6 +94,7 @@ const ViewModeToggle = ({
       document.addEventListener("keydown", handleEscape);
       return () => document.removeEventListener("keydown", handleEscape);
     }
+    return undefined;
   }, [isOpen]);
 
   const handleSelect = (modeId: string) => {

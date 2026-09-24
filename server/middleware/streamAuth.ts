@@ -45,9 +45,10 @@ export const authenticateStreamRequest: RequestHandler = async (
   }
 
   if (req.params.streamPath !== "stream" || req.params.subPath !== undefined) {
-    return res
+    res
       .status(401)
       .json({ error: "Signed links are valid only for the direct stream" });
+    return;
   }
 
   const sig = queryString(req.query.sig);
@@ -67,16 +68,19 @@ export const authenticateStreamRequest: RequestHandler = async (
     !EXP_PATTERN.test(exp) ||
     !INSTANCE_ID_PATTERN.test(instanceId)
   ) {
-    return invalid(res);
+    invalid(res);
+    return;
   }
 
   const now = Math.floor(Date.now() / 1000);
   const expSeconds = Number(exp);
   if (expSeconds <= now) {
-    return res.status(401).json({ error: "Stream link expired" });
+    res.status(401).json({ error: "Stream link expired" });
+    return;
   }
   if (expSeconds > now + STREAM_LINK_TTL_SECONDS + EXP_SLACK_SECONDS) {
-    return invalid(res);
+    invalid(res);
+    return;
   }
 
   const user = await prisma.user.findUnique({
@@ -84,7 +88,8 @@ export const authenticateStreamRequest: RequestHandler = async (
     select: { id: true, username: true, role: true, passwordChangedAt: true },
   });
   if (!user) {
-    return invalid(res);
+    invalid(res);
+    return;
   }
 
   const valid = isStreamLinkSignatureValid(
@@ -99,7 +104,8 @@ export const authenticateStreamRequest: RequestHandler = async (
     getStreamLinkKey()
   );
   if (!valid) {
-    return invalid(res);
+    invalid(res);
+    return;
   }
 
   (req as AuthenticatedRequest).user = {

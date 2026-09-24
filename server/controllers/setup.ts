@@ -94,24 +94,27 @@ export const createFirstAdmin = async (
     const userCount = await prisma.user.count();
 
     if (userCount > 0) {
-      return res.status(403).json({
+      res.status(403).json({
         error:
           "Users already exist. Use the regular user management to create additional users.",
       });
+      return;
     }
 
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Username and password are required",
       });
+      return;
     }
 
     if (password.length < 6) {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Password must be at least 6 characters",
       });
+      return;
     }
 
     // Hash password
@@ -180,9 +183,10 @@ export const testStashConnection = async (
     const isAdmin = req.user?.role === "ADMIN";
 
     if (!url || !apiKey) {
-      return res.status(400).json({
+      res.status(400).json({
         error: "URL and API key are required",
       });
+      return;
     }
 
     // Validate URL format
@@ -190,9 +194,10 @@ export const testStashConnection = async (
     try {
       parsedUrl = new URL(url);
     } catch {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+      return;
     }
 
     logger.info("Testing Stash connection", {
@@ -310,27 +315,30 @@ export const createFirstStashInstance = async (
     const instanceCount = await prisma.stashInstance.count();
 
     if (instanceCount > 0) {
-      return res.status(403).json({
+      res.status(403).json({
         error:
           "A Stash instance already exists. Use Server Settings to manage instances.",
       });
+      return;
     }
 
     const { name, url, uiUrl, apiKey } = req.body;
 
     if (!url || !apiKey) {
-      return res.status(400).json({
+      res.status(400).json({
         error: "URL and API key are required",
       });
+      return;
     }
 
     // Validate URL format
     try {
       new URL(url);
     } catch {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+      return;
     }
 
     // Validate uiUrl format if provided (optional)
@@ -338,9 +346,10 @@ export const createFirstStashInstance = async (
       try {
         new URL(uiUrl);
       } catch {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid UI URL format. Expected: https://hostname:port",
         });
+        return;
       }
     }
 
@@ -355,9 +364,10 @@ export const createFirstStashInstance = async (
         logger.error("Stash connection validation failed", {
           error: errorMessage,
         });
-        return res.status(400).json({
+        res.status(400).json({
           error: "Could not connect to Stash server",
         });
+        return;
       }
     }
 
@@ -511,18 +521,20 @@ export const createStashInstance = async (
     } = req.body;
 
     if (!name || !url || !apiKey) {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Name, URL, and API key are required",
       });
+      return;
     }
 
     // Validate URL format
     try {
       new URL(url);
     } catch {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Invalid URL format. Expected: http://hostname:port/graphql",
       });
+      return;
     }
 
     // Validate uiUrl format if provided (optional)
@@ -530,9 +542,10 @@ export const createStashInstance = async (
       try {
         new URL(uiUrl);
       } catch {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid UI URL format. Expected: https://hostname:port",
         });
+        return;
       }
     }
 
@@ -546,10 +559,11 @@ export const createStashInstance = async (
       logger.error("Stash connection validation failed", {
         error: errorMessage,
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Could not connect to Stash server",
         details: errorMessage,
       });
+      return;
     }
 
     // Get next priority if not specified
@@ -637,9 +651,10 @@ export const updateStashInstance = async (
     });
 
     if (!existing) {
-      return res.status(404).json({
+      res.status(404).json({
         error: "Stash instance not found",
       });
+      return;
     }
 
     // Track if connection details changed (requires re-sync)
@@ -660,10 +675,11 @@ export const updateStashInstance = async (
         logger.error("Stash connection validation failed", {
           error: errorMessage,
         });
-        return res.status(400).json({
+        res.status(400).json({
           error: "Could not connect to Stash server with new credentials",
           details: errorMessage,
         });
+        return;
       }
     }
 
@@ -672,9 +688,10 @@ export const updateStashInstance = async (
       try {
         new URL(uiUrl);
       } catch {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid UI URL format. Expected: https://hostname:port",
         });
+        return;
       }
     }
 
@@ -757,9 +774,10 @@ export const deleteStashInstance = async (
     });
 
     if (!existing) {
-      return res.status(404).json({
+      res.status(404).json({
         error: "Stash instance not found",
       });
+      return;
     }
 
     // Check if this is the last enabled instance
@@ -772,10 +790,11 @@ export const deleteStashInstance = async (
         where: { enabled: true },
       });
       if (lastEnabled?.id === id) {
-        return res.status(400).json({
+        res.status(400).json({
           error:
             "Cannot delete the last enabled Stash instance. Disable it first or add another instance.",
         });
+        return;
       }
     }
 

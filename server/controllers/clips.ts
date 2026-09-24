@@ -88,7 +88,8 @@ export const getClipById = async (
     const clip = await clipService.getClipById(id, userId);
 
     if (!clip) {
-      return res.status(404).json({ error: "Clip not found" });
+      res.status(404).json({ error: "Clip not found" });
+      return;
     }
 
     res.json(clip);

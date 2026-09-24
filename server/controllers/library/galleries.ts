@@ -242,7 +242,7 @@ export const findGalleries = async (
         matchCount: galleries.length,
         instances: galleries.map((g) => g.instanceId),
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple galleries found with ID ${ids[0]}. Specify instance_id parameter.`,
         matches: galleries.map((g) => ({
@@ -251,6 +251,7 @@ export const findGalleries = async (
           instanceId: g.instanceId,
         })),
       });
+      return;
     }
 
     // For single-entity requests (detail pages), get gallery with computed counts
@@ -330,9 +331,10 @@ export const findGalleriesMinimal = async (
 
     if (galleries.length === 0) {
       logger.warn("Gallery cache not initialized, returning empty result");
-      return res.json({
+      res.json({
         galleries: [],
       });
+      return;
     }
 
     // Step 2: Merge with user data (for favorites)

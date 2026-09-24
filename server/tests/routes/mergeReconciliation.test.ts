@@ -84,11 +84,10 @@ describe("Merge Reconciliation Routes", () => {
       const res = resFor(authenticate);
 
       // Configure authenticate to return 401
-      mockAuthenticate.mockImplementation((_req, res, _next) =>
-        Promise.resolve(
-          res.status(401).json({ error: "Access denied. No token provided." })
-        )
-      );
+      mockAuthenticate.mockImplementation((_req, res, _next) => {
+        res.status(401).json({ error: "Access denied. No token provided." });
+        return Promise.resolve();
+      });
 
       await mockAuthenticate(req, res, vi.fn());
 
@@ -110,7 +109,7 @@ describe("Merge Reconciliation Routes", () => {
       mockRequireAdmin.mockImplementation((req, res, _next) => {
         const authReq = req as Request & { user?: { role: string } };
         if (!authReq.user || authReq.user.role !== "ADMIN") {
-          return res.status(403).json({ error: "Admin access required." });
+          res.status(403).json({ error: "Admin access required." });
         }
       });
 
@@ -133,7 +132,6 @@ describe("Merge Reconciliation Routes", () => {
         if (authReq.user?.role === "ADMIN") {
           next();
         }
-        return undefined;
       });
 
       mockRequireAdmin(req, res, mockNext);

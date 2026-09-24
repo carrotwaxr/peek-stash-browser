@@ -159,6 +159,7 @@ function offsetMiddleware(player: any) {
         seeking = 2;
         return videojs.middleware.TERMINATOR;
       }
+      return undefined;
     },
   };
 }

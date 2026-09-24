@@ -80,7 +80,8 @@ router.post(
       const { targetSceneId } = req.body as { targetSceneId: string };
 
       if (!targetSceneId) {
-        return res.status(400).json({ error: "targetSceneId is required" });
+        res.status(400).json({ error: "targetSceneId is required" });
+        return;
       }
 
       const result = await mergeReconciliationService.reconcileScene(

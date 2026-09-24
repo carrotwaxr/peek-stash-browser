@@ -76,7 +76,8 @@ export const getUserPlaylists = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const playlists = await prisma.playlist.findMany({
@@ -188,7 +189,8 @@ export const getSharedPlaylists = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Find playlists shared with groups the user belongs to (excluding own playlists)
@@ -347,17 +349,20 @@ export const getPlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     // Check access level
     const access = await getPlaylistAccess(playlistId, userId);
     if (access.level === "none") {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     const playlist = await prisma.playlist.findUnique({
@@ -372,7 +377,8 @@ export const getPlaylist = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Fetch scene details from cache for all items
@@ -487,13 +493,15 @@ export const createPlaylist = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { name, description, isPublic } = req.body;
 
     if (!name || name.trim() === "") {
-      return res.status(400).json({ error: "Playlist name is required" });
+      res.status(400).json({ error: "Playlist name is required" });
+      return;
     }
 
     const playlist = await prisma.playlist.create({
@@ -531,11 +539,13 @@ export const updatePlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     const { name, description, repeat } = req.body;
@@ -552,7 +562,8 @@ export const updatePlaylist = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     const playlist = await prisma.playlist.update({
@@ -594,11 +605,13 @@ export const deletePlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     // Check ownership
@@ -610,7 +623,8 @@ export const deletePlaylist = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Delete playlist (items will cascade delete)
@@ -639,24 +653,28 @@ export const addSceneToPlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     const { sceneId } = req.body;
 
     if (!sceneId) {
-      return res.status(400).json({ error: "Scene ID is required" });
+      res.status(400).json({ error: "Scene ID is required" });
+      return;
     }
 
     // Check access — owners and shared users can add scenes
     // Note: remove/reorder/rename remain owner-only (intentional asymmetry)
     const access = await getPlaylistAccess(playlistId, userId);
     if (access.level === "none") {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     const playlist = await prisma.playlist.findUnique({
@@ -672,7 +690,8 @@ export const addSceneToPlaylist = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Get scene instanceId
@@ -690,7 +709,8 @@ export const addSceneToPlaylist = async (
     });
 
     if (existing) {
-      return res.status(400).json({ error: "Scene already in playlist" });
+      res.status(400).json({ error: "Scene already in playlist" });
+      return;
     }
 
     // Calculate next position
@@ -730,11 +750,13 @@ export const removeSceneFromPlaylist = async (
     const { sceneId } = req.params;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     // Check ownership
@@ -746,7 +768,8 @@ export const removeSceneFromPlaylist = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Get scene instanceId
@@ -784,17 +807,20 @@ export const reorderPlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     const { items } = req.body; // Array of { sceneId, position }
 
     if (!Array.isArray(items)) {
-      return res.status(400).json({ error: "Items must be an array" });
+      res.status(400).json({ error: "Items must be an array" });
+      return;
     }
 
     // Check ownership
@@ -806,7 +832,8 @@ export const reorderPlaylist = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Get instanceIds for all scenes
@@ -856,11 +883,13 @@ export const getPlaylistShares = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     // Verify ownership
@@ -869,7 +898,8 @@ export const getPlaylistShares = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     const shares = await prisma.playlistShare.findMany({
@@ -909,17 +939,20 @@ export const updatePlaylistShares = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     const { groupIds } = req.body;
 
     if (!Array.isArray(groupIds)) {
-      return res.status(400).json({ error: "groupIds must be an array" });
+      res.status(400).json({ error: "groupIds must be an array" });
+      return;
     }
 
     // Verify ownership
@@ -928,16 +961,18 @@ export const updatePlaylistShares = async (
     });
 
     if (!playlist) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // If sharing with any groups, check canShare permission
     if (groupIds.length > 0) {
       const permissions = await resolveUserPermissions(userId);
       if (!permissions?.canShare) {
-        return res
+        res
           .status(403)
           .json({ error: "You don't have permission to share playlists" });
+        return;
       }
 
       // Verify user belongs to all specified groups
@@ -946,9 +981,10 @@ export const updatePlaylistShares = async (
 
       for (const groupId of groupIds) {
         if (!userGroupIds.has(groupId)) {
-          return res
+          res
             .status(403)
             .json({ error: "You can only share with groups you belong to" });
+          return;
         }
       }
     }
@@ -1001,17 +1037,20 @@ export const duplicatePlaylist = async (
     const playlistId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(playlistId)) {
-      return res.status(400).json({ error: "Invalid playlist ID" });
+      res.status(400).json({ error: "Invalid playlist ID" });
+      return;
     }
 
     // Check access
     const access = await getPlaylistAccess(playlistId, userId);
     if (access.level === "none") {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Fetch original playlist with items
@@ -1025,7 +1064,8 @@ export const duplicatePlaylist = async (
     });
 
     if (!original) {
-      return res.status(404).json({ error: "Playlist not found" });
+      res.status(404).json({ error: "Playlist not found" });
+      return;
     }
 
     // Create duplicate

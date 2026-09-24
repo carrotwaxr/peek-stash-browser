@@ -86,6 +86,7 @@ describe("useFilterState", () => {
         if (url === "/user/default-presets") {
           return Promise.resolve({ defaults: { scene: "preset-1" } });
         }
+        return undefined;
       });
 
       const { result } = renderHook(
@@ -127,6 +128,7 @@ describe("useFilterState", () => {
         if (url === "/user/default-presets") {
           return Promise.resolve({ defaults: { performer: "preset-1" } });
         }
+        return undefined;
       });
 
       const { result } = renderHook(
@@ -173,6 +175,7 @@ describe("useFilterState", () => {
         if (url === "/user/default-presets") {
           return Promise.resolve({ defaults: { scene: "preset-1" } });
         }
+        return undefined;
       });
 
       const { result } = renderHook(

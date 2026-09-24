@@ -218,7 +218,7 @@ export const findPerformers = async (
         matchCount: performers.length,
         instances: performers.map((p) => p.instanceId),
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple performers found with ID ${ids[0]}. Specify instance_id parameter.`,
         matches: performers.map((p) => ({
@@ -227,6 +227,7 @@ export const findPerformers = async (
           instanceId: p.instanceId,
         })),
       });
+      return;
     }
 
     // For single-entity requests (detail pages), hydrate tags

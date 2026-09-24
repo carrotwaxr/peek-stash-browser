@@ -209,14 +209,16 @@ export const authenticateToken = async (
     req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
   if (!token) {
-    return res.status(401).json({ error: "Access denied. No token provided." });
+    res.status(401).json({ error: "Access denied. No token provided." });
+    return;
   }
 
   try {
     const decoded = verifyToken(token as string);
     const user = await lookupUser({ id: decoded.id });
     if (!user) {
-      return res.status(401).json({ error: "Invalid token. User not found." });
+      res.status(401).json({ error: "Invalid token. User not found." });
+      return;
     }
     const { passwordChangedAt, ...requestUser } = user;
 
@@ -226,9 +228,8 @@ export const authenticateToken = async (
       tokenPredatesPasswordChange(decoded.iat, passwordChangedAt) ||
       sessionPastMaxAge(decoded.authTime, decoded.iat)
     ) {
-      return res
-        .status(401)
-        .json({ error: "Session expired. Please log in again." });
+      res.status(401).json({ error: "Session expired. Please log in again." });
+      return;
     }
 
     // Check if token needs refresh (older than threshold)
@@ -260,7 +261,8 @@ export const requireAdmin = (
 ) => {
   const authReq = req as AuthenticatedRequest;
   if (!authReq.user || authReq.user.role !== "ADMIN") {
-    return res.status(403).json({ error: "Admin access required." });
+    res.status(403).json({ error: "Admin access required." });
+    return;
   }
   next();
 };
@@ -272,11 +274,12 @@ export const requireCacheReady = async (
 ) => {
   const isReady = await stashEntityService.isReady();
   if (!isReady) {
-    return res.status(503).json({
+    res.status(503).json({
       error: "Server is initializing",
       message: "Cache is still loading. Please wait a moment and try again.",
       ready: false,
     });
+    return;
   }
   next();
 };

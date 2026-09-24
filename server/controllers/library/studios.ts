@@ -131,7 +131,7 @@ export const findStudios = async (
         matchCount: studios.length,
         instances: studios.map((s) => s.instanceId),
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple studios found with ID ${ids[0]}. Specify instance_id parameter.`,
         matches: studios.map((s) => ({
@@ -140,6 +140,7 @@ export const findStudios = async (
           instanceId: s.instanceId,
         })),
       });
+      return;
     }
 
     // For single-entity requests (detail pages), get studio with computed counts

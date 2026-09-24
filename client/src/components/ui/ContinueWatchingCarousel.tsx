@@ -162,6 +162,7 @@ const ContinueWatchingCarousel = ({
       onInitializing(false);
       setRetryCount(0);
     }
+    return undefined;
   }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
 
   const handleSceneClick = (scene: NormalizedScene) => {

@@ -160,26 +160,32 @@ export const usePlaylistMediaKeys = ({
       "0": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 0);
+        return undefined;
       },
       "1": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 10);
+        return undefined;
       },
       "2": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 20);
+        return undefined;
       },
       "3": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 30);
+        return undefined;
       },
       "4": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 40);
+        return undefined;
       },
       "5": () => {
         if (isInRatingMode()) return false;
         jumpToPercentage(playerRef, 50);
+        return undefined;
       },
       "6": () => jumpToPercentage(playerRef, 60),
       "7": () => jumpToPercentage(playerRef, 70),
@@ -249,6 +255,7 @@ export const usePlaylistMediaKeys = ({
             player.requestFullscreen();
           }
         }
+        return undefined;
       },
 
       // ============================================================================

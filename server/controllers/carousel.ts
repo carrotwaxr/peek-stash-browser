@@ -53,7 +53,8 @@ export const getUserCarousels = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const carousels = await prisma.userCarousel.findMany({
@@ -82,7 +83,8 @@ export const getCarousel = async (
     const carouselId = req.params.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const carousel = await prisma.userCarousel.findFirst({
@@ -93,7 +95,8 @@ export const getCarousel = async (
     });
 
     if (!carousel) {
-      return res.status(404).json({ error: "Carousel not found" });
+      res.status(404).json({ error: "Carousel not found" });
+      return;
     }
 
     res.json({ carousel });
@@ -116,18 +119,21 @@ export const createCarousel = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { title, icon, rules, sort, direction } = req.body;
 
     // Validate required fields
     if (!title || title.trim() === "") {
-      return res.status(400).json({ error: "Title is required" });
+      res.status(400).json({ error: "Title is required" });
+      return;
     }
 
     if (!rules || typeof rules !== "object") {
-      return res.status(400).json({ error: "Rules are required" });
+      res.status(400).json({ error: "Rules are required" });
+      return;
     }
 
     // Check carousel limit
@@ -136,9 +142,10 @@ export const createCarousel = async (
     });
 
     if (count >= MAX_CAROUSELS_PER_USER) {
-      return res.status(400).json({
+      res.status(400).json({
         error: `Maximum ${MAX_CAROUSELS_PER_USER} custom carousels allowed`,
       });
+      return;
     }
 
     const carousel = await prisma.userCarousel.create({
@@ -202,7 +209,8 @@ export const updateCarousel = async (
     const carouselId = req.params.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { title, icon, rules, sort, direction } = req.body;
@@ -216,12 +224,14 @@ export const updateCarousel = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Carousel not found" });
+      res.status(404).json({ error: "Carousel not found" });
+      return;
     }
 
     // Validate title if provided
     if (title !== undefined && title.trim() === "") {
-      return res.status(400).json({ error: "Title cannot be empty" });
+      res.status(400).json({ error: "Title cannot be empty" });
+      return;
     }
 
     const carousel = await prisma.userCarousel.update({
@@ -258,7 +268,8 @@ export const deleteCarousel = async (
     const carouselId = req.params.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Check ownership
@@ -270,7 +281,8 @@ export const deleteCarousel = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Carousel not found" });
+      res.status(404).json({ error: "Carousel not found" });
+      return;
     }
 
     await prisma.userCarousel.delete({
@@ -298,13 +310,15 @@ export const previewCarousel = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { rules, sort, direction } = req.body;
 
     if (!rules || typeof rules !== "object") {
-      return res.status(400).json({ error: "Rules are required" });
+      res.status(400).json({ error: "Rules are required" });
+      return;
     }
 
     // Execute the carousel query
@@ -519,7 +533,8 @@ export const executeCarouselById = async (
     const carouselId = req.params.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Get the carousel
@@ -531,7 +546,8 @@ export const executeCarouselById = async (
     });
 
     if (!carousel) {
-      return res.status(404).json({ error: "Carousel not found" });
+      res.status(404).json({ error: "Carousel not found" });
+      return;
     }
 
     // Execute the query

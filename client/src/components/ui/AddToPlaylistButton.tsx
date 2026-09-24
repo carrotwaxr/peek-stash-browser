@@ -89,6 +89,7 @@ const AddToPlaylistButton = ({
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
+    return undefined;
   }, [showMenu]);
 
   const loadPlaylists = async () => {

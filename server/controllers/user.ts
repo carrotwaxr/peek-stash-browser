@@ -119,7 +119,8 @@ export const getUserSettings = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -149,7 +150,8 @@ export const getUserSettings = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     res.json({
@@ -203,7 +205,8 @@ export const updateUserSettings = async (
     const currentUserRole = req.user?.role;
 
     if (!currentUserId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Determine target user ID
@@ -213,9 +216,10 @@ export const updateUserSettings = async (
     if (req.params.userId) {
       // Admin updating another user's settings (or admin updating themselves via ServerSettings)
       if (currentUserRole !== "ADMIN") {
-        return res
+        res
           .status(403)
           .json({ error: "Only admins can update other users' settings" });
+        return;
       }
       targetUserId = parseInt(req.params.userId);
     }
@@ -244,21 +248,24 @@ export const updateUserSettings = async (
     const validPreviewQualities = ["sprite", "webp", "mp4"];
 
     if (preferredQuality && !validQualities.includes(preferredQuality)) {
-      return res.status(400).json({ error: "Invalid quality setting" });
+      res.status(400).json({ error: "Invalid quality setting" });
+      return;
     }
 
     if (
       preferredPlaybackMode &&
       !validPlaybackModes.includes(preferredPlaybackMode)
     ) {
-      return res.status(400).json({ error: "Invalid playback mode setting" });
+      res.status(400).json({ error: "Invalid playback mode setting" });
+      return;
     }
 
     if (
       preferredPreviewQuality &&
       !validPreviewQualities.includes(preferredPreviewQuality)
     ) {
-      return res.status(400).json({ error: "Invalid preview quality setting" });
+      res.status(400).json({ error: "Invalid preview quality setting" });
+      return;
     }
 
     // Validate minimumPlayPercent if provided
@@ -268,9 +275,10 @@ export const updateUserSettings = async (
         minimumPlayPercent < 0 ||
         minimumPlayPercent > 100
       ) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Minimum play percent must be a number between 0 and 100",
         });
+        return;
       }
     }
 
@@ -278,22 +286,23 @@ export const updateUserSettings = async (
     // own settings (/settings) or on anyone's (/:userId/settings); a regular
     // user's own request is refused.
     if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
-      return res.status(400).json({ error: "Sync to Stash must be a boolean" });
+      res.status(400).json({ error: "Sync to Stash must be a boolean" });
+      return;
     }
 
     if (syncToStash !== undefined && currentUserRole !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Only admins can change Sync to Stash" });
+      res.status(403).json({ error: "Only admins can change Sync to Stash" });
+      return;
     }
 
     // Validate unitPreference if provided
     if (unitPreference !== undefined) {
       const validUnits = ["metric", "imperial"];
       if (!validUnits.includes(unitPreference)) {
-        return res
+        res
           .status(400)
           .json({ error: "Unit preference must be 'metric' or 'imperial'" });
+        return;
       }
     }
 
@@ -301,18 +310,20 @@ export const updateUserSettings = async (
     if (wallPlayback !== undefined) {
       const validWallPlayback = ["autoplay", "hover", "static"];
       if (!validWallPlayback.includes(wallPlayback)) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Wall playback must be 'autoplay', 'hover', or 'static'",
         });
+        return;
       }
     }
 
     // Validate carousel preferences if provided
     if (carouselPreferences !== undefined) {
       if (!Array.isArray(carouselPreferences)) {
-        return res
+        res
           .status(400)
           .json({ error: "Carousel preferences must be an array" });
+        return;
       }
 
       // Validate each carousel preference
@@ -322,9 +333,8 @@ export const updateUserSettings = async (
           typeof pref.enabled !== "boolean" ||
           typeof pref.order !== "number"
         ) {
-          return res
-            .status(400)
-            .json({ error: "Invalid carousel preference format" });
+          res.status(400).json({ error: "Invalid carousel preference format" });
+          return;
         }
       }
     }
@@ -332,9 +342,10 @@ export const updateUserSettings = async (
     // Validate navigation preferences if provided
     if (navPreferences !== undefined) {
       if (!Array.isArray(navPreferences)) {
-        return res
+        res
           .status(400)
           .json({ error: "Navigation preferences must be an array" });
+        return;
       }
 
       // Validate each navigation preference
@@ -344,9 +355,10 @@ export const updateUserSettings = async (
           typeof pref.enabled !== "boolean" ||
           typeof pref.order !== "number"
         ) {
-          return res
+          res
             .status(400)
             .json({ error: "Invalid navigation preference format" });
+          return;
         }
       }
     }
@@ -357,9 +369,10 @@ export const updateUserSettings = async (
         tableColumnDefaults !== null &&
         typeof tableColumnDefaults !== "object"
       ) {
-        return res
+        res
           .status(400)
           .json({ error: "Table column defaults must be an object or null" });
+        return;
       }
 
       if (tableColumnDefaults !== null) {
@@ -377,9 +390,10 @@ export const updateUserSettings = async (
           tableColumnDefaults
         )) {
           if (!validEntityTypes.includes(entityType)) {
-            return res.status(400).json({
+            res.status(400).json({
               error: `Invalid entity type in table column defaults: ${entityType}`,
             });
+            return;
           }
 
           const typedConfig = config;
@@ -388,23 +402,26 @@ export const updateUserSettings = async (
             !Array.isArray(typedConfig.visible) ||
             !Array.isArray(typedConfig.order)
           ) {
-            return res.status(400).json({
+            res.status(400).json({
               error: `Invalid table column config for ${entityType}: must have visible and order arrays`,
             });
+            return;
           }
 
           // Validate that arrays contain strings
           if (
             !typedConfig.visible.every((v: unknown) => typeof v === "string")
           ) {
-            return res.status(400).json({
+            res.status(400).json({
               error: `Invalid visible columns for ${entityType}: must be string array`,
             });
+            return;
           }
           if (!typedConfig.order.every((v: unknown) => typeof v === "string")) {
-            return res.status(400).json({
+            res.status(400).json({
               error: `Invalid column order for ${entityType}: must be string array`,
             });
+            return;
           }
         }
       }
@@ -416,9 +433,10 @@ export const updateUserSettings = async (
         cardDisplaySettings !== null &&
         typeof cardDisplaySettings !== "object"
       ) {
-        return res
+        res
           .status(400)
           .json({ error: "Card display settings must be an object or null" });
+        return;
       }
     }
 
@@ -428,9 +446,10 @@ export const updateUserSettings = async (
         landingPagePreference !== null &&
         typeof landingPagePreference !== "object"
       ) {
-        return res
+        res
           .status(400)
           .json({ error: "Landing page preference must be an object or null" });
+        return;
       }
 
       if (landingPagePreference !== null) {
@@ -438,15 +457,17 @@ export const updateUserSettings = async (
           !Array.isArray(landingPagePreference.pages) ||
           landingPagePreference.pages.length === 0
         ) {
-          return res.status(400).json({
+          res.status(400).json({
             error: "Landing page preference must have at least one page",
           });
+          return;
         }
 
         if (typeof landingPagePreference.randomize !== "boolean") {
-          return res.status(400).json({
+          res.status(400).json({
             error: "Landing page preference randomize must be a boolean",
           });
+          return;
         }
 
         // Validate minimum pages for randomize mode
@@ -454,9 +475,10 @@ export const updateUserSettings = async (
           landingPagePreference.randomize &&
           landingPagePreference.pages.length < 2
         ) {
-          return res
+          res
             .status(400)
             .json({ error: "Random mode requires at least 2 pages selected" });
+          return;
         }
 
         // Validate page keys
@@ -476,9 +498,10 @@ export const updateUserSettings = async (
         ];
         for (const pageKey of landingPagePreference.pages) {
           if (!validPageKeys.includes(pageKey)) {
-            return res
+            res
               .status(400)
               .json({ error: `Invalid landing page key: ${pageKey}` });
+            return;
           }
         }
       }
@@ -488,10 +511,11 @@ export const updateUserSettings = async (
     if (lightboxDoubleTapAction !== undefined) {
       const validActions = ["favorite", "o_counter", "fullscreen"];
       if (!validActions.includes(lightboxDoubleTapAction)) {
-        return res.status(400).json({
+        res.status(400).json({
           error:
             "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'",
         });
+        return;
       }
     }
 
@@ -598,22 +622,23 @@ export const changePassword = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res
+      res
         .status(400)
         .json({ error: "Current password and new password are required" });
+      return;
     }
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res
-        .status(400)
-        .json({ error: passwordValidation.errors.join(". ") });
+      res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return;
     }
 
     // Get current user with password
@@ -622,13 +647,15 @@ export const changePassword = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Verify current password
     const validPassword = await bcrypt.compare(currentPassword, user.password);
     if (!validPassword) {
-      return res.status(401).json({ error: "Current password is incorrect" });
+      res.status(401).json({ error: "Current password is incorrect" });
+      return;
     }
 
     // Signs out every other session of this user
@@ -666,7 +693,8 @@ export const getRecoveryKey = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -675,7 +703,8 @@ export const getRecoveryKey = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
@@ -700,13 +729,15 @@ export const regenerateRecoveryKey = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Express 5 leaves req.body undefined when the request has no body
     const { currentPassword } = req.body ?? {};
     if (!currentPassword) {
-      return res.status(400).json({ error: "Current password is required" });
+      res.status(400).json({ error: "Current password is required" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -715,13 +746,15 @@ export const regenerateRecoveryKey = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // 400, not 401: the client treats 401 as a lost session
     const validPassword = await bcrypt.compare(currentPassword, user.password);
     if (!validPassword) {
-      return res.status(400).json({ error: "Current password is incorrect" });
+      res.status(400).json({ error: "Current password is incorrect" });
+      return;
     }
 
     const newKey = generateRecoveryKey();
@@ -749,9 +782,8 @@ export const getAllUsers = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const users = await prisma.user.findMany({
@@ -800,29 +832,25 @@ export const createUser = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const { username, password, role } = req.body;
 
     if (!username || !password) {
-      return res
-        .status(400)
-        .json({ error: "Username and password are required" });
+      res.status(400).json({ error: "Username and password are required" });
+      return;
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 6 characters" });
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
     }
 
     if (role && role !== "ADMIN" && role !== "USER") {
-      return res
-        .status(400)
-        .json({ error: "Role must be either ADMIN or USER" });
+      res.status(400).json({ error: "Role must be either ADMIN or USER" });
+      return;
     }
 
     // Check if username already exists
@@ -831,7 +859,8 @@ export const createUser = async (
     });
 
     if (existingUser) {
-      return res.status(409).json({ error: "Username already exists" });
+      res.status(409).json({ error: "Username already exists" });
+      return;
     }
 
     // Hash password
@@ -872,21 +901,22 @@ export const deleteUser = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const { userId } = req.params;
     const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     // Prevent admin from deleting themselves
     if (userIdInt === req.user.id) {
-      return res.status(400).json({ error: "Cannot delete your own account" });
+      res.status(400).json({ error: "Cannot delete your own account" });
+      return;
     }
 
     // Check if user exists
@@ -895,7 +925,8 @@ export const deleteUser = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Delete user (cascades will handle related data)
@@ -922,9 +953,8 @@ export const updateUserRole = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const { userId } = req.params;
@@ -932,18 +962,19 @@ export const updateUserRole = async (
     const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     if (!role || (role !== "ADMIN" && role !== "USER")) {
-      return res
-        .status(400)
-        .json({ error: "Role must be either ADMIN or USER" });
+      res.status(400).json({ error: "Role must be either ADMIN or USER" });
+      return;
     }
 
     // Prevent admin from changing their own role
     if (userIdInt === req.user.id) {
-      return res.status(400).json({ error: "Cannot change your own role" });
+      res.status(400).json({ error: "Cannot change your own role" });
+      return;
     }
 
     // Update user role
@@ -982,7 +1013,8 @@ export const getFilterPresets = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -993,7 +1025,8 @@ export const getFilterPresets = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Return empty preset structure if none exists
@@ -1024,7 +1057,8 @@ export const saveFilterPreset = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const {
@@ -1044,7 +1078,8 @@ export const saveFilterPreset = async (
 
     // Validate required fields
     if (!artifactType || !name || !filters || !sort || !direction) {
-      return res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Missing required fields" });
+      return;
     }
 
     // Validate artifact type
@@ -1059,7 +1094,8 @@ export const saveFilterPreset = async (
       "clip",
     ];
     if (!validTypes.includes(artifactType)) {
-      return res.status(400).json({ error: "Invalid artifact type" });
+      res.status(400).json({ error: "Invalid artifact type" });
+      return;
     }
 
     // Validate context if provided (used for setAsDefault)
@@ -1079,7 +1115,8 @@ export const saveFilterPreset = async (
         "clip",
       ];
       if (!validContexts.includes(context)) {
-        return res.status(400).json({ error: "Invalid context" });
+        res.status(400).json({ error: "Invalid context" });
+        return;
       }
     }
 
@@ -1149,7 +1186,8 @@ export const deleteFilterPreset = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { artifactType, presetId } = req.params;
@@ -1166,7 +1204,8 @@ export const deleteFilterPreset = async (
       "clip",
     ];
     if (!artifactType || !validTypes.includes(artifactType)) {
-      return res.status(400).json({ error: "Invalid artifact type" });
+      res.status(400).json({ error: "Invalid artifact type" });
+      return;
     }
 
     // Get current presets and defaults
@@ -1176,7 +1215,8 @@ export const deleteFilterPreset = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     const currentPresets = (user.filterPresets as FilterPresets) || {};
@@ -1222,7 +1262,8 @@ export const getDefaultFilterPresets = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Get user's default presets
@@ -1234,7 +1275,8 @@ export const getDefaultFilterPresets = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Return empty object if no defaults set
@@ -1263,14 +1305,16 @@ export const setDefaultFilterPreset = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { context, presetId } = req.body;
 
     // Validate required fields
     if (!context) {
-      return res.status(400).json({ error: "Missing context" });
+      res.status(400).json({ error: "Missing context" });
+      return;
     }
 
     // Validate context - includes base types and scene grid contexts
@@ -1287,7 +1331,8 @@ export const setDefaultFilterPreset = async (
       "gallery",
     ];
     if (!validContexts.includes(context)) {
-      return res.status(400).json({ error: "Invalid context" });
+      res.status(400).json({ error: "Invalid context" });
+      return;
     }
 
     // Get current defaults
@@ -1297,7 +1342,8 @@ export const setDefaultFilterPreset = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     const currentDefaults =
@@ -1313,7 +1359,8 @@ export const setDefaultFilterPreset = async (
       );
 
       if (!presetExists) {
-        return res.status(400).json({ error: "Preset not found" });
+        res.status(400).json({ error: "Preset not found" });
+        return;
       }
 
       currentDefaults[context] = presetId;
@@ -1354,12 +1401,14 @@ export const syncFromStash = async (
 
     // Only admins can sync
     if (!currentUser || currentUser.role !== "ADMIN") {
-      return res.status(403).json({ error: "Only admins can sync from Stash" });
+      res.status(403).json({ error: "Only admins can sync from Stash" });
+      return;
     }
 
     const targetUserId = parseInt(req.params.userId);
     if (isNaN(targetUserId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     // Get sync options from request body
@@ -1390,7 +1439,8 @@ export const syncFromStash = async (
     const allInstances = stashInstanceManager.getAll();
 
     if (allInstances.length === 0) {
-      return res.status(400).json({ error: "No Stash instances configured" });
+      res.status(400).json({ error: "No Stash instances configured" });
+      return;
     }
 
     const stats = {
@@ -2171,14 +2221,16 @@ export const getUserRestrictions = async (
     const requestingUser = req.user;
 
     if (!requestingUser) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res
+      res
         .status(403)
         .json({ error: "Only administrators can manage content restrictions" });
+      return;
     }
 
     const restrictions = await prisma.userContentRestriction.findMany({
@@ -2208,19 +2260,22 @@ export const updateUserRestrictions = async (
     const requestingUser = req.user;
 
     if (!requestingUser) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res
+      res
         .status(403)
         .json({ error: "Only administrators can manage content restrictions" });
+      return;
     }
 
     const targetUserId = parseInt(userId);
     if (isNaN(targetUserId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     // Restrictions apply to non-admin accounts only (item 13)
@@ -2229,17 +2284,20 @@ export const updateUserRestrictions = async (
       select: { role: true },
     });
     if (!target) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
     if (!restrictionsApplyTo(target.role)) {
-      return res
+      res
         .status(400)
         .json({ error: "Content restrictions do not apply to administrators" });
+      return;
     }
 
     // Validate input
     if (!Array.isArray(restrictions)) {
-      return res.status(400).json({ error: "Restrictions must be an array" });
+      res.status(400).json({ error: "Restrictions must be an array" });
+      return;
     }
 
     // Validate each restriction: one row per (type, mode), a non-empty list of
@@ -2256,40 +2314,44 @@ export const updateUserRestrictions = async (
       if (
         !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
       ) {
-        return res
-          .status(400)
-          .json({ error: `Invalid entity type: ${r.entityType}` });
+        res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
+        return;
       }
       if (!(RESTRICTION_MODES as readonly string[]).includes(r.mode)) {
-        return res.status(400).json({ error: `Invalid mode: ${r.mode}` });
+        res.status(400).json({ error: `Invalid mode: ${r.mode}` });
+        return;
       }
       const mode = r.mode as RestrictionMode;
       const pair = `${r.entityType}:${mode}`;
       if (seenPairs.has(pair)) {
-        return res.status(400).json({
+        res.status(400).json({
           error: `Only one ${mode} list is allowed for ${r.entityType}`,
         });
+        return;
       }
       seenPairs.add(pair);
       if (!Array.isArray(r.entityIds) || r.entityIds.length === 0) {
-        return res.status(400).json({
+        res.status(400).json({
           error: `entityIds for ${r.entityType} ${mode} must be a non-empty array`,
         });
+        return;
       }
       for (const id of r.entityIds) {
         if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
-          return res.status(400).json({
+          res.status(400).json({
             error: `Invalid entity id in ${r.entityType} ${mode}: ${id}`,
           });
+          return;
         }
       }
       if (
         r.restrictEmpty !== undefined &&
         typeof r.restrictEmpty !== "boolean"
       ) {
-        return res
+        res
           .status(400)
           .json({ error: "restrictEmpty must be a boolean when present" });
+        return;
       }
       rows.push({
         userId: targetUserId,
@@ -2344,14 +2406,16 @@ export const deleteUserRestrictions = async (
     const requestingUser = req.user;
 
     if (!requestingUser) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res
+      res
         .status(403)
         .json({ error: "Only administrators can manage content restrictions" });
+      return;
     }
 
     const targetUserId = parseInt(userId);
@@ -2524,17 +2588,20 @@ export const hideEntity = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const target = await validateHideTarget(req.body);
     if (!target.ok) {
-      return res.status(400).json({ error: target.error });
+      res.status(400).json({ error: target.error });
+      return;
     }
 
     const [access] = await checkHideTargets(userId, [target]);
     if (access === "not-found") {
-      return res.status(404).json({ error: "Not found" });
+      res.status(404).json({ error: "Not found" });
+      return;
     }
 
     if (access === "hide") {
@@ -2569,15 +2636,15 @@ export const unhideEntity = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { entityType, entityId } = req.params;
 
     if (!entityType || !entityId) {
-      return res
-        .status(400)
-        .json({ error: "Entity type and entity ID are required" });
+      res.status(400).json({ error: "Entity type and entity ID are required" });
+      return;
     }
 
     // Validate entity type
@@ -2591,7 +2658,8 @@ export const unhideEntity = async (
       "image",
     ];
     if (!validTypes.includes(entityType as EntityType)) {
-      return res.status(400).json({ error: "Invalid entity type" });
+      res.status(400).json({ error: "Invalid entity type" });
+      return;
     }
 
     // Import service
@@ -2606,7 +2674,8 @@ export const unhideEntity = async (
         await import("../services/StashInstanceManager.js");
       const instance = stashInstanceManager.getConfig(unhideInstanceId);
       if (!instance) {
-        return res.status(400).json({ error: "Invalid instanceId" });
+        res.status(400).json({ error: "Invalid instanceId" });
+        return;
       }
     }
 
@@ -2638,7 +2707,8 @@ export const unhideAllEntities = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { entityType } = req.query;
@@ -2655,7 +2725,8 @@ export const unhideAllEntities = async (
         "image",
       ];
       if (!validTypes.includes(entityType)) {
-        return res.status(400).json({ error: "Invalid entity type" });
+        res.status(400).json({ error: "Invalid entity type" });
+        return;
       }
     }
 
@@ -2690,7 +2761,8 @@ export const getHiddenEntities = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { entityType } = req.query;
@@ -2707,7 +2779,8 @@ export const getHiddenEntities = async (
         "image",
       ];
       if (!validTypes.includes(entityType as EntityType)) {
-        return res.status(400).json({ error: "Invalid entity type" });
+        res.status(400).json({ error: "Invalid entity type" });
+        return;
       }
     }
 
@@ -2740,7 +2813,8 @@ export const getHiddenEntityIds = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Import service
@@ -2780,15 +2854,15 @@ export const hideEntities = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { entities } = req.body;
 
     if (!Array.isArray(entities) || entities.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "entities must be a non-empty array" });
+      res.status(400).json({ error: "entities must be a non-empty array" });
+      return;
     }
 
     // Validate and check every entity before hiding any
@@ -2796,18 +2870,16 @@ export const hideEntities = async (
     for (const [i, entity] of entities.entries()) {
       const target = await validateHideTarget(entity);
       if (!target.ok) {
-        return res
-          .status(400)
-          .json({ error: `entities[${i}]: ${target.error}` });
+        res.status(400).json({ error: `entities[${i}]: ${target.error}` });
+        return;
       }
       targets.push(target);
     }
     const access = await checkHideTargets(userId, targets);
     const notFound = access.indexOf("not-found");
     if (notFound !== -1) {
-      return res
-        .status(404)
-        .json({ error: `entities[${notFound}]: Not found` });
+      res.status(404).json({ error: `entities[${notFound}]: Not found` });
+      return;
     }
     const toHide = targets.filter((_, i) => access[i] === "hide");
 
@@ -2861,15 +2933,17 @@ export const updateHideConfirmation = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { hideConfirmationDisabled } = req.body;
 
     if (typeof hideConfirmationDisabled !== "boolean") {
-      return res
+      res
         .status(400)
         .json({ error: "hideConfirmationDisabled must be a boolean" });
+      return;
     }
 
     await prisma.user.update({
@@ -2897,13 +2971,15 @@ export const getUserPermissions = async (
 ) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ error: "Not authenticated" });
+      res.status(401).json({ error: "Not authenticated" });
+      return;
     }
 
     const permissions = await resolveUserPermissions(req.user.id);
 
     if (!permissions) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     res.json({ permissions });
@@ -2924,20 +3000,21 @@ export const getAnyUserPermissions = async (
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     const permissions = await resolveUserPermissions(userId);
 
     if (!permissions) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     res.json({ permissions });
@@ -2961,14 +3038,14 @@ export const updateUserPermissionOverrides = async (
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     const {
@@ -3000,7 +3077,8 @@ export const updateUserPermissionOverrides = async (
         updates.canDownloadPlaylistsOverride = playlistsOverride;
 
       if (Object.keys(updates).length === 0) {
-        return res.status(400).json({ error: "No valid updates provided" });
+        res.status(400).json({ error: "No valid updates provided" });
+        return;
       }
 
       await prisma.user.update({
@@ -3012,7 +3090,7 @@ export const updateUserPermissionOverrides = async (
       const permissions = await resolveUserPermissions(userId);
       res.json({ success: true, permissions });
     } catch {
-      return res.status(400).json({
+      res.status(400).json({
         error: "Invalid override value - must be true, false, or null",
       });
     }
@@ -3033,14 +3111,14 @@ export const getUserGroupMemberships = async (
 ) => {
   try {
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     const memberships = await prisma.userGroupMembership.findMany({
@@ -3080,9 +3158,8 @@ export const adminResetPassword = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const { userId } = req.params;
@@ -3090,18 +3167,19 @@ export const adminResetPassword = async (
     const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     if (!newPassword) {
-      return res.status(400).json({ error: "New password is required" });
+      res.status(400).json({ error: "New password is required" });
+      return;
     }
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res
-        .status(400)
-        .json({ error: passwordValidation.errors.join(". ") });
+      res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return;
     }
 
     // Check if user exists
@@ -3110,7 +3188,8 @@ export const adminResetPassword = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Also signs the user out everywhere
@@ -3135,16 +3214,16 @@ export const adminRegenerateRecoveryKey = async (
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: Admin access required" });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
     }
 
     const { userId } = req.params;
     const userIdInt = parseInt(userId, 10);
 
     if (isNaN(userIdInt)) {
-      return res.status(400).json({ error: "Invalid user ID" });
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
     }
 
     // Check if user exists
@@ -3153,7 +3232,8 @@ export const adminRegenerateRecoveryKey = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Only the hash is stored; the admin passes the key on
@@ -3194,7 +3274,8 @@ export const getUserStashInstances = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Get user's selected instances
@@ -3244,12 +3325,14 @@ export const updateUserStashInstances = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { instanceIds } = req.body;
     if (!Array.isArray(instanceIds)) {
-      return res.status(400).json({ error: "instanceIds must be an array" });
+      res.status(400).json({ error: "instanceIds must be an array" });
+      return;
     }
 
     // Validate that all instance IDs exist and are enabled
@@ -3266,10 +3349,11 @@ export const updateUserStashInstances = async (
       const invalidIds = instanceIds.filter((id) => !validIds.has(id));
 
       if (invalidIds.length > 0) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid instance IDs",
           details: invalidIds.join(", "),
         });
+        return;
       }
     }
 
@@ -3320,7 +3404,8 @@ export const getSetupStatus = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -3331,7 +3416,8 @@ export const getSetupStatus = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Get enabled instances for selection
@@ -3371,7 +3457,8 @@ export const completeSetup = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { selectedInstanceIds } = req.body;
@@ -3386,9 +3473,10 @@ export const completeSetup = async (
         !Array.isArray(selectedInstanceIds) ||
         selectedInstanceIds.length === 0
       ) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "At least one Stash instance must be selected",
         });
+        return;
       }
 
       // Validate instance IDs
@@ -3406,10 +3494,11 @@ export const completeSetup = async (
       );
 
       if (invalidIds.length > 0) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid instance IDs",
           details: invalidIds.join(", "),
         });
+        return;
       }
 
       // Delete existing selections and create new ones

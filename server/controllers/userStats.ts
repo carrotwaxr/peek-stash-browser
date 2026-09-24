@@ -55,7 +55,8 @@ export async function getUserStats(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     // Parse sortBy query parameter

@@ -54,10 +54,11 @@ router.post(
       const { type = "incremental" } = (req.body || {}) as { type?: string };
 
       if (stashSyncService.isSyncing()) {
-        return res.status(409).json({
+        res.status(409).json({
           error: "Sync already in progress",
           message: "Please wait for the current sync to complete",
         });
+        return;
       }
 
       // Start sync in background, don't wait for completion
@@ -94,10 +95,11 @@ router.post(
   authenticated((req, res) => {
     try {
       if (!stashSyncService.isSyncing()) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "No sync in progress",
           message: "There is no sync to abort",
         });
+        return;
       }
 
       stashSyncService.abort();
@@ -130,10 +132,11 @@ router.post(
       const status = await stashSyncService.getSyncStatus();
 
       if (!status.settings.enablePluginWebhook) {
-        return res.status(403).json({
+        res.status(403).json({
           error: "Webhook disabled",
           message: "Plugin webhook is not enabled in sync settings",
         });
+        return;
       }
 
       const { entity, id, action } = (req.body || {}) as {
@@ -143,10 +146,11 @@ router.post(
       };
 
       if (!entity || !id || !action) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Missing required fields",
           message: "Request must include entity, id, and action",
         });
+        return;
       }
 
       const validEntities = [
@@ -160,19 +164,21 @@ router.post(
       ] as const;
       type SyncEntityType = (typeof validEntities)[number];
       if (!validEntities.includes(entity as SyncEntityType)) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid entity type",
           message: `Entity must be one of: ${validEntities.join(", ")}`,
         });
+        return;
       }
 
       const validActions = ["create", "update", "delete"] as const;
       type SyncAction = (typeof validActions)[number];
       if (!validActions.includes(action as SyncAction)) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid action",
           message: `Action must be one of: ${validActions.join(", ")}`,
         });
+        return;
       }
 
       // Queue single entity sync (don't wait for completion)
@@ -205,10 +211,11 @@ router.post(
   authenticated(async (req, res) => {
     try {
       if (stashSyncService.isSyncing()) {
-        return res.status(409).json({
+        res.status(409).json({
           error: "Sync in progress",
           message: "Cannot re-probe clips while a sync is running",
         });
+        return;
       }
 
       const { instanceId } = (req.body || {}) as { instanceId?: string };
@@ -220,17 +227,19 @@ router.post(
       if (!targetInstanceId) {
         const enabledInstances = stashInstanceManager.getAllEnabled();
         if (enabledInstances.length === 0) {
-          return res.status(400).json({
+          res.status(400).json({
             error: "No Stash instances",
             message: "No enabled Stash instances found",
           });
+          return;
         }
         const firstInstance = enabledInstances[0];
         if (!firstInstance) {
-          return res.status(400).json({
+          res.status(400).json({
             error: "No Stash instances",
             message: "No enabled Stash instances found",
           });
+          return;
         }
         targetInstanceId = firstInstance.id;
       }
@@ -284,11 +293,12 @@ router.put(
           syncIntervalMinutes < 5 ||
           syncIntervalMinutes > 10080
         ) {
-          return res.status(400).json({
+          res.status(400).json({
             error: "Invalid sync interval",
             message:
               "Sync interval must be between 5 and 10080 minutes (7 days)",
           });
+          return;
         }
       }
 
