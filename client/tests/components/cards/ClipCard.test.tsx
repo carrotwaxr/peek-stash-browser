@@ -2,7 +2,9 @@ import { MemoryRouter } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ClipCard from "../../../src/components/cards/ClipCard";
+import { AuthContext } from "../../../src/contexts/AuthContextProvider";
 import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext";
+import { createAuthValue } from "../../testUtils";
 
 // Mock the api module
 vi.mock("../../../src/api", () => ({
@@ -28,7 +30,9 @@ const mockClip = {
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <MemoryRouter>
-      <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>
+      <AuthContext.Provider value={createAuthValue()}>
+        <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>
+      </AuthContext.Provider>
     </MemoryRouter>
   );
 };

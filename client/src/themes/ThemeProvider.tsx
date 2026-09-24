@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { apiGet } from "../api";
+import { useAuth } from "../hooks/useAuth";
 import {
   type CustomTheme,
   ThemeContext,
@@ -12,6 +13,7 @@ import {
 } from "./themes";
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [allThemes, setAllThemes] = useState<Record<string, ThemeDefinition>>(
     builtInThemes as Record<string, ThemeDefinition>
@@ -23,13 +25,25 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     return saved || defaultTheme;
   });
 
-  // Load custom themes from API on mount
+  // Load custom themes once auth has resolved, and only for a signed-in user:
+  // a signed-out request answers 401, and apiFetch then reloads the page at
+  // /login while the router is already redirecting there.
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setCustomThemes([]);
+      setAllThemes(builtInThemes as Record<string, ThemeDefinition>);
+      return;
+    }
+
+    // A response that lands after sign-out (or a later load) is dropped.
+    let cancelled = false;
     const loadCustomThemes = async () => {
       try {
         const data = (await apiGet("/themes/custom")) as {
           themes?: CustomTheme[];
         };
+        if (cancelled) return;
         const themes = data.themes || [];
         setCustomThemes(themes);
 
@@ -48,14 +62,18 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         });
         setAllThemes(merged);
       } catch (error) {
-        // If API call fails (not authenticated, etc.), just use built-in themes
+        if (cancelled) return;
+        // If the API call fails, just use built-in themes
         console.error("Failed to load custom themes:", error);
         setAllThemes(builtInThemes as Record<string, ThemeDefinition>);
       }
     };
 
     loadCustomThemes();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authLoading]);
 
   const changeTheme = (themeKey: string) => {
     if (allThemes[themeKey]) {

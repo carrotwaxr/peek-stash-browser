@@ -20,6 +20,6 @@ It reads the URL once on mount and afterwards only writes it; reading it back ag
 
 ## Structure
 
-- Provider order in `App.tsx`: Theme, Auth, QueryClient, Config, UnitPreference, TVMode, CardDisplaySettings. `ThemeProvider` sits outside `AuthProvider` yet fetches the authenticated `/themes/custom` on mount; `ConfigProvider` reads only the public `/setup/status`.
+- Provider order in `App.tsx`: Auth, Theme, QueryClient, Config, UnitPreference, TVMode, CardDisplaySettings. The root providers load user data only while `isAuthenticated`; `ConfigProvider` reads only the public `/setup/status`.
 - New code uses theme CSS variables (`var(--bg-card)`, `var(--accent-primary)`). About 50 Tailwind palette classes remain, mostly spinners, grays and status colors; don't copy them. The `visual-style` skill has the full system.
 - `src/utils/filterConfig.ts` (3,600+ lines) defines every entity's filter options, so a change there reaches every search page.

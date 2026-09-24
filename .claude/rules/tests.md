@@ -13,7 +13,7 @@ paths:
 
 - Vitest with happy-dom and React Testing Library. The tree mirrors `src/`; `@/` is `src/` and `@tests/` is `tests/`.
 - `tests/setup.ts` stubs `matchMedia`, `IntersectionObserver`, `ResizeObserver` and `scrollIntoView`.
-- `tests/testUtils.tsx` has `createQueryWrapper`, needed by anything that renders a TanStack Query hook (including `OCounterButton`). `renderWithProviders` wraps only a router, with no QueryClient. Also there: `createRouterWrapper`, `createMockApi`, `setupPresetMocks` for `useFilterState`, `flushPromises`, `waitForCondition`.
+- `tests/testUtils.tsx` has `createQueryWrapper`, needed by anything that renders a TanStack Query hook (including `OCounterButton`). `renderWithProviders` wraps only a router, with no QueryClient. Also there: `createAuthValue` for code that calls `useAuth`, `createRouterWrapper`, `createMockApi`, `setupPresetMocks` for `useFilterState`, `flushPromises`, `waitForCondition`.
 - Page tests mock `@/api/hooks` rather than the network.
 
 ## Server unit (`server/tests/`)
