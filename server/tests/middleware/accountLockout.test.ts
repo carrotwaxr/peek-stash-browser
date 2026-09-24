@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetForTesting,
   _trackedCountForTesting,
+  _trimScansForTesting,
   checkAccountLockout,
   clearFailedAttempts,
   recordFailedAttempt,
@@ -9,6 +10,9 @@ import {
 
 const IP = "10.0.0.1";
 const LOCKOUT_MS = 15 * 60 * 1000;
+const MAX_RECORDS = 10_000;
+// A full map is trimmed to 90% of the cap, then the new record is added
+const AFTER_TRIM = MAX_RECORDS * 0.9 + 1;
 
 const lockOut = (username: string, ip: string) => {
   for (let i = 0; i < 5; i++) {
@@ -191,6 +195,105 @@ describe("accountLockout", () => {
 
       expect(_trackedCountForTesting()).toBe(1);
       expect(checkAccountLockout("fresh", IP).locked).toBe(false);
+    });
+
+    it("never tracks more than 10,000 records under a flood of fresh failures", () => {
+      let most = 0;
+      for (let i = 0; i < MAX_RECORDS + 500; i++) {
+        recordFailedAttempt(`flood${i}`, IP);
+        most = Math.max(most, _trackedCountForTesting());
+      }
+
+      expect(most).toBe(MAX_RECORDS);
+      expect(_trackedCountForTesting()).toBeLessThanOrEqual(MAX_RECORDS);
+    });
+
+    it("keeps a lock through a flood of unlocked failures from many addresses", () => {
+      lockOut("admin", IP);
+
+      let most = 0;
+      for (let i = 0; i < MAX_RECORDS + 500; i++) {
+        recordFailedAttempt("guess", `10.1.${(i >> 8) & 255}.${i & 255}`);
+        most = Math.max(most, _trackedCountForTesting());
+      }
+
+      expect(most).toBeLessThanOrEqual(MAX_RECORDS);
+      expect(checkAccountLockout("admin", IP).locked).toBe(true);
+    });
+
+    it("trims a full map to 90% in one scan, oldest failure first", () => {
+      for (let i = 0; i < MAX_RECORDS; i++) {
+        recordFailedAttempt(`user${i}`, IP);
+      }
+      expect(_trimScansForTesting()).toBe(0);
+
+      recordFailedAttempt("next", IP);
+      expect(_trimScansForTesting()).toBe(1);
+      expect(_trackedCountForTesting()).toBe(AFTER_TRIM);
+
+      // The next new record fits without another scan
+      recordFailedAttempt("another", IP);
+      expect(_trimScansForTesting()).toBe(1);
+
+      // The oldest 1,000 went; four more failures lock only a kept record
+      for (let i = 0; i < 4; i++) {
+        recordFailedAttempt("user999", IP);
+        recordFailedAttempt("user1000", IP);
+      }
+      expect(checkAccountLockout("user999", IP).locked).toBe(false);
+      expect(checkAccountLockout("user1000", IP).locked).toBe(true);
+    });
+
+    it("still trims to 90% when stale records free only a little room", () => {
+      for (let i = 0; i < 10; i++) {
+        recordFailedAttempt(`old${i}`, IP);
+      }
+      vi.advanceTimersByTime(LOCKOUT_MS + 1000);
+      for (let i = 10; i < MAX_RECORDS; i++) {
+        recordFailedAttempt(`user${i}`, IP);
+      }
+
+      recordFailedAttempt("next", IP);
+
+      // Dropping the 10 stale records alone would leave a scan per call
+      expect(_trackedCountForTesting()).toBe(AFTER_TRIM);
+      recordFailedAttempt("another", IP);
+      expect(_trimScansForTesting()).toBe(1);
+    });
+
+    it("orders records by their last failure", () => {
+      for (let i = 0; i < 3; i++) {
+        recordFailedAttempt("early", IP);
+      }
+      for (let i = 1; i < MAX_RECORDS; i++) {
+        recordFailedAttempt(`user${i}`, IP);
+      }
+      // A fourth failure makes "early" the newest record
+      recordFailedAttempt("early", IP);
+
+      recordFailedAttempt("next", IP);
+      expect(_trackedCountForTesting()).toBe(AFTER_TRIM);
+
+      // The record survived the trim, so a fifth failure locks it
+      recordFailedAttempt("early", IP);
+      expect(checkAccountLockout("early", IP).locked).toBe(true);
+    });
+
+    it("evicts locks only when every record is locked, oldest lock first", () => {
+      for (let i = 0; i < MAX_RECORDS; i++) {
+        lockOut(`user${i}`, IP);
+      }
+      expect(_trackedCountForTesting()).toBe(MAX_RECORDS);
+
+      recordFailedAttempt("next", IP);
+
+      expect(_trackedCountForTesting()).toBe(AFTER_TRIM);
+      expect(checkAccountLockout("user0", IP).locked).toBe(false);
+      expect(checkAccountLockout("user999", IP).locked).toBe(false);
+      expect(checkAccountLockout("user1000", IP).locked).toBe(true);
+      expect(checkAccountLockout(`user${MAX_RECORDS - 1}`, IP).locked).toBe(
+        true
+      );
     });
   });
 });
