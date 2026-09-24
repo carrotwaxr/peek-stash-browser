@@ -610,10 +610,10 @@ const SearchControls = ({
 
       // Find which section this filter belongs to
       let sectionKey = null;
-      for (let i = 0; i < filterOptions.length; i++) {
-        if (filterOptions[i].type === "section-header") {
-          sectionKey = filterOptions[i].key;
-        } else if (filterOptions[i].key === filterKey) {
+      for (const option of filterOptions) {
+        if (option.type === "section-header") {
+          sectionKey = option.key;
+        } else if (option.key === filterKey) {
           break;
         }
       }
@@ -1281,8 +1281,9 @@ const SearchControls = ({
           // Check if this filter should be hidden (if in a collapsed section)
           let currentSectionKey = null;
           for (let i = index - 1; i >= 0; i--) {
-            if (filterOptions[i].type === "section-header") {
-              currentSectionKey = filterOptions[i].key;
+            const option = filterOptions[i];
+            if (option?.type === "section-header") {
+              currentSectionKey = option.key;
               break;
             }
           }

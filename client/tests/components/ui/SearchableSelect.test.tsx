@@ -7,6 +7,7 @@
  * lookups on multi-instance setups.
  */
 import { fireEvent, render, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import SearchableSelect from "../../../src/components/ui/SearchableSelect";
@@ -386,7 +387,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
     });
 
     // Should deduplicate: only one "82" in the ids array
-    const callArg = mockFindTags.mock.calls[0][0];
+    const callArg = must(mockFindTags.mock.calls[0])[0];
     expect(callArg.ids).toEqual(["82"]);
   });
 

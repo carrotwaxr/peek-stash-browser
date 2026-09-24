@@ -16,6 +16,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import component after mocks
 import UserEditModal from "../../../src/components/settings/UserEditModal";
@@ -229,7 +230,7 @@ describe("UserEditModal", () => {
       // Find the Friends checkbox (unchecked initially since user is only in group 1)
       const checkboxes = screen.getAllByRole("checkbox");
       // Friends is the second group (index 1)
-      fireEvent.click(checkboxes[1]);
+      fireEvent.click(must(checkboxes[1]));
 
       await waitFor(() => {
         expect(mockAddGroupMember).toHaveBeenCalledWith("2", 1);
@@ -262,7 +263,7 @@ describe("UserEditModal", () => {
       // Find the Family checkbox (checked initially since user is in group 1)
       const checkboxes = screen.getAllByRole("checkbox");
       // Family is the first group (index 0)
-      fireEvent.click(checkboxes[0]);
+      fireEvent.click(must(checkboxes[0]));
 
       await waitFor(() => {
         expect(mockRemoveGroupMember).toHaveBeenCalledWith("1", "1");
@@ -726,7 +727,7 @@ describe("UserEditModal", () => {
       await waitFor(() =>
         expect(screen.getAllByRole("checkbox")[0]).toBeChecked()
       );
-      fireEvent.click(screen.getAllByRole("checkbox")[1]);
+      fireEvent.click(must(screen.getAllByRole("checkbox")[1]));
       await waitFor(() => expect(mockAddGroupMember).toHaveBeenCalled());
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
@@ -812,7 +813,7 @@ describe("UserEditModal", () => {
       const selects = screen
         .getAllByRole("combobox")
         .filter((el) => el.id !== "userRole");
-      fireEvent.change(selects[1], { target: { value: "true" } });
+      fireEvent.change(must(selects[1]), { target: { value: "true" } });
 
       await waitFor(() =>
         expect(onMessage).toHaveBeenCalledWith(
@@ -838,7 +839,7 @@ describe("UserEditModal", () => {
       const selects = screen
         .getAllByRole("combobox")
         .filter((el) => el.id !== "userRole");
-      fireEvent.change(selects[index], { target: { value } });
+      fireEvent.change(must(selects[index]), { target: { value } });
 
       await waitFor(() =>
         expect(mockUpdateUserPermissionOverrides).toHaveBeenCalledWith(
@@ -856,7 +857,7 @@ describe("UserEditModal", () => {
       const selects = screen
         .getAllByRole("combobox")
         .filter((el) => el.id !== "userRole");
-      fireEvent.change(selects[0], { target: { value: "false" } });
+      fireEvent.change(must(selects[0]), { target: { value: "false" } });
 
       expect(
         await screen.findByText("Failed to update permission")
@@ -898,7 +899,7 @@ describe("UserEditModal", () => {
       await waitFor(() =>
         expect(screen.getAllByRole("checkbox")[0]).toBeChecked()
       );
-      fireEvent.click(screen.getAllByRole("checkbox")[1]);
+      fireEvent.click(must(screen.getAllByRole("checkbox")[1]));
 
       expect(await screen.findByText("Group gone")).toBeInTheDocument();
       expect(screen.getAllByRole("checkbox")[1]).not.toBeChecked();

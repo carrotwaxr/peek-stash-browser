@@ -317,7 +317,7 @@ export const useLazyLoad = (
     try {
       observer = new IntersectionObserver(
         ([entry]) => {
-          if (entry.isIntersecting) {
+          if (entry?.isIntersecting) {
             setShouldLoad(true);
             observer.disconnect();
           }

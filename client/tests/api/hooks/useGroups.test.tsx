@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useGroupDetail, useGroupList } from "../../../src/api/hooks/useGroups";
 import { libraryApi } from "../../../src/api/library";
@@ -81,8 +82,9 @@ describe("useGroupList", () => {
     renderHook(() => useGroupList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findGroups).toHaveBeenCalled());
-    const callArgs = (libraryApi.findGroups as ReturnType<typeof vi.fn>).mock
-      .calls[0];
+    const callArgs = must(
+      (libraryApi.findGroups as ReturnType<typeof vi.fn>).mock.calls[0]
+    );
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 

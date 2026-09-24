@@ -181,9 +181,11 @@ export function useTimelineState({
           ) {
             const mostRecent =
               response.distribution[response.distribution.length - 1];
-            setSelectedPeriod(
-              parsePeriodToDateRange(mostRecent.period, zoomLevel)
-            );
+            if (mostRecent) {
+              setSelectedPeriod(
+                parsePeriodToDateRange(mostRecent.period, zoomLevel)
+              );
+            }
           }
 
           hasInitiallyLoaded.current = true;

@@ -1,12 +1,12 @@
 import videojs from "video.js";
 import "videojs-vr";
 
-const VRType: Record<string, string> = {
+const VRType = {
   LR180: "180 LR",
   TB360: "360 TB",
   Mono360: "360 Mono",
   Off: "Off",
-};
+} as const;
 
 const vrTypeProjection: Record<string, string> = {
   [VRType.LR180]: "180_LR",

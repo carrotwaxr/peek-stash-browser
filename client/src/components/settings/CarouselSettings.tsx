@@ -142,10 +142,11 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     if (index === 0) return;
 
     const newPreferences = [...preferences];
-    [newPreferences[index - 1], newPreferences[index]] = [
-      newPreferences[index],
-      newPreferences[index - 1],
-    ];
+    const current = newPreferences[index];
+    const previous = newPreferences[index - 1];
+    if (!current || !previous) return;
+    newPreferences[index - 1] = current;
+    newPreferences[index] = previous;
 
     const reordered = newPreferences.map((pref, idx) => ({
       ...pref,
@@ -160,10 +161,11 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     if (index === preferences.length - 1) return;
 
     const newPreferences = [...preferences];
-    [newPreferences[index], newPreferences[index + 1]] = [
-      newPreferences[index + 1],
-      newPreferences[index],
-    ];
+    const current = newPreferences[index];
+    const next = newPreferences[index + 1];
+    if (!current || !next) return;
+    newPreferences[index] = next;
+    newPreferences[index + 1] = current;
 
     const reordered = newPreferences.map((pref, idx) => ({
       ...pref,

@@ -8,10 +8,16 @@ import { WebVTT } from "videojs-vtt.js";
  * Parses VTT files with sprite coordinates and displays thumbnails using CSS background positioning.
  */
 
+interface VttThumbnailStyle {
+  background: string;
+  width: string;
+  height: string;
+}
+
 interface VttDataItem {
   start: number;
   end: number;
-  style: Record<string, string> | null;
+  style: VttThumbnailStyle | null;
 }
 
 class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
@@ -22,7 +28,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   thumbnailHolder: HTMLElement | null;
   showing: boolean;
   vttData: VttDataItem[] | null;
-  lastStyle: Record<string, string> | null;
+  lastStyle: VttThumbnailStyle | null;
   isTouching: boolean;
   declare player: any;
 
@@ -109,15 +115,17 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   }
 
   getBaseUrl() {
-    return [
-      window.location.protocol,
-      "//",
-      window.location.hostname,
-      window.location.port ? ":" + window.location.port : "",
-      window.location.pathname,
-    ]
-      .join("")
-      .split(/([^/]*)$/gi)[0];
+    return (
+      [
+        window.location.protocol,
+        "//",
+        window.location.hostname,
+        window.location.port ? ":" + window.location.port : "",
+        window.location.pathname,
+      ]
+        .join("")
+        .split(/([^/]*)$/gi)[0] ?? ""
+    ); // split() always returns a first part
   }
 
   getVttFile(url: string): Promise<string> {
@@ -199,6 +207,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     if (!progressBar || !this.isTouching) return;
 
     const touch = e.touches[0];
+    if (!touch) return;
     const rect = progressBar.getBoundingClientRect();
     const x = touch.clientX - rect.left;
     const percent = x / rect.width;

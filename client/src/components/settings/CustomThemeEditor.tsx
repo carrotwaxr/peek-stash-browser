@@ -191,14 +191,16 @@ const CustomThemeEditor = ({
     setConfig((prev) => {
       const newConfig = { ...prev };
       const keys = path.split(".");
+      const lastKey = keys.pop();
+      if (lastKey === undefined) return newConfig;
       let current: Record<string, unknown> = newConfig as unknown as Record<
         string,
         unknown
       >;
-      for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]] as Record<string, unknown>;
+      for (const key of keys) {
+        current = current[key] as Record<string, unknown>;
       }
-      current[keys[keys.length - 1]] = value;
+      current[lastKey] = value;
       return newConfig;
     });
   };

@@ -60,8 +60,7 @@ const FolderView = ({
 
   // Sync parent when path changes from any source (handler, browser back/forward, URL edit)
   useEffect(() => {
-    const currentTagId =
-      currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+    const currentTagId = currentPath[currentPath.length - 1] ?? null;
     if (currentTagId !== lastNotifiedTagRef.current) {
       lastNotifiedTagRef.current = currentTagId;
       onFolderPathChange?.(currentTagId);
@@ -83,8 +82,7 @@ const FolderView = ({
         return next;
       });
       // Eagerly notify parent (effect will deduplicate via ref)
-      const currentTagId =
-        newPath.length > 0 ? newPath[newPath.length - 1] : null;
+      const currentTagId = newPath[newPath.length - 1] ?? null;
       lastNotifiedTagRef.current = currentTagId;
       onFolderPathChange?.(currentTagId);
     },

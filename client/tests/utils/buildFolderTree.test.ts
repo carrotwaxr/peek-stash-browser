@@ -1,3 +1,4 @@
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
   UNTAGGED_FOLDER_ID,
@@ -53,8 +54,8 @@ describe("buildFolderTree - root level behavior", () => {
     const result = buildFolderTree(items, tags, []);
 
     expect(result.folders).toHaveLength(2);
-    expect(result.folders[0].name).toBe("Action");
-    expect(result.folders[1].name).toBe("Comedy");
+    expect(must(result.folders[0]).name).toBe("Action");
+    expect(must(result.folders[1]).name).toBe("Comedy");
     // NO loose items at root
     expect(result.items).toHaveLength(0);
   });
@@ -121,7 +122,7 @@ describe("buildFolderTree - root level behavior", () => {
 
     // Only action should appear - comedy is truly empty
     expect(result.folders).toHaveLength(1);
-    expect(result.folders[0].name).toBe("Action");
+    expect(must(result.folders[0]).name).toBe("Action");
   });
 
   it("sorts folders alphabetically", () => {
@@ -138,9 +139,9 @@ describe("buildFolderTree - root level behavior", () => {
 
     const result = buildFolderTree(items, tags, []);
 
-    expect(result.folders[0].name).toBe("Apple");
-    expect(result.folders[1].name).toBe("Mango");
-    expect(result.folders[2].name).toBe("Zebra");
+    expect(must(result.folders[0]).name).toBe("Apple");
+    expect(must(result.folders[1]).name).toBe("Mango");
+    expect(must(result.folders[2]).name).toBe("Zebra");
   });
 
   it("items with non-root tags only do NOT appear at root", () => {
@@ -164,8 +165,8 @@ describe("buildFolderTree - root level behavior", () => {
     // Item should be inside Genre folder (via descendant), not loose at root
     expect(result.items).toHaveLength(0);
     expect(result.folders).toHaveLength(1);
-    expect(result.folders[0].name).toBe("Genre");
-    expect(result.folders[0].totalCount).toBe(1);
+    expect(must(result.folders[0]).name).toBe("Genre");
+    expect(must(result.folders[0]).totalCount).toBe(1);
   });
 });
 
@@ -237,12 +238,12 @@ describe("buildFolderTree - inside tag folder", () => {
 
     // Slasher folder should contain scene2 and scene3
     expect(result.folders).toHaveLength(1);
-    expect(result.folders[0].name).toBe("Slasher");
-    expect(result.folders[0].totalCount).toBe(2);
+    expect(must(result.folders[0]).name).toBe("Slasher");
+    expect(must(result.folders[0]).totalCount).toBe(2);
 
     // Only scene1 should be a loose item (has Horror but not Slasher)
     expect(result.items).toHaveLength(1);
-    expect(result.items[0].id).toBe("scene1");
+    expect(must(result.items[0]).id).toBe("scene1");
   });
 
   it("item with parent+child tag only appears in child folder", () => {
@@ -266,7 +267,7 @@ describe("buildFolderTree - inside tag folder", () => {
     // Item should NOT be loose at Horror level
     expect(result.items).toHaveLength(0);
     // Item should be in Slasher folder
-    expect(result.folders[0].totalCount).toBe(1);
+    expect(must(result.folders[0]).totalCount).toBe(1);
   });
 
   it("item appears in all child folders when it has multiple child tags", () => {
@@ -321,7 +322,7 @@ describe("buildFolderTree - inside tag folder", () => {
 
     // Should be in Slasher folder
     expect(result.folders).toHaveLength(1);
-    expect(result.folders[0].totalCount).toBe(1);
+    expect(must(result.folders[0]).totalCount).toBe(1);
     // Should NOT be loose at Horror level (doesn't have Horror tag directly)
     expect(result.items).toHaveLength(0);
   });
@@ -352,20 +353,20 @@ describe("buildFolderTree - deep hierarchy", () => {
 
     // At root: item is in Genre folder (via descendant)
     const rootResult = buildFolderTree(items, tags, []);
-    expect(rootResult.folders[0].name).toBe("Genre");
-    expect(rootResult.folders[0].totalCount).toBe(1);
+    expect(must(rootResult.folders[0]).name).toBe("Genre");
+    expect(must(rootResult.folders[0]).totalCount).toBe(1);
     expect(rootResult.items).toHaveLength(0);
 
     // At Genre level: item is in Horror folder
     const genreResult = buildFolderTree(items, tags, ["genre"]);
-    expect(genreResult.folders[0].name).toBe("Horror");
-    expect(genreResult.folders[0].totalCount).toBe(1);
+    expect(must(genreResult.folders[0]).name).toBe("Horror");
+    expect(must(genreResult.folders[0]).totalCount).toBe(1);
     expect(genreResult.items).toHaveLength(0);
 
     // At Horror level: item is in Slasher folder
     const horrorResult = buildFolderTree(items, tags, ["genre", "horror"]);
-    expect(horrorResult.folders[0].name).toBe("Slasher");
-    expect(horrorResult.folders[0].totalCount).toBe(1);
+    expect(must(horrorResult.folders[0]).name).toBe("Slasher");
+    expect(must(horrorResult.folders[0]).totalCount).toBe(1);
     expect(horrorResult.items).toHaveLength(0);
 
     // At Slasher level: item appears as loose item (has the tag directly, no children)
@@ -376,7 +377,7 @@ describe("buildFolderTree - deep hierarchy", () => {
     ]);
     expect(slasherResult.folders).toHaveLength(0);
     expect(slasherResult.items).toHaveLength(1);
-    expect(slasherResult.items[0].id).toBe("scene1");
+    expect(must(slasherResult.items[0]).id).toBe("scene1");
   });
 });
 
@@ -417,7 +418,7 @@ describe("buildFolderTree - folder thumbnails", () => {
 
     const result = buildFolderTree(items, [tag], []);
 
-    expect(result.folders[0].thumbnail).toBe("/tag-image.jpg");
+    expect(must(result.folders[0]).thumbnail).toBe("/tag-image.jpg");
   });
 
   it("falls back to first item thumbnail", () => {
@@ -426,7 +427,7 @@ describe("buildFolderTree - folder thumbnails", () => {
 
     const result = buildFolderTree(items, [tag], []);
 
-    expect(result.folders[0].thumbnail).toBe("/thumb/scene1.jpg");
+    expect(must(result.folders[0]).thumbnail).toBe("/thumb/scene1.jpg");
   });
 });
 
@@ -442,7 +443,7 @@ describe("buildFolderTree - getItemThumbnail variants", () => {
 
     const result = buildFolderTree([galleryItem], tags, []);
 
-    expect(result.folders[0].thumbnail).toBe("/gallery-thumb.jpg");
+    expect(must(result.folders[0]).thumbnail).toBe("/gallery-thumb.jpg");
   });
 
   it("uses image paths.thumbnail as folder thumbnail", () => {
@@ -456,7 +457,7 @@ describe("buildFolderTree - getItemThumbnail variants", () => {
 
     const result = buildFolderTree([imageItem], tags, []);
 
-    expect(result.folders[0].thumbnail).toBe("/img-thumb.jpg");
+    expect(must(result.folders[0]).thumbnail).toBe("/img-thumb.jpg");
   });
 
   it("returns null thumbnail when item has no thumbnail paths", () => {
@@ -470,7 +471,7 @@ describe("buildFolderTree - getItemThumbnail variants", () => {
     const result = buildFolderTree([item], tags, []);
 
     // tag has no image_path, item has no thumbnail -> null thumbnail
-    expect(result.folders[0].thumbnail).toBeNull();
+    expect(must(result.folders[0]).thumbnail).toBeNull();
   });
 });
 
@@ -492,7 +493,7 @@ describe("buildFolderTree - container tags", () => {
 
     // Parent should still show because it has children (is a container)
     expect(result.folders).toHaveLength(1);
-    expect(result.folders[0].name).toBe("Parent");
+    expect(must(result.folders[0]).name).toBe("Parent");
   });
 });
 
@@ -504,8 +505,8 @@ describe("buildFolderTree - breadcrumbs with unknown tags", () => {
     const result = buildFolderTree(items, tags, ["known", "missing-tag"]);
 
     expect(result.breadcrumbs).toHaveLength(2);
-    expect(result.breadcrumbs[0].name).toBe("Known Tag");
-    expect(result.breadcrumbs[1].name).toBe("Unknown");
+    expect(must(result.breadcrumbs[0]).name).toBe("Known Tag");
+    expect(must(result.breadcrumbs[1]).name).toBe("Unknown");
   });
 });
 
@@ -522,7 +523,7 @@ describe("buildFolderTree - untagged items not shown inside folders", () => {
     // Untagged items should not appear as loose items inside a tag folder
     // scene1 has the current tag directly and no child tags -> loose item
     expect(result.items).toHaveLength(1);
-    expect(result.items[0].id).toBe("scene1");
+    expect(must(result.items[0]).id).toBe("scene1");
   });
 });
 

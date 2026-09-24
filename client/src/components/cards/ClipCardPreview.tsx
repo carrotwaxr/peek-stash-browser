@@ -41,7 +41,7 @@ const ClipCardPreview = ({ clip, objectFit = "cover" }: Props) => {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry?.isIntersecting) {
           setShouldLoadScreenshot(true);
           observer.disconnect();
         }

@@ -1,3 +1,4 @@
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
   ENTITY_DISPLAY_CONFIG,
@@ -70,7 +71,7 @@ describe("entityDisplayConfig", () => {
     it("returns clip view modes (grid only)", () => {
       const modes = getViewModes("clip") as ViewMode[];
       expect(modes).toHaveLength(1);
-      expect(modes[0].id).toBe("grid");
+      expect(must(modes[0]).id).toBe("grid");
     });
 
     it("returns group view modes", () => {

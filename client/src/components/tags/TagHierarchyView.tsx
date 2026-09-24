@@ -160,19 +160,25 @@ const TagHierarchyView = ({
       if (currentIndex === -1) return;
 
       const currentNode = visibleNodes[currentIndex];
+      if (!currentNode) return;
+      // Undefined at either end of the list
+      const nextNode = visibleNodes[currentIndex + 1];
+      const previousNode = visibleNodes[currentIndex - 1];
+      const firstNode = visibleNodes[0];
+      const lastNode = visibleNodes[visibleNodes.length - 1];
 
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          if (currentIndex < visibleNodes.length - 1) {
-            setFocusedId(visibleNodes[currentIndex + 1].id as string);
+          if (nextNode) {
+            setFocusedId(nextNode.id as string);
           }
           break;
 
         case "ArrowUp":
           e.preventDefault();
-          if (currentIndex > 0) {
-            setFocusedId(visibleNodes[currentIndex - 1].id as string);
+          if (previousNode) {
+            setFocusedId(previousNode.id as string);
           }
           break;
 
@@ -181,9 +187,9 @@ const TagHierarchyView = ({
           if ((currentNode.children as unknown[] | undefined)?.length) {
             if (!expandedIds.has(currentNode.id as string)) {
               handleToggle(currentNode.id as string);
-            } else if (currentIndex < visibleNodes.length - 1) {
+            } else if (nextNode) {
               // Already expanded, move to first child
-              setFocusedId(visibleNodes[currentIndex + 1].id as string);
+              setFocusedId(nextNode.id as string);
             }
           }
           break;
@@ -205,12 +211,16 @@ const TagHierarchyView = ({
 
         case "Home":
           e.preventDefault();
-          setFocusedId(visibleNodes[0].id as string);
+          if (firstNode) {
+            setFocusedId(firstNode.id as string);
+          }
           break;
 
         case "End":
           e.preventDefault();
-          setFocusedId(visibleNodes[visibleNodes.length - 1].id as string);
+          if (lastNode) {
+            setFocusedId(lastNode.id as string);
+          }
           break;
 
         default:
@@ -222,8 +232,9 @@ const TagHierarchyView = ({
 
   // Set initial focus
   useEffect(() => {
-    if (visibleNodes.length > 0 && !focusedId) {
-      setFocusedId(visibleNodes[0].id as string);
+    const firstNode = visibleNodes[0];
+    if (firstNode && !focusedId) {
+      setFocusedId(firstNode.id as string);
     }
   }, [visibleNodes, focusedId]);
 

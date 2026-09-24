@@ -9,6 +9,7 @@
  */
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Pagination from "../../../src/components/ui/Pagination";
 
@@ -250,7 +251,7 @@ describe("Pagination", () => {
 
       // Find dropdown and select page 5
       const comboboxes = screen.getAllByRole("combobox");
-      const pageSelect = comboboxes[0]; // First combobox is page selector
+      const pageSelect = must(comboboxes[0]); // First combobox is page selector
       await user.selectOptions(pageSelect, "5");
 
       expect(onPageChange).toHaveBeenCalledWith(5);

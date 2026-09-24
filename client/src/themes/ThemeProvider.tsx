@@ -136,10 +136,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     currentTheme,
     changeTheme,
     theme: allThemes[currentTheme],
-    availableThemes: Object.keys(allThemes).map((key) => ({
+    availableThemes: Object.entries(allThemes).map(([key, theme]) => ({
       key,
-      name: allThemes[key].name,
-      isCustom: allThemes[key].isCustom || false,
+      name: theme.name,
+      isCustom: theme.isCustom || false,
     })),
     customThemes,
     refreshCustomThemes,

@@ -4,6 +4,7 @@
  * The server sends keyless Peek proxy paths; the player uses them unchanged
  * and only marks which ones need the transcode time offset.
  */
+import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import { buildPlayerSources } from "@/components/video-player/playerSources";
 
@@ -132,10 +133,12 @@ describe("buildPlayerSources", () => {
   });
 
   it("leaves duration unset for a scene with no files", () => {
-    const [source] = buildPlayerSources({
-      id: "5",
-      sceneStreams: [{ url: "/api/scene/5/proxy-stream/stream" }],
-    });
+    const source = must(
+      buildPlayerSources({
+        id: "5",
+        sceneStreams: [{ url: "/api/scene/5/proxy-stream/stream" }],
+      })[0]
+    );
 
     expect(source.duration).toBeUndefined();
     expect(source.offset).toBe(false);

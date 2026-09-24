@@ -151,7 +151,8 @@ const Lightbox = ({
   // When we navigate across a page boundary, we store the current image ID as stale.
   // We refuse to show any image with this ID, preventing the flash of the wrong image
   // while waiting for the new page's data to arrive.
-  const staleImageIdRef = useRef<string | null>(null);
+  // Holds undefined when the boundary is crossed with no image at the index
+  const staleImageIdRef = useRef<string | null | undefined>(null);
 
   // Check if current image is stale (should not be displayed)
   const isShowingStaleImage =
@@ -1090,7 +1091,7 @@ const Lightbox = ({
       <MetadataDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        image={currentImage}
+        image={currentImage ?? null}
         rating={rating}
         isFavorite={isFavorite}
         oCounter={oCounter}

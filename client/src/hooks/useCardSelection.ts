@@ -82,6 +82,7 @@ export const useCardSelection = ({
         return;
 
       const touch = e.touches[0];
+      if (!touch) return;
       startPosRef.current = { x: touch.clientX, y: touch.clientY };
       hasMovedRef.current = false;
 
@@ -96,8 +97,8 @@ export const useCardSelection = ({
   );
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (longPressTimerRef.current && e.touches.length > 0) {
-      const touch = e.touches[0];
+    const touch = e.touches[0];
+    if (longPressTimerRef.current && touch) {
       const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
       const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
       const moveThreshold = 10;

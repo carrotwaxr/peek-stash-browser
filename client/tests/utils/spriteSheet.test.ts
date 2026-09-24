@@ -1,3 +1,4 @@
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchAndParseVTT,
@@ -114,8 +115,8 @@ describe("spriteSheet utilities", () => {
 
       const cues = await fetchAndParseVTT("http://example.com/long.vtt");
       expect(cues).toHaveLength(1);
-      expect(cues[0].startTime).toBe(5400); // 1h 30m = 5400s
-      expect(cues[0].endTime).toBe(5405);
+      expect(must(cues[0]).startTime).toBe(5400); // 1h 30m = 5400s
+      expect(must(cues[0]).endTime).toBe(5405);
     });
   });
 
@@ -171,9 +172,9 @@ describe("spriteSheet utilities", () => {
       const result = getEvenlySpacedSprites(cues, 3);
       expect(result).toHaveLength(3);
       // step = floor(15/3) = 5, indices 0, 5, 10
-      expect(result[0].x).toBe(0);
-      expect(result[1].x).toBe(800); // index 5 * 160
-      expect(result[2].x).toBe(1600); // index 10 * 160
+      expect(must(result[0]).x).toBe(0);
+      expect(must(result[1]).x).toBe(800); // index 5 * 160
+      expect(must(result[2]).x).toBe(1600); // index 10 * 160
     });
 
     it("returns exactly count sprites when cues are divisible", () => {

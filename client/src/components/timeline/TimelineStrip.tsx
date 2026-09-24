@@ -245,12 +245,12 @@ function TimelineStrip({
     });
 
     // Calculate end indices for each marker (where the next context starts)
-    for (let i = 0; i < markers.length; i++) {
-      markers[i].endIndex =
-        i < markers.length - 1
-          ? markers[i + 1].index - 1
-          : distribution.length - 1;
-    }
+    markers.forEach((marker, i) => {
+      const nextMarker = markers[i + 1];
+      marker.endIndex = nextMarker
+        ? nextMarker.index - 1
+        : distribution.length - 1;
+    });
 
     return markers;
   }, [distribution, zoomLevel]);
@@ -282,12 +282,14 @@ function TimelineStrip({
           setFocusedIndex(distribution.length - 1);
           break;
         case "Enter":
-        case " ":
+        case " ": {
           e.preventDefault();
-          if (focusedIndex >= 0 && focusedIndex < distribution.length) {
-            onSelectPeriod(distribution[focusedIndex].period);
+          const focused = distribution[focusedIndex];
+          if (focused) {
+            onSelectPeriod(focused.period);
           }
           break;
+        }
         default:
           if (onKeyboardNavigate) {
             onKeyboardNavigate(e);

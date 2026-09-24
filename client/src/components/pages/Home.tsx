@@ -458,7 +458,10 @@ const HomeCarousel = ({
     error,
   } = useQuery({
     queryKey,
-    queryFn: () => fetchFunction(),
+    queryFn: () => {
+      if (!fetchFunction) throw new Error(`Unknown carousel: ${fetchKey}`);
+      return fetchFunction();
+    },
   });
   const errorAny = error as (Error & { isInitializing?: boolean }) | null;
   // Handle server initialization state

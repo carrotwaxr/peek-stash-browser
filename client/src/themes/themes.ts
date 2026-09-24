@@ -256,8 +256,19 @@ export const themes = {
   },
 };
 
+interface FontOption {
+  value: string;
+  label: string;
+}
+
+/** Never empty: the first entry is a new custom theme's default */
+type FontOptionList = [FontOption, ...FontOption[]];
+
 // Available font options for custom theme creation
-export const fontOptions = {
+export const fontOptions: Record<
+  "brand" | "heading" | "body" | "mono",
+  FontOptionList
+> = {
   brand: [{ value: "'Lilita One', cursive", label: "Lilita One" }],
   heading: [
     {

@@ -17,7 +17,8 @@ export function formatDate(
     // For date-only strings (YYYY-MM-DD), format directly without Date object
     // to avoid timezone issues - publication dates don't have timezones
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split("-").map(Number);
+      // The pattern guarantees all three parts, so the defaults never apply
+      const [year = 0, month = 0, day = 0] = dateString.split("-").map(Number);
       const monthNames = [
         "Jan",
         "Feb",
@@ -58,7 +59,8 @@ export function formatRelativeTime(dateString: string) {
   try {
     // For date-only strings, calculate days difference directly
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split("-").map(Number);
+      // The pattern guarantees all three parts, so the defaults never apply
+      const [year = 0, month = 0, day = 0] = dateString.split("-").map(Number);
       const now = new Date();
       // Create "today" as just the date components to compare apples to apples
       const todayYear = now.getFullYear();

@@ -231,6 +231,7 @@ const PlaylistDetail = () => {
 
       const newScenes = [...scenes];
       const item = newScenes.splice(fromIndex, 1)[0];
+      if (!item) return;
       newScenes.splice(toIndex, 0, item);
       setScenes(newScenes);
     },
@@ -319,10 +320,11 @@ const PlaylistDetail = () => {
       repeat as (typeof repeatModes)[number]
     );
     const newRepeat = repeatModes[(currentIndex + 1) % repeatModes.length];
+    if (!newRepeat) return;
     try {
       await apiPut(`/playlists/${playlistId}`, { repeat: newRepeat });
       setRepeat(newRepeat);
-      const messages: Record<string, string> = {
+      const messages: Record<(typeof repeatModes)[number], string> = {
         none: "Repeat disabled",
         all: "Repeat all enabled",
         one: "Repeat one enabled",
@@ -335,7 +337,8 @@ const PlaylistDetail = () => {
 
   const playPlaylist = () => {
     // Play first scene in playlist with playlist context
-    if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
+    const firstScene = scenes[0];
+    if (firstScene && firstScene.exists && firstScene.scene) {
       const validScenes = scenes.filter((s) => s.exists && s.scene);
 
       // If shuffle is enabled, pick a random scene to start with
@@ -343,6 +346,7 @@ const PlaylistDetail = () => {
         ? Math.floor(Math.random() * validScenes.length)
         : 0;
       const startScene = validScenes[startIndex];
+      if (!startScene) return;
 
       navigate(
         getEntityPath(

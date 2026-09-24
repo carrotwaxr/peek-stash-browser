@@ -61,12 +61,13 @@ export const setupSubtitles = (
   const getDefaultLanguageCode = () => {
     let languageCode = window.navigator.language;
 
+    // split() always returns a first part, so the fallbacks never apply
     if (languageCode.indexOf("-") !== -1) {
-      languageCode = languageCode.split("-")[0];
+      languageCode = languageCode.split("-")[0] ?? languageCode;
     }
 
     if (languageCode.indexOf("_") !== -1) {
-      languageCode = languageCode.split("_")[0];
+      languageCode = languageCode.split("_")[0] ?? languageCode;
     }
 
     return languageCode;

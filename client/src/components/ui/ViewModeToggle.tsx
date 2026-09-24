@@ -116,6 +116,7 @@ const ViewModeToggle = ({
 
   const currentMode =
     effectiveModes.find((m) => m.id === localValue) || effectiveModes[0];
+  if (!currentMode) return null;
   const CurrentIcon = currentMode.icon;
 
   return (

@@ -71,11 +71,10 @@ export const useGlobalNavigation = () => {
   };
 
   // Register navigation keys (only work in nav mode)
-  Object.keys(navMap).forEach((key) => {
+  Object.entries(navMap).forEach(([key, path]) => {
     shortcuts[key] = () => {
       // Only handle if in navigation mode
       if (inNavModeRef.current) {
-        const path = navMap[key];
         navigate(path);
 
         // Exit navigation mode immediately after navigating

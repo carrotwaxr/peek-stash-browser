@@ -96,6 +96,7 @@ const MarqueeText = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry) return;
         setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.9);
       },
       {

@@ -174,164 +174,169 @@ const MergeRecoveryTab = () => {
               {orphans.length !== 1 ? "s" : ""} with user activity
             </p>
 
-            {orphans.map((orphan) => (
-              <div
-                key={orphan.id}
-                className="p-4 rounded-lg border"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  borderColor: "var(--border-color)",
-                }}
-              >
+            {orphans.map((orphan) => {
+              const orphanMatches = matches[orphan.id];
+              const manualTarget = manualTargetId[orphan.id];
+              return (
                 <div
-                  className="flex justify-between items-start cursor-pointer"
-                  onClick={() => handleExpand(orphan.id)}
+                  key={orphan.id}
+                  className="p-4 rounded-lg border"
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    borderColor: "var(--border-color)",
+                  }}
                 >
-                  <div>
-                    <h4
-                      className="font-medium"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {orphan.title || orphan.id}
-                    </h4>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Deleted: {new Date(orphan.deletedAt).toLocaleDateString()}
-                      {orphan.phash
-                        ? ` | PHASH: ${orphan.phash.substring(0, 12)}...`
-                        : " | No PHASH"}
-                    </p>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Activity: {orphan.totalPlayCount} plays
-                      {orphan.hasRatings && " | Has ratings"}
-                      {orphan.hasFavorites && " | Favorited"}
-                    </p>
+                  <div
+                    className="flex justify-between items-start cursor-pointer"
+                    onClick={() => handleExpand(orphan.id)}
+                  >
+                    <div>
+                      <h4
+                        className="font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {orphan.title || orphan.id}
+                      </h4>
+                      <p
+                        className="text-sm"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Deleted:{" "}
+                        {new Date(orphan.deletedAt).toLocaleDateString()}
+                        {orphan.phash
+                          ? ` | PHASH: ${orphan.phash.substring(0, 12)}...`
+                          : " | No PHASH"}
+                      </p>
+                      <p
+                        className="text-sm"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Activity: {orphan.totalPlayCount} plays
+                        {orphan.hasRatings && " | Has ratings"}
+                        {orphan.hasFavorites && " | Favorited"}
+                      </p>
+                    </div>
+                    {expandedOrphan === orphan.id ? (
+                      <ChevronDown
+                        size={20}
+                        style={{ color: "var(--text-secondary)" }}
+                      />
+                    ) : (
+                      <ChevronRight
+                        size={20}
+                        style={{ color: "var(--text-secondary)" }}
+                      />
+                    )}
                   </div>
-                  {expandedOrphan === orphan.id ? (
-                    <ChevronDown
-                      size={20}
-                      style={{ color: "var(--text-secondary)" }}
-                    />
-                  ) : (
-                    <ChevronRight
-                      size={20}
-                      style={{ color: "var(--text-secondary)" }}
-                    />
+
+                  {expandedOrphan === orphan.id && (
+                    <div
+                      className="mt-4 pt-4 border-t"
+                      style={{ borderColor: "var(--border-color)" }}
+                    >
+                      <p
+                        className="text-sm mb-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Potential matches:
+                      </p>
+
+                      {!orphanMatches ? (
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Loading matches...
+                        </p>
+                      ) : orphanMatches.length === 0 ? (
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          No PHASH matches found
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {orphanMatches.map((match) => (
+                            <div
+                              key={match.sceneId}
+                              className="flex justify-between items-center p-2 rounded"
+                              style={{ backgroundColor: "var(--bg-card)" }}
+                            >
+                              <div>
+                                <span style={{ color: "var(--text-primary)" }}>
+                                  {match.title || match.sceneId}
+                                </span>
+                                <span
+                                  className="ml-2 text-sm"
+                                  style={{ color: "var(--text-secondary)" }}
+                                >
+                                  ({match.similarity} match)
+                                  {match.recommended && " ★ Recommended"}
+                                </span>
+                              </div>
+                              <Button
+                                onClick={() =>
+                                  handleReconcile(orphan.id, match.sceneId)
+                                }
+                                disabled={processing === orphan.id}
+                                variant="primary"
+                                size="sm"
+                              >
+                                Transfer
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Manual scene ID"
+                          value={manualTarget || ""}
+                          onChange={(e) =>
+                            setManualTargetId((prev) => ({
+                              ...prev,
+                              [orphan.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 p-2 rounded border"
+                          style={{
+                            backgroundColor: "var(--bg-primary)",
+                            borderColor: "var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                        <Button
+                          onClick={() => {
+                            if (manualTarget) {
+                              handleReconcile(orphan.id, manualTarget);
+                            }
+                          }}
+                          disabled={!manualTarget || processing === orphan.id}
+                          variant="primary"
+                          size="sm"
+                        >
+                          Transfer
+                        </Button>
+                      </div>
+
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => handleDiscard(orphan.id)}
+                          disabled={processing === orphan.id}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Discard Activity
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {expandedOrphan === orphan.id && (
-                  <div
-                    className="mt-4 pt-4 border-t"
-                    style={{ borderColor: "var(--border-color)" }}
-                  >
-                    <p
-                      className="text-sm mb-2"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      Potential matches:
-                    </p>
-
-                    {!matches[orphan.id] ? (
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        Loading matches...
-                      </p>
-                    ) : matches[orphan.id].length === 0 ? (
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        No PHASH matches found
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {matches[orphan.id].map((match) => (
-                          <div
-                            key={match.sceneId}
-                            className="flex justify-between items-center p-2 rounded"
-                            style={{ backgroundColor: "var(--bg-card)" }}
-                          >
-                            <div>
-                              <span style={{ color: "var(--text-primary)" }}>
-                                {match.title || match.sceneId}
-                              </span>
-                              <span
-                                className="ml-2 text-sm"
-                                style={{ color: "var(--text-secondary)" }}
-                              >
-                                ({match.similarity} match)
-                                {match.recommended && " ★ Recommended"}
-                              </span>
-                            </div>
-                            <Button
-                              onClick={() =>
-                                handleReconcile(orphan.id, match.sceneId)
-                              }
-                              disabled={processing === orphan.id}
-                              variant="primary"
-                              size="sm"
-                            >
-                              Transfer
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Manual scene ID"
-                        value={manualTargetId[orphan.id] || ""}
-                        onChange={(e) =>
-                          setManualTargetId((prev) => ({
-                            ...prev,
-                            [orphan.id]: e.target.value,
-                          }))
-                        }
-                        className="flex-1 p-2 rounded border"
-                        style={{
-                          backgroundColor: "var(--bg-primary)",
-                          borderColor: "var(--border-color)",
-                          color: "var(--text-primary)",
-                        }}
-                      />
-                      <Button
-                        onClick={() =>
-                          handleReconcile(orphan.id, manualTargetId[orphan.id])
-                        }
-                        disabled={
-                          !manualTargetId[orphan.id] || processing === orphan.id
-                        }
-                        variant="primary"
-                        size="sm"
-                      >
-                        Transfer
-                      </Button>
-                    </div>
-
-                    <div className="mt-4">
-                      <Button
-                        onClick={() => handleDiscard(orphan.id)}
-                        disabled={processing === orphan.id}
-                        variant="destructive"
-                        size="sm"
-                      >
-                        Discard Activity
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

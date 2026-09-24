@@ -455,7 +455,10 @@ const SearchableSelect = ({
             <div className="flex items-center justify-between w-full">
               <span>{selectedItems[0]?.name}</span>
               <Button
-                onClick={(e) => handleRemove(selectedItems[0]?.id, e)}
+                onClick={(e) => {
+                  const selected = selectedItems[0];
+                  if (selected) handleRemove(selected.id, e);
+                }}
                 variant="tertiary"
                 className="hover:opacity-70 !p-1 !border-0"
                 aria-label={`Remove ${selectedItems[0]?.name}`}

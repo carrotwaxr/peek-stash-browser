@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PlaybackControls from "@/components/video-player/PlaybackControls";
 
@@ -57,7 +58,7 @@ describe("PlaybackControls download", () => {
     render(<PlaybackControls />);
 
     const buttons = await screen.findAllByTitle("Download");
-    fireEvent.click(buttons[0]);
+    fireEvent.click(must(buttons[0]));
 
     await waitFor(() => {
       expect(mockApiPost).toHaveBeenCalledWith("/downloads/scene/7", {

@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { renderWithProviders } from "@tests/testUtils";
+import { must, renderWithProviders } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HiddenItemsPage from "@/components/pages/HiddenItemsPage";
 
@@ -66,7 +66,7 @@ describe("HiddenItemsPage", () => {
     await screen.findByText("Tag");
 
     const [, tagRestore] = screen.getAllByRole("button", { name: "Restore" });
-    fireEvent.click(tagRestore);
+    fireEvent.click(must(tagRestore));
 
     await waitFor(() =>
       expect(mockApiDelete).toHaveBeenCalledWith(
@@ -80,7 +80,7 @@ describe("HiddenItemsPage", () => {
     await screen.findByText("A visible scene");
 
     const [sceneRestore] = screen.getAllByRole("button", { name: "Restore" });
-    fireEvent.click(sceneRestore);
+    fireEvent.click(must(sceneRestore));
 
     await waitFor(() =>
       expect(mockApiDelete).toHaveBeenCalledWith(

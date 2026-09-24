@@ -23,8 +23,9 @@ export const useTVNavigation = ({
   initialZone = null,
   enabled = true,
 }: UseTVNavigationOptions) => {
+  // "" when there are no zones and no initial zone
   const [currentZone, setCurrentZone] = useState<string>(
-    initialZone || zones[0]
+    (initialZone || zones[0]) ?? ""
   );
   const [focusIndex, setFocusIndex] = useState(0); // Focus index within current zone
 
@@ -33,8 +34,8 @@ export const useTVNavigation = ({
    */
   const goToNextZone = useCallback(() => {
     const currentIndex = zones.indexOf(currentZone);
-    if (currentIndex < zones.length - 1) {
-      const nextZone = zones[currentIndex + 1];
+    const nextZone = zones[currentIndex + 1];
+    if (currentIndex < zones.length - 1 && nextZone !== undefined) {
       setCurrentZone(nextZone);
       setFocusIndex(0); // Reset focus to first item in new zone
       return true;
@@ -47,8 +48,8 @@ export const useTVNavigation = ({
    */
   const goToPreviousZone = useCallback(() => {
     const currentIndex = zones.indexOf(currentZone);
-    if (currentIndex > 0) {
-      const prevZone = zones[currentIndex - 1];
+    const prevZone = zones[currentIndex - 1];
+    if (currentIndex > 0 && prevZone !== undefined) {
       setCurrentZone(prevZone);
       setFocusIndex(0); // Reset focus to first item in new zone
       return true;
@@ -92,7 +93,7 @@ export const useTVNavigation = ({
    * Reset to initial zone and focus
    */
   const reset = useCallback(() => {
-    setCurrentZone(initialZone || zones[0]);
+    setCurrentZone((initialZone || zones[0]) ?? "");
     setFocusIndex(0);
   }, [zones, initialZone]);
 

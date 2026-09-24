@@ -36,10 +36,11 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
     if (index === 0) return;
 
     const newPreferences = [...preferences];
-    [newPreferences[index - 1], newPreferences[index]] = [
-      newPreferences[index],
-      newPreferences[index - 1],
-    ];
+    const current = newPreferences[index];
+    const previous = newPreferences[index - 1];
+    if (!current || !previous) return;
+    newPreferences[index - 1] = current;
+    newPreferences[index] = previous;
 
     // Re-normalize order values
     const reordered = newPreferences.map((pref, idx) => ({
@@ -55,10 +56,11 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
     if (index === preferences.length - 1) return;
 
     const newPreferences = [...preferences];
-    [newPreferences[index], newPreferences[index + 1]] = [
-      newPreferences[index + 1],
-      newPreferences[index],
-    ];
+    const current = newPreferences[index];
+    const next = newPreferences[index + 1];
+    if (!current || !next) return;
+    newPreferences[index] = next;
+    newPreferences[index + 1] = current;
 
     // Re-normalize order values
     const reordered = newPreferences.map((pref, idx) => ({

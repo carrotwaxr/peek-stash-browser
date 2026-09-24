@@ -9,6 +9,7 @@
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { must } from "@tests/testUtils";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import FilterPresets from "../../../src/components/ui/FilterPresets";
 
@@ -419,7 +420,7 @@ describe("FilterPresets", () => {
 
       // Find and click delete button for first preset
       const deleteButtons = screen.getAllByTitle("Delete preset");
-      await user.click(deleteButtons[0]);
+      await user.click(must(deleteButtons[0]));
 
       expect(window.confirm).toHaveBeenCalledWith('Delete preset "Favorites"?');
 
@@ -449,7 +450,7 @@ describe("FilterPresets", () => {
 
       // Find and click delete button
       const deleteButtons = screen.getAllByTitle("Delete preset");
-      await user.click(deleteButtons[0]);
+      await user.click(must(deleteButtons[0]));
 
       expect(window.confirm).toHaveBeenCalled();
       expect(mockApiDelete).not.toHaveBeenCalled();
@@ -514,7 +515,7 @@ describe("FilterPresets", () => {
 
       // Click star to set as default
       const starButtons = screen.getAllByTitle("Set as default");
-      await user.click(starButtons[0]);
+      await user.click(must(starButtons[0]));
 
       await waitFor(() => {
         expect(mockApiPut).toHaveBeenCalledWith("/user/default-preset", {
