@@ -66,6 +66,23 @@ docker start peek-stash-browser
 
 ---
 
+## Databases from before v2.0.0
+
+Peek v2.0.0 and earlier created their database without a migration history. This version upgrades such a database only if it came from v2.0.0. A database from an older Peek stops the server at startup, before anything in it changes, and the log says:
+
+```
+This database was created by Peek before v2.0.0 (missing tables: ...). This version cannot upgrade it. Start carrotwaxr/peek-stash-browser:2.0.0 on the same data directory once, stop it, then start this version. See Upgrading → Databases from before v2.0.0.
+```
+
+To upgrade it, back it up (see [Backup Procedure](#backup-procedure)), then:
+
+1. Start `carrotwaxr/peek-stash-browser:2.0.0` on the same data directory: change only the image tag. Wait until its log shows `Server is running`; its start brings the database up to v2.0.0.
+2. Stop it, set the image back to the version you want, and start it. That start applies every later migration.
+
+If the message names `carrotwaxr/peek-stash-browser:3.2.2` instead, your database was upgraded past v2.0.0 while missing some of its tables. Do the same with the 3.2.2 image: its schema repair creates them.
+
+---
+
 ## Version Notes
 
 ### Version 3.3.7
@@ -113,7 +130,7 @@ The initial sync after upgrading may take several minutes depending on library s
 
 ### Version 1.x to 2.x
 
-**Migration:** Automatic. Schema updates are applied automatically on first start.
+**Migration:** Upgrade through v2.0.0: start v2.0.0 once on your data, then the version you want. See [Databases from before v2.0.0](#databases-from-before-v200).
 
 ---
 

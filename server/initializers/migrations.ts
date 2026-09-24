@@ -5,6 +5,10 @@
  * the migration folders beside the schema. When nothing is pending it starts
  * no process; otherwise it runs `prisma migrate deploy` once. The image's
  * start script only starts Node.
+ *
+ * Databases from before Peek kept migration history (`prisma db push`, up to
+ * v2.0.0) upgrade only from v2.0.0, whose tables are `0_baseline`'s; older
+ * ones stop at startup with an error naming the release to run first.
  */
 import type { PrismaClient } from "@prisma/client";
 import { execFile } from "child_process";
@@ -32,6 +36,74 @@ export interface MigrationRow {
  */
 export type DatabaseShape = "empty" | "dbPush" | "migrated";
 
+/** The first migration: the v2.0.0 schema, which `db push` databases share. */
+const BASELINE_MIGRATION = "0_baseline";
+
+/**
+ * The tables `0_baseline` creates, in its order: a `db push` database with all
+ * of them is a v2.0.0 database. Later migrations rebuild some of them and drop
+ * none, so every migrated database has them too.
+ */
+export const LEGACY_BASELINE_TABLES: readonly string[] = [
+  "User",
+  "WatchHistory",
+  "Playlist",
+  "PlaylistItem",
+  "CustomTheme",
+  "SceneRating",
+  "PerformerRating",
+  "StudioRating",
+  "TagRating",
+  "GalleryRating",
+  "GroupRating",
+  "ImageRating",
+  "UserContentRestriction",
+  "UserPerformerStats",
+  "UserStudioStats",
+  "UserTagStats",
+  "UserHiddenEntity",
+  "DataMigration",
+  "StashInstance",
+];
+
+/** The release a database this version cannot upgrade must run once first. */
+export type LegacyRepairRelease = "2.0.0" | "3.2.2";
+
+function legacyDatabaseMessage(
+  runFirst: LegacyRepairRelease,
+  missingTables: readonly string[]
+): string {
+  const missing = `missing tables: ${missingTables.join(", ")}`;
+  const problem =
+    runFirst === "2.0.0"
+      ? `This database was created by Peek before v2.0.0 (${missing}). This version cannot upgrade it.`
+      : `This database's migration history says it has Peek v2.0.0's tables, but some are missing (${missing}). This version cannot repair it.`;
+  const why =
+    runFirst === "3.2.2"
+      ? " (its schema repair creates the missing tables)"
+      : "";
+  return `${problem} Start carrotwaxr/peek-stash-browser:${runFirst} on the same data directory once${why}, stop it, then start this version. See Upgrading → Databases from before v2.0.0.`;
+}
+
+/**
+ * Thrown before anything touches a database this version cannot upgrade: a
+ * `db push` database from before v2.0.0, or a migrated one whose baseline is
+ * marked applied without all its tables (v2.0.1 marked it on any `db push`
+ * database). The message names the release to start once first.
+ */
+export class LegacyDatabaseError extends Error {
+  readonly runFirst: LegacyRepairRelease;
+  /** The `0_baseline` tables the database lacks. */
+  readonly missingTables: readonly string[];
+
+  constructor(runFirst: LegacyRepairRelease, missingTables: readonly string[]) {
+    super(legacyDatabaseMessage(runFirst, missingTables));
+    this.name = "LegacyDatabaseError";
+    this.runFirst = runFirst;
+    this.missingTables = missingTables;
+  }
+}
+
 /** A migration Prisma started and neither finished nor rolled back. */
 export interface UnfinishedMigration {
   name: string;
@@ -48,6 +120,8 @@ export interface MigrationPlan {
   unfinished: UnfinishedMigration[];
   /** Applied migrations with no folder here: a newer Peek ran them. */
   unknownApplied: string[];
+  /** `LEGACY_BASELINE_TABLES` the database lacks. */
+  missingBaselineTables: string[];
 }
 
 function shapeOf(tables: readonly string[]): DatabaseShape {
@@ -86,7 +160,25 @@ export function planMigrations(
         logs: row.logs,
       })),
     unknownApplied: [...done].filter((name) => !known.has(name)).sort(),
+    missingBaselineTables: LEGACY_BASELINE_TABLES.filter(
+      (table) => !tables.includes(table)
+    ),
   };
+}
+
+/**
+ * Why this version cannot upgrade the database, or null when it can. A new
+ * database lacks every baseline table, and one whose history has not reached
+ * the baseline gets it from the deploy; neither is refused.
+ */
+function legacyDatabaseError(plan: MigrationPlan): LegacyDatabaseError | null {
+  const missing = plan.missingBaselineTables;
+  if (missing.length === 0) return null;
+  if (plan.shape === "dbPush") return new LegacyDatabaseError("2.0.0", missing);
+  if (plan.applied.includes(BASELINE_MIGRATION)) {
+    return new LegacyDatabaseError("3.2.2", missing);
+  }
+  return null;
 }
 
 /**
@@ -193,14 +285,20 @@ function migrationCount(count: number): string {
 
 /**
  * Brings the database up to this version's migrations with at most one
- * `prisma migrate deploy`, and none when nothing is pending.
+ * `prisma migrate deploy`, and none when nothing is pending. A v2.0.0 `db push`
+ * database is first marked at the baseline; one this version cannot upgrade
+ * throws `LegacyDatabaseError` before anything is written.
  */
 export async function migrateDatabase(
   opts: MigrateOptions = {}
 ): Promise<MigrationResult> {
   const client = opts.client ?? prisma;
   const prismaDir = opts.prismaDir ?? defaultPrismaDir();
+  const cli = { prismaDir, databaseUrl: opts.databaseUrl };
   const plan = await readMigrationPlan(client, prismaDir);
+
+  const legacy = legacyDatabaseError(plan);
+  if (legacy) throw legacy;
 
   if (plan.unknownApplied.length > 0) {
     logger.warn(
@@ -208,25 +306,36 @@ export async function migrateDatabase(
     );
   }
 
-  if (plan.pending.length === 0) {
+  let pending = plan.pending;
+  if (plan.shape === "dbPush") {
+    // v2.0.0 created its tables with `db push`, which keeps no history: they
+    // are the baseline's, so the baseline is marked applied without running
     logger.info(
-      `Database schema is up to date (${migrationCount(plan.applied.length)})`
+      `This database is from Peek v2.0.0, before migration history: marking ${BASELINE_MIGRATION} applied`
     );
+    await client.$disconnect();
+    await runPrismaCli(
+      ["migrate", "resolve", "--applied", BASELINE_MIGRATION],
+      cli
+    );
+    pending = pending.filter((name) => name !== BASELINE_MIGRATION);
+  }
+
+  if (pending.length === 0) {
+    const current = plan.applied.length + plan.pending.length;
+    logger.info(`Database schema is up to date (${migrationCount(current)})`);
     return { plan, applied: [] };
   }
 
   logger.info(
-    `Applying ${plan.pending.length} pending ${plan.pending.length === 1 ? "migration" : "migrations"}: ${plan.pending.join(", ")}`
+    `Applying ${pending.length} pending ${pending.length === 1 ? "migration" : "migrations"}: ${pending.join(", ")}`
   );
   // No pooled connection stays open while the migrations' DDL runs; the
   // client reconnects at its next query
   await client.$disconnect();
   const started = performance.now();
-  await runPrismaCli(["migrate", "deploy"], {
-    prismaDir,
-    databaseUrl: opts.databaseUrl,
-  });
+  await runPrismaCli(["migrate", "deploy"], cli);
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  logger.info(`Applied ${migrationCount(plan.pending.length)} in ${seconds} s`);
-  return { plan, applied: plan.pending };
+  logger.info(`Applied ${migrationCount(pending.length)} in ${seconds} s`);
+  return { plan, applied: pending };
 }
