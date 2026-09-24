@@ -63,10 +63,14 @@ RUN npx prisma generate
 COPY server/ ./
 RUN npm run build && rm -f dist/vitest.config.js
 
-# Prune dev dependencies for production
-# Keep prisma CLI and its deps for runtime migrations, only remove typescript (peer dep)
+# Prune dev dependencies for production. Keep the prisma CLI for runtime
+# migrations; drop typescript (a peer dependency). npm links @peek/shared-types
+# to ../shared, a link that would point at /shared in the runtime stage:
+# replace it with the built package (package.json and dist only).
 RUN npm prune --omit=dev && \
-    rm -rf node_modules/typescript
+    rm -rf node_modules/typescript node_modules/@peek/shared-types && \
+    mkdir -p node_modules/@peek/shared-types && \
+    cp -R /app/shared/package.json /app/shared/dist node_modules/@peek/shared-types/
 
 # ===========================
 # Stage 3: Production Runtime
@@ -97,10 +101,6 @@ COPY server/package.json ./
 
 # Copy pruned node_modules from build stage (already has prisma client generated)
 COPY --from=backend-build /app/server/node_modules ./node_modules
-
-# Only the built shared types: the whole /app/shared carried shared/node_modules/typescript (~23 MB)
-COPY --from=backend-build /app/shared/package.json ./node_modules/@peek/shared-types/package.json
-COPY --from=backend-build /app/shared/dist ./node_modules/@peek/shared-types/dist
 
 # Copy Prisma schema and migrations (for runtime migrations)
 COPY server/prisma/schema.prisma ./prisma/
