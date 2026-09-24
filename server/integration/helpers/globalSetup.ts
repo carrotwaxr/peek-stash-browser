@@ -127,6 +127,7 @@ export async function setup() {
 
   // Run prisma migrations (applies migration files to ensure schema matches)
   console.log("[Integration Tests] Running database migrations...");
+  fs.mkdirSync(path.dirname(TEST_CONFIG.databasePath), { recursive: true });
   const { execSync } = await import("child_process");
   execSync("npx prisma migrate deploy", {
     cwd: path.resolve(__dirname, "../.."),
@@ -137,8 +138,19 @@ export async function setup() {
   // Configure SQLite PRAGMAs (WAL mode, busy_timeout, etc.)
   // Must happen after migrations but before any application queries
   console.log("[Integration Tests] Configuring SQLite PRAGMAs...");
-  const { configureSQLite } = await import("../../prisma/singleton.js");
+  const { default: prisma, configureSQLite } =
+    await import("../../prisma/singleton.js");
   await configureSQLite();
+
+  // Close what setup opened, so a refused run exits at once
+  const abort = async (error: Error): Promise<never> => {
+    await stopServer();
+    fs.rmSync(configDir, { recursive: true, force: true });
+    await prisma.$disconnect();
+    await replay?.close();
+    throw error;
+  };
+  const refuse = (message: string) => abort(new StashTargetError(message));
 
   // Import and start the server
   console.log(
@@ -151,6 +163,23 @@ export async function setup() {
   const app = setupAPI();
   const server = startServer(app, TEST_CONFIG.serverPort);
 
+  // A port another run holds must fail here: the health check below would
+  // otherwise reach that run's server, and the tests its database
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.once("listening", () => {
+        server.off("error", reject);
+        resolve();
+      });
+    });
+  } catch (error) {
+    await abort(
+      new Error(
+        `The integration server cannot listen on port ${TEST_CONFIG.serverPort} (${error instanceof Error ? error.message : String(error)}). Another run or program holds it: set INTEGRATION_SERVER_PORT to a free port.`
+      )
+    );
+  }
   setServerInstance(server);
 
   // Wait for server to be ready
@@ -164,16 +193,6 @@ export async function setup() {
   // Nothing has contacted a stored instance yet: the instance manager and
   // the sync scheduler start below. Refuse any enabled instance that is not
   // this run's Stash (a production row left from an earlier run, say).
-  const { default: prisma } = await import("../../prisma/singleton.js");
-  // Close what setup opened, so a refused run exits at once
-  const abort = async (error: Error): Promise<never> => {
-    await stopServer();
-    fs.rmSync(configDir, { recursive: true, force: true });
-    await prisma.$disconnect();
-    await replay?.close();
-    throw error;
-  };
-  const refuse = (message: string) => abort(new StashTargetError(message));
   const allowedUrls = [primary.url];
   if (second) allowedUrls.push(second.url);
   const disallowed = findDisallowedInstances(

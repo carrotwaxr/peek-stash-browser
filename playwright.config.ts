@@ -13,10 +13,10 @@ import {
  * Playwright E2E test configuration for Peek Stash Browser.
  *
  * Hermetic by default, locally and in CI: Playwright starts the Stash replay
- * (port 9100, serving item 83's second library), its own server (port 8100)
- * and Vite client (port 5180) beside the dev stack, on a throwaway database.
- * Global setup creates the run admin and the replay's instance, and waits for
- * the sync.
+ * (serving item 83's second library), its own server and Vite client beside
+ * the dev stack, on a throwaway database. Their ports come from the checkout's
+ * path, so two worktrees can run the suite at once. Global setup creates the
+ * run admin and the replay's instance, and waits for the sync.
  *
  * Dev-stack mode, for manual runs on real data: set E2E_BASE_URL (for example
  * http://localhost:6969). Nothing is started; .env.e2e names a bootstrap admin
