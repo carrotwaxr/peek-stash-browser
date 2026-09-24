@@ -83,8 +83,11 @@ test.describe("Settings Page", () => {
       page.getByRole("radio", { name: "User Preferences" })
     ).toBeVisible({ timeout: 10_000 });
 
-    // The playback tab should be active
-    await expect(page).toHaveURL(/tab=playback/);
+    // The Playback tab is the selected one
+    await expect(page.getByRole("tab", { name: "Playback" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
   });
 });
 
@@ -186,17 +189,21 @@ test.describe("Theme Switching", () => {
     expect(themeAfterReload).toEqual(storedTheme);
   });
 
-  test("UI Examples section is collapsible", async ({ page }) => {
+  test("UI Examples expands and collapses", async ({ page }) => {
     await page.goto("/settings?section=user&tab=theme");
     await expect(page.getByText("Built-in Themes")).toBeVisible({
       timeout: 10_000,
     });
+    const uiExamples = page.getByRole("button", { name: "UI Examples" });
+    const content = page.getByText(
+      "UI examples from original Settings page will be added here"
+    );
+    await expect(content).toHaveCount(0);
 
-    // UI Examples heading should be visible
-    const uiExamplesHeading = page.getByText("UI Examples");
-    if (await uiExamplesHeading.isVisible().catch(() => false)) {
-      // Click to expand/collapse
-      await uiExamplesHeading.click();
-    }
+    await uiExamples.click();
+    await expect(content).toBeVisible();
+
+    await uiExamples.click();
+    await expect(content).toHaveCount(0);
   });
 });

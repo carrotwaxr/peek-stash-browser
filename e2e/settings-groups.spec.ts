@@ -1,4 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+import { deleteGroups } from "./support/cleanup";
+import { runPrefix, uniqueName } from "./support/names";
+import { type TestUser, createUser, deleteUser } from "./support/users";
 
 /**
  * E2E tests for User Group management in Settings.
@@ -9,18 +12,63 @@ import { expect, test } from "@playwright/test";
  * Regression coverage for #438: editing a group with members crashed
  * because the API returned flat member objects but the client expected
  * nested { user: { id, username, role } } objects.
+ *
+ * Every group name goes through uniqueName; afterAll deletes the groups, and
+ * the throwaway user the member test adds (a user of its own, so no other
+ * spec's temporary user can vanish from the dropdown mid-test).
  */
 
+/**
+ * Every group here is named uniqueName("group"), which is
+ * `<run prefix>-group-<worker>-<n>`: this is one worker's share of them
+ */
+const workerGroupPrefix = (workerIndex: number) =>
+  `${runPrefix()}-group-${workerIndex}-`;
+
 test.describe("User Group Management", () => {
-  const uniqueSuffix = Date.now();
+  const createdUsers: TestUser[] = [];
+
+  // Only this worker's groups: with fullyParallel, Playwright runs these
+  // tests in groups on several workers at once, each group with its own
+  // afterAll, so deleting every group of the run would pull them from under
+  // tests still running elsewhere
+  test.afterAll(async ({ request }, testInfo) => {
+    for (const { id } of createdUsers.splice(0)) {
+      await deleteUser(request, id);
+    }
+    await deleteGroups(request, workerGroupPrefix(testInfo.workerIndex));
+  });
 
   /** Navigate to Settings > Server > User Management tab */
-  async function goToUserManagement(page: import("@playwright/test").Page) {
+  async function goToUserManagement(page: Page) {
     await page.goto("/settings?section=server&tab=user-management");
     // Wait for the User Groups heading to be visible
     await expect(
       page.getByRole("heading", { name: "User Groups" })
     ).toBeVisible({ timeout: 10_000 });
+  }
+
+  /** The groups table's row for one group */
+  const groupRow = (page: Page, name: string) =>
+    page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name, exact: true }) });
+
+  /** Creates a group through the Create Group modal */
+  async function createGroup(
+    page: Page,
+    name: string,
+    permissions: string[] = []
+  ) {
+    await page.getByRole("button", { name: "Create Group" }).first().click();
+    await page.getByLabel("Name").fill(name);
+    for (const permission of permissions) {
+      await page.getByText(permission, { exact: true }).click();
+    }
+    await page.getByRole("button", { name: "Create Group" }).last().click();
+    await expect(page.getByText("Group created successfully")).toBeVisible({
+      timeout: 5_000,
+    });
   }
 
   test("settings page loads User Management tab", async ({ page }) => {
@@ -38,7 +86,7 @@ test.describe("User Group Management", () => {
     await expect(page.getByText("Create Group").last()).toBeVisible();
 
     // Fill in group details
-    const groupName = `E2E Test Group ${uniqueSuffix}`;
+    const groupName = uniqueName("group");
     await page.getByLabel("Name").fill(groupName);
     await page.getByLabel("Description").fill("Created by E2E test");
 
@@ -54,32 +102,27 @@ test.describe("User Group Management", () => {
     });
 
     // Group should appear in the table
-    await expect(page.getByText(groupName)).toBeVisible();
+    await expect(groupRow(page, groupName)).toBeVisible();
   });
 
   test("can edit a group (regression: #438 blank page)", async ({ page }) => {
     await goToUserManagement(page);
 
     // First create a group to edit
-    const groupName = `Edit Target ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "Create Group" }).first().click();
-    await page.getByLabel("Name").fill(groupName);
-    await page.getByText("Can Download Files", { exact: true }).click();
-    await page.getByRole("button", { name: "Create Group" }).last().click();
-    await expect(page.getByText("Group created successfully")).toBeVisible({
-      timeout: 5_000,
-    });
+    const groupName = uniqueName("group");
+    await createGroup(page, groupName, ["Can Download Files"]);
 
     // Find the row with our group and click Edit
-    const groupRow = page.getByRole("row").filter({ hasText: groupName });
-    await groupRow.getByRole("button", { name: "Edit" }).click();
+    await groupRow(page, groupName)
+      .getByRole("button", { name: "Edit" })
+      .click();
 
     // Modal should open with "Edit Group: <name>" title
     await expect(page.getByText(`Edit Group: ${groupName}`)).toBeVisible({
       timeout: 5_000,
     });
 
-    // The form should be populated (not blank — this is the #438 regression)
+    // The form should be populated (not blank: the #438 regression)
     const nameInput = page.getByLabel("Name");
     await expect(nameInput).toHaveValue(groupName);
 
@@ -98,61 +141,46 @@ test.describe("User Group Management", () => {
     await expect(page.getByText("Group updated successfully")).toBeVisible({
       timeout: 5_000,
     });
-    await expect(page.getByText(updatedName)).toBeVisible();
+    await expect(groupRow(page, updatedName)).toBeVisible();
   });
 
-  test("can add and remove group members", async ({ page }) => {
+  test("can add and remove group members", async ({ page, request }) => {
+    // A member of this test's own, created before the page lists the users
+    const member = await createUser(request, "member");
+    createdUsers.push(member);
     await goToUserManagement(page);
 
     // Create a group for member management
-    const groupName = `Members Test ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "Create Group" }).first().click();
-    await page.getByLabel("Name").fill(groupName);
-    await page.getByRole("button", { name: "Create Group" }).last().click();
-    await expect(page.getByText("Group created successfully")).toBeVisible({
-      timeout: 5_000,
-    });
+    const groupName = uniqueName("group");
+    await createGroup(page, groupName);
 
     // Open the group for editing
-    const groupRow = page.getByRole("row").filter({ hasText: groupName });
-    await groupRow.getByRole("button", { name: "Edit" }).click();
+    await groupRow(page, groupName)
+      .getByRole("button", { name: "Edit" })
+      .click();
     await expect(page.getByText(`Edit Group: ${groupName}`)).toBeVisible({
       timeout: 5_000,
     });
+    await expect(page.getByText("Members (0)")).toBeVisible();
 
-    // The member dropdown should be available (if there are users to add)
+    // Add the member
     const memberSelect = page
       .locator("select")
       .filter({ hasText: "Select a user to add" });
-    const hasUsersToAdd = await memberSelect.isVisible().catch(() => false);
+    await expect(memberSelect).toBeVisible();
+    await memberSelect.selectOption({ label: member.username });
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(
+      page.getByText(`Added ${member.username} to group`)
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText("Members (1)")).toBeVisible();
 
-    if (hasUsersToAdd) {
-      // Select the first available user
-      const options = await memberSelect.locator("option").all();
-      // Skip the placeholder option
-      if (options.length > 1) {
-        const firstUserOption = options[1];
-        const userName = await firstUserOption.textContent();
-        await memberSelect.selectOption({ index: 1 });
-
-        // Click Add
-        await page.getByRole("button", { name: "Add" }).click();
-
-        // Member should appear in the list
-        await expect(page.getByText("Added")).toBeVisible({ timeout: 5_000 });
-
-        // Members count should update
-        await expect(page.getByText("Members (1)")).toBeVisible();
-
-        // Remove the member (click the X button next to their name)
-        const removeButton = page.locator("button[title='Remove from group']");
-        await removeButton.click();
-
-        // Should see removal confirmation
-        await expect(page.getByText("Removed")).toBeVisible({ timeout: 5_000 });
-        await expect(page.getByText("Members (0)")).toBeVisible();
-      }
-    }
+    // Remove the member (the X button next to their name)
+    await page.locator("button[title='Remove from group']").click();
+    await expect(
+      page.getByText(`Removed ${member.username} from group`)
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText("Members (0)")).toBeVisible();
 
     // Close the modal
     await page.getByRole("button", { name: "Cancel" }).click();
@@ -162,50 +190,40 @@ test.describe("User Group Management", () => {
     await goToUserManagement(page);
 
     // Create a group to delete
-    const groupName = `Delete Target ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "Create Group" }).first().click();
-    await page.getByLabel("Name").fill(groupName);
-    await page.getByRole("button", { name: "Create Group" }).last().click();
-    await expect(page.getByText("Group created successfully")).toBeVisible({
-      timeout: 5_000,
-    });
-
-    // Find the row and click Delete
-    const groupRow = page.getByRole("row").filter({ hasText: groupName });
+    const groupName = uniqueName("group");
+    await createGroup(page, groupName);
 
     // Handle the confirmation dialog
     page.on("dialog", (dialog) => dialog.accept());
 
-    await groupRow.getByRole("button", { name: "Delete" }).click();
+    await groupRow(page, groupName)
+      .getByRole("button", { name: "Delete" })
+      .click();
 
     // Should see success message
-    await expect(page.getByText("deleted successfully")).toBeVisible({
-      timeout: 5_000,
-    });
+    await expect(
+      page.getByText(`Group "${groupName}" deleted successfully`)
+    ).toBeVisible({ timeout: 5_000 });
 
     // Group should no longer be in the table
-    await expect(page.getByText(groupName)).not.toBeVisible();
+    await expect(groupRow(page, groupName)).toHaveCount(0);
   });
 
   test("group permissions badges display correctly", async ({ page }) => {
     await goToUserManagement(page);
 
     // Create a group with all permissions
-    const groupName = `Perms Display ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "Create Group" }).first().click();
-    await page.getByLabel("Name").fill(groupName);
-    await page.getByText("Can Share", { exact: true }).click();
-    await page.getByText("Can Download Files", { exact: true }).click();
-    await page.getByText("Can Download Playlists", { exact: true }).click();
-    await page.getByRole("button", { name: "Create Group" }).last().click();
-    await expect(page.getByText("Group created successfully")).toBeVisible({
-      timeout: 5_000,
-    });
+    const groupName = uniqueName("group");
+    await createGroup(page, groupName, [
+      "Can Share",
+      "Can Download Files",
+      "Can Download Playlists",
+    ]);
 
     // The group row should show permission badges
-    const groupRow = page.getByRole("row").filter({ hasText: groupName });
-    await expect(groupRow.getByText("Share")).toBeVisible();
-    await expect(groupRow.getByText("Files")).toBeVisible();
-    await expect(groupRow.getByText("Playlists")).toBeVisible();
+    const row = groupRow(page, groupName);
+    await expect(row.getByText("Share")).toBeVisible();
+    await expect(row.getByText("Files")).toBeVisible();
+    await expect(row.getByText("Playlists")).toBeVisible();
   });
 });

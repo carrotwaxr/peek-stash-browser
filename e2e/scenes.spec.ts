@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { ListPage } from "./pages/ListPage";
+import { requireData } from "./support/data";
 
 /**
  * E2E tests for the Scene Library page.
  *
- * Covers page load, search controls, view mode switching, filter panel,
- * sort controls, and empty state rendering.
+ * Covers page load, the scene grid, search controls, view mode switching,
+ * and sort controls. The filter panel is in advanced-filtering.spec.ts,
+ * pagination in pagination.spec.ts, and empty results in
+ * list-navigation.spec.ts.
  */
 
 test.describe("Scene Library", () => {
@@ -20,33 +24,10 @@ test.describe("Scene Library", () => {
     await expect(page.getByText("Filters")).toBeVisible();
   });
 
-  test("shows scenes or empty state after loading", async ({ page }) => {
-    await page.goto("/scenes");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Wait for loading to settle — dev has scenes, CI may not
-    await page.waitForTimeout(2000);
-
-    const hasScenes = await page
-      .locator("[class*='card'], [class*='Card'], table tbody tr")
-      .first()
-      .isVisible()
-      .catch(() => false);
-
-    if (hasScenes) {
-      // Scenes exist — verify search controls still present
-      await expect(page.getByPlaceholder("Search...")).toBeVisible();
-    } else {
-      // No scenes — verify empty state
-      await expect(page.getByText("No scenes found")).toBeVisible({
-        timeout: 5_000,
-      });
-      await expect(
-        page.getByText("Try adjusting your search filters")
-      ).toBeVisible();
-    }
+  test("the scene grid shows cards", async ({ page }) => {
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    requireData(await list.waitForResults("Scene"), "scenes");
   });
 
   test("search input accepts text and updates URL", async ({ page }) => {
@@ -82,26 +63,6 @@ test.describe("Scene Library", () => {
       // URL should no longer have the q param
       await expect(page).not.toHaveURL(/q=existing/, { timeout: 5_000 });
     }
-  });
-
-  test("filter panel toggles open and closed", async ({ page }) => {
-    await page.goto("/scenes");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Click the Filters button to open the panel
-    const filtersButton = page.locator(
-      '[data-tv-search-item="filters-button"]'
-    );
-    await filtersButton.click();
-
-    // Filter panel should be visible — look for a "Clear All" or filter section heading
-    // When the panel is open, the Filters button switches to primary variant
-    await expect(filtersButton).toBeVisible();
-
-    // Click Filters again to close
-    await filtersButton.click();
   });
 
   test("view mode toggle switches between views", async ({ page }) => {
@@ -155,30 +116,21 @@ test.describe("Scene Library", () => {
     await sortDirection.click();
   });
 
-  test("per-page selector is available via pagination", async ({ page }) => {
-    await page.goto("/scenes");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
-    });
+  test("view mode and sort are restored from the URL", async ({ page }) => {
+    // The URL as the app writes it: the direction in capitals
+    const list = new ListPage(page);
+    await list.goto("/scenes?sort=title&dir=ASC&view=table");
 
-    // Per-page selector should be present
-    const perPageSelect = page.locator("#perPage");
-    if (await perPageSelect.isVisible().catch(() => false)) {
-      // Default value should be one of the presets
-      const value = await perPageSelect.inputValue();
-      expect(["12", "24", "48", "96", "120"]).toContain(value);
-    }
-  });
-
-  test("URL preserves view mode and sort state", async ({ page }) => {
-    // Navigate with pre-set URL params
-    await page.goto("/scenes?sort=title&dir=asc&view=table");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // The URL params should be preserved
-    expect(page.url()).toContain("sort=title");
-    expect(page.url()).toContain("dir=asc");
+    await expect(
+      page.locator('button[aria-label="View mode: Table view"]')
+    ).toBeVisible();
+    // Sorted by Title, ascending (the direction button shows an up arrow)
+    await expect(list.sortControl.locator("select")).toHaveValue("title");
+    await expect(list.sortControl.locator("select option:checked")).toHaveText(
+      "Title"
+    );
+    await expect(
+      list.sortDirection.locator("svg.lucide-arrow-up")
+    ).toBeVisible();
   });
 });

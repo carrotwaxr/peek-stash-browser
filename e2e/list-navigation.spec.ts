@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { ListPage } from "./pages/ListPage";
 import { requireData } from "./support/data";
+import { runPrefix } from "./support/names";
 
 /**
  * Card to Back on the library lists (LG-34): opening a card and pressing Back
  * once returns to the same list, showing the same first card. Scenes have
  * this test, with the scroll position, in pagination.spec.ts.
+ *
+ * Empty results (LG-34): a search that matches nothing shows the list's empty
+ * state and no card.
  */
 
 /** The lists covered here, and their cards' label */
@@ -45,4 +49,18 @@ test.describe("List navigation", () => {
       await expect(titleLink).toHaveAttribute("href", String(href));
     });
   }
+
+  // The other list pages have no empty state yet (LG-13): their empty-results
+  // tests come with item 57, one per page here
+  test("a scene search that matches nothing shows the empty state", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    await list.goto(`/scenes?q=zzzz-${runPrefix()}`);
+
+    await expect(page.getByText("No scenes found")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(list.cards("Scene")).toHaveCount(0);
+  });
 });
