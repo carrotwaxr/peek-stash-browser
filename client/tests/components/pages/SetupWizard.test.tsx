@@ -171,9 +171,9 @@ describe("SetupWizard", () => {
       success: true,
       user: { id: 1, username: "admin", role: "ADMIN", createdAt: new Date() },
     });
-    mockLogin.mockImplementation(async () => {
+    mockLogin.mockImplementation(() => {
       authState.isAuthenticated = true;
-      return { success: true };
+      return Promise.resolve({ success: true });
     });
 
     render(
@@ -591,9 +591,9 @@ describe("SetupWizard", () => {
 
     it("paints every step in the active theme's colours", async () => {
       mockCreateFirstAdmin.mockResolvedValue(ADMIN_CREATED);
-      mockLogin.mockImplementation(async () => {
+      mockLogin.mockImplementation(() => {
         authState.isAuthenticated = true;
-        return { success: true };
+        return Promise.resolve({ success: true });
       });
       mockTestStashConnection.mockResolvedValue({ success: true });
       mockCreateFirstStashInstance.mockResolvedValue(STASH_CREATED);

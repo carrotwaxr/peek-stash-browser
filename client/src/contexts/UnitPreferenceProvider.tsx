@@ -43,7 +43,7 @@ export const UnitPreferenceProvider = ({
         if (!cancelled) setIsLoading(false);
       }
     };
-    loadUnitPreference();
+    void loadUnitPreference();
     return () => {
       cancelled = true;
     };

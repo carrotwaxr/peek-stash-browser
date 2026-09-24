@@ -24,7 +24,9 @@ const savePosition = (key: string, y: number) => {
     );
     index.push(key);
     while (index.length > MAX_SAVED) {
-      sessionStorage.removeItem(STORAGE_PREFIX + index.shift());
+      const oldest = index.shift();
+      if (oldest !== undefined)
+        sessionStorage.removeItem(STORAGE_PREFIX + oldest);
     }
     sessionStorage.setItem(INDEX_KEY, JSON.stringify(index));
   } catch {
@@ -60,7 +62,6 @@ const restoreWhenReachable = (y: number): (() => void) => {
 
   let done = false;
   let observer: ResizeObserver | null = null;
-  let timer: ReturnType<typeof setTimeout> | undefined;
 
   const stop = () => {
     if (done) return;
@@ -80,7 +81,8 @@ const restoreWhenReachable = (y: number): (() => void) => {
     if (reachable()) restore();
   });
   observer.observe(root);
-  timer = setTimeout(restore, RESTORE_TIMEOUT_MS);
+  // stop() reads timer only once a callback or scroll event runs, after this
+  const timer = setTimeout(restore, RESTORE_TIMEOUT_MS);
   for (const type of USER_SCROLL_EVENTS) {
     window.addEventListener(type, stop, { passive: true });
   }

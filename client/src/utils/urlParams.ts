@@ -18,6 +18,21 @@ interface SearchState {
   timelinePeriod: string | null;
 }
 
+/**
+ * Sets a filter value that has a URL form (a string, number or boolean). Any
+ * other value would be written as "[object Object]" or "null", so it is left
+ * out.
+ */
+const setParam = (params: URLSearchParams, key: string, value: unknown) => {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    params.set(key, String(value));
+  }
+};
+
 const filtersToUrlParams = (
   filters: Record<string, unknown>,
   filterOptions: FilterOption[]
@@ -25,7 +40,7 @@ const filtersToUrlParams = (
   const params = new URLSearchParams();
 
   filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
-    const value = filters[key] as unknown;
+    const value = filters[key];
 
     if (value === undefined || value === "" || value === false) {
       return; // Skip empty values
@@ -41,7 +56,7 @@ const filtersToUrlParams = (
       case "select":
       case "text":
         if (value) {
-          params.set(key, String(value));
+          setParam(params, key, value);
         }
         break;
 
@@ -54,16 +69,16 @@ const filtersToUrlParams = (
         } else {
           // Single select: just set the value
           if (value) {
-            params.set(key, String(value));
+            setParam(params, key, value);
           }
         }
         // Serialize modifier if present
         if (modifierKey && filters[modifierKey]) {
-          params.set(modifierKey, String(filters[modifierKey]));
+          setParam(params, modifierKey, filters[modifierKey]);
         }
         // Serialize hierarchy depth if present
         if (hierarchyKey && filters[hierarchyKey] !== undefined) {
-          params.set(hierarchyKey, String(filters[hierarchyKey]));
+          setParam(params, hierarchyKey, filters[hierarchyKey]);
         }
         break;
 

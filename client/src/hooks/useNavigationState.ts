@@ -28,7 +28,7 @@ export const useNavigationState = () => {
 
   // Go back using browser history
   const goBack = useCallback(() => {
-    navigate(-1);
+    void navigate(-1);
   }, [navigate]);
 
   return {

@@ -123,7 +123,7 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
         !this.playCountIncremented &&
         percentPlayed >= this.minimumPlayPercent
       ) {
-        this.incrementPlayCount();
+        void this.incrementPlayCount();
         this.playCountIncremented = true;
       }
 
@@ -132,7 +132,7 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
         resumeTime = 0;
       }
 
-      this.saveActivity(resumeTime, this.currentPlayDuration);
+      void this.saveActivity(resumeTime, this.currentPlayDuration);
       this.currentPlayDuration = 0;
     }
   }

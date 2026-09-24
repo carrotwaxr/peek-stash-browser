@@ -1,9 +1,4 @@
-import {
-  type MutableRefObject,
-  type ReactNode,
-  forwardRef,
-  useEffect,
-} from "react";
+import { type ReactNode, type RefObject, forwardRef, useEffect } from "react";
 import Button from "./Button";
 import SearchableSelect from "./SearchableSelect";
 
@@ -559,7 +554,7 @@ interface FilterPanelProps {
   onToggle: () => void;
   onSubmit: () => void;
   highlightedFilterKey?: string | null;
-  filterRefs?: MutableRefObject<Record<string, HTMLElement | null>>;
+  filterRefs?: RefObject<Record<string, HTMLElement | null>>;
 }
 
 export const FilterPanel = ({

@@ -81,7 +81,7 @@ describe("FilterPresets", () => {
   });
 
   describe("Rendering", () => {
-    it("renders Load Preset and Save Preset buttons", async () => {
+    it("renders Load Preset and Save Preset buttons", () => {
       render(<FilterPresets {...defaultProps} />);
 
       expect(screen.getByText("Load Preset")).toBeInTheDocument();

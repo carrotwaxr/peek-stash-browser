@@ -89,13 +89,8 @@ const GroupDetail = () => {
           instanceId
         )) as Record<string, unknown> | null;
         setGroup(groupData);
-        setRating(
-          (groupData as Record<string, unknown> | null)?.rating as number | null
-        );
-        setIsFavorite(
-          ((groupData as Record<string, unknown> | null)
-            ?.favorite as boolean) || false
-        );
+        setRating(groupData?.rating as number | null);
+        setIsFavorite((groupData?.favorite as boolean) || false);
       } catch {
         // Error loading group - will show loading spinner
       } finally {
@@ -103,7 +98,7 @@ const GroupDetail = () => {
       }
     };
 
-    fetchGroup();
+    void fetchGroup();
   }, [groupId, instanceId]);
 
   const handleRatingChange = async (newRating: number | null) => {
@@ -127,13 +122,13 @@ const GroupDetail = () => {
   };
 
   const toggleFavorite = () => {
-    handleFavoriteChange(!isFavorite);
+    void handleFavoriteChange(!isFavorite);
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
   useRatingHotkeys({
     enabled: !isLoading && !!group,
-    setRating: handleRatingChange,
+    setRating: (newRating) => void handleRatingChange(newRating),
     toggleFavorite,
   });
 
@@ -144,6 +139,8 @@ const GroupDetail = () => {
       </div>
     );
   }
+
+  const groupName = typeof group?.name === "string" ? group.name : "";
 
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
@@ -172,7 +169,9 @@ const GroupDetail = () => {
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
-                      onChange={handleFavoriteChange}
+                      onChange={(newValue) =>
+                        void handleFavoriteChange(newValue)
+                      }
                       size="large"
                     />
                   )}
@@ -195,7 +194,7 @@ const GroupDetail = () => {
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 showClearButton={true}
               />
             </div>
@@ -284,7 +283,7 @@ const GroupDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No performers found in "${group?.name}"`}
+                  emptyMessage={`No performers found in "${groupName}"`}
                 />
               )}
             </>
@@ -343,6 +342,8 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
     : group?.back_image_path;
   const displayImage = (currentImage || fallbackImage) as string | undefined;
 
+  const groupName = typeof group?.name === "string" ? group.name : "";
+
   return (
     <div className="relative w-full" style={{ maxHeight: "50vh" }}>
       <div
@@ -357,7 +358,7 @@ const GroupImageFlipper = ({ group }: GroupImageFlipperProps) => {
         {displayImage ? (
           <img
             src={displayImage}
-            alt={`${group?.name} - ${showFront ? "Front" : "Back"} Cover`}
+            alt={`${groupName} - ${showFront ? "Front" : "Back"} Cover`}
             style={{
               width: "100%",
               height: "100%",

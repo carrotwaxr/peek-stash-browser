@@ -159,6 +159,32 @@ describe("buildSearchParams", () => {
     expect(params.get("studioId")).toBe("3:server-1");
   });
 
+  it("serializes a numeric single-select value", () => {
+    const params = buildSearchParams({
+      searchText: "",
+      sortField: "",
+      sortDirection: "",
+      currentPage: 1,
+      perPage: 24,
+      filters: { studioId: 3 },
+      filterOptions: mockFilterOptions,
+    });
+    expect(params.get("studioId")).toBe("3");
+  });
+
+  it("leaves out a single-select value that has no URL form", () => {
+    const params = buildSearchParams({
+      searchText: "",
+      sortField: "",
+      sortDirection: "",
+      currentPage: 1,
+      perPage: 24,
+      filters: { studioId: { id: "3" } },
+      filterOptions: mockFilterOptions,
+    });
+    expect(params.has("studioId")).toBe(false);
+  });
+
   it("skips empty filters", () => {
     const params = buildSearchParams({
       searchText: "",

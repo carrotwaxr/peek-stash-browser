@@ -112,7 +112,7 @@ const FilterPresets = ({
 
   // Fetch presets on mount
   useEffect(() => {
-    fetchPresets();
+    void fetchPresets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only fetch once on mount, fetchPresets is stable
 
@@ -133,7 +133,7 @@ const FilterPresets = ({
       const presetArtifactType = effectiveContext.startsWith("scene_")
         ? "scene"
         : effectiveContext;
-      setPresets(allPresets[presetArtifactType] || []);
+      setPresets(allPresets[presetArtifactType] ?? []);
 
       const defaults =
         ((defaultsResponse as Record<string, unknown>)?.defaults as Record<
@@ -158,10 +158,12 @@ const FilterPresets = ({
 
     try {
       // Strip out permanent filters before saving
-      const filtersToSave = { ...currentFilters };
-      Object.keys(permanentFilters).forEach((key) => {
-        delete filtersToSave[key];
-      });
+      const permanentKeys = new Set(Object.keys(permanentFilters));
+      const filtersToSave = Object.fromEntries(
+        Object.entries(currentFilters).filter(
+          ([key]) => !permanentKeys.has(key)
+        )
+      );
 
       await apiPost("/user/filter-presets", {
         artifactType,
@@ -209,7 +211,7 @@ const FilterPresets = ({
       viewMode: preset.viewMode || "grid",
       zoomLevel: preset.zoomLevel || "medium",
       gridDensity: preset.gridDensity || "medium",
-      tableColumns: preset.tableColumns || null,
+      tableColumns: preset.tableColumns ?? null,
       perPage: preset.perPage || null,
     });
     setIsDropdownOpen(false);
@@ -357,7 +359,11 @@ const FilterPresets = ({
                           <div className="flex items-center gap-1 ml-2">
                             <Button
                               onClick={(e) =>
-                                handleToggleDefault(preset.id, preset.name, e)
+                                void handleToggleDefault(
+                                  preset.id,
+                                  preset.name,
+                                  e
+                                )
                               }
                               variant="tertiary"
                               className={`p-1 transition-opacity ${
@@ -384,7 +390,7 @@ const FilterPresets = ({
                             </Button>
                             <Button
                               onClick={() =>
-                                handleDeletePreset(preset.id, preset.name)
+                                void handleDeletePreset(preset.id, preset.name)
                               }
                               variant="tertiary"
                               className="p-1 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100"
@@ -458,7 +464,9 @@ const FilterPresets = ({
                     borderColor: "var(--border-color)",
                     color: "var(--text-primary)",
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleSavePreset();
+                  }}
                   autoFocus
                 />
 
@@ -495,7 +503,7 @@ const FilterPresets = ({
                     Cancel
                   </Button>
                   <Button
-                    onClick={handleSavePreset}
+                    onClick={() => void handleSavePreset()}
                     variant="primary"
                     size="sm"
                     disabled={isLoading || !presetName.trim()}

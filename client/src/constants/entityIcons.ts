@@ -97,7 +97,7 @@ export const getEntityIcon = (entityType: string) => {
         string,
         (typeof ENTITY_ICONS)[keyof typeof ENTITY_ICONS]
       >
-    )[entityType] || ENTITY_ICONS.scene
+    )[entityType] ?? ENTITY_ICONS.scene
   );
 };
 

@@ -80,7 +80,7 @@ const StashInstanceSection = () => {
   }, [isAdmin]);
 
   useEffect(() => {
-    loadInstances();
+    void loadInstances();
   }, [loadInstances]);
 
   const formatDate = (dateString: string | null | undefined) => {
@@ -509,13 +509,13 @@ const StashInstanceSection = () => {
             {/* Form Actions */}
             <div className="flex gap-3 pt-2">
               <Button
-                onClick={handleTestConnection}
+                onClick={() => void handleTestConnection()}
                 variant="secondary"
                 disabled={testing || !formData.url}
               >
                 {testing ? "Testing..." : "Test Connection"}
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={() => void handleSave()} disabled={saving}>
                 {saving
                   ? "Saving..."
                   : editingInstance
@@ -590,7 +590,7 @@ const StashInstanceSection = () => {
                   {isAdmin && (
                     <div className="flex items-center gap-2">
                       <Button
-                        onClick={() => handleToggleEnabled(instance)}
+                        onClick={() => void handleToggleEnabled(instance)}
                         variant="tertiary"
                         size="sm"
                       >
@@ -605,7 +605,7 @@ const StashInstanceSection = () => {
                       </Button>
                       {instances.length > 1 && (
                         <Button
-                          onClick={() => handleDelete(instance)}
+                          onClick={() => void handleDelete(instance)}
                           variant="tertiary"
                           size="sm"
                           className="text-red-400 hover:text-red-300"

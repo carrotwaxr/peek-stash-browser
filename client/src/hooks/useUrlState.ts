@@ -70,7 +70,7 @@ export const useUrlState = ({
           if (value === null || value === undefined || value === "") {
             newParams.delete(key);
           } else {
-            newParams.set(key, String(value));
+            newParams.set(key, value);
           }
           return newParams;
         },
@@ -99,7 +99,7 @@ export const useUrlState = ({
             if (value === null || value === undefined || value === "") {
               newParams.delete(key);
             } else {
-              newParams.set(key, String(value));
+              newParams.set(key, value);
             }
           });
           return newParams;

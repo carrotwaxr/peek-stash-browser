@@ -109,7 +109,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
         this.vttData = this.processVtt(data);
         this.setupThumbnailElement();
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error("[VTT Thumbnails] Failed to load VTT file:", err);
       });
   }
@@ -134,8 +134,8 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
       req.addEventListener("load", () => {
         resolve(req.responseText);
       });
-      req.addEventListener("error", (e) => {
-        reject(e);
+      req.addEventListener("error", () => {
+        reject(new Error(`Request for ${url} failed`));
       });
       req.open("GET", url);
       req.send();
@@ -271,13 +271,11 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const marginLeft = xPos - halfThumbnailWidth;
 
     if (marginLeft > 0 && marginRight > 0) {
-      this.thumbnailHolder.style.transform =
-        "translateX(" + (xPos - halfThumbnailWidth) + "px)";
+      this.thumbnailHolder.style.transform = `translateX(${xPos - halfThumbnailWidth}px)`;
     } else if (marginLeft <= 0) {
-      this.thumbnailHolder.style.transform = "translateX(" + 0 + "px)";
+      this.thumbnailHolder.style.transform = "translateX(0px)";
     } else if (marginRight <= 0) {
-      this.thumbnailHolder.style.transform =
-        "translateX(" + (width - thumbnailWidth) + "px)";
+      this.thumbnailHolder.style.transform = `translateX(${width - thumbnailWidth}px)`;
     }
 
     if (this.lastStyle && this.lastStyle === currentStyle) {
@@ -346,16 +344,9 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const spriteUrl = this.spriteUrl || imageProps.image;
 
     return {
-      background:
-        'url("' +
-        spriteUrl +
-        '") no-repeat -' +
-        imageProps.x +
-        "px -" +
-        imageProps.y +
-        "px",
-      width: imageProps.w + "px",
-      height: imageProps.h + "px",
+      background: `url("${spriteUrl}") no-repeat -${imageProps.x}px -${imageProps.y}px`,
+      width: `${imageProps.w}px`,
+      height: `${imageProps.h}px`,
     };
   }
 
@@ -386,9 +377,8 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     ].join("");
     let l = 0;
 
-    str += "";
     if (charlist) {
-      whitespace = (charlist + "").replace(/([[\]().?/*{}+$^:])/g, "$1");
+      whitespace = charlist.replace(/([[\]().?/*{}+$^:])/g, "$1");
     }
 
     l = str.length;

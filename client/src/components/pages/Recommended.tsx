@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { Info } from "lucide-react";
 import { apiGet } from "../../api";
 import { ApiError } from "../../api/client";
@@ -108,7 +109,7 @@ const Recommended = () => {
 
         setScenes(fetchedScenes);
         setTotalCount(count);
-        setCriteria(criteriaCounts || null);
+        setCriteria(criteriaCounts ?? null);
         if (msg) {
           setMessage(msg);
         }
@@ -126,7 +127,7 @@ const Recommended = () => {
           setInitMessage("Server is syncing library, please wait...");
           retryCount++;
           setTimeout(() => {
-            fetchRecommended();
+            void fetchRecommended();
           }, 5000);
           return;
         }
@@ -137,14 +138,14 @@ const Recommended = () => {
             "Failed to load recommendations",
           errorType:
             (err instanceof ApiError
-              ? ((err.data as Record<string, unknown>)?.errorType as string)
+              ? (err.data?.errorType as string)
               : null) || null,
         });
         setLoading(false);
       }
     };
 
-    fetchRecommended();
+    void fetchRecommended();
   }, [page, perPage]);
 
   // Handle page change
@@ -296,9 +297,7 @@ const Recommended = () => {
 
         {/* Scene Grid (includes bottom pagination) */}
         <SceneGrid
-          scenes={
-            scenes as unknown as import("@peek/shared-types").NormalizedScene[]
-          }
+          scenes={scenes as unknown as NormalizedScene[]}
           loading={loading}
           error={!initMessage && error ? error.message : undefined}
           currentPage={page}

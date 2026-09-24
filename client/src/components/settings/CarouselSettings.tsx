@@ -100,7 +100,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
       }
     };
 
-    loadCustomCarousels();
+    void loadCustomCarousels();
   }, []);
 
   // Derive merged preferences at render time instead of via effect
@@ -108,7 +108,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
     if (loadingCustom) return [];
 
     // Use user-modified preferences if available, otherwise start from props
-    const base = userPreferences || carouselPreferences;
+    const base = userPreferences ?? carouselPreferences;
 
     // Start with saved preferences
     let merged = [...base].sort((a, b) => a.order - b.order);
@@ -195,13 +195,13 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
   };
 
   const handleCreateCarousel = () => {
-    navigate("/settings/carousels/new");
+    void navigate("/settings/carousels/new");
   };
 
   const handleEditCarousel = (carouselId: string) => {
     // carouselId is the full "custom-{uuid}" format, extract the uuid
     const actualId = carouselId.replace("custom-", "");
-    navigate(`/settings/carousels/${actualId}/edit`);
+    void navigate(`/settings/carousels/${actualId}/edit`);
   };
 
   const handleDeleteCarousel = async (carouselId: string) => {
@@ -246,7 +246,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
                 style?: React.CSSProperties;
               }>
             >
-          )[carousel.icon] || LucideIcons.Film;
+          )[carousel.icon] ?? LucideIcons.Film;
         return {
           title: carousel.title,
           description: "Custom carousel",
@@ -421,7 +421,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }: Props) => {
                       title="Edit carousel"
                     />
                     <Button
-                      onClick={() => handleDeleteCarousel(pref.id)}
+                      onClick={() => void handleDeleteCarousel(pref.id)}
                       variant="secondary"
                       className="p-2"
                       disabled={deletingId === pref.id}

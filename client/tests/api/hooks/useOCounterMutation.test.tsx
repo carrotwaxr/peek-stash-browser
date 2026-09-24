@@ -1,9 +1,10 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiPost } from "../../../src/api/client";
 import { useIncrementOCounter } from "../../../src/api/hooks/useOCounterMutation";
+import { actAsync } from "../../testUtils";
 
 vi.mock("../../../src/api/client", () => ({
   apiPost: vi.fn(),
@@ -53,7 +54,7 @@ describe("useIncrementOCounter", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ sceneId: "scene-1" });
     });
 
@@ -71,7 +72,7 @@ describe("useIncrementOCounter", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ imageId: "image-1" });
     });
 
@@ -89,7 +90,7 @@ describe("useIncrementOCounter", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ imageId: "image-1", instanceId: "inst-1" });
     });
 
@@ -104,7 +105,7 @@ describe("useIncrementOCounter", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({});
     });
 
@@ -124,7 +125,7 @@ describe("useIncrementOCounter", () => {
 
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ sceneId: "scene-1" });
     });
 
@@ -144,7 +145,7 @@ describe("useIncrementOCounter", () => {
 
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ imageId: "image-1" });
     });
 
@@ -161,7 +162,7 @@ describe("useIncrementOCounter", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useIncrementOCounter(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({ sceneId: "scene-1" });
     });
 

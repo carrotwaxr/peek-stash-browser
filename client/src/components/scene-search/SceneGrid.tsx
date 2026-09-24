@@ -111,9 +111,8 @@ const SceneGrid = ({
   useEffect(() => {
     if (tvGridZoneActive && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
-      const firstFocusable = gridRef.current.querySelector(
-        '[tabindex="0"]'
-      ) as HTMLElement | null;
+      const firstFocusable =
+        gridRef.current.querySelector<HTMLElement>('[tabindex="0"]');
       if (firstFocusable) {
         firstFocusable.focus();
       }
@@ -251,7 +250,7 @@ const SceneGrid = ({
           <HideConfirmationDialog
             isOpen={hideDialogOpen}
             onClose={closeHideDialog}
-            onConfirm={handleHideConfirm}
+            onConfirm={(dontAskAgain) => void handleHideConfirm(dontAskAgain)}
             entityType="scene"
             entityName={`${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""}`}
           />

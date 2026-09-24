@@ -35,13 +35,13 @@ export function useUserStats({
   });
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.user.stats() });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.user.stats() });
   };
 
   return {
     data: (data as Record<string, unknown>) ?? null,
     loading: isLoading,
-    error: error ? (error as Error).message || "Failed to fetch stats" : null,
+    error: error ? error.message || "Failed to fetch stats" : null,
     refresh,
   };
 }

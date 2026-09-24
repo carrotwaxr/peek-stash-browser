@@ -392,9 +392,8 @@ describe("Pagination", () => {
     it("has preset options 12, 24, 48, 96, 120", () => {
       render(<Pagination {...defaultProps} perPage={24} />);
 
-      const perPageSelect = screen.getByLabelText(
-        "Per Page:"
-      ) as HTMLSelectElement;
+      const perPageSelect =
+        screen.getByLabelText<HTMLSelectElement>("Per Page:");
       const options = Array.from(perPageSelect.options).map(
         (o: HTMLOptionElement) => o.value
       );

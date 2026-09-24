@@ -65,19 +65,19 @@ const user = { id: 1, username: "restricted" };
 function showOnly(label: string): HTMLSelectElement {
   return screen.getByRole("listbox", {
     name: `Show only these ${label}...`,
-  }) as HTMLSelectElement;
+  });
 }
 
 function alwaysHide(label: string): HTMLSelectElement {
   return screen.getByRole("listbox", {
     name: `Always hide these ${label}...`,
-  }) as HTMLSelectElement;
+  });
 }
 
 function noItemsBox(label: string): HTMLInputElement {
   return screen.getByRole("checkbox", {
     name: `Also hide items with no ${label}`,
-  }) as HTMLInputElement;
+  });
 }
 
 function selected(select: HTMLSelectElement): string[] {

@@ -119,18 +119,11 @@ const TagDetail = () => {
         setIsLoading(true);
         const tagData = (await libraryApi.findTagById(
           tagId!,
-          instanceId!
+          instanceId
         )) as Record<string, unknown> | null;
         setTag(tagData);
-        setRating(
-          ((tagData as Record<string, unknown> | null)?.rating as
-            | number
-            | null) ?? null
-        );
-        setIsFavorite(
-          ((tagData as Record<string, unknown> | null)?.favorite as boolean) ||
-            false
-        );
+        setRating((tagData?.rating as number | null) ?? null);
+        setIsFavorite((tagData?.favorite as boolean) || false);
       } catch {
         // Error loading tag - will show loading spinner
       } finally {
@@ -138,13 +131,13 @@ const TagDetail = () => {
       }
     };
 
-    fetchTag();
+    void fetchTag();
   }, [tagId, instanceId]);
 
   const handleRatingChange = async (newRating: number | null) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("tag", tagId!, newRating, instanceId!);
+      await libraryApi.updateRating("tag", tagId!, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating((tag as Record<string, unknown>)?.rating as number | null);
@@ -154,7 +147,7 @@ const TagDetail = () => {
   const handleFavoriteChange = async (newValue: boolean) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("tag", tagId!, newValue, instanceId!);
+      await libraryApi.updateFavorite("tag", tagId!, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite((tag?.favorite as boolean) || false);
@@ -162,13 +155,13 @@ const TagDetail = () => {
   };
 
   const toggleFavorite = () => {
-    handleFavoriteChange(!isFavorite);
+    void handleFavoriteChange(!isFavorite);
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
   useRatingHotkeys({
     enabled: !isLoading && !!tag,
-    setRating: handleRatingChange,
+    setRating: (newRating) => void handleRatingChange(newRating),
     toggleFavorite,
   });
 
@@ -215,6 +208,8 @@ const TagDetail = () => {
     );
   }
 
+  const tagName = typeof tag.name === "string" ? tag.name : "";
+
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">
@@ -240,7 +235,9 @@ const TagDetail = () => {
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
-                      onChange={handleFavoriteChange}
+                      onChange={(newValue) =>
+                        void handleFavoriteChange(newValue)
+                      }
                       size="large"
                     />
                   )}
@@ -263,7 +260,7 @@ const TagDetail = () => {
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 showClearButton={true}
               />
             </div>
@@ -376,7 +373,7 @@ const TagDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No galleries found with tag "${tag?.name}"`}
+                  emptyMessage={`No galleries found with tag "${tagName}"`}
                 />
               )}
 
@@ -400,7 +397,7 @@ const TagDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No performers found with tag "${tag?.name}"`}
+                  emptyMessage={`No performers found with tag "${tagName}"`}
                 />
               )}
 
@@ -415,7 +412,7 @@ const TagDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No studios found with tag "${tag?.name}"`}
+                  emptyMessage={`No studios found with tag "${tagName}"`}
                 />
               )}
 
@@ -430,7 +427,7 @@ const TagDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No collections found with tag "${tag?.name}"`}
+                  emptyMessage={`No collections found with tag "${tagName}"`}
                 />
               )}
             </>
@@ -736,7 +733,7 @@ const ImagesTab = ({
         },
       })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
-        images: data.findImages?.images || [],
+        images: data.findImages?.images ?? [],
         count: data.findImages?.count || 0,
       };
     },

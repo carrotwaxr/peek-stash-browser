@@ -144,7 +144,7 @@ const SceneContent = () => {
               {(sceneError as { message?: string })?.message ||
                 "Scene not found"}
             </h2>
-            <Button onClick={() => navigate("/scenes")} variant="primary">
+            <Button onClick={() => void navigate("/scenes")} variant="primary">
               Browse Scenes
             </Button>
           </div>
@@ -216,7 +216,7 @@ const SceneContent = () => {
               ) : (
                 scene && (
                   <RecommendedSidebar
-                    sceneId={scene.id as string}
+                    sceneId={scene.id}
                     maxHeight={sidebarHeight ?? undefined}
                   />
                 )
@@ -270,7 +270,7 @@ const SceneContent = () => {
             {activeTab === "similar" && (
               <div className="mt-6">
                 <ScenesLikeThis
-                  sceneId={scene.id as string}
+                  sceneId={scene.id}
                   onCountChange={setSimilarScenesCount}
                 />
               </div>
@@ -282,12 +282,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     group_filter: {
                       scenes: {
-                        value: [
-                          makeCompositeKey(
-                            scene.id as string,
-                            scene.instanceId as string
-                          ),
-                        ],
+                        value: [makeCompositeKey(scene.id, scene.instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -304,12 +299,7 @@ const SceneContent = () => {
                   lockedFilters={{
                     gallery_filter: {
                       scenes: {
-                        value: [
-                          makeCompositeKey(
-                            scene.id as string,
-                            scene.instanceId as string
-                          ),
-                        ],
+                        value: [makeCompositeKey(scene.id, scene.instanceId)],
                         modifier: "INCLUDES",
                       },
                     },

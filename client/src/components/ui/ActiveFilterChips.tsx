@@ -50,13 +50,20 @@ const ActiveFilterChips = ({
         const selectedOption = options?.find(
           (opt: { value: string; label: string }) => opt.value === filterValue
         );
-        return selectedOption
-          ? `${label}: ${selectedOption.label}`
-          : `${label}: ${filterValue}`;
+        if (selectedOption) return `${label}: ${selectedOption.label}`;
+        // A value that is not a string, number or boolean has no text
+        return typeof filterValue === "string" ||
+          typeof filterValue === "number" ||
+          typeof filterValue === "boolean"
+          ? `${label}: ${filterValue}`
+          : label;
       }
 
       case "text":
-        return `${label}: "${filterValue}"`;
+        return typeof filterValue === "string" ||
+          typeof filterValue === "number"
+          ? `${label}: "${filterValue}"`
+          : label;
 
       case "searchable-select": {
         // For multi-select, show count if array

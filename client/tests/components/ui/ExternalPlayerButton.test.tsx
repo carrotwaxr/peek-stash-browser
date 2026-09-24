@@ -96,7 +96,7 @@ describe("ExternalPlayerButton", () => {
     expect(anchor).not.toHaveAttribute("aria-disabled");
   });
 
-  it("renders no href until the link has loaded", async () => {
+  it("renders no href until the link has loaded", () => {
     mockApiPost.mockReturnValue(new Promise(() => {}));
 
     renderButton();

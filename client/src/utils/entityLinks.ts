@@ -40,7 +40,9 @@ export function getEntityPath(
     return "#";
   }
 
-  const id = typeof entity === "string" ? entity : (entity?.id ?? entity);
+  const id = typeof entity === "string" ? entity : entity?.id;
+  // An entity without an id has no page
+  if (id == null) return "#";
   const base = `${basePath}/${id}`;
 
   if (
@@ -88,7 +90,9 @@ export function getScenePathWithTime(
   time: number,
   hasMultipleInstances: boolean
 ) {
-  const id = typeof scene === "string" ? scene : (scene?.id ?? scene);
+  const id = typeof scene === "string" ? scene : scene?.id;
+  // A scene without an id has no page
+  if (id == null) return "#";
   const base = `/scene/${id}`;
   const timeParam = `t=${Math.floor(time)}`;
 

@@ -9,8 +9,12 @@ const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  // A terabyte or more is shown in GB
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(k)),
+    sizes.length - 1
+  );
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i] ?? ""}`;
 };
 
 const formatDate = (dateString: string) => {
@@ -51,7 +55,7 @@ const BackupTab = () => {
   }, []);
 
   useEffect(() => {
-    fetchBackups();
+    void fetchBackups();
   }, [fetchBackups]);
 
   const handleCreateBackup = async () => {
@@ -59,7 +63,7 @@ const BackupTab = () => {
       setCreating(true);
       await apiPost("/admin/database/backup");
       showSuccess("Backup created successfully");
-      fetchBackups();
+      void fetchBackups();
     } catch {
       showError("Failed to create backup");
     } finally {
@@ -81,7 +85,7 @@ const BackupTab = () => {
         `/admin/database/backups/${encodeURIComponent(filename)}`
       );
       showSuccess("Backup deleted");
-      fetchBackups();
+      void fetchBackups();
     } catch {
       showError("Failed to delete backup");
     } finally {
@@ -115,7 +119,7 @@ const BackupTab = () => {
             </p>
           </div>
           <Button
-            onClick={handleCreateBackup}
+            onClick={() => void handleCreateBackup()}
             disabled={creating}
             variant="primary"
           >
@@ -160,7 +164,7 @@ const BackupTab = () => {
                   </p>
                 </div>
                 <Button
-                  onClick={() => handleDeleteBackup(backup.filename)}
+                  onClick={() => void handleDeleteBackup(backup.filename)}
                   disabled={deleting === backup.filename}
                   variant="destructive"
                   size="sm"

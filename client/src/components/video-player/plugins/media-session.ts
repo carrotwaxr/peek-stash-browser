@@ -105,7 +105,7 @@ class MediaSessionPlugin extends videojs.getPlugin("plugin") {
 
     navigator.mediaSession.setActionHandler("seekforward", () => {
       this.player.currentTime(
-        Math.min(this.player.duration(), this.player.currentTime() + 10)
+        Math.min(this.player.duration(), Number(this.player.currentTime()) + 10)
       );
     });
   }

@@ -79,7 +79,7 @@ export function useFolderViewTags(
               result as {
                 findTags?: { tags?: Array<{ id: string; name: string }> };
               }
-            )?.findTags?.tags || [];
+            )?.findTags?.tags ?? [];
         }
 
         setTags(fetchedTags);
@@ -92,7 +92,7 @@ export function useFolderViewTags(
       }
     };
 
-    fetchTags();
+    void fetchTags();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) captures all filter changes
   }, [isActive, filterKey]);
 

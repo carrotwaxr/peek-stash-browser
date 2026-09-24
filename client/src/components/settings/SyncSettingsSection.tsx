@@ -34,7 +34,7 @@ const SyncSettingsSection = () => {
         setLoading(false);
       }
     };
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -71,7 +71,7 @@ const SyncSettingsSection = () => {
           <select
             id="syncInterval"
             value={syncInterval}
-            onChange={handleChange}
+            onChange={(e) => void handleChange(e)}
             disabled={loading}
             className="w-full px-4 py-2 rounded-lg"
             style={{

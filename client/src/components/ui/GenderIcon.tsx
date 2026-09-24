@@ -69,6 +69,8 @@ const GenderIcon = ({ gender, size = 24, className = "" }: Props) => {
           color: "#FFF430", // Yellow from non-binary flag
           label: "Non-Binary",
         };
+      case null:
+      case undefined:
       default:
         // Fallback for unknown or null gender
         return {

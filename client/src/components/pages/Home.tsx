@@ -123,7 +123,7 @@ const Home = () => {
     const loadData = async () => {
       try {
         // Load user preferences
-        const data = (await apiGet("/user/settings")) as Record<string, any>;
+        const data = await apiGet<Record<string, any>>("/user/settings");
         const prefs = migrateCarouselPreferences(
           data.settings.carouselPreferences
         );
@@ -147,7 +147,7 @@ const Home = () => {
       }
     };
 
-    loadData();
+    void loadData();
     // Re-fetch when navigating to homepage (location.key changes on each navigation)
   }, [location.key]);
 
@@ -156,7 +156,7 @@ const Home = () => {
     (scene: Record<string, unknown>) => {
       const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-      navigate(getEntityPath("scene", scene, hasMultipleInstances), {
+      void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
         state: {
           scene,
           fromPageTitle: "Home",
@@ -311,7 +311,7 @@ const Home = () => {
               key={carousel.prefId}
               carouselId={id!}
               carousel={
-                customCarousels.find((c) => c.id === id) ||
+                customCarousels.find((c) => c.id === id) ??
                 ({} as Record<string, unknown>)
               }
               title={title}
@@ -408,7 +408,7 @@ const Home = () => {
           <HideConfirmationDialog
             isOpen={hideDialogOpen}
             onClose={closeHideDialog}
-            onConfirm={handleHideConfirm}
+            onConfirm={(dontAskAgain) => void handleHideConfirm(dontAskAgain)}
             entityType="scene"
             entityName={`${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""}`}
           />
@@ -472,7 +472,7 @@ const HomeCarousel = ({
         onInitializing(true);
         const timer = setTimeout(() => {
           setRetryCount((prev) => prev + 1);
-          queryClient.invalidateQueries({ queryKey: [...queryKey] });
+          void queryClient.invalidateQueries({ queryKey: [...queryKey] });
         }, 5000); // Retry every 5 seconds
         return () => clearTimeout(timer);
       } else {
@@ -517,7 +517,7 @@ const HomeCarousel = ({
         createSceneClickHandler(
           (scenes || []) as Record<string, unknown>[],
           title
-        ) as unknown as (scene: NormalizedScene) => boolean | void
+        ) as unknown as (scene: NormalizedScene) => void
       }
       selectedScenes={selectedScenes as unknown as NormalizedScene[]}
       onToggleSelect={
@@ -584,7 +584,7 @@ const CustomCarousel = ({
   }, [carouselId, onInitializing, title]);
 
   useEffect(() => {
-    fetchCarousel();
+    void fetchCarousel();
   }, [fetchCarousel]);
 
   // Handle server initialization state with retry
@@ -594,7 +594,7 @@ const CustomCarousel = ({
         onInitializing(true);
         const timer = setTimeout(() => {
           setRetryCount((prev) => prev + 1);
-          fetchCarousel();
+          void fetchCarousel();
         }, 5000);
         return () => clearTimeout(timer);
       } else {
@@ -632,7 +632,7 @@ const CustomCarousel = ({
       onSceneClick={
         createSceneClickHandler(scenes, title) as unknown as (
           scene: NormalizedScene
-        ) => boolean | void
+        ) => void
       }
       selectedScenes={selectedScenes as unknown as NormalizedScene[]}
       onToggleSelect={

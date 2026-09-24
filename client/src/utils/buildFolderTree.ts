@@ -143,7 +143,7 @@ export function buildFolderTree(
     const tag = tagMap.get(tagId);
     if (!tag) return;
 
-    const folderItems = folderContents.get(tagId) || [];
+    const folderItems = folderContents.get(tagId) ?? [];
 
     // Get pre-computed count from tag (image_count, scene_count, or gallery_count)
     // These are set by the backend during sync and represent the total items with this tag

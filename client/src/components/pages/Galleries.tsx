@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedGallery } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
 import { useGalleryList } from "../../api/hooks";
@@ -119,7 +120,7 @@ const Galleries = () => {
 
   const handleGalleryClick = useCallback(
     (gallery: { id: string; stashInstanceId?: string }) => {
-      navigate(getEntityPath("gallery", gallery, hasMultipleInstances), {
+      void navigate(getEntityPath("gallery", gallery, hasMultipleInstances), {
         state: { fromPageTitle: "Galleries" },
       });
     },
@@ -221,7 +222,7 @@ const Galleries = () => {
             }) =>
               viewMode === "table" ? (
                 <TableView
-                  items={currentGalleries as Record<string, unknown>[]}
+                  items={currentGalleries}
                   columns={
                     visibleColumns as {
                       id: string;
@@ -251,7 +252,7 @@ const Galleries = () => {
                 />
               ) : viewMode === "wall" ? (
                 <WallView
-                  items={currentGalleries as Record<string, unknown>[]}
+                  items={currentGalleries}
                   entityType="gallery"
                   zoomLevel={
                     zoomLevel as unknown as "small" | "medium" | "large"
@@ -272,9 +273,7 @@ const Galleries = () => {
                   renderItem={(gallery: Record<string, unknown>) => (
                     <GalleryCard
                       key={gallery.id as string}
-                      gallery={
-                        gallery as unknown as import("@peek/shared-types").NormalizedGallery
-                      }
+                      gallery={gallery as unknown as NormalizedGallery}
                       fromPageTitle="Galleries"
                       tabIndex={0}
                     />
@@ -299,9 +298,7 @@ const Galleries = () => {
                   renderItem={(gallery: Record<string, unknown>) => (
                     <GalleryCard
                       key={gallery.id as string}
-                      gallery={
-                        gallery as unknown as import("@peek/shared-types").NormalizedGallery
-                      }
+                      gallery={gallery as unknown as NormalizedGallery}
                       fromPageTitle="Galleries"
                       tabIndex={0}
                     />
@@ -332,9 +329,7 @@ const Galleries = () => {
                       return (
                         <GalleryCard
                           key={gallery.id as string}
-                          gallery={
-                            gallery as unknown as import("@peek/shared-types").NormalizedGallery
-                          }
+                          gallery={gallery as unknown as NormalizedGallery}
                           fromPageTitle="Galleries"
                           tabIndex={isTVMode ? _tabIndex : -1}
                           {...restItemProps}

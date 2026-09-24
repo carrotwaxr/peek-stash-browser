@@ -69,7 +69,7 @@ const ScenesLikeThis = ({ sceneId, onCountChange }: Props) => {
     }
 
     // Either scene didn't change, or we're already on page 1
-    fetchSimilarScenes(page, sceneId);
+    void fetchSimilarScenes(page, sceneId);
   }, [sceneId, page, searchParams, setSearchParams, fetchSimilarScenes]);
 
   const handlePageChange = useCallback(

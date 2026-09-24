@@ -256,7 +256,7 @@ const SceneSearch = ({
       navigationState.fromPageTitle = fromPageTitle;
     }
 
-    navigate(getEntityPath("scene", scene, hasMultipleInstances), {
+    void navigate(getEntityPath("scene", scene, hasMultipleInstances), {
       state: navigationState,
     });
   };
@@ -369,11 +369,7 @@ const SceneSearch = ({
           }) =>
             viewMode === "table" ? (
               <TableView
-                items={
-                  currentScenes as React.ComponentProps<
-                    typeof TableView
-                  >["items"]
-                }
+                items={currentScenes}
                 columns={
                   visibleColumns as React.ComponentProps<
                     typeof TableView

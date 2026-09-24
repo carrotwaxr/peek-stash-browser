@@ -219,7 +219,7 @@ const SearchableSelect = ({
     };
 
     // Run immediately (lazy load in background)
-    loadSelectedNames();
+    void loadSelectedNames();
   }, [value, options, entityType, multi, fetchItemsByIds]);
 
   // Build count_filter based on context
@@ -317,13 +317,13 @@ const SearchableSelect = ({
 
   // Debounced search - triggers loadOptions after 300ms of no typing
   useEffect(() => {
-    loadOptions(debouncedSearchTerm);
+    void loadOptions(debouncedSearchTerm);
   }, [debouncedSearchTerm, loadOptions]);
 
   // Load initial options when dropdown opens
   useEffect(() => {
     if (isOpen && options.length === 0) {
-      loadOptions("");
+      void loadOptions("");
     }
   }, [isOpen, options.length, loadOptions]);
 

@@ -93,7 +93,7 @@ const AppContent = () => {
       }
     };
 
-    checkSetup();
+    void checkSetup();
   }, []);
 
   // Handler for when setup completes - triggers re-check and navigation
@@ -104,7 +104,7 @@ const AppContent = () => {
   };
 
   // Ensure setupStatus has defaults to prevent null access in guards
-  const safeSetupStatus = setupStatus || {
+  const safeSetupStatus = setupStatus ?? {
     setupComplete: false,
     hasUsers: false,
     hasStashInstance: false,

@@ -4,6 +4,12 @@ import localForage from "localforage";
 const levelKey = "volume-level";
 const mutedKey = "volume-muted";
 
+// Storage can be unavailable (a private window, blocked IndexedDB): the
+// volume then just isn't remembered
+const logStorageError = (err: unknown) => {
+  console.warn("[Persist Volume] Volume storage failed:", err);
+};
+
 class PersistVolumePlugin extends videojs.getPlugin("plugin") {
   enabled: boolean;
   declare player: any;
@@ -15,8 +21,8 @@ class PersistVolumePlugin extends videojs.getPlugin("plugin") {
 
     player.on("volumechange", () => {
       if (this.enabled) {
-        localForage.setItem(levelKey, player.volume());
-        localForage.setItem(mutedKey, player.muted());
+        localForage.setItem(levelKey, player.volume()).catch(logStorageError);
+        localForage.setItem(mutedKey, player.muted()).catch(logStorageError);
       }
     });
 
@@ -26,17 +32,23 @@ class PersistVolumePlugin extends videojs.getPlugin("plugin") {
   }
 
   ready() {
-    localForage.getItem(levelKey).then((value: any) => {
-      if (value !== null) {
-        this.player.volume(value);
-      }
-    });
+    localForage
+      .getItem(levelKey)
+      .then((value: any) => {
+        if (value !== null) {
+          this.player.volume(value);
+        }
+      })
+      .catch(logStorageError);
 
-    localForage.getItem(mutedKey).then((value: any) => {
-      if (value !== null) {
-        this.player.muted(value);
-      }
-    });
+    localForage
+      .getItem(mutedKey)
+      .then((value: any) => {
+        if (value !== null) {
+          this.player.muted(value);
+        }
+      })
+      .catch(logStorageError);
   }
 }
 

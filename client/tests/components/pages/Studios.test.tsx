@@ -1,3 +1,4 @@
+import React from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
@@ -87,7 +88,6 @@ vi.mock("@/components/ui/index", () => ({
   SearchControls: (props: Record<string, unknown>) => {
     mockSearchControlsProps(props);
     const { children, onQueryChange, ...rest } = props;
-    const React = require("react");
     React.useEffect(() => {
       if (typeof onQueryChange === "function") {
         onQueryChange({ filter: {} });
@@ -96,7 +96,7 @@ vi.mock("@/components/ui/index", () => ({
     return (
       <div data-testid="search-controls" data-artifact-type={rest.artifactType}>
         {typeof children === "function"
-          ? (children as Function)({
+          ? children({
               viewMode: "grid",
               gridDensity: "medium",
               sortField: "name",

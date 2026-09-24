@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { vi } from "vitest";
 import type { AuthContextValue } from "@/contexts/AuthContextProvider";
 
@@ -249,6 +249,18 @@ export const waitForCondition = async (
  * Flushes all pending promises
  * Useful after triggering async operations
  */
+/**
+ * `await act(async () => { ... })` for a step that awaits nothing: React
+ * flushes the updates, effects and promises the step started before the
+ * test goes on. A plain `act(() => ...)` is typed as returning nothing, and
+ * an async callback without an await fails require-await.
+ */
+export const actAsync = (step: () => void): Promise<void> =>
+  act(() => {
+    step();
+    return Promise.resolve();
+  });
+
 export const flushPromises = () =>
   new Promise((resolve) => setTimeout(resolve, 0));
 

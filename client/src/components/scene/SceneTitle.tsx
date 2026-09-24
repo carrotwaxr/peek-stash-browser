@@ -70,9 +70,9 @@ const SceneTitle = ({
 
         // Also check if video is fullscreen
         const isFullscreen =
-          document.fullscreenElement ||
-          (document as unknown as Record<string, unknown>)
-            .webkitFullscreenElement ||
+          (document.fullscreenElement ??
+            (document as unknown as Record<string, unknown>)
+              .webkitFullscreenElement) ||
           (document as unknown as Record<string, unknown>)
             .mozFullScreenElement ||
           (document as unknown as Record<string, unknown>).msFullscreenElement;

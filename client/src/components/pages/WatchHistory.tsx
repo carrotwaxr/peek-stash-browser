@@ -90,7 +90,7 @@ const WatchHistory = () => {
         const scenesWithHistory: SceneWithHistory[] = fetchedScenes.map(
           (scene: Record<string, unknown>) => {
             const watchHistory =
-              historyList.find((wh) => wh.sceneId === scene.id) || null;
+              historyList.find((wh) => wh.sceneId === scene.id) ?? null;
             const files = scene.files as
               | Array<{ duration?: number }>
               | undefined;
@@ -109,7 +109,7 @@ const WatchHistory = () => {
               playDuration: watchHistory?.playDuration || 0,
               lastPlayedAt: watchHistory?.lastPlayedAt || null,
               oCount: watchHistory?.oCount || 0,
-              oHistory: watchHistory?.oHistory || [],
+              oHistory: watchHistory?.oHistory ?? [],
               isCompleted: isCompleted,
             };
           }
@@ -128,7 +128,7 @@ const WatchHistory = () => {
         }
 
         // Apply sorting
-        let sorted = [...filtered];
+        const sorted = [...filtered];
         if (sortBy === "recent") {
           sorted.sort((a, b) => {
             const dateA = a.lastPlayedAt
@@ -155,7 +155,7 @@ const WatchHistory = () => {
     };
 
     if (!loadingHistory) {
-      fetchScenes();
+      void fetchScenes();
     }
   }, [watchHistoryList, loadingHistory, sortBy, filterBy]);
 
@@ -259,10 +259,7 @@ const WatchHistory = () => {
                 <span>
                   Total watch time:{" "}
                   {formatDuration(
-                    scenes.reduce(
-                      (sum, s) => sum + (s.playDuration as number),
-                      0
-                    )
+                    scenes.reduce((sum, s) => sum + s.playDuration, 0)
                   )}
                 </span>
               )}
@@ -329,7 +326,7 @@ const WatchHistory = () => {
           <div className="space-y-3">
             {scenes.map((scene, index) => (
               <SceneListItem
-                key={scene.id as string}
+                key={scene.id}
                 scene={scene as unknown as NormalizedScene}
                 watchHistory={{
                   resumeTime: scene.resumeTime as number | undefined,
@@ -400,7 +397,7 @@ const WatchHistory = () => {
                 Cancel
               </Button>
               <Button
-                onClick={handleClearHistory}
+                onClick={() => void handleClearHistory()}
                 disabled={isClearing}
                 variant="destructive"
                 loading={isClearing}

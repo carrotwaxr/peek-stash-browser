@@ -37,12 +37,12 @@ interface Props {
  */
 const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
   const [activeEntity, setActiveEntity] = useState("scene");
-  const [localDefaults, setLocalDefaults] = useState(tableColumnDefaults || {});
+  const [localDefaults, setLocalDefaults] = useState(tableColumnDefaults ?? {});
   const [hasChanges, setHasChanges] = useState(false);
 
   // Get current entity's columns config
   const allColumns = getColumnsForEntity(activeEntity);
-  const currentConfig = localDefaults[activeEntity] || {
+  const currentConfig = localDefaults[activeEntity] ?? {
     visible: getDefaultVisibleColumns(activeEntity),
     order: getDefaultColumnOrder(activeEntity),
   };
@@ -279,7 +279,7 @@ const TableColumnSettings = ({ tableColumnDefaults, onSave }: Props) => {
         <Button
           variant="primary"
           size="sm"
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           disabled={!hasChanges}
         >
           Save Changes

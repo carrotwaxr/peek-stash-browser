@@ -51,7 +51,7 @@ const AddToPlaylistButton = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Support both single sceneId and multiple sceneIds
-  const scenesToAdd = sceneIds || (sceneId ? [sceneId] : []);
+  const scenesToAdd = sceneIds ?? (sceneId ? [sceneId] : []);
   const isMultiple = scenesToAdd.length > 1;
 
   // Auto-detect menu position when opening
@@ -71,7 +71,7 @@ const AddToPlaylistButton = ({
 
   useEffect(() => {
     if (showMenu && playlists.length === 0) {
-      loadPlaylists();
+      void loadPlaylists();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMenu]); // Only load when menu opens, not when playlists.length changes
@@ -101,8 +101,8 @@ const AddToPlaylistButton = ({
       ]);
       const ownData =
         ownResult.status === "fulfilled"
-          ? (ownResult.value as { playlists?: Record<string, unknown>[] })
-              .playlists || []
+          ? ((ownResult.value as { playlists?: Record<string, unknown>[] })
+              .playlists ?? [])
           : [];
       const own = ownData.map((p: Record<string, unknown>) => ({
         ...p,
@@ -110,8 +110,8 @@ const AddToPlaylistButton = ({
       })) as PlaylistItem[];
       const sharedData =
         sharedResult.status === "fulfilled"
-          ? (sharedResult.value as { playlists?: Record<string, unknown>[] })
-              .playlists || []
+          ? ((sharedResult.value as { playlists?: Record<string, unknown>[] })
+              .playlists ?? [])
           : [];
       const shared = sharedData.map((p: Record<string, unknown>) => ({
         ...p,
@@ -179,7 +179,7 @@ const AddToPlaylistButton = ({
     }
   };
 
-  const createPlaylistAndAdd = async (e: React.FormEvent) => {
+  const createPlaylistAndAdd = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
@@ -204,7 +204,7 @@ const AddToPlaylistButton = ({
       setShowMenu(false);
 
       // Reload playlists for next time
-      loadPlaylists();
+      void loadPlaylists();
     } catch {
       showError("Failed to create playlist");
     } finally {
@@ -307,7 +307,9 @@ const AddToPlaylistButton = ({
                         key={`${playlist.id}-${playlist.isShared ? "shared" : "own"}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          addToPlaylist(playlist.id);
+                          addToPlaylist(playlist.id).catch(() => {
+                            // addToPlaylist has shown the error toast
+                          });
                         }}
                         variant="tertiary"
                         fullWidth
@@ -366,7 +368,7 @@ const AddToPlaylistButton = ({
             onClick={(e) => e.stopPropagation()}
           >
             <Paper.Header title="Create New Playlist" />
-            <form onSubmit={createPlaylistAndAdd}>
+            <form onSubmit={(e) => void createPlaylistAndAdd(e)}>
               <Paper.Body>
                 <div className="space-y-4">
                   <div>

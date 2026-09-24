@@ -393,7 +393,7 @@ export function scenePlayerReducer(
       const index =
         typeof gotoPayload === "object" && gotoPayload !== null
           ? (gotoPayload.index ?? 0)
-          : (gotoPayload as number);
+          : gotoPayload;
       const shouldAutoplay =
         typeof gotoPayload === "object" && gotoPayload !== null
           ? (gotoPayload.shouldAutoplay ?? false)
@@ -545,9 +545,9 @@ export function scenePlayerReducer(
 
       return {
         ...state,
-        playlist: playlist || null,
+        playlist: playlist ?? null,
         currentIndex: initPayload.currentIndex || 0,
-        compatibility: initPayload.compatibility || null,
+        compatibility: initPayload.compatibility ?? null,
         quality: initPayload.initialQuality || "direct",
         // Initialize playlist controls from playlist object
         autoplayNext: (playlist?.autoplayNext as boolean | undefined) ?? true,

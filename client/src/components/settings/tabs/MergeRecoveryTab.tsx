@@ -46,7 +46,7 @@ const MergeRecoveryTab = () => {
   }, []);
 
   useEffect(() => {
-    fetchOrphans();
+    void fetchOrphans();
   }, [fetchOrphans]);
 
   const fetchMatches = async (sceneId: string) => {
@@ -66,7 +66,7 @@ const MergeRecoveryTab = () => {
       setExpandedOrphan(null);
     } else {
       setExpandedOrphan(sceneId);
-      fetchMatches(sceneId);
+      void fetchMatches(sceneId);
     }
   };
 
@@ -77,7 +77,7 @@ const MergeRecoveryTab = () => {
         targetSceneId: targetId,
       });
       showSuccess("Activity transferred successfully");
-      fetchOrphans();
+      void fetchOrphans();
     } catch {
       showError("Failed to reconcile scene");
     } finally {
@@ -97,7 +97,7 @@ const MergeRecoveryTab = () => {
       setProcessing(sceneId);
       await apiPost(`/admin/orphaned-scenes/${sceneId}/discard`);
       showSuccess("Orphaned data discarded");
-      fetchOrphans();
+      void fetchOrphans();
     } catch {
       showError("Failed to discard data");
     } finally {
@@ -121,7 +121,7 @@ const MergeRecoveryTab = () => {
       showSuccess(
         `Reconciled ${data.reconciled} scenes, skipped ${data.skipped}`
       );
-      fetchOrphans();
+      void fetchOrphans();
     } catch {
       showError("Failed to reconcile all");
     } finally {
@@ -155,7 +155,7 @@ const MergeRecoveryTab = () => {
             </p>
           </div>
           <Button
-            onClick={handleReconcileAll}
+            onClick={() => void handleReconcileAll()}
             disabled={processing === "all" || orphans.length === 0}
             variant="primary"
           >
@@ -277,7 +277,7 @@ const MergeRecoveryTab = () => {
                               </div>
                               <Button
                                 onClick={() =>
-                                  handleReconcile(orphan.id, match.sceneId)
+                                  void handleReconcile(orphan.id, match.sceneId)
                                 }
                                 disabled={processing === orphan.id}
                                 variant="primary"
@@ -311,7 +311,7 @@ const MergeRecoveryTab = () => {
                         <Button
                           onClick={() => {
                             if (manualTarget) {
-                              handleReconcile(orphan.id, manualTarget);
+                              void handleReconcile(orphan.id, manualTarget);
                             }
                           }}
                           disabled={!manualTarget || processing === orphan.id}
@@ -324,7 +324,7 @@ const MergeRecoveryTab = () => {
 
                       <div className="mt-4">
                         <Button
-                          onClick={() => handleDiscard(orphan.id)}
+                          onClick={() => void handleDiscard(orphan.id)}
                           disabled={processing === orphan.id}
                           variant="destructive"
                           size="sm"

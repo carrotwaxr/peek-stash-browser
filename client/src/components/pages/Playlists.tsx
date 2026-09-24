@@ -100,8 +100,8 @@ const Playlists = () => {
 
   useEffect(() => {
     // Load both playlist types on mount
-    loadPlaylists();
-    loadSharedPlaylists();
+    void loadPlaylists();
+    void loadSharedPlaylists();
   }, []);
 
   const loadPlaylists = async () => {
@@ -131,7 +131,7 @@ const Playlists = () => {
     }
   };
 
-  const createPlaylist = async (e: React.FormEvent<HTMLFormElement>) => {
+  const createPlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
@@ -146,7 +146,7 @@ const Playlists = () => {
       setNewPlaylistName("");
       setNewPlaylistDescription("");
       setShowCreateModal(false);
-      loadPlaylists();
+      void loadPlaylists();
     } catch {
       showError("Failed to create playlist");
     } finally {
@@ -163,9 +163,9 @@ const Playlists = () => {
     if (!playlistToDelete) return;
 
     try {
-      await apiDelete(`/playlists/${playlistToDelete.id}`);
+      await apiDelete(`/playlists/${String(playlistToDelete.id)}`);
       showSuccess("Playlist deleted");
-      loadPlaylists();
+      void loadPlaylists();
     } catch {
       showError("Failed to delete playlist");
     } finally {
@@ -404,7 +404,7 @@ const Playlists = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <Paper.Header title="Create New Playlist" />
-            <form onSubmit={createPlaylist}>
+            <form onSubmit={(e) => void createPlaylist(e)}>
               <Paper.Body>
                 <div className="space-y-4">
                   <div>
@@ -486,9 +486,9 @@ const Playlists = () => {
           setDeleteConfirmOpen(false);
           setPlaylistToDelete(null);
         }}
-        onConfirm={confirmDelete}
+        onConfirm={() => void confirmDelete()}
         title="Delete Playlist"
-        message={`Are you sure you want to delete "${playlistToDelete?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${typeof playlistToDelete?.name === "string" ? playlistToDelete.name : ""}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         confirmStyle="danger"

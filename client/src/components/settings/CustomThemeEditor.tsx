@@ -157,7 +157,7 @@ const CustomThemeEditor = ({
 }: CustomThemeEditorProps) => {
   const [name, setName] = useState(theme?.name || "");
   const [config, setConfig] = useState(
-    theme?.config || {
+    theme?.config ?? {
       mode: "dark",
       fonts: {
         brand: fontOptions.brand[0].value,

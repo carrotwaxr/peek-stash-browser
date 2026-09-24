@@ -104,7 +104,7 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     const handleDoubleClick = useCallback(
       (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+        void navigate(getEntityPath("tag", tag, hasMultipleInstances), {
           state: { fromPageTitle: "Tags" },
         });
       },
@@ -114,7 +114,7 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
     const handleNavigateClick = useCallback(
       (e: React.MouseEvent) => {
         e.stopPropagation();
-        navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+        void navigate(getEntityPath("tag", tag, hasMultipleInstances), {
           state: { fromPageTitle: "Tags" },
         });
       },
@@ -125,7 +125,7 @@ const TagTreeNode = forwardRef<HTMLDivElement, TagTreeNodeProps>(
       (e: React.KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+          void navigate(getEntityPath("tag", tag, hasMultipleInstances), {
             state: { fromPageTitle: "Tags" },
           });
         }

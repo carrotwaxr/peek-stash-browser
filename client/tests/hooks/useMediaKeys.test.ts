@@ -25,11 +25,11 @@ function createMockPlayer(overrides: Record<string, any> = {}) {
     paused: vi.fn(() => true),
     play: vi.fn(),
     pause: vi.fn(),
-    currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
+    currentTime: vi.fn((t?: number) => t ?? 30),
     duration: vi.fn(() => 100),
-    volume: vi.fn((v?: number) => (v !== undefined ? v : 0.5)),
-    muted: vi.fn((m?: boolean) => (m !== undefined ? m : false)),
-    playbackRate: vi.fn((r?: number) => (r !== undefined ? r : 1)),
+    volume: vi.fn((v?: number) => v ?? 0.5),
+    muted: vi.fn((m?: boolean) => m ?? false),
+    playbackRate: vi.fn((r?: number) => r ?? 1),
     isFullscreen: vi.fn(() => false),
     exitFullscreen: vi.fn(),
     requestFullscreen: vi.fn(),
@@ -112,7 +112,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("seeks backward 10s with j key (clamped to 0)", () => {
     const { player, shortcuts } = captureShortcuts({
-      currentTime: vi.fn((t?: number) => (t !== undefined ? t : 5)),
+      currentTime: vi.fn((t?: number) => t ?? 5),
     });
 
     must(shortcuts.j)();
@@ -123,7 +123,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("seeks forward 10s with l key", () => {
     const { player, shortcuts } = captureShortcuts({
-      currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
+      currentTime: vi.fn((t?: number) => t ?? 30),
     });
 
     must(shortcuts.l)();
@@ -133,7 +133,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("seeks backward 5s with left arrow", () => {
     const { player, shortcuts } = captureShortcuts({
-      currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
+      currentTime: vi.fn((t?: number) => t ?? 30),
     });
 
     must(shortcuts.left)();
@@ -143,7 +143,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("seeks forward 5s with right arrow", () => {
     const { player, shortcuts } = captureShortcuts({
-      currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
+      currentTime: vi.fn((t?: number) => t ?? 30),
     });
 
     must(shortcuts.right)();
@@ -221,7 +221,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("increases volume with up arrow (+0.05, clamped to 1)", () => {
     const { player, shortcuts } = captureShortcuts({
-      volume: vi.fn((v?: number) => (v !== undefined ? v : 0.95)),
+      volume: vi.fn((v?: number) => v ?? 0.95),
     });
 
     must(shortcuts.up)();
@@ -231,7 +231,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("decreases volume with down arrow (-0.05, clamped to 0)", () => {
     const { player, shortcuts } = captureShortcuts({
-      volume: vi.fn((v?: number) => (v !== undefined ? v : 0.03)),
+      volume: vi.fn((v?: number) => v ?? 0.03),
     });
 
     must(shortcuts.down)();
@@ -243,7 +243,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("toggles mute with m key", () => {
     const { player, shortcuts } = captureShortcuts({
-      muted: vi.fn((m?: boolean) => (m !== undefined ? m : false)),
+      muted: vi.fn((m?: boolean) => m ?? false),
     });
 
     must(shortcuts.m)();
@@ -255,7 +255,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("increases playback speed with shift+> (max 2)", () => {
     const { player, shortcuts } = captureShortcuts({
-      playbackRate: vi.fn((r?: number) => (r !== undefined ? r : 1.75)),
+      playbackRate: vi.fn((r?: number) => r ?? 1.75),
     });
 
     must(shortcuts["shift+>"])();
@@ -265,7 +265,7 @@ describe("usePlaylistMediaKeys", () => {
 
   it("decreases playback speed with shift+< (min 0.25)", () => {
     const { player, shortcuts } = captureShortcuts({
-      playbackRate: vi.fn((r?: number) => (r !== undefined ? r : 0.5)),
+      playbackRate: vi.fn((r?: number) => r ?? 0.5),
     });
 
     must(shortcuts["shift+<"])();
@@ -325,11 +325,11 @@ describe("usePlaylistMediaKeys", () => {
       bubbles: true,
       cancelable: true,
     });
-    vi.spyOn(event, "preventDefault");
+    const preventDefault = vi.spyOn(event, "preventDefault");
     document.dispatchEvent(event);
 
     expect(playNext).toHaveBeenCalledTimes(1);
-    expect(event.preventDefault).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
   });
 
   it("calls playPrevious on Shift+P when playlist exists", () => {
@@ -352,11 +352,11 @@ describe("usePlaylistMediaKeys", () => {
       bubbles: true,
       cancelable: true,
     });
-    vi.spyOn(event, "preventDefault");
+    const preventDefault = vi.spyOn(event, "preventDefault");
     document.dispatchEvent(event);
 
     expect(playPrevious).toHaveBeenCalledTimes(1);
-    expect(event.preventDefault).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
   });
 
   // ─── Playlist media keys ───────────────────────────────────────────────

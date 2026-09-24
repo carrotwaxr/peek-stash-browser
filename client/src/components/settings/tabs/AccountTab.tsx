@@ -34,10 +34,10 @@ const AccountTab = () => {
         setKeyLoading(false);
       }
     };
-    loadRecoveryKey();
+    void loadRecoveryKey();
   }, []);
 
-  const handleCreateKey = async (e: React.FormEvent) => {
+  const handleCreateKey = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!keyPassword) return;
 
@@ -82,7 +82,7 @@ const AccountTab = () => {
     }
   };
 
-  const changePassword = async (e: React.FormEvent) => {
+  const changePassword = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
@@ -125,7 +125,7 @@ const AccountTab = () => {
   return (
     <div className="space-y-6">
       {/* Change Password Section */}
-      <form onSubmit={changePassword}>
+      <form onSubmit={(e) => void changePassword(e)}>
         <div
           className="p-6 rounded-lg border"
           style={{
@@ -306,7 +306,10 @@ const AccountTab = () => {
               </div>
             )}
 
-            <form onSubmit={handleCreateKey} className="space-y-4">
+            <form
+              onSubmit={(e) => void handleCreateKey(e)}
+              className="space-y-4"
+            >
               <div>
                 <label
                   htmlFor="recoveryKeyPassword"

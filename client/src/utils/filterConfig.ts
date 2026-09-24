@@ -3533,7 +3533,7 @@ export const carouselRulesToFilterState = (
     if (r.modifier === "BETWEEN") {
       filterState.rating = { min: r.value, max: r.value2 };
     } else if (r.modifier === "GREATER_THAN") {
-      filterState.rating = { min: r.value + 1 };
+      filterState.rating = { min: Number(r.value) + 1 };
     } else if (r.modifier === "LESS_THAN") {
       filterState.rating = { max: r.value - 1 };
     }
@@ -3545,7 +3545,7 @@ export const carouselRulesToFilterState = (
     if (o.modifier === "BETWEEN") {
       filterState.oCount = { min: o.value, max: o.value2 };
     } else if (o.modifier === "GREATER_THAN") {
-      filterState.oCount = { min: o.value + 1 };
+      filterState.oCount = { min: Number(o.value) + 1 };
     } else if (o.modifier === "LESS_THAN") {
       filterState.oCount = { max: o.value - 1 };
     }
@@ -3560,7 +3560,7 @@ export const carouselRulesToFilterState = (
         max: Math.round(d.value2 / 60),
       };
     } else if (d.modifier === "GREATER_THAN") {
-      filterState.duration = { min: Math.round((d.value + 1) / 60) };
+      filterState.duration = { min: Math.round((Number(d.value) + 1) / 60) };
     } else if (d.modifier === "LESS_THAN") {
       filterState.duration = { max: Math.round((d.value - 1) / 60) };
     }
@@ -3572,7 +3572,7 @@ export const carouselRulesToFilterState = (
     if (p.modifier === "BETWEEN") {
       filterState.playCount = { min: p.value, max: p.value2 };
     } else if (p.modifier === "GREATER_THAN") {
-      filterState.playCount = { min: p.value + 1 };
+      filterState.playCount = { min: Number(p.value) + 1 };
     } else if (p.modifier === "LESS_THAN") {
       filterState.playCount = { max: p.value - 1 };
     }
@@ -3587,7 +3587,9 @@ export const carouselRulesToFilterState = (
         max: Math.round(pd.value2 / 60),
       };
     } else if (pd.modifier === "GREATER_THAN") {
-      filterState.playDuration = { min: Math.round((pd.value + 1) / 60) };
+      filterState.playDuration = {
+        min: Math.round((Number(pd.value) + 1) / 60),
+      };
     } else if (pd.modifier === "LESS_THAN") {
       filterState.playDuration = { max: Math.round((pd.value - 1) / 60) };
     }
@@ -3599,7 +3601,7 @@ export const carouselRulesToFilterState = (
     if (pc.modifier === "BETWEEN") {
       filterState.performerCount = { min: pc.value, max: pc.value2 };
     } else if (pc.modifier === "GREATER_THAN") {
-      filterState.performerCount = { min: pc.value + 1 };
+      filterState.performerCount = { min: Number(pc.value) + 1 };
     } else if (pc.modifier === "LESS_THAN") {
       filterState.performerCount = { max: pc.value - 1 };
     }
@@ -3614,7 +3616,9 @@ export const carouselRulesToFilterState = (
         max: Math.round(b.value2 / 1000000),
       };
     } else if (b.modifier === "GREATER_THAN") {
-      filterState.bitrate = { min: Math.round((b.value + 1) / 1000000) };
+      filterState.bitrate = {
+        min: Math.round((Number(b.value) + 1) / 1000000),
+      };
     } else if (b.modifier === "LESS_THAN") {
       filterState.bitrate = { max: Math.round((b.value - 1) / 1000000) };
     }

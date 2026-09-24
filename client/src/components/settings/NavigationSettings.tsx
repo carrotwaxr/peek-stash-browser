@@ -25,7 +25,7 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
 
   useEffect(() => {
     // Sort by order on initial load
-    const sorted = [...(navPreferences || [])].sort(
+    const sorted = [...(navPreferences ?? [])].sort(
       (a, b) => a.order - b.order
     );
     setPreferences(sorted);
@@ -86,7 +86,7 @@ const NavigationSettings = ({ navPreferences, onSave }: Props) => {
   };
 
   const handleReset = () => {
-    const sorted = [...(navPreferences || [])].sort(
+    const sorted = [...(navPreferences ?? [])].sort(
       (a, b) => a.order - b.order
     );
     setPreferences(sorted);

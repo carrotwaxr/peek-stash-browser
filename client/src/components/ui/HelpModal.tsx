@@ -318,7 +318,7 @@ const HelpModal = ({ onClose }: Props) => {
       playlists: "Playlists Page Shortcuts",
       global: "Keyboard Shortcuts",
     };
-    return titles[currentPage as keyof typeof titles] || "Keyboard Shortcuts";
+    return titles[currentPage] || "Keyboard Shortcuts";
   };
 
   const modalContent = (

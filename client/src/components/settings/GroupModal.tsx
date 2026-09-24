@@ -63,7 +63,7 @@ const GroupModal = ({
   // Load group details when editing
   useEffect(() => {
     if (isEditMode && group?.id) {
-      loadGroupDetails();
+      void loadGroupDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group?.id]);
@@ -143,7 +143,7 @@ const GroupModal = ({
     (user) => !members.some((m) => m.user.id === user.id)
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -164,7 +164,7 @@ const GroupModal = ({
       };
 
       if (isEditMode) {
-        await updateGroup(String(group!.id), groupData);
+        await updateGroup(String(group.id), groupData);
       } else {
         await createGroup(groupData);
       }
@@ -188,7 +188,7 @@ const GroupModal = ({
     onClose(false);
   };
 
-  const modalTitle = isEditMode ? `Edit Group: ${group!.name}` : "Create Group";
+  const modalTitle = isEditMode ? `Edit Group: ${group.name}` : "Create Group";
 
   return (
     <div
@@ -209,7 +209,7 @@ const GroupModal = ({
           </div>
         </Paper.Header>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => void handleSubmit(e)}>
           <Paper.Body>
             <div className="space-y-6">
               {/* Error Message */}
@@ -430,7 +430,7 @@ const GroupModal = ({
                             variant="secondary"
                             size="sm"
                             icon={<Plus size={14} />}
-                            onClick={handleAddMember}
+                            onClick={() => void handleAddMember()}
                             disabled={!selectedUserId}
                           >
                             Add
@@ -486,7 +486,7 @@ const GroupModal = ({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleRemoveMember(member.user.id)
+                                  void handleRemoveMember(member.user.id)
                                 }
                                 className="p-1 rounded hover:bg-opacity-80 transition-colors"
                                 style={{ color: "var(--text-muted)" }}

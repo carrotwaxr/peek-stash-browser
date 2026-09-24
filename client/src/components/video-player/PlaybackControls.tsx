@@ -58,7 +58,7 @@ const PlaybackControls = () => {
         console.error("Failed to fetch permissions:", error);
       }
     };
-    fetchPermissions();
+    void fetchPermissions();
   }, []);
 
   // Handle rating change
@@ -71,9 +71,9 @@ const PlaybackControls = () => {
     try {
       await libraryApi.updateRating(
         "scene",
-        scene.id as string,
+        scene.id,
         newRating,
-        scene.instanceId as string
+        scene.instanceId
       );
     } catch (error) {
       console.error("Failed to update scene rating:", error);
@@ -91,9 +91,9 @@ const PlaybackControls = () => {
     try {
       await libraryApi.updateFavorite(
         "scene",
-        scene.id as string,
+        scene.id,
         newFavorite,
-        scene.instanceId as string
+        scene.instanceId
       );
     } catch (error) {
       console.error("Failed to update scene favorite:", error);
@@ -104,8 +104,8 @@ const PlaybackControls = () => {
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
   useRatingHotkeys({
     enabled: !sceneLoading && !!scene,
-    setRating: handleRatingChange,
-    toggleFavorite: () => handleFavoriteChange(!isFavorite),
+    setRating: (newRating) => void handleRatingChange(newRating),
+    toggleFavorite: () => void handleFavoriteChange(!isFavorite),
   });
 
   // Handle scene download
@@ -162,7 +162,7 @@ const PlaybackControls = () => {
             >
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 label="Rating"
                 showClearButton={true}
               />
@@ -175,7 +175,7 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id as string}
+                sceneId={scene?.id}
                 initialCount={oCounter}
                 onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
@@ -186,19 +186,21 @@ const PlaybackControls = () => {
             {sceneSettings.showFavorite && (
               <FavoriteButton
                 isFavorite={isFavorite}
-                onChange={handleFavoriteChange}
+                onChange={(newFavorite) =>
+                  void handleFavoriteChange(newFavorite)
+                }
                 size="medium"
               />
             )}
             <AddToPlaylistButton
-              sceneId={scene?.id as string}
+              sceneId={scene?.id}
               disabled={isLoading}
               compact
             />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
-                onClick={handleDownload}
+                onClick={() => void handleDownload()}
                 disabled={downloading || isLoading}
                 title={downloading ? "Starting download..." : "Download"}
               >
@@ -219,7 +221,7 @@ const PlaybackControls = () => {
               >
                 <RatingSlider
                   rating={rating}
-                  onChange={handleRatingChange}
+                  onChange={(newRating) => void handleRatingChange(newRating)}
                   label="Rating"
                   showClearButton={true}
                 />
@@ -232,7 +234,7 @@ const PlaybackControls = () => {
             >
               {sceneSettings.showOCounter && (
                 <OCounterButton
-                  sceneId={scene?.id as string}
+                  sceneId={scene?.id}
                   initialCount={oCounter}
                   onChange={(newCount: number) =>
                     dispatch({ type: "SET_O_COUNTER", payload: newCount })
@@ -243,7 +245,9 @@ const PlaybackControls = () => {
               {sceneSettings.showFavorite && (
                 <FavoriteButton
                   isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
+                  onChange={(newFavorite) =>
+                    void handleFavoriteChange(newFavorite)
+                  }
                   size="medium"
                 />
               )}
@@ -253,14 +257,14 @@ const PlaybackControls = () => {
           {/* Row 2: Add to Playlist + Download */}
           <div className="flex items-center justify-end gap-4">
             <AddToPlaylistButton
-              sceneId={scene?.id as string}
+              sceneId={scene?.id}
               disabled={isLoading}
               compact
             />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
-                onClick={handleDownload}
+                onClick={() => void handleDownload()}
                 disabled={downloading || isLoading}
                 title={downloading ? "Starting download..." : "Download"}
               >
@@ -279,7 +283,7 @@ const PlaybackControls = () => {
           >
             {sceneSettings.showOCounter && (
               <OCounterButton
-                sceneId={scene?.id as string}
+                sceneId={scene?.id}
                 initialCount={oCounter}
                 onChange={(newCount: number) =>
                   dispatch({ type: "SET_O_COUNTER", payload: newCount })
@@ -290,19 +294,21 @@ const PlaybackControls = () => {
             {sceneSettings.showFavorite && (
               <FavoriteButton
                 isFavorite={isFavorite}
-                onChange={handleFavoriteChange}
+                onChange={(newFavorite) =>
+                  void handleFavoriteChange(newFavorite)
+                }
                 size="medium"
               />
             )}
             <AddToPlaylistButton
-              sceneId={scene?.id as string}
+              sceneId={scene?.id}
               disabled={isLoading}
               compact
             />
             {!!permissions?.canDownloadFiles && (
               <Button
                 variant="secondary"
-                onClick={handleDownload}
+                onClick={() => void handleDownload()}
                 disabled={downloading || isLoading}
                 title={downloading ? "Starting download..." : "Download"}
               >
@@ -316,7 +322,7 @@ const PlaybackControls = () => {
             <div style={{ opacity: isLoading ? 0.6 : 1 }}>
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 label="Rating"
                 showClearButton={true}
               />

@@ -19,7 +19,7 @@ const IconPickerButton = ({ icon, onChange }: Props) => {
         string,
         React.ComponentType<{ className?: string }>
       >
-    )[icon] || LucideIcons.Film;
+    )[icon] ?? LucideIcons.Film;
 
   return (
     <div className="relative">

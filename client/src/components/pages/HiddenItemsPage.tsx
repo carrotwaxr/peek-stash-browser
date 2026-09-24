@@ -65,7 +65,7 @@ const HiddenItemsPage = () => {
   }, [activeTab, getHiddenEntities]);
 
   useEffect(() => {
-    loadHiddenItems();
+    void loadHiddenItems();
   }, [loadHiddenItems]);
 
   const handleRestore = async (item: Record<string, unknown>) => {
@@ -79,7 +79,7 @@ const HiddenItemsPage = () => {
 
     if (success) {
       // Reload the list
-      loadHiddenItems();
+      void loadHiddenItems();
     }
   };
 
@@ -91,7 +91,7 @@ const HiddenItemsPage = () => {
     const success = await unhideAll(entityType);
 
     if (success) {
-      loadHiddenItems();
+      void loadHiddenItems();
     }
     setRestoringAll(false);
   };
@@ -102,9 +102,7 @@ const HiddenItemsPage = () => {
       ? hiddenItems.reduce(
           (acc: Record<string, Record<string, unknown>[]>, item) => {
             const type = item.entityType as string;
-            if (!acc[type]) {
-              acc[type] = [];
-            }
+            acc[type] ??= [];
             acc[type].push(item);
             return acc;
           },
@@ -163,7 +161,7 @@ const HiddenItemsPage = () => {
           <Button
             variant="destructive"
             icon={<RotateCcw size={18} />}
-            onClick={handleRestoreAll}
+            onClick={() => void handleRestoreAll()}
             loading={restoringAll}
             disabled={restoringAll}
           >
@@ -250,7 +248,7 @@ const HiddenItemsPage = () => {
 
                         {/* Restore button */}
                         <button
-                          onClick={() => handleRestore(item)}
+                          onClick={() => void handleRestore(item)}
                           className="px-4 py-2 rounded transition-colors"
                           style={{
                             backgroundColor: "var(--accent-color)",

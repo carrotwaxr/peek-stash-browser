@@ -20,7 +20,7 @@ const UserManagementTab = () => {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
   }, []);
 
   const loadUsers = async () => {
@@ -90,7 +90,7 @@ const UserManagementTab = () => {
       <UserManagementSection
         users={users}
         currentUser={currentUser as UserItem | null}
-        onUsersChanged={loadUsers}
+        onUsersChanged={() => void loadUsers()}
         onMessage={showMessage}
         onError={showError}
       />

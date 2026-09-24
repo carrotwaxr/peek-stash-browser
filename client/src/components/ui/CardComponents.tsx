@@ -53,7 +53,7 @@ export const CardContainer = forwardRef<HTMLDivElement, CardContainerProps>(
 
     return (
       <div
-        aria-label={`${entityDisplayType}`}
+        aria-label={entityDisplayType}
         className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all focus:outline-none ${className}`}
         ref={ref}
         style={{
@@ -246,7 +246,7 @@ export const CardImage = ({
                 }`}
                 style={{ objectFit }}
                 onLoad={() => setIsLoaded(true)}
-                onError={handleImageError}
+                onError={() => void handleImageError()}
               />
             ))}
         </>
@@ -678,7 +678,7 @@ export const CardMenuRow = ({
           entityType={entityType}
           entityId={entityId}
           entityName={entityTitle || ""}
-          onHide={handleHideClick}
+          onHide={(hideInfo) => void handleHideClick(hideInfo)}
         />
       </div>
       <HideConfirmationDialog
@@ -687,7 +687,7 @@ export const CardMenuRow = ({
           setHideDialogOpen(false);
           setPendingHide(null);
         }}
-        onConfirm={handleHideConfirm}
+        onConfirm={(dontAskAgain) => void handleHideConfirm(dontAskAgain)}
         entityType={pendingHide?.entityType ?? ""}
         entityName={pendingHide?.entityName ?? ""}
       />
@@ -863,7 +863,7 @@ export const CardRatingRow = ({
           isOpen={dialogOpen}
           onClose={() => setDialogOpen(false)}
           initialRating={rating}
-          onSave={handleRatingSave}
+          onSave={(newRating) => void handleRatingSave(newRating)}
           entityType={entityType}
           entityTitle={entityTitle}
           anchorEl={badgeRef.current}
@@ -871,7 +871,7 @@ export const CardRatingRow = ({
         <HideConfirmationDialog
           isOpen={hideDialogOpen}
           onClose={handleHideCancel}
-          onConfirm={handleHideConfirm}
+          onConfirm={(dontAskAgain) => void handleHideConfirm(dontAskAgain)}
           entityType={pendingHide?.entityType ?? ""}
           entityName={pendingHide?.entityName ?? ""}
         />
@@ -912,7 +912,7 @@ export const CardRatingRow = ({
           {showFavorite && (
             <FavoriteButton
               isFavorite={isFavorite}
-              onChange={handleFavoriteChange}
+              onChange={(newValue) => void handleFavoriteChange(newValue)}
               size="small"
               variant="card"
             />
@@ -922,7 +922,7 @@ export const CardRatingRow = ({
               entityType={entityType}
               entityId={entityId}
               entityName={entityTitle || ""}
-              onHide={handleHideClick}
+              onHide={(hideInfo) => void handleHideClick(hideInfo)}
             />
           )}
         </div>
@@ -932,7 +932,7 @@ export const CardRatingRow = ({
         isOpen={dialogOpen}
         onClose={() => setDialogOpen(false)}
         initialRating={rating}
-        onSave={handleRatingSave}
+        onSave={(newRating) => void handleRatingSave(newRating)}
         entityType={entityType}
         entityTitle={entityTitle}
         anchorEl={badgeRef.current}
@@ -941,7 +941,7 @@ export const CardRatingRow = ({
       <HideConfirmationDialog
         isOpen={hideDialogOpen}
         onClose={handleHideCancel}
-        onConfirm={handleHideConfirm}
+        onConfirm={(dontAskAgain) => void handleHideConfirm(dontAskAgain)}
         entityType={pendingHide?.entityType ?? ""}
         entityName={pendingHide?.entityName ?? ""}
       />

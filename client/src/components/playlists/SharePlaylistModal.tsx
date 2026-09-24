@@ -59,7 +59,7 @@ const SharePlaylistModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadData();
+      void loadData();
     }
   }, [isOpen, playlistId, loadData]);
 
@@ -175,7 +175,7 @@ const SharePlaylistModal = ({
             </Button>
             {userGroups.length > 0 && (
               <Button
-                onClick={handleSave}
+                onClick={() => void handleSave()}
                 variant="primary"
                 disabled={saving}
                 loading={saving}

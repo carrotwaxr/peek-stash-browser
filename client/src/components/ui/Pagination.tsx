@@ -134,9 +134,9 @@ const Pagination = ({
     items: paginationItems,
     enabled: isTVMode && tvActive,
     onSelect: (item) => {
-      const element = document.querySelector(
+      const element = document.querySelector<HTMLElement>(
         `[data-tv-pagination-item="${item.id}"]`
-      ) as HTMLElement | null;
+      );
       if (element) {
         element.click();
         // For inputs/dropdowns, focus them so user can interact

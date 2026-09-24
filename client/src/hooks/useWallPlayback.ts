@@ -24,7 +24,7 @@ export const useWallPlayback = () => {
       }
     };
 
-    loadSetting();
+    void loadSetting();
   }, []);
 
   // Update local state (called after API save succeeds in ContextSettings)

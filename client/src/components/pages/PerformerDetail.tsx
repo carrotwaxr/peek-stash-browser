@@ -103,7 +103,7 @@ const PerformerDetail = () => {
       }
     };
 
-    fetchPerformer();
+    void fetchPerformer();
   }, [performerId, instanceId]);
 
   const handleRatingChange = async (newRating: number | null) => {
@@ -139,14 +139,14 @@ const PerformerDetail = () => {
   };
 
   const toggleFavorite = () => {
-    handleFavoriteChange(!isFavorite);
+    void handleFavoriteChange(!isFavorite);
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
 
   useRatingHotkeys({
     enabled: !isLoading && !!performer,
-    setRating: handleRatingChange,
+    setRating: (newRating) => void handleRatingChange(newRating),
     toggleFavorite,
   });
 
@@ -184,7 +184,9 @@ const PerformerDetail = () => {
                   {(settings.showFavorite as boolean) && (
                     <FavoriteButton
                       isFavorite={isFavorite}
-                      onChange={handleFavoriteChange}
+                      onChange={(newValue) =>
+                        void handleFavoriteChange(newValue)
+                      }
                       size="large"
                     />
                   )}
@@ -207,7 +209,7 @@ const PerformerDetail = () => {
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 showClearButton={true}
               />
             </div>
@@ -257,14 +259,14 @@ const PerformerDetail = () => {
                   context="scene_performer"
                   permanentFilters={{
                     performers: {
-                      value: [makeCompositeKey(performerId!, instanceId!)],
+                      value: [makeCompositeKey(performerId!, instanceId)],
                       modifier: "INCLUDES",
                     },
                   }}
                   permanentFiltersMetadata={{
                     performers: [
                       {
-                        id: makeCompositeKey(performerId!, instanceId!),
+                        id: makeCompositeKey(performerId!, instanceId),
                         name: performer?.name as string,
                       },
                     ],
@@ -280,7 +282,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     gallery_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId!, instanceId!)],
+                        value: [makeCompositeKey(performerId!, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -303,7 +305,7 @@ const PerformerDetail = () => {
                   lockedFilters={{
                     group_filter: {
                       performers: {
-                        value: [makeCompositeKey(performerId!, instanceId!)],
+                        value: [makeCompositeKey(performerId!, instanceId)],
                         modifier: "INCLUDES",
                       },
                     },
@@ -715,7 +717,7 @@ const PerformerStats = ({
               className="text-2xl font-bold"
               style={{ color: "var(--accent-primary)" }}
             >
-              {performer!.rating100 as React.ReactNode}/100
+              {performer.rating100 as React.ReactNode}/100
             </span>
           </div>
           <div
@@ -725,7 +727,7 @@ const PerformerStats = ({
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
-                width: `${performer!.rating100 as number}%`,
+                width: `${performer.rating100 as number}%`,
                 backgroundColor: "var(--accent-primary)",
               }}
             />
@@ -861,7 +863,7 @@ const PerformerLinks = ({ performer, settings }: PerformerLinksProps) => {
       {/* Tags Section */}
       {hasTags && (
         <Card title="Tags">
-          <TagChips tags={tags!} />
+          <TagChips tags={tags} />
         </Card>
       )}
 
@@ -917,13 +919,13 @@ const ImagesTab = ({
         filter: { page, per_page: perPage },
         image_filter: {
           performers: {
-            value: [makeCompositeKey(performerId!, instanceId!)],
+            value: [makeCompositeKey(performerId!, instanceId)],
             modifier: "INCLUDES",
           },
         },
       })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
-        images: data.findImages?.images || [],
+        images: data.findImages?.images ?? [],
         count: data.findImages?.count || 0,
       };
     },

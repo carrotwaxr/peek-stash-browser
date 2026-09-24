@@ -34,10 +34,10 @@ const PlaybackTab = () => {
       }
     };
 
-    loadSettings();
+    void loadSettings();
   }, []);
 
-  const saveSettings = async (e: React.FormEvent) => {
+  const saveSettings = async (e: React.SubmitEvent) => {
     e.preventDefault();
     try {
       setSaving(true);
@@ -69,7 +69,7 @@ const PlaybackTab = () => {
   }
 
   return (
-    <form onSubmit={saveSettings}>
+    <form onSubmit={(e) => void saveSettings(e)}>
       <div
         className="p-6 rounded-lg border"
         style={{

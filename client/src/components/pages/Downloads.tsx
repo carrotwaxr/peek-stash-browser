@@ -114,13 +114,16 @@ const getDownloadThumbnail = (download: Record<string, unknown>) => {
   const instanceParam = instanceId
     ? `instanceId=${encodeURIComponent(instanceId)}`
     : "";
+  // A playlist download has no entity (entityId is null)
+  const entityId =
+    typeof download.entityId === "string" ? download.entityId : "";
 
   // For scenes and images, show actual thumbnail
-  if (download.type === "SCENE" && download.entityId) {
+  if (download.type === "SCENE" && entityId) {
     return (
       <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${download.entityId}/screenshot`)}${instanceParam ? `&${instanceParam}` : ""}`}
+          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${entityId}/screenshot`)}${instanceParam ? `&${instanceParam}` : ""}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -139,11 +142,11 @@ const getDownloadThumbnail = (download: Record<string, unknown>) => {
     );
   }
 
-  if (download.type === "IMAGE" && download.entityId) {
+  if (download.type === "IMAGE" && entityId) {
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/image/${download.entityId}/thumbnail${instanceParam ? `?${instanceParam}` : ""}`}
+          src={`/api/proxy/image/${entityId}/thumbnail${instanceParam ? `?${instanceParam}` : ""}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -235,12 +238,12 @@ const Downloads = () => {
 
   // Set up polling when there are active downloads
   useEffect(() => {
-    loadDownloads();
+    void loadDownloads();
   }, [loadDownloads]);
 
   useEffect(() => {
     if (hasActiveDownloads) {
-      pollIntervalRef.current = setInterval(loadDownloads, 3000);
+      pollIntervalRef.current = setInterval(() => void loadDownloads(), 3000);
     } else if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
@@ -257,7 +260,7 @@ const Downloads = () => {
     try {
       await apiDelete(`/downloads/${id}`);
       showSuccess("Download removed");
-      loadDownloads();
+      void loadDownloads();
     } catch {
       showError("Failed to delete download");
     }
@@ -267,7 +270,7 @@ const Downloads = () => {
     try {
       await apiPost(`/downloads/${id}/retry`);
       showSuccess("Download queued for retry");
-      loadDownloads();
+      void loadDownloads();
     } catch {
       showError("Failed to retry download");
     }
@@ -446,7 +449,7 @@ const Downloads = () => {
                     {/* Retry button for failed */}
                     {download.status === "FAILED" && (
                       <Button
-                        onClick={() => handleRetry(download.id as string)}
+                        onClick={() => void handleRetry(download.id as string)}
                         variant="secondary"
                         size="sm"
                       >
@@ -456,7 +459,7 @@ const Downloads = () => {
 
                     {/* Delete button for all */}
                     <Button
-                      onClick={() => handleDelete(download.id as string)}
+                      onClick={() => void handleDelete(download.id as string)}
                       variant="destructive"
                       size="sm"
                     >

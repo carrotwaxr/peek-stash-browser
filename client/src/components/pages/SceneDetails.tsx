@@ -7,6 +7,7 @@ import { useConfig } from "../../contexts/ConfigContext";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext";
 import { getEntityPath } from "../../utils/entityLinks";
 import { formatBitRate, formatFileSize } from "../../utils/format";
+import type { Clip } from "../cards/ClipCard";
 import ClipList from "../clips/ClipList";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index";
 
@@ -80,7 +81,7 @@ const SceneDetails = ({
           scene.instanceId,
           true
         )) as { clips?: Record<string, unknown>[] };
-        setClips(response.clips || []);
+        setClips(response.clips ?? []);
       } catch (err) {
         console.error("Failed to fetch clips", err);
         setClips([]);
@@ -88,7 +89,7 @@ const SceneDetails = ({
         setClipsLoading(false);
       }
     }
-    fetchClips();
+    void fetchClips();
   }, [scene?.id, scene?.instanceId]);
 
   // Handle clip click - dispatch event to seek video player
@@ -321,14 +322,8 @@ const SceneDetails = ({
               {showClips && (
                 <Paper.Body>
                   <ClipList
-                    clips={
-                      clips as unknown as import("../cards/ClipCard").Clip[]
-                    }
-                    onClipClick={
-                      handleClipClick as (
-                        clip: import("../cards/ClipCard").Clip
-                      ) => void
-                    }
+                    clips={clips as unknown as Clip[]}
+                    onClipClick={handleClipClick as (clip: Clip) => void}
                     loading={clipsLoading}
                   />
                 </Paper.Body>

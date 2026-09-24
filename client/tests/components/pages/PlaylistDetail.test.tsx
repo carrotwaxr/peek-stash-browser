@@ -2,6 +2,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PlaylistDetail from "@/components/pages/PlaylistDetail";
+import type * as uiModule from "@/components/ui/index";
 
 const mockApiGet = vi.fn();
 const mockApiPost = vi.fn();
@@ -31,7 +32,7 @@ vi.mock("@/themes/useTheme", () => ({
   useTheme: () => ({ theme: undefined }),
 }));
 vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/components/ui/index")>()),
+  ...(await importOriginal<typeof uiModule>()),
   SceneListItem: () => null,
 }));
 
@@ -65,9 +66,9 @@ function renderPage() {
 describe("PlaylistDetail download", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockApiGet.mockImplementation(async (endpoint: string) => {
-      if (endpoint === "/playlists/5") return sharedPlaylist;
-      throw new Error(`unexpected GET ${endpoint}`);
+    mockApiGet.mockImplementation((endpoint: string) => {
+      if (endpoint === "/playlists/5") return Promise.resolve(sharedPlaylist);
+      return Promise.reject(new Error(`unexpected GET ${endpoint}`));
     });
     mockApiPost.mockResolvedValue({ download: { id: 1, status: "PENDING" } });
   });

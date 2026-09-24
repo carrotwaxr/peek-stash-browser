@@ -1,10 +1,5 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { actAsync } from "@tests/testUtils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Downloads from "@/components/pages/Downloads";
 import { showError, showSuccess } from "@/utils/toast";
@@ -49,9 +44,9 @@ function download(overrides: Record<string, unknown>) {
 }
 
 function mockDownloads(downloads: Record<string, unknown>[]) {
-  mockApiGet.mockImplementation(async (endpoint: string) => {
-    if (endpoint === "/downloads") return { downloads };
-    throw new Error(`unexpected GET ${endpoint}`);
+  mockApiGet.mockImplementation((endpoint: string) => {
+    if (endpoint === "/downloads") return Promise.resolve({ downloads });
+    return Promise.reject(new Error(`unexpected GET ${endpoint}`));
   });
 }
 
@@ -407,29 +402,29 @@ describe("Downloads page", () => {
     it("polls every 3 seconds while a download is active and stops once none is", async () => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
       let calls = 0;
-      mockApiGet.mockImplementation(async () => {
+      mockApiGet.mockImplementation(() => {
         calls++;
-        return {
+        return Promise.resolve({
           downloads: [
             download({
               status: calls < 2 ? "PROCESSING" : "COMPLETED",
               progress: 50,
             }),
           ],
-        };
+        });
       });
 
       render(<Downloads />);
       expect(await screen.findByText("Processing")).toBeInTheDocument();
       expect(mockApiGet).toHaveBeenCalledTimes(1);
 
-      await act(async () => {
+      await actAsync(() => {
         vi.advanceTimersByTime(3000);
       });
       expect(await screen.findByText("Completed")).toBeInTheDocument();
       expect(mockApiGet).toHaveBeenCalledTimes(2);
 
-      await act(async () => {
+      await actAsync(() => {
         vi.advanceTimersByTime(9000);
       });
       expect(mockApiGet).toHaveBeenCalledTimes(2);

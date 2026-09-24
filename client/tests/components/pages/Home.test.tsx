@@ -1,4 +1,5 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { actAsync } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/components/pages/Home";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -146,21 +147,21 @@ describe("Home", () => {
 
   describe("Rendering", () => {
     it("renders without crashing", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(screen.getByTestId("page-layout")).toBeInTheDocument();
     });
 
     it("sets page title to 'Home'", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(usePageTitle).toHaveBeenCalledWith("Home");
     });
 
     it("shows welcome message with username", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       const header = screen.getByTestId("page-header");
@@ -168,7 +169,7 @@ describe("Home", () => {
     });
 
     it("shows PageHeader with subtitle", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       const header = screen.getByTestId("page-header");
@@ -178,7 +179,7 @@ describe("Home", () => {
     });
 
     it("shows PageLayout wrapper", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(screen.getByTestId("page-layout")).toBeInTheDocument();
@@ -187,7 +188,7 @@ describe("Home", () => {
 
   describe("Empty State", () => {
     it("renders no carousels when preferences are empty", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(screen.queryByTestId("scene-carousel")).not.toBeInTheDocument();
@@ -213,7 +214,7 @@ describe("Home", () => {
         { id: "recentlyAddedScenes", enabled: true, order: 0 },
       ]);
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
 
@@ -242,7 +243,7 @@ describe("Home", () => {
         { id: "continueWatching", enabled: true, order: 0 },
       ]);
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
 
@@ -255,14 +256,14 @@ describe("Home", () => {
 
   describe("API Loading", () => {
     it("calls apiGet for user settings on mount", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(mockApiGet).toHaveBeenCalledWith("/user/settings");
     });
 
     it("calls libraryApi.getCarousels on mount", async () => {
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
       expect(mockGetCarousels).toHaveBeenCalled();
@@ -271,7 +272,7 @@ describe("Home", () => {
     it("falls back to migrated empty prefs on API error", async () => {
       mockApiGet.mockRejectedValue(new Error("Network error"));
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Home />);
       });
 

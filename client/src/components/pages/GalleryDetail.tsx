@@ -118,7 +118,7 @@ const GalleryDetail = () => {
   });
 
   // Set page title to gallery name
-  usePageTitle(gallery ? (galleryTitle(gallery) as string) : "Gallery");
+  usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
 
   useEffect(() => {
     const fetchGallery = async () => {
@@ -129,15 +129,8 @@ const GalleryDetail = () => {
           instanceId
         )) as Record<string, unknown> | null;
         setGallery(galleryData);
-        setRating(
-          (galleryData as Record<string, unknown> | null)?.rating as
-            | number
-            | null
-        );
-        setIsFavorite(
-          ((galleryData as Record<string, unknown> | null)
-            ?.favorite as boolean) || false
-        );
+        setRating(galleryData?.rating as number | null);
+        setIsFavorite((galleryData?.favorite as boolean) || false);
       } catch (error) {
         console.error("Error loading gallery:", error);
       } finally {
@@ -145,7 +138,7 @@ const GalleryDetail = () => {
       }
     };
 
-    fetchGallery();
+    void fetchGallery();
   }, [galleryId, instanceId]);
 
   useEffect(() => {
@@ -169,7 +162,7 @@ const GalleryDetail = () => {
       }
     };
 
-    fetchImages();
+    void fetchImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryId, instanceId, lightbox.currentPage]);
 
@@ -204,13 +197,13 @@ const GalleryDetail = () => {
   };
 
   const toggleFavorite = () => {
-    handleFavoriteChange(!isFavorite);
+    void handleFavoriteChange(!isFavorite);
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
   useRatingHotkeys({
     enabled: !isLoading && !!gallery,
-    setRating: handleRatingChange,
+    setRating: (newRating) => void handleRatingChange(newRating),
     toggleFavorite,
   });
 
@@ -273,7 +266,9 @@ const GalleryDetail = () => {
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
-                      onChange={handleFavoriteChange}
+                      onChange={(newValue) =>
+                        void handleFavoriteChange(newValue)
+                      }
                       size="large"
                     />
                   )}
@@ -332,7 +327,7 @@ const GalleryDetail = () => {
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 showClearButton={true}
               />
             </div>
@@ -499,12 +494,12 @@ const GalleryDetail = () => {
                     galleries: [
                       {
                         id: makeCompositeKey(galleryId!, instanceId),
-                        title: galleryTitle(gallery) as string,
+                        title: galleryTitle(gallery),
                       },
                     ],
                   }}
-                  title={`Scenes in ${galleryTitle(gallery) as string}`}
-                  fromPageTitle={(galleryTitle(gallery) as string) || "Gallery"}
+                  title={`Scenes in ${galleryTitle(gallery)}`}
+                  fromPageTitle={galleryTitle(gallery) || "Gallery"}
                 />
               )}
             </>

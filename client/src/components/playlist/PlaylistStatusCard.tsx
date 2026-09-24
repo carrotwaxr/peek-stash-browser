@@ -181,9 +181,9 @@ const PlaylistStatusCard = () => {
         msFullscreenElement?: Element;
       };
       const isFullscreen =
-        doc.fullscreenElement ||
-        doc.webkitFullscreenElement ||
-        doc.mozFullScreenElement ||
+        doc.fullscreenElement ??
+        doc.webkitFullscreenElement ??
+        doc.mozFullScreenElement ??
         doc.msFullscreenElement;
       if (isFullscreen) {
         sessionStorage.setItem("videoPlayerFullscreen", "true");

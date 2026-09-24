@@ -14,7 +14,7 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
     if (!username.trim() || !password.trim()) {
@@ -56,7 +56,7 @@ const CreateUserModal = ({ onClose, onUserCreated }: Props) => {
         onClick={(e) => e.stopPropagation()}
       >
         <Paper.Header title="Create New User" />
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => void handleSubmit(e)}>
           <Paper.Body>
             <div className="space-y-4">
               {error && (

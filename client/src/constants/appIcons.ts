@@ -297,6 +297,6 @@ export const getAppIconComponent = (key: string) => {
         string,
         (typeof APP_ICON_COMPONENTS)[keyof typeof APP_ICON_COMPONENTS]
       >
-    )[key] || null
+    )[key] ?? null
   );
 };

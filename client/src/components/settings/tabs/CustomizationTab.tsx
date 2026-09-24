@@ -47,7 +47,7 @@ const CustomizationTab = () => {
       }
     };
 
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const saveViewPreference = async (key: string, value: string) => {
@@ -126,7 +126,10 @@ const CustomizationTab = () => {
               id="preferredPreviewQuality"
               value={preferredPreviewQuality}
               onChange={(e) =>
-                saveViewPreference("preferredPreviewQuality", e.target.value)
+                void saveViewPreference(
+                  "preferredPreviewQuality",
+                  e.target.value
+                )
               }
               className="w-full px-4 py-2 rounded-lg"
               style={{
@@ -158,7 +161,7 @@ const CustomizationTab = () => {
               id="wallPlayback"
               value={wallPlayback}
               onChange={(e) =>
-                saveViewPreference("wallPlayback", e.target.value)
+                void saveViewPreference("wallPlayback", e.target.value)
               }
               className="w-full px-4 py-2 rounded-lg"
               style={{
@@ -222,7 +225,10 @@ const CustomizationTab = () => {
               id="lightboxDoubleTapAction"
               value={lightboxDoubleTapAction}
               onChange={(e) =>
-                saveViewPreference("lightboxDoubleTapAction", e.target.value)
+                void saveViewPreference(
+                  "lightboxDoubleTapAction",
+                  e.target.value
+                )
               }
               className="w-full px-4 py-2 rounded-lg"
               style={{

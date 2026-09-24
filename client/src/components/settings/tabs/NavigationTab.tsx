@@ -66,7 +66,7 @@ const NavigationTab = () => {
       }
     };
 
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const saveCarouselPreferences = async (
@@ -144,7 +144,9 @@ const NavigationTab = () => {
       >
         <LandingPageSettings
           landingPagePreference={landingPagePreference}
-          onSave={saveLandingPagePreference}
+          onSave={(newPreference) =>
+            void saveLandingPagePreference(newPreference)
+          }
         />
       </div>
 
@@ -158,7 +160,7 @@ const NavigationTab = () => {
       >
         <NavigationSettings
           navPreferences={navPreferences}
-          onSave={saveNavPreferences}
+          onSave={(newPreferences) => void saveNavPreferences(newPreferences)}
         />
       </div>
 
@@ -172,7 +174,9 @@ const NavigationTab = () => {
       >
         <CarouselSettings
           carouselPreferences={carouselPreferences}
-          onSave={saveCarouselPreferences}
+          onSave={(newPreferences) =>
+            void saveCarouselPreferences(newPreferences)
+          }
         />
       </div>
     </div>

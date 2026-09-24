@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
+import type { NormalizedImage } from "@peek/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { type LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
@@ -85,7 +86,7 @@ const Images = () => {
 
   // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    let filters: Record<string, unknown> = {};
+    const filters: Record<string, unknown> = {};
 
     // Add timeline date filter when in timeline view
     if (currentViewMode === "timeline" && timelineDateFilter) {
@@ -324,7 +325,7 @@ const Images = () => {
             }) =>
               viewMode === "table" ? (
                 <TableView
-                  items={currentImages as Record<string, unknown>[]}
+                  items={currentImages}
                   columns={
                     visibleColumns as {
                       id: string;
@@ -354,7 +355,7 @@ const Images = () => {
                 />
               ) : viewMode === "wall" ? (
                 <WallView
-                  items={currentImages as Record<string, unknown>[]}
+                  items={currentImages}
                   entityType="image"
                   zoomLevel={
                     zoomLevel as unknown as "small" | "medium" | "large"
@@ -367,7 +368,7 @@ const Images = () => {
               ) : viewMode === "timeline" ? (
                 <TimelineView
                   entityType="image"
-                  items={currentImages as Record<string, unknown>[]}
+                  items={currentImages}
                   renderItem={(
                     image: Record<string, unknown>,
                     index: number,
@@ -377,9 +378,7 @@ const Images = () => {
                   ) => (
                     <ImageCard
                       key={image.id as string}
-                      image={
-                        image as unknown as import("@peek/shared-types").NormalizedImage
-                      }
+                      image={image as unknown as NormalizedImage}
                       onClick={() => onItemClick?.(image)}
                       fromPageTitle="Images"
                       tabIndex={0}
@@ -400,7 +399,7 @@ const Images = () => {
                 />
               ) : viewMode === "folder" ? (
                 <FolderView
-                  items={currentImages as Record<string, unknown>[]}
+                  items={currentImages}
                   tags={folderTags}
                   gridDensity={gridDensity}
                   loading={isLoading || tagsLoading}
@@ -409,9 +408,7 @@ const Images = () => {
                   renderItem={(image: Record<string, unknown>) => (
                     <ImageCard
                       key={image.id as string}
-                      image={
-                        image as unknown as import("@peek/shared-types").NormalizedImage
-                      }
+                      image={image as unknown as NormalizedImage}
                       onClick={() => handleImageClick(image)}
                       fromPageTitle="Images"
                       tabIndex={0}
@@ -446,12 +443,8 @@ const Images = () => {
                       return (
                         <ImageCard
                           key={image.id as string}
-                          image={
-                            image as unknown as import("@peek/shared-types").NormalizedImage
-                          }
-                          onClick={() =>
-                            handleImageClick(image as Record<string, unknown>)
-                          }
+                          image={image as unknown as NormalizedImage}
+                          onClick={() => handleImageClick(image)}
                           fromPageTitle="Images"
                           tabIndex={isTVMode ? _tabIndex : -1}
                           onOCounterChange={handleOCounterChange}
@@ -480,7 +473,7 @@ const Images = () => {
                     ? `?instanceId=${encodeURIComponent(img.instanceId)}`
                     : "";
                 return {
-                  ...(img as Record<string, unknown>),
+                  ...img,
                   paths: {
                     image:
                       paths?.image ||
@@ -492,7 +485,7 @@ const Images = () => {
                   },
                   oCounter: (img.oCounter as number) ?? 0,
                 };
-              }) as unknown as import("@peek/shared-types").NormalizedImage[]
+              }) as unknown as NormalizedImage[]
             }
             initialIndex={lightbox.lightboxIndex}
             onClose={lightbox.closeLightbox}

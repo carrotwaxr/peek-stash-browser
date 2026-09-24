@@ -59,7 +59,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
       }
     };
 
-    fetchSetupStatus();
+    void fetchSetupStatus();
   }, []);
 
   // Select the key for a manual copy when the clipboard API is missing
@@ -322,7 +322,7 @@ const UserSetupModal = ({ onComplete }: Props) => {
               variant="primary"
               size="lg"
               fullWidth
-              onClick={handleContinue}
+              onClick={() => void handleContinue()}
               disabled={submitting}
               loading={submitting}
             >

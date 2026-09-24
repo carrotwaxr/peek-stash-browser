@@ -723,11 +723,7 @@ describe("scenePlayerReducer", () => {
         const result = scenePlayerReducer(state, { type: "NEXT_SCENE" });
 
         // shuffleHistory should end with the previous currentIndex (2)
-        expect(
-          (result.shuffleHistory as number[])[
-            (result.shuffleHistory as number[]).length - 1
-          ]
-        ).toBe(2);
+        expect(result.shuffleHistory[result.shuffleHistory.length - 1]).toBe(2);
       });
 
       it("updates playlist.shuffleHistory as well", () => {

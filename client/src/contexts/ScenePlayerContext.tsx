@@ -67,8 +67,7 @@ export function ScenePlayerProvider({
       type: "INITIALIZE",
       payload: {
         playlist,
-        currentIndex:
-          (playlist as Record<string, unknown> | null)?.currentIndex || 0,
+        currentIndex: playlist?.currentIndex || 0,
         compatibility,
         initialQuality,
         initialShouldAutoplay,
@@ -164,7 +163,7 @@ export function ScenePlayerProvider({
       (playlistScene?.instanceId as string | undefined) || instanceId;
 
     if (effectiveSceneId) {
-      loadScene(effectiveSceneId, effectiveInstanceId);
+      void loadScene(effectiveSceneId, effectiveInstanceId);
     }
   }, [sceneId, instanceId, state.currentIndex, state.playlist, loadScene]);
 

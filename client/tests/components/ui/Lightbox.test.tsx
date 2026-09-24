@@ -345,8 +345,7 @@ describe("Lightbox", () => {
       const getImgSrc = () =>
         container.querySelector("img")?.getAttribute("src");
       const getVisibility = () =>
-        (container.querySelector(".w-\\[90vw\\]") as HTMLElement | null)?.style
-          .visibility;
+        container.querySelector<HTMLElement>(".w-\\[90vw\\]")?.style.visibility;
 
       expect(getImgSrc()).toBe("http://example.com/page1/image9.jpg");
 
@@ -529,7 +528,7 @@ describe("Lightbox", () => {
   });
 
   describe("fullscreen exit behavior", () => {
-    it("exits fullscreen when close button is clicked", async () => {
+    it("exits fullscreen when close button is clicked", () => {
       const exitFullscreen = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(document, "fullscreenElement", {
         value: document.body,

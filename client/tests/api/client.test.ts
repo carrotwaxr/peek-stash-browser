@@ -56,7 +56,8 @@ describe("api client login redirect", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
-        json: async () => ({ error: "Access denied. No token provided." }),
+        json: () =>
+          Promise.resolve({ error: "Access denied. No token provided." }),
       })
     );
     const { apiFetch, LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } =
@@ -87,7 +88,8 @@ describe("api client login redirect", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
-        json: async () => ({ error: "Access denied. No token provided." }),
+        json: () =>
+          Promise.resolve({ error: "Access denied. No token provided." }),
       })
     );
     const { apiFetch, ApiError } = await import("@/api/client");
@@ -128,7 +130,7 @@ describe("api client login redirect", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
-        json: async () => ({ error: "Session expired" }),
+        json: () => Promise.resolve({ error: "Session expired" }),
       })
     );
     const { apiFetch, redirectToLogin, ApiError } =
@@ -150,7 +152,7 @@ describe("api client login redirect", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 403,
-        json: async () => ({ error: "Forbidden" }),
+        json: () => Promise.resolve({ error: "Forbidden" }),
       })
     );
     const { apiFetch, REDIRECT_STORAGE_KEY } = await import("@/api/client");
@@ -175,7 +177,7 @@ describe("api client login redirect", () => {
         vi.fn().mockResolvedValue({
           ok: false,
           status: 401,
-          json: async () => ({ error: "Session expired" }),
+          json: () => Promise.resolve({ error: "Session expired" }),
         })
       );
       const { apiFetch, ApiError } = await import("@/api/client");
@@ -195,7 +197,7 @@ describe("api client login redirect", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 403,
-        json: async () => ({}),
+        json: () => Promise.resolve({}),
       })
     );
     const { apiFetch } = await import("@/api/client");
@@ -216,7 +218,7 @@ describe("api client login redirect", () => {
         vi.fn().mockResolvedValue({
           ok: false,
           status: 401,
-          json: async () => ({}),
+          json: () => Promise.resolve({}),
         })
       );
       const { apiFetch, ApiError, REDIRECT_STORAGE_KEY } =
@@ -247,7 +249,7 @@ describe("apiFetch errors and results", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ scenes: [1, 2] }),
+      json: () => Promise.resolve({ scenes: [1, 2] }),
     });
     vi.stubGlobal("fetch", fetchMock);
     const { apiPost } = await import("@/api/client");
@@ -272,7 +274,7 @@ describe("apiFetch errors and results", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 400,
-        json: async () => ({ error: "Bad filter" }),
+        json: () => Promise.resolve({ error: "Bad filter" }),
       })
     );
     const { apiFetch, ApiError } = await import("@/api/client");
@@ -293,7 +295,7 @@ describe("apiFetch errors and results", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 409,
-        json: async () => ({ message: "Already exists" }),
+        json: () => Promise.resolve({ message: "Already exists" }),
       })
     );
     const { apiFetch } = await import("@/api/client");
@@ -307,9 +309,7 @@ describe("apiFetch errors and results", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 502,
-        json: async () => {
-          throw new SyntaxError("Unexpected token <");
-        },
+        json: () => Promise.reject(new SyntaxError("Unexpected token <")),
       })
     );
     const { apiFetch, ApiError } = await import("@/api/client");
@@ -327,7 +327,7 @@ describe("apiFetch errors and results", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 503,
-        json: async () => ({ ready: false, message: "Cache warming" }),
+        json: () => Promise.resolve({ ready: false, message: "Cache warming" }),
       })
     );
     const { apiFetch, ApiError } = await import("@/api/client");
