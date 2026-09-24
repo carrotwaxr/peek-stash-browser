@@ -207,6 +207,10 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
+  image:
+    name: Image Smoke Test
+    uses: ./.github/workflows/image-smoke.yml
+
   # Integration tests require access to a Stash test instance on the local network.
   # This job only runs on self-hosted runners with network access to the test server.
   # To enable: add a self-hosted runner on the same network as the Stash test instance,

@@ -230,8 +230,12 @@ The server tests are checked with the same flags as the source. The check needs 
 ### Build Docker Image
 
 ```bash
-docker build -t peek-stash-browser:local .
+docker build -f Dockerfile.production -t peek-stash-browser:local .
 ```
+
+### Smoke Test the Image
+
+`node docker/smoke-test.mjs peek-stash-browser:local` boots it against an empty volume and runs the checks CI runs. It uses a throwaway container and volume on port 8080 (pass another port as a second argument) and removes both afterwards.
 
 ### Test Production Build Locally
 
