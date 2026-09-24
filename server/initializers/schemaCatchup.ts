@@ -35,14 +35,16 @@ import { promisify } from "util";
 import { logger } from "../utils/logger.js";
 
 const execAsync = promisify(exec);
-const TMP_DIR = "/app/data/tmp";
 
 /**
  * Execute a SQLite query and return the result
  */
 async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
-  mkdirSync(TMP_DIR, { recursive: true });
-  const tmpFile = path.join(TMP_DIR, `sql_${Date.now()}.sql`);
+  // Scratch files go in tmp/ beside the database, whose directory is writable
+  // wherever Peek runs: /app/data/tmp in the image
+  const tmpDir = path.join(path.dirname(dbPath), "tmp");
+  mkdirSync(tmpDir, { recursive: true });
+  const tmpFile = path.join(tmpDir, `sql_${Date.now()}.sql`);
   try {
     writeFileSync(tmpFile, sql);
     const { stdout } = await execAsync(
