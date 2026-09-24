@@ -19,6 +19,7 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -71,7 +72,9 @@ const UPSERT_RESULT = {
 describe("Ratings Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.user.findUnique.mockResolvedValue({ syncToStash: false } as any);
+    mockPrisma.user.findUnique.mockResolvedValue(
+      partialRow({ syncToStash: false })
+    );
     mockResolve.mockImplementation(
       async (_userId, _type, _id, requested) => requested ?? "instance-1"
     );
@@ -129,7 +132,9 @@ describe("Ratings Controller", () => {
     });
 
     it("accepts rating of 0 (boundary)", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 0 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -137,7 +142,9 @@ describe("Ratings Controller", () => {
     });
 
     it("accepts rating of 100 (boundary)", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 100 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -145,7 +152,9 @@ describe("Ratings Controller", () => {
     });
 
     it("accepts null rating (clearing a rating)", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: null }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -161,7 +170,9 @@ describe("Ratings Controller", () => {
     });
 
     it("accepts favorite as true/false", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -182,7 +193,9 @@ describe("Ratings Controller", () => {
 
   describe("instance ID resolution", () => {
     it("uses instanceId from request body when provided", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq(
         { rating: 50, instanceId: "custom-instance" },
         { sceneId: "1" },
@@ -211,7 +224,9 @@ describe("Ratings Controller", () => {
     });
 
     it("lets the resolver pick the instance when the request has none", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -248,9 +263,11 @@ describe("Ratings Controller", () => {
     it.each(handlers)(
       "%s returns 404 and writes nothing when the user cannot see the entity",
       async (entityType, handler, paramKey, modelKey) => {
-        mockPrisma.user.findUnique.mockResolvedValue({
-          syncToStash: true,
-        } as any);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({
+            syncToStash: true,
+          })
+        );
         mockResolve.mockResolvedValueOnce(null);
         const model = mockPrisma[modelKey] as any;
         const req = mockReq(
@@ -270,7 +287,9 @@ describe("Ratings Controller", () => {
     );
 
     it("passes the request's instance to the resolver", async () => {
-      mockPrisma.performerRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.performerRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq(
         { rating: 5, instanceId: "inst-b" },
         { performerId: "77" },
@@ -314,7 +333,9 @@ describe("Ratings Controller", () => {
 
   describe("upsert behavior", () => {
     it("creates with rating and default favorite when rating provided", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 75 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -334,7 +355,9 @@ describe("Ratings Controller", () => {
     });
 
     it("creates with favorite and null rating when only favorite provided", async () => {
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ favorite: true }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -357,7 +380,7 @@ describe("Ratings Controller", () => {
         rating: 85,
         favorite: true,
       };
-      mockPrisma.sceneRating.upsert.mockResolvedValue(upsertResult as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(partialRow(upsertResult));
       const req = mockReq(
         { rating: 85, favorite: true },
         { sceneId: "1" },
@@ -386,17 +409,23 @@ describe("Ratings Controller", () => {
     };
 
     beforeEach(() => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        syncToStash: true,
-      } as any);
-      mockInstanceManager.getForSync.mockReturnValue(mockStash as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          syncToStash: true,
+        })
+      );
+      mockInstanceManager.getForSync.mockReturnValue(partialRow(mockStash));
     });
 
     it("does not sync when syncToStash is disabled", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        syncToStash: false,
-      } as any);
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          syncToStash: false,
+        })
+      );
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -406,8 +435,10 @@ describe("Ratings Controller", () => {
     });
 
     it("does not sync when getForSync returns null (no stash client)", async () => {
-      mockInstanceManager.getForSync.mockReturnValue(null as any);
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockInstanceManager.getForSync.mockReturnValue(null);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -418,7 +449,9 @@ describe("Ratings Controller", () => {
 
     it("succeeds even when Stash sync throws (non-blocking)", async () => {
       mockStash.sceneUpdate.mockRejectedValue(new Error("Stash down"));
-      mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+      mockPrisma.sceneRating.upsert.mockResolvedValue(
+        partialRow(UPSERT_RESULT)
+      );
       const req = mockReq({ rating: 50 }, { sceneId: "1" }, USER);
       const res = mockRes();
       await updateSceneRating(req, res);
@@ -429,7 +462,9 @@ describe("Ratings Controller", () => {
     // Scene: syncs rating only, NOT favorite
     describe("scene sync policy", () => {
       beforeEach(() => {
-        mockPrisma.sceneRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.sceneRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs rating to Stash as rating100", async () => {
@@ -455,7 +490,7 @@ describe("Ratings Controller", () => {
     describe("performer sync policy", () => {
       beforeEach(() => {
         mockPrisma.performerRating.upsert.mockResolvedValue(
-          UPSERT_RESULT as any
+          partialRow(UPSERT_RESULT)
         );
       });
 
@@ -497,7 +532,9 @@ describe("Ratings Controller", () => {
     // Studio: syncs both rating AND favorite
     describe("studio sync policy", () => {
       beforeEach(() => {
-        mockPrisma.studioRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.studioRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs both rating and favorite", async () => {
@@ -518,7 +555,9 @@ describe("Ratings Controller", () => {
     // Tag: syncs favorite ONLY (no rating in Stash)
     describe("tag sync policy", () => {
       beforeEach(() => {
-        mockPrisma.tagRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.tagRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs favorite to Stash", async () => {
@@ -543,7 +582,9 @@ describe("Ratings Controller", () => {
     // Gallery: syncs rating ONLY (no favorite in Stash)
     describe("gallery sync policy", () => {
       beforeEach(() => {
-        mockPrisma.galleryRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.galleryRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs rating to Stash", async () => {
@@ -568,7 +609,9 @@ describe("Ratings Controller", () => {
     // Group: syncs rating ONLY
     describe("group sync policy", () => {
       beforeEach(() => {
-        mockPrisma.groupRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.groupRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs rating to Stash", async () => {
@@ -593,7 +636,9 @@ describe("Ratings Controller", () => {
     // Image: syncs rating ONLY
     describe("image sync policy", () => {
       beforeEach(() => {
-        mockPrisma.imageRating.upsert.mockResolvedValue(UPSERT_RESULT as any);
+        mockPrisma.imageRating.upsert.mockResolvedValue(
+          partialRow(UPSERT_RESULT)
+        );
       });
 
       it("syncs rating to Stash", async () => {
@@ -656,7 +701,7 @@ describe("Ratings Controller", () => {
       "successfully upserts %s rating",
       async (_entity, handler, paramKey, modelKey) => {
         const model = mockPrisma[modelKey] as any;
-        model.upsert.mockResolvedValue(UPSERT_RESULT);
+        model.upsert.mockResolvedValue(partialRow(UPSERT_RESULT));
         const req = mockReq({ rating: 50 }, { [paramKey]: "1" }, USER);
         const res = mockRes();
         await handler(req as any, res);

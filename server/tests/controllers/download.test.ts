@@ -18,6 +18,7 @@ import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
 import { authReq } from "../helpers/controllerTestUtils.js";
+import { downloadRow } from "../helpers/fixtures.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -90,37 +91,13 @@ const ALL_DOWNLOAD_PERMISSIONS = {
   },
 };
 
-/** A completed download row; override any field per test. */
-function downloadRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 1,
-    userId: 1,
-    type: "SCENE",
-    status: "COMPLETED",
-    entityType: "scene",
-    entityId: "scene-123",
-    instanceId: "inst-a",
-    fileName: "test.mp4",
-    fileSize: BigInt(1000),
-    filePath: null,
-    progress: 100,
-    error: null,
-    playlistId: null,
-    createdAt: new Date(),
-    completedAt: new Date(),
-    expiresAt: null,
-    ...overrides,
-  } as never;
-}
-
-const okStream = () => ({
-  ok: true,
-  headers: new Headers([
-    ["content-type", "video/mp4"],
-    ["content-length", "1000"],
-  ]),
-  body: new ReadableStream(),
-});
+const okStream = () =>
+  new Response(new ReadableStream(), {
+    headers: [
+      ["content-type", "video/mp4"],
+      ["content-length", "1000"],
+    ],
+  });
 
 describe("Download Controller", () => {
   let mockResponse: Partial<Response>;
@@ -734,14 +711,14 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       // Mock fetch response
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        headers: new Headers([
-          ["content-type", "video/mp4"],
-          ["content-length", "1000"],
-        ]),
-        body: new ReadableStream(),
-      });
+      vi.mocked(global.fetch).mockResolvedValue(
+        new Response(new ReadableStream(), {
+          headers: [
+            ["content-type", "video/mp4"],
+            ["content-length", "1000"],
+          ],
+        })
+      );
 
       await getDownloadFile(
         authReq({
@@ -789,14 +766,14 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       // Mock fetch response
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        headers: new Headers([
-          ["content-type", "image/jpeg"],
-          ["content-length", "1000"],
-        ]),
-        body: new ReadableStream(),
-      });
+      vi.mocked(global.fetch).mockResolvedValue(
+        new Response(new ReadableStream(), {
+          headers: [
+            ["content-type", "image/jpeg"],
+            ["content-length", "1000"],
+          ],
+        })
+      );
 
       await getDownloadFile(
         authReq({
@@ -899,7 +876,7 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({ instanceId: "inst-b" })
       );
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(okStream());
+      vi.mocked(global.fetch).mockResolvedValue(okStream());
 
       await getDownloadFile(
         authReq({
@@ -988,7 +965,7 @@ describe("Download Controller", () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it.each(["SCENE", "IMAGE", "PLAYLIST"])(
+    it.each(["SCENE", "IMAGE", "PLAYLIST"] as const)(
       "returns 410 for an EXPIRED download of any type, before the status check (%s)",
       async (type) => {
         mockDownloadService.getDownload.mockResolvedValue(
@@ -1165,7 +1142,7 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload
         .mockResolvedValueOnce(failedDownload)
         .mockResolvedValueOnce(retriedDownload);
-      mockDownloadService.updateProgress.mockResolvedValue({} as any);
+      mockDownloadService.updateProgress.mockResolvedValue(downloadRow());
       mockPlaylistZipService.createZip.mockResolvedValue(undefined);
 
       await retryDownload(

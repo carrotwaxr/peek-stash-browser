@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing
 vi.mock(
@@ -17,9 +18,9 @@ describe("EntityExclusionHelper", () => {
 
   describe("filterExcluded", () => {
     it("filters entities by ID from the exclusion table", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([{ entityId: "2", instanceId: "" }]);
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "2", instanceId: "" }),
+      ]);
 
       const entities = [
         { id: "1", name: "Entity 1" },
@@ -53,9 +54,9 @@ describe("EntityExclusionHelper", () => {
     it("handles instance-scoped exclusions correctly for multi-instance entities", async () => {
       // BUG FIX TEST: Entity with id "2" is excluded only for instance "instA"
       // Entity with id "2" from "instB" should NOT be excluded
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([{ entityId: "2", instanceId: "instA" }]);
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "2", instanceId: "instA" }),
+      ]);
 
       // Callers pass normalized entities which use `instanceId`, not `stashInstanceId`
       const entities = [
@@ -82,9 +83,9 @@ describe("EntityExclusionHelper", () => {
 
     it("handles global exclusions (empty instanceId) that apply to all instances", async () => {
       // Global exclusion (empty instanceId) should exclude entity from ALL instances
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([{ entityId: "2", instanceId: "" }]);
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "2", instanceId: "" }),
+      ]);
 
       // Callers pass normalized entities which use `instanceId`, not `stashInstanceId`
       const entities = [
@@ -108,12 +109,10 @@ describe("EntityExclusionHelper", () => {
 
   describe("getExcludedIds", () => {
     it("returns a flat superset of all excluded IDs when no instanceId is provided", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" },
-        { entityId: "2", instanceId: "instA" },
-        { entityId: "3", instanceId: "instB" },
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }),
+        partialRow({ entityId: "2", instanceId: "instA" }),
+        partialRow({ entityId: "3", instanceId: "instB" }),
       ]);
 
       const result = await entityExclusionHelper.getExcludedIds(1, "scene");
@@ -133,12 +132,10 @@ describe("EntityExclusionHelper", () => {
     });
 
     it("returns global + instance-scoped exclusions when instanceId is provided", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" }, // global - should be included
-        { entityId: "2", instanceId: "instA" }, // scoped to instA - should be included
-        { entityId: "3", instanceId: "instB" }, // scoped to instB - should NOT be included
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }), // global - should be included
+        partialRow({ entityId: "2", instanceId: "instA" }), // scoped to instA - should be included
+        partialRow({ entityId: "3", instanceId: "instB" }), // scoped to instB - should NOT be included
       ]);
 
       const result = await entityExclusionHelper.getExcludedIds(
@@ -153,11 +150,9 @@ describe("EntityExclusionHelper", () => {
     });
 
     it("returns only global exclusions when instanceId has no scoped exclusions", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" },
-        { entityId: "2", instanceId: "instA" },
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }),
+        partialRow({ entityId: "2", instanceId: "instA" }),
       ]);
 
       const result = await entityExclusionHelper.getExcludedIds(
@@ -171,11 +166,9 @@ describe("EntityExclusionHelper", () => {
     });
 
     it("deduplicates when entity has both global and scoped exclusion", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" }, // global
-        { entityId: "1", instanceId: "instA" }, // also scoped to instA
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }), // global
+        partialRow({ entityId: "1", instanceId: "instA" }), // also scoped to instA
       ]);
 
       const result = await entityExclusionHelper.getExcludedIds(
@@ -190,12 +183,10 @@ describe("EntityExclusionHelper", () => {
 
   describe("getExclusionData", () => {
     it("returns structured exclusion data with global and scoped sets", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" },
-        { entityId: "2", instanceId: "instA" },
-        { entityId: "3", instanceId: "instB" },
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }),
+        partialRow({ entityId: "2", instanceId: "instA" }),
+        partialRow({ entityId: "3", instanceId: "instB" }),
       ]);
 
       const result = await entityExclusionHelper.getExclusionData(1, "scene");
@@ -218,11 +209,9 @@ describe("EntityExclusionHelper", () => {
     });
 
     it("handles records with only global exclusions", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "" },
-        { entityId: "2", instanceId: "" },
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "" }),
+        partialRow({ entityId: "2", instanceId: "" }),
       ]);
 
       const result = await entityExclusionHelper.getExclusionData(1, "scene");
@@ -231,11 +220,9 @@ describe("EntityExclusionHelper", () => {
     });
 
     it("handles records with only scoped exclusions", async () => {
-      (
-        mockPrisma.userExcludedEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityId: "1", instanceId: "instA" },
-        { entityId: "2", instanceId: "instB" },
+      mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+        partialRow({ entityId: "1", instanceId: "instA" }),
+        partialRow({ entityId: "2", instanceId: "instB" }),
       ]);
 
       const result = await entityExclusionHelper.getExclusionData(1, "scene");

@@ -357,7 +357,7 @@ describe("Groups Controller", () => {
         ...group,
         scene_count: 15,
         performer_count: 8,
-      } as any);
+      });
 
       const req = mockReq(
         { ids: ["g1"], filter: {}, group_filter: {} },
@@ -523,7 +523,7 @@ describe("Groups Controller", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ]);
 
       const req = mockReq({ filter: {} }, {}, defaultUser);
       const res = mockRes();

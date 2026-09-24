@@ -5,6 +5,7 @@
  * regenerateRecoveryKey, adminResetPassword, adminRegenerateRecoveryKey,
  * getAllUsers, createUser, deleteUser, updateUserRole.
  */
+import type { Prisma, User, UserContentRestriction } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,7 +28,9 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { validatePassword } from "../../utils/passwordValidation.js";
 import { formatRecoveryKey } from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { type UserWithGroups, userRow } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -104,28 +107,30 @@ describe("User Controller", () => {
     });
 
     it("returns user settings with defaults for null fields", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        username: "testuser",
-        role: "USER",
-        preferredQuality: "1080p",
-        preferredPlaybackMode: null,
-        preferredPreviewQuality: null,
-        enableCast: false,
-        theme: "dark",
-        carouselPreferences: null,
-        navPreferences: null,
-        filterPresets: null,
-        minimumPlayPercent: null,
-        syncToStash: false,
-        hideConfirmationDisabled: false,
-        unitPreference: null,
-        wallPlayback: null,
-        tableColumnDefaults: null,
-        cardDisplaySettings: null,
-        landingPagePreference: null,
-        lightboxDoubleTapAction: null,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          username: "testuser",
+          role: "USER",
+          preferredQuality: "1080p",
+          preferredPlaybackMode: null,
+          preferredPreviewQuality: null,
+          enableCast: false,
+          theme: "dark",
+          carouselPreferences: null,
+          navPreferences: null,
+          filterPresets: null,
+          minimumPlayPercent: 20,
+          syncToStash: false,
+          hideConfirmationDisabled: false,
+          unitPreference: null,
+          wallPlayback: null,
+          tableColumnDefaults: null,
+          cardDisplaySettings: null,
+          landingPagePreference: null,
+          lightboxDoubleTapAction: null,
+        })
+      );
 
       const req = mockReq({}, {}, USER);
       const res = mockRes();
@@ -156,21 +161,21 @@ describe("User Controller", () => {
   // ─── updateUserSettings ───
 
   describe("updateUserSettings", () => {
-    const mockUpdatedUser = {
+    const mockUpdatedUser: User = partialRow({
       id: 2,
       preferredQuality: "720p",
       preferredPlaybackMode: null,
       theme: null,
       carouselPreferences: null,
       navPreferences: null,
-      minimumPlayPercent: null,
+      minimumPlayPercent: 20,
       syncToStash: false,
       wallPlayback: null,
       tableColumnDefaults: null,
       cardDisplaySettings: null,
       landingPagePreference: null,
       lightboxDoubleTapAction: null,
-    };
+    });
 
     it("returns 401 when user has no id", async () => {
       const req = mockReq({}, {}, {} as any);
@@ -187,7 +192,7 @@ describe("User Controller", () => {
     });
 
     it("allows admin to update another user's settings", async () => {
-      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser as any);
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       const req = mockReq({ preferredQuality: "720p" }, { userId: "2" }, ADMIN);
       const res = mockRes();
       await updateUserSettings(req, res);
@@ -198,7 +203,7 @@ describe("User Controller", () => {
     });
 
     it("updates own settings successfully", async () => {
-      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser as any);
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       const req = mockReq({ preferredQuality: "720p" }, {}, USER);
       const res = mockRes();
       await updateUserSettings(req, res);
@@ -265,7 +270,7 @@ describe("User Controller", () => {
         ...mockUpdatedUser,
         id: 1,
         syncToStash: true,
-      } as any);
+      });
       const req = mockReq({ syncToStash: true }, {}, ADMIN);
       const res = mockRes();
       await updateUserSettings(req, res);
@@ -340,7 +345,7 @@ describe("User Controller", () => {
     });
 
     it("accepts null tableColumnDefaults (clearing)", async () => {
-      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser as any);
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       const req = mockReq({ tableColumnDefaults: null }, {}, USER);
       const res = mockRes();
       await updateUserSettings(req, res);
@@ -395,7 +400,7 @@ describe("User Controller", () => {
     });
 
     it("accepts valid lightboxDoubleTapAction values", async () => {
-      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser as any);
+      mockPrisma.user.update.mockResolvedValue(mockUpdatedUser);
       for (const action of ["favorite", "o_counter", "fullscreen"]) {
         const req = mockReq({ lightboxDoubleTapAction: action }, {}, USER);
         const res = mockRes();
@@ -458,11 +463,13 @@ describe("User Controller", () => {
 
     it("returns 401 when current password is incorrect", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        password: "hashed",
-      } as any);
-      mockBcrypt.compare.mockResolvedValue(false as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          password: "hashed",
+        })
+      );
+      mockBcrypt.compare.mockImplementation(async () => false);
       const req = mockReq(
         { currentPassword: "wrong", newPassword: "NewPass1" },
         {},
@@ -476,12 +483,14 @@ describe("User Controller", () => {
 
     it("changes password successfully", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        password: "hashed",
-      } as any);
-      mockBcrypt.compare.mockResolvedValue(true as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          password: "hashed",
+        })
+      );
+      mockBcrypt.compare.mockImplementation(async () => true);
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq(
         { currentPassword: "OldPass1", newPassword: "NewPass1" },
         {},
@@ -535,9 +544,11 @@ describe("User Controller", () => {
     });
 
     it("reports that a key exists without returning it", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        recoveryKeyHash: "a".repeat(64),
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          recoveryKeyHash: "a".repeat(64),
+        })
+      );
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
@@ -545,9 +556,11 @@ describe("User Controller", () => {
     });
 
     it("reports hasRecoveryKey false when no recovery key exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        recoveryKeyHash: null,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          recoveryKeyHash: null,
+        })
+      );
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getRecoveryKey(req, res);
@@ -575,11 +588,13 @@ describe("User Controller", () => {
     });
 
     it("returns 400 when currentPassword is wrong", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        password: "hashed",
-      } as any);
-      mockBcrypt.compare.mockResolvedValue(false as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          password: "hashed",
+        })
+      );
+      mockBcrypt.compare.mockImplementation(async () => false);
       const req = mockReq({ currentPassword: "wrong" }, {}, USER);
       const res = mockRes();
       await regenerateRecoveryKey(req, res);
@@ -590,12 +605,14 @@ describe("User Controller", () => {
     });
 
     it("stores only the hash and returns the formatted key", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        password: "hashed",
-      } as any);
-      mockBcrypt.compare.mockResolvedValue(true as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          password: "hashed",
+        })
+      );
+      mockBcrypt.compare.mockImplementation(async () => true);
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({ currentPassword: "OldPass1" }, {}, USER);
       const res = mockRes();
       await regenerateRecoveryKey(req, res);
@@ -656,8 +673,8 @@ describe("User Controller", () => {
 
     it("resets password successfully", async () => {
       mockValidatePassword.mockReturnValue({ valid: true, errors: [] });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 3 } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({ newPassword: "NewPass1" }, { userId: "3" }, ADMIN);
       const res = mockRes();
       await adminResetPassword(req, res);
@@ -693,8 +710,8 @@ describe("User Controller", () => {
     });
 
     it("regenerates key successfully", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 3 } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({}, { userId: "3" }, ADMIN);
       const res = mockRes();
       await adminRegenerateRecoveryKey(req, res);
@@ -718,16 +735,18 @@ describe("User Controller", () => {
 
     it("returns users with group memberships mapped", async () => {
       mockPrisma.user.findMany.mockResolvedValue([
-        {
+        partialRow<UserWithGroups>({
           id: 1,
           username: "admin",
           role: "ADMIN",
           createdAt: new Date(),
           updatedAt: new Date(),
           syncToStash: false,
-          groupMemberships: [{ group: { id: 1, name: "Group A" } }],
-        },
-      ] as any);
+          groupMemberships: [
+            partialRow({ group: partialRow({ id: 1, name: "Group A" }) }),
+          ],
+        }),
+      ]);
       const req = mockReq({}, {}, ADMIN);
       const res = mockRes();
       await getAllUsers(req, res);
@@ -776,7 +795,7 @@ describe("User Controller", () => {
     });
 
     it("returns 409 when username already exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 5 } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 5 }));
       const req = mockReq(
         { username: "existing", password: "Pass123" },
         {},
@@ -789,12 +808,14 @@ describe("User Controller", () => {
 
     it("creates user with default USER role", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      mockPrisma.user.create.mockResolvedValue({
-        id: 5,
-        username: "new",
-        role: "USER",
-        createdAt: new Date(),
-      } as any);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 5,
+          username: "new",
+          role: "USER",
+          createdAt: new Date(),
+        })
+      );
       const req = mockReq({ username: "new", password: "Pass123" }, {}, ADMIN);
       const res = mockRes();
       await createUser(req, res);
@@ -810,12 +831,14 @@ describe("User Controller", () => {
 
     it("creates user with explicit ADMIN role", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      mockPrisma.user.create.mockResolvedValue({
-        id: 5,
-        username: "admin2",
-        role: "ADMIN",
-        createdAt: new Date(),
-      } as any);
+      mockPrisma.user.create.mockResolvedValue(
+        partialRow({
+          id: 5,
+          username: "admin2",
+          role: "ADMIN",
+          createdAt: new Date(),
+        })
+      );
       const req = mockReq(
         { username: "admin2", password: "Pass123", role: "ADMIN" },
         {},
@@ -861,8 +884,8 @@ describe("User Controller", () => {
     });
 
     it("deletes user successfully", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 3 } as any);
-      mockPrisma.user.delete.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(partialRow({ id: 3 }));
+      mockPrisma.user.delete.mockResolvedValue(partialRow({}));
       const req = mockReq({}, { userId: "3" }, ADMIN);
       const res = mockRes();
       await deleteUser(req, res);
@@ -904,12 +927,14 @@ describe("User Controller", () => {
     });
 
     it("updates role successfully", async () => {
-      mockPrisma.user.update.mockResolvedValue({
-        id: 3,
-        username: "user3",
-        role: "ADMIN",
-        updatedAt: new Date(),
-      } as any);
+      mockPrisma.user.update.mockResolvedValue(
+        partialRow({
+          id: 3,
+          username: "user3",
+          role: "ADMIN",
+          updatedAt: new Date(),
+        })
+      );
       const req = mockReq({ role: "ADMIN" }, { userId: "3" }, ADMIN);
       const res = mockRes();
       await updateUserRole(req, res);
@@ -944,7 +969,7 @@ describe("User Controller", () => {
   // ─── updateUserRestrictions ───
 
   describe("updateUserRestrictions", () => {
-    const TARGET = { id: 3, username: "user3", role: "USER" };
+    const TARGET = userRow({ id: 3, username: "user3" });
     const tagRule = (mode: string, ids: unknown[] = ["1:A"]) => ({
       entityType: "tags",
       mode,
@@ -952,14 +977,14 @@ describe("User Controller", () => {
     });
 
     beforeEach(() => {
-      mockPrisma.user.findUnique.mockResolvedValue(TARGET as any);
+      mockPrisma.user.findUnique.mockResolvedValue(TARGET);
       mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
         count: 0,
-      } as any);
+      });
       mockPrisma.userContentRestriction.createMany.mockResolvedValue({
         count: 1,
-      } as any);
-      mockPrisma.userContentRestriction.findMany.mockResolvedValue([] as any);
+      });
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
       mockPrisma.$transaction.mockImplementation(((ops: unknown[]) =>
         Promise.all(ops)) as any);
       mockExclusions.recomputeForUser.mockResolvedValue(undefined);
@@ -980,7 +1005,7 @@ describe("User Controller", () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         ...TARGET,
         role: "ADMIN",
-      } as any);
+      });
       const req = mockReq(
         { restrictions: [tagRule("EXCLUDE")] },
         { userId: "3" },
@@ -1041,7 +1066,7 @@ describe("User Controller", () => {
     it("400 on a malformed id", async () => {
       for (const bad of [["abc"], ["1:"], [5], ["1:A", "x:y:"]]) {
         vi.clearAllMocks();
-        mockPrisma.user.findUnique.mockResolvedValue(TARGET as any);
+        mockPrisma.user.findUnique.mockResolvedValue(TARGET);
         const req = mockReq(
           { restrictions: [tagRule("EXCLUDE", bad)] },
           { userId: "3" },
@@ -1115,13 +1140,11 @@ describe("User Controller", () => {
     });
 
     it("stores an INCLUDE and an EXCLUDE row for the same type and recomputes", async () => {
-      const saved = [
-        { id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" },
-        { id: 11, userId: 3, entityType: "tags", mode: "EXCLUDE" },
+      const saved: UserContentRestriction[] = [
+        partialRow({ id: 10, userId: 3, entityType: "tags", mode: "INCLUDE" }),
+        partialRow({ id: 11, userId: 3, entityType: "tags", mode: "EXCLUDE" }),
       ];
-      mockPrisma.userContentRestriction.findMany.mockResolvedValue(
-        saved as any
-      );
+      mockPrisma.userContentRestriction.findMany.mockResolvedValue(saved);
       const req = mockReq(
         {
           restrictions: [
@@ -1157,15 +1180,16 @@ describe("User Controller", () => {
     });
 
     it("deletes and inserts in one batch transaction, then recomputes", async () => {
-      const deleteOp = { op: "deleteMany" };
-      const createOp = { op: "createMany" };
+      // Stand-ins the test only compares by identity
+      const deleteOp = partialRow<Prisma.PrismaPromise<Prisma.BatchPayload>>(
+        {}
+      );
+      const createOp = partialRow<Prisma.PrismaPromise<Prisma.BatchPayload>>(
+        {}
+      );
       const order: string[] = [];
-      mockPrisma.userContentRestriction.deleteMany.mockReturnValue(
-        deleteOp as any
-      );
-      mockPrisma.userContentRestriction.createMany.mockReturnValue(
-        createOp as any
-      );
+      mockPrisma.userContentRestriction.deleteMany.mockReturnValue(deleteOp);
+      mockPrisma.userContentRestriction.createMany.mockReturnValue(createOp);
       mockPrisma.$transaction.mockImplementation((async () => {
         order.push("transaction");
         return [{ count: 0 }, { count: 1 }];

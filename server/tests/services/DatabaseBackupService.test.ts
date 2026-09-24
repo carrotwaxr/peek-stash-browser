@@ -1,21 +1,22 @@
 /**
  * Unit Tests for DatabaseBackupService
  */
+import type { PathLike } from "fs";
 import fs from "fs/promises";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock fs/promises
 vi.mock("fs/promises");
 
-// Mock prisma - add at top with other mocks
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $executeRawUnsafe: vi.fn(),
-  },
-}));
+// Mock prisma
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -27,6 +28,11 @@ vi.mock("../../utils/logger.js", () => ({
     verbose: vi.fn(),
   },
 }));
+
+/** `fs.readdir` as the service calls it: it lists names, not `Dirent`s. */
+const mockReaddir = vi.mocked<(path: PathLike) => Promise<string[]>>(
+  fs.readdir
+);
 
 // Mock environment
 const originalEnv = process.env;
@@ -44,10 +50,10 @@ describe("DatabaseBackupService", () => {
 
   describe("listBackups", () => {
     it("should return empty array when no backups exist", async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
+      mockReaddir.mockResolvedValue([
         "peek-stash-browser.db",
         "other-file.txt",
-      ] as any);
+      ]);
 
       const { databaseBackupService } =
         await import("../../services/DatabaseBackupService.js");
@@ -57,11 +63,11 @@ describe("DatabaseBackupService", () => {
     });
 
     it("should return backup files with metadata", async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
+      mockReaddir.mockResolvedValue([
         "peek-stash-browser.db",
         "peek-stash-browser.db.backup-20260118-104532",
         "peek-stash-browser.db.backup-20260117-093045",
-      ] as any);
+      ]);
 
       vi.mocked(fs.stat).mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
@@ -92,10 +98,10 @@ describe("DatabaseBackupService", () => {
     });
 
     it("should sort backups by date descending (newest first)", async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
+      mockReaddir.mockResolvedValue([
         "peek-stash-browser.db.backup-20260117-093045",
         "peek-stash-browser.db.backup-20260118-104532",
-      ] as any);
+      ]);
 
       vi.mocked(fs.stat).mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
@@ -122,7 +128,7 @@ describe("DatabaseBackupService", () => {
     it("should log error and rethrow when directory read fails", async () => {
       const { logger } = await import("../../utils/logger.js");
       const readError = new Error("ENOENT: no such file or directory");
-      vi.mocked(fs.readdir).mockRejectedValue(readError);
+      mockReaddir.mockRejectedValue(readError);
 
       const { databaseBackupService } =
         await import("../../services/DatabaseBackupService.js");
@@ -140,11 +146,11 @@ describe("DatabaseBackupService", () => {
     });
 
     it("should gracefully skip files deleted between readdir and stat", async () => {
-      vi.mocked(fs.readdir).mockResolvedValue([
+      mockReaddir.mockResolvedValue([
         "peek-stash-browser.db.backup-20260118-104532",
         "peek-stash-browser.db.backup-20260117-093045",
         "peek-stash-browser.db.backup-20260116-080000",
-      ] as any);
+      ]);
 
       vi.mocked(fs.stat).mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
@@ -187,10 +193,12 @@ describe("DatabaseBackupService", () => {
       vi.setSystemTime(mockDate);
 
       vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(0);
-      vi.mocked(fs.stat).mockResolvedValue({
-        size: 246747136,
-        mtime: new Date("2026-01-18T10:45:32.000Z"),
-      } as any);
+      vi.mocked(fs.stat).mockResolvedValue(
+        partialRow({
+          size: 246747136,
+          mtime: new Date("2026-01-18T10:45:32.000Z"),
+        })
+      );
 
       const { databaseBackupService } =
         await import("../../services/DatabaseBackupService.js");

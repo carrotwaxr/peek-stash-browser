@@ -7,6 +7,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initializeStashInstances } from "../../initializers/stashInstance.js";
 import prisma from "../../prisma/singleton.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -56,10 +57,12 @@ describe("initializeStashInstances", () => {
 
   it("migrates from env vars when no DB instances but env vars are set", async () => {
     mockPrisma.stashInstance.count.mockResolvedValue(0);
-    mockPrisma.stashInstance.create.mockResolvedValue({
-      id: "migrated-1",
-      name: "Default",
-    } as any);
+    mockPrisma.stashInstance.create.mockResolvedValue(
+      partialRow({
+        id: "migrated-1",
+        name: "Default",
+      })
+    );
 
     process.env.STASH_URL = "http://stash:9999/graphql";
     process.env.STASH_API_KEY = "test-key";

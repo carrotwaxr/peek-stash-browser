@@ -15,8 +15,12 @@ import { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate, requireAdmin } from "../../middleware/auth.js";
 // Import after mocks are set up
-import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
+import {
+  type OrphanedSceneInfo,
+  mergeReconciliationService,
+} from "../../services/MergeReconciliationService.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock MergeReconciliationService - hoisted to top level
 vi.mock("../../services/MergeReconciliationService.js", () => ({
@@ -173,7 +177,7 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("GET /orphaned-scenes handler", () => {
     it("should return list of orphaned scenes", async () => {
-      const mockOrphans = [
+      const mockOrphans: OrphanedSceneInfo[] = [
         {
           id: "scene-1",
           title: "Deleted Scene 1",
@@ -528,15 +532,13 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("POST /reconcile-all handler", () => {
     it("should reconcile all orphans with exact matches", async () => {
-      const mockOrphans = [
-        { id: "orphan-1", phash: "abc123", title: "Scene 1" },
-        { id: "orphan-2", phash: "def456", title: "Scene 2" },
-        { id: "orphan-3", phash: null, title: "Scene 3" }, // No phash - will be skipped
+      const mockOrphans: OrphanedSceneInfo[] = [
+        partialRow({ id: "orphan-1", phash: "abc123", title: "Scene 1" }),
+        partialRow({ id: "orphan-2", phash: "def456", title: "Scene 2" }),
+        partialRow({ id: "orphan-3", phash: null, title: "Scene 3" }), // No phash - will be skipped
       ];
 
-      mockService.findOrphanedScenesWithActivity.mockResolvedValue(
-        mockOrphans as never
-      );
+      mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
 
       // First orphan has exact match, second has no exact match
       mockService.findPhashMatches.mockImplementation(async (id: string) => {
@@ -655,13 +657,11 @@ describe("Merge Reconciliation Routes", () => {
     });
 
     it("should skip all when no exact matches found", async () => {
-      const mockOrphans = [
-        { id: "orphan-1", phash: "abc123", title: "Scene 1" },
+      const mockOrphans: OrphanedSceneInfo[] = [
+        partialRow({ id: "orphan-1", phash: "abc123", title: "Scene 1" }),
       ];
 
-      mockService.findOrphanedScenesWithActivity.mockResolvedValue(
-        mockOrphans as never
-      );
+      mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
       mockService.findPhashMatches.mockResolvedValue([
         {
           sceneId: "target-1",

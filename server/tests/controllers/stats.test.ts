@@ -12,6 +12,7 @@ import { getStats, refreshCache } from "../../controllers/stats.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -51,7 +52,7 @@ describe("Stats Controller", () => {
     process.env.DATABASE_URL = "file:/tmp/test.db";
 
     // Default happy-path mocks
-    mockEntityService.getStats.mockReturnValue({
+    mockEntityService.getStats.mockResolvedValue({
       scenes: 100,
       performers: 50,
       studios: 10,
@@ -59,13 +60,15 @@ describe("Stats Controller", () => {
       galleries: 5,
       images: 200,
       groups: 3,
-    } as any);
+      clips: 0,
+      ungeneratedClips: 0,
+    });
     mockEntityService.isReady.mockResolvedValue(true);
     mockEntityService.getLastRefreshed.mockResolvedValue(
       new Date("2026-01-15T12:00:00Z")
     );
     mockSyncService.isSyncing.mockReturnValue(false);
-    mockFsStat.mockResolvedValue({ size: 1048576 } as any); // 1 MB
+    mockFsStat.mockResolvedValue(partialRow({ size: 1048576 })); // 1 MB
   });
 
   afterAll(() => {
@@ -134,7 +137,7 @@ describe("Stats Controller", () => {
     });
 
     it("formats database size correctly for a 1 MB file", async () => {
-      mockFsStat.mockResolvedValue({ size: 1048576 } as any);
+      mockFsStat.mockResolvedValue(partialRow({ size: 1048576 }));
 
       const req = mockReq();
       const res = mockRes();
@@ -145,7 +148,7 @@ describe("Stats Controller", () => {
     });
 
     it("formats database size correctly for a 1 KB file", async () => {
-      mockFsStat.mockResolvedValue({ size: 1024 } as any);
+      mockFsStat.mockResolvedValue(partialRow({ size: 1024 }));
 
       const req = mockReq();
       const res = mockRes();
@@ -156,7 +159,9 @@ describe("Stats Controller", () => {
     });
 
     it("formats database size correctly for a 2.5 GB file", async () => {
-      mockFsStat.mockResolvedValue({ size: 2.5 * 1024 * 1024 * 1024 } as any);
+      mockFsStat.mockResolvedValue(
+        partialRow({ size: 2.5 * 1024 * 1024 * 1024 })
+      );
 
       const req = mockReq();
       const res = mockRes();
@@ -167,7 +172,7 @@ describe("Stats Controller", () => {
     });
 
     it("formats 0 bytes as '0 B'", async () => {
-      mockFsStat.mockResolvedValue({ size: 0 } as any);
+      mockFsStat.mockResolvedValue(partialRow({ size: 0 }));
 
       const req = mockReq();
       const res = mockRes();
@@ -219,7 +224,7 @@ describe("Stats Controller", () => {
 
   describe("refreshCache", () => {
     it("triggers fullSync and returns success", async () => {
-      mockSyncService.fullSync.mockResolvedValue(undefined as any);
+      mockSyncService.fullSync.mockResolvedValue([]);
 
       const req = mockReq();
       const res = mockRes();

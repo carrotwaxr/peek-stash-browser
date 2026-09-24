@@ -11,6 +11,7 @@ import { findImages } from "../../../controllers/library/images.js";
 
 import prisma from "../../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
+import type { NormalizedImage } from "../../../types/index.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { must } from "../../helpers/must.js";
 
@@ -47,9 +48,15 @@ const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 const defaultUser = { id: 1, role: "USER" };
 const adminUser = { id: 1, role: "ADMIN" };
 
-/** Helper to create a minimal mock image for query builder results */
-function createQueryBuilderImage(overrides: Record<string, unknown> = {}) {
-  return {
+/**
+ * A query builder result row. `execute` declares `NormalizedImage[]` but
+ * returns hydrated SQL rows of this shape (its `hydrateImages` casts them the
+ * same way), which the controller reads; item 74 types the rows honestly.
+ */
+function createQueryBuilderImage(
+  overrides: Record<string, unknown> = {}
+): NormalizedImage {
+  const row = {
     id: overrides.id ?? "img1",
     stashInstanceId: overrides.stashInstanceId ?? "default",
     instanceId: overrides.instanceId ?? "default",
@@ -66,6 +73,7 @@ function createQueryBuilderImage(overrides: Record<string, unknown> = {}) {
     stashOCounter: overrides.stashOCounter ?? 0,
     ...overrides,
   };
+  return row as unknown as NormalizedImage;
 }
 
 describe("Images Controller", () => {
@@ -81,7 +89,7 @@ describe("Images Controller", () => {
     it("returns images from query builder on happy path", async () => {
       const images = [createQueryBuilderImage({ id: "img1" })];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images as any,
+        images: images,
         total: 1,
       });
 
@@ -106,7 +114,7 @@ describe("Images Controller", () => {
         }),
       ];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images as any,
+        images: images,
         total: 1,
       });
 
@@ -127,7 +135,7 @@ describe("Images Controller", () => {
     it("adds stashUrl to each image for an admin", async () => {
       const images = [createQueryBuilderImage({ id: "img1" })];
       mockImageQueryBuilder.execute.mockResolvedValue({
-        images: images as any,
+        images: images,
         total: 1,
       });
 
@@ -147,7 +155,7 @@ describe("Images Controller", () => {
         images: [
           createQueryBuilderImage({ id: "img1" }),
           createQueryBuilderImage({ id: "img2" }),
-        ] as any,
+        ],
         total: 2,
       });
 

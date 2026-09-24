@@ -8,6 +8,7 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -76,9 +77,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("hideEntity", () => {
     it("upserts the hidden entity record with correct composite key", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       await userHiddenEntityService.hideEntity(1, "scene", "42", "inst-a");
 
@@ -104,9 +103,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("defaults instanceId to empty string when not provided", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       await userHiddenEntityService.hideEntity(1, "performer", "7");
 
@@ -125,9 +122,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("triggers exclusion computation with correct arguments", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       await userHiddenEntityService.hideEntity(5, "studio", "10", "inst-b");
 
@@ -140,9 +135,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("passes empty instanceId to exclusion computation when not provided", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       await userHiddenEntityService.hideEntity(5, "tag", "3");
 
@@ -155,14 +148,10 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("invalidates the cached hidden IDs for the user", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       // Prime the cache
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
       await userHiddenEntityService.getHiddenEntityIds(1);
       expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
 
@@ -175,9 +164,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("works for all entity types", async () => {
-      (
-        mockPrisma.userHiddenEntity.upsert as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({});
+      mockPrisma.userHiddenEntity.upsert.mockResolvedValue(partialRow({}));
 
       const types: EntityType[] = [
         "scene",
@@ -203,9 +190,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("unhideEntity", () => {
     it("deletes the hidden entity record with correct filters", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 1 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
 
       await userHiddenEntityService.unhideEntity(
         2,
@@ -225,9 +210,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("defaults instanceId to empty string when not provided", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 1 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
 
       await userHiddenEntityService.unhideEntity(2, "scene", "5");
 
@@ -242,9 +225,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("triggers removeHiddenEntity on the exclusion service", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 1 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
 
       await userHiddenEntityService.unhideEntity(3, "tag", "8", "inst-c");
 
@@ -257,14 +238,12 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("invalidates the cached hidden IDs for the user", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 1 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 1 });
 
       // Prime the cache
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([{ entityType: "scene", entityId: "1" }]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({ entityType: "scene", entityId: "1" }),
+      ]);
       await userHiddenEntityService.getHiddenEntityIds(3);
       expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
 
@@ -272,9 +251,7 @@ describe("UserHiddenEntityService", () => {
       await userHiddenEntityService.unhideEntity(3, "scene", "1", "");
 
       // Next call should hit DB again
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
       await userHiddenEntityService.getHiddenEntityIds(3);
       expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(2);
     });
@@ -284,9 +261,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("unhideAll", () => {
     it("deletes all hidden entities for a user and returns the count", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 5 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 5 });
 
       const result = await userHiddenEntityService.unhideAll(1);
 
@@ -297,9 +272,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("filters by entityType when provided", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 2 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 2 });
 
       const result = await userHiddenEntityService.unhideAll(1, "performer");
 
@@ -310,9 +283,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("triggers full recompute when entities were actually unhidden", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 3 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 3 });
 
       await userHiddenEntityService.unhideAll(4);
 
@@ -320,9 +291,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("does NOT trigger recompute when no entities were unhidden", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 0 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 0 });
 
       await userHiddenEntityService.unhideAll(4);
 
@@ -330,14 +299,10 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("invalidates cache even when count is 0", async () => {
-      (
-        mockPrisma.userHiddenEntity.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 0 });
+      mockPrisma.userHiddenEntity.deleteMany.mockResolvedValue({ count: 0 });
 
       // Prime cache
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
       await userHiddenEntityService.getHiddenEntityIds(4);
 
       await userHiddenEntityService.unhideAll(4);
@@ -354,6 +319,7 @@ describe("UserHiddenEntityService", () => {
     const mockHiddenRecords = [
       {
         id: 1,
+        userId: 1,
         entityType: "scene",
         entityId: "10",
         instanceId: "inst-a",
@@ -361,6 +327,7 @@ describe("UserHiddenEntityService", () => {
       },
       {
         id: 2,
+        userId: 1,
         entityType: "performer",
         entityId: "20",
         instanceId: "",
@@ -368,6 +335,7 @@ describe("UserHiddenEntityService", () => {
       },
       {
         id: 3,
+        userId: 1,
         entityType: "tag",
         entityId: "30",
         instanceId: "inst-b",
@@ -376,9 +344,7 @@ describe("UserHiddenEntityService", () => {
     ];
 
     it("fetches hidden entities ordered by hiddenAt descending", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       await userHiddenEntityService.getHiddenEntities(1);
 
@@ -389,9 +355,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("filters by entityType when provided", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       await userHiddenEntityService.getHiddenEntities(1, "scene");
 
@@ -403,21 +367,25 @@ describe("UserHiddenEntityService", () => {
 
     it("enriches each visible row from the instance the access check resolved", async () => {
       everyRefVisible();
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(mockHiddenRecords);
-      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "10",
-        title: "Scene 10",
-      });
-      (mockEntity.getPerformer as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "20",
-        name: "Performer 20",
-      });
-      (mockEntity.getTag as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "30",
-        name: "Tag 30",
-      });
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue(mockHiddenRecords);
+      mockEntity.getScene.mockResolvedValue(
+        partialRow({
+          id: "10",
+          title: "Scene 10",
+        })
+      );
+      mockEntity.getPerformer.mockResolvedValue(
+        partialRow({
+          id: "20",
+          name: "Performer 20",
+        })
+      );
+      mockEntity.getTag.mockResolvedValue(
+        partialRow({
+          id: "30",
+          name: "Tag 30",
+        })
+      );
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -438,17 +406,15 @@ describe("UserHiddenEntityService", () => {
 
     it("checks visibility once per entity type with each row's stored instance", async () => {
       everyRefVisible();
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
         ...mockHiddenRecords,
-        {
+        partialRow({
           id: 4,
           entityType: "scene",
           entityId: "11",
           instanceId: "",
           hiddenAt: new Date("2026-01-04"),
-        },
+        }),
       ]);
 
       await userHiddenEntityService.getHiddenEntities(7);
@@ -470,28 +436,28 @@ describe("UserHiddenEntityService", () => {
       mockResolveVisible.mockResolvedValue(
         new Map([[entityRefKey("10", "i"), "i"]])
       );
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        {
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({
           id: 1,
           entityType: "scene",
           entityId: "10",
           instanceId: "i",
           hiddenAt: new Date("2026-01-01"),
-        },
-        {
+        }),
+        partialRow({
           id: 2,
           entityType: "scene",
           entityId: "99",
           instanceId: "i",
           hiddenAt: new Date("2026-01-02"),
-        },
+        }),
       ]);
-      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "10",
-        title: "Visible",
-      });
+      mockEntity.getScene.mockResolvedValue(
+        partialRow({
+          id: "10",
+          title: "Visible",
+        })
+      );
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -521,18 +487,16 @@ describe("UserHiddenEntityService", () => {
 
     it("keeps a row whose entity left the cache, as restricted", async () => {
       everyRefVisible();
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        {
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({
           id: 2,
           entityType: "scene",
           entityId: "99",
           instanceId: "i",
           hiddenAt: new Date(),
-        },
+        }),
       ]);
-      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      mockEntity.getScene.mockResolvedValue(null);
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -556,25 +520,20 @@ describe("UserHiddenEntityService", () => {
         "image",
       ].map((entityType, i) => ({
         id: i + 1,
+        userId: 1,
         entityType,
         entityId: String(i + 1),
         instanceId: "i",
         hiddenAt: new Date(),
       }));
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(allTypes);
-      for (const getter of [
-        mockEntity.getScene,
-        mockEntity.getPerformer,
-        mockEntity.getStudio,
-        mockEntity.getTag,
-        mockEntity.getGroup,
-        mockEntity.getGallery,
-        mockEntity.getImage,
-      ]) {
-        (getter as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "x" });
-      }
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue(allTypes);
+      mockEntity.getScene.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getPerformer.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getStudio.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getTag.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getGroup.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getGallery.mockResolvedValue(partialRow({ id: "x" }));
+      mockEntity.getImage.mockResolvedValue(partialRow({ id: "x" }));
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -591,27 +550,27 @@ describe("UserHiddenEntityService", () => {
 
     it("returns instanceId as stored", async () => {
       everyRefVisible();
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        {
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({
           id: 1,
           entityType: "scene",
           entityId: "10",
           instanceId: "inst-x",
           hiddenAt: new Date(),
-        },
-        {
+        }),
+        partialRow({
           id: 2,
           entityType: "scene",
           entityId: "11",
           instanceId: "",
           hiddenAt: new Date(),
-        },
+        }),
       ]);
-      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "10",
-      });
+      mockEntity.getScene.mockResolvedValue(
+        partialRow({
+          id: "10",
+        })
+      );
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -623,9 +582,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("findAlreadyHidden", () => {
     it("reads the user's hides of the whole batch in one query", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       await userHiddenEntityService.findAlreadyHidden(1, [
         { entityType: "scene", entityId: "42", instanceId: "A" },
@@ -641,13 +598,11 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("an instance matches its own hide or one stored for every instance; no instance matches any hide", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityType: "scene", entityId: "1", instanceId: "" },
-        { entityType: "scene", entityId: "2", instanceId: "A" },
-        { entityType: "scene", entityId: "3", instanceId: "B" },
-        { entityType: "tag", entityId: "4", instanceId: "A" },
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({ entityType: "scene", entityId: "1", instanceId: "" }),
+        partialRow({ entityType: "scene", entityId: "2", instanceId: "A" }),
+        partialRow({ entityType: "scene", entityId: "3", instanceId: "B" }),
+        partialRow({ entityType: "tag", entityId: "4", instanceId: "A" }),
       ]);
 
       const hidden = await userHiddenEntityService.findAlreadyHidden(1, [
@@ -674,17 +629,15 @@ describe("UserHiddenEntityService", () => {
 
   describe("getHiddenEntityIds", () => {
     it("returns Sets organized by entity type", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityType: "scene", entityId: "1" },
-        { entityType: "scene", entityId: "2" },
-        { entityType: "performer", entityId: "10" },
-        { entityType: "tag", entityId: "5" },
-        { entityType: "studio", entityId: "3" },
-        { entityType: "group", entityId: "7" },
-        { entityType: "gallery", entityId: "11" },
-        { entityType: "image", entityId: "15" },
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({ entityType: "scene", entityId: "1" }),
+        partialRow({ entityType: "scene", entityId: "2" }),
+        partialRow({ entityType: "performer", entityId: "10" }),
+        partialRow({ entityType: "tag", entityId: "5" }),
+        partialRow({ entityType: "studio", entityId: "3" }),
+        partialRow({ entityType: "group", entityId: "7" }),
+        partialRow({ entityType: "gallery", entityId: "11" }),
+        partialRow({ entityType: "image", entityId: "15" }),
       ]);
 
       const result = await userHiddenEntityService.getHiddenEntityIds(1);
@@ -699,9 +652,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("returns empty Sets when user has no hidden entities", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       const result = await userHiddenEntityService.getHiddenEntityIds(1);
 
@@ -715,9 +666,7 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("queries only userId and entityType+entityId columns", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       await userHiddenEntityService.getHiddenEntityIds(7);
 
@@ -728,9 +677,9 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("caches results and serves from cache on second call", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([{ entityType: "scene", entityId: "1" }]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({ entityType: "scene", entityId: "1" }),
+      ]);
 
       const result1 = await userHiddenEntityService.getHiddenEntityIds(1);
       const result2 = await userHiddenEntityService.getHiddenEntityIds(1);
@@ -741,9 +690,13 @@ describe("UserHiddenEntityService", () => {
     });
 
     it("maintains separate caches per user", async () => {
-      (mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce([{ entityType: "scene", entityId: "1" }])
-        .mockResolvedValueOnce([{ entityType: "performer", entityId: "2" }]);
+      mockPrisma.userHiddenEntity.findMany
+        .mockResolvedValueOnce([
+          partialRow({ entityType: "scene", entityId: "1" }),
+        ])
+        .mockResolvedValueOnce([
+          partialRow({ entityType: "performer", entityId: "2" }),
+        ]);
 
       const user1 = await userHiddenEntityService.getHiddenEntityIds(1);
       const user2 = await userHiddenEntityService.getHiddenEntityIds(2);
@@ -760,16 +713,14 @@ describe("UserHiddenEntityService", () => {
 
   describe("isEntityHidden", () => {
     beforeEach(() => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        { entityType: "scene", entityId: "10" },
-        { entityType: "performer", entityId: "20" },
-        { entityType: "studio", entityId: "30" },
-        { entityType: "tag", entityId: "40" },
-        { entityType: "group", entityId: "50" },
-        { entityType: "gallery", entityId: "60" },
-        { entityType: "image", entityId: "70" },
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+        partialRow({ entityType: "scene", entityId: "10" }),
+        partialRow({ entityType: "performer", entityId: "20" }),
+        partialRow({ entityType: "studio", entityId: "30" }),
+        partialRow({ entityType: "tag", entityId: "40" }),
+        partialRow({ entityType: "group", entityId: "50" }),
+        partialRow({ entityType: "gallery", entityId: "60" }),
+        partialRow({ entityType: "image", entityId: "70" }),
       ]);
     });
 
@@ -830,9 +781,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("clearCache", () => {
     it("invalidates cache for a specific user", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       // Prime caches for two users
       await userHiddenEntityService.getHiddenEntityIds(1);
@@ -851,9 +800,7 @@ describe("UserHiddenEntityService", () => {
 
   describe("clearAllCache", () => {
     it("invalidates cache for all users", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([]);
+      mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
 
       // Prime caches for two users
       await userHiddenEntityService.getHiddenEntityIds(1);

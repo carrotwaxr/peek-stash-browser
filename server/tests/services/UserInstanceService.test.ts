@@ -11,6 +11,7 @@ import {
   buildInstanceFilterClause,
   getUserAllowedInstanceIds,
 } from "../../services/UserInstanceService.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -39,9 +40,9 @@ describe("UserInstanceService", () => {
   describe("getUserAllowedInstanceIds", () => {
     it("returns all enabled instances when user has no selections", async () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "instance-a" },
-        { id: "instance-b" },
-      ] as any);
+        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-b" }),
+      ]);
       mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
 
       const result = await getUserAllowedInstanceIds(1);
@@ -51,14 +52,14 @@ describe("UserInstanceService", () => {
 
     it("returns only selected instances when user has selections", async () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "instance-a" },
-        { id: "instance-b" },
-        { id: "instance-c" },
-      ] as any);
+        partialRow({ id: "instance-a" }),
+        partialRow({ id: "instance-b" }),
+        partialRow({ id: "instance-c" }),
+      ]);
       mockPrisma.userStashInstance.findMany.mockResolvedValue([
-        { instanceId: "instance-a" },
-        { instanceId: "instance-c" },
-      ] as any);
+        partialRow({ instanceId: "instance-a" }),
+        partialRow({ instanceId: "instance-c" }),
+      ]);
 
       const result = await getUserAllowedInstanceIds(1);
 
@@ -69,13 +70,13 @@ describe("UserInstanceService", () => {
     it("filters out disabled instances from user selections", async () => {
       // Only instance-a is enabled
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "instance-a" },
-      ] as any);
+        partialRow({ id: "instance-a" }),
+      ]);
       // User selected both instance-a and instance-b (which is now disabled)
       mockPrisma.userStashInstance.findMany.mockResolvedValue([
-        { instanceId: "instance-a" },
-        { instanceId: "instance-b" },
-      ] as any);
+        partialRow({ instanceId: "instance-a" }),
+        partialRow({ instanceId: "instance-b" }),
+      ]);
 
       const result = await getUserAllowedInstanceIds(1);
 
@@ -84,12 +85,12 @@ describe("UserInstanceService", () => {
 
     it("returns empty array when user selects only disabled instances", async () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "instance-a" },
-      ] as any);
+        partialRow({ id: "instance-a" }),
+      ]);
       // User only selected instance-b which is now disabled
       mockPrisma.userStashInstance.findMany.mockResolvedValue([
-        { instanceId: "instance-b" },
-      ] as any);
+        partialRow({ instanceId: "instance-b" }),
+      ]);
 
       const result = await getUserAllowedInstanceIds(1);
 

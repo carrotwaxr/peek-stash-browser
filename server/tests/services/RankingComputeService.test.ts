@@ -4,10 +4,11 @@
  * Tests the percentile ranking algorithm, engagement score calculation,
  * tie handling, edge cases, and BigInt/float rounding from SQLite.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -27,6 +28,20 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
+/** A transaction client with only the ranking table, whose writes a test reads back. */
+interface RankingTx {
+  userEntityRanking: { deleteMany: Mock; createMany: Mock };
+}
+
+/** Run every transaction callback against `tx` instead of the client. */
+function runTransactionsOn(tx: RankingTx) {
+  mockPrisma.$transaction.mockImplementation(async (fn) => {
+    await fn(
+      partialRow({ userEntityRanking: partialRow(tx.userEntityRanking) })
+    );
+  });
+}
+
 /** Helper: set up mocks for a recomputeAllRankings call */
 function setupRankingMocks(opts: {
   avgDuration?: number;
@@ -35,7 +50,7 @@ function setupRankingMocks(opts: {
   tagStats?: unknown[];
   sceneStats?: unknown[];
 }) {
-  const queryRawMock = mockPrisma.$queryRaw as ReturnType<typeof vi.fn>;
+  const queryRawMock = mockPrisma.$queryRaw;
   queryRawMock
     .mockResolvedValueOnce([{ avgDuration: opts.avgDuration ?? 1200 }])
     .mockResolvedValueOnce(opts.performerStats ?? [])
@@ -43,17 +58,13 @@ function setupRankingMocks(opts: {
     .mockResolvedValueOnce(opts.tagStats ?? [])
     .mockResolvedValueOnce(opts.sceneStats ?? []);
 
-  const txMock = {
+  const txMock: RankingTx = {
     userEntityRanking: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
-  (mockPrisma.$transaction as ReturnType<typeof vi.fn>).mockImplementation(
-    async (fn: (tx: typeof txMock) => Promise<void>) => {
-      await fn(txMock);
-    }
-  );
+  runTransactionsOn(txMock);
 
   return txMock;
 }
@@ -427,7 +438,7 @@ describe("RankingComputeService", () => {
 
   describe("average scene duration fallback", () => {
     it("defaults to 1200 when no scenes have duration", async () => {
-      const queryRawMock = mockPrisma.$queryRaw as ReturnType<typeof vi.fn>;
+      const queryRawMock = mockPrisma.$queryRaw;
       queryRawMock
         .mockResolvedValueOnce([{ avgDuration: null }]) // No scenes
         .mockResolvedValueOnce([
@@ -444,17 +455,13 @@ describe("RankingComputeService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const txMock = {
+      const txMock: RankingTx = {
         userEntityRanking: {
           deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       };
-      (mockPrisma.$transaction as ReturnType<typeof vi.fn>).mockImplementation(
-        async (fn: (tx: typeof txMock) => Promise<void>) => {
-          await fn(txMock);
-        }
-      );
+      runTransactionsOn(txMock);
 
       await rankingComputeService.recomputeAllRankings(1);
 

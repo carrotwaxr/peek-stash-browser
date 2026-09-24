@@ -4,6 +4,8 @@ import {
   type UserPermissions,
   resolveUserPermissions,
 } from "../../services/PermissionService.js";
+import { type UserWithGroups } from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing the service
 vi.mock(
@@ -20,13 +22,15 @@ describe("PermissionService", () => {
 
   describe("resolveUserPermissions", () => {
     it("should return all false when user has no groups and no overrides", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        canShareOverride: null,
-        canDownloadFilesOverride: null,
-        canDownloadPlaylistsOverride: null,
-        groupMemberships: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<UserWithGroups>({
+          id: 1,
+          canShareOverride: null,
+          canDownloadFilesOverride: null,
+          canDownloadPlaylistsOverride: null,
+          groupMemberships: [],
+        })
+      );
 
       const result = await resolveUserPermissions(1);
 
@@ -43,23 +47,25 @@ describe("PermissionService", () => {
     });
 
     it("should inherit permissions from single group", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        canShareOverride: null,
-        canDownloadFilesOverride: null,
-        canDownloadPlaylistsOverride: null,
-        groupMemberships: [
-          {
-            group: {
-              id: 1,
-              name: "Family",
-              canShare: true,
-              canDownloadFiles: false,
-              canDownloadPlaylists: true,
-            },
-          },
-        ],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<UserWithGroups>({
+          id: 1,
+          canShareOverride: null,
+          canDownloadFilesOverride: null,
+          canDownloadPlaylistsOverride: null,
+          groupMemberships: [
+            partialRow({
+              group: partialRow({
+                id: 1,
+                name: "Family",
+                canShare: true,
+                canDownloadFiles: false,
+                canDownloadPlaylists: true,
+              }),
+            }),
+          ],
+        })
+      );
 
       const result = await resolveUserPermissions(1);
 
@@ -76,32 +82,34 @@ describe("PermissionService", () => {
     });
 
     it("should use most permissive when user belongs to multiple groups", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        canShareOverride: null,
-        canDownloadFilesOverride: null,
-        canDownloadPlaylistsOverride: null,
-        groupMemberships: [
-          {
-            group: {
-              id: 1,
-              name: "Family",
-              canShare: true,
-              canDownloadFiles: false,
-              canDownloadPlaylists: false,
-            },
-          },
-          {
-            group: {
-              id: 2,
-              name: "Friends",
-              canShare: false,
-              canDownloadFiles: true,
-              canDownloadPlaylists: false,
-            },
-          },
-        ],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<UserWithGroups>({
+          id: 1,
+          canShareOverride: null,
+          canDownloadFilesOverride: null,
+          canDownloadPlaylistsOverride: null,
+          groupMemberships: [
+            partialRow({
+              group: partialRow({
+                id: 1,
+                name: "Family",
+                canShare: true,
+                canDownloadFiles: false,
+                canDownloadPlaylists: false,
+              }),
+            }),
+            partialRow({
+              group: partialRow({
+                id: 2,
+                name: "Friends",
+                canShare: false,
+                canDownloadFiles: true,
+                canDownloadPlaylists: false,
+              }),
+            }),
+          ],
+        })
+      );
 
       const result = await resolveUserPermissions(1);
 
@@ -118,23 +126,25 @@ describe("PermissionService", () => {
     });
 
     it("should let user override take precedence over group permissions", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        canShareOverride: false, // Explicit override to disable
-        canDownloadFilesOverride: true, // Explicit override to enable
-        canDownloadPlaylistsOverride: null, // Inherit from group
-        groupMemberships: [
-          {
-            group: {
-              id: 1,
-              name: "Family",
-              canShare: true,
-              canDownloadFiles: false,
-              canDownloadPlaylists: true,
-            },
-          },
-        ],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow<UserWithGroups>({
+          id: 1,
+          canShareOverride: false, // Explicit override to disable
+          canDownloadFilesOverride: true, // Explicit override to enable
+          canDownloadPlaylistsOverride: null, // Inherit from group
+          groupMemberships: [
+            partialRow({
+              group: partialRow({
+                id: 1,
+                name: "Family",
+                canShare: true,
+                canDownloadFiles: false,
+                canDownloadPlaylists: true,
+              }),
+            }),
+          ],
+        })
+      );
 
       const result = await resolveUserPermissions(1);
 

@@ -56,3 +56,13 @@ export function createPrismaMock(): PrismaMock {
 export function partialRow<T>(fields: Partial<NoInfer<NonNullable<T>>>): T {
   return fields as unknown as T;
 }
+
+/**
+ * A row the database cannot return, such as a null in a NOT NULL column, for a
+ * test of the code's defensive handling of it. Typed as the full row like
+ * `partialRow`, but its fields are not checked, so use it only for rows that
+ * are invalid on purpose (as `malformed()` does for request input).
+ */
+export function malformedRow<T>(fields: Record<string, unknown>): T {
+  return fields as T;
+}

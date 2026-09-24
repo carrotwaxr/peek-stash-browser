@@ -26,6 +26,7 @@ import libraryScenesRoutes from "../../../routes/library/scenes.js";
 import libraryStudiosRoutes from "../../../routes/library/studios.js";
 import libraryTagsRoutes from "../../../routes/library/tags.js";
 import { stashInstanceManager } from "../../../services/StashInstanceManager.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 vi.mock("../../../middleware/auth.js", () => ({
   authenticate: vi.fn((req: Request, _res: Response, next: NextFunction) => {
@@ -98,7 +99,9 @@ describe("library write routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(stashInstanceManager, "get").mockReturnValue(fakeStash as never);
+    vi.spyOn(stashInstanceManager, "get").mockReturnValue(
+      partialRow(fakeStash)
+    );
   });
 
   it.each([

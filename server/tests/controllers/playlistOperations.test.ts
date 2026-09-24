@@ -5,6 +5,7 @@
  * controller functions. Covers validation, ownership checks, and the
  * access-control-based duplicate flow.
  */
+import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createPlaylist,
@@ -21,6 +22,16 @@ import {
   getUserGroups,
 } from "../../services/PlaylistAccessService.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import {
+  type PlaylistShareWithGroup,
+  type PlaylistWithItems,
+  userPermissions,
+} from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
+
+type PlaylistWithItemCount = Prisma.PlaylistGetPayload<{
+  include: { _count: { select: { items: true } } };
+}>;
 
 // Mock prisma
 vi.mock(
@@ -82,15 +93,15 @@ describe("Playlist Controller Operations", () => {
 
   describe("createPlaylist", () => {
     it("creates playlist with valid name", async () => {
-      const createdPlaylist = {
+      const createdPlaylist = partialRow<PlaylistWithItemCount>({
         id: 1,
         name: "My Playlist",
         description: null,
         userId: 1,
         isPublic: false,
         _count: { items: 0 },
-      };
-      mockPrisma.playlist.create.mockResolvedValue(createdPlaylist as any);
+      });
+      mockPrisma.playlist.create.mockResolvedValue(createdPlaylist);
 
       const req = mockReq({ name: "My Playlist" }, {}, USER);
       const res = mockRes();
@@ -102,7 +113,7 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("trims whitespace from name and description", async () => {
-      mockPrisma.playlist.create.mockResolvedValue({ id: 1 } as any);
+      mockPrisma.playlist.create.mockResolvedValue(partialRow({ id: 1 }));
 
       const req = mockReq(
         { name: "  My Playlist  ", description: "  A description  " },
@@ -168,15 +179,19 @@ describe("Playlist Controller Operations", () => {
 
   describe("updatePlaylist", () => {
     it("updates playlist name when user is owner", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
-      mockPrisma.playlist.update.mockResolvedValue({
-        id: 1,
-        name: "Updated",
-        _count: { items: 3 },
-      } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
+      mockPrisma.playlist.update.mockResolvedValue(
+        partialRow<PlaylistWithItemCount>({
+          id: 1,
+          name: "Updated",
+          _count: { items: 3 },
+        })
+      );
 
       const req = mockReq({ name: "Updated" }, { id: "1" }, USER);
       const res = mockRes();
@@ -217,11 +232,13 @@ describe("Playlist Controller Operations", () => {
 
   describe("deletePlaylist", () => {
     it("deletes playlist when user is owner", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
-      mockPrisma.playlist.delete.mockResolvedValue({} as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
+      mockPrisma.playlist.delete.mockResolvedValue(partialRow({}));
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -253,22 +270,26 @@ describe("Playlist Controller Operations", () => {
   describe("duplicatePlaylist", () => {
     it("duplicates playlist when user has owner access", async () => {
       mockGetAccess.mockResolvedValue({ level: "owner" });
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        id: 1,
-        name: "Original",
-        description: "Desc",
-        shuffle: false,
-        repeat: "none",
-        items: [
-          { sceneId: "s1", instanceId: "i1", position: 0 },
-          { sceneId: "s2", instanceId: "i1", position: 1 },
-        ],
-      } as any);
-      mockPrisma.playlist.create.mockResolvedValue({
-        id: 2,
-        name: "Original (Copy)",
-        _count: { items: 2 },
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow<PlaylistWithItems>({
+          id: 1,
+          name: "Original",
+          description: "Desc",
+          shuffle: false,
+          repeat: "none",
+          items: [
+            partialRow({ sceneId: "s1", instanceId: "i1", position: 0 }),
+            partialRow({ sceneId: "s2", instanceId: "i1", position: 1 }),
+          ],
+        })
+      );
+      mockPrisma.playlist.create.mockResolvedValue(
+        partialRow<PlaylistWithItemCount>({
+          id: 2,
+          name: "Original (Copy)",
+          _count: { items: 2 },
+        })
+      );
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -289,19 +310,23 @@ describe("Playlist Controller Operations", () => {
 
     it("duplicates playlist when user has shared access", async () => {
       mockGetAccess.mockResolvedValue({ level: "shared", groups: ["Family"] });
-      mockPrisma.playlist.findUnique.mockResolvedValue({
-        id: 1,
-        name: "Shared Playlist",
-        description: null,
-        shuffle: true,
-        repeat: "all",
-        items: [],
-      } as any);
-      mockPrisma.playlist.create.mockResolvedValue({
-        id: 3,
-        name: "Shared Playlist (Copy)",
-        _count: { items: 0 },
-      } as any);
+      mockPrisma.playlist.findUnique.mockResolvedValue(
+        partialRow<PlaylistWithItems>({
+          id: 1,
+          name: "Shared Playlist",
+          description: null,
+          shuffle: true,
+          repeat: "all",
+          items: [],
+        })
+      );
+      mockPrisma.playlist.create.mockResolvedValue(
+        partialRow<PlaylistWithItemCount>({
+          id: 3,
+          name: "Shared Playlist (Copy)",
+          _count: { items: 0 },
+        })
+      );
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -334,16 +359,18 @@ describe("Playlist Controller Operations", () => {
 
   describe("getPlaylistShares", () => {
     it("returns shares for owned playlist", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
       mockPrisma.playlistShare.findMany.mockResolvedValue([
-        {
+        partialRow<PlaylistShareWithGroup>({
           sharedAt: new Date("2025-06-01"),
-          group: { id: 10, name: "Family" },
-        },
-      ] as any);
+          group: partialRow({ id: 10, name: "Family" }),
+        }),
+      ]);
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -375,22 +402,26 @@ describe("Playlist Controller Operations", () => {
 
   describe("updatePlaylistShares", () => {
     it("replaces shares with new group IDs", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
-      mockResolvePermissions.mockResolvedValue({ canShare: true } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: true })
+      );
       mockGetUserGroups.mockResolvedValue([
         { id: 10, name: "Family" },
         { id: 20, name: "Friends" },
       ]);
       mockPrisma.$transaction.mockResolvedValue([]);
       mockPrisma.playlistShare.findMany.mockResolvedValue([
-        {
+        partialRow<PlaylistShareWithGroup>({
           sharedAt: new Date("2025-06-01"),
-          group: { id: 10, name: "Family" },
-        },
-      ] as any);
+          group: partialRow({ id: 10, name: "Family" }),
+        }),
+      ]);
 
       const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
       const res = mockRes();
@@ -403,11 +434,15 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("returns 403 when user lacks canShare permission", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
-      mockResolvePermissions.mockResolvedValue({ canShare: false } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: false })
+      );
 
       const req = mockReq({ groupIds: [10] }, { id: "1" }, USER);
       const res = mockRes();
@@ -421,11 +456,15 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("returns 403 when sharing with group user does not belong to", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
-      mockResolvePermissions.mockResolvedValue({ canShare: true } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
+      mockResolvePermissions.mockResolvedValue(
+        userPermissions({ canShare: true })
+      );
       mockGetUserGroups.mockResolvedValue([{ id: 10, name: "Family" }]);
 
       const req = mockReq(
@@ -444,10 +483,12 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("allows clearing all shares without permission check", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
       mockPrisma.$transaction.mockResolvedValue([]);
       mockPrisma.playlistShare.findMany.mockResolvedValue([]);
 
@@ -466,10 +507,12 @@ describe("Playlist Controller Operations", () => {
     });
 
     it("returns 400 when groupIds is not an array", async () => {
-      mockPrisma.playlist.findFirst.mockResolvedValue({
-        id: 1,
-        userId: 1,
-      } as any);
+      mockPrisma.playlist.findFirst.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+        })
+      );
 
       const req = mockReq({ groupIds: "not-an-array" }, { id: "1" }, USER);
       const res = mockRes();

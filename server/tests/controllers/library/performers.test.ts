@@ -19,6 +19,7 @@ import { stashEntityService } from "../../../services/StashEntityService.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
+import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
 // Mocks — declared BEFORE importing the module under test
@@ -177,13 +178,13 @@ describe("mergePerformersWithUserData", () => {
     const performer = createMockPerformer({ id: "p1", instanceId: "inst1" });
 
     vi.mocked(prisma.performerRating.findMany).mockResolvedValue([
-      {
+      partialRow({
         performerId: "p1",
         instanceId: "inst1",
         userId: 1,
         rating: 80,
         favorite: true,
-      } as any,
+      }),
     ]);
 
     const statsMap = new Map();

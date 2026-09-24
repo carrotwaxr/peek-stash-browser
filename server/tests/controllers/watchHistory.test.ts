@@ -11,6 +11,7 @@
  * - pingWatchHistory (player progress pings)
  * - the entity access check on every write
  */
+import type { WatchHistory } from "@prisma/client";
 import { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
@@ -149,22 +150,26 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new watch history record if none exists (upsert)", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 0,
-        playDuration: 10,
-        resumeTime: 60,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 0,
+          playDuration: 10,
+          resumeTime: 60,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -209,22 +214,26 @@ describe("Watch History Controller", () => {
     });
 
     it("should update existing record with incremented playDuration", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 0,
-        playDuration: 60, // 50 existing + 10 new = 60
-        resumeTime: 120,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 0,
+          playDuration: 60, // 50 existing + 10 new = 60
+          resumeTime: 120,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -243,22 +252,26 @@ describe("Watch History Controller", () => {
     });
 
     it("should handle zero playDuration gracefully", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 0,
-        playDuration: 50, // unchanged
-        resumeTime: 60,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 0,
+          playDuration: 50, // unchanged
+          resumeTime: 60,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -274,22 +287,26 @@ describe("Watch History Controller", () => {
     });
 
     it("should handle null/undefined playDuration", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 0,
-        playDuration: 0,
-        resumeTime: 60,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 0,
+          playDuration: 0,
+          resumeTime: 60,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -339,23 +356,27 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new record with playCount=1 if none exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.watchHistory.create.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 1,
-        playDuration: 0,
-        resumeTime: 0,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [new Date().toISOString()],
-      } as never);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 1,
+          playDuration: 0,
+          resumeTime: 0,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [new Date().toISOString()],
+        })
+      );
 
       await incrementPlayCount(
         authReq({
@@ -385,29 +406,35 @@ describe("Watch History Controller", () => {
     });
 
     it("should increment existing playCount using atomic increment", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.findUnique.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 5,
-        playHistory: ["2024-01-01T00:00:00.000Z"],
-      } as never);
-      mockPrisma.watchHistory.update.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        sceneId: "123",
-        playCount: 6,
-        playDuration: 0,
-        resumeTime: 0,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 5,
+          playHistory: ["2024-01-01T00:00:00.000Z"],
+        })
+      );
+      mockPrisma.watchHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          sceneId: "123",
+          playCount: 6,
+          playDuration: 0,
+          resumeTime: 0,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await incrementPlayCount(
         authReq({
@@ -429,24 +456,30 @@ describe("Watch History Controller", () => {
 
     it("should add timestamp to playHistory", async () => {
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.findUnique.mockResolvedValue({
-        id: 1,
-        playHistory: existingHistory,
-      } as never);
-      mockPrisma.watchHistory.update.mockResolvedValue({
-        id: 1,
-        playCount: 2,
-        playDuration: 0,
-        resumeTime: 0,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playHistory: existingHistory,
+        })
+      );
+      mockPrisma.watchHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 2,
+          playDuration: 0,
+          resumeTime: 0,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await incrementPlayCount(
         authReq({
@@ -497,16 +530,20 @@ describe("Watch History Controller", () => {
     });
 
     it("should create new record with oCount=1 if none exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.watchHistory.create.mockResolvedValue({
-        id: 1,
-        oCount: 1,
-        oHistory: [new Date().toISOString()],
-      } as never);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 1,
+          oHistory: [new Date().toISOString()],
+        })
+      );
 
       await incrementOCounter(
         authReq({
@@ -534,20 +571,26 @@ describe("Watch History Controller", () => {
     });
 
     it("should increment existing oCount", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.findUnique.mockResolvedValue({
-        id: 1,
-        oCount: 3,
-        oHistory: ["2024-01-01T00:00:00.000Z"],
-      } as never);
-      mockPrisma.watchHistory.update.mockResolvedValue({
-        id: 1,
-        oCount: 4,
-        oHistory: ["2024-01-01T00:00:00.000Z", new Date().toISOString()],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 3,
+          oHistory: ["2024-01-01T00:00:00.000Z"],
+        })
+      );
+      mockPrisma.watchHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 4,
+          oHistory: ["2024-01-01T00:00:00.000Z", new Date().toISOString()],
+        })
+      );
 
       await incrementOCounter(
         authReq({
@@ -621,16 +664,18 @@ describe("Watch History Controller", () => {
     });
 
     it("should return full watch history when record exists", async () => {
-      mockPrisma.watchHistory.findUnique.mockResolvedValue({
-        id: 1,
-        resumeTime: 120,
-        playCount: 5,
-        playDuration: 300,
-        lastPlayedAt: new Date("2024-01-01"),
-        oCount: 2,
-        oHistory: ["2024-01-01T00:00:00.000Z", "2024-01-01T01:00:00.000Z"],
-        playHistory: ["2024-01-01T00:00:00.000Z"],
-      } as never);
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          resumeTime: 120,
+          playCount: 5,
+          playDuration: 300,
+          lastPlayedAt: new Date("2024-01-01"),
+          oCount: 2,
+          oHistory: ["2024-01-01T00:00:00.000Z", "2024-01-01T01:00:00.000Z"],
+          playHistory: ["2024-01-01T00:00:00.000Z"],
+        })
+      );
 
       await getWatchHistory(
         authReq({
@@ -671,23 +716,23 @@ describe("Watch History Controller", () => {
 
     it("should return all watch history for user", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
-        {
+        partialRow({
           id: 1,
           sceneId: "123",
           resumeTime: 60,
           playCount: 1,
           oHistory: [],
           playHistory: [],
-        },
-        {
+        }),
+        partialRow({
           id: 2,
           sceneId: "456",
           resumeTime: 120,
           playCount: 2,
           oHistory: [],
           playHistory: [],
-        },
-      ] as never);
+        }),
+      ]);
 
       await getAllWatchHistory(
         authReq({
@@ -714,7 +759,7 @@ describe("Watch History Controller", () => {
     });
 
     it("should filter by inProgress when requested", async () => {
-      mockPrisma.watchHistory.findMany.mockResolvedValue([] as never);
+      mockPrisma.watchHistory.findMany.mockResolvedValue([]);
 
       await getAllWatchHistory(
         authReq({
@@ -754,19 +799,19 @@ describe("Watch History Controller", () => {
     it("should delete all watch history and stats for user", async () => {
       mockPrisma.watchHistory.deleteMany.mockResolvedValue({
         count: 10,
-      } as never);
+      });
       mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({
         count: 5,
-      } as never);
+      });
       mockPrisma.userStudioStats.deleteMany.mockResolvedValue({
         count: 3,
-      } as never);
+      });
       mockPrisma.userTagStats.deleteMany.mockResolvedValue({
         count: 15,
-      } as never);
+      });
       mockPrisma.userEntityRanking.deleteMany.mockResolvedValue({
         count: 20,
-      } as never);
+      });
 
       await clearAllWatchHistory(
         authReq({
@@ -829,11 +874,13 @@ describe("Watch History Controller", () => {
     it.each(writes)(
       "%s returns 404 and writes nothing when the scene is not visible",
       async (_name, handler, extra) => {
-        mockPrisma.user.findUnique.mockResolvedValue({
-          id: 1,
-          minimumPlayPercent: 0,
-          syncToStash: true,
-        } as never);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({
+            id: 1,
+            minimumPlayPercent: 0,
+            syncToStash: true,
+          })
+        );
         mockResolve.mockResolvedValueOnce(null);
 
         await handler(
@@ -857,17 +904,21 @@ describe("Watch History Controller", () => {
     );
 
     it("passes the request's instanceId through", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        playCount: 0,
-        playDuration: 5,
-        resumeTime: 5,
-        lastPlayedAt: new Date(),
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 0,
+          playDuration: 5,
+          resumeTime: 5,
+          lastPlayedAt: new Date(),
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -916,25 +967,29 @@ describe("Watch History Controller", () => {
     );
 
     it("ping reads the duration from the resolved instance", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        minimumPlayPercent: 50,
-        syncToStash: false,
-      } as never);
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        duration: 600,
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          minimumPlayPercent: 50,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          duration: 600,
+        })
+      );
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      const record = {
+      const record: WatchHistory = partialRow({
         id: 1,
         playCount: 0,
         playDuration: 0,
         resumeTime: 1,
         lastPlayedAt: new Date(),
         playHistory: [],
-      };
-      mockPrisma.watchHistory.create.mockResolvedValue(record as never);
-      mockPrisma.watchHistory.update.mockResolvedValue(record as never);
+      });
+      mockPrisma.watchHistory.create.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
 
       await pingWatchHistory(
         authReq({
@@ -968,16 +1023,20 @@ describe("Watch History Controller", () => {
 
   describe("pingWatchHistory", () => {
     it("two pings of one session past the threshold count one play", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        minimumPlayPercent: 50,
-        syncToStash: false,
-      } as never);
-      mockPrisma.stashScene.findFirst.mockResolvedValue({
-        duration: 600,
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          minimumPlayPercent: 50,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          duration: 600,
+        })
+      );
       // 400 of 600 seconds played: past the 50% threshold
-      const record = {
+      const record: WatchHistory = partialRow({
         id: 1,
         playCount: 0,
         playDuration: 400,
@@ -985,9 +1044,9 @@ describe("Watch History Controller", () => {
         lastPlayedAt: new Date(),
         oHistory: [],
         playHistory: [],
-      };
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(record as never);
-      mockPrisma.watchHistory.update.mockResolvedValue(record as never);
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
 
       // A scene id no other test pings, so the session starts clean
       const ping = () =>
@@ -1021,20 +1080,24 @@ describe("Watch History Controller", () => {
 
   describe("Race Condition Prevention", () => {
     it("saveActivity should use upsert to handle concurrent calls", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
-        id: 1,
-        playCount: 0,
-        playDuration: 10,
-        resumeTime: 60,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.watchHistory.upsert.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 0,
+          playDuration: 10,
+          resumeTime: 60,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await saveActivity(
         authReq({
@@ -1052,21 +1115,25 @@ describe("Watch History Controller", () => {
     });
 
     it("incrementPlayCount reads and writes in one transaction", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as never);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.watchHistory.create.mockResolvedValue({
-        id: 1,
-        playCount: 1,
-        playDuration: 0,
-        resumeTime: 0,
-        lastPlayedAt: new Date(),
-        oCount: 0,
-        oHistory: [],
-        playHistory: [],
-      } as never);
+      mockPrisma.watchHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 1,
+          playDuration: 0,
+          resumeTime: 0,
+          lastPlayedAt: new Date(),
+          oCount: 0,
+          oHistory: [],
+          playHistory: [],
+        })
+      );
 
       await incrementPlayCount(
         authReq({

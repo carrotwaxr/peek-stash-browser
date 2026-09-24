@@ -5,6 +5,7 @@
  * With `sig`, the link's claims are checked against the user's current
  * passwordChangedAt and the request is accepted for the direct stream only.
  */
+import type { User } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate } from "../../middleware/auth.js";
@@ -16,6 +17,7 @@ import {
   deriveStreamLinkKey,
   signStreamLink,
 } from "../../utils/streamLink.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -43,12 +45,13 @@ const NOW = new Date("2026-09-23T12:00:00Z");
 const PASSWORD_CHANGED_AT = new Date("2026-09-01T00:00:00Z");
 const KEY = deriveStreamLinkKey("test-secret");
 
-const DB_USER = {
+/** The fields the middleware's user lookup selects. */
+const DB_USER: User = partialRow({
   id: 7,
   username: "u",
   role: "USER",
   passwordChangedAt: PASSWORD_CHANGED_AT,
-};
+});
 
 function claimsFor(
   overrides: Partial<StreamLinkClaims> = {}
@@ -101,7 +104,7 @@ describe("authenticateStreamRequest", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    mockPrisma.user.findUnique.mockResolvedValue(DB_USER as any);
+    mockPrisma.user.findUnique.mockResolvedValue(DB_USER);
   });
 
   afterEach(() => {
@@ -161,7 +164,7 @@ describe("authenticateStreamRequest", () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       ...DB_USER,
       passwordChangedAt: new Date("2026-09-23T11:59:00Z"),
-    } as any);
+    });
     const req = signedReq(claimsFor());
     const res = createMockRes();
     const next = vi.fn();

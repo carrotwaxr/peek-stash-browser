@@ -3,6 +3,7 @@ import { pipeline } from "stream/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../../utils/logger.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { debug: vi.fn(), error: vi.fn() },
@@ -84,7 +85,7 @@ describe("pipeResponseToClient", () => {
   it("converts web stream to node stream and pipes via pipeline", async () => {
     const fakeBody = { locked: false };
     const fakeNodeStream = { pipe: vi.fn() };
-    vi.mocked(Readable.fromWeb).mockReturnValue(fakeNodeStream as never);
+    vi.mocked(Readable.fromWeb).mockReturnValue(partialRow(fakeNodeStream));
     vi.mocked(pipeline).mockResolvedValue(undefined);
 
     const fetchRes = makeFetchResponse({ body: fakeBody });
@@ -98,7 +99,7 @@ describe("pipeResponseToClient", () => {
 
   it("silently swallows AbortError (logs debug, not error)", async () => {
     const fakeBody = { locked: false };
-    vi.mocked(Readable.fromWeb).mockReturnValue({} as never);
+    vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const abortError = new Error("The operation was aborted");
     abortError.name = "AbortError";
@@ -117,7 +118,7 @@ describe("pipeResponseToClient", () => {
 
   it("silently swallows ERR_STREAM_PREMATURE_CLOSE", async () => {
     const fakeBody = { locked: false };
-    vi.mocked(Readable.fromWeb).mockReturnValue({} as never);
+    vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const prematureCloseError = new Error(
       "Premature close"
@@ -138,7 +139,7 @@ describe("pipeResponseToClient", () => {
 
   it("logs error for unexpected pipeline errors", async () => {
     const fakeBody = { locked: false };
-    vi.mocked(Readable.fromWeb).mockReturnValue({} as never);
+    vi.mocked(Readable.fromWeb).mockReturnValue(partialRow({}));
 
     const unexpectedError = new Error("ECONNRESET");
     vi.mocked(pipeline).mockRejectedValue(unexpectedError);

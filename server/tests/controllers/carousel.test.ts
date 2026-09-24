@@ -10,6 +10,7 @@
  * - previewCarousel (preview carousel query results)
  * - executeCarouselById (execute saved carousel and return scenes)
  */
+import type { UserCarousel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCarousel,
@@ -24,6 +25,9 @@ import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { userRow } from "../helpers/fixtures.js";
+import { createMockScene } from "../helpers/mockDataGenerators.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted before imports
 vi.mock(
@@ -78,8 +82,8 @@ const mockAddStreamability = vi.mocked(addStreamabilityInfo);
 const USER = { id: 1, username: "testuser", role: "USER" };
 
 /** Sample carousel record from the database */
-const SAMPLE_CAROUSEL = {
-  id: 1,
+const SAMPLE_CAROUSEL: UserCarousel = {
+  id: "1",
   userId: 1,
   title: "Top Rated",
   icon: "Star",
@@ -91,12 +95,12 @@ const SAMPLE_CAROUSEL = {
 };
 
 /** Sample scene for carousel results */
-const SAMPLE_SCENE = {
+const SAMPLE_SCENE = createMockScene({
   id: "scene-1",
   title: "Test Scene",
   rating100: 90,
-  stashInstanceId: "instance-1",
-};
+  instanceId: "instance-1",
+});
 
 describe("Carousel Controller", () => {
   beforeEach(() => {
@@ -118,9 +122,9 @@ describe("Carousel Controller", () => {
     it("returns array of user carousels on success", async () => {
       const carousels = [
         SAMPLE_CAROUSEL,
-        { ...SAMPLE_CAROUSEL, id: 2, title: "Recent" },
+        { ...SAMPLE_CAROUSEL, id: "2", title: "Recent" },
       ];
-      mockPrisma.userCarousel.findMany.mockResolvedValue(carousels as any);
+      mockPrisma.userCarousel.findMany.mockResolvedValue(carousels);
 
       const req = mockReq({}, {}, USER);
       const res = mockRes();
@@ -169,9 +173,7 @@ describe("Carousel Controller", () => {
     });
 
     it("returns carousel on success", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -252,17 +254,19 @@ describe("Carousel Controller", () => {
       mockPrisma.userCarousel.count.mockResolvedValue(3);
       mockPrisma.userCarousel.create.mockResolvedValue({
         ...SAMPLE_CAROUSEL,
-        id: 10,
+        id: "10",
         title: "New Carousel",
         icon: "Film",
         sort: "random",
         direction: "DESC",
-      } as any);
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        carouselPreferences: [],
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          carouselPreferences: [],
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq(
         {
@@ -293,12 +297,14 @@ describe("Carousel Controller", () => {
         icon: "Film",
         sort: "random",
         direction: "DESC",
-      } as any);
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        carouselPreferences: null as any,
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          carouselPreferences: null,
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq(
         { title: "Defaults Test", rules: [{ field: "tag", value: "action" }] },
@@ -323,16 +329,18 @@ describe("Carousel Controller", () => {
       mockPrisma.userCarousel.count.mockResolvedValue(2);
       mockPrisma.userCarousel.create.mockResolvedValue({
         ...SAMPLE_CAROUSEL,
-        id: 42,
-      } as any);
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        carouselPreferences: [
-          { id: "builtin-1", enabled: true, order: 0 },
-          { id: "builtin-2", enabled: true, order: 1 },
-        ],
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+        id: "42",
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          carouselPreferences: [
+            { id: "builtin-1", enabled: true, order: 0 },
+            { id: "builtin-2", enabled: true, order: 1 },
+          ],
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq(
         { title: "Prefs Test", rules: [{ field: "rating" }] },
@@ -392,9 +400,7 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 400 when title is set to empty string", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
 
       const req = mockReq({ title: "" }, { id: "1" }, USER);
       const res = mockRes();
@@ -405,13 +411,11 @@ describe("Carousel Controller", () => {
     });
 
     it("allows partial update (only title)", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockPrisma.userCarousel.update.mockResolvedValue({
         ...SAMPLE_CAROUSEL,
         title: "Updated Title",
-      } as any);
+      });
 
       const req = mockReq({ title: "Updated Title" }, { id: "1" }, USER);
       const res = mockRes();
@@ -458,10 +462,8 @@ describe("Carousel Controller", () => {
     });
 
     it("deletes carousel on happy path", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
-      mockPrisma.userCarousel.delete.mockResolvedValue(SAMPLE_CAROUSEL as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockPrisma.userCarousel.delete.mockResolvedValue(SAMPLE_CAROUSEL);
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -505,8 +507,11 @@ describe("Carousel Controller", () => {
 
     it("returns scenes from executeCarouselQuery on success", async () => {
       const scenes = [SAMPLE_SCENE, { ...SAMPLE_SCENE, id: "scene-2" }];
-      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
-      mockAddStreamability.mockReturnValue(scenes as any);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(scenes);
 
       const req = mockReq(
         {
@@ -563,11 +568,12 @@ describe("Carousel Controller", () => {
 
     it("executes carousel query and returns scenes on success", async () => {
       const scenes = [SAMPLE_SCENE];
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
-      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
-      mockAddStreamability.mockReturnValue(scenes as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(scenes);
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -578,9 +584,7 @@ describe("Carousel Controller", () => {
     });
 
     it("returns 500 on unexpected error", async () => {
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockQueryBuilder.execute.mockRejectedValue(new Error("Execution failed"));
 
       const req = mockReq({}, { id: "1" }, USER);
@@ -598,8 +602,11 @@ describe("Carousel Controller", () => {
   describe("executeCarouselQuery (via previewCarousel)", () => {
     it("uses SceneQueryBuilder SQL path by default", async () => {
       const scenes = [SAMPLE_SCENE];
-      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
-      mockAddStreamability.mockReturnValue(scenes as any);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(scenes);
 
       const req = mockReq(
         {
@@ -619,8 +626,11 @@ describe("Carousel Controller", () => {
     it("applies addStreamabilityInfo to results", async () => {
       const rawScenes = [SAMPLE_SCENE];
       const streamableScenes = [{ ...SAMPLE_SCENE, streamable: true }];
-      mockQueryBuilder.execute.mockResolvedValue({ scenes: rawScenes } as any);
-      mockAddStreamability.mockReturnValue(streamableScenes as any);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes: rawScenes,
+        total: rawScenes.length,
+      });
+      mockAddStreamability.mockReturnValue(streamableScenes);
 
       const req = mockReq(
         {
@@ -639,11 +649,12 @@ describe("Carousel Controller", () => {
 
     it("passes the request user to addStreamabilityInfo for a saved carousel", async () => {
       const scenes = [SAMPLE_SCENE];
-      mockPrisma.userCarousel.findFirst.mockResolvedValue(
-        SAMPLE_CAROUSEL as any
-      );
-      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
-      mockAddStreamability.mockReturnValue(scenes as any);
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(scenes);
 
       const req = mockReq({}, { id: "1" }, USER);
       const res = mockRes();
@@ -654,8 +665,11 @@ describe("Carousel Controller", () => {
 
     it("passes CAROUSEL_SCENE_LIMIT (12) as perPage to query builder", async () => {
       const scenes = [SAMPLE_SCENE];
-      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
-      mockAddStreamability.mockReturnValue(scenes as any);
+      mockQueryBuilder.execute.mockResolvedValue({
+        scenes,
+        total: scenes.length,
+      });
+      mockAddStreamability.mockReturnValue(scenes);
 
       const req = mockReq(
         {

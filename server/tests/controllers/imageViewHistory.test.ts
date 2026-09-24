@@ -17,6 +17,7 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted before imports. Interactive transactions run their
 // callback on this same mock client.
@@ -67,10 +68,12 @@ describe("Image View History Controller", () => {
     it.each(writes)(
       "%s returns 404 and writes nothing when the image is not visible",
       async (_name, handler) => {
-        mockPrisma.user.findUnique.mockResolvedValue({
-          id: 1,
-          syncToStash: true,
-        } as any);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          partialRow({
+            id: 1,
+            syncToStash: true,
+          })
+        );
         mockResolve.mockResolvedValueOnce(null);
         const req = mockReq(
           { imageId: "img-1", instanceId: "inst-b" },
@@ -138,20 +141,24 @@ describe("Image View History Controller", () => {
     });
 
     it("creates new record with oCount=1 when no history exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        imageId: "img-1",
-        instanceId: "instance-1",
-        viewCount: 0,
-        oCount: 1,
-        oHistory: [new Date().toISOString()],
-      } as any);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          imageId: "img-1",
+          instanceId: "instance-1",
+          viewCount: 0,
+          oCount: 1,
+          oHistory: [new Date().toISOString()],
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -176,23 +183,29 @@ describe("Image View History Controller", () => {
 
     it("increments oCount on existing record", async () => {
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as any);
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        imageId: "img-1",
-        instanceId: "instance-1",
-        oCount: 3,
-        oHistory: existingHistory,
-      } as any);
-      mockPrisma.imageViewHistory.update.mockResolvedValue({
-        id: 1,
-        oCount: 4,
-        oHistory: [...existingHistory, new Date().toISOString()],
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          imageId: "img-1",
+          instanceId: "instance-1",
+          oCount: 3,
+          oHistory: existingHistory,
+        })
+      );
+      mockPrisma.imageViewHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 4,
+          oHistory: [...existingHistory, new Date().toISOString()],
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -215,16 +228,20 @@ describe("Image View History Controller", () => {
     });
 
     it("uses instanceId from request body when provided", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue({
-        id: 1,
-        oCount: 1,
-        oHistory: [],
-      } as any);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 1,
+          oHistory: [],
+        })
+      );
 
       const req = mockReq(
         { imageId: "img-1", instanceId: "custom-instance" },
@@ -252,16 +269,20 @@ describe("Image View History Controller", () => {
     });
 
     it("lets the resolver pick the instance when instanceId is not in body", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue({
-        id: 1,
-        oCount: 1,
-        oHistory: [],
-      } as any);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 1,
+          oHistory: [],
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -273,16 +294,20 @@ describe("Image View History Controller", () => {
 
     it("logs warning when user has syncToStash enabled", async () => {
       const { logger } = await import("../../utils/logger.js");
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: true,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: true,
+        })
+      );
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue({
-        id: 1,
-        oCount: 1,
-        oHistory: [],
-      } as any);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 1,
+          oHistory: [],
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -293,23 +318,29 @@ describe("Image View History Controller", () => {
     });
 
     it("handles oHistory stored as JSON string", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 1,
-        syncToStash: false,
-      } as any);
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
-        id: 1,
-        oCount: 2,
-        oHistory: JSON.stringify([
-          "2024-01-01T00:00:00.000Z",
-          "2024-01-02T00:00:00.000Z",
-        ]),
-      } as any);
-      mockPrisma.imageViewHistory.update.mockResolvedValue({
-        id: 1,
-        oCount: 3,
-        oHistory: [],
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 2,
+          oHistory: JSON.stringify([
+            "2024-01-01T00:00:00.000Z",
+            "2024-01-02T00:00:00.000Z",
+          ]),
+        })
+      );
+      mockPrisma.imageViewHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          oCount: 3,
+          oHistory: [],
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -368,16 +399,18 @@ describe("Image View History Controller", () => {
 
     it("creates new view record with viewCount=1 when no history exists", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.imageViewHistory.create.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        imageId: "img-1",
-        instanceId: "instance-1",
-        viewCount: 1,
-        viewHistory: [new Date().toISOString()],
-        oCount: 0,
-        lastViewedAt: new Date(),
-      } as any);
+      mockPrisma.imageViewHistory.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          imageId: "img-1",
+          instanceId: "instance-1",
+          viewCount: 1,
+          viewHistory: [new Date().toISOString()],
+          oCount: 0,
+          lastViewedAt: new Date(),
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -401,20 +434,24 @@ describe("Image View History Controller", () => {
 
     it("increments viewCount on existing record", async () => {
       const existingHistory = ["2024-01-01T00:00:00.000Z"];
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        imageId: "img-1",
-        viewCount: 5,
-        viewHistory: existingHistory,
-        lastViewedAt: new Date("2024-01-01"),
-      } as any);
-      mockPrisma.imageViewHistory.update.mockResolvedValue({
-        id: 1,
-        viewCount: 6,
-        viewHistory: [...existingHistory, new Date().toISOString()],
-        lastViewedAt: new Date(),
-      } as any);
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          imageId: "img-1",
+          viewCount: 5,
+          viewHistory: existingHistory,
+          lastViewedAt: new Date("2024-01-01"),
+        })
+      );
+      mockPrisma.imageViewHistory.update.mockResolvedValue(
+        partialRow({
+          id: 1,
+          viewCount: 6,
+          viewHistory: [...existingHistory, new Date().toISOString()],
+          lastViewedAt: new Date(),
+        })
+      );
 
       const req = mockReq({ imageId: "img-1" }, {}, USER);
       const res = mockRes();
@@ -485,21 +522,23 @@ describe("Image View History Controller", () => {
 
     it("returns full history when record exists", async () => {
       const lastViewed = new Date("2024-06-15T12:00:00.000Z");
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
-        id: 1,
-        userId: 1,
-        imageId: "img-1",
-        instanceId: "instance-1",
-        viewCount: 10,
-        viewHistory: ["2024-06-15T12:00:00.000Z"],
-        oCount: 3,
-        oHistory: [
-          "2024-06-10T08:00:00.000Z",
-          "2024-06-12T08:00:00.000Z",
-          "2024-06-14T08:00:00.000Z",
-        ],
-        lastViewedAt: lastViewed,
-      } as any);
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 1,
+          imageId: "img-1",
+          instanceId: "instance-1",
+          viewCount: 10,
+          viewHistory: ["2024-06-15T12:00:00.000Z"],
+          oCount: 3,
+          oHistory: [
+            "2024-06-10T08:00:00.000Z",
+            "2024-06-12T08:00:00.000Z",
+            "2024-06-14T08:00:00.000Z",
+          ],
+          lastViewedAt: lastViewed,
+        })
+      );
 
       const req = mockReq({}, { imageId: "img-1" }, USER);
       const res = mockRes();
@@ -515,17 +554,19 @@ describe("Image View History Controller", () => {
     });
 
     it("parses JSON strings in viewHistory and oHistory", async () => {
-      mockPrisma.imageViewHistory.findUnique.mockResolvedValue({
-        id: 1,
-        viewCount: 2,
-        viewHistory: JSON.stringify([
-          "2024-01-01T00:00:00.000Z",
-          "2024-01-02T00:00:00.000Z",
-        ]),
-        oCount: 1,
-        oHistory: JSON.stringify(["2024-01-01T12:00:00.000Z"]),
-        lastViewedAt: new Date("2024-01-02"),
-      } as any);
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          viewCount: 2,
+          viewHistory: JSON.stringify([
+            "2024-01-01T00:00:00.000Z",
+            "2024-01-02T00:00:00.000Z",
+          ]),
+          oCount: 1,
+          oHistory: JSON.stringify(["2024-01-01T12:00:00.000Z"]),
+          lastViewedAt: new Date("2024-01-02"),
+        })
+      );
 
       const req = mockReq({}, { imageId: "img-1" }, USER);
       const res = mockRes();

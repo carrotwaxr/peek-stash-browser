@@ -11,6 +11,7 @@
  * getUserStashInstances, updateUserStashInstances, getSetupStatus,
  * completeSetup, syncFromStash (auth/validation only).
  */
+import type { UserContentRestriction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   completeSetup,
@@ -53,7 +54,13 @@ import {
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import {
+  type MembershipWithGroup,
+  userPermissions,
+  userRow,
+} from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
 vi.mock(
@@ -196,9 +203,11 @@ describe("User Controller — Features", () => {
     });
 
     it("returns empty preset structure when none exist", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        filterPresets: null,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          filterPresets: null,
+        })
+      );
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getFilterPresets(req, res);
@@ -213,9 +222,11 @@ describe("User Controller — Features", () => {
 
     it("returns existing presets", async () => {
       const presets = { scene: [{ id: "1", name: "Test" }] };
-      mockPrisma.user.findUnique.mockResolvedValue({
-        filterPresets: presets,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          filterPresets: presets,
+        })
+      );
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getFilterPresets(req, res);
@@ -277,11 +288,13 @@ describe("User Controller — Features", () => {
     });
 
     it("saves preset with defaults for optional fields", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        filterPresets: {},
-        defaultFilterPresets: {},
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          filterPresets: {},
+          defaultFilterPresets: {},
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq(
         {
@@ -307,11 +320,13 @@ describe("User Controller — Features", () => {
     });
 
     it("sets preset as default when setAsDefault is true", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        filterPresets: {},
-        defaultFilterPresets: {},
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          filterPresets: {},
+          defaultFilterPresets: {},
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq(
         {
@@ -357,11 +372,13 @@ describe("User Controller — Features", () => {
 
     it("deletes preset and clears default if it was default", async () => {
       const presetId = "preset-to-delete";
-      mockPrisma.user.findUnique.mockResolvedValue({
-        filterPresets: { scene: [{ id: presetId, name: "Test" }] },
-        defaultFilterPresets: { scene: presetId },
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          filterPresets: { scene: [{ id: presetId, name: "Test" }] },
+          defaultFilterPresets: { scene: presetId },
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
 
       const req = mockReq({}, { artifactType: "scene", presetId }, USER);
       const res = mockRes();
@@ -391,9 +408,11 @@ describe("User Controller — Features", () => {
     });
 
     it("returns empty object when no defaults set", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        defaultFilterPresets: null,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          defaultFilterPresets: null,
+        })
+      );
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getDefaultFilterPresets(req, res);
@@ -418,10 +437,12 @@ describe("User Controller — Features", () => {
     });
 
     it("returns 400 when preset not found", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        defaultFilterPresets: {},
-        filterPresets: { scene: [] },
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          defaultFilterPresets: {},
+          filterPresets: { scene: [] },
+        })
+      );
       const req = mockReq(
         { context: "scene", presetId: "nonexistent" },
         {},
@@ -434,11 +455,13 @@ describe("User Controller — Features", () => {
     });
 
     it("clears default when presetId is null", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        defaultFilterPresets: { scene: "some-id" },
-        filterPresets: {},
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          defaultFilterPresets: { scene: "some-id" },
+          filterPresets: {},
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({ context: "scene" }, {}, USER);
       const res = mockRes();
       await setDefaultFilterPreset(req, res);
@@ -447,11 +470,13 @@ describe("User Controller — Features", () => {
 
     it("validates scene grid contexts against scene presets", async () => {
       const presetId = "existing-preset";
-      mockPrisma.user.findUnique.mockResolvedValue({
-        defaultFilterPresets: {},
-        filterPresets: { scene: [{ id: presetId, name: "Test" }] },
-      } as any);
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          defaultFilterPresets: {},
+          filterPresets: { scene: [{ id: presetId, name: "Test" }] },
+        })
+      );
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({ context: "scene_performer", presetId }, {}, USER);
       const res = mockRes();
       await setDefaultFilterPreset(req, res);
@@ -477,11 +502,16 @@ describe("User Controller — Features", () => {
     });
 
     it("returns restrictions for user", async () => {
-      const restrictions = [
-        { id: 1, entityType: "tags", mode: "EXCLUDE", entityIds: "[]" },
+      const restrictions: UserContentRestriction[] = [
+        partialRow({
+          id: 1,
+          entityType: "tags",
+          mode: "EXCLUDE",
+          entityIds: "[]",
+        }),
       ];
       mockPrisma.userContentRestriction.findMany.mockResolvedValue(
-        restrictions as any
+        restrictions
       );
       const req = mockReq({}, { userId: "2" }, ADMIN);
       const res = mockRes();
@@ -549,19 +579,21 @@ describe("User Controller — Features", () => {
     });
 
     it("replaces all restrictions and recomputes exclusions", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 2,
-        role: "USER",
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 2,
+          role: "USER",
+        })
+      );
       mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
         count: 1,
-      } as any);
+      });
       mockPrisma.userContentRestriction.createMany.mockResolvedValue({
         count: 1,
-      } as any);
+      });
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([
-        { id: 1, entityType: "tags", mode: "EXCLUDE" },
-      ] as any);
+        partialRow({ id: 1, entityType: "tags", mode: "EXCLUDE" }),
+      ]);
       const req = mockReq(
         {
           restrictions: [
@@ -598,7 +630,7 @@ describe("User Controller — Features", () => {
     it("deletes all restrictions and recomputes exclusions", async () => {
       mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
         count: 3,
-      } as any);
+      });
       const req = mockReq({}, { userId: "2" }, ADMIN);
       const res = mockRes();
       await deleteUserRestrictions(req, res);
@@ -954,7 +986,7 @@ describe("User Controller — Features", () => {
     });
 
     it("updates preference successfully", async () => {
-      mockPrisma.user.update.mockResolvedValue({} as any);
+      mockPrisma.user.update.mockResolvedValue(userRow());
       const req = mockReq({ hideConfirmationDisabled: true }, {}, USER);
       const res = mockRes();
       await updateHideConfirmation(req, res);
@@ -974,7 +1006,7 @@ describe("User Controller — Features", () => {
     });
 
     it("returns 404 when permissions null", async () => {
-      mockResolvePermissions.mockResolvedValue(null as any);
+      mockResolvePermissions.mockResolvedValue(null);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getUserPermissions(req, res);
@@ -982,8 +1014,11 @@ describe("User Controller — Features", () => {
     });
 
     it("returns resolved permissions", async () => {
-      const perms = { canShare: true, canDownloadFiles: false };
-      mockResolvePermissions.mockResolvedValue(perms as any);
+      const perms = userPermissions({
+        canShare: true,
+        canDownloadFiles: false,
+      });
+      mockResolvePermissions.mockResolvedValue(perms);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getUserPermissions(req, res);
@@ -1007,8 +1042,8 @@ describe("User Controller — Features", () => {
     });
 
     it("returns permissions for specified user", async () => {
-      const perms = { canShare: false };
-      mockResolvePermissions.mockResolvedValue(perms as any);
+      const perms = userPermissions({ canShare: false });
+      mockResolvePermissions.mockResolvedValue(perms);
       const req = mockReq({}, { userId: "3" }, ADMIN);
       const res = mockRes();
       await getAnyUserPermissions(req, res);
@@ -1047,18 +1082,19 @@ describe("User Controller — Features", () => {
     });
 
     it("updates overrides and returns permissions", async () => {
-      mockPrisma.user.update.mockResolvedValue({} as any);
-      mockResolvePermissions.mockResolvedValue({ canShare: true } as any);
+      mockPrisma.user.update.mockResolvedValue(userRow());
+      const perms = userPermissions({ canShare: true });
+      mockResolvePermissions.mockResolvedValue(perms);
       const req = mockReq({ canShareOverride: true }, { userId: "3" }, ADMIN);
       const res = mockRes();
       await updateUserPermissionOverrides(req, res);
       expect(res._getBody().success).toBe(true);
-      expect(res._getBody().permissions).toEqual({ canShare: true });
+      expect(res._getBody().permissions).toEqual(perms);
     });
 
     it("accepts null to clear overrides", async () => {
-      mockPrisma.user.update.mockResolvedValue({} as any);
-      mockResolvePermissions.mockResolvedValue({} as any);
+      mockPrisma.user.update.mockResolvedValue(userRow());
+      mockResolvePermissions.mockResolvedValue(userPermissions());
       const req = mockReq({ canShareOverride: null }, { userId: "3" }, ADMIN);
       const res = mockRes();
       await updateUserPermissionOverrides(req, res);
@@ -1076,17 +1112,17 @@ describe("User Controller — Features", () => {
 
     it("returns mapped groups", async () => {
       mockPrisma.userGroupMembership.findMany.mockResolvedValue([
-        {
-          group: {
+        partialRow<MembershipWithGroup>({
+          group: partialRow({
             id: 1,
             name: "Group A",
             description: null,
             canShare: true,
             canDownloadFiles: false,
             canDownloadPlaylists: false,
-          },
-        },
-      ] as any);
+          }),
+        }),
+      ]);
       const req = mockReq({}, { userId: "3" }, ADMIN);
       const res = mockRes();
       await getUserGroupMemberships(req, res);
@@ -1107,12 +1143,12 @@ describe("User Controller — Features", () => {
 
     it("returns selected and available instances", async () => {
       mockPrisma.userStashInstance.findMany.mockResolvedValue([
-        { instanceId: "inst-1" },
-      ] as any);
+        partialRow({ instanceId: "inst-1" }),
+      ]);
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "inst-1", name: "Stash 1", description: null },
-        { id: "inst-2", name: "Stash 2", description: null },
-      ] as any);
+        partialRow({ id: "inst-1", name: "Stash 1", description: null }),
+        partialRow({ id: "inst-2", name: "Stash 2", description: null }),
+      ]);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getUserStashInstances(req, res);
@@ -1132,8 +1168,8 @@ describe("User Controller — Features", () => {
 
     it("returns 400 for invalid instance IDs", async () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "inst-1" },
-      ] as any);
+        partialRow({ id: "inst-1" }),
+      ]);
       const req = mockReq({ instanceIds: ["inst-1", "inst-99"] }, {}, USER);
       const res = mockRes();
       await updateUserStashInstances(req, res);
@@ -1145,7 +1181,7 @@ describe("User Controller — Features", () => {
     it("clears selections when empty array", async () => {
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({
         count: 1,
-      } as any);
+      });
       const req = mockReq({ instanceIds: [] }, {}, USER);
       const res = mockRes();
       await updateUserStashInstances(req, res);
@@ -1156,14 +1192,14 @@ describe("User Controller — Features", () => {
 
     it("replaces selections with valid IDs", async () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "inst-2" },
-      ] as any);
+        partialRow({ id: "inst-2" }),
+      ]);
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({
         count: 0,
-      } as any);
+      });
       mockPrisma.userStashInstance.createMany.mockResolvedValue({
         count: 1,
-      } as any);
+      });
       const req = mockReq({ instanceIds: ["inst-2"] }, {}, USER);
       const res = mockRes();
       await updateUserStashInstances(req, res);
@@ -1193,12 +1229,14 @@ describe("User Controller — Features", () => {
     });
 
     it("returns setup status with instances and no recovery key", async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        setupCompleted: false,
-      } as any);
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          setupCompleted: false,
+        })
+      );
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "inst-1", name: "Stash 1", description: null },
-      ] as any);
+        partialRow({ id: "inst-1", name: "Stash 1", description: null }),
+      ]);
       const req = mockReq({}, {}, USER);
       const res = mockRes();
       await getSetupStatus(req, res);
@@ -1220,7 +1258,7 @@ describe("User Controller — Features", () => {
 
     it("completes setup for single instance without selections", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(1);
-      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 } as any);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
       vi.mocked(generateRecoveryKey).mockReturnValue("RAWKEY");
       vi.mocked(hashRecoveryKey).mockReturnValue("hashed-key");
       vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
@@ -1240,7 +1278,7 @@ describe("User Controller — Features", () => {
 
     it("returns recoveryKey null when setup was already complete", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(1);
-      mockPrisma.user.updateMany.mockResolvedValue({ count: 0 } as any);
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 0 });
       vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
       const req = mockReq({}, {}, USER);
       const res = mockRes();
@@ -1260,15 +1298,15 @@ describe("User Controller — Features", () => {
     it("completes setup for multi-instance with valid selections", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(3);
       mockPrisma.stashInstance.findMany.mockResolvedValue([
-        { id: "inst-1" },
-      ] as any);
+        partialRow({ id: "inst-1" }),
+      ]);
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({
         count: 0,
-      } as any);
+      });
       mockPrisma.userStashInstance.createMany.mockResolvedValue({
         count: 1,
-      } as any);
-      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 } as any);
+      });
+      mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
       const req = mockReq({ selectedInstanceIds: ["inst-1"] }, {}, USER);
       const res = mockRes();
       await completeSetup(req, res);

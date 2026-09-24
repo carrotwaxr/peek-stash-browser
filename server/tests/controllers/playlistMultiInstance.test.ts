@@ -5,6 +5,7 @@
  * the same numeric ID, the scene map must use composite keys (id + instanceId)
  * to avoid one instance's data overwriting another's.
  */
+import type { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getPlaylist,
@@ -18,6 +19,20 @@ import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { type PlaylistWithItems } from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
+
+type PlaylistWithCountAndItems = Prisma.PlaylistGetPayload<{
+  include: { _count: { select: { items: true } }; items: true };
+}>;
+type SharedPlaylistWithItems = Prisma.PlaylistGetPayload<{
+  include: {
+    user: true;
+    shares: { include: { group: true } };
+    _count: { select: { items: true } };
+    items: true;
+  };
+}>;
 
 // ---------- mocks (must be before imports of modules under test) ----------
 
@@ -152,7 +167,7 @@ describe("Playlist multi-instance scene map (#393)", () => {
     const sceneB = stubScene("42", "inst-B", "Scene from B");
 
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      {
+      partialRow<PlaylistWithCountAndItems>({
         id: 1,
         userId: USER.id,
         name: "Mixed",
@@ -181,7 +196,7 @@ describe("Playlist multi-instance scene map (#393)", () => {
             addedAt: new Date(),
           },
         ],
-      } as any,
+      }),
     ]);
 
     // getScenesByIdsWithRelations is called once per instance group
@@ -205,7 +220,7 @@ describe("Playlist multi-instance scene map (#393)", () => {
     const sceneB = stubScene("42", "inst-B", "Scene from B");
 
     mockPrisma.playlist.findMany.mockResolvedValueOnce([
-      {
+      partialRow<SharedPlaylistWithItems>({
         id: 2,
         userId: 99,
         name: "Shared Mixed",
@@ -215,8 +230,13 @@ describe("Playlist multi-instance scene map (#393)", () => {
         repeat: "none",
         createdAt: new Date(),
         updatedAt: new Date(),
-        user: { id: 99, username: "other" },
-        shares: [{ sharedAt: new Date(), group: { name: "Group1" } }],
+        user: partialRow({ id: 99, username: "other" }),
+        shares: [
+          partialRow({
+            sharedAt: new Date(),
+            group: partialRow({ name: "Group1" }),
+          }),
+        ],
         _count: { items: 2 },
         items: [
           {
@@ -236,7 +256,7 @@ describe("Playlist multi-instance scene map (#393)", () => {
             addedAt: new Date(),
           },
         ],
-      } as any,
+      }),
     ]);
 
     mockGetScenes
@@ -258,36 +278,38 @@ describe("Playlist multi-instance scene map (#393)", () => {
     const sceneA = stubScene("42", "inst-A", "Scene from A");
     const sceneB = stubScene("42", "inst-B", "Scene from B");
 
-    mockGetAccess.mockResolvedValueOnce({ level: "owner" } as any);
-    mockPrisma.playlist.findUnique.mockResolvedValueOnce({
-      id: 3,
-      userId: USER.id,
-      name: "Detail Mixed",
-      description: null,
-      isPublic: false,
-      shuffle: false,
-      repeat: "none",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      items: [
-        {
-          id: 20,
-          playlistId: 3,
-          sceneId: "42",
-          instanceId: "inst-A",
-          position: 0,
-          addedAt: new Date(),
-        },
-        {
-          id: 21,
-          playlistId: 3,
-          sceneId: "42",
-          instanceId: "inst-B",
-          position: 1,
-          addedAt: new Date(),
-        },
-      ],
-    } as any);
+    mockGetAccess.mockResolvedValueOnce({ level: "owner" });
+    mockPrisma.playlist.findUnique.mockResolvedValueOnce(
+      partialRow<PlaylistWithItems>({
+        id: 3,
+        userId: USER.id,
+        name: "Detail Mixed",
+        description: null,
+        isPublic: false,
+        shuffle: false,
+        repeat: "none",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        items: [
+          {
+            id: 20,
+            playlistId: 3,
+            sceneId: "42",
+            instanceId: "inst-A",
+            position: 0,
+            addedAt: new Date(),
+          },
+          {
+            id: 21,
+            playlistId: 3,
+            sceneId: "42",
+            instanceId: "inst-B",
+            position: 1,
+            addedAt: new Date(),
+          },
+        ],
+      })
+    );
 
     mockGetScenes
       .mockResolvedValueOnce([sceneA])

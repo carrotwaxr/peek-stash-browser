@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Build a mock StashClient using vi.hoisted so it's available in vi.mock factories
 const mockStashClient = vi.hoisted(() => ({
@@ -137,7 +138,7 @@ describe("syncFromStash", () => {
     vi.clearAllMocks();
     // Default: single instance
     mockInstanceManager.getAll.mockReturnValue([
-      ["instance-1", mockStashClient as any],
+      ["instance-1", partialRow(mockStashClient)],
     ]);
     // Default: empty existing records
     mockPrisma.sceneRating.findMany.mockResolvedValue([]);
@@ -146,7 +147,7 @@ describe("syncFromStash", () => {
     mockPrisma.tagRating.findMany.mockResolvedValue([]);
     mockPrisma.galleryRating.findMany.mockResolvedValue([]);
     mockPrisma.groupRating.findMany.mockResolvedValue([]);
-    (mockPrisma as any).watchHistory.findMany.mockResolvedValue([]);
+    mockPrisma.watchHistory.findMany.mockResolvedValue([]);
     // Default: transaction resolves
     mockPrisma.$transaction.mockResolvedValue([]);
     // Default: all Stash API calls return empty
@@ -388,7 +389,7 @@ describe("syncFromStash", () => {
       });
       // Existing rating with different value
       mockPrisma.sceneRating.findMany.mockResolvedValue([
-        { sceneId: "1", rating: 60 } as any,
+        partialRow({ sceneId: "1", rating: 60 }),
       ]);
 
       const req = mockReq(
@@ -412,7 +413,7 @@ describe("syncFromStash", () => {
         },
       });
       mockPrisma.sceneRating.findMany.mockResolvedValue([
-        { sceneId: "1", rating: 80 } as any,
+        partialRow({ sceneId: "1", rating: 80 }),
       ]);
 
       const req = mockReq(
@@ -556,7 +557,7 @@ describe("syncFromStash", () => {
         },
       });
       mockPrisma.performerRating.findMany.mockResolvedValue([
-        { performerId: "1", rating: 50, favorite: false } as any,
+        partialRow({ performerId: "1", rating: 50, favorite: false }),
       ]);
 
       const req = mockReq(
@@ -578,7 +579,7 @@ describe("syncFromStash", () => {
         },
       });
       mockPrisma.performerRating.findMany.mockResolvedValue([
-        { performerId: "1", rating: 90, favorite: false } as any,
+        partialRow({ performerId: "1", rating: 90, favorite: false }),
       ]);
 
       const req = mockReq(
@@ -812,7 +813,7 @@ describe("syncFromStash", () => {
         },
       });
       mockPrisma.tagRating.findMany.mockResolvedValue([
-        { tagId: "1", favorite: false } as any,
+        partialRow({ tagId: "1", favorite: false }),
       ]);
 
       const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
@@ -958,8 +959,8 @@ describe("syncFromStash", () => {
         findScenes: { scenes: [makeScene("1", 80)], count: 1 },
       });
       mockInstanceManager.getAll.mockReturnValue([
-        ["instance-1", mockStashClient as any],
-        ["instance-2", mockStash2 as any],
+        ["instance-1", partialRow(mockStashClient)],
+        ["instance-2", partialRow(mockStash2)],
       ]);
 
       const req = mockReq({ options: DEFAULT_OPTIONS }, { userId: "2" }, ADMIN);
@@ -1008,8 +1009,8 @@ describe("syncFromStash", () => {
       };
 
       mockInstanceManager.getAll.mockReturnValue([
-        ["failing-instance", failingStash as any],
-        ["working-instance", workingStash as any],
+        ["failing-instance", partialRow(failingStash)],
+        ["working-instance", partialRow(workingStash)],
       ]);
 
       const req = mockReq({ options: DEFAULT_OPTIONS }, { userId: "2" }, ADMIN);
@@ -1025,7 +1026,7 @@ describe("syncFromStash", () => {
     it("returns 500 when top-level error occurs", async () => {
       // Force a top-level error by making getAll throw after the instances check
       mockInstanceManager.getAll
-        .mockReturnValueOnce([["instance-1", mockStashClient as any]]) // for length check
+        .mockReturnValueOnce([["instance-1", partialRow(mockStashClient)]]) // for length check
         .mockImplementation(() => {
           throw new Error("Catastrophic failure");
         });
@@ -1036,7 +1037,7 @@ describe("syncFromStash", () => {
       // trigger it by making the stash API throw a non-instance error
       // Reset to a working mock
       mockInstanceManager.getAll.mockReturnValue([
-        ["instance-1", mockStashClient as any],
+        ["instance-1", partialRow(mockStashClient)],
       ]);
 
       // Make the scene sync throw inside the instance loop — this is caught per-instance

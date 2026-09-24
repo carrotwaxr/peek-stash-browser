@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -16,6 +17,15 @@ import {
   malformed,
   testUser,
 } from "../helpers/controllerTestUtils.js";
+import { type MembershipWithGroup } from "../helpers/fixtures.js";
+import { partialRow } from "../helpers/prismaMock.js";
+
+type GroupWithMemberCount = Prisma.UserGroupGetPayload<{
+  include: { _count: { select: { members: true } } };
+}>;
+type GroupWithMembers = Prisma.UserGroupGetPayload<{
+  include: { members: { include: { user: true } } };
+}>;
 
 vi.mock(
   "../../prisma/singleton.js",
@@ -48,7 +58,7 @@ describe("Groups Controller", () => {
 
     it("should return all groups with member counts", async () => {
       mockPrisma.userGroup.findMany.mockResolvedValue([
-        {
+        partialRow<GroupWithMemberCount>({
           id: 1,
           name: "Family",
           description: "Family members",
@@ -58,8 +68,8 @@ describe("Groups Controller", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           _count: { members: 3 },
-        },
-      ] as never);
+        }),
+      ]);
 
       await getAllGroups(
         authReq({ user: testUser({ id: 1, role: "ADMIN" }) }),
@@ -103,25 +113,27 @@ describe("Groups Controller", () => {
 
     it("should return group with members containing nested user objects", async () => {
       const createdAt = new Date();
-      mockPrisma.userGroup.findUnique.mockResolvedValue({
-        id: 1,
-        name: "Family",
-        description: "Family members",
-        canShare: true,
-        canDownloadFiles: false,
-        canDownloadPlaylists: false,
-        createdAt,
-        updatedAt: createdAt,
-        members: [
-          {
-            id: 1,
-            userId: 2,
-            groupId: 1,
-            createdAt,
-            user: { id: 2, username: "user1", role: "USER" },
-          },
-        ],
-      } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(
+        partialRow<GroupWithMembers>({
+          id: 1,
+          name: "Family",
+          description: "Family members",
+          canShare: true,
+          canDownloadFiles: false,
+          canDownloadPlaylists: false,
+          createdAt,
+          updatedAt: createdAt,
+          members: [
+            partialRow({
+              id: 1,
+              userId: 2,
+              groupId: 1,
+              createdAt,
+              user: partialRow({ id: 2, username: "user1", role: "USER" }),
+            }),
+          ],
+        })
+      );
 
       await getGroup(
         authReq({
@@ -172,7 +184,7 @@ describe("Groups Controller", () => {
     });
 
     it("should return 409 if name already exists", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(partialRow({ id: 1 }));
 
       await createGroup(
         authReq({
@@ -196,7 +208,7 @@ describe("Groups Controller", () => {
         canDownloadPlaylists: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as never);
+      });
 
       await createGroup(
         authReq({
@@ -252,10 +264,12 @@ describe("Groups Controller", () => {
     });
 
     it("should update group", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({
-        id: 1,
-        name: "Family",
-      } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          name: "Family",
+        })
+      );
       mockPrisma.userGroup.update.mockResolvedValue({
         id: 1,
         name: "Updated Family",
@@ -265,7 +279,7 @@ describe("Groups Controller", () => {
         canDownloadPlaylists: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as never);
+      });
 
       await updateGroup(
         authReq({
@@ -317,11 +331,13 @@ describe("Groups Controller", () => {
     });
 
     it("should delete group by id", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({
-        id: 1,
-        name: "Family",
-      } as never);
-      mockPrisma.userGroup.delete.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          name: "Family",
+        })
+      );
+      mockPrisma.userGroup.delete.mockResolvedValue(partialRow({ id: 1 }));
 
       await deleteGroup(
         authReq({
@@ -368,7 +384,7 @@ describe("Groups Controller", () => {
     });
 
     it("should return 400 if userId is missing", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(partialRow({ id: 1 }));
 
       await addMember(
         authReq({
@@ -383,13 +399,15 @@ describe("Groups Controller", () => {
     });
 
     it("should add user to group", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(partialRow({ id: 1 }));
       mockPrisma.userGroupMembership.findUnique.mockResolvedValue(null);
-      mockPrisma.userGroupMembership.create.mockResolvedValue({
-        id: 1,
-        userId: 2,
-        groupId: 1,
-      } as never);
+      mockPrisma.userGroupMembership.create.mockResolvedValue(
+        partialRow({
+          id: 1,
+          userId: 2,
+          groupId: 1,
+        })
+      );
 
       await addMember(
         authReq({
@@ -407,10 +425,12 @@ describe("Groups Controller", () => {
     });
 
     it("should return 409 if user already in group", async () => {
-      mockPrisma.userGroup.findUnique.mockResolvedValue({ id: 1 } as never);
-      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
-        id: 1,
-      } as never);
+      mockPrisma.userGroup.findUnique.mockResolvedValue(partialRow({ id: 1 }));
+      mockPrisma.userGroupMembership.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+        })
+      );
 
       await addMember(
         authReq({
@@ -453,12 +473,16 @@ describe("Groups Controller", () => {
     });
 
     it("should remove user from group", async () => {
-      mockPrisma.userGroupMembership.findUnique.mockResolvedValue({
-        id: 1,
-      } as never);
-      mockPrisma.userGroupMembership.delete.mockResolvedValue({
-        id: 1,
-      } as never);
+      mockPrisma.userGroupMembership.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+        })
+      );
+      mockPrisma.userGroupMembership.delete.mockResolvedValue(
+        partialRow({
+          id: 1,
+        })
+      );
 
       await removeMember(
         authReq({
@@ -486,35 +510,35 @@ describe("Groups Controller", () => {
 
     it("should return user's groups when authenticated", async () => {
       mockPrisma.userGroupMembership.findMany.mockResolvedValue([
-        {
+        partialRow<MembershipWithGroup>({
           id: 1,
           userId: 2,
           groupId: 1,
           createdAt: new Date(),
-          group: {
+          group: partialRow({
             id: 1,
             name: "Family",
             description: "Family members",
             canShare: true,
             canDownloadFiles: false,
             canDownloadPlaylists: false,
-          },
-        },
-        {
+          }),
+        }),
+        partialRow<MembershipWithGroup>({
           id: 2,
           userId: 2,
           groupId: 2,
           createdAt: new Date(),
-          group: {
+          group: partialRow({
             id: 2,
             name: "Friends",
             description: null,
             canShare: false,
             canDownloadFiles: true,
             canDownloadPlaylists: true,
-          },
-        },
-      ] as never);
+          }),
+        }),
+      ]);
 
       await getUserGroups(
         authReq({ user: testUser({ id: 2, role: "USER" }) }),
