@@ -1,0 +1,51 @@
+name: Image Smoke Test
+
+# Builds Dockerfile.production natively on each architecture and boots it
+# against an empty data volume (item 80, TCI-10). Called by ci.yml on every
+# pull request and push to main, and by docker-build.yml before publishing.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the production image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.production
+          load: true
+          tags: peek:smoke
+          build-args: BUILD_DATE=smoke-${{ github.sha }}
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          # Only main writes. GitHub keeps a cache under the ref that saved it,
+          # and a run can read only its own ref's entries and main's, so a
+          # tag's or a pull request's entries would be read by no later run.
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,scope=image-{0}', matrix.arch) || '' }}
+
+      - name: Boot it against an empty volume
+        run: node docker/smoke-test.mjs peek:smoke
+        env:
+          EXPECT_BUILD_DATE: smoke-${{ github.sha }}
