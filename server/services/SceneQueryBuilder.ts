@@ -17,6 +17,7 @@ import type {
 } from "../types/index.js";
 import type { SceneQueryRow } from "../types/internal/queryRows.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 import {
   type FilterClause,
@@ -1437,8 +1438,8 @@ class SceneQueryBuilder {
    */
   private transformRow(row: SceneQueryRow): NormalizedScene {
     // Parse JSON fields
-    const oHistory = parseJsonArray(row.userOHistory);
-    const playHistory = parseJsonArray(row.userPlayHistory);
+    const oHistory = readHistory(row.userOHistory);
+    const playHistory = readHistory(row.userPlayHistory);
 
     // Determine last_o_at from o_history
     const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
