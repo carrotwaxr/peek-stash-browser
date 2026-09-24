@@ -598,6 +598,44 @@ describe("UserStatsService", () => {
       );
     });
 
+    it("reads a malformed history as empty and still rebuilds the scene's stats", async () => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        partialRow({
+          sceneId: "scene-1",
+          instanceId: "inst-a",
+          oCount: 2,
+          playCount: 3,
+          oHistory: "not json",
+          playHistory: "not json",
+        }),
+      ]);
+
+      mockGetScenesByIdsWithRelations.mockResolvedValue([
+        {
+          id: "scene-1",
+          instanceId: "inst-a",
+          performers: [{ id: "perf-1", name: "Jane" }],
+          studio: null,
+          tags: [],
+        },
+      ]);
+
+      await userStatsService.rebuildAllStatsForUser(1);
+
+      const performerCall =
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = [must(performerCall).data].flat();
+      expect(performerData).toEqual([
+        objectContaining({
+          performerId: "perf-1",
+          oCounter: 2,
+          playCount: 3,
+          lastPlayedAt: null,
+          lastOAt: null,
+        }),
+      ]);
+    });
+
     it("handles watch history with oHistory/playHistory as arrays (already parsed)", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([
         partialRow({

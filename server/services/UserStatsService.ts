@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
+import { readHistory } from "../utils/historyJson.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
 import { stashEntityService } from "./StashEntityService.js";
@@ -474,12 +475,8 @@ class UserStatsService {
         const whInstanceId = wh.instanceId || "";
 
         // Parse O history for timestamps
-        const oHistory: string[] = Array.isArray(wh.oHistory)
-          ? (wh.oHistory as string[])
-          : (JSON.parse((wh.oHistory as string) || "[]") as string[]);
-        const playHistory: string[] = Array.isArray(wh.playHistory)
-          ? (wh.playHistory as string[])
-          : (JSON.parse((wh.playHistory as string) || "[]") as string[]);
+        const oHistory = readHistory(wh.oHistory);
+        const playHistory = readHistory(wh.playHistory);
 
         const lastPlayEntry =
           playHistory.length > 0

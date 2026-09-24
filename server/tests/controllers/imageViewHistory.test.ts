@@ -617,10 +617,37 @@ describe("Image View History Controller", () => {
 
       const body = res._getOkBody();
       expect(body.exists).toBe(true);
-      expect(Array.isArray(body.viewHistory)).toBe(true);
-      expect(body.viewHistory).toHaveLength(2);
-      expect(Array.isArray(body.oHistory)).toBe(true);
-      expect(body.oHistory).toHaveLength(1);
+      expect(body.viewHistory).toEqual([
+        "2024-01-01T00:00:00.000Z",
+        "2024-01-02T00:00:00.000Z",
+      ]);
+      expect(body.oHistory).toEqual(["2024-01-01T12:00:00.000Z"]);
+    });
+
+    it("reads a malformed viewHistory and oHistory as empty lists", async () => {
+      mockPrisma.imageViewHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          viewCount: 2,
+          viewHistory: "not json",
+          oCount: 1,
+          oHistory: "not json",
+          lastViewedAt: new Date("2024-01-02"),
+        })
+      );
+
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
+      await getImageViewHistory(req, res);
+
+      expect(res.status).not.toHaveBeenCalled();
+      const body = res._getOkBody();
+      expect(body.exists).toBe(true);
+      expect(body.viewHistory).toEqual([]);
+      expect(body.oHistory).toEqual([]);
     });
 
     it("uses instanceId from query param when provided", async () => {

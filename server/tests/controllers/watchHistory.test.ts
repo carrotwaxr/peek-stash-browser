@@ -705,6 +705,63 @@ describe("Watch History Controller", () => {
         })
       );
     });
+
+    it("reads histories stored as JSON-encoded strings", async () => {
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 1,
+          oCount: 2,
+          oHistory: JSON.stringify([
+            "2024-01-01T00:00:00.000Z",
+            "2024-01-01T01:00:00.000Z",
+          ]),
+          playHistory: JSON.stringify(["2024-01-01T00:00:00.000Z"]),
+        })
+      );
+
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      const body = res._getOkBody();
+      expect(body.oHistory).toEqual([
+        "2024-01-01T00:00:00.000Z",
+        "2024-01-01T01:00:00.000Z",
+      ]);
+      expect(body.playHistory).toEqual(["2024-01-01T00:00:00.000Z"]);
+    });
+
+    it("reads a malformed history as an empty list", async () => {
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          playCount: 1,
+          oCount: 2,
+          oHistory: "not json",
+          playHistory: "not json",
+        })
+      );
+
+      const res = resFor(getWatchHistory);
+      await getWatchHistory(
+        reqFor(getWatchHistory, {
+          params: { sceneId: "123" },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      const body = res._getOkBody();
+      expect(body.oHistory).toEqual([]);
+      expect(body.playHistory).toEqual([]);
+    });
   });
 
   // ============================================================================
@@ -768,6 +825,61 @@ describe("Watch History Controller", () => {
           expect.objectContaining({ sceneId: "456" }),
         ]),
       });
+    });
+
+    it("reads histories stored as JSON-encoded strings", async () => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        partialRow({
+          id: 1,
+          sceneId: "123",
+          oHistory: JSON.stringify(["2024-01-01T01:00:00.000Z"]),
+          playHistory: JSON.stringify([
+            "2024-01-01T00:00:00.000Z",
+            "2024-01-02T00:00:00.000Z",
+          ]),
+        }),
+      ]);
+
+      const res = resFor(getAllWatchHistory);
+      await getAllWatchHistory(
+        reqFor(getAllWatchHistory, {
+          query: {},
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      const record = must(res._getOkBody().watchHistory[0]);
+      expect(record.oHistory).toEqual(["2024-01-01T01:00:00.000Z"]);
+      expect(record.playHistory).toEqual([
+        "2024-01-01T00:00:00.000Z",
+        "2024-01-02T00:00:00.000Z",
+      ]);
+    });
+
+    it("reads a malformed history as an empty list", async () => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        partialRow({
+          id: 1,
+          sceneId: "123",
+          oHistory: "not json",
+          playHistory: "not json",
+        }),
+      ]);
+
+      const res = resFor(getAllWatchHistory);
+      await getAllWatchHistory(
+        reqFor(getAllWatchHistory, {
+          query: {},
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      const record = must(res._getOkBody().watchHistory[0]);
+      expect(record.oHistory).toEqual([]);
+      expect(record.playHistory).toEqual([]);
     });
 
     it("should filter by inProgress when requested", async () => {
