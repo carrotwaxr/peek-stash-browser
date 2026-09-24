@@ -4,7 +4,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 
 ## Commands
 
-- Dev: `docker-compose up --build -d` (client on :6969, server on :8000); `docker-compose logs -f peek-server`
+- Dev: `docker compose up --build -d` (client on :6969, server on :8000); `docker compose logs -f peek-server`
 - Shared types: `cd shared && npm run build`. Needed before server `tsc`, the server dev runtime and client `typecheck`; Vite and Vitest read `shared/types` directly.
 - Test: `npm run test:run` in `client/` and `server/` (`npm test` starts watch mode in a terminal)
 - Coverage gate: `npm run test:coverage` in both; CI enforces the thresholds in each `vitest.config`
@@ -32,4 +32,5 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - A filter or content restriction silently matches nothing, or INCLUDE mode hides everything: an `"id:instanceId"` value reached SQL unparsed (#412, #424).
 - A filter or restriction also matches another instance's entities: the value was parsed to a bare ID and the instance dropped (#390, #437).
 - The server container fails on a `@peek/shared-types/...` import that `tsc` accepts: docker dev runs ts-node, which ignores wildcard subpath exports. Add an explicit entry to `exports` in `shared/package.json` (#498).
-- E2E logins fail for 15 minutes after a few bad attempts: the account lockout lives in server memory. `docker-compose restart peek-server` clears it.
+- The dev server log shows only `[Object: null prototype] { [Symbol(nodejs.util.inspect.custom)] ... }`: ts-node's ESM loader swallowed a TypeScript error; `docker compose exec peek-server npx tsc --noEmit` shows it. After a schema change it is the container's stale Prisma client: `docker compose restart peek-server` regenerates it (a host `npx prisma generate` does not reach the container's `node_modules`).
+- E2E logins fail for 15 minutes after a few bad attempts: the account lockout lives in server memory. `docker compose restart peek-server` clears it.

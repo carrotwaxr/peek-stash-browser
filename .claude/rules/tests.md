@@ -33,4 +33,4 @@ paths:
 - `auth.setup.ts` logs in through the API and injects the cookie, because filling the login form breaks on special characters in headless Chromium. Credentials come from `.env.e2e`, parsed in `playwright.config.ts`.
 - Tests must pass on both the populated dev database and the empty CI one: check which state exists, then assert.
 - Settings tabs are `role="tab"`, not buttons.
-- A few failed logins lock the account for 15 minutes; `docker-compose restart peek-server` clears it.
+- A few failed logins lock the account for 15 minutes; `docker compose restart peek-server` clears it.

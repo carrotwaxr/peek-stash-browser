@@ -36,7 +36,7 @@ The fastest way to get a development environment running:
 4. **Start the development stack**:
 
     ```bash
-    docker-compose up -d
+    docker compose up -d
     ```
 
 5. **Access the app**: Open `http://localhost:6969`
@@ -183,13 +183,13 @@ Use browser DevTools (F12). The Vite dev server provides source maps for debuggi
 
 ```bash
 # Docker Compose logs
-docker-compose logs -f
+docker compose logs -f
 
 # Backend only
-docker-compose logs -f peek-server
+docker compose logs -f peek-server
 
 # Frontend only
-docker-compose logs -f peek-client
+docker compose logs -f peek-client
 ```
 
 ## Code Style
@@ -245,18 +245,15 @@ kill -9 <PID>
 
 ### Prisma Client Out of Sync
 
-```bash
-cd server
-npx prisma generate
-```
+The dev server regenerates the Prisma client and applies migrations every time it starts. After changing `schema.prisma` or adding a migration, restart it: `docker compose restart peek-server`.
 
 ### Docker Compose Issues
 
 ```bash
 # Rebuild containers
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Clear Node Modules
