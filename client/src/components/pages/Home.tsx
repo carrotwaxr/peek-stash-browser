@@ -483,6 +483,7 @@ const HomeCarousel = ({
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
     }
+    return undefined;
   }, [
     error,
     errorAny,
@@ -603,6 +604,7 @@ const CustomCarousel = ({
     } else if (!error) {
       setRetryCount(0);
     }
+    return undefined;
   }, [error, retryCount, onInitializing, title, fetchCarousel]);
 
   // Silently skip failed carousels (non-initialization errors only)

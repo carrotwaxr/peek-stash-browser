@@ -91,7 +91,8 @@ export const getUserCustomThemes = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const themes = await prisma.customTheme.findMany({
@@ -127,11 +128,13 @@ export const getCustomTheme = async (
     const themeId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(themeId)) {
-      return res.status(400).json({ error: "Invalid theme ID" });
+      res.status(400).json({ error: "Invalid theme ID" });
+      return;
     }
 
     const theme = await prisma.customTheme.findFirst({
@@ -142,7 +145,8 @@ export const getCustomTheme = async (
     });
 
     if (!theme) {
-      return res.status(404).json({ error: "Theme not found" });
+      res.status(404).json({ error: "Theme not found" });
+      return;
     }
 
     res.json({ theme });
@@ -166,23 +170,27 @@ export const createCustomTheme = async (
     const { name, config } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Validate name
     if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return res.status(400).json({ error: "Theme name is required" });
+      res.status(400).json({ error: "Theme name is required" });
+      return;
     }
 
     if (name.length > 50) {
-      return res
+      res
         .status(400)
         .json({ error: "Theme name must be 50 characters or less" });
+      return;
     }
 
     // Validate config
     if (!validateThemeConfig(config)) {
-      return res.status(400).json({ error: "Invalid theme configuration" });
+      res.status(400).json({ error: "Invalid theme configuration" });
+      return;
     }
 
     // Check for duplicate name
@@ -194,9 +202,8 @@ export const createCustomTheme = async (
     });
 
     if (existing) {
-      return res
-        .status(409)
-        .json({ error: "A theme with this name already exists" });
+      res.status(409).json({ error: "A theme with this name already exists" });
+      return;
     }
 
     // Create theme
@@ -230,11 +237,13 @@ export const updateCustomTheme = async (
     const { name, config } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(themeId)) {
-      return res.status(400).json({ error: "Invalid theme ID" });
+      res.status(400).json({ error: "Invalid theme ID" });
+      return;
     }
 
     // Verify ownership
@@ -246,7 +255,8 @@ export const updateCustomTheme = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Theme not found" });
+      res.status(404).json({ error: "Theme not found" });
+      return;
     }
 
     // Validate updates
@@ -254,12 +264,14 @@ export const updateCustomTheme = async (
 
     if (name !== undefined) {
       if (typeof name !== "string" || name.trim().length === 0) {
-        return res.status(400).json({ error: "Theme name cannot be empty" });
+        res.status(400).json({ error: "Theme name cannot be empty" });
+        return;
       }
       if (name.length > 50) {
-        return res
+        res
           .status(400)
           .json({ error: "Theme name must be 50 characters or less" });
+        return;
       }
 
       // Check for duplicate name (excluding current theme)
@@ -272,9 +284,10 @@ export const updateCustomTheme = async (
       });
 
       if (duplicate) {
-        return res
+        res
           .status(409)
           .json({ error: "A theme with this name already exists" });
+        return;
       }
 
       updates.name = name.trim();
@@ -282,7 +295,8 @@ export const updateCustomTheme = async (
 
     if (config !== undefined) {
       if (!validateThemeConfig(config)) {
-        return res.status(400).json({ error: "Invalid theme configuration" });
+        res.status(400).json({ error: "Invalid theme configuration" });
+        return;
       }
       updates.config = config as object;
     }
@@ -314,11 +328,13 @@ export const deleteCustomTheme = async (
     const themeId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(themeId)) {
-      return res.status(400).json({ error: "Invalid theme ID" });
+      res.status(400).json({ error: "Invalid theme ID" });
+      return;
     }
 
     // Verify ownership
@@ -330,7 +346,8 @@ export const deleteCustomTheme = async (
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Theme not found" });
+      res.status(404).json({ error: "Theme not found" });
+      return;
     }
 
     // Delete theme
@@ -359,11 +376,13 @@ export const duplicateCustomTheme = async (
     const themeId = parseInt(req.params.id);
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (isNaN(themeId)) {
-      return res.status(400).json({ error: "Invalid theme ID" });
+      res.status(400).json({ error: "Invalid theme ID" });
+      return;
     }
 
     // Get original theme
@@ -375,7 +394,8 @@ export const duplicateCustomTheme = async (
     });
 
     if (!original) {
-      return res.status(404).json({ error: "Theme not found" });
+      res.status(404).json({ error: "Theme not found" });
+      return;
     }
 
     // Generate unique name

@@ -27,20 +27,21 @@ export async function incrementImageOCounter(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!imageId) {
-      return res.status(400).json({ error: "Missing required field: imageId" });
+      res.status(400).json({ error: "Missing required field: imageId" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user settings for syncToStash, and the image's instance if this
@@ -54,11 +55,13 @@ export async function incrementImageOCounter(
     ]);
 
     if (!user) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Image not found" });
+      res.status(404).json({ error: "Image not found" });
+      return;
     }
 
     const now = new Date();
@@ -125,20 +128,21 @@ export async function recordImageView(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!imageId) {
-      return res.status(400).json({ error: "Missing required field: imageId" });
+      res.status(400).json({ error: "Missing required field: imageId" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // The image's instance, if this user can see it
@@ -150,7 +154,8 @@ export async function recordImageView(
     );
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Image not found" });
+      res.status(404).json({ error: "Image not found" });
+      return;
     }
 
     const now = new Date();
@@ -212,13 +217,13 @@ export async function getImageViewHistory(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     if (!imageId) {
-      return res
-        .status(400)
-        .json({ error: "Missing required parameter: imageId" });
+      res.status(400).json({ error: "Missing required parameter: imageId" });
+      return;
     }
 
     // Get image instanceId (prefer frontend-provided, fall back to auto-lookup)
@@ -230,11 +235,12 @@ export async function getImageViewHistory(
     });
 
     if (!viewHistory) {
-      return res.json({
+      res.json({
         exists: false,
         viewCount: 0,
         oCount: 0,
       });
+      return;
     }
 
     res.json({

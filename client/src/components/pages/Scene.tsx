@@ -95,6 +95,7 @@ const SceneContent = () => {
         return () => clearTimeout(timer);
       }
     }
+    return undefined;
   }, [scene?.id, searchParams]);
 
   // Measure left column height and sync to sidebar

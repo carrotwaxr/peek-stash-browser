@@ -49,6 +49,7 @@ const SceneCarousel = ({
       container.addEventListener("scroll", checkScrollButtons);
       return () => container.removeEventListener("scroll", checkScrollButtons);
     }
+    return undefined;
   }, [scenes]);
 
   const scrollLeft = () => {

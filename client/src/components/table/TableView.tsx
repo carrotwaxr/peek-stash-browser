@@ -80,6 +80,7 @@ const TableView = ({
         window.removeEventListener("resize", checkScrollState);
       };
     }
+    return undefined;
   }, [checkScrollState, columns]);
 
   /**

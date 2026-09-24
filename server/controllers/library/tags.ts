@@ -131,7 +131,7 @@ export const findTags = async (
         matchCount: tags.length,
         instances: tags.map((t) => t.instanceId),
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple tags found with ID ${ids[0]}. Specify instance_id parameter.`,
         matches: tags.map((t) => ({
@@ -140,6 +140,7 @@ export const findTags = async (
           instanceId: t.instanceId,
         })),
       });
+      return;
     }
 
     // For single-entity requests (detail pages), get tag with computed counts
@@ -687,7 +688,8 @@ export const findTagsForScenes = async (
     const tagIds = new Set(tagIdResults.map((r) => r.tagId));
 
     if (tagIds.size === 0) {
-      return res.json({ tags: [] });
+      res.json({ tags: [] });
+      return;
     }
 
     // Get all tags to build hierarchy

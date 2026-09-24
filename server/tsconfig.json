@@ -13,6 +13,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
     "paths": {
       "@peek/shared-types": ["../shared/dist/index.d.ts"],
       "@peek/shared-types/*": ["../shared/dist/*"]

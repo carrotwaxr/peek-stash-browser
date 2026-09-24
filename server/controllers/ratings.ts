@@ -55,34 +55,37 @@ export async function updateSceneRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!sceneId) {
-      return res.status(400).json({ error: "Missing sceneId" });
+      res.status(400).json({ error: "Missing sceneId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the scene's instance, if this user can see it
@@ -95,7 +98,8 @@ export async function updateSceneRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Scene not found" });
+      res.status(404).json({ error: "Scene not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -167,34 +171,37 @@ export async function updatePerformerRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!performerId) {
-      return res.status(400).json({ error: "Missing performerId" });
+      res.status(400).json({ error: "Missing performerId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the performer's instance, if this user can see it
@@ -212,7 +219,8 @@ export async function updatePerformerRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Performer not found" });
+      res.status(404).json({ error: "Performer not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -290,34 +298,37 @@ export async function updateStudioRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!studioId) {
-      return res.status(400).json({ error: "Missing studioId" });
+      res.status(400).json({ error: "Missing studioId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the studio's instance, if this user can see it
@@ -335,7 +346,8 @@ export async function updateStudioRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Studio not found" });
+      res.status(404).json({ error: "Studio not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -413,34 +425,37 @@ export async function updateTagRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!tagId) {
-      return res.status(400).json({ error: "Missing tagId" });
+      res.status(400).json({ error: "Missing tagId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the tag's instance, if this user can see it
@@ -453,7 +468,8 @@ export async function updateTagRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Tag not found" });
+      res.status(404).json({ error: "Tag not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -524,34 +540,37 @@ export async function updateGalleryRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!galleryId) {
-      return res.status(400).json({ error: "Missing galleryId" });
+      res.status(400).json({ error: "Missing galleryId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the gallery's instance, if this user can see it
@@ -569,7 +588,8 @@ export async function updateGalleryRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Gallery not found" });
+      res.status(404).json({ error: "Gallery not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -645,34 +665,37 @@ export async function updateGroupRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!groupId) {
-      return res.status(400).json({ error: "Missing groupId" });
+      res.status(400).json({ error: "Missing groupId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the group's instance, if this user can see it
@@ -685,7 +708,8 @@ export async function updateGroupRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Group not found" });
+      res.status(404).json({ error: "Group not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB
@@ -756,34 +780,37 @@ export async function updateImageRating(
     const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     if (!imageId) {
-      return res.status(400).json({ error: "Missing imageId" });
+      res.status(400).json({ error: "Missing imageId" });
+      return;
     }
 
     // Validate rating if provided
     if (rating !== undefined && rating !== null) {
       if (typeof rating !== "number" || rating < 0 || rating > 100) {
-        return res
+        res
           .status(400)
           .json({ error: "Rating must be a number between 0 and 100" });
+        return;
       }
     }
 
     // Validate favorite if provided
     if (favorite !== undefined && typeof favorite !== "boolean") {
-      return res.status(400).json({ error: "Favorite must be a boolean" });
+      res.status(400).json({ error: "Favorite must be a boolean" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user sync settings and the image's instance, if this user can see it
@@ -796,7 +823,8 @@ export async function updateImageRating(
     ]);
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Image not found" });
+      res.status(404).json({ error: "Image not found" });
+      return;
     }
 
     // Upsert rating record in Peek DB

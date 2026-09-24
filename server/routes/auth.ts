@@ -32,9 +32,8 @@ router.post("/login", authRateLimiter, async (req, res) => {
     };
 
     if (!username || !password) {
-      return res
-        .status(400)
-        .json({ error: "Username and password are required" });
+      res.status(400).json({ error: "Username and password are required" });
+      return;
     }
 
     // Lockout is per username and client address
@@ -47,10 +46,11 @@ router.post("/login", authRateLimiter, async (req, res) => {
         (lockoutStatus.remainingMs || 0) / 1000
       );
       res.setHeader("Retry-After", retryAfterSeconds.toString());
-      return res.status(423).json({
+      res.status(423).json({
         error: "Account temporarily locked due to too many failed attempts",
         retryAfterSeconds,
       });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -67,13 +67,15 @@ router.post("/login", authRateLimiter, async (req, res) => {
 
     if (!user) {
       recordFailedAttempt(username, clientIp);
-      return res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       recordFailedAttempt(username, clientIp);
-      return res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
     }
 
     // Clear failed attempts on successful login
@@ -151,7 +153,8 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
     const { username } = req.body as { username: string };
 
     if (!username) {
-      return res.status(400).json({ error: "Username is required" });
+      res.status(400).json({ error: "Username is required" });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -161,7 +164,8 @@ router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
 
     if (!user) {
       // Don't reveal if user exists
-      return res.json({ hasRecoveryKey: false });
+      res.json({ hasRecoveryKey: false });
+      return;
     }
 
     res.json({ hasRecoveryKey: !!user.recoveryKeyHash });
@@ -183,14 +187,14 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
     };
 
     if (!username || !recoveryKey || !newPassword) {
-      return res.status(400).json({ error: "All fields are required" });
+      res.status(400).json({ error: "All fields are required" });
+      return;
     }
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res
-        .status(400)
-        .json({ error: passwordValidation.errors.join(". ") });
+      res.status(400).json({ error: passwordValidation.errors.join(". ") });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -203,9 +207,8 @@ router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
       !user?.recoveryKeyHash ||
       !recoveryKeyMatches(recoveryKey, user.recoveryKeyHash)
     ) {
-      return res
-        .status(401)
-        .json({ error: "Invalid username or recovery key" });
+      res.status(401).json({ error: "Invalid username or recovery key" });
+      return;
     }
 
     // Also signs out every existing session of this user

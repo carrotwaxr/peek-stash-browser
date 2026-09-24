@@ -68,6 +68,7 @@ const EntityMenu = ({ entityType, entityId, entityName, onHide }: Props) => {
       window.addEventListener("scroll", handleScroll, true);
       return () => window.removeEventListener("scroll", handleScroll, true);
     }
+    return undefined;
   }, [isOpen]);
 
   const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {

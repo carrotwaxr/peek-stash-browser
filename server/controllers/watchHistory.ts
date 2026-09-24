@@ -53,22 +53,23 @@ export async function pingWatchHistory(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!sceneId || typeof currentTime !== "number") {
-      return res
+      res
         .status(400)
         .json({ error: "Missing required fields: sceneId, currentTime" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     logger.info("Watch history ping", {
@@ -89,11 +90,13 @@ export async function pingWatchHistory(
     ]);
 
     if (!user) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Scene not found" });
+      res.status(404).json({ error: "Scene not found" });
+      return;
     }
 
     // Scene duration from the cache, on the resolved instance
@@ -363,20 +366,21 @@ export async function incrementOCounter(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!sceneId) {
-      return res.status(400).json({ error: "Missing required field: sceneId" });
+      res.status(400).json({ error: "Missing required field: sceneId" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     // Get user settings for syncToStash, and the scene's instance if this
@@ -390,11 +394,13 @@ export async function incrementOCounter(
     ]);
 
     if (!user) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Scene not found" });
+      res.status(404).json({ error: "Scene not found" });
+      return;
     }
 
     const now = new Date();
@@ -488,13 +494,13 @@ export async function getWatchHistory(
     const userId = req.user?.id;
 
     if (!sceneId) {
-      return res
-        .status(400)
-        .json({ error: "Missing required parameter: sceneId" });
+      res.status(400).json({ error: "Missing required parameter: sceneId" });
+      return;
     }
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     // Get scene instanceId
@@ -505,12 +511,13 @@ export async function getWatchHistory(
     });
 
     if (!watchHistory) {
-      return res.json({
+      res.json({
         exists: false,
         resumeTime: null,
         playCount: 0,
         oCount: 0,
       });
+      return;
     }
 
     // Parse JSON fields
@@ -563,7 +570,8 @@ export async function getAllWatchHistory(
     const onlyInProgress = req.query.inProgress === "true";
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     const where: { userId: number; resumeTime?: { not: null } } = { userId };
@@ -610,7 +618,8 @@ export async function clearAllWatchHistory(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     logger.info("Clearing all watch history and stats", { userId });
@@ -674,20 +683,21 @@ export async function saveActivity(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!sceneId) {
-      return res.status(400).json({ error: "Missing required field: sceneId" });
+      res.status(400).json({ error: "Missing required field: sceneId" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     logger.info("Save activity", {
@@ -708,11 +718,13 @@ export async function saveActivity(
     ]);
 
     if (!user) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Scene not found" });
+      res.status(404).json({ error: "Scene not found" });
+      return;
     }
 
     const now = new Date();
@@ -794,20 +806,21 @@ export async function incrementPlayCount(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!sceneId) {
-      return res.status(400).json({ error: "Missing required field: sceneId" });
+      res.status(400).json({ error: "Missing required field: sceneId" });
+      return;
     }
 
     if (
       requestInstanceId !== undefined &&
       (typeof requestInstanceId !== "string" || requestInstanceId === "")
     ) {
-      return res
-        .status(400)
-        .json({ error: "instanceId must be a non-empty string" });
+      res.status(400).json({ error: "instanceId must be a non-empty string" });
+      return;
     }
 
     logger.info("Increment play count", { userId, sceneId });
@@ -823,11 +836,13 @@ export async function incrementPlayCount(
     ]);
 
     if (!user) {
-      return res.status(401).json({ error: "User not found" });
+      res.status(401).json({ error: "User not found" });
+      return;
     }
 
     if (!instanceId) {
-      return res.status(404).json({ error: "Scene not found" });
+      res.status(404).json({ error: "Scene not found" });
+      return;
     }
 
     const now = new Date();

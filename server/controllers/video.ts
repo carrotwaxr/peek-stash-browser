@@ -280,7 +280,8 @@ export const proxyStashStream = async (
       !isAllowedStreamPath(streamPath, subPath) ||
       !isValidOptionalInstanceId(instanceId)
     ) {
-      return res.status(400).send("Invalid stream path");
+      res.status(400).send("Invalid stream path");
+      return;
     }
 
     if (
@@ -290,7 +291,8 @@ export const proxyStashStream = async (
         instanceId
       ))
     ) {
-      return res.status(404).send("Not found");
+      res.status(404).send("Not found");
+      return;
     }
 
     // Combine path segments if subPath exists (for HLS segments like stream.m3u8/0.ts)
@@ -315,7 +317,8 @@ export const proxyStashStream = async (
         error,
         instanceId,
       });
-      return res.status(500).send("Stash not configured");
+      res.status(500).send("Stash not configured");
+      return;
     }
 
     const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? "?" + queryString : ""}`;
@@ -345,9 +348,10 @@ export const proxyStashStream = async (
       logger.warn(
         `[PROXY] Stash returned ${response.status} for scene=${sceneId} ${fullStreamPath}`
       );
-      return res
+      res
         .status(response.status)
         .send(`Stash stream error: ${response.statusText}`);
+      return;
     }
 
     // Check if this is an HLS playlist that needs URL rewriting
@@ -400,7 +404,8 @@ export const proxyStashStream = async (
         logger.warn(
           `[PROXY] Refused a DASH manifest that names apikey: scene=${sceneId} ${fullStreamPath}`
         );
-        return res.status(502).send("Stash stream error");
+        res.status(502).send("Stash stream error");
+        return;
       }
       res.setHeader("content-type", contentType || "application/dash+xml");
       res.send(manifest);
@@ -460,7 +465,8 @@ export const getCaption = async (
     const { lang, type, instanceId } = req.query;
 
     if (!lang || !type) {
-      return res.status(400).send("Missing lang or type parameter");
+      res.status(400).send("Missing lang or type parameter");
+      return;
     }
 
     if (
@@ -470,7 +476,8 @@ export const getCaption = async (
       !isAllowedCaption(lang, type) ||
       !isValidOptionalInstanceId(instanceId)
     ) {
-      return res.status(400).send("Invalid caption parameters");
+      res.status(400).send("Invalid caption parameters");
+      return;
     }
 
     if (
@@ -480,7 +487,8 @@ export const getCaption = async (
         instanceId
       ))
     ) {
-      return res.status(404).send("Not found");
+      res.status(404).send("Not found");
+      return;
     }
 
     logger.debug(
@@ -500,7 +508,8 @@ export const getCaption = async (
         error,
         instanceId,
       });
-      return res.status(500).send("Stash configuration missing");
+      res.status(500).send("Stash configuration missing");
+      return;
     }
 
     // Construct Stash caption URL
@@ -520,7 +529,8 @@ export const getCaption = async (
       logger.warn(
         `[CAPTION] Stash returned ${response.status} for scene ${sceneId}`
       );
-      return res.status(response.status).send("Caption not found");
+      res.status(response.status).send("Caption not found");
+      return;
     }
 
     const captionData = await response.text();
@@ -569,11 +579,13 @@ export const createExternalPlayerLink = async (
     typeof instanceId !== "string" ||
     !INSTANCE_ID_PATTERN.test(instanceId)
   ) {
-    return res.status(400).json({ error: "Invalid scene or instance" });
+    res.status(400).json({ error: "Invalid scene or instance" });
+    return;
   }
 
   if (!(await canUserAccessEntity(req.user.id, "scene", sceneId, instanceId))) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   const user = await prisma.user.findUnique({
@@ -581,7 +593,8 @@ export const createExternalPlayerLink = async (
     select: { passwordChangedAt: true },
   });
   if (!user) {
-    return res.status(401).json({ error: "Session expired" });
+    res.status(401).json({ error: "Session expired" });
+    return;
   }
 
   const exp = Math.floor(Date.now() / 1000) + STREAM_LINK_TTL_SECONDS;

@@ -247,10 +247,12 @@ export const proxyScenePreview = async (
   const { instanceId } = req.query;
 
   if (!id) {
-    return res.status(400).json({ error: "Missing scene ID" });
+    res.status(400).json({ error: "Missing scene ID" });
+    return;
   }
   if (!SCENE_ID_PATTERN.test(id)) {
-    return res.status(400).json({ error: "Invalid scene ID" });
+    res.status(400).json({ error: "Invalid scene ID" });
+    return;
   }
 
   // Get scene from database to find its stashInstanceId
@@ -260,7 +262,8 @@ export const proxyScenePreview = async (
   });
 
   if (!scene) {
-    return res.status(404).json({ error: "Scene not found" });
+    res.status(404).json({ error: "Scene not found" });
+    return;
   }
 
   // The check uses the row actually served
@@ -272,7 +275,8 @@ export const proxyScenePreview = async (
       scene.stashInstanceId
     ))
   ) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   let stashUrl: string;
@@ -287,7 +291,8 @@ export const proxyScenePreview = async (
       error,
       instanceId: scene.stashInstanceId,
     });
-    return res.status(500).json({ error: "Stash configuration missing" });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return;
   }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
@@ -330,10 +335,12 @@ export const proxySceneWebp = async (
   const { instanceId } = req.query;
 
   if (!id) {
-    return res.status(400).json({ error: "Missing scene ID" });
+    res.status(400).json({ error: "Missing scene ID" });
+    return;
   }
   if (!SCENE_ID_PATTERN.test(id)) {
-    return res.status(400).json({ error: "Invalid scene ID" });
+    res.status(400).json({ error: "Invalid scene ID" });
+    return;
   }
 
   // Get scene from database to find its stashInstanceId
@@ -343,7 +350,8 @@ export const proxySceneWebp = async (
   });
 
   if (!scene) {
-    return res.status(404).json({ error: "Scene not found" });
+    res.status(404).json({ error: "Scene not found" });
+    return;
   }
 
   if (
@@ -354,7 +362,8 @@ export const proxySceneWebp = async (
       scene.stashInstanceId
     ))
   ) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   let stashUrl: string;
@@ -369,7 +378,8 @@ export const proxySceneWebp = async (
       error,
       instanceId: scene.stashInstanceId,
     });
-    return res.status(500).json({ error: "Stash configuration missing" });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return;
   }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
@@ -420,23 +430,27 @@ export const proxyStashMedia = async (
   const { path, instanceId } = req.query;
 
   if (!path || typeof path !== "string") {
-    return res.status(400).json({ error: "Missing or invalid path parameter" });
+    res.status(400).json({ error: "Missing or invalid path parameter" });
+    return;
   }
 
   const target = parseStashMediaPath(path);
   if (!target) {
-    return res.status(400).json({ error: "Invalid path parameter" });
+    res.status(400).json({ error: "Invalid path parameter" });
+    return;
   }
 
   if (
     instanceId !== undefined &&
     (typeof instanceId !== "string" || !INSTANCE_ID_PATTERN.test(instanceId))
   ) {
-    return res.status(400).json({ error: "Invalid instanceId parameter" });
+    res.status(400).json({ error: "Invalid instanceId parameter" });
+    return;
   }
 
   if (!(await canUserLoadMedia(req.user.id, target.entities, instanceId))) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   let stashUrl: string;
@@ -451,7 +465,8 @@ export const proxyStashMedia = async (
       error,
       instanceId,
     });
-    return res.status(500).json({ error: "Stash configuration missing" });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return;
   }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
@@ -502,7 +517,8 @@ export const proxyClipPreview = async (
   const { instanceId } = req.query;
 
   if (!id) {
-    return res.status(400).json({ error: "Missing clip ID" });
+    res.status(400).json({ error: "Missing clip ID" });
+    return;
   }
 
   // Get clip from database - include stashInstanceId for routing
@@ -512,20 +528,23 @@ export const proxyClipPreview = async (
   });
 
   if (!clip) {
-    return res.status(404).json({ error: "Clip preview not found" });
+    res.status(404).json({ error: "Clip preview not found" });
+    return;
   }
 
   if (
     !(await canUserAccessEntity(req.user.id, "clip", id, clip.stashInstanceId))
   ) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   // Use streamPath (video) if available, otherwise screenshotPath (image)
   const mediaPath = clip.streamPath || clip.screenshotPath;
 
   if (!mediaPath) {
-    return res.status(404).json({ error: "Clip preview not found" });
+    res.status(404).json({ error: "Clip preview not found" });
+    return;
   }
 
   let apiKey: string;
@@ -538,7 +557,8 @@ export const proxyClipPreview = async (
       error,
       instanceId: clip.stashInstanceId,
     });
-    return res.status(500).json({ error: "Stash configuration missing" });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return;
   }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
@@ -586,17 +606,20 @@ export const proxyImage = async (
   const { instanceId } = req.query;
 
   if (!imageId) {
-    return res.status(400).json({ error: "Missing image ID" });
+    res.status(400).json({ error: "Missing image ID" });
+    return;
   }
   if (!SCENE_ID_PATTERN.test(imageId)) {
-    return res.status(400).json({ error: "Invalid image ID" });
+    res.status(400).json({ error: "Invalid image ID" });
+    return;
   }
 
   const validTypes = ["thumbnail", "preview", "image"];
   if (!type || !validTypes.includes(type)) {
-    return res.status(400).json({
+    res.status(400).json({
       error: "Invalid image type. Must be: thumbnail, preview, or image",
     });
+    return;
   }
 
   // Get image from database - include stashInstanceId for routing
@@ -611,7 +634,8 @@ export const proxyImage = async (
   });
 
   if (!image) {
-    return res.status(404).json({ error: "Image not found" });
+    res.status(404).json({ error: "Image not found" });
+    return;
   }
 
   if (
@@ -622,7 +646,8 @@ export const proxyImage = async (
       image.stashInstanceId
     ))
   ) {
-    return res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: "Not found" });
+    return;
   }
 
   // Get the appropriate path
@@ -634,7 +659,8 @@ export const proxyImage = async (
   const stashPath = pathMap[type];
 
   if (!stashPath) {
-    return res.status(404).json({ error: `Image ${type} path not available` });
+    res.status(404).json({ error: `Image ${type} path not available` });
+    return;
   }
 
   let stashUrl: string;
@@ -649,7 +675,8 @@ export const proxyImage = async (
       error,
       instanceId: image.stashInstanceId,
     });
-    return res.status(500).json({ error: "Stash configuration missing" });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return;
   }
 
   // Nothing to send to a browser that has moved on; skip the queue entirely

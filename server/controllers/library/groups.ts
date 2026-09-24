@@ -212,7 +212,7 @@ export const findGroups = async (
         matchCount: groups.length,
         instances: groups.map((g) => g.instanceId),
       });
-      return res.status(400).json({
+      res.status(400).json({
         error: "Ambiguous lookup",
         message: `Multiple groups found with ID ${ids[0]}. Specify instance_id parameter.`,
         matches: groups.map((g) => ({
@@ -221,6 +221,7 @@ export const findGroups = async (
           instanceId: g.instanceId,
         })),
       });
+      return;
     }
 
     // For single-entity requests (detail pages), get group with computed counts
@@ -306,9 +307,10 @@ export const findGroupsMinimal = async (
 
     if (groups.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
-      return res.json({
+      res.json({
         groups: [],
       });
+      return;
     }
 
     // Step 2: Merge with user data (for favorites)

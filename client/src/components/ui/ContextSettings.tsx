@@ -79,6 +79,7 @@ const ContextSettings = ({
       document.addEventListener("mouseup", handleClickOutside);
       return () => document.removeEventListener("mouseup", handleClickOutside);
     }
+    return undefined;
   }, [isOpen]);
 
   // Close on Escape key
@@ -93,6 +94,7 @@ const ContextSettings = ({
       document.addEventListener("keydown", handleKeyDown);
       return () => document.removeEventListener("keydown", handleKeyDown);
     }
+    return undefined;
   }, [isOpen]);
 
   const handleSettingChange = useCallback(

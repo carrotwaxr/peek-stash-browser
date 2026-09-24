@@ -28,10 +28,11 @@ router.post(
     try {
       const userId = parseInt(req.params.userId as string, 10);
       if (isNaN(userId)) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Invalid user ID",
           message: "User ID must be a number",
         });
+        return;
       }
 
       // Check if user exists
@@ -40,10 +41,11 @@ router.post(
         select: { id: true },
       });
       if (!user) {
-        return res.status(404).json({
+        res.status(404).json({
           error: "User not found",
           message: `No user with ID ${userId}`,
         });
+        return;
       }
 
       await exclusionComputationService.recomputeForUser(userId);

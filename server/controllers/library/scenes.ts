@@ -939,7 +939,8 @@ export const findScenes = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const { filter, scene_filter, ids } = req.body;
@@ -1008,7 +1009,7 @@ export const findScenes = async (
           matchCount: result.scenes.length,
           instances: result.scenes.map((s) => s.instanceId),
         });
-        return res.status(400).json({
+        res.status(400).json({
           error: "Ambiguous lookup",
           message: `Multiple scenes found with ID ${ids[0]}. Specify instance_id parameter.`,
           matches: result.scenes.map((s) => ({
@@ -1017,6 +1018,7 @@ export const findScenes = async (
             instanceId: s.instanceId,
           })),
         });
+        return;
       }
 
       // Add streamability info
@@ -1042,12 +1044,13 @@ export const findScenes = async (
         total: result.total,
       });
 
-      return res.json({
+      res.json({
         findScenes: {
           count: result.total,
           scenes,
         },
       });
+      return;
     }
 
     // Check if we can use the FAST PATH (pure DB pagination)
@@ -1124,12 +1127,13 @@ export const findScenes = async (
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (FAST PATH)`
       );
 
-      return res.json({
+      res.json({
         findScenes: {
           count: total,
           scenes: scenesWithStreamability,
         },
       });
+      return;
     }
 
     // STANDARD PATH: Load all scenes and filter in memory
@@ -1153,12 +1157,13 @@ export const findScenes = async (
 
     if (scenes.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
-      return res.json({
+      res.json({
         findScenes: {
           count: 0,
           scenes: [],
         },
       });
+      return;
     }
 
     // Apply pre-computed exclusions immediately (instance-aware filtering)
@@ -1262,7 +1267,7 @@ export const findScenes = async (
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (expensive pipeline)`
       );
 
-      return res.json({
+      res.json({
         findScenes: {
           count: total,
           scenes: scenesWithStreamability,
@@ -1345,7 +1350,7 @@ export const findScenes = async (
         `findScenes: TOTAL request took ${Date.now() - requestStart}ms (optimized pipeline)`
       );
 
-      return res.json({
+      res.json({
         findScenes: {
           count: total,
           scenes: scenesWithStreamability,
@@ -1389,7 +1394,8 @@ export const findSimilarScenes = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     // Get pre-computed scene exclusions for this user
@@ -1408,12 +1414,13 @@ export const findSimilarScenes = async (
 
     // Empty result if no candidates found
     if (candidates.length === 0) {
-      return res.json({
+      res.json({
         scenes: [],
         count: 0,
         page,
         perPage,
       });
+      return;
     }
 
     // Paginate candidate IDs (already sorted by weight desc, date desc from SQL)
@@ -1423,12 +1430,13 @@ export const findSimilarScenes = async (
       .map((c) => c.sceneId);
 
     if (paginatedIds.length === 0) {
-      return res.json({
+      res.json({
         scenes: [],
         count: candidates.length,
         page,
         perPage,
       });
+      return;
     }
 
     // Get user's allowed instance IDs for multi-instance filtering
@@ -1490,7 +1498,8 @@ export const getRecommendedScenes = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+      res.status(401).json({ error: "User not authenticated" });
+      return;
     }
 
     // Fetch user ratings, watch history, engagement rankings, and lightweight scoring data in parallel
@@ -1590,7 +1599,7 @@ export const getRecommendedScenes = async (
 
     // Check if user has any criteria (now includes scenes)
     if (!hasAnyCriteria(criteriaCounts)) {
-      return res.json({
+      res.json({
         scenes: [],
         count: 0,
         page,
@@ -1598,6 +1607,7 @@ export const getRecommendedScenes = async (
         message: "No recommendations yet",
         criteria: criteriaCounts,
       });
+      return;
     }
 
     // Build watch history map
@@ -1771,7 +1781,7 @@ export const getRecommendedScenes = async (
 
     // If no recommendations after scoring, include criteria for feedback
     if (cappedScenes.length === 0) {
-      return res.json({
+      res.json({
         scenes: [],
         count: 0,
         page,
@@ -1779,6 +1789,7 @@ export const getRecommendedScenes = async (
         message: "No matching recommendations found",
         criteria: criteriaCounts,
       });
+      return;
     }
 
     // Paginate scene IDs

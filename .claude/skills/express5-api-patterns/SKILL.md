@@ -84,6 +84,7 @@ router.put("/scene/:sceneId", authenticated(updateSceneRating));
 
 - Errors are `{ error: string }`, optionally with `message` and `details` (`ApiErrorResponse`). `sendError`, `sendSuccess`, `sendCreated` and `sendNoContent` in `server/utils/responses.ts` produce these shapes; controllers adopt them as they're touched.
 - A 503 with `ready: false` means the cache is still warming (`requireCacheReady`). The client shows its initializing state for it.
+- Handlers and middleware never return the response: send it, then `return;` on its own line (`res.status(404).json({ error: "Not found" }); return;`). `noImplicitReturns` rejects a handler that returns `res` on some paths and falls off the end on others; older handlers that `return res` on every path move to this form when touched.
 
 ## 5. Middleware order (`server/initializers/api.ts`)
 

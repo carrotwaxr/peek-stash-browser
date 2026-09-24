@@ -640,6 +640,7 @@ const SearchControls = ({
       }, 1500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [highlightedFilterKey]);
 
   // Handle loading a saved preset

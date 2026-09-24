@@ -181,6 +181,7 @@ export default function ExternalPlayerButton({
       window.addEventListener("scroll", handleScroll, true);
       return () => window.removeEventListener("scroll", handleScroll, true);
     }
+    return undefined;
   }, [isDropdownOpen]);
 
   // Don't render if no sceneId provided, or the scene is not this user's to play

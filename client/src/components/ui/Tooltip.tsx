@@ -154,6 +154,7 @@ const Tooltip = ({
       const timer = setTimeout(calculatePosition, 0);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isVisible, calculatePosition]);
 
   // Reposition tooltip on window resize or scroll
