@@ -3,6 +3,7 @@ import prisma from "../../prisma/singleton.js";
 import {
   formatRecoveryKey,
   generateRecoveryKey,
+  hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
@@ -181,6 +182,53 @@ describe("Session end and recovery keys", () => {
       {
         username: USERNAME,
         recoveryKey: formatRecoveryKey(legacyKey),
+        newPassword,
+      }
+    );
+    expect(reset.status).toBe(200);
+    password = newPassword;
+  });
+
+  it("a key 3.3.6 wrote to recoveryKey after a downgrade replaces the hash and resets the password", async () => {
+    // 3.3.6 generates a plaintext key at sign-in and stores it in recoveryKey,
+    // leaving the older hash in recoveryKeyHash
+    const oldKey = generateRecoveryKey();
+    const downgradeKey = generateRecoveryKey();
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        recoveryKeyHash: hashRecoveryKey(oldKey),
+        recoveryKey: downgradeKey,
+      },
+    });
+
+    const { hashLegacyRecoveryKeys } =
+      await import("../../initializers/recoveryKeys.js");
+    expect(await hashLegacyRecoveryKeys()).toBeGreaterThanOrEqual(1);
+
+    const stored = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { recoveryKey: true, recoveryKeyHash: true },
+    });
+    expect(stored).toEqual({
+      recoveryKey: null,
+      recoveryKeyHash: hashRecoveryKey(downgradeKey),
+    });
+    // Idempotent: a second run leaves the row alone
+    await hashLegacyRecoveryKeys();
+    expect(
+      await prisma.user.findUnique({
+        where: { id: userId },
+        select: { recoveryKey: true, recoveryKeyHash: true },
+      })
+    ).toEqual(stored);
+
+    const newPassword = nextPassword();
+    const reset = await new TestClient().post(
+      "/api/auth/forgot-password/reset",
+      {
+        username: USERNAME,
+        recoveryKey: formatRecoveryKey(downgradeKey),
         newPassword,
       }
     );

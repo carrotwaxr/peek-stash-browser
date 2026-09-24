@@ -72,6 +72,7 @@ model User {
 
   // Recovery key for password reset
   recoveryKeyHash   String? // SHA-256 hex of the normalized key; the key is shown once
+  recoveryKey       String? // unused since 3.3.7; kept for downgrade to 3.3.6; never read except by hashLegacyRecoveryKeys
   passwordChangedAt DateTime? // set by setUserPassword(); tokens issued earlier are rejected
 
   // Group memberships relation

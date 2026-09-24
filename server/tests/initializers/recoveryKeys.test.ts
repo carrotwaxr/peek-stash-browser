@@ -30,8 +30,8 @@ describe("hashLegacyRecoveryKeys", () => {
   it("hashLegacyRecoveryKeys hashes plaintext keys and leaves hashes alone", async () => {
     const legacyKey = "ABCDEFGHJKMNPQRSTUVWXYZ23456";
     mockPrisma.user.findMany.mockResolvedValue([
-      { id: 1, recoveryKeyHash: legacyKey },
-      { id: 2, recoveryKeyHash: "a".repeat(64) },
+      { id: 1, recoveryKey: null, recoveryKeyHash: legacyKey },
+      { id: 2, recoveryKey: null, recoveryKeyHash: "a".repeat(64) },
     ] as any);
     mockPrisma.user.update.mockResolvedValue({} as any);
 
@@ -43,5 +43,40 @@ describe("hashLegacyRecoveryKeys", () => {
       where: { id: 1 },
       data: { recoveryKeyHash: hashRecoveryKey(legacyKey) },
     });
+  });
+
+  it("moves a plaintext key from the legacy recoveryKey column into recoveryKeyHash and clears it", async () => {
+    // A downgrade to 3.3.6 writes a new plaintext key to recoveryKey at
+    // sign-in; it is newer than any stored hash, so it wins
+    const downgradeKey = "ZYXWVUTSRQPNMKJHGFEDCBA65432";
+    mockPrisma.user.findMany.mockResolvedValue([
+      { id: 1, recoveryKey: downgradeKey, recoveryKeyHash: "b".repeat(64) },
+      { id: 2, recoveryKey: downgradeKey, recoveryKeyHash: null },
+      { id: 3, recoveryKey: null, recoveryKeyHash: "c".repeat(64) },
+    ] as any);
+    mockPrisma.user.update.mockResolvedValue({} as any);
+
+    const count = await hashLegacyRecoveryKeys();
+
+    expect(count).toBe(2);
+    expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { recoveryKey: { not: null } },
+          { recoveryKeyHash: { not: null } },
+        ],
+      },
+      select: { id: true, recoveryKey: true, recoveryKeyHash: true },
+    });
+    expect(mockPrisma.user.update).toHaveBeenCalledTimes(2);
+    for (const id of [1, 2]) {
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id },
+        data: {
+          recoveryKeyHash: hashRecoveryKey(downgradeKey),
+          recoveryKey: null,
+        },
+      });
+    }
   });
 });
