@@ -89,11 +89,19 @@ jobs:
         working-directory: shared
         run: npm ci && npm run build
 
+      - name: Provide integration test fixture
+        # testEntities.ts is gitignored (each developer's own Stash IDs); the
+        # example has the same keys, which is all type checking and lint need.
+        run: cp integration/fixtures/testEntities.example.ts integration/fixtures/testEntities.ts
+
       - name: Lint
         run: npm run lint
 
       - name: TypeScript Compile
         run: npx tsc --noEmit
+
+      - name: Type-check tests
+        run: npm run typecheck:tests
 
       - name: Test with coverage
         run: npm run test:coverage

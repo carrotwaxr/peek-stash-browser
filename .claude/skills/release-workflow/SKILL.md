@@ -26,7 +26,7 @@ Both `client/package.json` and `server/package.json` must always have identical 
 Run `/pre-release` to execute all checks:
 
 1. Server unit tests: `cd server && npm test`
-2. Server linting: `cd server && npm run lint`
+2. Server linting and type check: `cd server && npm run lint && npm run typecheck`
 3. Client unit tests: `cd client && npm test`
 4. Client linting: `cd client && npm run lint`
 5. Integration tests: `cd server && npm run test:integration`

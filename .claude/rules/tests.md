@@ -18,9 +18,12 @@ paths:
 
 ## Server unit (`server/tests/`)
 
-- Call `vi.mock("../../prisma/singleton.js", ...)` before importing the module under test, then use `vi.mocked(prisma)`.
+- Mock Prisma with `vi.mock("../../prisma/singleton.js", () => import("../helpers/prismaSingletonMock.js"))` before importing the module under test, then `const mockPrisma = vi.mocked(prisma, true)`. The mock (`tests/helpers/prismaMock.ts`) creates every model method as a `vi.fn()` typed against the real Prisma signature, and runs `$transaction` as Prisma does (an array with `Promise.all`, a callback with the mock). Files that still build their own Prisma factory move to it when touched.
+- Build rows with `partialRow({ ... })` from the same file: only the fields the test needs, typed as the full row inferred from where it goes (a mock's `mockResolvedValue`, say), so an unknown column, a wrong value type or a bad enum value does not compile. Use it instead of `as any` or `as unknown as`.
+- Other mocked modules: `vi.mocked(module, true)`, so their mocks carry the real types.
+- Index access the test relies on goes through `must()` from `tests/helpers/must.ts`, as in `must(result[0]).id` or `must(mock.calls[0])[0]`: a missing element fails with a message naming it, where `?.` inside `expect(...)` can pass silently.
 - Files run one at a time (`fileParallelism: false`).
-- `tsc` does not check these files, so a changed service signature leaves stale calls and mocks here without an error. Grep for them.
+- `tsconfig.tests.json` type-checks `tests/` and `integration/` with the source flags, `noUncheckedIndexedAccess` included, so a changed signature breaks stale calls and mocks here. `npm run typecheck` checks source, then tests; `npm run typecheck:tests` only the tests; plain `tsc --noEmit` skips them. CI runs `npm run typecheck:tests` in Server Checks. It needs `integration/fixtures/testEntities.ts`: copy `testEntities.example.ts` if you have none.
 
 ## Server integration (`server/integration/`)
 

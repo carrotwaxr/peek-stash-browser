@@ -12,7 +12,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - E2E: `npm run test:e2e` from the root, against the running compose stack
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
-- Types: `cd server && npx tsc --noEmit` and `cd client && npm run typecheck` (CI runs only the server one)
+- Types: `cd server && npm run typecheck` (source, then tests; the tests need `integration/fixtures/testEntities.ts`, as for Integration) and `cd client && npm run typecheck` (CI runs only the server one)
 - Build: `cd client && npm run build`
 - Release: `/pre-release`, then `/release-beta` or `/release-stable`
 
@@ -23,7 +23,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - Libraries reach 100k+ scenes. Filter and paginate in SQL; never load or loop over the whole library per request.
 - Migrations are written by hand (see `.claude/rules/prisma.md`). Never run `prisma migrate dev` or `prisma db push`.
 - Tests live in `client/tests/` and `server/tests/`, mirroring the source tree, never beside the source.
-- Server `tsc` excludes test files; client `typecheck` includes them. After changing a server signature, grep the server tests for its callers.
+- Server tests and `integration/` are type-checked by `server/tsconfig.tests.json` with the source flags (`npm run typecheck:tests`; plain `tsc` skips them). Client `typecheck` includes its tests. Mock Prisma in server tests with `tests/helpers/prismaMock.ts` (see `.claude/rules/tests.md`).
 - Releases push the version-bump commit straight to main and tag it. That is the only push to main without a pull request.
 - Rules for specific areas live in `.claude/rules/` and load with the files they cover. Plans and design docs go in `docs/plans/`, which is gitignored: they stay local.
 

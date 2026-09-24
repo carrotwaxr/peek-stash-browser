@@ -45,7 +45,7 @@ Expected: All tests pass
 ### 2b. Server Linter + Type Check
 ```bash
 cd server && npm run lint
-cd server && npx tsc --noEmit
+cd server && npm run typecheck
 ```
 Expected: No errors (warnings OK)
 

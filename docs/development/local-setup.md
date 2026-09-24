@@ -213,6 +213,18 @@ cd server && npm run format
 npm run lint
 ```
 
+### Type Check
+
+```bash
+# Server: source, then unit and integration tests (tsconfig.tests.json)
+cd server && npm run typecheck
+
+# Client: source and tests
+cd client && npm run typecheck
+```
+
+The server tests are checked with the same flags as the source. The check needs `server/integration/fixtures/testEntities.ts`; if you have none, copy it from `testEntities.example.ts` in the same folder. CI runs the server check.
+
 ## Building for Production
 
 ### Build Docker Image
