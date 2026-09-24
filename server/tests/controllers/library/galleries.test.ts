@@ -5,12 +5,14 @@
  * Note: mergeGalleriesWithUserData is private and tested indirectly through
  * the handlers.
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyGalleryFilters,
   findGalleries,
   findGalleriesMinimal,
 } from "../../../controllers/library/galleries.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -115,7 +117,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g3" }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        ids: { value: ["g1", "g3"], modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(["g1", "g3"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2);
       expect(result.map((g) => g.id)).toEqual(["g1", "g3"]);
@@ -137,7 +139,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g2", rating100: 30 }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        rating100: { modifier: "GREATER_THAN", value: 50 },
+        rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -150,7 +152,11 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g3", rating100: 20 }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        rating100: { modifier: "BETWEEN", value: 40, value2: 60 },
+        rating100: {
+          modifier: CriterionModifier.Between,
+          value: 40,
+          value2: 60,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -162,7 +168,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g2", image_count: 5 }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        image_count: { modifier: "GREATER_THAN", value: 50 },
+        image_count: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -174,7 +180,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g2", image_count: 20 }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        image_count: { modifier: "EQUALS", value: 10 },
+        image_count: { modifier: CriterionModifier.Equals, value: 10 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -186,7 +192,7 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g2", title: "Urban Shots" }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        title: { value: "beach", modifier: "INCLUDES" },
+        title: { value: "beach", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -205,7 +211,10 @@ describe("Galleries Controller", () => {
         createMockGallery({ id: "g3", studio: null }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        studios: { value: ["s1"] },
+        studios: {
+          value: coerceEntityRefs(["s1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -223,7 +232,10 @@ describe("Galleries Controller", () => {
         }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        performers: { value: ["p1"], modifier: "INCLUDES" },
+        performers: {
+          value: coerceEntityRefs(["p1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -241,7 +253,10 @@ describe("Galleries Controller", () => {
         }),
       ];
       const result = await applyGalleryFilters(galleries, {
-        tags: { value: ["t1"] },
+        tags: {
+          value: coerceEntityRefs(["t1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");

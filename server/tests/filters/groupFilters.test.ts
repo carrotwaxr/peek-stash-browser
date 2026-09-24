@@ -4,8 +4,10 @@
  *
  * Tests the group filters in controllers/library/groups.ts
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyGroupFilters } from "../../controllers/library/groups.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import {
   createMockGroup,
@@ -25,7 +27,10 @@ describe("Group Filters", () => {
   describe("ID Filter", () => {
     it("should filter groups by single ID", async () => {
       const filter: PeekGroupFilter = {
-        ids: { value: [mockGroups[0].id], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs([mockGroups[0].id]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -37,7 +42,7 @@ describe("Group Filters", () => {
     it("should filter groups by multiple IDs", async () => {
       const targetIds = [mockGroups[0].id, mockGroups[5].id, mockGroups[10].id];
       const filter: PeekGroupFilter = {
-        ids: { value: targetIds, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -50,7 +55,10 @@ describe("Group Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekGroupFilter = {
-        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs(["nonexistent-id"]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -110,8 +118,8 @@ describe("Group Filters", () => {
       const tagId = mockTags[0].id;
       const filter: PeekGroupFilter = {
         tags: {
-          value: [tagId],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([tagId]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -133,8 +141,8 @@ describe("Group Filters", () => {
       const tagIds = [mockTags[0].id, mockTags[1].id];
       const filter: PeekGroupFilter = {
         tags: {
-          value: tagIds,
-          modifier: "INCLUDES_ALL",
+          value: coerceEntityRefs(tagIds),
+          modifier: CriterionModifier.IncludesAll,
         },
       };
 
@@ -163,8 +171,8 @@ describe("Group Filters", () => {
       const tagId = mockTags[0].id;
       const filter: PeekGroupFilter = {
         tags: {
-          value: [tagId],
-          modifier: "EXCLUDES",
+          value: coerceEntityRefs([tagId]),
+          modifier: CriterionModifier.Excludes,
         },
       };
 
@@ -186,7 +194,7 @@ describe("Group Filters", () => {
       const filter: PeekGroupFilter = {
         tags: {
           value: [],
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -200,7 +208,10 @@ describe("Group Filters", () => {
     it("should filter by rating100 with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekGroupFilter = {
-        rating100: { value: threshold, modifier: "GREATER_THAN" },
+        rating100: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -214,7 +225,7 @@ describe("Group Filters", () => {
     it("should filter by rating100 with EQUALS modifier", async () => {
       const rating = 80;
       const filter: PeekGroupFilter = {
-        rating100: { value: rating, modifier: "EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -227,7 +238,7 @@ describe("Group Filters", () => {
     it("should filter by rating100 with NOT_EQUALS modifier", async () => {
       const rating = 0;
       const filter: PeekGroupFilter = {
-        rating100: { value: rating, modifier: "NOT_EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.NotEquals },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -241,7 +252,11 @@ describe("Group Filters", () => {
       const min = 20;
       const max = 80;
       const filter: PeekGroupFilter = {
-        rating100: { value: min, value2: max, modifier: "BETWEEN" },
+        rating100: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -258,7 +273,7 @@ describe("Group Filters", () => {
     it("should apply multiple filters together (AND logic)", async () => {
       const filter: PeekGroupFilter = {
         favorite: true,
-        rating100: { value: 60, modifier: "GREATER_THAN" },
+        rating100: { value: 60, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -287,7 +302,7 @@ describe("Group Filters", () => {
       const groupsWithNullRatings = mockGroups.filter((g) => !g.rating100);
 
       const filter: PeekGroupFilter = {
-        rating100: { value: 0, modifier: "GREATER_THAN" },
+        rating100: { value: 0, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyGroupFilters(groupsWithNullRatings, filter);
@@ -301,8 +316,8 @@ describe("Group Filters", () => {
 
       const filter: PeekGroupFilter = {
         tags: {
-          value: [mockTags[0].id],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([mockTags[0].id]),
+          modifier: CriterionModifier.Includes,
         },
       };
 

@@ -4,6 +4,7 @@
  * Tests mergeTagsWithUserData, applyTagFilters, findTags, findTagsMinimal
  * and findTagsForScenes.
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyTagFilters,
@@ -12,6 +13,7 @@ import {
   findTagsMinimal,
   mergeTagsWithUserData,
 } from "../../../controllers/library/tags.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -177,7 +179,7 @@ describe("Tags Controller", () => {
         createMockTag({ id: "t3" }),
       ];
       const result = await applyTagFilters(tags, {
-        ids: { value: ["t1", "t3"], modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(["t1", "t3"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2);
       expect(result.map((t) => t.id)).toEqual(["t1", "t3"]);
@@ -249,7 +251,7 @@ describe("Tags Controller", () => {
         createMockTag({ id: "t2", scene_count: 5 }),
       ];
       const result = await applyTagFilters(tags, {
-        scene_count: { modifier: "GREATER_THAN", value: 10 },
+        scene_count: { modifier: CriterionModifier.GreaterThan, value: 10 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t1");
@@ -261,7 +263,7 @@ describe("Tags Controller", () => {
         createMockTag({ id: "t2", name: "Comedy" }),
       ];
       const result = await applyTagFilters(tags, {
-        name: { value: "act", modifier: "INCLUDES" },
+        name: { value: "act", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t1");
@@ -273,7 +275,7 @@ describe("Tags Controller", () => {
         createMockTag({ id: "t2", description: "relaxing content" }),
       ];
       const result = await applyTagFilters(tags, {
-        description: { value: "energy", modifier: "INCLUDES" },
+        description: { value: "energy", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t1");
@@ -286,7 +288,7 @@ describe("Tags Controller", () => {
       ];
       const result = await applyTagFilters(tags, {
         created_at: {
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
           value: "2024-03-01T00:00:00Z",
         },
       });
@@ -300,7 +302,10 @@ describe("Tags Controller", () => {
         createMockTag({ id: "t2", updated_at: "2024-06-01T00:00:00Z" }),
       ];
       const result = await applyTagFilters(tags, {
-        updated_at: { modifier: "LESS_THAN", value: "2024-03-01T00:00:00Z" },
+        updated_at: {
+          modifier: CriterionModifier.LessThan,
+          value: "2024-03-01T00:00:00Z",
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t1");
@@ -317,7 +322,7 @@ describe("Tags Controller", () => {
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
-        performers: { value: ["p1"], modifier: "INCLUDES" },
+        performers: { value: coerceEntityRefs(["p1"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t1");
@@ -334,7 +339,7 @@ describe("Tags Controller", () => {
 
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
-        studios: { value: ["s1"], modifier: "INCLUDES" },
+        studios: { value: coerceEntityRefs(["s1"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("t2");
@@ -353,7 +358,10 @@ describe("Tags Controller", () => {
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         scenes_filter: {
-          id: { value: ["sc1"], modifier: "INCLUDES" },
+          id: {
+            value: coerceEntityRefs(["sc1"]),
+            modifier: CriterionModifier.Includes,
+          },
         },
       });
       expect(result).toHaveLength(1);
@@ -374,7 +382,10 @@ describe("Tags Controller", () => {
       const tags = [createMockTag({ id: "t1" }), createMockTag({ id: "t2" })];
       const result = await applyTagFilters(tags, {
         scenes_filter: {
-          groups: { value: ["g1"], modifier: "INCLUDES" },
+          groups: {
+            value: coerceEntityRefs(["g1"]),
+            modifier: CriterionModifier.Includes,
+          },
         },
       });
       expect(result).toHaveLength(1);

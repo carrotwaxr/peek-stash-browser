@@ -4,11 +4,13 @@
  * Tests the performer filtering implementation in controllers/library/performers.ts
  * Uses mock data to validate filter behavior without database dependency
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   applyPerformerFilters,
   parseCareerLength,
 } from "../../controllers/library/performers.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
@@ -33,7 +35,7 @@ describe("Performer Filters", () => {
     it("should filter performers by single ID", async () => {
       const targetId = mockPerformers[0].id;
       const filter: PeekPerformerFilter = {
-        ids: { value: [targetId], modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs([targetId]), modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -49,7 +51,7 @@ describe("Performer Filters", () => {
         mockPerformers[10].id,
       ];
       const filter: PeekPerformerFilter = {
-        ids: { value: targetIds, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -72,7 +74,10 @@ describe("Performer Filters", () => {
 
     it("should return empty array when no performers match the IDs", async () => {
       const filter: PeekPerformerFilter = {
-        ids: { value: ["non-existent-id"], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs(["non-existent-id"]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -120,7 +125,7 @@ describe("Performer Filters", () => {
   describe("Gender Filter", () => {
     it("should filter by gender with EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "FEMALE", modifier: "EQUALS" },
+        gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -132,7 +137,7 @@ describe("Performer Filters", () => {
 
     it("should filter by gender with NOT_EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "MALE", modifier: "NOT_EQUALS" },
+        gender: { value: "MALE", modifier: CriterionModifier.NotEquals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -144,7 +149,7 @@ describe("Performer Filters", () => {
 
     it("should filter non-binary performers", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "NON_BINARY", modifier: "EQUALS" },
+        gender: { value: "NON_BINARY", modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -173,8 +178,8 @@ describe("Performer Filters", () => {
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: [mockTags[0].id, mockTags[1].id],
-          modifier: "INCLUDES_ALL",
+          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          modifier: CriterionModifier.IncludesAll,
         },
       };
 
@@ -202,8 +207,8 @@ describe("Performer Filters", () => {
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: [mockTags[0].id, mockTags[1].id],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -231,8 +236,8 @@ describe("Performer Filters", () => {
 
       const filter: PeekPerformerFilter = {
         tags: {
-          value: [mockTags[0].id, mockTags[1].id],
-          modifier: "EXCLUDES",
+          value: coerceEntityRefs([mockTags[0].id, mockTags[1].id]),
+          modifier: CriterionModifier.Excludes,
         },
       };
 
@@ -247,7 +252,7 @@ describe("Performer Filters", () => {
       const filter: PeekPerformerFilter = {
         tags: {
           value: [],
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -261,7 +266,10 @@ describe("Performer Filters", () => {
     it("should filter by rating100 with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
-        rating100: { value: threshold, modifier: "GREATER_THAN" },
+        rating100: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -275,7 +283,7 @@ describe("Performer Filters", () => {
     it("should filter by rating100 with LESS_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
-        rating100: { value: threshold, modifier: "LESS_THAN" },
+        rating100: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -289,7 +297,7 @@ describe("Performer Filters", () => {
     it("should filter by rating100 with EQUALS modifier", async () => {
       const rating = 80;
       const filter: PeekPerformerFilter = {
-        rating100: { value: rating, modifier: "EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -302,7 +310,7 @@ describe("Performer Filters", () => {
     it("should filter by rating100 with NOT_EQUALS modifier", async () => {
       const rating = 0;
       const filter: PeekPerformerFilter = {
-        rating100: { value: rating, modifier: "NOT_EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.NotEquals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -316,7 +324,11 @@ describe("Performer Filters", () => {
       const min = 20;
       const max = 80;
       const filter: PeekPerformerFilter = {
-        rating100: { value: min, value2: max, modifier: "BETWEEN" },
+        rating100: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -333,7 +345,10 @@ describe("Performer Filters", () => {
     it("should filter by o_counter with GREATER_THAN modifier", async () => {
       const threshold = 10;
       const filter: PeekPerformerFilter = {
-        o_counter: { value: threshold, modifier: "GREATER_THAN" },
+        o_counter: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -347,7 +362,7 @@ describe("Performer Filters", () => {
     it("should filter by o_counter with LESS_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
-        o_counter: { value: threshold, modifier: "LESS_THAN" },
+        o_counter: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -361,7 +376,7 @@ describe("Performer Filters", () => {
     it("should filter by o_counter with EQUALS modifier", async () => {
       const count = 25;
       const filter: PeekPerformerFilter = {
-        o_counter: { value: count, modifier: "EQUALS" },
+        o_counter: { value: count, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -375,7 +390,11 @@ describe("Performer Filters", () => {
       const min = 10;
       const max = 50;
       const filter: PeekPerformerFilter = {
-        o_counter: { value: min, value2: max, modifier: "BETWEEN" },
+        o_counter: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -392,7 +411,10 @@ describe("Performer Filters", () => {
     it("should filter by play_count with GREATER_THAN modifier", async () => {
       const threshold = 20;
       const filter: PeekPerformerFilter = {
-        play_count: { value: threshold, modifier: "GREATER_THAN" },
+        play_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -406,7 +428,7 @@ describe("Performer Filters", () => {
     it("should filter by play_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekPerformerFilter = {
-        play_count: { value: threshold, modifier: "LESS_THAN" },
+        play_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -421,7 +443,11 @@ describe("Performer Filters", () => {
       const min = 20;
       const max = 80;
       const filter: PeekPerformerFilter = {
-        play_count: { value: min, value2: max, modifier: "BETWEEN" },
+        play_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -438,7 +464,10 @@ describe("Performer Filters", () => {
     it("should filter by scene_count with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
-        scene_count: { value: threshold, modifier: "GREATER_THAN" },
+        scene_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -452,7 +481,7 @@ describe("Performer Filters", () => {
     it("should filter by scene_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekPerformerFilter = {
-        scene_count: { value: threshold, modifier: "LESS_THAN" },
+        scene_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -466,7 +495,7 @@ describe("Performer Filters", () => {
     it("should filter by scene_count with EQUALS modifier", async () => {
       const count = 75;
       const filter: PeekPerformerFilter = {
-        scene_count: { value: count, modifier: "EQUALS" },
+        scene_count: { value: count, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -480,7 +509,11 @@ describe("Performer Filters", () => {
       const min = 30;
       const max = 100;
       const filter: PeekPerformerFilter = {
-        scene_count: { value: min, value2: max, modifier: "BETWEEN" },
+        scene_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -499,7 +532,7 @@ describe("Performer Filters", () => {
       const filter: PeekPerformerFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -517,7 +550,7 @@ describe("Performer Filters", () => {
       const filter: PeekPerformerFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "LESS_THAN",
+          modifier: CriterionModifier.LessThan,
         },
       };
 
@@ -537,7 +570,7 @@ describe("Performer Filters", () => {
         created_at: {
           value: min.toISOString(),
           value2: max.toISOString(),
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
         },
       };
 
@@ -556,7 +589,7 @@ describe("Performer Filters", () => {
       const filter: PeekPerformerFilter = {
         updated_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -580,7 +613,7 @@ describe("Performer Filters", () => {
       const filter: PeekPerformerFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -595,8 +628,8 @@ describe("Performer Filters", () => {
     it("should apply multiple filters together (AND logic)", async () => {
       const filter: PeekPerformerFilter = {
         favorite: true,
-        rating100: { value: 60, modifier: "GREATER_THAN" },
-        scene_count: { value: 50, modifier: "GREATER_THAN" },
+        rating100: { value: 60, modifier: CriterionModifier.GreaterThan },
+        scene_count: { value: 50, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -627,8 +660,11 @@ describe("Performer Filters", () => {
       const testPerformers = [performer1, performer2, performer3];
 
       const filter: PeekPerformerFilter = {
-        gender: { value: "FEMALE", modifier: "EQUALS" },
-        tags: { value: [mockTags[0].id], modifier: "INCLUDES" },
+        gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
+        tags: {
+          value: coerceEntityRefs([mockTags[0].id]),
+          modifier: CriterionModifier.Includes,
+        },
       };
 
       const result = await applyPerformerFilters(testPerformers, filter);
@@ -659,7 +695,7 @@ describe("Performer Filters", () => {
       );
 
       const filter: PeekPerformerFilter = {
-        rating100: { value: 0, modifier: "GREATER_THAN" },
+        rating100: { value: 0, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyPerformerFilters(
@@ -678,7 +714,7 @@ describe("Performer Filters", () => {
       });
 
       const filter: PeekPerformerFilter = {
-        scene_count: { value: 0, modifier: "EQUALS" },
+        scene_count: { value: 0, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyPerformerFilters(
@@ -821,7 +857,7 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value: 4, modifier: "GREATER_THAN" },
+      career_length: { value: 4, modifier: CriterionModifier.GreaterThan },
     };
 
     const result = await applyPerformerFilters(performers, filter);
@@ -842,7 +878,7 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value: 5, modifier: "LESS_THAN" },
+      career_length: { value: 5, modifier: CriterionModifier.LessThan },
     };
 
     const result = await applyPerformerFilters(performers, filter);
@@ -863,7 +899,11 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value: 3, value2: 12, modifier: "BETWEEN" },
+      career_length: {
+        value: 3,
+        value2: 12,
+        modifier: CriterionModifier.Between,
+      },
     };
 
     const result = await applyPerformerFilters(performers, filter);
@@ -882,7 +922,7 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value2: 3, modifier: "BETWEEN" },
+      career_length: { value2: 3, modifier: CriterionModifier.Between },
     };
 
     const result = await applyPerformerFilters(performers, filter);
@@ -902,7 +942,7 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value: 0, modifier: "GREATER_THAN" },
+      career_length: { value: 0, modifier: CriterionModifier.GreaterThan },
     };
 
     const result = await applyPerformerFilters(performers, filter);
@@ -919,7 +959,7 @@ describe("Career Length Filter", () => {
     ];
 
     const filter: PeekPerformerFilter = {
-      career_length: { value: 6, modifier: "GREATER_THAN" },
+      career_length: { value: 6, modifier: CriterionModifier.GreaterThan },
     };
 
     const result = await applyPerformerFilters(performers, filter);

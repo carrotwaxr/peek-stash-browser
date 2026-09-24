@@ -4,6 +4,7 @@
  * Tests mergeStudiosWithUserData, applyStudioFilters (sync), findStudios
  * and findStudiosMinimal.
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyStudioFilters,
@@ -11,6 +12,7 @@ import {
   findStudiosMinimal,
   mergeStudiosWithUserData,
 } from "../../../controllers/library/studios.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -173,7 +175,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s3" }),
       ];
       const result = applyStudioFilters(studios, {
-        ids: { value: ["s1", "s3"], modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(["s1", "s3"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2);
       expect(result.map((s) => s.id)).toEqual(["s1", "s3"]);
@@ -201,7 +203,7 @@ describe("Studios Controller", () => {
         }),
       ];
       const result = applyStudioFilters(studios, {
-        tags: { value: ["t1"], modifier: "INCLUDES" },
+        tags: { value: ["t1"], modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -222,7 +224,7 @@ describe("Studios Controller", () => {
         }),
       ];
       const result = applyStudioFilters(studios, {
-        tags: { value: ["t1", "t2"], modifier: "INCLUDES_ALL" },
+        tags: { value: ["t1", "t2"], modifier: CriterionModifier.IncludesAll },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -240,7 +242,7 @@ describe("Studios Controller", () => {
         }),
       ];
       const result = applyStudioFilters(studios, {
-        tags: { value: ["t1"], modifier: "EXCLUDES" },
+        tags: { value: ["t1"], modifier: CriterionModifier.Excludes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s2");
@@ -252,7 +254,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s2", rating100: 30 }),
       ];
       const result = applyStudioFilters(studios, {
-        rating100: { modifier: "GREATER_THAN", value: 50 },
+        rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -265,7 +267,11 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s3", rating100: 20 }),
       ];
       const result = applyStudioFilters(studios, {
-        rating100: { modifier: "BETWEEN", value: 40, value2: 60 },
+        rating100: {
+          modifier: CriterionModifier.Between,
+          value: 40,
+          value2: 60,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -301,7 +307,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s2", scene_count: 5 }),
       ];
       const result = applyStudioFilters(studios, {
-        scene_count: { modifier: "NOT_EQUALS", value: 10 },
+        scene_count: { modifier: CriterionModifier.NotEquals, value: 10 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s2");
@@ -313,7 +319,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s2", name: "Reality Kings" }),
       ];
       const result = applyStudioFilters(studios, {
-        name: { value: "brazz", modifier: "INCLUDES" },
+        name: { value: "brazz", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -325,7 +331,7 @@ describe("Studios Controller", () => {
         createMockStudio({ id: "s2", details: "independent studio" }),
       ];
       const result = applyStudioFilters(studios, {
-        details: { value: "premium", modifier: "INCLUDES" },
+        details: { value: "premium", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("s1");
@@ -338,7 +344,7 @@ describe("Studios Controller", () => {
       ];
       const result = applyStudioFilters(studios, {
         created_at: {
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
           value: "2024-03-01T00:00:00Z",
         },
       });
@@ -353,7 +359,7 @@ describe("Studios Controller", () => {
       ];
       const result = applyStudioFilters(studios, {
         updated_at: {
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
           value: "2024-03-01T00:00:00Z",
           value2: "2024-05-01T00:00:00Z",
         },

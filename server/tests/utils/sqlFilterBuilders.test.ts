@@ -4,6 +4,7 @@
  * Tests buildNumericFilter, buildDateFilter, buildTextFilter, and buildFavoriteFilter
  * with all modifier branches and edge cases.
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { describe, expect, it } from "vitest";
 import {
   buildDateFilter,
@@ -446,7 +447,7 @@ describe("buildJunctionFilter", () => {
   describe("bare IDs (no instanceId)", () => {
     it("INCLUDES: generates EXISTS with IN clause", () => {
       const result = buildJunctionFilter(
-        ["1", "2"],
+        coerceEntityRefs(["1", "2"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -462,7 +463,7 @@ describe("buildJunctionFilter", () => {
 
     it("INCLUDES_ALL: generates COUNT(DISTINCT) = N", () => {
       const result = buildJunctionFilter(
-        ["1", "2", "3"],
+        coerceEntityRefs(["1", "2", "3"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -478,7 +479,7 @@ describe("buildJunctionFilter", () => {
 
     it("EXCLUDES: generates NOT EXISTS", () => {
       const result = buildJunctionFilter(
-        ["1"],
+        coerceEntityRefs(["1"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -494,7 +495,7 @@ describe("buildJunctionFilter", () => {
 
     it("unknown modifier returns empty", () => {
       const result = buildJunctionFilter(
-        ["1"],
+        coerceEntityRefs(["1"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -510,7 +511,7 @@ describe("buildJunctionFilter", () => {
   describe("composite IDs (with instanceId)", () => {
     it("INCLUDES: generates pair conditions with AND", () => {
       const result = buildJunctionFilter(
-        ["82:server-1", "5:server-2"],
+        coerceEntityRefs(["82:server-1", "5:server-2"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -528,7 +529,7 @@ describe("buildJunctionFilter", () => {
 
     it("INCLUDES_ALL: generates COUNT(DISTINCT concat) = N", () => {
       const result = buildJunctionFilter(
-        ["82:server-1", "5:server-2"],
+        coerceEntityRefs(["82:server-1", "5:server-2"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -544,7 +545,7 @@ describe("buildJunctionFilter", () => {
 
     it("EXCLUDES: generates NOT EXISTS with pair conditions", () => {
       const result = buildJunctionFilter(
-        ["82:server-1"],
+        coerceEntityRefs(["82:server-1"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -561,7 +562,7 @@ describe("buildJunctionFilter", () => {
 
     it("mixed bare + composite: bare ID matches any instance", () => {
       const result = buildJunctionFilter(
-        ["82:server-1", "5"],
+        coerceEntityRefs(["82:server-1", "5"]),
         junctionTable,
         parentIdCol,
         parentInstanceCol,
@@ -579,7 +580,7 @@ describe("buildJunctionFilter", () => {
 
   it("joins parent table correctly", () => {
     const result = buildJunctionFilter(
-      ["1"],
+      coerceEntityRefs(["1"]),
       junctionTable,
       parentIdCol,
       parentInstanceCol,
@@ -602,7 +603,7 @@ describe("buildDirectFilter", () => {
   describe("bare IDs", () => {
     it("INCLUDES: generates IN clause", () => {
       const result = buildDirectFilter(
-        ["1", "2"],
+        coerceEntityRefs(["1", "2"]),
         idCol,
         instanceCol,
         "INCLUDES"
@@ -612,13 +613,23 @@ describe("buildDirectFilter", () => {
     });
 
     it("EXCLUDES: generates NOT IN with NULL check", () => {
-      const result = buildDirectFilter(["1"], idCol, instanceCol, "EXCLUDES");
+      const result = buildDirectFilter(
+        coerceEntityRefs(["1"]),
+        idCol,
+        instanceCol,
+        "EXCLUDES"
+      );
       expect(result.sql).toBe("(s.studioId IS NULL OR s.studioId NOT IN (?))");
       expect(result.params).toEqual(["1"]);
     });
 
     it("unknown modifier returns empty", () => {
-      const result = buildDirectFilter(["1"], idCol, instanceCol, "UNKNOWN");
+      const result = buildDirectFilter(
+        coerceEntityRefs(["1"]),
+        idCol,
+        instanceCol,
+        "UNKNOWN"
+      );
       expect(result).toEqual({ sql: "", params: [] });
     });
   });
@@ -626,7 +637,7 @@ describe("buildDirectFilter", () => {
   describe("composite IDs", () => {
     it("INCLUDES: generates pair conditions", () => {
       const result = buildDirectFilter(
-        ["3:server-1"],
+        coerceEntityRefs(["3:server-1"]),
         idCol,
         instanceCol,
         "INCLUDES"
@@ -637,7 +648,7 @@ describe("buildDirectFilter", () => {
 
     it("EXCLUDES: generates NOT pair conditions", () => {
       const result = buildDirectFilter(
-        ["3:server-1"],
+        coerceEntityRefs(["3:server-1"]),
         idCol,
         instanceCol,
         "EXCLUDES"
@@ -650,7 +661,7 @@ describe("buildDirectFilter", () => {
 
     it("multiple composite IDs joined with OR", () => {
       const result = buildDirectFilter(
-        ["3:server-1", "7:server-2"],
+        coerceEntityRefs(["3:server-1", "7:server-2"]),
         idCol,
         instanceCol,
         "INCLUDES"
