@@ -1149,6 +1149,57 @@ describe("Watch History Controller", () => {
       }
       expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
     });
+
+    it("a ping keeps the play sessions Peek 1.0 stored, as their start times", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          minimumPlayPercent: 50,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          duration: 600,
+        })
+      );
+      const first = "2025-10-22T10:00:00.000Z";
+      const second = "2025-10-22T11:00:00.000Z";
+      const later = "2025-11-01T09:00:00.000Z";
+      const session = (startTime: string) => ({
+        startTime,
+        endTime: startTime,
+        quality: "1080p",
+        duration: 10,
+        totalSessionDuration: 10,
+        seekEvents: [],
+      });
+      // 100 of 600 seconds played: below the threshold, so no play is added
+      const record: WatchHistory = partialRow({
+        id: 1,
+        playCount: 1,
+        playDuration: 100,
+        resumeTime: 90,
+        lastPlayedAt: new Date(),
+        oHistory: [],
+        playHistory: JSON.stringify([session(first), session(second), later]),
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      mockPrisma.watchHistory.update.mockResolvedValue(record);
+
+      const res = resFor(pingWatchHistory);
+      await pingWatchHistory(
+        reqFor(pingWatchHistory, {
+          body: { sceneId: "session-v1-history", currentTime: 100 },
+          user: testUser({ id: 1 }),
+        }),
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      const update = must(mockPrisma.watchHistory.update.mock.calls[0]);
+      expect(update[0].data.playHistory).toEqual([first, second, later]);
+    });
   });
 
   // ============================================================================
