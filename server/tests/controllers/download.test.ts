@@ -1,3 +1,4 @@
+import type { Download } from "@prisma/client";
 import type { Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -10,13 +11,13 @@ import {
   startPlaylistDownload,
   startSceneDownload,
 } from "../../controllers/download.js";
-import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import { downloadService } from "../../services/DownloadService.js";
 import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import { authReq } from "../helpers/controllerTestUtils.js";
 
 // Mock the services
 vi.mock("../../services/DownloadService.js", () => ({
@@ -122,7 +123,6 @@ const okStream = () => ({
 });
 
 describe("Download Controller", () => {
-  let mockRequest: Partial<AuthenticatedRequest>;
   let mockResponse: Partial<Response>;
   let responseJson: ReturnType<typeof vi.fn>;
   let responseStatus: ReturnType<typeof vi.fn>;
@@ -167,10 +167,6 @@ describe("Download Controller", () => {
 
   describe("startSceneDownload", () => {
     it("should return 403 if user does not have canDownloadFiles permission", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { sceneId: "scene-123" },
-      };
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: false,
@@ -183,7 +179,10 @@ describe("Download Controller", () => {
       });
 
       await startSceneDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { sceneId: "scene-123" },
+        }),
         mockResponse as Response
       );
 
@@ -194,11 +193,6 @@ describe("Download Controller", () => {
     });
 
     it("should create scene download and return serialized download on success", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { sceneId: "scene-123" },
-        body: { instanceId: "inst-a" },
-      };
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: true,
@@ -209,7 +203,7 @@ describe("Download Controller", () => {
           canDownloadPlaylists: "default",
         },
       });
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "SCENE",
@@ -230,7 +224,11 @@ describe("Download Controller", () => {
       mockDownloadService.createSceneDownload.mockResolvedValue(mockDownload);
 
       await startSceneDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { sceneId: "scene-123" },
+          body: { instanceId: "inst-a" },
+        }),
         mockResponse as Response
       );
 
@@ -250,14 +248,12 @@ describe("Download Controller", () => {
     });
 
     it("returns 400 without an instanceId", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { sceneId: "scene-123" },
-        body: undefined,
-      };
-
       await startSceneDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { sceneId: "scene-123" },
+          body: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -269,15 +265,14 @@ describe("Download Controller", () => {
     });
 
     it("returns 404 when the user cannot see the scene", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { sceneId: "scene-123" },
-        body: { instanceId: "inst-b" },
-      };
       mockCanUserAccessEntity.mockResolvedValue(false);
 
       await startSceneDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { sceneId: "scene-123" },
+          body: { instanceId: "inst-b" },
+        }),
         mockResponse as Response
       );
 
@@ -293,17 +288,16 @@ describe("Download Controller", () => {
     });
 
     it("passes the instance to the service", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { sceneId: "scene-123" },
-        body: { instanceId: "inst-b" },
-      };
       mockDownloadService.createSceneDownload.mockResolvedValue(
         downloadRow({ instanceId: "inst-b" })
       );
 
       await startSceneDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { sceneId: "scene-123" },
+          body: { instanceId: "inst-b" },
+        }),
         mockResponse as Response
       );
 
@@ -320,14 +314,12 @@ describe("Download Controller", () => {
 
   describe("startImageDownload", () => {
     it("returns 400 without an instanceId", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { imageId: "image-456" },
-        body: {},
-      };
-
       await startImageDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { imageId: "image-456" },
+          body: {},
+        }),
         mockResponse as Response
       );
 
@@ -339,15 +331,14 @@ describe("Download Controller", () => {
     });
 
     it("returns 404 when the user cannot see the image", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { imageId: "image-456" },
-        body: { instanceId: "inst-b" },
-      };
       mockCanUserAccessEntity.mockResolvedValue(false);
 
       await startImageDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { imageId: "image-456" },
+          body: { instanceId: "inst-b" },
+        }),
         mockResponse as Response
       );
 
@@ -363,11 +354,6 @@ describe("Download Controller", () => {
     });
 
     it("passes the instance to the service", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { imageId: "image-456" },
-        body: { instanceId: "inst-b" },
-      };
       mockDownloadService.createImageDownload.mockResolvedValue(
         downloadRow({
           type: "IMAGE",
@@ -378,7 +364,11 @@ describe("Download Controller", () => {
       );
 
       await startImageDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { imageId: "image-456" },
+          body: { instanceId: "inst-b" },
+        }),
         mockResponse as Response
       );
 
@@ -395,10 +385,6 @@ describe("Download Controller", () => {
 
   describe("startPlaylistDownload", () => {
     it("should return 400 if playlist exceeds maximum size", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: false,
@@ -416,7 +402,10 @@ describe("Download Controller", () => {
       );
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -428,10 +417,6 @@ describe("Download Controller", () => {
     });
 
     it("should return 403 if user does not have canDownloadPlaylists permission", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       mockResolveUserPermissions.mockResolvedValue({
         canShare: false,
         canDownloadFiles: true,
@@ -444,7 +429,10 @@ describe("Download Controller", () => {
       });
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -455,14 +443,13 @@ describe("Download Controller", () => {
     });
 
     it("returns 404 when the playlist is not the user's or shared with them", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       mockGetPlaylistAccess.mockResolvedValue({ level: "none" });
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -475,10 +462,6 @@ describe("Download Controller", () => {
     });
 
     it("lets a shared recipient download", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       mockGetPlaylistAccess.mockResolvedValue({
         level: "shared",
         groups: ["friends"],
@@ -500,7 +483,10 @@ describe("Download Controller", () => {
       mockPlaylistZipService.createZip.mockResolvedValue(undefined);
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -514,14 +500,13 @@ describe("Download Controller", () => {
     });
 
     it("returns 400 when no scene is downloadable", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       mockDownloadService.getDownloadablePlaylistItems.mockResolvedValue([]);
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -537,10 +522,6 @@ describe("Download Controller", () => {
     });
 
     it("sizes only the downloadable items", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { playlistId: "5" },
-      };
       const items = [
         { sceneId: "s1", instanceId: "inst-a" },
         { sceneId: "s1", instanceId: "inst-b" },
@@ -551,7 +532,10 @@ describe("Download Controller", () => {
       );
 
       await startPlaylistDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { playlistId: "5" },
+        }),
         mockResponse as Response
       );
 
@@ -563,10 +547,7 @@ describe("Download Controller", () => {
 
   describe("getUserDownloads", () => {
     it("should return serialized downloads for the user", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-      };
-      const mockDownloads = [
+      const mockDownloads: Download[] = [
         {
           id: 1,
           userId: 1,
@@ -607,7 +588,9 @@ describe("Download Controller", () => {
       mockDownloadService.getUserDownloads.mockResolvedValue(mockDownloads);
 
       await getUserDownloads(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+        }),
         mockResponse as Response
       );
 
@@ -630,12 +613,10 @@ describe("Download Controller", () => {
     });
 
     it("should return 401 if user is not authenticated", async () => {
-      mockRequest = {
-        user: undefined,
-      };
-
       await getUserDownloads(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: undefined,
+        }),
         mockResponse as Response
       );
 
@@ -646,11 +627,7 @@ describe("Download Controller", () => {
 
   describe("getDownloadStatus", () => {
     it("should return download status for own download", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "SCENE",
@@ -671,7 +648,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       await getDownloadStatus(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -681,11 +661,7 @@ describe("Download Controller", () => {
     });
 
     it("should return 403 if user does not own the download", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 2, // Different user
         type: "SCENE",
@@ -706,7 +682,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       await getDownloadStatus(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -715,14 +694,13 @@ describe("Download Controller", () => {
     });
 
     it("should return 404 if download not found", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "999" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(null);
 
       await getDownloadStatus(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "999" },
+        }),
         mockResponse as Response
       );
 
@@ -735,11 +713,7 @@ describe("Download Controller", () => {
 
   describe("getDownloadFile", () => {
     it("should proxy scene stream with Content-Disposition for SCENE downloads", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "SCENE",
@@ -770,7 +744,10 @@ describe("Download Controller", () => {
       });
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -791,11 +768,7 @@ describe("Download Controller", () => {
     });
 
     it("should proxy image with Content-Disposition for IMAGE downloads", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "IMAGE",
@@ -826,7 +799,10 @@ describe("Download Controller", () => {
       });
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -847,11 +823,7 @@ describe("Download Controller", () => {
     });
 
     it("should serve a completed PLAYLIST zip with an RFC 6266 Content-Disposition", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "PLAYLIST",
@@ -872,7 +844,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -885,11 +860,7 @@ describe("Download Controller", () => {
     });
 
     it("should return 400 if download is not completed", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const mockDownload = {
+      const mockDownload: Download = {
         id: 1,
         userId: 1,
         type: "PLAYLIST",
@@ -910,7 +881,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -922,17 +896,16 @@ describe("Download Controller", () => {
     });
 
     it("streams a scene from its own instance", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({ instanceId: "inst-b" })
       );
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(okStream());
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -949,15 +922,14 @@ describe("Download Controller", () => {
     });
 
     it("returns 404 and fetches nothing when scene access was revoked", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(downloadRow());
       mockCanUserAccessEntity.mockResolvedValue(false);
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -969,10 +941,6 @@ describe("Download Controller", () => {
     });
 
     it("returns 403 when the files permission was revoked", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({
           type: "IMAGE",
@@ -986,7 +954,10 @@ describe("Download Controller", () => {
       });
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -998,16 +969,15 @@ describe("Download Controller", () => {
     });
 
     it("returns 410 for a scene download with no stored instance", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({ instanceId: "" })
       );
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1021,10 +991,6 @@ describe("Download Controller", () => {
     it.each(["SCENE", "IMAGE", "PLAYLIST"])(
       "returns 410 for an EXPIRED download of any type, before the status check (%s)",
       async (type) => {
-        mockRequest = {
-          user: { id: 1, username: "testuser", role: "USER" },
-          params: { id: "1" },
-        };
         mockDownloadService.getDownload.mockResolvedValue(
           downloadRow({
             type,
@@ -1035,7 +1001,10 @@ describe("Download Controller", () => {
         );
 
         await getDownloadFile(
-          mockRequest as AuthenticatedRequest,
+          authReq({
+            user: { id: 1, username: "testuser", role: "USER" },
+            params: { id: "1" },
+          }),
           mockResponse as Response
         );
 
@@ -1049,10 +1018,6 @@ describe("Download Controller", () => {
     );
 
     it("serves a zip only while the playlist is accessible", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       const zipRow = downloadRow({
         type: "PLAYLIST",
         entityType: null,
@@ -1066,7 +1031,10 @@ describe("Download Controller", () => {
       mockGetPlaylistAccess.mockResolvedValue({ level: "none" });
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1079,10 +1047,6 @@ describe("Download Controller", () => {
     });
 
     it("returns 403 for a zip when the playlist permission was revoked", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(
         downloadRow({
           type: "PLAYLIST",
@@ -1100,7 +1064,10 @@ describe("Download Controller", () => {
       });
 
       await getDownloadFile(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1114,14 +1081,13 @@ describe("Download Controller", () => {
 
   describe("deleteDownload", () => {
     it("should delete download successfully", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.deleteDownload.mockResolvedValue(undefined);
 
       await deleteDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1133,16 +1099,15 @@ describe("Download Controller", () => {
     });
 
     it("should return 404 if download not found", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "999" },
-      };
       mockDownloadService.deleteDownload.mockRejectedValue(
         new Error("Download not found")
       );
 
       await deleteDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "999" },
+        }),
         mockResponse as Response
       );
 
@@ -1153,16 +1118,15 @@ describe("Download Controller", () => {
     });
 
     it("should return 403 if user not authorized", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.deleteDownload.mockRejectedValue(
         new Error("Not authorized to delete this download")
       );
 
       await deleteDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1173,11 +1137,7 @@ describe("Download Controller", () => {
 
   describe("retryDownload", () => {
     it("should retry failed playlist download", async () => {
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const failedDownload = {
+      const failedDownload: Download = {
         id: 1,
         userId: 1,
         type: "PLAYLIST",
@@ -1195,7 +1155,7 @@ describe("Download Controller", () => {
         completedAt: null,
         expiresAt: null,
       };
-      const retriedDownload = {
+      const retriedDownload: Download = {
         ...failedDownload,
         status: "PROCESSING",
         progress: 0,
@@ -1209,7 +1169,10 @@ describe("Download Controller", () => {
       mockPlaylistZipService.createZip.mockResolvedValue(undefined);
 
       await retryDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1223,11 +1186,7 @@ describe("Download Controller", () => {
       // Need to clear mocks to remove previous mockResolvedValueOnce calls
       mockDownloadService.getDownload.mockReset();
 
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const sceneDownload = {
+      const sceneDownload: Download = {
         id: 1,
         userId: 1,
         type: "SCENE",
@@ -1248,7 +1207,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(sceneDownload);
 
       await retryDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1261,11 +1223,7 @@ describe("Download Controller", () => {
     it("should return 400 if download status is not FAILED", async () => {
       mockDownloadService.getDownload.mockReset();
 
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
-      const completedDownload = {
+      const completedDownload: Download = {
         id: 1,
         userId: 1,
         type: "PLAYLIST",
@@ -1286,7 +1244,10 @@ describe("Download Controller", () => {
       mockDownloadService.getDownload.mockResolvedValue(completedDownload);
 
       await retryDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1314,15 +1275,14 @@ describe("Download Controller", () => {
 
     it("returns 404 when the playlist is no longer accessible", async () => {
       mockDownloadService.getDownload.mockReset();
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(failedZip());
       mockGetPlaylistAccess.mockResolvedValue({ level: "none" });
 
       await retryDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 
@@ -1337,10 +1297,6 @@ describe("Download Controller", () => {
 
     it("returns 403 when the playlist permission was revoked", async () => {
       mockDownloadService.getDownload.mockReset();
-      mockRequest = {
-        user: { id: 1, username: "testuser", role: "USER" },
-        params: { id: "1" },
-      };
       mockDownloadService.getDownload.mockResolvedValue(failedZip());
       mockResolveUserPermissions.mockResolvedValue({
         ...ALL_DOWNLOAD_PERMISSIONS,
@@ -1348,7 +1304,10 @@ describe("Download Controller", () => {
       });
 
       await retryDownload(
-        mockRequest as AuthenticatedRequest,
+        authReq({
+          user: { id: 1, username: "testuser", role: "USER" },
+          params: { id: "1" },
+        }),
         mockResponse as Response
       );
 

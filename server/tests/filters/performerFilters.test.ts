@@ -10,7 +10,7 @@ import {
   applyPerformerFilters,
   parseCareerLength,
 } from "../../controllers/library/performers.js";
-import { CriterionModifier } from "../../graphql/types.js";
+import { CriterionModifier, GenderEnum } from "../../graphql/types.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
@@ -125,7 +125,10 @@ describe("Performer Filters", () => {
   describe("Gender Filter", () => {
     it("should filter by gender with EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
+        gender: {
+          value: GenderEnum.Female,
+          modifier: CriterionModifier.Equals,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -137,7 +140,10 @@ describe("Performer Filters", () => {
 
     it("should filter by gender with NOT_EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "MALE", modifier: CriterionModifier.NotEquals },
+        gender: {
+          value: GenderEnum.Male,
+          modifier: CriterionModifier.NotEquals,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -149,7 +155,10 @@ describe("Performer Filters", () => {
 
     it("should filter non-binary performers", async () => {
       const filter: PeekPerformerFilter = {
-        gender: { value: "NON_BINARY", modifier: CriterionModifier.Equals },
+        gender: {
+          value: GenderEnum.NonBinary,
+          modifier: CriterionModifier.Equals,
+        },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -660,7 +669,10 @@ describe("Performer Filters", () => {
       const testPerformers = [performer1, performer2, performer3];
 
       const filter: PeekPerformerFilter = {
-        gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
+        gender: {
+          value: GenderEnum.Female,
+          modifier: CriterionModifier.Equals,
+        },
         tags: {
           value: coerceEntityRefs([mockTags[0].id]),
           modifier: CriterionModifier.Includes,

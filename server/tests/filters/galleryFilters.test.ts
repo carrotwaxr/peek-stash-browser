@@ -256,7 +256,9 @@ describe("Gallery Filters", () => {
       const result = await applyGalleryFilters(mockGalleries, filter);
 
       result.forEach((gallery) => {
-        expect(gallery.title.toLowerCase()).toContain(searchTerm.toLowerCase());
+        expect(gallery.title?.toLowerCase()).toContain(
+          searchTerm.toLowerCase()
+        );
       });
 
       expect(result.length).toBeGreaterThan(0);
@@ -279,7 +281,7 @@ describe("Gallery Filters", () => {
       const result = await applyGalleryFilters(galleriesWithTitle, filter);
 
       result.forEach((gallery) => {
-        expect(gallery.title.toLowerCase()).toContain("special");
+        expect(gallery.title?.toLowerCase()).toContain("special");
       });
 
       expect(result.length).toBeGreaterThan(0);

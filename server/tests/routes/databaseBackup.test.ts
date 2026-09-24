@@ -4,6 +4,7 @@
 import { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { databaseBackupService } from "../../services/DatabaseBackupService.js";
+import { authReq, findHandler } from "../helpers/controllerTestUtils.js";
 
 // Mock DatabaseBackupService
 vi.mock("../../services/DatabaseBackupService.js", () => ({
@@ -41,12 +42,12 @@ function createMockRequest(
     body?: Record<string, unknown>;
     user?: { id: number; username: string; role: string };
   } = {}
-): Partial<Request> {
-  return {
+): Request {
+  return authReq({
     params: options.params || {},
     body: options.body || {},
     user: options.user,
-  } as Partial<Request>;
+  });
 }
 
 function createMockResponse() {
@@ -90,11 +91,7 @@ describe("Database Backup Routes", () => {
       const mockRes = { json, status } as unknown as Response;
 
       // Find and call the route handler
-      const layer = router.stack.find(
-        (l: any) =>
-          l.route?.path === "/database/backups" && l.route?.methods?.get
-      );
-      const handler = layer?.route?.stack?.[0]?.handle;
+      const handler = findHandler(router, "get", "/database/backups");
 
       await handler(mockReq, mockRes, () => {});
 
@@ -115,11 +112,7 @@ describe("Database Backup Routes", () => {
         createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
-      const layer = router.stack.find(
-        (l: any) =>
-          l.route?.path === "/database/backups" && l.route?.methods?.get
-      );
-      const handler = layer?.route?.stack?.[0]?.handle;
+      const handler = findHandler(router, "get", "/database/backups");
 
       await handler(mockReq, mockRes, () => {});
 
@@ -149,11 +142,7 @@ describe("Database Backup Routes", () => {
       const { json, status } = createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
-      const layer = router.stack.find(
-        (l: any) =>
-          l.route?.path === "/database/backup" && l.route?.methods?.post
-      );
-      const handler = layer?.route?.stack?.[0]?.handle;
+      const handler = findHandler(router, "post", "/database/backup");
 
       await handler(mockReq, mockRes, () => {});
 
@@ -176,12 +165,11 @@ describe("Database Backup Routes", () => {
       const { json, status } = createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
-      const layer = router.stack.find(
-        (l: any) =>
-          l.route?.path === "/database/backups/:filename" &&
-          l.route?.methods?.delete
+      const handler = findHandler(
+        router,
+        "delete",
+        "/database/backups/:filename"
       );
-      const handler = layer?.route?.stack?.[0]?.handle;
 
       await handler(mockReq, mockRes, () => {});
 
@@ -207,12 +195,11 @@ describe("Database Backup Routes", () => {
         createMockResponse();
       const mockRes = { json, status } as unknown as Response;
 
-      const layer = router.stack.find(
-        (l: any) =>
-          l.route?.path === "/database/backups/:filename" &&
-          l.route?.methods?.delete
+      const handler = findHandler(
+        router,
+        "delete",
+        "/database/backups/:filename"
       );
-      const handler = layer?.route?.stack?.[0]?.handle;
 
       await handler(mockReq, mockRes, () => {});
 

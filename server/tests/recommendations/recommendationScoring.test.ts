@@ -15,6 +15,7 @@ import {
   scoreSceneByPreferences,
 } from "../../services/RecommendationScoringService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 describe("RecommendationScoringService", () => {
   describe("calculateSceneWeightMultiplier", () => {
@@ -312,17 +313,17 @@ describe("RecommendationScoringService", () => {
       implicitTagWeights: new Map(),
     });
 
-    const mockScene = {
+    const mockScene = partialRow<NormalizedScene>({
       id: "scene1",
       title: "Test Scene",
       instanceId: INST_ID,
       performers: [
-        { id: "perf1", name: "Performer 1", tags: [] },
-        { id: "perf2", name: "Performer 2", tags: [] },
+        partialRow({ id: "perf1", name: "Performer 1", tags: [] }),
+        partialRow({ id: "perf2", name: "Performer 2", tags: [] }),
       ],
       studio: { id: "studio1", name: "Studio 1", tags: [] },
-      tags: [{ id: "tag1", name: "Tag 1" }],
-    } as NormalizedScene;
+      tags: [partialRow({ id: "tag1", name: "Tag 1" })],
+    });
 
     it("returns 0 for scene with no matching preferences", () => {
       const prefs = createEmptyPrefs();

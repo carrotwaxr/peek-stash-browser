@@ -11,7 +11,7 @@ import {
   mergePerformersWithUserData,
   parseCareerLength,
 } from "../../../controllers/library/performers.js";
-import { CriterionModifier } from "../../../graphql/types.js";
+import { CriterionModifier, GenderEnum } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
@@ -279,7 +279,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "f", gender: "FEMALE" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
+      gender: { value: GenderEnum.Female, modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("f");
@@ -291,7 +291,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "f", gender: "FEMALE" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      gender: { value: "MALE", modifier: CriterionModifier.NotEquals },
+      gender: { value: GenderEnum.Male, modifier: CriterionModifier.NotEquals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("f");

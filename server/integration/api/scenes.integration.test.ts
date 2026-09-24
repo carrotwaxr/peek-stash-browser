@@ -315,9 +315,7 @@ describe("Scene API", () => {
   describe("scene tag inheritance", () => {
     it("filters scenes by tag inherited from performer/studio", async () => {
       // Skip if no test entity configured
-      // @ts-expect-error - sceneWithInheritedTags may not exist in older testEntities
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
-      // @ts-expect-error - inheritedTagFromPerformerOrStudio may not exist
       let inheritedTagId = TEST_ENTITIES.inheritedTagFromPerformerOrStudio;
 
       if (!sceneId) {
@@ -385,7 +383,6 @@ describe("Scene API", () => {
     });
 
     it("verifies scene has both direct tags and inherited tags", async () => {
-      // @ts-expect-error - sceneWithInheritedTags may not exist in older testEntities
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
 
       if (!sceneId) {
@@ -451,7 +448,6 @@ describe("Scene API", () => {
     });
 
     it("verifies inherited tags from same instance are filterable", async () => {
-      // @ts-expect-error - sceneWithInheritedTags may not exist in older testEntities
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
 
       if (!sceneId) {

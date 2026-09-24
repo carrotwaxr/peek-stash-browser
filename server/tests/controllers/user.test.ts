@@ -1182,7 +1182,9 @@ describe("User Controller", () => {
 
       expect(res._getStatus()).toBe(200);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      const ops = mockPrisma.$transaction.mock.calls[0][0] as unknown[];
+      // The batch form; the mock's parameter type is the callback overload's
+      const ops: unknown = mockPrisma.$transaction.mock.calls[0][0];
+      if (!Array.isArray(ops)) throw new Error("expected a batch transaction");
       expect(ops).toHaveLength(2);
       expect(ops[0]).toBe(deleteOp);
       expect(ops[1]).toBe(createOp);

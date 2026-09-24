@@ -48,8 +48,13 @@ export type PeekSceneFilter = BaseSceneFilterType & {
  * Peek Performer Filter
  * Adds custom Peek filter fields to base Stash performer filters.
  * Entity reference fields override base types with InstanceAwareId[].
+ * `career_length` is omitted from the base: Stash's is a string criterion,
+ * Peek's a numeric range in years.
  */
-export type PeekPerformerFilter = BasePerformerFilterType & {
+export type PeekPerformerFilter = Omit<
+  BasePerformerFilterType,
+  "career_length"
+> & {
   ids?: EntityRefFilter;
   tags?: EntityRefFilter;
   favorite?: boolean;
@@ -90,8 +95,10 @@ export type PeekStudioFilter = BaseStudioFilterType & {
 /**
  * Peek Tag Filter
  * Adds custom Peek filter fields to base Stash tag filters.
+ * `scenes_filter` is omitted from the base: Stash's is a full scene filter
+ * whose `id` is an integer criterion, Peek's takes composite scene and group ids.
  */
-export type PeekTagFilter = BaseTagFilterType & {
+export type PeekTagFilter = Omit<BaseTagFilterType, "scenes_filter"> & {
   ids?: EntityRefFilter;
   favorite?: boolean;
   instance_id?: string;

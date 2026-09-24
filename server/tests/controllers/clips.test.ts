@@ -12,9 +12,13 @@ import {
   getClips,
   getClipsForScene,
 } from "../../controllers/clips.js";
-import { clipService } from "../../services/ClipService.js";
+import {
+  type ClipWithRelations,
+  clipService,
+} from "../../services/ClipService.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
 vi.mock("../../services/ClipService.js", () => ({
@@ -51,7 +55,10 @@ describe("Clips Controller", () => {
 
   describe("getClips", () => {
     it("returns paginated clips with default query params", async () => {
-      const clips = [{ id: "c1" }, { id: "c2" }];
+      const clips: ClipWithRelations[] = [
+        partialRow({ id: "c1" }),
+        partialRow({ id: "c2" }),
+      ];
       mockClipService.getClips.mockResolvedValue({ clips, total: 2 });
 
       const req = mockReq({}, {}, USER, {});
@@ -207,7 +214,10 @@ describe("Clips Controller", () => {
 
   describe("getClipById", () => {
     it("returns the clip when found", async () => {
-      const clip = { id: "c1", title: "Test Clip" };
+      const clip: ClipWithRelations = partialRow({
+        id: "c1",
+        title: "Test Clip",
+      });
       mockClipService.getClipById.mockResolvedValue(clip);
 
       const req = mockReq({}, { id: "c1" }, USER);
@@ -248,7 +258,10 @@ describe("Clips Controller", () => {
 
   describe("getClipsForScene", () => {
     it("returns clips for a scene with default options", async () => {
-      const clips = [{ id: "c1" }, { id: "c2" }];
+      const clips: ClipWithRelations[] = [
+        partialRow({ id: "c1" }),
+        partialRow({ id: "c2" }),
+      ];
       mockClipService.getClipsForScene.mockResolvedValue(clips);
 
       const req = mockReq({}, { id: "scene-1" }, USER, {});

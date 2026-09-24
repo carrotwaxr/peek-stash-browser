@@ -65,7 +65,7 @@ describe("ClipService", () => {
         `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/42/screenshot")}`
       );
       // Raw screenshotPath should not be exposed
-      expect((clip as Record<string, unknown>).screenshotPath).toBeUndefined();
+      expect(clip).not.toHaveProperty("screenshotPath");
     });
 
     it("should return null screenshotUrl when screenshotPath is null", async () => {

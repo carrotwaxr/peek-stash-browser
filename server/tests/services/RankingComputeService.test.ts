@@ -63,6 +63,7 @@ function getWrittenRankings(
   entityType: string
 ): Array<{
   entityId: string;
+  instanceId: string;
   percentileRank: number;
   engagementScore: number;
   engagementRate: number;

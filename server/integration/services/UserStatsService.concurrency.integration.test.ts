@@ -13,6 +13,7 @@
  */
 import { Prisma } from "@prisma/client";
 import {
+  type MockInstance,
   afterAll,
   afterEach,
   beforeEach,
@@ -82,7 +83,7 @@ async function readCounts(): Promise<
 }
 
 describe("UserStatsService.updateStatsForScene concurrency (integration)", () => {
-  let errorSpy: ReturnType<typeof vi.spyOn<typeof logger, "error">>;
+  let errorSpy: MockInstance<typeof logger.error>;
 
   beforeEach(async () => {
     await clearStats();
