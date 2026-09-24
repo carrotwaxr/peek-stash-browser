@@ -213,4 +213,83 @@ describe("useScrollRestoration", () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 500);
     expect(scrollTo).not.toHaveBeenCalledWith(0, 2000);
   });
+
+  it("keeps only the newest 100 saved positions", async () => {
+    const old = Array.from({ length: 100 }, (_, i) => `old${i}`);
+    for (const key of old) sessionStorage.setItem(`peek:scroll:${key}`, "10");
+    sessionStorage.setItem("peek:scroll:index", JSON.stringify(old));
+    const { router } = renderHarness();
+    const firstKey = router.state.location.key;
+    setScrollY(700);
+
+    await act(() => router.navigate("/scene/1"));
+
+    const index = JSON.parse(
+      sessionStorage.getItem("peek:scroll:index") as string
+    ) as string[];
+    expect(index).toHaveLength(100);
+    expect(index[index.length - 1]).toBe(firstKey);
+    expect(index).not.toContain("old0");
+    expect(sessionStorage.getItem("peek:scroll:old0")).toBeNull();
+    expect(sessionStorage.getItem("peek:scroll:old1")).toBe("10");
+    expect(sessionStorage.getItem(`peek:scroll:${firstKey}`)).toBe("700");
+  });
+
+  it("starts a fresh index when the stored one is not a list", async () => {
+    sessionStorage.setItem("peek:scroll:index", JSON.stringify({ a: 1 }));
+    const { router } = renderHarness();
+    const firstKey = router.state.location.key;
+    setScrollY(300);
+
+    await act(() => router.navigate("/scene/1"));
+
+    expect(
+      JSON.parse(sessionStorage.getItem("peek:scroll:index") as string)
+    ).toEqual([firstKey]);
+  });
+
+  it("an unreadable saved position scrolls to the top on Back", async () => {
+    const { router } = renderHarness();
+    const firstKey = router.state.location.key;
+    setScrollY(900);
+    await act(() => router.navigate("/scene/1"));
+    sessionStorage.setItem(`peek:scroll:${firstKey}`, "not-a-number");
+    scrollTo.mockClear();
+
+    await act(() => router.navigate(-1));
+
+    expect(router.state.location.pathname).toBe("/scenes");
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
+  it("navigation still works when sessionStorage throws", async () => {
+    const { router } = renderHarness();
+    setScrollY(900);
+    const setItem = vi
+      .spyOn(sessionStorage, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("full", "QuotaExceededError");
+      });
+    const getItem = vi
+      .spyOn(sessionStorage, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("denied", "SecurityError");
+      });
+
+    try {
+      await act(() => router.navigate("/scene/1"));
+      expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+      scrollTo.mockClear();
+
+      // Nothing could be saved or read, so Back lands at the top
+      await act(() => router.navigate(-1));
+      expect(router.state.location.pathname).toBe("/scenes");
+      expect(scrollTo).toHaveBeenCalledWith(0, 0);
+      expect(scrollTo).not.toHaveBeenCalledWith(0, 900);
+    } finally {
+      setItem.mockRestore();
+      getItem.mockRestore();
+    }
+  });
 });
