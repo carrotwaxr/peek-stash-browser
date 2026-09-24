@@ -90,35 +90,34 @@ describe("Performer API", () => {
       const performer = must(response.data.findPerformers.performers[0]);
 
       // Tags should have image_path for TooltipEntityGrid
-      if (performer.tags && performer.tags.length > 0) {
-        expect(performer.tags[0]).toHaveProperty("id");
-        expect(performer.tags[0]).toHaveProperty("name");
-        expect(performer.tags[0]).toHaveProperty("image_path");
-      }
+      const firstTag = must(performer.tags?.[0], "performer.tags[0]");
+      expect(firstTag).toHaveProperty("id");
+      expect(firstTag).toHaveProperty("name");
+      expect(firstTag).toHaveProperty("image_path");
 
       // Groups should exist with tooltip data
       expect(performer).toHaveProperty("groups");
-      if (performer.groups && performer.groups.length > 0) {
-        expect(performer.groups[0]).toHaveProperty("id");
-        expect(performer.groups[0]).toHaveProperty("name");
-        expect(performer.groups[0]).toHaveProperty("front_image_path");
-      }
+      const firstGroup = must(performer.groups?.[0], "performer.groups[0]");
+      expect(firstGroup).toHaveProperty("id");
+      expect(firstGroup).toHaveProperty("name");
+      expect(firstGroup).toHaveProperty("front_image_path");
 
       // Galleries should exist with tooltip data
       expect(performer).toHaveProperty("galleries");
-      if (performer.galleries && performer.galleries.length > 0) {
-        expect(performer.galleries[0]).toHaveProperty("id");
-        expect(performer.galleries[0]).toHaveProperty("title");
-        expect(performer.galleries[0]).toHaveProperty("cover");
-      }
+      const firstGallery = must(
+        performer.galleries?.[0],
+        "performer.galleries[0]"
+      );
+      expect(firstGallery).toHaveProperty("id");
+      expect(firstGallery).toHaveProperty("title");
+      expect(firstGallery).toHaveProperty("cover");
 
       // Studios should exist with tooltip data
       expect(performer).toHaveProperty("studios");
-      if (performer.studios && performer.studios.length > 0) {
-        expect(performer.studios[0]).toHaveProperty("id");
-        expect(performer.studios[0]).toHaveProperty("name");
-        expect(performer.studios[0]).toHaveProperty("image_path");
-      }
+      const firstStudio = must(performer.studios?.[0], "performer.studios[0]");
+      expect(firstStudio).toHaveProperty("id");
+      expect(firstStudio).toHaveProperty("name");
+      expect(firstStudio).toHaveProperty("image_path");
     });
   });
 

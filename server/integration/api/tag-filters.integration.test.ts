@@ -96,9 +96,8 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        if (tag.rating100 !== null && tag.rating100 !== undefined) {
-          expect(tag.rating100).toBeGreaterThan(50);
-        }
+        // The filter counts an unrated tag as 0
+        expect(tag.rating100 ?? 0).toBeGreaterThan(50);
       }
     });
 
@@ -120,9 +119,8 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        if (tag.rating100 !== null && tag.rating100 !== undefined) {
-          expect(tag.rating100).toBeLessThan(80);
-        }
+        // The filter counts an unrated tag as 0, so unrated tags match
+        expect(tag.rating100 ?? 0).toBeLessThan(80);
       }
     });
 
@@ -145,10 +143,10 @@ describe("Tag Filters", () => {
       expect(response.data.findTags).toBeDefined();
 
       for (const tag of response.data.findTags.tags) {
-        if (tag.rating100 !== null && tag.rating100 !== undefined) {
-          expect(tag.rating100).toBeGreaterThanOrEqual(40);
-          expect(tag.rating100).toBeLessThanOrEqual(80);
-        }
+        // The filter counts an unrated tag as 0
+        const rating = tag.rating100 ?? 0;
+        expect(rating).toBeGreaterThanOrEqual(40);
+        expect(rating).toBeLessThanOrEqual(80);
       }
     });
   });
@@ -411,9 +409,8 @@ describe("Tag Filters", () => {
 
       for (const tag of response.data.findTags.tags) {
         expect(tag.favorite).toBe(true);
-        if (tag.rating100 !== null && tag.rating100 !== undefined) {
-          expect(tag.rating100).toBeGreaterThan(60);
-        }
+        // The filter counts an unrated tag as 0
+        expect(tag.rating100 ?? 0).toBeGreaterThan(60);
       }
     });
 

@@ -182,17 +182,15 @@ describe("User Groups API", () => {
       expect(response.data.groups).toBeDefined();
       expect(Array.isArray(response.data.groups)).toBe(true);
 
-      // If there are groups, check the structure
-      if (response.data.groups.length > 0) {
-        const group = response.data.groups[0];
-        expect(group).toHaveProperty("id");
-        expect(group).toHaveProperty("name");
-        expect(group).toHaveProperty("description");
-        expect(group).toHaveProperty("canShare");
-        expect(group).toHaveProperty("canDownloadFiles");
-        expect(group).toHaveProperty("canDownloadPlaylists");
-        expect(group).toHaveProperty("memberCount");
-      }
+      // The groups created above are listed; check the structure
+      const group = must(response.data.groups[0], "a user group");
+      expect(group).toHaveProperty("id");
+      expect(group).toHaveProperty("name");
+      expect(group).toHaveProperty("description");
+      expect(group).toHaveProperty("canShare");
+      expect(group).toHaveProperty("canDownloadFiles");
+      expect(group).toHaveProperty("canDownloadPlaylists");
+      expect(group).toHaveProperty("memberCount");
     });
 
     it("includes newly created groups in the list", async () => {

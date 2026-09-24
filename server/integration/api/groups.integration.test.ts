@@ -70,7 +70,7 @@ describe("Group API", () => {
       );
     });
 
-    it("returns group with tooltip entity data (tags, studio, performers, galleries)", async () => {
+    it("returns group with tooltip entity data (tags, performers, galleries)", async () => {
       const response = await adminClient.post<FindGroupsResponse>(
         "/api/library/groups",
         {
@@ -83,34 +83,45 @@ describe("Group API", () => {
 
       // Tags should have image_path
       expect(group).toHaveProperty("tags");
-      if (group.tags && group.tags.length > 0) {
-        expect(group.tags[0]).toHaveProperty("id");
-        expect(group.tags[0]).toHaveProperty("name");
-        expect(group.tags[0]).toHaveProperty("image_path");
-      }
-
-      // Studio should have image_path
-      if (group.studio) {
-        expect(group.studio).toHaveProperty("id");
-        expect(group.studio).toHaveProperty("name");
-        expect(group.studio).toHaveProperty("image_path");
-      }
+      const firstTag = must(group.tags?.[0], "group.tags[0]");
+      expect(firstTag).toHaveProperty("id");
+      expect(firstTag).toHaveProperty("name");
+      expect(firstTag).toHaveProperty("image_path");
 
       // Performers should exist with tooltip data
       expect(group).toHaveProperty("performers");
-      if (group.performers && group.performers.length > 0) {
-        expect(group.performers[0]).toHaveProperty("id");
-        expect(group.performers[0]).toHaveProperty("name");
-        expect(group.performers[0]).toHaveProperty("image_path");
-      }
+      const firstPerformer = must(group.performers?.[0], "group.performers[0]");
+      expect(firstPerformer).toHaveProperty("id");
+      expect(firstPerformer).toHaveProperty("name");
+      expect(firstPerformer).toHaveProperty("image_path");
 
       // Galleries should exist with tooltip data
       expect(group).toHaveProperty("galleries");
-      if (group.galleries && group.galleries.length > 0) {
-        expect(group.galleries[0]).toHaveProperty("id");
-        expect(group.galleries[0]).toHaveProperty("title");
-        expect(group.galleries[0]).toHaveProperty("cover");
-      }
+      const firstGallery = must(group.galleries?.[0], "group.galleries[0]");
+      expect(firstGallery).toHaveProperty("id");
+      expect(firstGallery).toHaveProperty("title");
+      expect(firstGallery).toHaveProperty("cover");
+    });
+
+    // The studio is optional: the test skips when groupWithScenes has none,
+    // rather than passing without checking anything
+    it("returns group studio with tooltip data", async ({ skip }) => {
+      const response = await adminClient.post<FindGroupsResponse>(
+        "/api/library/groups",
+        {
+          ids: [TEST_ENTITIES.groupWithScenes],
+        }
+      );
+
+      expect(response.ok).toBe(true);
+      const group = must(response.data.findGroups.groups[0]);
+      skip(!group.studio, "groupWithScenes has no studio");
+
+      // Studio should have image_path
+      const groupStudio = must(group.studio, "group.studio");
+      expect(groupStudio).toHaveProperty("id");
+      expect(groupStudio).toHaveProperty("name");
+      expect(groupStudio).toHaveProperty("image_path");
     });
   });
 

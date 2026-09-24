@@ -8,7 +8,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - Shared types: `cd shared && npm run build`. Needed before server `tsc`, the server dev runtime and client `typecheck`; Vite and Vitest read `shared/types` directly.
 - Test: `npm run test:run` in `client/` and `server/` (`npm test` starts watch mode in a terminal)
 - Coverage gate: `npm run test:coverage` in both; CI enforces the thresholds in each `vitest.config`
-- Integration: `cd server && npm run test:integration`. Needs `STASH_TEST_URL` and `STASH_TEST_API_KEY` (or `STASH_URL` and `STASH_API_KEY`) in the root `.env`, and `server/integration/fixtures/testEntities.ts` copied from its example.
+- Integration: `cd server && npm run test:integration`. Needs `STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env`; `STASH_URL` only with `ALLOW_PROD_STASH=1` in the shell. Also `server/integration/fixtures/testEntities.ts` copied from its example.
 - E2E: `npm run test:e2e` from the root, against the running compose stack
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.

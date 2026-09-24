@@ -5,6 +5,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { TEST_CONFIG } from "./config.js";
 import { setServerInstance, stopServer } from "./serverManager.js";
+import {
+  StashTargetError,
+  findDisallowedInstances,
+  resolveStashTarget,
+  stashHost,
+} from "./stashTarget.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,34 +18,34 @@ const __dirname = path.dirname(__filename);
 export async function setup() {
   console.log("[Integration Tests] Starting global setup...");
 
-  // Load environment from project root
+  // The shell as it was before the root .env loads: the Stash guard reads
+  // ALLOW_PROD_STASH only from here, never from the file.
+  const shellEnv = { ...process.env };
+
+  // Load the root .env if there is one (the Stash settings, LOG_LEVEL and
+  // the like). dotenv keeps any variable the shell already set, even empty.
   const envPath = path.resolve(__dirname, "../../../.env");
-  if (!fs.existsSync(envPath)) {
-    throw new Error(
-      `Missing .env file at ${envPath}. Integration tests require STASH_URL and STASH_API_KEY.`
-    );
-  }
-  dotenv.config({ path: envPath });
-
-  // Prefer STASH_TEST_* env vars for integration tests if available
-  // This allows running tests against a dedicated test Stash instance
-  if (process.env.STASH_TEST_URL && process.env.STASH_TEST_API_KEY) {
-    console.log("[Integration Tests] Using test Stash instance (STASH_TEST_*)");
-    // Save original (production) credentials for multi-instance tests
-    // These allow the test to add production as a second read-only instance
-    process.env.STASH_URL_ORIGINAL = process.env.STASH_URL;
-    process.env.STASH_API_KEY_ORIGINAL = process.env.STASH_API_KEY;
-    // Override with test instance for primary instance
-    process.env.STASH_URL = process.env.STASH_TEST_URL;
-    process.env.STASH_API_KEY = process.env.STASH_TEST_API_KEY;
+  let fileEnv: Record<string, string> = {};
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    fileEnv = dotenv.parse(fs.readFileSync(envPath));
   }
 
-  // Validate required env vars
-  if (!process.env.STASH_URL || !process.env.STASH_API_KEY) {
-    throw new Error(
-      "Integration tests require STASH_URL and STASH_API_KEY (or STASH_TEST_*) in .env"
-    );
+  // Refuses (StashTargetError) unless a test Stash is configured or
+  // ALLOW_PROD_STASH=1 comes from the shell; see stashTarget.ts
+  const target = resolveStashTarget(fileEnv, shellEnv);
+  process.env.STASH_URL = target.primary.url;
+  process.env.STASH_API_KEY = target.primary.apiKey;
+  if (target.second) {
+    process.env.STASH_SECOND_URL = target.second.url;
+    process.env.STASH_SECOND_API_KEY = target.second.apiKey;
+  } else {
+    delete process.env.STASH_SECOND_URL;
+    delete process.env.STASH_SECOND_API_KEY;
   }
+  console.log(
+    `[Integration Tests] Stash: ${target.source} (${stashHost(target.primary.url)}), second instance: ${target.second ? stashHost(target.second.url) : "none"}`
+  );
 
   // Check if testEntities.ts exists
   const testEntitiesPath = path.resolve(
@@ -108,6 +114,44 @@ export async function setup() {
   const { ensureTestSetup } = await import("./testSetup.js");
   await ensureTestSetup();
 
+  // Nothing has contacted a stored instance yet: the instance manager and
+  // the sync scheduler start below. Refuse any enabled instance that is not
+  // this run's Stash (a production row left from an earlier run, say).
+  const { default: prisma } = await import("../../prisma/singleton.js");
+  // Close what setup opened, so a refused run exits at once
+  const refuse = async (message: string): Promise<never> => {
+    await stopServer();
+    fs.rmSync(configDir, { recursive: true, force: true });
+    await prisma.$disconnect();
+    throw new StashTargetError(message);
+  };
+  const allowedUrls = [target.primary.url];
+  if (target.second) allowedUrls.push(target.second.url);
+  const disallowed = findDisallowedInstances(
+    await prisma.stashInstance.findMany({
+      select: { id: true, url: true, enabled: true },
+    }),
+    allowedUrls
+  );
+  if (disallowed.length > 0) {
+    const rows = disallowed.map((row) => `${row.id} (${row.url})`).join(", ");
+    await refuse(
+      `The test database has enabled Stash instances this run may not use: ${rows}. Start from an empty database with FRESH_DB=true npm run test:integration, or allow the production Stash with ALLOW_PROD_STASH=1 in the shell.`
+    );
+  }
+
+  // Sync to Stash writes ratings and plays back to Stash
+  const syncingUsers = await prisma.user.findMany({
+    where: { syncToStash: true },
+    select: { username: true },
+  });
+  if (syncingUsers.length > 0) {
+    const usernames = syncingUsers.map((user) => user.username).join(", ");
+    await refuse(
+      `Users in the test database have Sync to Stash on, so a test could write to Stash: ${usernames}. Turn it off for them, or start from an empty database with FRESH_DB=true npm run test:integration.`
+    );
+  }
+
   // Initialize the StashInstanceManager - loads Stash config from DB
   // This MUST happen after testSetup creates the Stash instance
   console.log("[Integration Tests] Initializing Stash instance manager...");
@@ -159,7 +203,6 @@ export async function setup() {
     // Disconnect Prisma — suppress stderr noise from SQLite cleanup
     // Prisma emits benign connection-close warnings that pollute test output
     console.log("[Integration Tests] Disconnecting Prisma...");
-    const { default: prisma } = await import("../../prisma/singleton.js");
     const originalStderrWrite = process.stderr.write.bind(process.stderr);
     const teardownLog: string[] = [];
     process.stderr.write = ((chunk: string | Uint8Array) => {

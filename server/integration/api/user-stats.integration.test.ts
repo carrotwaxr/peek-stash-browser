@@ -42,27 +42,38 @@ describe("User Stats API Integration Tests", () => {
       expect(Array.isArray(data.topStudios)).toBe(true);
       expect(Array.isArray(data.topTags)).toBe(true);
 
-      // Highlights (nullable)
-      // These may be null if no watch history exists
-      if (data.mostWatchedScene) {
-        expect(data.mostWatchedScene.id).toBeDefined();
-        expect(typeof data.mostWatchedScene.playCount).toBe("number");
-      }
-
-      if (data.mostViewedImage) {
-        expect(data.mostViewedImage.id).toBeDefined();
-        expect(typeof data.mostViewedImage.viewCount).toBe("number");
-      }
-
-      if (data.mostOdScene) {
-        expect(data.mostOdScene.id).toBeDefined();
-        expect(typeof data.mostOdScene.oCount).toBe("number");
-      }
-
-      if (data.mostOdPerformer) {
-        expect(data.mostOdPerformer.id).toBeDefined();
-        expect(typeof data.mostOdPerformer.oCount).toBe("number");
-      }
+      // Highlights are null until the user has history; a set one has an
+      // id and its count
+      const {
+        mostWatchedScene,
+        mostViewedImage,
+        mostOdScene,
+        mostOdPerformer,
+      } = data;
+      expect(
+        mostWatchedScene === null ||
+          (typeof mostWatchedScene.id === "string" &&
+            typeof mostWatchedScene.playCount === "number"),
+        "mostWatchedScene is null or has an id and a playCount"
+      ).toBe(true);
+      expect(
+        mostViewedImage === null ||
+          (typeof mostViewedImage.id === "string" &&
+            typeof mostViewedImage.viewCount === "number"),
+        "mostViewedImage is null or has an id and a viewCount"
+      ).toBe(true);
+      expect(
+        mostOdScene === null ||
+          (typeof mostOdScene.id === "string" &&
+            typeof mostOdScene.oCount === "number"),
+        "mostOdScene is null or has an id and an oCount"
+      ).toBe(true);
+      expect(
+        mostOdPerformer === null ||
+          (typeof mostOdPerformer.id === "string" &&
+            typeof mostOdPerformer.oCount === "number"),
+        "mostOdPerformer is null or has an id and an oCount"
+      ).toBe(true);
     });
 
     it("should reject unauthenticated requests", async () => {
@@ -125,10 +136,12 @@ describe("User Stats API Integration Tests", () => {
         expect(typeof scene.playDuration).toBe("number");
         expect(typeof scene.oCount).toBe("number");
         // title and filePath can be null
-        // imageUrl should be a proxy URL or null
-        if (scene.imageUrl) {
-          expect(scene.imageUrl).toContain("/api/proxy/stash");
-        }
+        // imageUrl is a proxy URL, or null for an entity without an image
+        expect(
+          scene.imageUrl === null ||
+            scene.imageUrl.includes("/api/proxy/stash"),
+          `imageUrl ${String(scene.imageUrl)} is a proxy URL or null`
+        ).toBe(true);
       }
     });
 
@@ -144,10 +157,12 @@ describe("User Stats API Integration Tests", () => {
         expect(typeof performer.playCount).toBe("number");
         expect(typeof performer.playDuration).toBe("number");
         expect(typeof performer.oCount).toBe("number");
-        // imageUrl should be a proxy URL or null
-        if (performer.imageUrl) {
-          expect(performer.imageUrl).toContain("/api/proxy/stash");
-        }
+        // imageUrl is a proxy URL, or null for an entity without an image
+        expect(
+          performer.imageUrl === null ||
+            performer.imageUrl.includes("/api/proxy/stash"),
+          `imageUrl ${String(performer.imageUrl)} is a proxy URL or null`
+        ).toBe(true);
       }
     });
 
@@ -163,10 +178,12 @@ describe("User Stats API Integration Tests", () => {
         expect(typeof studio.playCount).toBe("number");
         expect(typeof studio.playDuration).toBe("number");
         expect(typeof studio.oCount).toBe("number");
-        // imageUrl should be a proxy URL or null
-        if (studio.imageUrl) {
-          expect(studio.imageUrl).toContain("/api/proxy/stash");
-        }
+        // imageUrl is a proxy URL, or null for an entity without an image
+        expect(
+          studio.imageUrl === null ||
+            studio.imageUrl.includes("/api/proxy/stash"),
+          `imageUrl ${String(studio.imageUrl)} is a proxy URL or null`
+        ).toBe(true);
       }
     });
 
@@ -182,10 +199,11 @@ describe("User Stats API Integration Tests", () => {
         expect(typeof tag.playCount).toBe("number");
         expect(typeof tag.playDuration).toBe("number");
         expect(typeof tag.oCount).toBe("number");
-        // imageUrl should be a proxy URL or null
-        if (tag.imageUrl) {
-          expect(tag.imageUrl).toContain("/api/proxy/stash");
-        }
+        // imageUrl is a proxy URL, or null for an entity without an image
+        expect(
+          tag.imageUrl === null || tag.imageUrl.includes("/api/proxy/stash"),
+          `imageUrl ${String(tag.imageUrl)} is a proxy URL or null`
+        ).toBe(true);
       }
     });
 
@@ -195,38 +213,23 @@ describe("User Stats API Integration Tests", () => {
 
       expect(response.ok).toBe(true);
 
-      // Check all image URLs are proxied, not direct Stash URLs
-      const checkProxyUrl = (url: string | null) => {
-        if (url) {
-          expect(url).not.toMatch(/^https?:\/\//);
-          expect(url).toContain("/api/proxy/stash");
-        }
-      };
+      // Check all image URLs are proxied, not direct Stash URLs. An entity
+      // without an image has none, and highlights are null without history.
+      const data = response.data;
+      const imageUrls = [
+        ...data.topScenes.map((s) => s.imageUrl),
+        ...data.topPerformers.map((p) => p.imageUrl),
+        ...data.topStudios.map((s) => s.imageUrl),
+        ...data.topTags.map((t) => t.imageUrl),
+        data.mostWatchedScene?.imageUrl,
+        data.mostViewedImage?.imageUrl,
+        data.mostOdScene?.imageUrl,
+        data.mostOdPerformer?.imageUrl,
+      ].filter((url): url is string => Boolean(url));
 
-      // Top scenes
-      response.data.topScenes.forEach((s) => checkProxyUrl(s.imageUrl));
-
-      // Top performers
-      response.data.topPerformers.forEach((p) => checkProxyUrl(p.imageUrl));
-
-      // Top studios
-      response.data.topStudios.forEach((s) => checkProxyUrl(s.imageUrl));
-
-      // Top tags
-      response.data.topTags.forEach((t) => checkProxyUrl(t.imageUrl));
-
-      // Highlights
-      if (response.data.mostWatchedScene) {
-        checkProxyUrl(response.data.mostWatchedScene.imageUrl);
-      }
-      if (response.data.mostViewedImage) {
-        checkProxyUrl(response.data.mostViewedImage.imageUrl);
-      }
-      if (response.data.mostOdScene) {
-        checkProxyUrl(response.data.mostOdScene.imageUrl);
-      }
-      if (response.data.mostOdPerformer) {
-        checkProxyUrl(response.data.mostOdPerformer.imageUrl);
+      for (const url of imageUrls) {
+        expect(url).not.toMatch(/^https?:\/\//);
+        expect(url).toContain("/api/proxy/stash");
       }
     });
   });

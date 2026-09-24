@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -54,9 +55,8 @@ describe("Image Date Filters", () => {
 
       // All returned images should have a date > 2020-01-01
       for (const image of response.data.findImages.images) {
-        if (image.date) {
-          expect(image.date > "2020-01-01").toBe(true);
-        }
+        // The filter matches only dated images
+        expect(must(image.date, "image.date") > "2020-01-01").toBe(true);
       }
     });
 
@@ -100,12 +100,9 @@ describe("Image Date Filters", () => {
 
       // All returned images should have a date within the range
       for (const image of response.data.findImages.images) {
-        expect(image.date).not.toBeNull();
-        expect(image.date).toBeDefined();
-        if (image.date) {
-          expect(image.date >= "2022-01-01").toBe(true);
-          expect(image.date <= "2022-12-31").toBe(true);
-        }
+        const date = must(image.date, "image.date");
+        expect(date >= "2022-01-01").toBe(true);
+        expect(date <= "2022-12-31").toBe(true);
       }
     });
 

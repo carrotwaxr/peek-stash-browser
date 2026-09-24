@@ -68,13 +68,12 @@ describe("Timeline API", () => {
       );
       expect(response.ok).toBe(true);
 
-      if (response.data.distribution.length > 0) {
-        const item = must(response.data.distribution[0]);
-        expect(item.period).toBeDefined();
-        expect(typeof item.period).toBe("string");
-        expect(item.count).toBeDefined();
-        expect(typeof item.count).toBe("number");
-      }
+      // The library has dated scenes
+      const item = must(response.data.distribution[0], "a distribution item");
+      expect(item.period).toBeDefined();
+      expect(typeof item.period).toBe("string");
+      expect(item.count).toBeDefined();
+      expect(typeof item.count).toBe("number");
     });
   });
 });

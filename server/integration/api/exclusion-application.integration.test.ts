@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -87,10 +88,10 @@ describe("Exclusion Application", () => {
 
       // Verify excluded performer not in results
       for (const scene of response.data.findScenes.scenes) {
-        if (scene.performers) {
-          const performerIds = scene.performers.map((p) => p.id);
-          expect(performerIds).not.toContain(TEST_ENTITIES.performerWithScenes);
-        }
+        const performerIds = must(scene.performers, "scene.performers").map(
+          (p) => p.id
+        );
+        expect(performerIds).not.toContain(TEST_ENTITIES.performerWithScenes);
       }
     });
 
@@ -128,10 +129,9 @@ describe("Exclusion Application", () => {
       const includesCount = includesResponse.data.findScenes.count;
       const excludesCount = excludesResponse.data.findScenes.count;
 
-      // At minimum, includes + excludes should not both be 0 if performer has scenes
-      if (includesCount > 0) {
-        expect(includesCount).not.toBe(excludesCount);
-      }
+      // performerWithScenes has scenes, so the two counts differ
+      expect(includesCount).toBeGreaterThan(0);
+      expect(includesCount).not.toBe(excludesCount);
     });
   });
 
@@ -155,9 +155,8 @@ describe("Exclusion Application", () => {
 
       // Verify excluded studio not in results
       for (const scene of response.data.findScenes.scenes) {
-        if (scene.studio) {
-          expect(scene.studio.id).not.toBe(TEST_ENTITIES.studioWithScenes);
-        }
+        // A scene without a studio passes: it is not the excluded one
+        expect(scene.studio?.id).not.toBe(TEST_ENTITIES.studioWithScenes);
       }
     });
   });
@@ -182,10 +181,8 @@ describe("Exclusion Application", () => {
 
       // Verify excluded tag not in results
       for (const scene of response.data.findScenes.scenes) {
-        if (scene.tags) {
-          const tagIds = scene.tags.map((t) => t.id);
-          expect(tagIds).not.toContain(TEST_ENTITIES.tagWithEntities);
-        }
+        const tagIds = must(scene.tags, "scene.tags").map((t) => t.id);
+        expect(tagIds).not.toContain(TEST_ENTITIES.tagWithEntities);
       }
     });
   });
@@ -236,10 +233,8 @@ describe("Exclusion Application", () => {
 
       // Should have scenes from the studio but without the excluded tag
       for (const scene of response.data.findScenes.scenes) {
-        if (scene.tags) {
-          const tagIds = scene.tags.map((t) => t.id);
-          expect(tagIds).not.toContain(TEST_ENTITIES.restrictableTag);
-        }
+        const tagIds = must(scene.tags, "scene.tags").map((t) => t.id);
+        expect(tagIds).not.toContain(TEST_ENTITIES.restrictableTag);
       }
     });
   });

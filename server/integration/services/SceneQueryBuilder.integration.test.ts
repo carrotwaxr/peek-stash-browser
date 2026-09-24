@@ -126,11 +126,11 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     });
 
     // Different seeds should give different orders (with enough scenes)
-    if (result1.scenes.length >= 3 && result2.scenes.length >= 3) {
-      const order1 = result1.scenes.map((s) => s.id).join(",");
-      const order2 = result2.scenes.map((s) => s.id).join(",");
-      expect(order1).not.toEqual(order2);
-    }
+    expect(result1.scenes.length).toBeGreaterThanOrEqual(3);
+    expect(result2.scenes.length).toBeGreaterThanOrEqual(3);
+    const order1 = result1.scenes.map((s) => s.id).join(",");
+    const order2 = result2.scenes.map((s) => s.id).join(",");
+    expect(order1).not.toEqual(order2);
   });
 
   it("should produce shuffled non-sequential IDs with random sort", async () => {
@@ -192,11 +192,10 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     });
 
     // Same seed should produce identical results
-    if (result1.scenes.length >= 2 && result2.scenes.length >= 2) {
-      const ids1 = result1.scenes.map((s) => s.id);
-      const ids2 = result2.scenes.map((s) => s.id);
-      expect(ids1).toEqual(ids2);
-    }
+    expect(result1.scenes.length).toBeGreaterThanOrEqual(2);
+    const ids1 = result1.scenes.map((s) => s.id);
+    const ids2 = result2.scenes.map((s) => s.id);
+    expect(ids1).toEqual(ids2);
   });
 
   it("should fetch scenes by IDs with full relations", async () => {
