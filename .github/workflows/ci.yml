@@ -210,6 +210,8 @@ jobs:
   image:
     name: Image Smoke Test
     uses: ./.github/workflows/image-smoke.yml
+    with:
+      browser-checks: true
 
   # Integration tests require access to a Stash test instance on the local network.
   # This job only runs on self-hosted runners with network access to the test server.
