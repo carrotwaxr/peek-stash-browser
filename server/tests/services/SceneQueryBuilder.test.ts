@@ -502,4 +502,98 @@ describe("SceneQueryBuilder", () => {
       );
     });
   });
+
+  describe("user history", () => {
+    const executeOptions = {
+      userId: 1,
+      sort: "created_at",
+      sortDirection: "DESC" as const,
+      page: 1,
+      perPage: 10,
+    };
+    const O_AT = "2025-10-25T03:50:32.452Z";
+    const PLAYED_AT = ["2025-10-25T03:46:27.346Z", "2025-10-26T08:00:00.000Z"];
+
+    // Prisma decodes the JSONB history columns in a raw query: a list stored
+    // as an array arrives as the array, one stored by the old updates
+    // (JSON.stringify(...) of the list) arrives as that string.
+    const executeWith = async (
+      userOHistory: string[] | string,
+      userPlayHistory: string[] | string
+    ) => {
+      const row = {
+        id: "1",
+        stashInstanceId: "inst-a",
+        title: "Scene 1",
+        code: null,
+        date: null,
+        studioId: null,
+        stashRating100: null,
+        duration: 60,
+        organized: 0,
+        details: null,
+        director: null,
+        urls: null,
+        filePath: "/v/scene1.mp4",
+        fileBitRate: null,
+        fileFrameRate: null,
+        fileWidth: 1280,
+        fileHeight: 720,
+        fileVideoCodec: "h264",
+        fileAudioCodec: "aac",
+        fileSize: null,
+        pathScreenshot: null,
+        pathPreview: null,
+        pathSprite: null,
+        pathVtt: null,
+        pathChaptersVtt: null,
+        pathStream: null,
+        pathCaption: null,
+        captions: null,
+        streams: null,
+        inheritedTagIds: null,
+        stashOCounter: 0,
+        stashPlayCount: 0,
+        stashPlayDuration: 0,
+        stashCreatedAt: null,
+        stashUpdatedAt: null,
+        userRating: null,
+        userFavorite: null,
+        userPlayCount: 2,
+        userPlayDuration: 100,
+        userLastPlayedAt: null,
+        userOCount: 1,
+        userResumeTime: null,
+        userOHistory,
+        userPlayHistory,
+      };
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([row]) // main query
+        .mockResolvedValueOnce([{ total: 1 }]) // count query
+        .mockResolvedValue([]);
+
+      const result = await sceneQueryBuilder.execute(executeOptions);
+      return must(result.scenes[0]);
+    };
+
+    it("reads a history stored as an array", async () => {
+      const scene = await executeWith([O_AT], PLAYED_AT);
+
+      expect(scene.o_history).toEqual([new Date(O_AT)]);
+      expect(scene.last_o_at).toBe(O_AT);
+      expect(scene.play_history).toEqual(PLAYED_AT);
+    });
+
+    it("reads a history stored as a JSON-encoded string", async () => {
+      const scene = await executeWith(
+        JSON.stringify([O_AT]),
+        JSON.stringify(PLAYED_AT)
+      );
+
+      expect(scene.o_history).toEqual([new Date(O_AT)]);
+      expect(scene.last_o_at).toBe(O_AT);
+      expect(scene.play_history).toEqual(PLAYED_AT);
+    });
+  });
 });

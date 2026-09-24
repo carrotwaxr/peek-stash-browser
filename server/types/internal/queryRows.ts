@@ -12,9 +12,12 @@
  *   - BOOLEAN -> boolean (fields below that still say 0 | 1 are wrong)
  *   - TEXT -> string
  *   - NULL -> null
- *   - JSON columns -> string (parsed in transformRow)
+ *   - JSON held in TEXT columns -> string (parsed in transformRow)
+ *   - JSONB columns (WatchHistory's oHistory and playHistory) -> the decoded
+ *     JSON value, as Prisma.JsonValue
  *   - LEFT JOIN columns -> T | null
  */
+import type { Prisma } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // SceneQueryBuilder
@@ -73,8 +76,9 @@ export interface SceneQueryRow {
   userLastPlayedAt: string | null;
   userOCount: number | null;
   userResumeTime: number | null;
-  userOHistory: string | null; // JSON-encoded string[]
-  userPlayHistory: string | null; // JSON-encoded string[]
+  // JSONB, decoded: the list, or the JSON-encoded string older updates stored
+  userOHistory: Prisma.JsonValue | null;
+  userPlayHistory: Prisma.JsonValue | null;
 }
 
 // ---------------------------------------------------------------------------
