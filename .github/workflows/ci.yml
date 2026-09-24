@@ -50,6 +50,9 @@ jobs:
         working-directory: shared
         run: npm ci && npm run build
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Lint
         run: npm run lint
 
