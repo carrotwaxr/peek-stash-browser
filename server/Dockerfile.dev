@@ -10,10 +10,11 @@ COPY shared/ ./shared/
 WORKDIR /app/shared
 RUN npm ci && npm run build
 
-# Install server dependencies
+# Install server dependencies. The stamp lets a container notice that
+# package-lock.json changed after its node_modules volume was filled (CMD).
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm install
+RUN npm ci && sha256sum package-lock.json > node_modules/.package-lock.sha256
 
 # Copy prisma schema and generate client
 COPY server/prisma ./prisma
@@ -24,5 +25,7 @@ COPY server/ .
 
 EXPOSE 8000
 
-# Development mode with nodemon for hot reloading
-CMD ["npm", "run", "dev"]
+# Development mode with nodemon for hot reloading. node_modules is an anonymous
+# volume, which outlives image rebuilds: reinstall into it when package-lock.json
+# changed since it was filled
+CMD ["sh", "-c", "sha256sum -c --status node_modules/.package-lock.sha256 2>/dev/null || { echo 'package-lock.json changed: reinstalling node_modules'; npm ci && sha256sum package-lock.json > node_modules/.package-lock.sha256; } && exec npm run dev"]

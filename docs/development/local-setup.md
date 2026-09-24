@@ -36,7 +36,7 @@ The fastest way to get a development environment running:
 4. **Start the development stack**:
 
     ```bash
-    docker compose up -d
+    docker compose up --build -d
     ```
 
 5. **Access the app**: Open `http://localhost:6969`
@@ -249,12 +249,7 @@ The dev server regenerates the Prisma client and applies migrations every time i
 
 ### Docker Compose Issues
 
-```bash
-# Rebuild containers
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
+Rebuild the containers with `docker compose up --build -d`. Each container reinstalls its dependencies itself when `package-lock.json` changed since its `node_modules` volume was filled, so no `-V` is needed after pulling a dependency change.
 
 ### Clear Node Modules
 
