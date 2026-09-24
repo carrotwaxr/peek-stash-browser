@@ -1,6 +1,12 @@
+import type { ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { createAuthValue } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultSettings } from "../../src/config/entityDisplayConfig";
+import {
+  AuthContext,
+  type AuthContextValue,
+} from "../../src/contexts/AuthContextProvider";
 // Import after mock setup
 import {
   CardDisplaySettingsProvider,
@@ -20,6 +26,35 @@ vi.mock("../../src/api", () => ({
   apiGet: (...args: unknown[]) => mockGet(...args),
   apiPut: (...args: unknown[]) => mockPut(...args),
 }));
+
+// The provider loads settings only for a signed-in user (useAuth).
+const signedIn = createAuthValue({ isAuthenticated: true });
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <AuthContext.Provider value={signedIn}>
+    <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
+  </AuthContext.Provider>
+);
+
+/** Renders the hook under a provider whose auth state can change. */
+function renderWithAuth(initialAuth: AuthContextValue) {
+  let auth = initialAuth;
+  const authWrapper = ({ children }: { children: ReactNode }) => (
+    <AuthContext.Provider value={auth}>
+      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
+    </AuthContext.Provider>
+  );
+  const view = renderHook(() => useCardDisplaySettings(), {
+    wrapper: authWrapper,
+  });
+  return {
+    ...view,
+    setAuth: (next: AuthContextValue) => {
+      auth = next;
+      view.rerender();
+    },
+  };
+}
 
 describe("useCardDisplaySettings", () => {
   beforeEach(() => {
@@ -47,10 +82,6 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("with provider", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-    );
-
     it("initially shows loading state then loads", async () => {
       const { result } = renderHook(() => useCardDisplaySettings(), {
         wrapper,
@@ -90,11 +121,54 @@ describe("useCardDisplaySettings", () => {
     });
   });
 
-  describe("getSettings", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-    );
+  describe("auth", () => {
+    const userSettings = {
+      settings: { cardDisplaySettings: { scene: { showRating: false } } },
+    };
 
+    it("does not ask for user settings while signed out", async () => {
+      mockGet.mockResolvedValue(userSettings);
+      const { result } = renderWithAuth(
+        createAuthValue({ isAuthenticated: false, isLoading: false })
+      );
+
+      // Let any request the mount started settle before checking.
+      await act(async () => {});
+      expect(mockGet).not.toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.getSettings("scene")).toEqual(
+        getDefaultSettings("scene")
+      );
+    });
+
+    it("loads user settings once the user signs in", async () => {
+      mockGet.mockResolvedValue(userSettings);
+      const { result, setAuth } = renderWithAuth(
+        createAuthValue({ isAuthenticated: false, isLoading: false })
+      );
+
+      setAuth(createAuthValue({ isAuthenticated: true, isLoading: false }));
+
+      await waitFor(() => {
+        expect(result.current.getSettings("scene").showRating).toBe(false);
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(mockGet).toHaveBeenCalledWith("/user/settings");
+    });
+
+    it("stays loading without a request while auth is loading", async () => {
+      const { result } = renderWithAuth(
+        createAuthValue({ isAuthenticated: false, isLoading: true })
+      );
+
+      await act(async () => {});
+      expect(mockGet).not.toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(true);
+    });
+  });
+
+  describe("getSettings", () => {
     it("returns default settings for scene entity type", async () => {
       const { result } = renderHook(() => useCardDisplaySettings(), {
         wrapper,
@@ -182,10 +256,6 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("updateSettings", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-    );
-
     it("performs optimistic update", async () => {
       const { result } = renderHook(() => useCardDisplaySettings(), {
         wrapper,
@@ -271,10 +341,6 @@ describe("useCardDisplaySettings", () => {
   });
 
   describe("error handling", () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <CardDisplaySettingsProvider>{children}</CardDisplaySettingsProvider>
-    );
-
     it("handles API load failure gracefully", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")

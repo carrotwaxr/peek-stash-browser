@@ -71,6 +71,39 @@ test.describe("Unauthenticated access", () => {
     await expect(page.locator(".text-red-500")).toBeVisible({ timeout: 5_000 });
   });
 
+  test("a signed-out deep link loads the app once and lands on the login page", async ({
+    page,
+  }) => {
+    const documents: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document") {
+        documents.push(new URL(request.url()).pathname);
+      }
+    });
+
+    await page.goto("/performers");
+    await expect(page.getByLabel("Username")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+
+    // One document: the router's own redirect, not a full reload to /login
+    expect(documents).toEqual(["/performers"]);
+    expect(new URL(page.url()).pathname).toBe("/login");
+    // Signing in returns to the deep link
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("peek_auth_redirect"))
+    ).toBe("/performers");
+  });
+
+  test("the forgot-password page opens while signed out", async ({ page }) => {
+    await page.goto("/forgot-password");
+    await page.waitForLoadState("networkidle");
+
+    expect(new URL(page.url()).pathname).toBe("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Forgot Password" })
+    ).toBeVisible();
+  });
+
   test("protected routes redirect to login", async ({ page }) => {
     const protectedRoutes = [
       "/scenes",

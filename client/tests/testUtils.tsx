@@ -9,6 +9,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
+import type { AuthContextValue } from "@/contexts/AuthContextProvider";
 
 // ============================================================================
 // Query Client Wrapper
@@ -36,6 +37,29 @@ export const createQueryWrapper = () => {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 };
+
+// ============================================================================
+// Auth Context Value
+// ============================================================================
+
+/**
+ * An AuthContext value for rendering code that calls useAuth without
+ * AuthProvider's /auth/check request. Defaults to a finished check, signed out.
+ *
+ * @example
+ * <AuthContext.Provider value={createAuthValue({ isAuthenticated: true })}>
+ */
+export const createAuthValue = (
+  overrides: Partial<AuthContextValue> = {}
+): AuthContextValue => ({
+  isAuthenticated: false,
+  isLoading: false,
+  user: null,
+  login: vi.fn(),
+  logout: vi.fn(),
+  updateUser: vi.fn(),
+  ...overrides,
+});
 
 // ============================================================================
 // Router Wrapper

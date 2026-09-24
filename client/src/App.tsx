@@ -499,8 +499,8 @@ const AppContent = () => {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <ConfigProvider>
             <UnitPreferenceProvider>
@@ -522,8 +522,8 @@ function App() {
           </ConfigProvider>
           <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
