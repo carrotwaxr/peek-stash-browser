@@ -2,6 +2,32 @@
 
 Self-hosted web app for browsing and streaming media from one or more Stash servers, with playlists, ratings and per-user content restrictions. Ships as a single Docker image.
 
+## What Peek is
+
+What Peek adds to Stash, and the invariants every change keeps. `.claude/rules/` has the detail per area.
+
+- Users and access: ADMIN and USER accounts; groups grant Can Share, Download Files and Download Playlists (denied by default; a per-user override beats groups); recovery keys; trusted-header SSO; login rate limit and lockout; a setup wizard.
+- Per-user data, keyed by user and instance: ratings and favorites on all 7 entity types, watch history and resume points, O counts, image views, stats, hidden items, presets, carousels, themes and other preferences. Rating, favorite, O-count and play fields in responses are the requesting user's, not Stash's.
+- Content restrictions: an admin gives a user Show-only and Always-hide lists of collections, tags, studios and galleries (tags and studios include their descendants; Always-hide wins), cascading to the entities they cover; precomputed into `UserExcludedEntity`.
+- Multi-instance: one Peek in front of several Stash servers. Each user picks which enabled instances to see, as a preference, not access control.
+- Media: streams, captions and images go through Peek; the external player gets a personal signed link (12 h). Named playlists shareable with groups, TV mode, timeline and folder views, recommendations and similar scenes from the user's own data.
+- Downloads: scene files and playlist zips with NFO, permission-gated and queued.
+- Operations: a synced SQL cache of each library, merge reconciliation, per-user Sync to Stash and Sync from Stash, database backups.
+
+Invariants:
+
+1. No user needs, sees or receives Stash credentials. The API key never leaves the server; Stash's address reaches only admins.
+2. Every request that shows or serves Stash content is authenticated as a Peek user: a session, or on the direct stream a personal signed link.
+3. A user's exclusions (restrictions, hidden items, cascades) apply on every surface that lists, counts, recommends, shows or serves an entity, by-id lookups, downloads and media included.
+4. Only admins set restrictions, and never on admin accounts; users cannot bypass them. Hidden items belong to the user who hid them.
+5. Admins bypass restrictions; everyone's own hidden items apply to them everywhere.
+6. No user sees another user's data, except shared playlists and admin exclusion counts. Deleting a user deletes all their data.
+7. Everything stored about a Stash entity carries its instance.
+8. Peek never edits Stash metadata. It writes to Stash only through Sync to Stash, which only an admin can switch on for a user.
+9. Sharing and downloading are denied by default and enforced on the server.
+10. Sharing never widens access: a recipient sees only what their own exclusions allow.
+11. Instance selection only narrows what a user sees: disabled instances never show, and an empty selection means all enabled instances.
+
 ## Commands
 
 - Dev: `docker compose up --build -d` (client on :6969, server on :8000); `docker compose logs -f peek-server`. Each container reinstalls `node_modules` when `package-lock.json` changed, and the server regenerates its Prisma client, so no `-V` is needed.
