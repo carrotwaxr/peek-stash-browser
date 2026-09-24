@@ -16,7 +16,6 @@ vi.mock("../../prisma/singleton.js", () => ({
       upsert: vi.fn(),
       deleteMany: vi.fn(),
       findMany: vi.fn(),
-      findFirst: vi.fn(),
     },
   },
 }));
@@ -625,51 +624,54 @@ describe("UserHiddenEntityService", () => {
     });
   });
 
-  // ─── isHiddenByUser ───────────────────────────────────────────────
+  // ─── findAlreadyHidden ────────────────────────────────────────────
 
-  describe("isHiddenByUser", () => {
-    it("matches the instance or a hide stored for every instance", async () => {
+  describe("findAlreadyHidden", () => {
+    it("reads the user's hides of the whole batch in one query", async () => {
       (
-        mockPrisma.userHiddenEntity.findFirst as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ id: 1 });
+        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([]);
 
-      const hidden = await userHiddenEntityService.isHiddenByUser(
-        1,
-        "scene",
-        "42",
-        "inst-a"
-      );
+      await userHiddenEntityService.findAlreadyHidden(1, [
+        { entityType: "scene", entityId: "42", instanceId: "A" },
+        { entityType: "tag", entityId: "42", instanceId: "" },
+        { entityType: "scene", entityId: "43", instanceId: "" },
+      ]);
 
-      expect(hidden).toBe(true);
-      expect(mockPrisma.userHiddenEntity.findFirst).toHaveBeenCalledWith({
-        where: {
-          userId: 1,
-          entityType: "scene",
-          entityId: "42",
-          instanceId: { in: ["inst-a", ""] },
-        },
-        select: { id: true },
+      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.userHiddenEntity.findMany).toHaveBeenCalledWith({
+        where: { userId: 1, entityId: { in: ["42", "43"] } },
+        select: { entityType: true, entityId: true, instanceId: true },
       });
     });
 
-    it("without an instance, matches only a hide stored for every instance", async () => {
+    it("an instance matches its own hide or one stored for every instance; no instance matches any hide", async () => {
       (
-        mockPrisma.userHiddenEntity.findFirst as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(null);
+        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([
+        { entityType: "scene", entityId: "1", instanceId: "" },
+        { entityType: "scene", entityId: "2", instanceId: "A" },
+        { entityType: "scene", entityId: "3", instanceId: "B" },
+        { entityType: "tag", entityId: "4", instanceId: "A" },
+      ]);
 
-      const hidden = await userHiddenEntityService.isHiddenByUser(
-        1,
-        "tag",
-        "7",
-        ""
-      );
+      const hidden = await userHiddenEntityService.findAlreadyHidden(1, [
+        { entityType: "scene", entityId: "1", instanceId: "A" }, // "" covers A
+        { entityType: "scene", entityId: "2", instanceId: "A" }, // same instance
+        { entityType: "scene", entityId: "2", instanceId: "" }, // any hide
+        { entityType: "scene", entityId: "3", instanceId: "A" }, // other instance
+        { entityType: "scene", entityId: "4", instanceId: "" }, // other type
+        { entityType: "scene", entityId: "5", instanceId: "" }, // not hidden
+      ]);
 
-      expect(hidden).toBe(false);
-      expect(mockPrisma.userHiddenEntity.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ instanceId: { in: [""] } }),
-        })
-      );
+      expect(hidden).toEqual([true, true, true, false, false, false]);
+    });
+
+    it("returns [] without a query for no targets", async () => {
+      await expect(
+        userHiddenEntityService.findAlreadyHidden(1, [])
+      ).resolves.toEqual([]);
+      expect(mockPrisma.userHiddenEntity.findMany).not.toHaveBeenCalled();
     });
   });
 
