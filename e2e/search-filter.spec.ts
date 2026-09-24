@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { ListPage } from "./pages/ListPage";
+import { requireData } from "./support/data";
+import { runPrefix } from "./support/names";
 
 /**
  * E2E tests for search and filter functionality.
@@ -36,28 +39,29 @@ test.describe("Search and Filter", () => {
     await expect(page.getByPlaceholder("Search...")).toHaveValue("my search");
   });
 
-  test("filter panel opens and contains filter controls", async ({ page }) => {
-    await page.goto("/scenes");
-    await expect(page.getByPlaceholder("Search...")).toBeVisible({
-      timeout: 10_000,
+  test("a title filter narrows the results and shows a chip", async ({
+    page,
+  }) => {
+    const list = new ListPage(page);
+    await list.goto("/scenes");
+    requireData(await list.waitForResults("Scene"), "scenes");
+
+    // A title no scene has
+    await list.openFilters();
+    await page.getByPlaceholder("Search title...").fill(`zzzz-${runPrefix()}`);
+    await page.getByRole("button", { name: "Apply Filters" }).click();
+
+    await expect(page.getByText("No scenes found")).toBeVisible({
+      timeout: 15_000,
     });
+    await expect(list.cards("Scene")).toHaveCount(0);
+    const chip = page.getByRole("button", { name: /^Remove filter:/ });
+    await expect(chip).toHaveCount(1);
 
-    // Open the filter panel
-    const filtersButton = page.locator(
-      '[data-tv-search-item="filters-button"]'
-    );
-    await filtersButton.click();
-
-    // Filter panel content should be visible — check for common filter sections
-    // Look for filter labels/headings that appear in the panel
-    await expect(page.getByText("Clear All"))
-      .toBeVisible({
-        timeout: 5_000,
-      })
-      .catch(() => {
-        // "Clear All" only shows if there are active filters
-        // The panel itself being open is sufficient
-      });
+    // Removing the chip removes the filter
+    await chip.click();
+    await expect(list.cards("Scene").first()).toBeVisible({ timeout: 15_000 });
+    await expect(chip).toHaveCount(0);
   });
 
   test("sort direction toggles between ascending and descending", async ({

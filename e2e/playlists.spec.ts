@@ -1,22 +1,73 @@
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+import { mustOk } from "./support/api";
+import { deleteOwnPlaylists } from "./support/cleanup";
+import { requireData } from "./support/data";
+import { runPrefix, uniqueName } from "./support/names";
+import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
  * E2E tests for Playlist CRUD operations.
  *
- * Covers the full lifecycle: list, create, view detail, edit, delete.
- * All operations are local DB — no Stash data needed.
+ * Covers the full lifecycle: list, create, view detail, edit, delete. The run
+ * admin owns the playlists these tests create; every name goes through
+ * uniqueName, and afterAll deletes them. The empty state is a throwaway
+ * user's, since the run admin's list holds these tests' playlists.
  */
 
+/**
+ * Every playlist here is named uniqueName("playlist"), which is
+ * `<run prefix>-playlist-<worker>-<n>`: this is one worker's share of them
+ */
+const workerPlaylistPrefix = (workerIndex: number) =>
+  `${runPrefix()}-playlist-${workerIndex}-`;
+
+interface PlaylistRow {
+  id: number;
+  name: string;
+}
+
+/** The signed-in user's playlists, read from the server */
+async function listPlaylists(page: Page): Promise<PlaylistRow[]> {
+  const response = await mustOk(
+    await page.request.get("/api/playlists"),
+    "GET /api/playlists"
+  );
+  return ((await response.json()) as { playlists: PlaylistRow[] }).playlists;
+}
+
+async function gotoPlaylists(page: Page) {
+  await page.goto("/playlists");
+  await expect(
+    page.getByRole("heading", { name: "Playlists", exact: true })
+  ).toBeVisible({ timeout: 10_000 });
+}
+
+/** Creates a playlist through the New Playlist modal and waits for its card */
+async function createThroughModal(page: Page, name: string) {
+  await page.getByRole("button", { name: "+ New Playlist" }).click();
+  await page.getByLabel("Playlist Name *").fill(name);
+  await page.getByRole("button", { name: "Create" }).last().click();
+  await expect(playlistLink(page, name)).toBeVisible({ timeout: 10_000 });
+}
+
+const playlistLink = (page: Page, name: string) =>
+  page.getByRole("link", { name, exact: true });
+
+/** A playlist's card on the list (a Paper: div.rounded-lg.border) */
+const playlistCard = (page: Page, name: string) =>
+  page.locator(".rounded-lg.border").filter({ has: playlistLink(page, name) });
+
 test.describe("Playlist CRUD", () => {
-  const uniqueSuffix = Date.now();
+  // Only this worker's playlists: with fullyParallel, Playwright runs these
+  // tests in groups on several workers at once, each group with its own
+  // afterAll, so deleting every playlist of the run would pull them from
+  // under tests still running elsewhere
+  test.afterAll(({ request }, testInfo) =>
+    deleteOwnPlaylists(request, workerPlaylistPrefix(testInfo.workerIndex))
+  );
 
   test("playlists page loads with heading and tabs", async ({ page }) => {
-    await page.goto("/playlists");
-
-    // Main heading
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Tab buttons should be visible (showEmpty + showSingleTab means both always show)
     await expect(page.getByText("My Playlists")).toBeVisible();
@@ -28,37 +79,64 @@ test.describe("Playlist CRUD", () => {
     ).toBeVisible();
   });
 
-  test("shows playlists or empty state after loading", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+  test("a user with no playlists sees the empty state", async ({
+    request,
+    browser,
+    baseURL,
+  }) => {
+    const user = await createUser(request, "no-playlists");
+    try {
+      const context = await signIn(browser, baseURL, user);
+      try {
+        await completeSetup(context);
+        const userPage = await context.newPage();
+        await gotoPlaylists(userPage);
 
-    // After loading, page shows either playlist cards or empty state
-    const hasPlaylists = await page
-      .getByRole("link")
-      .filter({ hasText: /.+/ })
-      .first()
-      .isVisible()
-      .catch(() => false);
-
-    if (hasPlaylists) {
-      // Playlists exist — verify the list rendered
-      await expect(page.getByText(/\d+ videos?/).first()).toBeVisible();
-    } else {
-      // No playlists — verify empty state
-      await expect(page.getByText("No playlists yet")).toBeVisible();
-      await expect(
-        page.getByText("Create your first playlist to get started")
-      ).toBeVisible();
+        await expect(userPage.getByText("No playlists yet")).toBeVisible();
+        await expect(
+          userPage.getByText("Create your first playlist to get started")
+        ).toBeVisible();
+      } finally {
+        await context.close();
+      }
+    } finally {
+      await deleteUser(request, user.id);
     }
   });
 
-  test("shared tab shows empty state", async ({ page }) => {
-    await page.goto("/playlists");
+  test("a playlist card shows its video count", async ({ page }) => {
+    const found = await mustOk(
+      await page.request.post("/api/library/scenes", {
+        data: { filter: { per_page: 1 } },
+      }),
+      "POST /api/library/scenes"
+    );
+    const { findScenes } = (await found.json()) as {
+      findScenes: { scenes: { id: string }[] };
+    };
+    const scene = requireData(findScenes.scenes[0], "a scene");
+
+    const name = uniqueName("playlist");
+    const created = await mustOk(
+      await page.request.post("/api/playlists", { data: { name } }),
+      "POST /api/playlists"
+    );
+    const { playlist } = (await created.json()) as { playlist: PlaylistRow };
+    await mustOk(
+      await page.request.post(`/api/playlists/${playlist.id}/items`, {
+        data: { sceneId: scene.id },
+      }),
+      `POST /api/playlists/${playlist.id}/items`
+    );
+
+    await gotoPlaylists(page);
     await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+      playlistCard(page, name).getByText("1 video", { exact: true })
+    ).toBeVisible();
+  });
+
+  test("shared tab shows empty state", async ({ page }) => {
+    await gotoPlaylists(page);
 
     // Switch to Shared tab
     await page.getByText("Shared with Me").click();
@@ -78,10 +156,7 @@ test.describe("Playlist CRUD", () => {
   });
 
   test("can create a new playlist", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Click the New Playlist button
     await page.getByRole("button", { name: "+ New Playlist" }).click();
@@ -90,7 +165,7 @@ test.describe("Playlist CRUD", () => {
     await expect(page.getByText("Create New Playlist")).toBeVisible();
 
     // Fill in the form
-    const playlistName = `E2E Playlist ${uniqueSuffix}`;
+    const playlistName = uniqueName("playlist");
     await page.getByLabel("Playlist Name *").fill(playlistName);
     await page.getByLabel("Description (Optional)").fill("Created by E2E test");
 
@@ -102,23 +177,21 @@ test.describe("Playlist CRUD", () => {
     await createButton.click();
 
     // Wait for the playlist name to appear in the list (confirms creation + modal close)
-    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+    await expect(playlistLink(page, playlistName)).toBeVisible({
       timeout: 10_000,
     });
   });
 
   test("create modal cancel closes without creating", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Open the modal
     await page.getByRole("button", { name: "+ New Playlist" }).click();
     await expect(page.getByText("Create New Playlist")).toBeVisible();
 
     // Fill in a name
-    await page.getByLabel("Playlist Name *").fill("Should Not Exist");
+    const playlistName = uniqueName("playlist");
+    await page.getByLabel("Playlist Name *").fill(playlistName);
 
     // Click Cancel
     await page.getByRole("button", { name: "Cancel" }).click();
@@ -126,15 +199,13 @@ test.describe("Playlist CRUD", () => {
     // Modal should close
     await expect(page.getByText("Create New Playlist")).not.toBeVisible();
 
-    // The playlist should NOT appear
-    await expect(page.getByText("Should Not Exist")).not.toBeVisible();
+    // The server has no playlist with that name
+    const names = (await listPlaylists(page)).map((p) => p.name);
+    expect(names).not.toContain(playlistName);
   });
 
   test("create button disabled when name is empty", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Open the modal
     await page.getByRole("button", { name: "+ New Playlist" }).click();
@@ -145,7 +216,7 @@ test.describe("Playlist CRUD", () => {
     await expect(createButton).toBeDisabled();
 
     // Fill in a name
-    await page.getByLabel("Playlist Name *").fill("Has Name");
+    await page.getByLabel("Playlist Name *").fill(uniqueName("playlist"));
     await expect(createButton).toBeEnabled();
 
     // Clear the name
@@ -154,26 +225,20 @@ test.describe("Playlist CRUD", () => {
   });
 
   test("can navigate to playlist detail", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // First create a playlist to navigate to
-    const playlistName = `Detail Nav ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "+ New Playlist" }).click();
-    await page.getByLabel("Playlist Name *").fill(playlistName);
-    await page.getByRole("button", { name: "Create" }).last().click();
-    await expect(page.getByText(playlistName)).toBeVisible({ timeout: 5_000 });
+    const playlistName = uniqueName("playlist");
+    await createThroughModal(page, playlistName);
 
     // Click the playlist name link
-    await page.getByRole("link", { name: playlistName }).click();
+    await playlistLink(page, playlistName).click();
 
     // Should navigate to the detail page
     await expect(page).toHaveURL(/\/playlist\/\d+/, { timeout: 10_000 });
 
     // Playlist name should appear as heading
-    await expect(page.getByText(playlistName)).toBeVisible();
+    await expect(page.getByText(playlistName, { exact: true })).toBeVisible();
 
     // Empty state should show since no scenes are added
     await expect(page.getByText("No scenes in this playlist yet")).toBeVisible({
@@ -182,35 +247,24 @@ test.describe("Playlist CRUD", () => {
   });
 
   test("can delete a playlist with confirmation", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Create a playlist to delete
-    const playlistName = `Delete Target ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "+ New Playlist" }).click();
-    await page.getByLabel("Playlist Name *").fill(playlistName);
-    await page.getByRole("button", { name: "Create" }).last().click();
-    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
-      timeout: 10_000,
-    });
+    const playlistName = uniqueName("playlist");
+    await createThroughModal(page, playlistName);
 
     // Navigate to playlist detail and delete from there
-    await page.getByRole("link", { name: playlistName }).click();
+    await playlistLink(page, playlistName).click();
     await expect(page).toHaveURL(/\/playlist\/\d+/, { timeout: 10_000 });
 
     // Go back to the list and use the Delete button on the card
-    await page.goto("/playlists");
-    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
+    await gotoPlaylists(page);
+    await expect(playlistLink(page, playlistName)).toBeVisible({
       timeout: 10_000,
     });
-
-    // Each playlist card is a Paper component (div.rounded-lg.border)
-    const card = page
-      .locator(".rounded-lg.border")
-      .filter({ has: page.getByRole("link", { name: playlistName }) });
-    await card.getByRole("button", { name: "Delete" }).click();
+    await playlistCard(page, playlistName)
+      .getByRole("button", { name: "Delete" })
+      .click();
 
     // Confirmation dialog should appear
     await expect(
@@ -225,37 +279,32 @@ test.describe("Playlist CRUD", () => {
     await dialog.getByRole("button", { name: "Delete" }).click();
 
     // Playlist should be removed from the list
-    await expect(
-      page.getByRole("link", { name: playlistName })
-    ).not.toBeVisible({ timeout: 5_000 });
+    await expect(playlistLink(page, playlistName)).not.toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("delete confirmation cancel keeps playlist", async ({ page }) => {
-    await page.goto("/playlists");
-    await expect(
-      page.getByRole("heading", { name: "Playlists", exact: true })
-    ).toBeVisible({ timeout: 10_000 });
+    await gotoPlaylists(page);
 
     // Create a playlist
-    const playlistName = `Cancel Delete ${uniqueSuffix}`;
-    await page.getByRole("button", { name: "+ New Playlist" }).click();
-    await page.getByLabel("Playlist Name *").fill(playlistName);
-    await page.getByRole("button", { name: "Create" }).last().click();
-    await expect(page.getByRole("link", { name: playlistName })).toBeVisible({
-      timeout: 10_000,
-    });
+    const playlistName = uniqueName("playlist");
+    await createThroughModal(page, playlistName);
 
-    // Each playlist card is a Paper component (div.rounded-lg.border)
-    const card = page
-      .locator(".rounded-lg.border")
-      .filter({ has: page.getByRole("link", { name: playlistName }) });
-    await card.getByRole("button", { name: "Delete" }).click();
+    await playlistCard(page, playlistName)
+      .getByRole("button", { name: "Delete" })
+      .click();
 
     // Cancel the deletion
     const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toHaveCount(0);
 
-    // Playlist should still be visible
-    await expect(page.getByRole("link", { name: playlistName })).toBeVisible();
+    // The playlist is still there after a reload
+    await page.reload();
+    await expect(playlistLink(page, playlistName)).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
