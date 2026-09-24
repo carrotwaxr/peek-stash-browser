@@ -1,6 +1,6 @@
 import { once } from "events";
 import fs from "fs";
-import type { Server } from "http";
+import http, { type Server } from "http";
 import type { AddressInfo } from "net";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -152,5 +152,61 @@ describe("health and version", () => {
     expect(res.status).toBe(200);
     expect(queryRaw).not.toHaveBeenCalled();
     expect(queryRawUnsafe).not.toHaveBeenCalled();
+  });
+});
+
+describe("startServer", () => {
+  const servers: Server[] = [];
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await Promise.all(
+      servers
+        .splice(0)
+        .filter((server) => server.listening)
+        .map(
+          (server) =>
+            new Promise<void>((resolve) => server.close(() => resolve()))
+        )
+    );
+    process.env = originalEnv;
+  });
+
+  const load = async () => {
+    const { logger } = await import("../../utils/logger.js");
+    const info = vi.spyOn(logger, "info");
+    const api = await import("../../initializers/api.js");
+    const messages = () => info.mock.calls.map(([message]) => message);
+    return { ...api, messages };
+  };
+
+  it("logs that the server is running once it listens", async () => {
+    const { messages, setupAPI, startServer } = await load();
+    const server = startServer(setupAPI(), 0);
+    servers.push(server);
+
+    await once(server, "listening");
+
+    expect(messages()).toContain("Server is running");
+  });
+
+  it("emits a port in use on the server, without logging that it is running", async () => {
+    const holder = http.createServer().listen(0);
+    servers.push(holder);
+    await once(holder, "listening");
+    const { port } = holder.address() as AddressInfo;
+    const { messages, setupAPI, startServer } = await load();
+
+    const server = startServer(setupAPI(), port);
+    servers.push(server);
+    const [error] = (await once(server, "error")) as [NodeJS.ErrnoException];
+
+    expect(error.code).toBe("EADDRINUSE");
+    expect(messages()).not.toContain("Server is running");
   });
 });

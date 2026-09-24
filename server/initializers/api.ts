@@ -189,15 +189,22 @@ export const setupAPI = () => {
 /**
  * Start the API server on the specified port.
  * Separated from setupAPI() to allow integration tests to start on a different port.
+ *
+ * No listen callback: Express 5 hands it a listen error (a port in use) as an
+ * argument, which would log "Server is running" for a server that is not.
+ * Without one the error is emitted on the returned server: uncaught, it ends
+ * the process; the integration setup listens for it.
  */
 export const startServer = (
   app: ReturnType<typeof setupAPI>,
   port: number = 8000
 ) => {
-  return app.listen(port, () => {
+  const server = app.listen(port);
+  server.once("listening", () => {
     logger.info("Server is running", {
       url: `http://localhost:${port}`,
       transcodingSystem: "session-based",
     });
   });
+  return server;
 };
