@@ -201,7 +201,6 @@ export const testStashConnection = async (
       hostname: parsedUrl.hostname,
       port: parsedUrl.port,
       apiKeyLength: apiKey?.length,
-      apiKeyPreview: apiKey ? `${apiKey.substring(0, 20)}...` : "NOT SET",
     });
 
     // Try to connect to Stash

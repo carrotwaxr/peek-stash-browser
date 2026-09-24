@@ -36,8 +36,10 @@ export function getStashUiUrl(instanceId?: string): string | null {
  * Uses the uiUrl if configured, otherwise falls back to the base url
  * @param entityType - Type of entity (scene, performer, studio, tag, group, gallery, image)
  * @param entityId - ID of the entity
- * @param instanceId - Optional instance ID for multi-instance routing
- * @returns Full URL to the entity in Stash, or null if stashBaseUrl is not available
+ * @param instanceId - Instance ID for multi-instance routing (undefined: the default instance)
+ * @param viewer - The requesting user. Stash's address is internal, so only
+ *   admins get a link; everyone else, and a missing viewer, gets null.
+ * @returns Full URL to the entity in Stash, or null
  */
 export function buildStashEntityUrl(
   entityType:
@@ -49,8 +51,13 @@ export function buildStashEntityUrl(
     | "gallery"
     | "image",
   entityId: string | number,
-  instanceId?: string
+  instanceId: string | undefined,
+  viewer: { role: string } | undefined
 ): string | null {
+  if (viewer?.role !== "ADMIN") {
+    return null;
+  }
+
   const baseUrl = getStashUiUrl(instanceId);
 
   if (!baseUrl) {

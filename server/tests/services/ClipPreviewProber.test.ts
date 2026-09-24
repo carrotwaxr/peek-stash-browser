@@ -2,6 +2,7 @@ import crypto from "crypto";
 import http from "http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClipPreviewProber } from "../../services/ClipPreviewProber.js";
+import { logger } from "../../utils/logger.js";
 
 describe("ClipPreviewProber", () => {
   describe("probePreviewUrl", () => {
@@ -11,6 +12,23 @@ describe("ClipPreviewProber", () => {
         "http://localhost:99999/nonexistent"
       );
       expect(result).toBe(false);
+    });
+
+    it("never logs the API key when a probe fails", async () => {
+      const debugSpy = vi.spyOn(logger, "debug");
+      try {
+        const prober = new ClipPreviewProber({ timeoutMs: 1000 });
+        // Port 1: connection refused, which logs the URL it probed
+        const result = await prober.probePreviewUrl(
+          "http://127.0.0.1:1/scene/1/preview?apikey=SECRETKEY"
+        );
+
+        expect(result).toBe(false);
+        expect(debugSpy).toHaveBeenCalled();
+        expect(JSON.stringify(debugSpy.mock.calls)).not.toContain("SECRETKEY");
+      } finally {
+        debugSpy.mockRestore();
+      }
     });
 
     it("should return false on timeout", async () => {

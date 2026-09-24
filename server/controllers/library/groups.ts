@@ -263,7 +263,8 @@ export const findGroups = async (
       stashUrl: buildStashEntityUrl(
         "group",
         group.id,
-        group.instanceId || undefined
+        group.instanceId || undefined,
+        req.user
       ),
     }));
 

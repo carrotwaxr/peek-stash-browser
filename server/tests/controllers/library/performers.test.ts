@@ -84,7 +84,9 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/performers/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/performers/${id}` : null
+    ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -551,7 +553,7 @@ describe("findPerformers", () => {
     const req = mockReq(
       { filter: { page: 1, per_page: 20 } },
       {},
-      { id: 1, role: "USER" }
+      { id: 1, role: "ADMIN" }
     );
     const res = mockRes();
 
@@ -564,6 +566,29 @@ describe("findPerformers", () => {
     expect(body.findPerformers.performers[0].stashUrl).toBe(
       "http://stash/performers/p1"
     );
+  });
+
+  it("does not send stashUrl to a regular user", async () => {
+    vi.mocked(performerQueryBuilder.execute).mockResolvedValue({
+      performers: [
+        createMockPerformer({ id: "p1" }),
+        createMockPerformer({ id: "p2" }),
+      ],
+      total: 2,
+    });
+
+    const req = mockReq(
+      { filter: { page: 1, per_page: 20 } },
+      {},
+      { id: 1, role: "USER" }
+    );
+    const res = mockRes();
+
+    await findPerformers(req, res);
+
+    const performers = res._getBody().findPerformers.performers;
+    expect(performers).toHaveLength(2);
+    for (const performer of performers) expect(performer.stashUrl).toBeNull();
   });
 
   it("returns 400 for ambiguous single-ID lookup (multiple instances)", async () => {

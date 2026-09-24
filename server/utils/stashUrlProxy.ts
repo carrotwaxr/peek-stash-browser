@@ -5,6 +5,7 @@
  * to the client. All Stash image/asset URLs are rewritten to go through Peek's
  * proxy endpoint.
  */
+import { redactUrl } from "./logRedaction.js";
 import { logger } from "./logger.js";
 
 /**
@@ -77,7 +78,9 @@ export const convertToProxyUrl = (url: string): string => {
 
     return proxyUrl;
   } catch (urlError) {
-    logger.error(`Error converting URL to proxy: ${url}`, { error: urlError });
+    logger.error(`Error converting URL to proxy: ${redactUrl(url)}`, {
+      error: urlError,
+    });
     return url; // Return original URL if parsing fails
   }
 };

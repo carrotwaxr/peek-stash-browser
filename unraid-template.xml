@@ -120,4 +120,5 @@
   <Config Name="PUID" Target="PUID" Default="99" Type="Variable" Display="advanced" Required="false" Description="User ID that owns the App Data Directory (99 = nobody).">99</Config>
   <Config Name="PGID" Target="PGID" Default="100" Type="Variable" Display="advanced" Required="false" Description="Group ID that owns the App Data Directory (100 = users).">100</Config>
   <Config Name="Reverse proxies in front of Peek" Target="TRUST_PROXY" Default="" Description="Number of reverse proxies (SWAG, Nginx Proxy Manager, Traefik) between browsers and Peek. Leave empty if none. Too high lets anyone fake their address." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Proxy auth trusted addresses" Target="PROXY_AUTH_TRUSTED_IPS" Default="" Description="Only with PROXY_AUTH_HEADER: comma-separated IPs or CIDR ranges of your auth proxy as Peek sees it. The username header is honoured only from these; the log names the address to add. Leave empty if you do not use proxy authentication." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 </Container>

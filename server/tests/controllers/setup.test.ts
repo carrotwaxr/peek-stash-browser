@@ -18,6 +18,7 @@ import {
   updateStashInstance,
 } from "../../controllers/setup.js";
 import prisma from "../../prisma/singleton.js";
+import { logger } from "../../utils/logger.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
@@ -226,6 +227,28 @@ describe("Setup Controller", () => {
 
       expect(res._getBody().success).toBe(true);
       expect(res._getBody().version).toBe("0.27.0");
+    });
+
+    it("logs the key length, never any of its characters", async () => {
+      const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sig";
+      const res = mockRes();
+      await testStashConnection(
+        mockReq(
+          { url: "http://stash:9999/graphql", apiKey },
+          {},
+          { role: "ADMIN" }
+        ),
+        res
+      );
+
+      expect(res._getBody().success).toBe(true);
+      const logged = JSON.stringify(
+        (["error", "warn", "info", "debug"] as const).map(
+          (level) => vi.mocked(logger[level]).mock.calls
+        )
+      );
+      expect(logged).toContain(`"apiKeyLength":${apiKey.length}`);
+      expect(logged).not.toContain("eyJhbGciOiJIUzI1NiIs");
     });
 
     it("returns 400 when URL is missing", async () => {

@@ -9,6 +9,7 @@ import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { privateCacheControl } from "../utils/cacheControl.js";
+import { redactUrl } from "../utils/logRedaction.js";
 import { logger } from "../utils/logger.js";
 import { canUserLoadMedia } from "../utils/mediaAccess.js";
 import {
@@ -147,7 +148,8 @@ function rewriteHlsPlaylist(
         return `/api/scene/${sceneId}/proxy-stream/${streamPath}${queryString}`;
       } catch {
         // If parsing fails, return original line (shouldn't happen for valid playlists)
-        logger.warn(`[PROXY] Failed to rewrite HLS line: ${line}`);
+        // Stash's playlist lines carry apikey
+        logger.warn(`[PROXY] Failed to rewrite HLS line: ${redactUrl(line)}`);
         return line;
       }
     })
@@ -370,7 +372,7 @@ export const getCaption = async (
       return res.status(404).send("Not found");
     }
 
-    logger.info(
+    logger.debug(
       `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId ?? "(not specified)"}`
     );
 
@@ -417,7 +419,7 @@ export const getCaption = async (
     res.setHeader("Cache-Control", "private, max-age=86400");
     res.send(captionData);
 
-    logger.info(
+    logger.debug(
       `[CAPTION] Served caption: scene=${sceneId}, lang=${lang}, size=${captionData.length} bytes`
     );
   } catch (error) {

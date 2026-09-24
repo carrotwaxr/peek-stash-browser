@@ -80,7 +80,9 @@ vi.mock("../../../utils/seededRandom.js", () => ({
 vi.mock("../../../utils/stashUrl.js", () => ({
   buildStashEntityUrl: vi
     .fn()
-    .mockImplementation((_type, id) => `http://stash/groups/${id}`),
+    .mockImplementation((_type, id, _inst, viewer) =>
+      viewer?.role === "ADMIN" ? `http://stash/groups/${id}` : null
+    ),
 }));
 
 const mockPrisma = vi.mocked(prisma);
@@ -352,11 +354,26 @@ describe("Groups Controller", () => {
       );
     });
 
-    it("adds stashUrl to each group", async () => {
+    it("adds stashUrl to each group for an admin", async () => {
       const groups = [createMockGroup({ id: "g1" })];
       mockGroupQueryBuilder.execute.mockResolvedValue({
         groups,
         total: 1,
+      });
+
+      const req = mockReq({ filter: {}, group_filter: {} }, {}, adminUser);
+      const res = mockRes();
+
+      await findGroups(req, res);
+
+      const body = res._getBody();
+      expect(body.findGroups.groups[0].stashUrl).toBe("http://stash/groups/g1");
+    });
+
+    it("does not send stashUrl to a regular user", async () => {
+      mockGroupQueryBuilder.execute.mockResolvedValue({
+        groups: [createMockGroup({ id: "g1" }), createMockGroup({ id: "g2" })],
+        total: 2,
       });
 
       const req = mockReq({ filter: {}, group_filter: {} }, {}, defaultUser);
@@ -364,8 +381,9 @@ describe("Groups Controller", () => {
 
       await findGroups(req, res);
 
-      const body = res._getBody();
-      expect(body.findGroups.groups[0].stashUrl).toBe("http://stash/groups/g1");
+      const groups = res._getBody().findGroups.groups;
+      expect(groups).toHaveLength(2);
+      for (const group of groups) expect(group.stashUrl).toBeNull();
     });
   });
 

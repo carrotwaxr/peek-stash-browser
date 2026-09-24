@@ -645,7 +645,23 @@ describe("Carousel Controller", () => {
       const res = mockRes();
       await previewCarousel(req, res);
 
-      expect(mockAddStreamability).toHaveBeenCalled();
+      // The viewer decides whether scenes carry the admin-only stashUrl
+      expect(mockAddStreamability).toHaveBeenCalledWith(rawScenes, USER);
+    });
+
+    it("passes the request user to addStreamabilityInfo for a saved carousel", async () => {
+      const scenes = [SAMPLE_SCENE];
+      mockPrisma.userCarousel.findFirst.mockResolvedValue(
+        SAMPLE_CAROUSEL as any
+      );
+      mockQueryBuilder.execute.mockResolvedValue({ scenes } as any);
+      mockAddStreamability.mockReturnValue(scenes as any);
+
+      const req = mockReq({}, { id: "1" }, USER);
+      const res = mockRes();
+      await executeCarouselById(req, res);
+
+      expect(mockAddStreamability).toHaveBeenCalledWith(scenes, USER);
     });
 
     it("passes CAROUSEL_SCENE_LIMIT (12) as perPage to query builder", async () => {

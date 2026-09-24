@@ -17,7 +17,9 @@ Peek never transcodes. It proxies Stash's own HLS streams and media files, and t
 
 ## Invariant
 
-No Stash host and no API key reaches the browser. The client gets media only through `/api/proxy/...`, `/api/scene/:sceneId/proxy-stream/...` and `/api/scene/:sceneId/caption`. The key travels upstream only: in an `ApiKey` header from `video.ts`, or as `apikey` on the server-side URL in `proxy.ts`, redacted in logs.
+No Stash host and no API key reaches the browser. The client gets media only through `/api/proxy/...`, `/api/scene/:sceneId/proxy-stream/...` and `/api/scene/:sceneId/caption`. The key travels upstream only: in an `ApiKey` header from `video.ts`, or as `apikey` on the server-side URL in `proxy.ts`, redacted in logs. Log any URL that can carry `apikey` or `sig` through `redactUrl` (`utils/logRedaction.ts`).
+
+The one exception is `stashUrl`, the View in Stash link on library entities, which holds Stash's UI address: `buildStashEntityUrl` takes the viewer and returns null unless it is an admin, so handlers pass `req.user` (through `addStreamabilityInfo` and `executeCarouselQuery` for scenes).
 
 ## Building proxy URLs
 

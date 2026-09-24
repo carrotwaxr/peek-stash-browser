@@ -312,7 +312,8 @@ export const previewCarousel = async (
       userId,
       rules as PeekSceneFilter,
       sort || "random",
-      direction || "DESC"
+      direction || "DESC",
+      req.user
     );
 
     res.json({ scenes });
@@ -330,12 +331,15 @@ export const previewCarousel = async (
  *
  * OPTIMIZED: For carousels without filters, uses DB pagination with pre-computed exclusions
  * For carousels with filters, still needs to load scenes but uses optimized exclusion checking
+ *
+ * `viewer` is the requesting user: only an admin's scenes carry stashUrl.
  */
 export async function executeCarouselQuery(
   userId: number,
   rules: PeekSceneFilter,
   sort: string,
-  direction: string
+  direction: string,
+  viewer: { role: string } | undefined
 ): Promise<NormalizedScene[]> {
   const startTime = Date.now();
 
@@ -355,7 +359,7 @@ export async function executeCarouselQuery(
       randomSeed: sort === "random" ? userId + Date.now() : userId,
     });
 
-    const scenes = addStreamabilityInfo(result.scenes);
+    const scenes = addStreamabilityInfo(result.scenes, viewer);
 
     logger.info("executeCarouselQuery complete (SQL path)", {
       totalTimeMs: Date.now() - startTime,
@@ -428,7 +432,7 @@ export async function executeCarouselQuery(
     );
 
     // Add streamability info
-    const finalScenes = addStreamabilityInfo(scenesWithUserData);
+    const finalScenes = addStreamabilityInfo(scenesWithUserData, viewer);
 
     logger.info(
       `executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`
@@ -490,7 +494,7 @@ export async function executeCarouselQuery(
   );
 
   // Add streamability info
-  scenes = addStreamabilityInfo(scenes);
+  scenes = addStreamabilityInfo(scenes, viewer);
 
   // Sort the results
   scenes = sortScenes(scenes, sort, direction);
@@ -535,7 +539,8 @@ export const executeCarouselById = async (
       userId,
       carousel.rules as PeekSceneFilter,
       carousel.sort,
-      carousel.direction
+      carousel.direction,
+      req.user
     );
 
     res.json({
