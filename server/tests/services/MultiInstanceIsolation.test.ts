@@ -13,43 +13,10 @@ import type { NormalizedScene } from "../../types/index.js";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 // Mock prisma before importing service
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    stashPerformer: { findFirst: vi.fn() },
-    stashStudio: { findMany: vi.fn() },
-    scenePerformer: { findMany: vi.fn(), count: vi.fn() },
-    galleryPerformer: { count: vi.fn() },
-    stashScene: { findMany: vi.fn() },
-    sceneTag: { findMany: vi.fn() },
-    performerTag: { findMany: vi.fn() },
-    studioTag: { findMany: vi.fn() },
-    groupTag: { findMany: vi.fn() },
-    sceneGroup: { findMany: vi.fn() },
-    sceneGallery: { findMany: vi.fn() },
-    imageGallery: { findMany: vi.fn() },
-    userExcludedEntity: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-    userContentRestriction: { findMany: vi.fn() },
-    userHiddenEntity: { findMany: vi.fn() },
-    userEntityStats: { upsert: vi.fn() },
-    user: { findMany: vi.fn() },
-    stashTag: { count: vi.fn() },
-    stashGroup: { count: vi.fn() },
-    stashGallery: { count: vi.fn() },
-    stashImage: { count: vi.fn() },
-    stashClip: { count: vi.fn() },
-    $transaction: vi.fn(),
-    $queryRaw: vi.fn(),
-    $queryRawUnsafe: vi.fn(),
-    $executeRaw: vi.fn(),
-    $executeRawUnsafe: vi.fn(),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock UserInstanceService: the exclusion compute resolves hides on the
 // user's allowed instances
@@ -72,7 +39,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 const createEmptyPrefs = (): EntityPreferences => ({
   favoritePerformers: new Set(),

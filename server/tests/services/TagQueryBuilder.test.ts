@@ -3,20 +3,10 @@ import prisma from "../../prisma/singleton.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-    performerTag: { findMany: vi.fn().mockResolvedValue([]) },
-    studioTag: { findMany: vi.fn().mockResolvedValue([]) },
-    groupTag: { findMany: vi.fn().mockResolvedValue([]) },
-    galleryTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    stashStudio: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGallery: { findMany: vi.fn().mockResolvedValue([]) },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -47,11 +37,21 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   ),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("TagQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.performerTag.findMany.mockResolvedValue([]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([]);
+    mockPrisma.groupTag.findMany.mockResolvedValue([]);
+    mockPrisma.galleryTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
+    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
+    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

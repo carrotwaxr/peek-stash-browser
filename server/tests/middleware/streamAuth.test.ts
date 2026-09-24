@@ -17,11 +17,10 @@ import {
   signStreamLink,
 } from "../../utils/streamLink.js";
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: { findUnique: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../middleware/auth.js", () => ({
   authenticate: vi.fn((_req: Request, _res: Response, next: NextFunction) =>
@@ -37,7 +36,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockAuthenticate = vi.mocked(authenticate);
 
 const NOW = new Date("2026-09-23T12:00:00Z");

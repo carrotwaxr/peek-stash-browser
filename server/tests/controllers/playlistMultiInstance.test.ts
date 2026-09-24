@@ -21,14 +21,10 @@ import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // ---------- mocks (must be before imports of modules under test) ----------
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    playlist: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -81,7 +77,7 @@ vi.mock("../../utils/instanceUtils.js", async (importOriginal) => {
   return { ...actual };
 });
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockGetScenes = vi.mocked(stashEntityService.getScenesByIdsWithRelations);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 

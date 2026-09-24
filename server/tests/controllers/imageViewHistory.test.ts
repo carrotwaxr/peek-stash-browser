@@ -20,18 +20,10 @@ import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock Prisma - hoisted before imports. Interactive transactions run their
 // callback on this same mock client.
-vi.mock("../../prisma/singleton.js", () => {
-  const client = {
-    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
-    user: { findUnique: vi.fn() },
-    imageViewHistory: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-  };
-  return { default: client };
-});
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock entityInstanceId (getImageViewHistory keeps its own lookup)
 vi.mock("../../utils/entityInstanceId.js", () => ({
@@ -48,7 +40,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockGetEntityInstanceId = vi.mocked(getEntityInstanceId);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 

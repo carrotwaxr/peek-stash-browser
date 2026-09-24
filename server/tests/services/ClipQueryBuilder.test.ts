@@ -10,11 +10,10 @@ import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -27,11 +26,12 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("ClipQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

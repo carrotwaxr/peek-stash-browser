@@ -30,11 +30,10 @@ import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
 import { logger } from "../../utils/logger.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: { findUnique: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock StashEntityService
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -54,7 +53,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockEntityService = vi.mocked(stashEntityService);
 
 const MOCK_USER = {

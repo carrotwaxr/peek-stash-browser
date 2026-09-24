@@ -27,14 +27,10 @@ import {
 } from "../../utils/recoveryKey.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../services/RankingComputeService.js", () => ({
   default: {
@@ -52,7 +48,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 // The stored form: SHA-256 hex of the key without dashes, upper case.
 const KEY = generateRecoveryKey();

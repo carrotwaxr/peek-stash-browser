@@ -3,16 +3,10 @@ import prisma from "../../prisma/singleton.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-    galleryPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    galleryTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    stashTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashStudio: { findMany: vi.fn().mockResolvedValue([]) },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -35,11 +29,17 @@ vi.mock("../../utils/titleUtils.js", () => ({
   getGalleryFallbackTitle: vi.fn().mockReturnValue("Untitled Gallery"),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("GalleryQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.galleryPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.galleryTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

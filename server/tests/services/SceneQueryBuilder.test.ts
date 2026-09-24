@@ -10,20 +10,10 @@ import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-    scenePerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneTag: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneGallery: { findMany: vi.fn().mockResolvedValue([]) },
-    stashPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    stashTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashStudio: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGallery: { findMany: vi.fn().mockResolvedValue([]) },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -47,11 +37,21 @@ vi.mock("../../utils/titleUtils.js", () => ({
   getSceneFallbackTitle: vi.fn().mockReturnValue("Untitled"),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("SceneQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
+    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
+    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
+    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

@@ -26,22 +26,10 @@ import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock Prisma - hoisted before imports
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    userCarousel: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock StashEntityService
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -83,7 +71,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
 

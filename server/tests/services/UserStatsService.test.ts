@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { logger } from "../../utils/logger.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Hoist mock functions so they can be referenced in vi.mock factories
 const { mockGetScene, mockGetScenesByIdsWithRelations } = vi.hoisted(() => ({
@@ -21,37 +22,10 @@ const { mockGetScene, mockGetScenesByIdsWithRelations } = vi.hoisted(() => ({
 }));
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    userPerformerStats: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-    },
-    userStudioStats: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-    },
-    userTagStats: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-    },
-    user: {
-      findMany: vi.fn(),
-    },
-    watchHistory: {
-      findMany: vi.fn(),
-    },
-    stashScene: {
-      findFirst: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock StashEntityService
 vi.mock("../../services/StashEntityService.js", () => ({
@@ -84,7 +58,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("UserStatsService", () => {
   beforeEach(() => {
@@ -453,8 +427,8 @@ describe("UserStatsService", () => {
 
       // Performer stats should have TWO entries (one per instance)
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      const performerData = performerCall.data as any[];
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = performerCall?.data as any[];
       expect(performerData).toHaveLength(2);
 
       // Find the entries for each instance
@@ -517,8 +491,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      const performerData = performerCall.data as any[];
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = performerCall?.data as any[];
 
       // Should aggregate into ONE entry (same performer + same instance)
       expect(performerData).toHaveLength(1);
@@ -554,8 +528,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      const performerData = performerCall.data as any[];
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = performerCall?.data as any[];
 
       expect(performerData[0].instanceId).toBe("");
     });
@@ -567,8 +541,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      expect((performerCall.data as any[]).length).toBe(0);
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      expect((performerCall?.data as any[]).length).toBe(0);
     });
 
     it("tracks lastPlayedAt and lastOAt from play/o history", async () => {
@@ -603,8 +577,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      const performerData = performerCall.data as any[];
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = performerCall?.data as any[];
 
       // lastPlayedAt should be the last entry in playHistory
       expect(performerData[0].lastPlayedAt).toEqual(
@@ -642,8 +616,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      expect((performerCall.data as any[]).length).toBe(1);
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      expect((performerCall?.data as any[]).length).toBe(1);
     });
 
     it("skips scenes not found in cache", async () => {
@@ -680,8 +654,8 @@ describe("UserStatsService", () => {
       await userStatsService.rebuildAllStatsForUser(1);
 
       const performerCall =
-        mockPrisma.userPerformerStats.createMany.mock.calls[0][0];
-      const performerData = performerCall.data as any[];
+        mockPrisma.userPerformerStats.createMany.mock.calls[0]?.[0];
+      const performerData = performerCall?.data as any[];
 
       // Only scene-1's stats should be included
       expect(performerData).toHaveLength(1);
@@ -729,8 +703,9 @@ describe("UserStatsService", () => {
 
       await userStatsService.rebuildAllStatsForUser(1);
 
-      const studioCall = mockPrisma.userStudioStats.createMany.mock.calls[0][0];
-      const studioData = studioCall.data as any[];
+      const studioCall =
+        mockPrisma.userStudioStats.createMany.mock.calls[0]?.[0];
+      const studioData = studioCall?.data as any[];
 
       // Should be TWO entries (same studio ID but different instances)
       expect(studioData).toHaveLength(2);
@@ -807,22 +782,22 @@ describe("UserStatsService", () => {
 
     it("returns separate stats for same performerId across different instances", async () => {
       mockPrisma.userPerformerStats.findMany.mockResolvedValue([
-        {
+        partialRow({
           performerId: "2",
           instanceId: "instance-aaa",
           oCounter: 5,
           playCount: 10,
           lastPlayedAt: null,
           lastOAt: null,
-        },
-        {
+        }),
+        partialRow({
           performerId: "2",
           instanceId: "instance-bbb",
           oCounter: 3,
           playCount: 7,
           lastPlayedAt: null,
           lastOAt: null,
-        },
+        }),
       ]);
 
       const stats = await userStatsService.getPerformerStats(1);
@@ -859,8 +834,18 @@ describe("UserStatsService", () => {
 
     it("returns separate stats for same studioId across different instances", async () => {
       mockPrisma.userStudioStats.findMany.mockResolvedValue([
-        { studioId: "5", instanceId: "inst-a", oCounter: 10, playCount: 20 },
-        { studioId: "5", instanceId: "inst-b", oCounter: 1, playCount: 2 },
+        partialRow({
+          studioId: "5",
+          instanceId: "inst-a",
+          oCounter: 10,
+          playCount: 20,
+        }),
+        partialRow({
+          studioId: "5",
+          instanceId: "inst-b",
+          oCounter: 1,
+          playCount: 2,
+        }),
       ]);
 
       const stats = await userStatsService.getStudioStats(1);
@@ -889,8 +874,18 @@ describe("UserStatsService", () => {
 
     it("returns separate stats for same tagId across different instances", async () => {
       mockPrisma.userTagStats.findMany.mockResolvedValue([
-        { tagId: "3", instanceId: "inst-x", oCounter: 8, playCount: 15 },
-        { tagId: "3", instanceId: "inst-y", oCounter: 2, playCount: 4 },
+        partialRow({
+          tagId: "3",
+          instanceId: "inst-x",
+          oCounter: 8,
+          playCount: 15,
+        }),
+        partialRow({
+          tagId: "3",
+          instanceId: "inst-y",
+          oCounter: 2,
+          playCount: 4,
+        }),
       ]);
 
       const stats = await userStatsService.getTagStats(1);

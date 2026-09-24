@@ -12,6 +12,8 @@
     "lint": "eslint .",
     "format": "cd .. && prettier --write server",
     "format:check": "cd .. && prettier --check server",
+    "typecheck": "tsc --noEmit && npm run typecheck:tests",
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

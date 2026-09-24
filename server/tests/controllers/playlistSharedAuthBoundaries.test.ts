@@ -22,23 +22,10 @@ import {
 import prisma from "../../prisma/singleton.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    playlist: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    playlistItem: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      delete: vi.fn(),
-      update: vi.fn(),
-    },
-    playlistShare: { findMany: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock PlaylistAccessService
 vi.mock("../../services/PlaylistAccessService.js", () => ({
@@ -76,7 +63,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 /** User IDs: owner = 1, shared user = 2 */
 const OWNER_ID = 1;

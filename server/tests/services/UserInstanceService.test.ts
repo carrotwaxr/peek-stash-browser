@@ -13,16 +13,10 @@ import {
 } from "../../services/UserInstanceService.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    stashInstance: {
-      findMany: vi.fn(),
-    },
-    userStashInstance: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -35,7 +29,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("UserInstanceService", () => {
   beforeEach(() => {

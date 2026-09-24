@@ -29,23 +29,10 @@ import { formatRecoveryKey } from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    userContentRestriction: {
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-    },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -84,7 +71,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockExclusions = vi.mocked(exclusionComputationService);
 const mockBcrypt = vi.mocked(bcrypt);
 const mockValidatePassword = vi.mocked(validatePassword);
@@ -932,14 +919,14 @@ describe("User Controller", () => {
     it("recomputes exclusions after a role change", async () => {
       // Promotion drops restricted/empty rows; demotion applies the kept rows again
       const order: string[] = [];
-      mockPrisma.user.update.mockImplementation(async () => {
+      mockPrisma.user.update.mockImplementation(() => {
         order.push("update");
-        return {
+        return Promise.resolve({
           id: 3,
           username: "user3",
           role: "USER",
           updatedAt: new Date(),
-        } as any;
+        }) as any;
       });
       mockExclusions.recomputeForUser.mockImplementation(async () => {
         order.push("recompute");
@@ -1093,8 +1080,8 @@ describe("User Controller", () => {
       const res = mockRes();
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(200);
-      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
-        .data as Array<Record<string, unknown>>;
+      const data = mockPrisma.userContentRestriction.createMany.mock
+        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
       expect(data).toEqual([
         {
           userId: 3,
@@ -1121,8 +1108,8 @@ describe("User Controller", () => {
       );
       const res = mockRes();
       await updateUserRestrictions(req, res);
-      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
-        .data as Array<Record<string, unknown>>;
+      const data = mockPrisma.userContentRestriction.createMany.mock
+        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
       expect(data[0].restrictEmpty).toBe(false);
     });
 
@@ -1156,8 +1143,8 @@ describe("User Controller", () => {
       expect(
         mockPrisma.userContentRestriction.createMany
       ).toHaveBeenCalledTimes(1);
-      const data = mockPrisma.userContentRestriction.createMany.mock.calls[0][0]
-        .data as Array<Record<string, unknown>>;
+      const data = mockPrisma.userContentRestriction.createMany.mock
+        .calls[0]?.[0]?.data as Array<Record<string, unknown>>;
       expect(data.map((r) => r.mode)).toEqual(["INCLUDE", "EXCLUDE"]);
       expect(mockExclusions.recomputeForUser).toHaveBeenCalledTimes(1);
       expect(mockExclusions.recomputeForUser).toHaveBeenCalledWith(3);
