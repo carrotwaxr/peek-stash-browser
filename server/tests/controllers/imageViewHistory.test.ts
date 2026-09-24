@@ -18,17 +18,20 @@ import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
-// Mock Prisma - hoisted before imports
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
+// Mock Prisma - hoisted before imports. Interactive transactions run their
+// callback on this same mock client.
+vi.mock("../../prisma/singleton.js", () => {
+  const client = {
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
     user: { findUnique: vi.fn() },
     imageViewHistory: {
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
-  },
-}));
+  };
+  return { default: client };
+});
 
 // Mock entityInstanceId (getImageViewHistory keeps its own lookup)
 vi.mock("../../utils/entityInstanceId.js", () => ({
@@ -203,7 +206,17 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await incrementImageOCounter(req, res);
 
-      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalled();
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { maxWait: 10_000, timeout: 10_000 }
+      );
+      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          oCount: { increment: 1 },
+          oHistory: [...existingHistory, expect.any(String)],
+        },
+      });
       const body = res._getBody();
       expect(body.success).toBe(true);
       expect(body.oCount).toBe(4);
@@ -310,7 +323,18 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await incrementImageOCounter(req, res);
 
-      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalled();
+      // Read through readHistory, written back as an array
+      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            oHistory: [
+              "2024-01-01T00:00:00.000Z",
+              "2024-01-02T00:00:00.000Z",
+              expect.any(String),
+            ],
+          }),
+        })
+      );
       expect(res._getBody().success).toBe(true);
     });
 
@@ -404,7 +428,14 @@ describe("Image View History Controller", () => {
       const res = mockRes();
       await recordImageView(req, res);
 
-      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalled();
+      expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          viewCount: { increment: 1 },
+          viewHistory: [...existingHistory, expect.any(String)],
+          lastViewedAt: expect.any(Date),
+        },
+      });
       const body = res._getBody();
       expect(body.success).toBe(true);
       expect(body.viewCount).toBe(6);

@@ -7,13 +7,15 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { HISTORY_TX } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 
 /**
  * Merge two JSON arrays (for oHistory and playHistory).
- * Deduplicates by stringified value and sorts.
+ * Deduplicates by stringified value and sorts. Returns the array itself, for
+ * the Json column; either input may be a JSON-encoded string.
  */
-function mergeJsonArrays(arr1: unknown, arr2: unknown): string {
+function mergeJsonArrays(arr1: unknown, arr2: unknown): Prisma.InputJsonValue {
   const list1 = parseJsonArray(arr1);
   const list2 = parseJsonArray(arr2);
   const merged = [...list1, ...list2];
@@ -37,7 +39,7 @@ function mergeJsonArrays(arr1: unknown, arr2: unknown): string {
       typeof b === "string" ? b : (bRec?.startTime ?? bRec?.time ?? "");
     return aTime.localeCompare(bTime);
   });
-  return JSON.stringify(deduped);
+  return deduped as Prisma.InputJsonValue;
 }
 
 function parseJsonArray(value: unknown): unknown[] {
@@ -245,65 +247,69 @@ class MergeReconciliationService {
       return { success: false }; // Nothing to transfer
     }
 
-    // Transfer WatchHistory
+    // Transfer WatchHistory. The target's read and its create or update run
+    // in one transaction, so a history write to the target that arrives
+    // meanwhile waits for the merge and is not overwritten by it.
     if (sourceHistory) {
-      const targetHistory = await prisma.watchHistory.findUnique({
-        where: {
-          userId_instanceId_sceneId: {
-            userId,
-            instanceId: targetInstanceId,
-            sceneId: targetSceneId,
-          },
+      const targetKey = {
+        userId_instanceId_sceneId: {
+          userId,
+          instanceId: targetInstanceId,
+          sceneId: targetSceneId,
         },
-      });
+      };
+      await prisma.$transaction(async (tx) => {
+        const targetHistory = await tx.watchHistory.findUnique({
+          where: targetKey,
+        });
 
-      if (targetHistory) {
-        // Merge with existing
-        await prisma.watchHistory.update({
-          where: {
-            userId_instanceId_sceneId: {
+        if (targetHistory) {
+          // Merge with existing
+          await tx.watchHistory.update({
+            where: targetKey,
+            data: {
+              playCount: targetHistory.playCount + sourceHistory.playCount,
+              playDuration:
+                targetHistory.playDuration + sourceHistory.playDuration,
+              oCount: targetHistory.oCount + sourceHistory.oCount,
+              oHistory: mergeJsonArrays(
+                targetHistory.oHistory,
+                sourceHistory.oHistory
+              ),
+              playHistory: mergeJsonArrays(
+                targetHistory.playHistory,
+                sourceHistory.playHistory
+              ),
+              lastPlayedAt: laterDate(
+                targetHistory.lastPlayedAt,
+                sourceHistory.lastPlayedAt
+              ),
+              // resumeTime: keep target's (survivor wins)
+            },
+          });
+        } else {
+          // Create new record for target; a JSON-encoded source history
+          // lands as an array
+          await tx.watchHistory.create({
+            data: {
               userId,
               instanceId: targetInstanceId,
               sceneId: targetSceneId,
+              playCount: sourceHistory.playCount,
+              playDuration: sourceHistory.playDuration,
+              resumeTime: sourceHistory.resumeTime,
+              lastPlayedAt: sourceHistory.lastPlayedAt,
+              oCount: sourceHistory.oCount,
+              oHistory: parseJsonArray(
+                sourceHistory.oHistory
+              ) as Prisma.InputJsonValue,
+              playHistory: parseJsonArray(
+                sourceHistory.playHistory
+              ) as Prisma.InputJsonValue,
             },
-          },
-          data: {
-            playCount: targetHistory.playCount + sourceHistory.playCount,
-            playDuration:
-              targetHistory.playDuration + sourceHistory.playDuration,
-            oCount: targetHistory.oCount + sourceHistory.oCount,
-            oHistory: mergeJsonArrays(
-              targetHistory.oHistory,
-              sourceHistory.oHistory
-            ),
-            playHistory: mergeJsonArrays(
-              targetHistory.playHistory,
-              sourceHistory.playHistory
-            ),
-            lastPlayedAt: laterDate(
-              targetHistory.lastPlayedAt,
-              sourceHistory.lastPlayedAt
-            ),
-            // resumeTime: keep target's (survivor wins)
-          },
-        });
-      } else {
-        // Create new record for target
-        await prisma.watchHistory.create({
-          data: {
-            userId,
-            instanceId: targetInstanceId,
-            sceneId: targetSceneId,
-            playCount: sourceHistory.playCount,
-            playDuration: sourceHistory.playDuration,
-            resumeTime: sourceHistory.resumeTime,
-            lastPlayedAt: sourceHistory.lastPlayedAt,
-            oCount: sourceHistory.oCount,
-            oHistory: sourceHistory.oHistory as Prisma.InputJsonValue,
-            playHistory: sourceHistory.playHistory as Prisma.InputJsonValue,
-          },
-        });
-      }
+          });
+        }
+      }, HISTORY_TX);
     }
 
     // Transfer SceneRating

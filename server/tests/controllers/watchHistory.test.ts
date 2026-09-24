@@ -27,10 +27,13 @@ import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 
-// Mock Prisma - hoisted to top level
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
+// Mock Prisma - hoisted to top level. Interactive transactions run their
+// callback on this same mock client.
+vi.mock("../../prisma/singleton.js", () => {
+  const client = {
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
     watchHistory: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -60,8 +63,9 @@ vi.mock("../../prisma/singleton.js", () => ({
     userEntityRanking: {
       deleteMany: vi.fn(),
     },
-  },
-}));
+  };
+  return { default: client };
+});
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -384,7 +388,7 @@ describe("Watch History Controller", () => {
         syncToStash: false,
       } as never);
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
+      mockPrisma.watchHistory.create.mockResolvedValue({
         id: 1,
         userId: 1,
         sceneId: "123",
@@ -402,10 +406,11 @@ describe("Watch History Controller", () => {
         mockResponse as Response
       );
 
-      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+      expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({
+          data: expect.objectContaining({
             playCount: 1,
+            playHistory: [expect.any(String)],
           }),
         })
       );
@@ -437,7 +442,7 @@ describe("Watch History Controller", () => {
         playCount: 5,
         playHistory: ["2024-01-01T00:00:00.000Z"],
       } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
+      mockPrisma.watchHistory.update.mockResolvedValue({
         id: 1,
         userId: 1,
         sceneId: "123",
@@ -455,9 +460,10 @@ describe("Watch History Controller", () => {
         mockResponse as Response
       );
 
-      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          update: expect.objectContaining({
+          where: { id: 1 },
+          data: expect.objectContaining({
             playCount: { increment: 1 },
           }),
         })
@@ -479,7 +485,7 @@ describe("Watch History Controller", () => {
         id: 1,
         playHistory: existingHistory,
       } as never);
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
+      mockPrisma.watchHistory.update.mockResolvedValue({
         id: 1,
         playCount: 2,
         playDuration: 0,
@@ -495,10 +501,11 @@ describe("Watch History Controller", () => {
         mockResponse as Response
       );
 
-      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
+      // Stored as an array, never a JSON string
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          update: expect.objectContaining({
-            playHistory: expect.stringContaining("2024-01-01T00:00:00.000Z"),
+          data: expect.objectContaining({
+            playHistory: ["2024-01-01T00:00:00.000Z", expect.any(String)],
           }),
         })
       );
@@ -574,6 +581,7 @@ describe("Watch History Controller", () => {
           oCount: 1,
         })
       );
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
     });
 
     it("should increment existing oCount", async () => {
@@ -605,9 +613,14 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            oCount: 4,
+            oCount: { increment: 1 },
+            oHistory: ["2024-01-01T00:00:00.000Z", expect.any(String)],
           }),
         })
+      );
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(responseJson).toHaveBeenCalledWith(
+        expect.objectContaining({ success: true, oCount: 4 })
       );
     });
   });
@@ -1026,10 +1039,63 @@ describe("Watch History Controller", () => {
   });
 
   // ============================================================================
-  // Race Condition Tests (upsert behavior)
+  // pingWatchHistory Tests
   // ============================================================================
 
-  describe("Race Condition Prevention (upsert)", () => {
+  describe("pingWatchHistory", () => {
+    it("two pings of one session past the threshold count one play", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 1,
+        minimumPlayPercent: 50,
+        syncToStash: false,
+      } as never);
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
+        duration: 600,
+      } as never);
+      // 400 of 600 seconds played: past the 50% threshold
+      const record = {
+        id: 1,
+        playCount: 0,
+        playDuration: 400,
+        resumeTime: 390,
+        lastPlayedAt: new Date(),
+        oHistory: [],
+        playHistory: [],
+      };
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record as never);
+      mockPrisma.watchHistory.update.mockResolvedValue(record as never);
+
+      // A scene id no other test pings, so the session starts clean
+      const ping = () =>
+        pingWatchHistory(
+          {
+            body: { sceneId: "session-guard", currentTime: 400 },
+            user: { id: 1 },
+          } as never,
+          mockResponse as Response
+        );
+      await Promise.all([ping(), ping()]);
+
+      expect(responseStatus).not.toHaveBeenCalled();
+      expect(responseJson).toHaveBeenCalledTimes(2);
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledWith(
+        1,
+        "session-guard",
+        0,
+        1,
+        expect.any(Date),
+        undefined,
+        "test-instance"
+      );
+    });
+  });
+
+  // ============================================================================
+  // Race Condition Tests
+  // ============================================================================
+
+  describe("Race Condition Prevention", () => {
     it("saveActivity should use upsert to handle concurrent calls", async () => {
       mockRequest = {
         body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
@@ -1063,7 +1129,7 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
     });
 
-    it("incrementPlayCount should use upsert to handle concurrent calls", async () => {
+    it("incrementPlayCount reads and writes in one transaction", async () => {
       mockRequest = {
         body: { sceneId: "123" },
         user: { id: 1 },
@@ -1073,8 +1139,8 @@ describe("Watch History Controller", () => {
         id: 1,
         syncToStash: false,
       } as never);
-      mockPrisma.watchHistory.findUnique.mockResolvedValue(null); // For playHistory
-      mockPrisma.watchHistory.upsert.mockResolvedValue({
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.watchHistory.create.mockResolvedValue({
         id: 1,
         playCount: 1,
         playDuration: 0,
@@ -1090,11 +1156,14 @@ describe("Watch History Controller", () => {
         mockResponse as Response
       );
 
-      // Verify upsert was called
-      expect(mockPrisma.watchHistory.upsert).toHaveBeenCalled();
-      // findUnique is still called for playHistory, but create/update should not be
-      expect(mockPrisma.watchHistory.create).not.toHaveBeenCalled();
-      expect(mockPrisma.watchHistory.update).not.toHaveBeenCalled();
+      // The play history append needs the row read in the same transaction,
+      // which an upsert can't give it
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { maxWait: 10_000, timeout: 10_000 }
+      );
+      expect(mockPrisma.watchHistory.create).toHaveBeenCalled();
+      expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
     });
   });
 });

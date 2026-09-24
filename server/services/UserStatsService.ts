@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
@@ -40,6 +41,22 @@ interface TagStats {
   tagId: string;
   oCounter: number;
   playCount: number;
+}
+
+/** The fields a failure log carries for an error: Prisma code and message. */
+function describeError(error: unknown): {
+  code?: string;
+  error: string;
+  stack?: string;
+} {
+  return {
+    code:
+      error instanceof Prisma.PrismaClientKnownRequestError
+        ? error.code
+        : undefined,
+    error: error instanceof Error ? error.message : "Unknown error",
+    stack: error instanceof Error ? error.stack : undefined,
+  };
 }
 
 class UserStatsService {
@@ -141,6 +158,11 @@ class UserStatsService {
    * @param playCountDelta - Change in play count (can be negative for corrections)
    * @param lastPlayedAt - Timestamp of last playback (optional)
    * @param lastOAt - Timestamp of last O (optional)
+   *
+   * Each upsert carries its increment, and Prisma sends it as one
+   * INSERT ... ON CONFLICT DO UPDATE, so concurrent updates all count. A
+   * failed write doesn't stop the others: each failure is logged with its
+   * context, and the caller's history write, already committed, stands.
    */
   async updateStatsForScene(
     userId: number,
@@ -151,6 +173,15 @@ class UserStatsService {
     lastOAt?: Date,
     instanceId?: string
   ): Promise<void> {
+    // What every failure log carries, so a lost stats write can be traced
+    const context = {
+      userId,
+      sceneId,
+      instanceId,
+      oCountDelta,
+      playCountDelta,
+    };
+
     try {
       // Get scene from cache to find all related entities
       const scene = await stashEntityService.getScene(
@@ -171,11 +202,19 @@ class UserStatsService {
         });
         resolvedInstanceId = sceneRecord?.stashInstanceId || "";
       }
+      context.instanceId = resolvedInstanceId;
 
-      // Update performer stats
-      if (scene.performers && scene.performers.length > 0) {
-        await Promise.all(
-          scene.performers.map((performer) =>
+      // One write per performer, the studio and each tag
+      const studio = scene.studio;
+      const writes: {
+        entityType: "performer" | "studio" | "tag";
+        entityId: string;
+        run: () => Promise<void>;
+      }[] = [
+        ...(scene.performers ?? []).map((performer) => ({
+          entityType: "performer" as const,
+          entityId: performer.id,
+          run: () =>
             this.updatePerformerStats(
               userId,
               performer.id,
@@ -184,42 +223,54 @@ class UserStatsService {
               lastPlayedAt,
               lastOAt,
               resolvedInstanceId
-            )
-          )
-        );
-      }
-
-      // Update studio stats
-      if (scene.studio) {
-        await this.updateStudioStats(
-          userId,
-          scene.studio.id,
-          oCountDelta,
-          playCountDelta,
-          resolvedInstanceId
-        );
-      }
-
-      // Update tag stats
-      if (scene.tags && scene.tags.length > 0) {
-        await Promise.all(
-          scene.tags.map((tag) =>
+            ),
+        })),
+        ...(studio
+          ? [
+              {
+                entityType: "studio" as const,
+                entityId: studio.id,
+                run: () =>
+                  this.updateStudioStats(
+                    userId,
+                    studio.id,
+                    oCountDelta,
+                    playCountDelta,
+                    resolvedInstanceId
+                  ),
+              },
+            ]
+          : []),
+        ...(scene.tags ?? []).map((tag) => ({
+          entityType: "tag" as const,
+          entityId: tag.id,
+          run: () =>
             this.updateTagStats(
               userId,
               tag.id,
               oCountDelta,
               playCountDelta,
               resolvedInstanceId
-            )
-          )
-        );
-      }
+            ),
+        })),
+      ];
+
+      const results = await Promise.allSettled(writes.map((w) => w.run()));
+      writes.forEach(({ entityType, entityId }, i) => {
+        const result = results[i];
+        if (result?.status === "rejected") {
+          logger.error("Error updating stats for scene", {
+            ...context,
+            entityType,
+            entityId,
+            ...describeError(result.reason),
+          });
+        }
+      });
     } catch (error) {
       logger.error("Error updating stats for scene", {
-        userId,
-        sceneId,
-        error: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
+        ...context,
+        ...describeError(error),
       });
     }
   }

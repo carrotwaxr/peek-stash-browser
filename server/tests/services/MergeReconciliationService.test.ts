@@ -22,9 +22,11 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-// Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
+// Mock prisma. Interactive transactions run their callback on this same
+// mock client.
+vi.mock("../../prisma/singleton.js", () => {
+  const client = {
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
     $queryRaw: vi.fn(),
     stashScene: {
       findFirst: vi.fn(), // Changed from findUnique for composite primary key
@@ -55,8 +57,9 @@ vi.mock("../../prisma/singleton.js", () => ({
     mergeRecord: {
       create: vi.fn(),
     },
-  },
-}));
+  };
+  return { default: client };
+});
 
 describe("MergeReconciliationService", () => {
   beforeEach(() => {
@@ -164,6 +167,9 @@ describe("MergeReconciliationService", () => {
           data: expect.objectContaining({
             sceneId: "target",
             playCount: 5,
+            // The source's JSON-encoded strings land as arrays
+            oHistory: [],
+            playHistory: [],
           }),
         })
       );
@@ -219,6 +225,82 @@ describe("MergeReconciliationService", () => {
           }),
         })
       );
+    });
+
+    it("transferUserData merges watch history into arrays", async () => {
+      const findUnique = vi.mocked(prisma.watchHistory.findUnique);
+      const update = vi.mocked(prisma.watchHistory.update);
+      const create = vi.mocked(prisma.watchHistory.create);
+      findUnique
+        .mockResolvedValueOnce({
+          userId: 1,
+          sceneId: "source",
+          playCount: 1,
+          playDuration: 100,
+          oCount: 1,
+          // Written by the old updates: a JSON-encoded string
+          oHistory: '["2025-01-01T00:00:00.000Z"]',
+          playHistory: ["2025-01-03T00:00:00.000Z"],
+          resumeTime: 10,
+          lastPlayedAt: new Date("2025-01-03"),
+        } as never)
+        .mockResolvedValueOnce({
+          userId: 1,
+          sceneId: "target",
+          playCount: 1,
+          playDuration: 50,
+          oCount: 1,
+          oHistory: ["2025-01-02T00:00:00.000Z"],
+          playHistory: "[]",
+          resumeTime: 20,
+          lastPlayedAt: new Date("2025-01-02"),
+        } as never);
+      update.mockResolvedValue({} as never);
+      vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.mergeRecord.create).mockResolvedValue({
+        id: "mr-1",
+      } as never);
+
+      // Count the watch-history calls made while the transaction callback runs
+      let inTransaction = { finds: 0, writes: 0 };
+      vi.mocked(prisma.$transaction).mockImplementationOnce((async (
+        fn: (tx: typeof prisma) => Promise<unknown>
+      ) => {
+        const writes = () =>
+          update.mock.calls.length + create.mock.calls.length;
+        const findsBefore = findUnique.mock.calls.length;
+        const writesBefore = writes();
+        const result = await fn(prisma);
+        inTransaction = {
+          finds: findUnique.mock.calls.length - findsBefore,
+          writes: writes() - writesBefore,
+        };
+        return result;
+      }) as never);
+
+      await mergeReconciliationService.transferUserData(
+        "source",
+        "target",
+        1,
+        null,
+        null
+      );
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            oHistory: ["2025-01-01T00:00:00.000Z", "2025-01-02T00:00:00.000Z"],
+            playHistory: ["2025-01-03T00:00:00.000Z"],
+          }),
+        })
+      );
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        maxWait: 10_000,
+        timeout: 10_000,
+      });
+      // The target's find and the merge write, both inside the transaction
+      expect(inTransaction).toEqual({ finds: 1, writes: 1 });
     });
 
     it("should use OR logic for favorites", async () => {

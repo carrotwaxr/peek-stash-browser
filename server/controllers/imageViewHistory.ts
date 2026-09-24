@@ -12,6 +12,7 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
+import { HISTORY_TX, readHistory } from "../utils/historyJson.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -62,39 +63,34 @@ export async function incrementImageOCounter(
 
     const now = new Date();
 
-    // Get or create image view history record
-    let viewHistory = await prisma.imageViewHistory.findUnique({
-      where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
-    });
-
-    if (!viewHistory) {
-      viewHistory = await prisma.imageViewHistory.create({
+    // Read, then create or update, in one transaction: a view or another O
+    // press on this image waits for it to commit, then sees its row.
+    const viewHistory = await prisma.$transaction(async (tx) => {
+      const existing = await tx.imageViewHistory.findUnique({
+        where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
+      });
+      if (!existing) {
+        return tx.imageViewHistory.create({
+          data: {
+            userId,
+            instanceId,
+            imageId,
+            viewCount: 0,
+            viewHistory: [],
+            oCount: 1,
+            oHistory: [now.toISOString()],
+            lastViewedAt: now,
+          },
+        });
+      }
+      return tx.imageViewHistory.update({
+        where: { id: existing.id },
         data: {
-          userId,
-          instanceId,
-          imageId,
-          viewCount: 0,
-          viewHistory: [],
-          oCount: 1,
-          oHistory: [now.toISOString()],
-          lastViewedAt: now,
+          oCount: { increment: 1 },
+          oHistory: [...readHistory(existing.oHistory), now.toISOString()],
         },
       });
-    } else {
-      const oHistory = (
-        Array.isArray(viewHistory.oHistory)
-          ? viewHistory.oHistory
-          : JSON.parse((viewHistory.oHistory as string) || "[]")
-      ) as string[];
-
-      viewHistory = await prisma.imageViewHistory.update({
-        where: { id: viewHistory.id },
-        data: {
-          oCount: viewHistory.oCount + 1,
-          oHistory: JSON.stringify([...oHistory, now.toISOString()]),
-        },
-      });
-    }
+    }, HISTORY_TX);
 
     // Sync to Stash if user has sync enabled
     // Note: imageIncrementO is not yet in stashapp-api, so we log a warning for now
@@ -159,43 +155,38 @@ export async function recordImageView(
 
     const now = new Date();
 
-    // Get or create image view history record
-    let viewHistory = await prisma.imageViewHistory.findUnique({
-      where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
-    });
-
-    if (!viewHistory) {
-      viewHistory = await prisma.imageViewHistory.create({
-        data: {
-          userId,
-          instanceId,
-          imageId,
-          viewCount: 1,
-          viewHistory: [now.toISOString()],
-          oCount: 0,
-          oHistory: [],
-          lastViewedAt: now,
-        },
+    // Read, then create or update, in one transaction: an O press or another
+    // view of this image waits for it to commit, then sees its row.
+    const viewHistory = await prisma.$transaction(async (tx) => {
+      const existing = await tx.imageViewHistory.findUnique({
+        where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
       });
-    } else {
-      const existingViewHistory = (
-        Array.isArray(viewHistory.viewHistory)
-          ? viewHistory.viewHistory
-          : JSON.parse((viewHistory.viewHistory as string) || "[]")
-      ) as string[];
-
-      viewHistory = await prisma.imageViewHistory.update({
-        where: { id: viewHistory.id },
+      if (!existing) {
+        return tx.imageViewHistory.create({
+          data: {
+            userId,
+            instanceId,
+            imageId,
+            viewCount: 1,
+            viewHistory: [now.toISOString()],
+            oCount: 0,
+            oHistory: [],
+            lastViewedAt: now,
+          },
+        });
+      }
+      return tx.imageViewHistory.update({
+        where: { id: existing.id },
         data: {
-          viewCount: viewHistory.viewCount + 1,
-          viewHistory: JSON.stringify([
-            ...existingViewHistory,
+          viewCount: { increment: 1 },
+          viewHistory: [
+            ...readHistory(existing.viewHistory),
             now.toISOString(),
-          ]),
+          ],
           lastViewedAt: now,
         },
       });
-    }
+    }, HISTORY_TX);
 
     res.json({
       success: true,

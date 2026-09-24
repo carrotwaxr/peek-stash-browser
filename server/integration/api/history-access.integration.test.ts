@@ -166,4 +166,194 @@ describe("History access (integration)", () => {
     });
     expect(rows).toEqual([]);
   });
+
+  /**
+   * Writes to one history row that arrive together (item 81). Before each
+   * round the viewer's row is deleted, so every round races on creating it.
+   * The outcomes of all rounds are compared at once, so a failure shows
+   * every round.
+   */
+  describe("writes that arrive together", () => {
+    const ROUNDS = 10;
+    const image = { imageId: FX_ID.SAME, instanceId: FX.A };
+    const scene = { sceneId: FX_ID.SAME, instanceId: FX.A };
+
+    const imageKey = () => ({
+      userId_instanceId_imageId: {
+        userId: viewer.id,
+        instanceId: FX.A,
+        imageId: FX_ID.SAME,
+      },
+    });
+    const sceneKey = () => ({
+      userId_instanceId_sceneId: {
+        userId: viewer.id,
+        instanceId: FX.A,
+        sceneId: FX_ID.SAME,
+      },
+    });
+
+    const clearImageRow = () =>
+      prisma.imageViewHistory.deleteMany({
+        where: { userId: viewer.id, instanceId: FX.A, imageId: FX_ID.SAME },
+      });
+    const clearSceneRow = () =>
+      prisma.watchHistory.deleteMany({
+        where: { userId: viewer.id, instanceId: FX.A, sceneId: FX_ID.SAME },
+      });
+
+    /** A history column as the test reads it: its length, or its JS type. */
+    const shape = (value: unknown) =>
+      Array.isArray(value) ? value.length : typeof value;
+
+    it("an image O press and a view recorded at the same moment both count", async () => {
+      const outcomes = [];
+      for (let round = 0; round < ROUNDS; round++) {
+        await clearImageRow();
+        const [oed, viewed] = await Promise.all([
+          viewer.client.post("/api/image-view-history/increment-o", image),
+          viewer.client.post("/api/image-view-history/view", image),
+        ]);
+        const row = await prisma.imageViewHistory.findUnique({
+          where: imageKey(),
+        });
+        outcomes.push({
+          round,
+          status: [oed.status, viewed.status],
+          oCount: row?.oCount,
+          viewCount: row?.viewCount,
+        });
+      }
+
+      expect(outcomes).toEqual(
+        Array.from({ length: ROUNDS }, (_, round) => ({
+          round,
+          status: [200, 200],
+          oCount: 1,
+          viewCount: 1,
+        }))
+      );
+    });
+
+    it("ten image O presses at once count ten", async () => {
+      await clearImageRow();
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          viewer.client.post<{ oCount?: number }>(
+            "/api/image-view-history/increment-o",
+            image
+          )
+        )
+      );
+      const row = await prisma.imageViewHistory.findUnique({
+        where: imageKey(),
+      });
+
+      expect({
+        statuses: responses.map((r) => r.status),
+        returned: responses
+          .map((r) => r.data.oCount ?? 0)
+          .sort((a, b) => a - b),
+        oCount: row?.oCount,
+        oHistory: shape(row?.oHistory),
+      }).toEqual({
+        statuses: Array(10).fill(200),
+        returned: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        oCount: 10,
+        oHistory: 10,
+      });
+    });
+
+    it("scene history writes that arrive together all count", async () => {
+      const outcomes = [];
+      for (let round = 0; round < ROUNDS; round++) {
+        await clearSceneRow();
+        const responses = await Promise.all([
+          viewer.client.post("/api/watch-history/ping", {
+            ...scene,
+            currentTime: 1,
+          }),
+          viewer.client.post("/api/watch-history/increment-o", scene),
+          viewer.client.post("/api/watch-history/increment-play-count", scene),
+          viewer.client.post("/api/watch-history/save-activity", {
+            ...scene,
+            resumeTime: 5,
+            playDuration: 5,
+          }),
+        ]);
+        const row = await prisma.watchHistory.findUnique({
+          where: sceneKey(),
+        });
+        outcomes.push({
+          round,
+          status: responses.map((r) => r.status),
+          oCount: row?.oCount,
+          playCount: row?.playCount,
+          playDuration: row?.playDuration,
+          oHistory: shape(row?.oHistory),
+          playHistory: shape(row?.playHistory),
+        });
+      }
+
+      // The fixture scene has no duration, so ping never adds a play itself.
+      expect(outcomes).toEqual(
+        Array.from({ length: ROUNDS }, (_, round) => ({
+          round,
+          status: [200, 200, 200, 200],
+          oCount: 1,
+          playCount: 1,
+          playDuration: 5,
+          oHistory: 1,
+          playHistory: 1,
+        }))
+      );
+    });
+
+    it("ten scene O presses at once count ten", async () => {
+      await clearSceneRow();
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          viewer.client.post<{ oCount?: number }>(
+            "/api/watch-history/increment-o",
+            scene
+          )
+        )
+      );
+      const row = await prisma.watchHistory.findUnique({ where: sceneKey() });
+
+      expect({
+        statuses: responses.map((r) => r.status),
+        returned: responses
+          .map((r) => r.data.oCount ?? 0)
+          .sort((a, b) => a - b),
+        oCount: row?.oCount,
+        oHistory: shape(row?.oHistory),
+      }).toEqual({
+        statuses: Array(10).fill(200),
+        returned: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        oCount: 10,
+        oHistory: 10,
+      });
+    });
+
+    it("ten play-count increments at once record ten plays", async () => {
+      await clearSceneRow();
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          viewer.client.post("/api/watch-history/increment-play-count", scene)
+        )
+      );
+      const row = await prisma.watchHistory.findUnique({ where: sceneKey() });
+
+      expect({
+        statuses: responses.map((r) => r.status),
+        playCount: row?.playCount,
+        playHistory: shape(row?.playHistory),
+      }).toEqual({
+        statuses: Array(10).fill(200),
+        playCount: 10,
+        playHistory: 10,
+      });
+    });
+  });
 });
