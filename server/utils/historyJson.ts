@@ -38,7 +38,11 @@ function readEntry(entry: unknown): string | null {
     return null;
   }
   const session = entry as { startTime?: unknown; time?: unknown };
-  if (typeof session.startTime === "string") return session.startTime;
-  if (typeof session.time === "string") return session.time;
+  if (typeof session.startTime === "string" && session.startTime !== "") {
+    return session.startTime;
+  }
+  if (typeof session.time === "string" && session.time !== "") {
+    return session.time;
+  }
   return null;
 }
