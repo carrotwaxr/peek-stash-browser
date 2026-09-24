@@ -246,19 +246,25 @@ export function scenePlayerReducer(
         if (unplayedScenes.length > 0) {
           // Pick random from unplayed
           nextIndex =
-            unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)];
+            unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)] ??
+            null;
         } else if (state.repeat === "all") {
           // All scenes played, reset shuffle history and start over
           const candidates = Array.from(
             { length: totalScenes },
             (_, i) => i
           ).filter((i) => i !== state.currentIndex);
-          nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
+          const candidate =
+            candidates[Math.floor(Math.random() * candidates.length)];
+          // A one-scene playlist has no other scene to go to
+          if (candidate === undefined) {
+            return state;
+          }
 
           // Also return updated shuffle history
           return {
             ...state,
-            currentIndex: nextIndex,
+            currentIndex: candidate,
             shuffleHistory: [state.currentIndex], // Start new history
             playlist: {
               ...state.playlist,
@@ -318,15 +324,15 @@ export function scenePlayerReducer(
 
       if (state.shuffle) {
         // In shuffle mode, go back to last played scene (from history)
-        if (state.shuffleHistory.length > 0) {
-          prevIndex = state.shuffleHistory[state.shuffleHistory.length - 1];
-
+        const lastPlayed =
+          state.shuffleHistory[state.shuffleHistory.length - 1];
+        if (lastPlayed !== undefined) {
           // Remove last item from history
           const newHistory = state.shuffleHistory.slice(0, -1);
 
           return {
             ...state,
-            currentIndex: prevIndex,
+            currentIndex: lastPlayed,
             shuffleHistory: newHistory,
             playlist: state.playlist
               ? { ...state.playlist, shuffleHistory: newHistory }
@@ -348,7 +354,7 @@ export function scenePlayerReducer(
               (_, i) => i
             ).filter((i) => i !== state.currentIndex);
             prevIndex =
-              candidates[Math.floor(Math.random() * candidates.length)];
+              candidates[Math.floor(Math.random() * candidates.length)] ?? null;
           }
           // else: only 1 scene in playlist, can't go anywhere
         }
@@ -498,6 +504,7 @@ export function scenePlayerReducer(
       const repeatModes = ["none", "all", "one"];
       const currentIdx = repeatModes.indexOf(state.repeat);
       const nextRepeat = repeatModes[(currentIdx + 1) % repeatModes.length];
+      if (nextRepeat === undefined) return state;
       return {
         ...state,
         repeat: nextRepeat,

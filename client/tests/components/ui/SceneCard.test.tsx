@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
 import SceneCard from "../../../src/components/ui/SceneCard";
 
@@ -137,7 +138,7 @@ describe("navigation", () => {
     const { router, imageLink, titleLink } = renderCard(onClick);
     expect(imageLink).not.toBe(titleLink);
 
-    fireEvent.click(imageLink);
+    fireEvent.click(must(imageLink));
 
     expect(router.state.location.pathname).toBe("/scenes");
     expect(onClick).toHaveBeenCalledTimes(1);

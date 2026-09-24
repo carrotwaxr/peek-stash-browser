@@ -118,7 +118,7 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
         {/* Default View Mode - always first if available */}
         {availableSettings.includes("defaultViewMode") && (
           <Dropdown
-            label={(SETTING_LABELS as Record<string, string>).defaultViewMode}
+            label={SETTING_LABELS.defaultViewMode}
             value={settings.defaultViewMode as string}
             options={viewModes}
             onChange={(v) => handleChange("defaultViewMode", v)}
@@ -167,7 +167,10 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
           .map((settingKey: string) => (
             <Toggle
               key={settingKey}
-              label={(SETTING_LABELS as Record<string, string>)[settingKey]}
+              label={
+                (SETTING_LABELS as Record<string, string>)[settingKey] ??
+                settingKey
+              }
               checked={settings[settingKey] as boolean}
               onChange={(v) => handleChange(settingKey, v)}
               description={
@@ -202,6 +205,7 @@ const CardDisplaySettings = () => {
           const config = (
             ENTITY_DISPLAY_CONFIG as Record<string, { label: string }>
           )[entityType];
+          if (!config) return null;
           return (
             <div
               key={entityType}

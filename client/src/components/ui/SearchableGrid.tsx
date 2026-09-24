@@ -119,14 +119,18 @@ export const SearchableGrid = ({
         setLastQuery(mergedQuery);
         setError(null);
 
-        const result = await (
+        const fetchPage = (
           libraryApi as unknown as Record<
             string,
             (
               params: unknown
             ) => Promise<Record<string, Record<string, unknown>>>
           >
-        )[apiMethod](mergedQuery);
+        )[apiMethod];
+        if (!fetchPage) {
+          throw new Error(`Unknown library method: ${apiMethod}`);
+        }
+        const result = await fetchPage(mergedQuery);
         const items = (result[responseKey]?.[dataKey] || []) as Array<
           Record<string, unknown>
         >;

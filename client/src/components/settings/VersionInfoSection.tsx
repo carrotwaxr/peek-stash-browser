@@ -56,7 +56,8 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
   }, [loadServerVersion, checkForUpdates]);
 
   const parseVersion = (v: string) => {
-    const [core, pre] = v.split("-");
+    // split() always returns at least one part, so the default never applies
+    const [core = "", pre] = v.split("-");
     const parts = core.split(".").map(Number);
     return {
       major: parts[0] || 0,

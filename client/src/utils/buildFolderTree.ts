@@ -180,12 +180,13 @@ export function buildFolderTree(
   });
 
   // Add untagged folder if at root and has items
-  if (currentPath.length === 0 && untaggedItems.length > 0) {
+  const firstUntagged = untaggedItems[0];
+  if (currentPath.length === 0 && firstUntagged) {
     folders.push({
       id: UNTAGGED_FOLDER_ID,
       tag: null,
       name: "Untagged",
-      thumbnail: getItemThumbnail(untaggedItems[0]),
+      thumbnail: getItemThumbnail(firstUntagged),
       totalCount: untaggedItems.length,
       isFolder: true,
     });

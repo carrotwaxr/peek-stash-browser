@@ -100,7 +100,7 @@ const SceneCardPreview = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry?.isIntersecting) {
           setShouldLoadScreenshot(true);
           observer.disconnect(); // Only need to trigger once
         }

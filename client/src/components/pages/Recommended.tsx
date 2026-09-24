@@ -15,6 +15,18 @@ import {
   Tooltip,
 } from "../ui/index";
 
+/** The counts the server sends with an empty result (`GetRecommendedScenesResponse`) */
+interface RecommendationCriteria {
+  favoritedPerformers: number;
+  ratedPerformers: number;
+  favoritedStudios: number;
+  ratedStudios: number;
+  favoritedTags: number;
+  ratedTags: number;
+  favoritedScenes: number;
+  ratedScenes: number;
+}
+
 const RecommendationInfoContent = () => (
   <div className="text-sm max-w-sm">
     <p className="mb-2">
@@ -59,7 +71,7 @@ const Recommended = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [initMessage, setInitMessage] = useState<string | null>(null);
-  const [criteria, setCriteria] = useState<Record<string, number> | null>(null);
+  const [criteria, setCriteria] = useState<RecommendationCriteria | null>(null);
 
   // Get pagination params from URL
   const page = parseInt(searchParams.get("page") ?? "1") || 1;
@@ -84,7 +96,7 @@ const Recommended = () => {
           scenes: Record<string, unknown>[];
           count: number;
           message?: string;
-          criteria?: Record<string, number>;
+          criteria?: RecommendationCriteria;
         }>(`/library/scenes/recommended?page=${page}&per_page=${perPage}`);
 
         const {

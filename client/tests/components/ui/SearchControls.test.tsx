@@ -10,6 +10,7 @@
 import { MemoryRouter } from "react-router-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchControls from "../../../src/components/ui/SearchControls";
 
@@ -152,7 +153,7 @@ describe("SearchControls", () => {
       });
 
       // Initial query should have default values
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       expect(query.filter).toMatchObject({
         page: 1,
         per_page: 24,
@@ -168,7 +169,7 @@ describe("SearchControls", () => {
         expect(onQueryChange).toHaveBeenCalled();
       });
 
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       expect(query).toHaveProperty("performer_filter");
       expect(query).not.toHaveProperty("scene_filter");
     });
@@ -242,7 +243,7 @@ describe("SearchControls", () => {
       });
 
       // Query should have page reset to 1
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       expect(query.filter.page).toBe(1);
     });
   });
@@ -260,14 +261,14 @@ describe("SearchControls", () => {
       onQueryChange.mockClear();
 
       // Find and change the sort dropdown (first combobox)
-      const sortSelect = screen.getAllByRole("combobox")[0];
+      const sortSelect = must(screen.getAllByRole("combobox")[0]);
       await user.selectOptions(sortSelect, "rating");
 
       await waitFor(() => {
         expect(onQueryChange).toHaveBeenCalled();
       });
 
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       expect(query.filter.sort).toBe("rating");
     });
 
@@ -283,14 +284,14 @@ describe("SearchControls", () => {
       onQueryChange.mockClear();
 
       // Select random sort
-      const sortSelect = screen.getAllByRole("combobox")[0];
+      const sortSelect = must(screen.getAllByRole("combobox")[0]);
       await user.selectOptions(sortSelect, "random");
 
       await waitFor(() => {
         expect(onQueryChange).toHaveBeenCalled();
       });
 
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       // Sort should be random_XXXXXXXX format
       expect(query.filter.sort).toMatch(/^random_\d+$/);
     });
@@ -320,8 +321,9 @@ describe("SearchControls", () => {
         { timeout: 1000 }
       );
 
-      const query =
-        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
+      const query = must(
+        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1]
+      )[0];
       expect(query.filter.q).toBe("test query");
     });
 
@@ -346,8 +348,9 @@ describe("SearchControls", () => {
         { timeout: 1000 }
       );
 
-      const query =
-        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
+      const query = must(
+        onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1]
+      )[0];
       expect(query.filter.page).toBe(1);
     });
   });
@@ -388,7 +391,7 @@ describe("SearchControls", () => {
           expect(onQueryChange).toHaveBeenCalled();
         });
 
-        const query = onQueryChange.mock.calls[0][0];
+        const query = must(onQueryChange.mock.calls[0])[0];
         expect(query.filter.per_page).toBe(48);
         expect(query.filter.page).toBe(1); // Should reset to page 1
       }
@@ -442,7 +445,7 @@ describe("SearchControls", () => {
           expect(onQueryChange).toHaveBeenCalled();
         });
 
-        const query = onQueryChange.mock.calls[0][0];
+        const query = must(onQueryChange.mock.calls[0])[0];
         expect(query).toHaveProperty(expectedKey);
 
         unmount();
@@ -570,7 +573,7 @@ describe("SearchControls", () => {
       });
 
       // Verify the query includes the date filter
-      const query = onQueryChange.mock.calls[0][0];
+      const query = must(onQueryChange.mock.calls[0])[0];
       expect(query.gallery_filter).toBeDefined();
       expect(query.gallery_filter.date).toBeDefined();
       expect(query.gallery_filter.date.value).toBe("2024-01-01");

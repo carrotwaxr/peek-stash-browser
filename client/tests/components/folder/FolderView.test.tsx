@@ -1,6 +1,7 @@
 // client/tests/components/folder/FolderView.test.jsx
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
 import FolderView from "../../../src/components/folder/FolderView";
 
@@ -62,7 +63,7 @@ describe("FolderView", () => {
         .getAllByRole("button")
         .filter((btn) => btn.querySelector("h3")?.textContent === "Photo");
       expect(folderCards.length).toBeGreaterThan(0);
-      fireEvent.click(folderCards[0]);
+      fireEvent.click(must(folderCards[0]));
 
       // After navigating into a folder, page should be reset (deleted = page 1)
       expect(capturedSearchParams!.get("page")).toBeNull();
@@ -134,7 +135,7 @@ describe("FolderView", () => {
         .getAllByRole("button")
         .filter((btn) => btn.querySelector("h3")?.textContent === "Color");
       expect(folderCards.length).toBeGreaterThan(0);
-      fireEvent.click(folderCards[0]);
+      fireEvent.click(must(folderCards[0]));
 
       // After navigating deeper, page should be reset
       expect(capturedSearchParams!.get("page")).toBeNull();

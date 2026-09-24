@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSceneDetail, useSceneList } from "../../../src/api/hooks/useScenes";
 import { libraryApi } from "../../../src/api/library";
@@ -81,8 +82,9 @@ describe("useSceneList", () => {
     renderHook(() => useSceneList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findScenes).toHaveBeenCalled());
-    const callArgs = (libraryApi.findScenes as ReturnType<typeof vi.fn>).mock
-      .calls[0];
+    const callArgs = must(
+      (libraryApi.findScenes as ReturnType<typeof vi.fn>).mock.calls[0]
+    );
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 

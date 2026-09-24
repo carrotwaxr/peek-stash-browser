@@ -124,27 +124,29 @@ const SceneSearch = ({
     const filters: Record<string, string> = {};
 
     // Extract performer ID
-    if ((permanentFilters.performers?.value as unknown[] | undefined)?.length) {
-      filters.performerId = String(
-        (permanentFilters.performers.value as unknown[])[0]
-      );
+    const performerIds = permanentFilters.performers?.value as
+      | unknown[]
+      | undefined;
+    if (performerIds?.length) {
+      filters.performerId = String(performerIds[0]);
     }
 
     // Extract tag ID
-    if ((permanentFilters.tags?.value as unknown[] | undefined)?.length) {
-      filters.tagId = String((permanentFilters.tags.value as unknown[])[0]);
+    const tagIds = permanentFilters.tags?.value as unknown[] | undefined;
+    if (tagIds?.length) {
+      filters.tagId = String(tagIds[0]);
     }
 
     // Extract studio ID
-    if ((permanentFilters.studios?.value as unknown[] | undefined)?.length) {
-      filters.studioId = String(
-        (permanentFilters.studios.value as unknown[])[0]
-      );
+    const studioIds = permanentFilters.studios?.value as unknown[] | undefined;
+    if (studioIds?.length) {
+      filters.studioId = String(studioIds[0]);
     }
 
     // Extract group ID
-    if ((permanentFilters.groups?.value as unknown[] | undefined)?.length) {
-      filters.groupId = String((permanentFilters.groups.value as unknown[])[0]);
+    const groupIds = permanentFilters.groups?.value as unknown[] | undefined;
+    if (groupIds?.length) {
+      filters.groupId = String(groupIds[0]);
     }
 
     return Object.keys(filters).length > 0 ? filters : null;

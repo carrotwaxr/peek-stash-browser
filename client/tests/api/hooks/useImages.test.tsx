@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useImageList } from "../../../src/api/hooks/useImages";
 import { libraryApi } from "../../../src/api/library";
@@ -80,8 +81,9 @@ describe("useImageList", () => {
     renderHook(() => useImageList(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(libraryApi.findImages).toHaveBeenCalled());
-    const callArgs = (libraryApi.findImages as ReturnType<typeof vi.fn>).mock
-      .calls[0];
+    const callArgs = must(
+      (libraryApi.findImages as ReturnType<typeof vi.fn>).mock.calls[0]
+    );
     expect(callArgs[1]).toBeInstanceOf(AbortSignal);
   });
 

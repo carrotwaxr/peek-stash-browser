@@ -45,8 +45,9 @@ export function getSceneTitle(scene: SceneTitleInput | null) {
   }
 
   // Fallback to first file basename
-  if (scene.files && scene.files.length > 0 && scene.files[0].basename) {
-    return scene.files[0].basename.replace(/\.[^/.]+$/, ""); // Remove file extension
+  const firstBasename = scene.files?.[0]?.basename;
+  if (firstBasename) {
+    return firstBasename.replace(/\.[^/.]+$/, ""); // Remove file extension
   }
 
   return "Unknown Scene";

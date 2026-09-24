@@ -35,12 +35,14 @@ function parseVTT(vttContent: string): SpriteCue[] {
 
   let i = 0;
   // Skip WEBVTT header
-  while (i < lines.length && !lines[i].includes("-->")) {
+  while (i < lines.length && !lines[i]?.includes("-->")) {
     i++;
   }
 
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const rawLine = lines[i];
+    if (rawLine === undefined) break;
+    const line = rawLine.trim();
 
     // Look for timestamp lines (format: 00:00:00.000 --> 00:00:10.000)
     if (line.includes("-->")) {
@@ -50,19 +52,25 @@ function parseVTT(vttContent: string): SpriteCue[] {
 
       // Next line should have the sprite position
       i++;
-      if (i < lines.length) {
-        const positionLine = lines[i].trim();
+      const nextLine = lines[i];
+      if (
+        nextLine !== undefined &&
+        startTime !== undefined &&
+        endTime !== undefined
+      ) {
+        const positionLine = nextLine.trim();
 
         // Parse sprite position (format: sprite#xywh=x,y,width,height)
         const match = positionLine.match(/xywh=(\d+),(\d+),(\d+),(\d+)/);
-        if (match) {
+        const [, x, y, width, height] = match ?? [];
+        if (x && y && width && height) {
           cues.push({
             startTime: parseTimestamp(startTime),
             endTime: parseTimestamp(endTime),
-            x: parseInt(match[1]),
-            y: parseInt(match[2]),
-            width: parseInt(match[3]),
-            height: parseInt(match[4]),
+            x: parseInt(x),
+            y: parseInt(y),
+            width: parseInt(width),
+            height: parseInt(height),
           });
         }
       }
@@ -81,19 +89,22 @@ function parseVTT(vttContent: string): SpriteCue[] {
  */
 function parseTimestamp(timestamp: string): number {
   const parts = timestamp.split(":");
+  // The length checks below guarantee each part they read, so the defaults
+  // never apply
+  const [first = "", second = "", third = ""] = parts;
   let hours = 0,
     minutes = 0,
     seconds = 0;
 
   if (parts.length === 3) {
-    hours = parseInt(parts[0]);
-    minutes = parseInt(parts[1]);
-    seconds = parseFloat(parts[2]);
+    hours = parseInt(first);
+    minutes = parseInt(second);
+    seconds = parseFloat(third);
   } else if (parts.length === 2) {
-    minutes = parseInt(parts[0]);
-    seconds = parseFloat(parts[1]);
+    minutes = parseInt(first);
+    seconds = parseFloat(second);
   } else {
-    seconds = parseFloat(parts[0]);
+    seconds = parseFloat(first);
   }
 
   return hours * 3600 + minutes * 60 + seconds;
@@ -153,7 +164,8 @@ export function getEvenlySpacedSprites(
 
   for (let i = 0; i < count; i++) {
     const index = Math.min(i * step, cues.length - 1);
-    sprites.push(extractSpritePosition(cues[index]));
+    const cue = cues[index];
+    if (cue) sprites.push(extractSpritePosition(cue));
   }
 
   return sprites;

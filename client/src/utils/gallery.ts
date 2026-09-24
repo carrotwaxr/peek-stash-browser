@@ -39,9 +39,8 @@ export function galleryTitle(gallery: GalleryTitleInput | null): string {
   }
 
   // Try to get basename from files
-  if (gallery.files && gallery.files.length > 0) {
-    const firstFile = gallery.files[0];
-
+  const firstFile = gallery.files?.[0];
+  if (firstFile) {
     // Prefer basename if available
     if (firstFile.basename) {
       return firstFile.basename;

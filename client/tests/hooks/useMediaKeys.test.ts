@@ -1,4 +1,5 @@
 import { renderHook } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { useVideoPlayerShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -57,10 +58,11 @@ function captureShortcuts(
   );
 
   // useVideoPlayerShortcuts is called with (playerRef, shortcuts, options)
-  const lastCall =
+  const lastCall = must(
     mockUseVideoPlayerShortcuts.mock.calls[
       mockUseVideoPlayerShortcuts.mock.calls.length - 1
-    ];
+    ]
+  );
   const shortcuts = lastCall[1] as Record<string, (event?: any) => any>;
 
   return { player, playerRef, shortcuts };
@@ -79,7 +81,7 @@ describe("usePlaylistMediaKeys", () => {
       paused: vi.fn(() => true),
     });
 
-    shortcuts.space();
+    must(shortcuts.space)();
 
     expect(player.play).toHaveBeenCalledTimes(1);
     expect(player.pause).not.toHaveBeenCalled();
@@ -90,7 +92,7 @@ describe("usePlaylistMediaKeys", () => {
       paused: vi.fn(() => false),
     });
 
-    shortcuts.space();
+    must(shortcuts.space)();
 
     expect(player.pause).toHaveBeenCalledTimes(1);
     expect(player.play).not.toHaveBeenCalled();
@@ -101,7 +103,7 @@ describe("usePlaylistMediaKeys", () => {
       paused: vi.fn(() => true),
     });
 
-    shortcuts.k();
+    must(shortcuts.k)();
 
     expect(player.play).toHaveBeenCalledTimes(1);
   });
@@ -113,7 +115,7 @@ describe("usePlaylistMediaKeys", () => {
       currentTime: vi.fn((t?: number) => (t !== undefined ? t : 5)),
     });
 
-    shortcuts.j();
+    must(shortcuts.j)();
 
     // 5 - 10 = -5, clamped to 0
     expect(player.currentTime).toHaveBeenCalledWith(0);
@@ -124,7 +126,7 @@ describe("usePlaylistMediaKeys", () => {
       currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
     });
 
-    shortcuts.l();
+    must(shortcuts.l)();
 
     expect(player.currentTime).toHaveBeenCalledWith(40);
   });
@@ -134,7 +136,7 @@ describe("usePlaylistMediaKeys", () => {
       currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
     });
 
-    shortcuts.left();
+    must(shortcuts.left)();
 
     expect(player.currentTime).toHaveBeenCalledWith(25);
   });
@@ -144,7 +146,7 @@ describe("usePlaylistMediaKeys", () => {
       currentTime: vi.fn((t?: number) => (t !== undefined ? t : 30)),
     });
 
-    shortcuts.right();
+    must(shortcuts.right)();
 
     expect(player.currentTime).toHaveBeenCalledWith(35);
   });
@@ -154,7 +156,7 @@ describe("usePlaylistMediaKeys", () => {
   it("seeks to start with Home key", () => {
     const { player, shortcuts } = captureShortcuts();
 
-    shortcuts.home();
+    must(shortcuts.home)();
 
     expect(player.currentTime).toHaveBeenCalledWith(0);
   });
@@ -164,7 +166,7 @@ describe("usePlaylistMediaKeys", () => {
       duration: vi.fn(() => 200),
     });
 
-    shortcuts.end();
+    must(shortcuts.end)();
 
     expect(player.currentTime).toHaveBeenCalledWith(200);
   });
@@ -176,15 +178,15 @@ describe("usePlaylistMediaKeys", () => {
       duration: vi.fn(() => 100),
     });
 
-    shortcuts["0"]();
+    must(shortcuts["0"])();
     expect(player.currentTime).toHaveBeenCalledWith(0);
 
     player.currentTime.mockClear();
-    shortcuts["5"]();
+    must(shortcuts["5"])();
     expect(player.currentTime).toHaveBeenCalledWith(50);
 
     player.currentTime.mockClear();
-    shortcuts["9"]();
+    must(shortcuts["9"])();
     expect(player.currentTime).toHaveBeenCalledWith(90);
   });
 
@@ -195,7 +197,7 @@ describe("usePlaylistMediaKeys", () => {
     const { shortcuts } = captureShortcuts();
 
     for (const key of ["0", "1", "2", "3", "4", "5"]) {
-      expect(shortcuts[key]()).toBe(false);
+      expect(must(shortcuts[key])()).toBe(false);
     }
   });
 
@@ -208,7 +210,7 @@ describe("usePlaylistMediaKeys", () => {
     });
 
     for (const key of ["6", "7", "8", "9"]) {
-      const result = shortcuts[key]();
+      const result = must(shortcuts[key])();
       expect(result).not.toBe(false);
     }
     // Verify actual seeking happened
@@ -222,7 +224,7 @@ describe("usePlaylistMediaKeys", () => {
       volume: vi.fn((v?: number) => (v !== undefined ? v : 0.95)),
     });
 
-    shortcuts.up();
+    must(shortcuts.up)();
 
     expect(player.volume).toHaveBeenCalledWith(1);
   });
@@ -232,7 +234,7 @@ describe("usePlaylistMediaKeys", () => {
       volume: vi.fn((v?: number) => (v !== undefined ? v : 0.03)),
     });
 
-    shortcuts.down();
+    must(shortcuts.down)();
 
     expect(player.volume).toHaveBeenCalledWith(0);
   });
@@ -244,7 +246,7 @@ describe("usePlaylistMediaKeys", () => {
       muted: vi.fn((m?: boolean) => (m !== undefined ? m : false)),
     });
 
-    shortcuts.m();
+    must(shortcuts.m)();
 
     expect(player.muted).toHaveBeenCalledWith(true);
   });
@@ -256,7 +258,7 @@ describe("usePlaylistMediaKeys", () => {
       playbackRate: vi.fn((r?: number) => (r !== undefined ? r : 1.75)),
     });
 
-    shortcuts["shift+>"]();
+    must(shortcuts["shift+>"])();
 
     expect(player.playbackRate).toHaveBeenCalledWith(2);
   });
@@ -266,7 +268,7 @@ describe("usePlaylistMediaKeys", () => {
       playbackRate: vi.fn((r?: number) => (r !== undefined ? r : 0.5)),
     });
 
-    shortcuts["shift+<"]();
+    must(shortcuts["shift+<"])();
 
     expect(player.playbackRate).toHaveBeenCalledWith(0.25);
   });
@@ -278,7 +280,7 @@ describe("usePlaylistMediaKeys", () => {
       isFullscreen: vi.fn(() => false),
     });
 
-    shortcuts.f();
+    must(shortcuts.f)();
 
     expect(player.requestFullscreen).toHaveBeenCalledTimes(1);
   });
@@ -288,7 +290,7 @@ describe("usePlaylistMediaKeys", () => {
       isFullscreen: vi.fn(() => true),
     });
 
-    shortcuts.f();
+    must(shortcuts.f)();
 
     expect(player.exitFullscreen).toHaveBeenCalledTimes(1);
   });
@@ -297,7 +299,7 @@ describe("usePlaylistMediaKeys", () => {
     mockIsInRatingMode.mockReturnValue(true);
     const { shortcuts } = captureShortcuts();
 
-    expect(shortcuts.f()).toBe(false);
+    expect(must(shortcuts.f)()).toBe(false);
   });
 
   // ─── Playlist navigation (Shift+N/P) ───────────────────────────────────
@@ -374,10 +376,10 @@ describe("usePlaylistMediaKeys", () => {
     expect(shortcuts.mediatracknext).toBeDefined();
     expect(shortcuts.mediatrackprevious).toBeDefined();
 
-    shortcuts.mediatracknext();
+    must(shortcuts.mediatracknext)();
     expect(playNext).toHaveBeenCalledTimes(1);
 
-    shortcuts.mediatrackprevious();
+    must(shortcuts.mediatrackprevious)();
     expect(playPrevious).toHaveBeenCalledTimes(1);
   });
 

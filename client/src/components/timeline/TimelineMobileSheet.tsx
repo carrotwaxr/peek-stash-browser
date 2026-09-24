@@ -39,7 +39,9 @@ function TimelineMobileSheet({
 
   // Touch handlers for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartY.current = touch.clientY;
     touchStartTime.current = Date.now();
   }, []);
 
@@ -48,7 +50,9 @@ function TimelineMobileSheet({
       if (touchStartY.current === null || touchStartTime.current === null)
         return;
 
-      const touchEndY = e.changedTouches[0].clientY;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const touchEndY = touch.clientY;
       const deltaY = touchEndY - touchStartY.current;
       const deltaTime = Date.now() - touchStartTime.current;
 

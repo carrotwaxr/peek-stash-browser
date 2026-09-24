@@ -16,8 +16,16 @@ import ThemeTab from "../settings/tabs/ThemeTab";
 import UserManagementTab from "../settings/tabs/UserManagementTab";
 import { PageHeader, PageLayout } from "../ui/index";
 
+interface SettingsTab {
+  id: string;
+  label: string;
+}
+
+/** Never empty: the first tab is the section's default */
+type SettingsTabList = [SettingsTab, ...SettingsTab[]];
+
 // Tab definitions
-const USER_TABS = [
+const USER_TABS: SettingsTabList = [
   { id: "theme", label: "Theme" },
   { id: "playback", label: "Playback" },
   { id: "customization", label: "Customization" },
@@ -26,7 +34,7 @@ const USER_TABS = [
   { id: "account", label: "Account" },
 ];
 
-const SERVER_TABS = [
+const SERVER_TABS: SettingsTabList = [
   { id: "server-config", label: "Server Configuration" },
   { id: "user-management", label: "User Management" },
   { id: "merge-recovery", label: "Merge Recovery" },

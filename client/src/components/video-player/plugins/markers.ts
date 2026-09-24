@@ -84,13 +84,11 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     dot.toggleAttribute("marker-tooltip-shown", true);
 
     // Set background color based on tag (if available)
-    if (
-      marker.primaryTag &&
-      marker.primaryTag.name &&
-      this.tagColors[marker.primaryTag.name]
-    ) {
-      dot.style.backgroundColor =
-        this.tagColors[marker.primaryTag.name];
+    const dotColor = marker.primaryTag?.name
+      ? this.tagColors[marker.primaryTag.name]
+      : undefined;
+    if (dotColor) {
+      dot.style.backgroundColor = dotColor;
     }
     dot.addEventListener("mouseenter", () => {
       this.showMarkerTooltip(marker.title);
@@ -240,9 +238,10 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
 
     // Compute p(j) for each marker. This is the index of the marker that has the highest end time that doesn't overlap with marker j
     const p = new Array(n).fill(-1);
-    for (let j = 0; j < n; j++) {
+    for (const [j, markerJ] of markers.entries()) {
       for (let i = j - 1; i >= 0; i--) {
-        if ((markers[i].end_seconds || 0) <= markers[j].seconds) {
+        const markerI = markers[i];
+        if (markerI && (markerI.end_seconds || 0) <= markerJ.seconds) {
           p[j] = i;
           break;
         }
@@ -252,21 +251,22 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     // Initialize M[j]
     // Compute M[j] for each marker. This is the maximum total duration of markers that don't overlap with marker j
     const M = new Array(n).fill(0);
-    for (let j = 0; j < n; j++) {
+    for (const [j, markerJ] of markers.entries()) {
       const include =
-        (markers[j].end_seconds || 0) - markers[j].seconds + (M[p[j]] || 0);
+        (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
       const exclude = j > 0 ? M[j - 1] : 0;
       M[j] = Math.max(include, exclude);
     }
 
     // Reconstruct optimal solution
     const findSolution = (j: number): Marker[] => {
-      if (j < 0) return [];
+      const markerJ = markers[j];
+      if (j < 0 || !markerJ) return [];
       const include =
-        (markers[j].end_seconds || 0) - markers[j].seconds + (M[p[j]] || 0);
+        (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
       const exclude = j > 0 ? M[j - 1] : 0;
       if (include >= exclude) {
-        return [...findSolution(p[j]), markers[j]];
+        return [...findSolution(p[j]), markerJ];
       } else {
         return findSolution(j - 1);
       }
@@ -281,6 +281,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
 
     this.markers.splice(i, 1);
     const markerSet = this.markerDivs.splice(i, 1)[0];
+    if (!markerSet) return;
 
     if (markerSet.dot && markerSet.dot.hasAttribute("marker-tooltip-shown")) {
       this.hideMarkerTooltip();
@@ -320,7 +321,8 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
 
     // Convert adjusted hues to colors and store in tagColors dictionary
     for (const tag of tagNames) {
-      this.tagColors[tag] = this.hueToColor(adjustedHues[tag]);
+      const hue = adjustedHues[tag];
+      if (hue !== undefined) this.tagColors[tag] = this.hueToColor(hue);
     }
   }
 
@@ -360,47 +362,66 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     const deltaMin = this.calculateDeltaMin(N);
 
     // Sort the tags by base hue
-    const sortedTags = tags.sort((a, b) => baseHues[a] - baseHues[b]);
+    const sortedEntries = Object.entries(baseHues).sort(
+      ([, a], [, b]) => a - b
+    );
+    const sortedTags = sortedEntries.map(([tag]) => tag);
     // Get sorted base hues
-    const baseHuesSorted = sortedTags.map((tag) => baseHues[tag]);
+    const baseHuesSorted = sortedEntries.map(([, hue]) => hue);
 
     // Unwrap hues to handle circular nature
     const unwrappedHues = [...baseHuesSorted];
     for (let i = 1; i < N; i++) {
-      if (unwrappedHues[i] <= unwrappedHues[i - 1]) {
-        unwrappedHues[i] += 360; // Unwrap by adding 360 degrees
+      const hue = unwrappedHues[i];
+      const previousHue = unwrappedHues[i - 1];
+      if (hue === undefined || previousHue === undefined) continue;
+      if (hue <= previousHue) {
+        unwrappedHues[i] = hue + 360; // Unwrap by adding 360 degrees
       }
     }
 
     // Adjust hues to ensure minimum difference
     for (let i = 1; i < N; i++) {
-      const requiredHue = unwrappedHues[i - 1] + deltaMin;
-      if (unwrappedHues[i] < requiredHue) {
+      const hue = unwrappedHues[i];
+      const previousHue = unwrappedHues[i - 1];
+      if (hue === undefined || previousHue === undefined) continue;
+      const requiredHue = previousHue + deltaMin;
+      if (hue < requiredHue) {
         unwrappedHues[i] = requiredHue; // Adjust hue minimally
       }
     }
 
-    // Handle wrap-around difference
-    const endGap = unwrappedHues[0] + 360 - unwrappedHues[N - 1];
-    if (endGap < deltaMin) {
-      // Adjust first and last hues minimally to increase end gap
-      const adjustmentNeeded = (deltaMin - endGap) / 2;
-      // Adjust the first hue backward, ensure it doesn't go below other hues
-      unwrappedHues[0] = Math.max(
-        unwrappedHues[0] - adjustmentNeeded,
-        unwrappedHues[1] - 360 + deltaMin
-      );
-      // Adjust the last hue forward
-      unwrappedHues[N - 1] += adjustmentNeeded;
+    // Handle wrap-around difference (needs at least two hues)
+    const firstHue = unwrappedHues[0];
+    const secondHue = unwrappedHues[1];
+    const lastHue = unwrappedHues[N - 1];
+    if (
+      firstHue !== undefined &&
+      secondHue !== undefined &&
+      lastHue !== undefined
+    ) {
+      const endGap = firstHue + 360 - lastHue;
+      if (endGap < deltaMin) {
+        // Adjust first and last hues minimally to increase end gap
+        const adjustmentNeeded = (deltaMin - endGap) / 2;
+        // Adjust the first hue backward, ensure it doesn't go below other hues
+        unwrappedHues[0] = Math.max(
+          firstHue - adjustmentNeeded,
+          secondHue - 360 + deltaMin
+        );
+        // Adjust the last hue forward
+        unwrappedHues[N - 1] = lastHue + adjustmentNeeded;
+      }
     }
 
     // Wrap adjusted hues back to [0, 360)
     const adjustedHuesList = unwrappedHues.map((hue) => hue % 360);
 
     // Map adjusted hues back to tags
-    for (let i = 0; i < N; i++) {
-      adjustedHues[sortedTags[i]] = adjustedHuesList[i];
-    }
+    sortedTags.forEach((tag, i) => {
+      const hue = adjustedHuesList[i];
+      if (hue !== undefined) adjustedHues[tag] = hue;
+    });
 
     return adjustedHues;
   }
@@ -420,7 +441,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   // Convert HSV to RGB
-  hsvToRgb(h: number, s: number, v: number) {
+  hsvToRgb(h: number, s: number, v: number): [number, number, number] {
     const i = Math.floor(h * 6);
     const f = h * 6 - i;
     const p = v * (1 - s);

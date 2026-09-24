@@ -40,8 +40,9 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
     setValidationError("");
 
     // If turning off randomize and multiple pages selected, keep only first
-    if (!checked && selectedPages.length > 1) {
-      setSelectedPages([selectedPages[0]]);
+    const firstPage = selectedPages[0];
+    if (!checked && selectedPages.length > 1 && firstPage !== undefined) {
+      setSelectedPages([firstPage]);
     }
   };
 
