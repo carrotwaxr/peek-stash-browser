@@ -21,6 +21,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/fira-code": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/lilita-one": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/outfit": "^5.3.0",
+    "@fontsource/poppins": "^5.3.0",
+    "@fontsource/rubik": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
+    "@fontsource/work-sans": "^5.3.0",
     "@peek/shared-types": "file:../shared",
     "@silvermine/videojs-airplay": "^1.2.0",
     "@silvermine/videojs-chromecast": "^1.4.1",
