@@ -1,10 +1,5 @@
-import {
-  type Browser,
-  type BrowserContext,
-  expect,
-  request,
-  test,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
  * E2E test for the gallery lightbox O count (sweep item 11).
@@ -20,54 +15,12 @@ import {
  * empty).
  */
 
-const PASSWORD = "E2eLightbox1";
-
-/** A fresh browser context signed in as the user, first-login setup done. */
-async function signIn(
-  browser: Browser,
-  baseURL: string,
-  username: string
-): Promise<BrowserContext> {
-  const api = await request.newContext({ baseURL });
-  let token: string | undefined;
-  try {
-    const res = await api.post("/api/auth/login", {
-      data: { username, password: PASSWORD },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
-    token = (res.headers()["set-cookie"] || "").match(/token=([^;]+)/)?.[1];
-    expect(token).toBeTruthy();
-  } finally {
-    await api.dispose();
-  }
-
-  const context = await browser.newContext({ baseURL });
-  await context.addCookies([
-    {
-      name: "token",
-      value: token!,
-      domain: new URL(baseURL).hostname,
-      path: "/",
-    },
-  ]);
-
-  const status = await context.request.get("/api/user/setup-status");
-  const { instances } = (await status.json()) as {
-    instances: Array<{ id: string }>;
-  };
-  const setup = await context.request.post("/api/user/complete-setup", {
-    data: { selectedInstanceIds: instances.map((i) => i.id) },
-  });
-  expect(setup.ok(), await setup.text()).toBeTruthy();
-  return context;
-}
-
 test.describe("Gallery lightbox", () => {
   let userId: number | undefined;
 
   test.afterEach(async ({ page }) => {
     if (userId !== undefined) {
-      await page.request.delete(`/api/user/${userId}`);
+      await deleteUser(page.request, userId);
       userId = undefined;
     }
   });
@@ -77,15 +30,12 @@ test.describe("Gallery lightbox", () => {
     browser,
     baseURL,
   }) => {
-    const username = `e2e-lightbox-${Date.now()}-${test.info().workerIndex}`;
-    const created = await page.request.post("/api/user/create", {
-      data: { username, password: PASSWORD, role: "USER" },
-    });
-    expect(created.ok(), await created.text()).toBeTruthy();
-    userId = ((await created.json()) as { user: { id: number } }).user.id;
+    const user = await createUser(page.request, "lightbox");
+    userId = user.id;
 
-    const context = await signIn(browser, baseURL!, username);
+    const context = await signIn(browser, baseURL, user);
     try {
+      await completeSetup(context);
       const userPage = await context.newPage();
 
       // 1. Open the first gallery

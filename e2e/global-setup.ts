@@ -14,28 +14,16 @@
  * production Stash, so a test playing, rating or pressing O as it would write
  * there. The run admin has Sync to Stash off, as every new user does.
  */
-import {
-  type APIRequestContext,
-  type APIResponse,
-  request,
-} from "@playwright/test";
+import { type APIRequestContext, request } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { mustOk } from "./support/api";
+import { deleteGroups, deleteUsers } from "./support/cleanup";
 import { HERMETIC_ADMIN, baseURL, dbFile, devStack } from "./support/env";
 
 interface SetupStatus {
   setupComplete: boolean;
   hasUsers: boolean;
   hasStashInstance: boolean;
-}
-
-interface UserRow {
-  id: number;
-  username: string;
-}
-
-interface GroupRow {
-  id: number;
-  name: string;
 }
 
 /** Hermetic mode's Stash: nothing listens there (port 9 is discard) */
@@ -64,19 +52,6 @@ export async function readSetupStatus(
   }
 }
 
-/** Throws with the status and body unless the response is 2xx */
-export async function mustOk(
-  response: APIResponse,
-  what: string
-): Promise<APIResponse> {
-  if (!response.ok()) {
-    throw new Error(
-      `${what} answered ${response.status()} ${(await response.text()) || "(empty body)"}`
-    );
-  }
-  return response;
-}
-
 /** Signs `api` in; the session cookie stays in its cookie jar */
 export async function logIn(
   api: APIRequestContext,
@@ -99,46 +74,6 @@ export function bootstrapAdmin(): { username: string; password: string } {
     );
   }
   return { username, password };
-}
-
-export async function listUsers(api: APIRequestContext): Promise<UserRow[]> {
-  const response = await mustOk(
-    await api.get("/api/user/all"),
-    "Listing users"
-  );
-  return ((await response.json()) as { users: UserRow[] }).users;
-}
-
-export async function listGroups(api: APIRequestContext): Promise<GroupRow[]> {
-  const response = await mustOk(await api.get("/api/groups"), "Listing groups");
-  return ((await response.json()) as { groups: GroupRow[] }).groups;
-}
-
-/**
- * Deletes the users and groups whose name starts with `prefix`, except the
- * signed-in bootstrap admin
- */
-export async function deleteByPrefix(
-  api: APIRequestContext,
-  prefix: string,
-  keepUsername: string
-): Promise<void> {
-  for (const user of await listUsers(api)) {
-    if (user.username.startsWith(prefix) && user.username !== keepUsername) {
-      await mustOk(
-        await api.delete(`/api/user/${user.id}`),
-        `Deleting user ${user.username}`
-      );
-    }
-  }
-  for (const group of await listGroups(api)) {
-    if (group.name.startsWith(prefix)) {
-      await mustOk(
-        await api.delete(`/api/groups/${group.id}`),
-        `Deleting group ${group.name}`
-      );
-    }
-  }
 }
 
 async function createStashInstance(
@@ -213,7 +148,8 @@ async function setUpDevStack(
   }
 
   // Leftovers of runs that were killed before their teardown
-  await deleteByPrefix(api, "e2e-", bootstrap.username);
+  await deleteUsers(api, "e2e-", bootstrap.username);
+  await deleteGroups(api, "e2e-");
 
   const runAdmin = {
     username: `e2e-${runId}-admin`,

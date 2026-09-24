@@ -1,4 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
+import { type TestUser, createUser, deleteUser } from "./support/users";
 
 /**
  * E2E tests for the Content Restrictions editor in Settings (item 13).
@@ -12,32 +13,25 @@ import { type Page, expect, test } from "@playwright/test";
  * found" (assert that and cancel).
  */
 
-const PASSWORD = "E2eRestr1ctions!";
-
 test.describe("Content Restrictions editor", () => {
-  const uniqueSuffix = Date.now();
-  const userName = `e2e-restr-user-${uniqueSuffix}`;
-  const adminName = `e2e-restr-admin-${uniqueSuffix}`;
-  const createdIds: number[] = [];
+  // Set in beforeAll: each worker that runs these tests creates its own pair
+  let userName = "";
+  let adminName = "";
+  const created: TestUser[] = [];
 
   test.beforeAll(async ({ request }) => {
     // The request fixture carries the admin cookie from e2e/.auth/user.json
-    for (const [username, role] of [
-      [userName, "USER"],
-      [adminName, "ADMIN"],
-    ] as const) {
-      const response = await request.post("/api/user/create", {
-        data: { username, password: PASSWORD, role },
-      });
-      expect(response.ok(), `create ${username}`).toBeTruthy();
-      const body = (await response.json()) as { user: { id: number } };
-      createdIds.push(body.user.id);
-    }
+    const user = await createUser(request, "restr-user");
+    created.push(user);
+    userName = user.username;
+    const admin = await createUser(request, "restr-admin", "ADMIN");
+    created.push(admin);
+    adminName = admin.username;
   });
 
   test.afterAll(async ({ request }) => {
-    for (const id of createdIds) {
-      await request.delete(`/api/user/${id}`);
+    for (const { id } of created.splice(0)) {
+      await deleteUser(request, id);
     }
   });
 

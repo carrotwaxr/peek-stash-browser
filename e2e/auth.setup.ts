@@ -1,5 +1,5 @@
 import { expect, request, test as setup } from "@playwright/test";
-import { mustOk } from "./global-setup";
+import { mustOk } from "./support/api";
 
 const AUTH_FILE = "e2e/.auth/user.json";
 

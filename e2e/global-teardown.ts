@@ -1,45 +1,38 @@
 /**
  * Playwright global teardown: runs once, after every test.
  *
- * Dev-stack mode: the bootstrap admin deletes this run's admin. Its
- * playlists, history, ratings, carousels and presets go with it (every
- * per-user relation cascades). Then it deletes the users and groups named
- * with this run's prefix, and fails the run if any remain.
+ * Dev-stack mode: the bootstrap admin deletes the users and groups named with
+ * this run's prefix, the run admin among them, and fails the run if any
+ * remain. Each user's playlists, history, ratings, carousels and presets go
+ * with it (every per-user relation cascades).
  *
  * Hermetic mode: nothing to do, since the next run replaces the database.
  */
 import { request } from "@playwright/test";
+import { bootstrapAdmin, logIn } from "./global-setup";
 import {
-  bootstrapAdmin,
-  deleteByPrefix,
+  deleteGroups,
+  deleteUsers,
   listGroups,
   listUsers,
-  logIn,
-  mustOk,
-} from "./global-setup";
+} from "./support/cleanup";
 import { baseURL, devStack } from "./support/env";
+import { runPrefix } from "./support/names";
 
 async function globalTeardown() {
-  const runId = process.env.E2E_RUN_ID;
-  const runAdmin = process.env.E2E_ADMIN_USERNAME;
   // Global setup failed before it created anything for this run
-  if (!devStack || !runId || !runAdmin) return;
+  if (!devStack || !process.env.E2E_RUN_ID || !process.env.E2E_ADMIN_USERNAME) {
+    return;
+  }
 
   const bootstrap = bootstrapAdmin();
-  const prefix = `e2e-${runId}`;
+  const prefix = runPrefix();
   const api = await request.newContext({ baseURL });
   try {
     await logIn(api, bootstrap.username, bootstrap.password);
 
-    const admin = (await listUsers(api)).find((u) => u.username === runAdmin);
-    if (admin) {
-      await mustOk(
-        await api.delete(`/api/user/${admin.id}`),
-        `Deleting the run admin ${runAdmin}`
-      );
-    }
-
-    await deleteByPrefix(api, prefix, bootstrap.username);
+    await deleteUsers(api, prefix, bootstrap.username);
+    await deleteGroups(api, prefix);
 
     const left = [
       ...(await listUsers(api))

@@ -1,4 +1,4 @@
-import { Locator, Page, expect } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
 
 /**
  * Shared page object for all library list pages
@@ -11,9 +11,13 @@ export class ListPage {
   readonly sortControl: Locator;
   readonly sortDirection: Locator;
   readonly viewModeButton: Locator;
-  readonly perPageSelect: Locator;
-  readonly paginationNext: Locator;
-  readonly paginationPrev: Locator;
+  // The pagination bar shows above and below the grid, so its controls
+  // (and the #perPage id) appear twice: these take the bottom one
+  readonly perPage: Locator;
+  readonly nextPage: Locator;
+  readonly previousPage: Locator;
+  /** "No scenes found" and the like, when nothing matches */
+  readonly emptyState: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -22,9 +26,28 @@ export class ListPage {
     this.sortControl = page.locator('[data-tv-search-item="sort-control"]');
     this.sortDirection = page.locator('[data-tv-search-item="sort-direction"]');
     this.viewModeButton = page.locator('button[aria-label*="View mode"]');
-    this.perPageSelect = page.locator("#perPage");
-    this.paginationNext = page.locator('button[aria-label="Next page"]');
-    this.paginationPrev = page.locator('button[aria-label="Previous page"]');
+    this.perPage = page.locator("#perPage").last();
+    this.nextPage = page.locator('button[aria-label="Next Page"]').last();
+    this.previousPage = page
+      .locator('button[aria-label="Previous Page"]')
+      .last();
+    this.emptyState = page.getByText(/^No .+ found/);
+  }
+
+  /**
+   * The cards of one entity type: CardContainer sets each card's aria-label
+   * to its type ("Scene", "Performer", "Gallery", ...)
+   */
+  cards(label: string): Locator {
+    return this.page.locator(`[aria-label="${label}"]`);
+  }
+
+  /** Waits for the first card or the empty state, then counts the cards */
+  async waitForResults(label: string): Promise<number> {
+    await expect(this.cards(label).first().or(this.emptyState)).toBeVisible({
+      timeout: 15_000,
+    });
+    return this.cards(label).count();
   }
 
   async goto(path: string) {
@@ -50,18 +73,5 @@ export class ListPage {
 
   async toggleSortDirection() {
     await this.sortDirection.click();
-  }
-
-  async hasCards(): Promise<boolean> {
-    return this.page
-      .locator("[class*='card'], [class*='Card'], table tbody tr")
-      .first()
-      .isVisible()
-      .catch(() => false);
-  }
-
-  async getPageHeading(): Promise<string> {
-    const heading = this.page.getByRole("heading", { level: 1 }).first();
-    return (await heading.textContent()) ?? "";
   }
 }
