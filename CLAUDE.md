@@ -35,7 +35,8 @@ Invariants:
 - Test: `npm run test:run` in `client/` and `server/` (`npm test` starts watch mode in a terminal)
 - Coverage gate: `npm run test:coverage` in both; CI enforces the thresholds in each `vitest.config`
 - Integration, in `server/`: `npm run test:integration:replay` runs against the synthetic replay of the test Stash and needs no setup. `npm run test:integration` runs against the live test Stash (`STASH_TEST_*` in the root `.env`; `STASH_URL` only with `ALLOW_PROD_STASH=1` in the shell). From the root, `npm run fixtures:generate` rebuilds the fixture offline after a query change; `npm run fixtures:record` (owner) re-records after the test Stash changes. `-- --check` reports drift.
-- E2E: `npm run test:e2e` from the root. It is hermetic: it starts a Stash replay, its own server and client, and a throwaway database, on ports 9100/8100/5180 beside the dev stack. `E2E_BASE_URL=http://localhost:6969` runs it against the dev stack for manual runs on real data, as a throwaway run admin deleted afterwards; `.env.e2e` then names the bootstrap admin that creates it.
+- E2E: `npm run test:e2e` from the root. It is hermetic: it starts a Stash replay, its own server and client, and a throwaway database, on ports derived from the checkout path, beside the dev stack. `E2E_BASE_URL=http://localhost:6969` runs it against the dev stack for manual runs on real data, as a throwaway run admin deleted afterwards; `.env.e2e` then names the bootstrap admin that creates it.
+- Test suites in two worktrees can run at once; each worktree gets its own ports and databases.
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
 - Types: `cd server && npm run typecheck` (source, then tests) and `cd client && npm run typecheck` (CI runs both)

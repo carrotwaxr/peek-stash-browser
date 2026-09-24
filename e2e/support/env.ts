@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -38,13 +39,36 @@ if (devStack && existsSync(envFile)) {
   }
 }
 
-const port = (name: string, fallback: number) =>
-  Number(process.env[name]) || fallback;
+/**
+ * Hermetic mode's ports. Each defaults to a base plus this checkout's slot, a
+ * number from 0 to 1999 hashed from the checkout's path, so the suite runs in
+ * two worktrees at once without configuration, and a checkout keeps its ports
+ * from run to run. The ranges stay clear of the dev stack (6969, 8000), of
+ * each other and of the integration server (26000-27999, from the same slot in
+ * server/integration/helpers/config.ts), and below the ephemeral ports (32768
+ * up on Linux) that port 0 and outgoing connections take. The variables
+ * override them.
+ */
+const checkoutRoot = path.resolve(__dirname, "../..");
+const checkoutSlot =
+  createHash("sha256").update(checkoutRoot).digest().readUInt32BE(0) % 2000;
+
+const port = (name: string, base: number): number => {
+  const value = process.env[name];
+  if (!value) return base + checkoutSlot;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new Error(
+      `${name} must be a port number, got ${JSON.stringify(value)}`
+    );
+  }
+  return parsed;
+};
 
 export const ports = {
-  server: port("E2E_SERVER_PORT", 8100),
-  client: port("E2E_CLIENT_PORT", 5180),
-  stash: port("E2E_STASH_PORT", 9100),
+  server: port("E2E_SERVER_PORT", 20000),
+  client: port("E2E_CLIENT_PORT", 22000),
+  stash: port("E2E_STASH_PORT", 24000),
 };
 
 export const baseURL =
@@ -66,7 +90,10 @@ const tmpRoot =
   process.env.E2E_TMP_DIR ||
   (existsSync("/dev/shm") ? "/dev/shm" : os.tmpdir());
 
-/** Hermetic mode's database and CONFIG_DIR, replaced at every run */
+/**
+ * Hermetic mode's database and CONFIG_DIR, replaced at every run. Named after
+ * the server port, so each checkout has its own.
+ */
 export const runDir = path.join(tmpRoot, `peek-e2e-${ports.server}`);
 export const dbFile = path.join(runDir, "peek-e2e.db");
 

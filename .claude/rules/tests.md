@@ -34,7 +34,7 @@ paths:
 
 ## Server integration (`server/integration/`)
 
-- Starts a real server on port 9999 against one of two Stashes (`helpers/stashTarget.ts`):
+- Starts a real server on the checkout's integration port (see "Two worktrees at once" below) against one of two Stashes (`helpers/stashTarget.ts`):
   - Replay, `npm run test:integration:replay` (`STASH_REPLAY=1`, from the shell or the root `.env`): global setup serves the committed synthetic fixture (`stash-replay/fixture/`) in-process, plus a second library for multi-instance. It deletes `integration/test-replay.db` (with `-wal` and `-shm`) before every run, and after the startup sync requires the test instance to hold `FIXTURE_LIBRARY`'s counts of the 7 synced types. No `.env` needed.
   - Live, `npm run test:integration`: the test Stash (`STASH_TEST_*` from the root `.env`; `STASH_URL` only with `ALLOW_PROD_STASH=1` in the shell, which also adds it as multi-instance's second instance), on `integration/test.db`. `FRESH_DB=true` deletes `test.db` first. Global setup refuses to start when `test.db` holds an enabled instance at any other URL, or a user with Sync to Stash on.
 - The replay refuses mutations and requests it cannot answer. In replay mode `helpers/replayAudit.ts` (a setup file) fails the test file during which either reached it ("Stash mutations sent during this file", "requests the Stash replay cannot answer"), and global teardown fails the run for any it saw, the startup sync's included. The error names the operation and the field: `npm run fixtures:generate` fixes a query change, `npm run fixtures:record` (owner) a changed test Stash.
@@ -45,7 +45,7 @@ paths:
 ## E2E (`e2e/`)
 
 - Two modes, set up in `e2e/support/env.ts`:
-  - Hermetic, the default locally and in CI: Playwright starts its own server and Vite client on ports 8100 and 5180, beside the dev stack, on a throwaway database in `/dev/shm/peek-e2e-8100` (`E2E_SERVER_PORT`, `E2E_CLIENT_PORT`, `E2E_TMP_DIR`). Global setup creates the database's only admin, `e2e-admin`, which is the run admin.
+  - Hermetic, the default locally and in CI: Playwright starts the Stash replay, its own server and Vite client on the checkout's E2E ports (see "Two worktrees at once" below), beside the dev stack, on a throwaway database in `/dev/shm/peek-e2e-<server port>`. Global setup creates the database's only admin, `e2e-admin`, which is the run admin.
   - Dev-stack, for manual runs on real data: `E2E_BASE_URL=http://localhost:6969` in the shell. Nothing is started. `.env.e2e` names a bootstrap admin of that stack (`E2E_USERNAME`, `E2E_PASSWORD`), used only to create the throwaway run admin `e2e-<runId>-admin` in global setup and to delete it in global teardown, with every user and group named `e2e-<runId>...`. Setup also deletes `e2e-` users and groups left by killed runs.
 - Tests run as the run admin (`E2E_ADMIN_USERNAME` and `E2E_ADMIN_PASSWORD`, set by global setup) or as users they create. No test logs in as a real account: the owner's `.env.e2e` account has Sync to Stash on, and the dev stack syncs with the production Stash, so a test that plays, rates, favorites or presses O as that account writes there.
 - Helpers live in `e2e/support/`; names go through `uniqueName`; list pages go through `ListPage`.
@@ -55,3 +55,13 @@ paths:
 - CI retries once and fails on a flaky test: fix the cause, never raise retries.
 - Settings tabs are `role="tab"`, not buttons.
 - In dev-stack runs, a few failed logins lock the account for 15 minutes; `docker compose restart peek-server` clears it.
+
+## Two worktrees at once
+
+Every suite can run in two checkouts at the same time. Ports default to a base plus the checkout's slot, `sha256(<checkout root path>)`'s first 4 bytes (big-endian) mod 2000, so a checkout keeps its ports from run to run. The ranges avoid the dev stack (6969, 8000) and each other, and stay below the ephemeral ports (32768 up on Linux) that port 0 takes. Files live under the checkout or are named after its port. The variables override the defaults:
+
+- `E2E_SERVER_PORT` (20000-21999), `E2E_CLIENT_PORT` (22000-23999), `E2E_STASH_PORT` (24000-25999): hermetic E2E, in `e2e/support/env.ts`. `E2E_TMP_DIR` (default `/dev/shm`, else the temp dir) holds the run directory `peek-e2e-<server port>`.
+- `INTEGRATION_SERVER_PORT` (26000-27999): the integration server, in `integration/helpers/config.ts`. Global setup fails, naming the variable, when the port is taken. `INTEGRATION_DB_DIR` (default the checkout's `server/integration/`) holds `test.db` and `test-replay.db`. The replay listens on free ports the system picks; `CONFIG_DIR` is a fresh temp directory per run.
+- Unit tests: servers they start listen on port 0. Some server tests query SQLite at `server/.env`'s `DATABASE_URL`, a path relative to `server/prisma/`, so each checkout has its own. A new worktree needs that file (gitignored: copy it) and `cd server && npx prisma migrate deploy` before them, as CI does; without the migration they fail with "no such table".
+
+Two checkouts share a slot with odds of 1 in 2000; a run then fails on a port in use, and one variable moves it. The live integration suite (`npm run test:integration`) runs in one checkout at a time anyway: two runs would sync the test Stash twice.

@@ -165,7 +165,7 @@ npm ci                                # root: Playwright
 npx playwright install chromium
 ```
 
-`npm run test:e2e` from the root is hermetic, locally and in CI. Playwright starts the Stash replay on port 9100, serving a larger variant of the integration tests' synthetic library, then its own server and Vite client beside the dev stack, on a throwaway database (in `/dev/shm` when it exists) that is replaced at every run. Global setup creates that database's only admin, points its one Stash instance at the replay and waits for the sync, and the tests sign in as that admin. The replay refuses writes, and the run fails at teardown if Peek sent it one or asked for something it does not serve. The dev stack can keep running, and nothing the suite does reaches it or a real Stash.
+`npm run test:e2e` from the root is hermetic, locally and in CI. Playwright starts the Stash replay, serving a larger variant of the integration tests' synthetic library, then its own server and Vite client beside the dev stack, on a throwaway database (in `/dev/shm` when it exists) that is replaced at every run. Their ports come from a hash of the checkout's path (table below), so the suite can run in two worktrees at once; the run's log names them. Global setup creates that database's only admin, points its one Stash instance at the replay and waits for the sync, and the tests sign in as that admin. The replay refuses writes, and the run fails at teardown if Peek sent it one or asked for something it does not serve. The dev stack can keep running, and nothing the suite does reaches it or a real Stash.
 
 `E2E_BASE_URL=http://localhost:6969 npm run test:e2e` runs the suite against the dev stack instead, for manual runs on real data. Nothing is started. `.env.e2e` in the root (gitignored) names an admin of that stack:
 
@@ -176,13 +176,13 @@ E2E_PASSWORD=your-password
 
 That account only creates a throwaway admin for the run (`e2e-<run id>-admin`) and deletes it afterwards, with the users and groups the run created. No test signs in as it.
 
-| Variable          | Default                       | Purpose                                          |
-| ----------------- | ----------------------------- | ------------------------------------------------ |
-| `E2E_SERVER_PORT` | `8100`                        | The hermetic run's server                        |
-| `E2E_CLIENT_PORT` | `5180`                        | The hermetic run's Vite client                   |
-| `E2E_STASH_PORT`  | `9100`                        | The hermetic run's Stash replay                  |
-| `E2E_TMP_DIR`     | `/dev/shm`, else the temp dir | Where the run's database directory is created    |
-| `E2E_BASE_URL`    | unset                         | Set: dev-stack mode against the Peek at this URL |
+| Variable          | Default                             | Purpose                                                            |
+| ----------------- | ----------------------------------- | ------------------------------------------------------------------ |
+| `E2E_SERVER_PORT` | 20000-21999, from the checkout path | The hermetic run's server                                          |
+| `E2E_CLIENT_PORT` | 22000-23999, from the checkout path | The hermetic run's Vite client                                     |
+| `E2E_STASH_PORT`  | 24000-25999, from the checkout path | The hermetic run's Stash replay                                    |
+| `E2E_TMP_DIR`     | `/dev/shm`, else the temp dir       | Where the run's database directory, `peek-e2e-<server port>`, goes |
+| `E2E_BASE_URL`    | unset                               | Set: dev-stack mode against the Peek at this URL                   |
 
 ## Debugging
 
