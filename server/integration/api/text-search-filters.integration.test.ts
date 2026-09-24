@@ -363,25 +363,26 @@ describe("Text Search Filters", () => {
         }
       );
 
-      if (initial.data.findTags.tags.length > 0) {
-        const tagName = must(initial.data.findTags.tags[0]).name;
+      const tagName = must(
+        initial.data.findTags.tags[0],
+        "tagWithEntities"
+      ).name;
 
-        const response = await adminClient.post<FindTagsResponse>(
-          "/api/library/tags",
-          {
-            filter: { per_page: 50 },
-            tag_filter: {
-              name: {
-                value: tagName,
-                modifier: "EQUALS",
-              },
+      const response = await adminClient.post<FindTagsResponse>(
+        "/api/library/tags",
+        {
+          filter: { per_page: 50 },
+          tag_filter: {
+            name: {
+              value: tagName,
+              modifier: "EQUALS",
             },
-          }
-        );
+          },
+        }
+      );
 
-        expect(response.ok).toBe(true);
-        expect(response.data.findTags.count).toBeGreaterThan(0);
-      }
+      expect(response.ok).toBe(true);
+      expect(response.data.findTags.count).toBeGreaterThan(0);
     });
   });
 

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -54,9 +55,8 @@ describe("Gallery Date Filters", () => {
 
       // All returned galleries should have a date > 2020-01-01
       for (const gallery of response.data.findGalleries.galleries) {
-        if (gallery.date) {
-          expect(gallery.date > "2020-01-01").toBe(true);
-        }
+        // The filter matches only dated gallerys
+        expect(must(gallery.date, "gallery.date") > "2020-01-01").toBe(true);
       }
     });
 
@@ -100,12 +100,9 @@ describe("Gallery Date Filters", () => {
 
       // All returned galleries should have a date within the range
       for (const gallery of response.data.findGalleries.galleries) {
-        expect(gallery.date).not.toBeNull();
-        expect(gallery.date).toBeDefined();
-        if (gallery.date) {
-          expect(gallery.date >= "2022-01-01").toBe(true);
-          expect(gallery.date <= "2022-12-31").toBe(true);
-        }
+        const date = must(gallery.date, "gallery.date");
+        expect(date >= "2022-01-01").toBe(true);
+        expect(date <= "2022-12-31").toBe(true);
       }
     });
 

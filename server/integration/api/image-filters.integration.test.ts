@@ -414,7 +414,7 @@ describe("Image Filters", () => {
         {
           filter: {
             page: 1,
-            per_page: 10,
+            per_page: 2,
           },
         }
       );
@@ -424,7 +424,7 @@ describe("Image Filters", () => {
         {
           filter: {
             page: 2,
-            per_page: 10,
+            per_page: 2,
           },
         }
       );
@@ -435,11 +435,11 @@ describe("Image Filters", () => {
       const page1Ids = page1.data.findImages.images.map((i) => i.id);
       const page2Ids = page2.data.findImages.images.map((i) => i.id);
 
-      // Pages should have different images
-      if (page1Ids.length > 0 && page2Ids.length > 0) {
-        for (const id of page2Ids) {
-          expect(page1Ids).not.toContain(id);
-        }
+      // Both pages have images, and different ones
+      expect(page1Ids).toHaveLength(2);
+      expect(page2Ids).not.toHaveLength(0);
+      for (const id of page2Ids) {
+        expect(page1Ids).not.toContain(id);
       }
     });
   });

@@ -2,7 +2,9 @@
  * Integration Tests for StashSyncService
  *
  * These tests connect to a real Stash instance to verify the sync functionality.
- * Requires STASH_URL and STASH_API_KEY environment variables.
+ * They read (never write) the test Stash, STASH_TEST_URL and
+ * STASH_TEST_API_KEY from the root .env, and skip without it. They never use
+ * STASH_URL, the production Stash.
  *
  * Note: These tests are SKIPPED by default to prevent unintended database modifications.
  * Run with: npm test -- --run services/__tests__/StashSyncService.integration.test.ts
@@ -19,7 +21,9 @@ import { must } from "../helpers/must.js";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 // Check if we have the required environment variables
-const hasStashConfig = !!(process.env.STASH_URL && process.env.STASH_API_KEY);
+const hasStashConfig = !!(
+  process.env.STASH_TEST_URL && process.env.STASH_TEST_API_KEY
+);
 
 // Mock prisma to avoid database operations during tests
 vi.mock("../../prisma/singleton.js", () => ({
@@ -100,16 +104,16 @@ vi.mock("../../prisma/singleton.js", () => ({
       findFirst: vi.fn().mockResolvedValue({
         id: "test-instance",
         name: "Test",
-        url: process.env.STASH_URL,
-        apiKey: process.env.STASH_API_KEY,
+        url: process.env.STASH_TEST_URL,
+        apiKey: process.env.STASH_TEST_API_KEY,
         enabled: true,
       }),
       findMany: vi.fn().mockResolvedValue([
         {
           id: "test-instance",
           name: "Test",
-          url: process.env.STASH_URL,
-          apiKey: process.env.STASH_API_KEY,
+          url: process.env.STASH_TEST_URL,
+          apiKey: process.env.STASH_TEST_API_KEY,
           enabled: true,
         },
       ]),
@@ -124,8 +128,8 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
   beforeAll(() => {
     // Initialize Stash client directly for testing
     stash = new StashClient({
-      url: must(process.env.STASH_URL, "STASH_URL"),
-      apiKey: must(process.env.STASH_API_KEY, "STASH_API_KEY"),
+      url: must(process.env.STASH_TEST_URL, "STASH_TEST_URL"),
+      apiKey: must(process.env.STASH_TEST_API_KEY, "STASH_TEST_API_KEY"),
     });
   });
 
@@ -394,10 +398,10 @@ describe("StashSyncService Integration Tests - Configuration Check", () => {
   it("should report if Stash configuration is available", () => {
     if (!hasStashConfig) {
       console.log(
-        "Stash integration tests SKIPPED - STASH_URL or STASH_API_KEY not configured"
+        "Stash integration tests SKIPPED - STASH_TEST_URL or STASH_TEST_API_KEY not configured"
       );
       console.log(
-        "To run integration tests, set STASH_URL and STASH_API_KEY in .env"
+        "To run integration tests, set STASH_TEST_URL and STASH_TEST_API_KEY in .env"
       );
     } else {
       console.log(

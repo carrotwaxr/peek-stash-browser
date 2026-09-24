@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
 /**
@@ -228,18 +228,15 @@ describe("Pagination Edge Cases", () => {
       expect(page1.ok).toBe(true);
       expect(page2.ok).toBe(true);
 
-      // If there are enough results, page 2 should have different items
-      if (
-        page1.data.findScenes.count > 5 &&
-        page2.data.findScenes.scenes.length > 0
-      ) {
-        const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
-        const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
+      // The library fills page 2, and it has different items
+      expect(page1.data.findScenes.count).toBeGreaterThan(5);
+      expect(page2.data.findScenes.scenes).not.toHaveLength(0);
+      const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
+      const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
 
-        // Verify no overlap between pages
-        const overlap = page1Ids.filter((id) => page2Ids.includes(id));
-        expect(overlap.length).toBe(0);
-      }
+      // Verify no overlap between pages
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap.length).toBe(0);
     });
 
     it("maintains consistent count across pages", async () => {
@@ -349,25 +346,25 @@ describe("Pagination Edge Cases", () => {
       expect(countResponse.ok).toBe(true);
       const totalCount = countResponse.data.findScenes.count;
 
-      if (totalCount > 7) {
-        const lastPage = Math.ceil(totalCount / 7);
-        const expectedLastPageCount = totalCount % 7 || 7;
+      // The library has more than one page of 7
+      expect(totalCount).toBeGreaterThan(7);
+      const lastPage = Math.ceil(totalCount / 7);
+      const expectedLastPageCount = totalCount % 7 || 7;
 
-        const response = await adminClient.post<FindScenesResponse>(
-          "/api/library/scenes",
-          {
-            filter: {
-              per_page: 7,
-              page: lastPage,
-            },
-          }
-        );
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: {
+            per_page: 7,
+            page: lastPage,
+          },
+        }
+      );
 
-        expect(response.ok).toBe(true);
-        expect(response.data.findScenes.scenes.length).toBe(
-          expectedLastPageCount
-        );
-      }
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes.scenes.length).toBe(
+        expectedLastPageCount
+      );
     });
   });
 
@@ -403,15 +400,12 @@ describe("Pagination Edge Cases", () => {
         page2.data.findPerformers.count
       );
 
-      if (
-        page1.data.findPerformers.count > 5 &&
-        page2.data.findPerformers.performers.length > 0
-      ) {
-        const page1Ids = page1.data.findPerformers.performers.map((p) => p.id);
-        const page2Ids = page2.data.findPerformers.performers.map((p) => p.id);
-        const overlap = page1Ids.filter((id) => page2Ids.includes(id));
-        expect(overlap.length).toBe(0);
-      }
+      expect(page1.data.findPerformers.count).toBeGreaterThan(5);
+      expect(page2.data.findPerformers.performers).not.toHaveLength(0);
+      const page1Ids = page1.data.findPerformers.performers.map((p) => p.id);
+      const page2Ids = page2.data.findPerformers.performers.map((p) => p.id);
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap.length).toBe(0);
     });
 
     it("paginates tags correctly", async () => {
@@ -443,56 +437,45 @@ describe("Pagination Edge Cases", () => {
       expect(page2.ok).toBe(true);
       expect(page1.data.findTags.count).toBe(page2.data.findTags.count);
 
-      if (
-        page1.data.findTags.count > 5 &&
-        page2.data.findTags.tags.length > 0
-      ) {
-        const page1Ids = page1.data.findTags.tags.map((t) => t.id);
-        const page2Ids = page2.data.findTags.tags.map((t) => t.id);
-        const overlap = page1Ids.filter((id) => page2Ids.includes(id));
-        expect(overlap.length).toBe(0);
-      }
+      expect(page1.data.findTags.count).toBeGreaterThan(5);
+      expect(page2.data.findTags.tags).not.toHaveLength(0);
+      const page1Ids = page1.data.findTags.tags.map((t) => t.id);
+      const page2Ids = page2.data.findTags.tags.map((t) => t.id);
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap.length).toBe(0);
     });
   });
 
   describe("pagination with filters", () => {
     it("paginates filtered results correctly", async () => {
+      // studioWithScenes has more than one scene, so a page of one leaves a
+      // second page
+      const sceneFilter = {
+        studios: {
+          value: [TEST_ENTITIES.studioWithScenes],
+          modifier: "INCLUDES",
+        },
+      };
+
       // First get count of filtered results
       const countResponse = await adminClient.post<FindScenesResponse>(
         "/api/library/scenes",
-        {
-          filter: { per_page: 5, page: 1 },
-          scene_filter: {
-            rating100: {
-              value: 0,
-              modifier: "NOT_NULL",
-            },
-          },
-        }
+        { filter: { per_page: 1, page: 1 }, scene_filter: sceneFilter }
       );
 
       expect(countResponse.ok).toBe(true);
       const filteredCount = countResponse.data.findScenes.count;
+      expect(filteredCount).toBeGreaterThan(1);
 
-      if (filteredCount > 5) {
-        // Get page 2 of filtered results
-        const page2 = await adminClient.post<FindScenesResponse>(
-          "/api/library/scenes",
-          {
-            filter: { per_page: 5, page: 2 },
-            scene_filter: {
-              rating100: {
-                value: 0,
-                modifier: "NOT_NULL",
-              },
-            },
-          }
-        );
+      // Get page 2 of filtered results
+      const page2 = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        { filter: { per_page: 1, page: 2 }, scene_filter: sceneFilter }
+      );
 
-        expect(page2.ok).toBe(true);
-        expect(page2.data.findScenes.count).toBe(filteredCount);
-        expect(page2.data.findScenes.scenes.length).toBeGreaterThan(0);
-      }
+      expect(page2.ok).toBe(true);
+      expect(page2.data.findScenes.count).toBe(filteredCount);
+      expect(page2.data.findScenes.scenes.length).toBeGreaterThan(0);
     });
   });
 
@@ -526,15 +509,12 @@ describe("Pagination Edge Cases", () => {
       expect(page2.ok).toBe(true);
 
       // With same seed, pages should not overlap
-      if (
-        page1.data.findScenes.count > 5 &&
-        page2.data.findScenes.scenes.length > 0
-      ) {
-        const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
-        const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
-        const overlap = page1Ids.filter((id) => page2Ids.includes(id));
-        expect(overlap.length).toBe(0);
-      }
+      expect(page1.data.findScenes.count).toBeGreaterThan(5);
+      expect(page2.data.findScenes.scenes).not.toHaveLength(0);
+      const page1Ids = page1.data.findScenes.scenes.map((s) => s.id);
+      const page2Ids = page2.data.findScenes.scenes.map((s) => s.id);
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap.length).toBe(0);
     });
 
     it("re-requesting same page with same seed returns same results", async () => {

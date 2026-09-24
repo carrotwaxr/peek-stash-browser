@@ -129,13 +129,5 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-unnecessary-type-parameters": "off",
     },
-  },
-  // Integration assertions depend on the live Stash's data until the suite
-  // runs against recorded fixtures (task INT-1 removes this override).
-  {
-    files: ["integration/**/*.ts"],
-    rules: {
-      "vitest/no-conditional-expect": "off",
-    },
   }
 );

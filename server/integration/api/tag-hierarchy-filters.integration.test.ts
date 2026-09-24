@@ -180,27 +180,29 @@ describe("Tag Hierarchy Filters", () => {
         }
       );
 
-      if (parentResponse.data.findTags.count > 0) {
-        const parentTagId = must(parentResponse.data.findTags.tags[0]).id;
+      // The library has a tag with children
+      const parentTagId = must(
+        parentResponse.data.findTags.tags[0],
+        "a tag with children"
+      ).id;
 
-        // Now filter scenes by this parent tag
-        const response = await adminClient.post<FindScenesResponse>(
-          "/api/library/scenes",
-          {
-            filter: { per_page: 50 },
-            scene_filter: {
-              tags: {
-                value: [parentTagId],
-                modifier: "INCLUDES",
-                depth: 1, // Include child tags
-              },
+      // Now filter scenes by this parent tag
+      const response = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [parentTagId],
+              modifier: "INCLUDES",
+              depth: 1, // Include child tags
             },
-          }
-        );
+          },
+        }
+      );
 
-        expect(response.ok).toBe(true);
-        expect(response.data.findScenes).toBeDefined();
-      }
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes).toBeDefined();
     });
 
     it("returns tag by ID with relationships", async () => {

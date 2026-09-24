@@ -88,35 +88,31 @@ describe("Tag API", () => {
 
       // Performers should exist with tooltip data
       expect(tag).toHaveProperty("performers");
-      if (tag.performers && tag.performers.length > 0) {
-        expect(tag.performers[0]).toHaveProperty("id");
-        expect(tag.performers[0]).toHaveProperty("name");
-        expect(tag.performers[0]).toHaveProperty("image_path");
-      }
+      const firstPerformer = must(tag.performers?.[0], "tag.performers[0]");
+      expect(firstPerformer).toHaveProperty("id");
+      expect(firstPerformer).toHaveProperty("name");
+      expect(firstPerformer).toHaveProperty("image_path");
 
       // Studios should exist with tooltip data
       expect(tag).toHaveProperty("studios");
-      if (tag.studios && tag.studios.length > 0) {
-        expect(tag.studios[0]).toHaveProperty("id");
-        expect(tag.studios[0]).toHaveProperty("name");
-        expect(tag.studios[0]).toHaveProperty("image_path");
-      }
+      const firstStudio = must(tag.studios?.[0], "tag.studios[0]");
+      expect(firstStudio).toHaveProperty("id");
+      expect(firstStudio).toHaveProperty("name");
+      expect(firstStudio).toHaveProperty("image_path");
 
       // Groups should exist with tooltip data
       expect(tag).toHaveProperty("groups");
-      if (tag.groups && tag.groups.length > 0) {
-        expect(tag.groups[0]).toHaveProperty("id");
-        expect(tag.groups[0]).toHaveProperty("name");
-        expect(tag.groups[0]).toHaveProperty("front_image_path");
-      }
+      const firstGroup = must(tag.groups?.[0], "tag.groups[0]");
+      expect(firstGroup).toHaveProperty("id");
+      expect(firstGroup).toHaveProperty("name");
+      expect(firstGroup).toHaveProperty("front_image_path");
 
       // Galleries should exist with tooltip data
       expect(tag).toHaveProperty("galleries");
-      if (tag.galleries && tag.galleries.length > 0) {
-        expect(tag.galleries[0]).toHaveProperty("id");
-        expect(tag.galleries[0]).toHaveProperty("title");
-        expect(tag.galleries[0]).toHaveProperty("cover");
-      }
+      const firstGallery = must(tag.galleries?.[0], "tag.galleries[0]");
+      expect(firstGallery).toHaveProperty("id");
+      expect(firstGallery).toHaveProperty("title");
+      expect(firstGallery).toHaveProperty("cover");
     });
   });
 

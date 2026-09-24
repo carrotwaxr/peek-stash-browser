@@ -614,15 +614,12 @@ describe("Gallery Filters", () => {
       expect("coverWidth" in gallery).toBe(true);
       expect("coverHeight" in gallery).toBe(true);
 
-      // If both dimensions exist, they should allow aspect ratio calculation
-      if (
-        typeof gallery.coverWidth === "number" &&
-        typeof gallery.coverHeight === "number"
-      ) {
-        const aspectRatio = gallery.coverWidth / gallery.coverHeight;
-        expect(aspectRatio).toBeGreaterThan(0);
-        expect(Number.isFinite(aspectRatio)).toBe(true);
-      }
+      // galleryWithImages has a cover, so both dimensions exist
+      const aspectRatio =
+        must(gallery.coverWidth, "gallery.coverWidth") /
+        must(gallery.coverHeight, "gallery.coverHeight");
+      expect(aspectRatio).toBeGreaterThan(0);
+      expect(Number.isFinite(aspectRatio)).toBe(true);
     });
   });
 });

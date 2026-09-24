@@ -135,7 +135,8 @@ describe("media security", () => {
         expect(stream.url).not.toContain(stashHost);
       }
       for (const value of Object.values(scene.paths ?? {})) {
-        if (value) expect(value).not.toContain(stashHost);
+        // A path Stash left null holds no host either
+        expect(value ?? "").not.toContain(stashHost);
       }
     }
   });

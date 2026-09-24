@@ -276,13 +276,14 @@ describe("Scene API", () => {
       const page1Scenes = page1.data.findScenes.scenes;
       const page2Scenes = page2.data.findScenes.scenes;
 
-      if (page1Scenes.length === 5 && page2Scenes.length > 0) {
-        const page1Ids = page1Scenes.map((s) => s.id);
-        const page2Ids = page2Scenes.map((s) => s.id);
+      // The library fills page 1 and reaches page 2
+      expect(page1Scenes).toHaveLength(5);
+      expect(page2Scenes).not.toHaveLength(0);
+      const page1Ids = page1Scenes.map((s) => s.id);
+      const page2Ids = page2Scenes.map((s) => s.id);
 
-        for (const id of page2Ids) {
-          expect(page1Ids).not.toContain(id);
-        }
+      for (const id of page2Ids) {
+        expect(page1Ids).not.toContain(id);
       }
     });
   });
@@ -314,74 +315,46 @@ describe("Scene API", () => {
    * scene tag inheritance stores in a JSON column (inheritedTagIds) for efficiency.
    */
   describe("scene tag inheritance", () => {
-    it("filters scenes by tag inherited from performer/studio", async () => {
-      // Skip if no test entity configured
-      const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
-      let inheritedTagId = TEST_ENTITIES.inheritedTagFromPerformerOrStudio;
+    it.skipIf(!TEST_ENTITIES.sceneWithInheritedTags)(
+      "filters scenes by tag inherited from performer/studio",
+      async () => {
+        const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
+        // The configured tag, or the first one the scene inherits
+        const inheritedTagId =
+          TEST_ENTITIES.inheritedTagFromPerformerOrStudio ||
+          (await firstInheritedTagId(sceneId));
 
-      if (!sceneId) {
-        console.log(
-          "Skipping scene tag inheritance test - sceneWithInheritedTags not configured"
-        );
-        return;
-      }
-
-      // If inheritedTagId not provided, fetch the scene and get one from inheritedTagIds
-      if (!inheritedTagId) {
-        const sceneResponse = await adminClient.post<FindScenesResponse>(
+        // Filter scenes by the inherited tag AND the specific scene ID
+        // This tests that the scene is correctly filterable by its inherited tag
+        // We use scene_filter.ids instead of per_page pagination to avoid issues
+        // where the test scene might not appear in the first N results
+        const response = await adminClient.post<FindScenesResponse>(
           "/api/library/scenes",
           {
-            ids: [sceneId],
+            filter: { per_page: 10 },
+            scene_filter: {
+              ids: {
+                value: [sceneId],
+                modifier: "INCLUDES",
+              },
+              tags: {
+                value: [inheritedTagId],
+                modifier: "INCLUDES",
+              },
+            },
           }
         );
 
-        expect(sceneResponse.ok).toBe(true);
-        expect(sceneResponse.data.findScenes.scenes).toHaveLength(1);
+        expect(response.ok).toBe(true);
+        expect(response.data.findScenes).toBeDefined();
 
-        const scene = must(sceneResponse.data.findScenes.scenes[0]);
-
-        if (!scene.inheritedTagIds || scene.inheritedTagIds.length === 0) {
-          console.log(
-            "Skipping scene tag inheritance test - scene has no inherited tags"
-          );
-          return;
-        }
-
-        // Use the first inherited tag for testing
-        inheritedTagId = must(scene.inheritedTagIds[0]);
-        console.log(`Auto-discovered inherited tag ID: ${inheritedTagId}`);
+        // The key assertion: should find the scene when filtering by inherited tag
+        // This test FAILS if scene tag inheritance didn't run during sync
+        // or if the tag filter doesn't check inheritedTagIds
+        expect(response.data.findScenes.count).toBe(1);
+        expect(must(response.data.findScenes.scenes[0]).id).toBe(sceneId);
       }
-
-      // Filter scenes by the inherited tag AND the specific scene ID
-      // This tests that the scene is correctly filterable by its inherited tag
-      // We use scene_filter.ids instead of per_page pagination to avoid issues
-      // where the test scene might not appear in the first N results
-      const response = await adminClient.post<FindScenesResponse>(
-        "/api/library/scenes",
-        {
-          filter: { per_page: 10 },
-          scene_filter: {
-            ids: {
-              value: [sceneId],
-              modifier: "INCLUDES",
-            },
-            tags: {
-              value: [inheritedTagId],
-              modifier: "INCLUDES",
-            },
-          },
-        }
-      );
-
-      expect(response.ok).toBe(true);
-      expect(response.data.findScenes).toBeDefined();
-
-      // The key assertion: should find the scene when filtering by inherited tag
-      // This test FAILS if scene tag inheritance didn't run during sync
-      // or if the tag filter doesn't check inheritedTagIds
-      expect(response.data.findScenes.count).toBe(1);
-      expect(must(response.data.findScenes.scenes[0]).id).toBe(sceneId);
-    });
+    );
 
     it("verifies scene has both direct tags and inherited tags", async () => {
       const sceneId = TEST_ENTITIES.sceneWithInheritedTags;
@@ -526,28 +499,36 @@ describe("Scene API", () => {
       // Scene should have tags (either direct or inherited)
       expect(scene.tags).toBeDefined();
 
-      // If we have a configured test, verify the scene is findable by its tags
-      if (scene.tags && scene.tags.length > 0) {
-        const tagId = must(scene.tags[0]).id;
+      // sceneWithRelations has tags; it is findable by the first one
+      const tagId = must(scene.tags?.[0], "scene.tags[0]").id;
 
-        const filterResponse = await adminClient.post<FindScenesResponse>(
-          "/api/library/scenes",
-          {
-            filter: { per_page: 50 },
-            scene_filter: {
-              tags: { value: [tagId], modifier: "INCLUDES" },
-            },
-          }
-        );
+      const filterResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: { value: [tagId], modifier: "INCLUDES" },
+          },
+        }
+      );
 
-        expect(filterResponse.ok).toBe(true);
-        expect(filterResponse.data.findScenes.count).toBeGreaterThan(0);
+      expect(filterResponse.ok).toBe(true);
+      expect(filterResponse.data.findScenes.count).toBeGreaterThan(0);
 
-        const foundSceneIds = filterResponse.data.findScenes.scenes.map(
-          (s) => s.id
-        );
-        expect(foundSceneIds).toContain(TEST_ENTITIES.sceneWithRelations);
-      }
+      const foundSceneIds = filterResponse.data.findScenes.scenes.map(
+        (s) => s.id
+      );
+      expect(foundSceneIds).toContain(TEST_ENTITIES.sceneWithRelations);
     });
   });
 });
+
+/** The first tag a scene inherits from its performers, studio or groups. */
+async function firstInheritedTagId(sceneId: string): Promise<string> {
+  const response = await adminClient.post<FindScenesResponse>(
+    "/api/library/scenes",
+    { ids: [sceneId] }
+  );
+  const scene = must(response.data.findScenes.scenes[0], "the scene");
+  return must(scene.inheritedTagIds?.[0], "an inherited tag on the scene");
+}

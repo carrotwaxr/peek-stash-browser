@@ -1,9 +1,10 @@
 /**
  * Multi-Instance Integration Tests
  *
- * Tests for multi-Stash-instance support using TWO real Stash instances:
- * - Test Stash (primary, STASH_TEST_*) - can be freely modified
- * - Production Stash (secondary, STASH_URL/STASH_API_KEY) - READ ONLY
+ * Tests for multi-Stash-instance support. The primary instance is the run's
+ * Stash. The filtering tests need a second instance, STASH_SECOND_URL and
+ * STASH_SECOND_API_KEY, which globalSetup sets only when the run allows one
+ * (ALLOW_PROD_STASH=1 in the shell); without it they are skipped.
  *
  * These tests verify:
  * - Admin instance management endpoints
@@ -11,18 +12,16 @@
  * - Instance-aware queries across multiple instances
  * - Composite key behavior with potential ID overlaps
  *
- * IMPORTANT: Production Stash tests are READ-ONLY. No modifications allowed.
+ * IMPORTANT: The second instance is READ-ONLY. No modifications allowed.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
 
-// Production Stash credentials from env (the "main" Stash, not the test one)
-const PRODUCTION_STASH_URL =
-  process.env.STASH_URL_ORIGINAL || "http://10.0.0.4:6969/graphql";
-const PRODUCTION_STASH_API_KEY =
-  process.env.STASH_API_KEY_ORIGINAL || process.env.STASH_API_KEY;
+// The second instance globalSetup allows for this run, if any
+const SECOND_STASH_URL = process.env.STASH_SECOND_URL;
+const SECOND_STASH_API_KEY = process.env.STASH_SECOND_API_KEY;
 
 interface StashInstance {
   id: string;
@@ -35,7 +34,6 @@ interface StashInstance {
 describe("Multi-Instance Support", () => {
   let testInstanceId: string;
   let productionInstanceId: string | null = null;
-  let hasMultipleInstances = false;
   let testInstanceSceneCount = 0;
   let productionInstanceSceneCount = 0;
 
@@ -57,44 +55,39 @@ describe("Multi-Instance Support", () => {
     // Find test instance (should be first/primary)
     testInstanceId = must(instancesResponse.data.instances[0]).id;
 
-    // Check if production instance already exists
-    const existingProduction = instancesResponse.data.instances.find(
-      (i) => i.url === PRODUCTION_STASH_URL
-    );
+    // Check if the second instance already exists
+    const existingSecond = SECOND_STASH_URL
+      ? instancesResponse.data.instances.find((i) => i.url === SECOND_STASH_URL)
+      : undefined;
 
-    if (existingProduction) {
-      productionInstanceId = existingProduction.id;
-      hasMultipleInstances = true;
-      console.log(
-        "[Multi-Instance Tests] Production instance already configured"
-      );
-    } else if (
-      PRODUCTION_STASH_API_KEY &&
-      PRODUCTION_STASH_URL !== process.env.STASH_URL
-    ) {
-      // Add production Stash as second instance (READ ONLY - we just sync from it)
-      console.log(
-        "[Multi-Instance Tests] Adding production Stash as second instance..."
-      );
+    if (existingSecond) {
+      productionInstanceId = existingSecond.id;
+      console.log("[Multi-Instance Tests] Second instance already configured");
+    } else if (SECOND_STASH_URL && SECOND_STASH_API_KEY) {
+      // Add the second Stash (READ ONLY - we just sync from it)
+      console.log("[Multi-Instance Tests] Adding the second Stash instance...");
 
       const addResponse = await adminClient.post<{
         success: boolean;
         instance: StashInstance;
       }>("/api/setup/stash-instance", {
-        name: "Production Stash (Read-Only)",
-        description: "Main production Stash - for multi-instance testing only",
-        url: PRODUCTION_STASH_URL,
-        apiKey: PRODUCTION_STASH_API_KEY,
+        name: "Second Stash (Read-Only)",
+        description: "Second Stash - for multi-instance testing only",
+        url: SECOND_STASH_URL,
+        apiKey: SECOND_STASH_API_KEY,
         enabled: true,
         priority: 2, // Lower priority than test instance
       });
 
       if (addResponse.ok) {
         productionInstanceId = addResponse.data.instance.id;
-        hasMultipleInstances = true;
         console.log(
-          "[Multi-Instance Tests] Production instance added, waiting for sync..."
+          "[Multi-Instance Tests] Second instance added, waiting for sync..."
         );
+
+        // Earlier files may have limited the admin to the test instance;
+        // count every instance while waiting
+        await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
         // Wait for sync to complete (poll for up to 2 minutes)
         const maxWait = 120000;
@@ -124,14 +117,14 @@ describe("Multi-Instance Support", () => {
         }
       } else {
         console.log(
-          "[Multi-Instance Tests] Could not add production instance:",
+          "[Multi-Instance Tests] Could not add the second instance:",
           addResponse.data
         );
       }
     }
 
     // Get scene counts for each instance if we have multiple
-    if (hasMultipleInstances && productionInstanceId) {
+    if (productionInstanceId) {
       // Select only test instance and count
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [testInstanceId],
@@ -163,7 +156,8 @@ describe("Multi-Instance Support", () => {
         `[Multi-Instance Tests] Production instance: ${productionInstanceSceneCount} scenes`
       );
     }
-  });
+    // Room for the two-minute sync wait above
+  }, 180_000);
 
   afterAll(async () => {
     // Restore user instance selection to test-only (so subsequent tests aren't affected)
@@ -409,9 +403,7 @@ describe("Multi-Instance Support", () => {
 
       expect(response.ok).toBe(true);
       const scene = must(response.data.findScenes.scenes[0]);
-      if (scene.paths.screenshot) {
-        expect(scene.paths.screenshot).toContain("/api/proxy/stash");
-      }
+      expect(scene.paths.screenshot).toContain("/api/proxy/stash");
     });
 
     it("performer image paths are proxy URLs", async () => {
@@ -423,9 +415,7 @@ describe("Multi-Instance Support", () => {
 
       expect(response.ok).toBe(true);
       for (const performer of response.data.findPerformers.performers) {
-        if (performer.image_path) {
-          expect(performer.image_path).toContain("/api/proxy/stash");
-        }
+        expect(performer.image_path).toContain("/api/proxy/stash");
       }
     });
   });
@@ -439,27 +429,24 @@ describe("Multi-Instance Support", () => {
    *
    * IMPORTANT: All operations on production Stash are READ-ONLY.
    */
-  describe("Multi-Instance Filtering", () => {
+  describe.skipIf(!SECOND_STASH_URL)("Multi-Instance Filtering", () => {
+    beforeAll(() => {
+      expect(
+        productionInstanceId,
+        "second instance added and synced"
+      ).toBeTruthy();
+    });
+
     it("multiple instances are available when configured", async () => {
       const response = await adminClient.get<{
         instances: StashInstance[];
       }>("/api/setup/stash-instances");
 
       expect(response.ok).toBe(true);
-
-      if (hasMultipleInstances) {
-        expect(response.data.instances.length).toBeGreaterThanOrEqual(2);
-      } else {
-        console.log("Skipping: Only one instance configured");
-      }
+      expect(response.data.instances.length).toBeGreaterThanOrEqual(2);
     });
 
     it("filtering to test instance shows only test instance scenes", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       // Select only test instance
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [testInstanceId],
@@ -480,11 +467,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("filtering to production instance shows only production scenes", async function () {
-      if (!hasMultipleInstances || !productionInstanceId) {
-        console.log("Skipping: Requires production instance");
-        return;
-      }
-
       // Select only production instance
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [productionInstanceId],
@@ -506,11 +488,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("selecting all instances shows combined scene count", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       // Select all instances (empty array)
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
@@ -528,11 +505,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("switching between instances changes visible content", async function () {
-      if (!hasMultipleInstances || !productionInstanceId) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       // Get scenes from test instance
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [testInstanceId],
@@ -565,23 +537,16 @@ describe("Multi-Instance Support", () => {
         testTitles.every((t) => prodTitles.includes(t)) &&
         prodTitles.every((t) => testTitles.includes(t));
 
-      // It's unlikely both instances have exactly the same 5 scenes
-      // This test verifies that switching instances actually changes what you see
-      if (testInstanceSceneCount !== productionInstanceSceneCount) {
-        // If counts differ, content must differ
-        expect(allSame).toBe(false);
-      }
+      // The instances hold different libraries, so switching changes what
+      // you see
+      expect(testInstanceSceneCount).not.toBe(productionInstanceSceneCount);
+      expect(allSame).toBe(false);
 
       // Reset
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
     });
 
     it("performers from different instances can coexist", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       // Select all instances
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
@@ -596,11 +561,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("tags from different instances can coexist", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
       const response = await adminClient.post<{
@@ -612,11 +572,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("studios from different instances can coexist", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
       const response = await adminClient.post<{
@@ -628,11 +583,6 @@ describe("Multi-Instance Support", () => {
     });
 
     it("user selection persists across queries", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
       // Select test instance
       await adminClient.put("/api/user/stash-instances", {
         instanceIds: [testInstanceId],
@@ -665,68 +615,68 @@ describe("Multi-Instance Support", () => {
     });
   });
 
-  describe("Instance-Specific Entity Filtering", () => {
-    it("filtering by test instance performer only returns test instance scenes", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
-      // Select all instances
-      await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
-
-      // Filter by a performer that exists in test instance
-      const response = await adminClient.post<{
-        findScenes: {
-          count: number;
-          scenes: Array<{ id: string; performers: Array<{ id: string }> }>;
-        };
-      }>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "INCLUDES",
-          },
-        },
+  describe.skipIf(!SECOND_STASH_URL)(
+    "Instance-Specific Entity Filtering",
+    () => {
+      beforeAll(() => {
+        expect(
+          productionInstanceId,
+          "second instance added and synced"
+        ).toBeTruthy();
       });
 
-      expect(response.ok).toBe(true);
+      it("filtering by test instance performer only returns test instance scenes", async function () {
+        // Select all instances
+        await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
 
-      // Results should only be from test instance (the performer is from test instance)
-      // This verifies that junction table queries correctly match instance IDs
-      for (const scene of response.data.findScenes.scenes) {
-        expect(scene.performers.map((p) => p.id)).toContain(
-          TEST_ENTITIES.performerWithScenes
+        // Filter by a performer that exists in test instance
+        const response = await adminClient.post<{
+          findScenes: {
+            count: number;
+            scenes: Array<{ id: string; performers: Array<{ id: string }> }>;
+          };
+        }>("/api/library/scenes", {
+          filter: { per_page: 50 },
+          scene_filter: {
+            performers: {
+              value: [TEST_ENTITIES.performerWithScenes],
+              modifier: "INCLUDES",
+            },
+          },
+        });
+
+        expect(response.ok).toBe(true);
+
+        // Results should only be from test instance (the performer is from test instance)
+        // This verifies that junction table queries correctly match instance IDs
+        for (const scene of response.data.findScenes.scenes) {
+          expect(scene.performers.map((p) => p.id)).toContain(
+            TEST_ENTITIES.performerWithScenes
+          );
+        }
+      });
+
+      it("filtering by test instance tag only returns matching scenes", async function () {
+        await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
+
+        const response = await adminClient.post<{
+          findScenes: { count: number };
+        }>("/api/library/scenes", {
+          filter: { per_page: 50 },
+          scene_filter: {
+            tags: {
+              value: [TEST_ENTITIES.tagWithEntities],
+              modifier: "INCLUDES",
+            },
+          },
+        });
+
+        expect(response.ok).toBe(true);
+        // The tag is from test instance, so only test instance scenes should match
+        expect(response.data.findScenes.count).toBeLessThanOrEqual(
+          testInstanceSceneCount
         );
-      }
-    });
-
-    it("filtering by test instance tag only returns matching scenes", async function () {
-      if (!hasMultipleInstances) {
-        console.log("Skipping: Requires multiple instances");
-        return;
-      }
-
-      await adminClient.put("/api/user/stash-instances", { instanceIds: [] });
-
-      const response = await adminClient.post<{
-        findScenes: { count: number };
-      }>("/api/library/scenes", {
-        filter: { per_page: 50 },
-        scene_filter: {
-          tags: {
-            value: [TEST_ENTITIES.tagWithEntities],
-            modifier: "INCLUDES",
-          },
-        },
       });
-
-      expect(response.ok).toBe(true);
-      // The tag is from test instance, so only test instance scenes should match
-      expect(response.data.findScenes.count).toBeLessThanOrEqual(
-        testInstanceSceneCount
-      );
-    });
-  });
+    }
+  );
 });
