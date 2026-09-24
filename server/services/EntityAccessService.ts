@@ -219,6 +219,38 @@ WHERE ${ACCESS_WHERE}
 }
 
 /**
+ * Batch form of resolveAccessibleInstanceId's guess: the ids (no instance)
+ * this user may see on at least one instance. One SQL round trip, one bound
+ * JSON parameter for all ids; each id probes the entity primary key.
+ */
+export async function getIdsVisibleOnAnyInstance(
+  userId: number,
+  entityType: Exclude<AccessEntityType, "clip">,
+  ids: ReadonlyArray<string>
+): Promise<Set<string>> {
+  const source = sourceFor(entityType);
+  const unique = [...new Set(ids.map((id) => String(id ?? "")))].filter(
+    Boolean
+  );
+  if (unique.length === 0) return new Set();
+
+  const sql = `SELECT DISTINCT x.id AS id
+FROM json_each(?) j
+CROSS JOIN ${source.table} x ON x.id = j.value
+JOIN StashInstance si ON si.id = x.stashInstanceId AND si.enabled = 1
+${source.join}
+WHERE ${ACCESS_WHERE}
+  ${source.where}`;
+
+  const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    sql,
+    JSON.stringify(unique),
+    ...accessParams(source, userId, entityType)
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
  * The conditions whose (id, stashInstanceId) this user may see, in their
  * order. For the query builders' relation loaders: filter the composite-key
  * conditions before the findMany, so tooltips never list an entity the user

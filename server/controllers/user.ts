@@ -3,8 +3,10 @@ import { randomUUID } from "crypto";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import {
-  canUserAccessEntity,
-  resolveAccessibleInstanceId,
+  type EntityRef,
+  entityRefKey,
+  getIdsVisibleOnAnyInstance,
+  getVisibleEntityKeys,
 } from "../services/EntityAccessService.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { setUserPassword } from "../services/PasswordService.js";
@@ -2444,45 +2446,74 @@ interface HideTarget {
   instanceId: string;
 }
 
+type HideAccess = "hide" | "already-hidden" | "not-found";
+
 /**
- * May this user hide this target? Hiding requires visibility: the user must
- * see the entity on the given instance, or on some instance when none is
- * given (the rule ratings use). A target this user has already hidden is
+ * May this user hide these targets? Hiding requires visibility: the user
+ * must see the entity on the given instance, or on some instance when none
+ * is given (the rule ratings use). A target this user has already hidden is
  * "already-hidden": a repeat hide succeeds without writing. Anything else is
  * "not-found", the same answer as an id that does not exist, so a hide never
  * reveals whether a restricted entity exists.
+ *
+ * One query for the user's existing hides, then one visibility query per
+ * entity type for the targets with an instance and one for those without,
+ * whatever the batch size.
  */
-async function checkHideTarget(
+async function checkHideTargets(
   userId: number,
-  target: HideTarget
-): Promise<"hide" | "already-hidden" | "not-found"> {
+  targets: HideTarget[]
+): Promise<HideAccess[]> {
   const { userHiddenEntityService } =
     await import("../services/UserHiddenEntityService.js");
-  if (
-    await userHiddenEntityService.isHiddenByUser(
-      userId,
-      target.entityType,
-      target.entityId,
-      target.instanceId
-    )
-  ) {
-    return "already-hidden";
+  const alreadyHidden = await userHiddenEntityService.findAlreadyHidden(
+    userId,
+    targets.map(({ entityType, entityId, instanceId }) => ({
+      entityType,
+      entityId,
+      instanceId,
+    }))
+  );
+
+  const scoped = new Map<EntityType, EntityRef[]>();
+  const bare = new Map<EntityType, string[]>();
+  targets.forEach((target, i) => {
+    if (alreadyHidden[i]) return;
+    if (target.instanceId) {
+      const refs = scoped.get(target.entityType) ?? [];
+      refs.push({ id: target.entityId, instanceId: target.instanceId });
+      scoped.set(target.entityType, refs);
+    } else {
+      const ids = bare.get(target.entityType) ?? [];
+      ids.push(target.entityId);
+      bare.set(target.entityType, ids);
+    }
+  });
+
+  const visibleKeys = new Map<EntityType, Set<string>>();
+  for (const [entityType, refs] of scoped) {
+    visibleKeys.set(
+      entityType,
+      await getVisibleEntityKeys(userId, entityType, refs)
+    );
+  }
+  const visibleIds = new Map<EntityType, Set<string>>();
+  for (const [entityType, ids] of bare) {
+    visibleIds.set(
+      entityType,
+      await getIdsVisibleOnAnyInstance(userId, entityType, ids)
+    );
   }
 
-  const visible = target.instanceId
-    ? await canUserAccessEntity(
-        userId,
-        target.entityType,
-        target.entityId,
-        target.instanceId
-      )
-    : (await resolveAccessibleInstanceId(
-        userId,
-        target.entityType,
-        target.entityId,
-        undefined
-      )) !== null;
-  return visible ? "hide" : "not-found";
+  return targets.map((target, i) => {
+    if (alreadyHidden[i]) return "already-hidden";
+    const visible = target.instanceId
+      ? visibleKeys
+          .get(target.entityType)
+          ?.has(entityRefKey(target.entityId, target.instanceId))
+      : visibleIds.get(target.entityType)?.has(target.entityId);
+    return visible ? "hide" : "not-found";
+  });
 }
 
 /**
@@ -2504,7 +2535,7 @@ export const hideEntity = async (
       return res.status(400).json({ error: target.error });
     }
 
-    const access = await checkHideTarget(userId, target);
+    const [access] = await checkHideTargets(userId, [target]);
     if (access === "not-found") {
       return res.status(404).json({ error: "Not found" });
     }
@@ -2774,14 +2805,14 @@ export const hideEntities = async (
       }
       targets.push(target);
     }
-    const toHide: HideTarget[] = [];
-    for (const target of targets) {
-      const access = await checkHideTarget(userId, target);
-      if (access === "not-found") {
-        return res.status(404).json({ error: "Not found" });
-      }
-      if (access === "hide") toHide.push(target);
+    const access = await checkHideTargets(userId, targets);
+    const notFound = access.indexOf("not-found");
+    if (notFound !== -1) {
+      return res
+        .status(404)
+        .json({ error: `entities[${notFound}]: Not found` });
     }
+    const toHide = targets.filter((_, i) => access[i] === "hide");
 
     // Import service
     const { userHiddenEntityService } =

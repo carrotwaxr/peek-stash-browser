@@ -15,6 +15,7 @@ import {
   type AccessEntityType,
   canUserAccessEntity,
   entityRefKey,
+  getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
   resolveAccessibleInstanceId,
 } from "../../services/EntityAccessService.js";
@@ -191,6 +192,32 @@ describeWithDb("EntityAccessService (integration)", () => {
     expect(
       await resolveAccessibleInstanceId(u, "scene", FX_ID.GLOBAL, undefined)
     ).toBeNull();
+  });
+
+  it("getIdsVisibleOnAnyInstance keeps exactly the ids the legacy guess resolves", async () => {
+    const ids = [
+      FX_ID.SAME,
+      FX_ID.GLOBAL,
+      FX_ID.DELETED,
+      FX_ID.ON_OFF,
+      FX_ID.B_ONLY,
+      "9999999",
+    ];
+    for (const user of [u, v]) {
+      const guessed = new Set<string>();
+      for (const id of ids) {
+        if (await resolveAccessibleInstanceId(user, "scene", id, undefined)) {
+          guessed.add(id);
+        }
+      }
+      expect(await getIdsVisibleOnAnyInstance(user, "scene", ids)).toEqual(
+        guessed
+      );
+    }
+    // u hid SAME on B only and GLOBAL everywhere
+    expect(await getIdsVisibleOnAnyInstance(u, "scene", ids)).toEqual(
+      new Set([FX_ID.SAME, FX_ID.B_ONLY])
+    );
   });
 
   it("getVisibleEntityKeys returns only the visible refs", async () => {

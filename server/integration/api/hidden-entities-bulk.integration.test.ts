@@ -173,7 +173,7 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       );
 
       expect(response.status).toBe(404);
-      expect(response.data.error).toBe("Not found");
+      expect(response.data.error).toBe("entities[1]: Not found");
 
       const hidden = await testUserClient.get<{
         hiddenEntities: Array<{ entityType: string; entityId: string }>;

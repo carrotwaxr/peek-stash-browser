@@ -12,6 +12,7 @@ import {
   type AccessEntityType,
   canUserAccessEntity,
   entityRefKey,
+  getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
   keepVisibleConditions,
   resolveAccessibleInstanceId,
@@ -207,6 +208,31 @@ describe("EntityAccessService", () => {
         resolveAccessibleInstanceId(7, "scene", "42", undefined)
       ).resolves.toBeNull();
       expect(mockQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("getIdsVisibleOnAnyInstance", () => {
+    it("returns an empty set without a query for no ids", async () => {
+      await expect(getIdsVisibleOnAnyInstance(7, "scene", [])).resolves.toEqual(
+        new Set()
+      );
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("sends the ids as one deduplicated JSON parameter, probing the primary key", async () => {
+      mockQuery.mockResolvedValueOnce([{ id: "1" }] as never);
+
+      const ids = await getIdsVisibleOnAnyInstance(7, "tag", ["1", "2", "1"]);
+
+      expect(ids).toEqual(new Set(["1"]));
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      const { sql, params } = call();
+      expect(params).toEqual([JSON.stringify(["1", "2"]), 7, 7, 7, "tag"]);
+      expect(sql).toContain("FROM json_each(?) j");
+      expect(sql).toContain("CROSS JOIN StashTag x ON x.id = j.value");
+      expect(sql).toContain("si.enabled = 1");
+      expect(sql).toContain("NOT EXISTS (SELECT 1 FROM UserExcludedEntity e");
+      expect(sql).not.toContain("e.reason");
     });
   });
 

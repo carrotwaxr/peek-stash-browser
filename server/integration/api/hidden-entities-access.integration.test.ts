@@ -49,6 +49,7 @@ describe("Hidden items and content restrictions (integration)", () => {
   let restrictedTagName: string;
   let restrictedScene: { id: string; title: string };
   let visibleScene: { id: string; title: string };
+  let otherVisibleScene: { id: string; title: string };
 
   async function list(entityType?: string): Promise<HiddenItem[]> {
     const query = entityType ? `?entityType=${entityType}` : "";
@@ -136,14 +137,17 @@ describe("Hidden items and content restrictions (integration)", () => {
       select: { id: true, title: true },
       orderBy: { id: "asc" },
     });
-    const visible = scenes.find(
+    const visible = scenes.filter(
       (s) =>
         s.title &&
         !excludedKeys.has(`${s.id}\0${testInstanceId}`) &&
         !excludedKeys.has(`${s.id}\0`)
     );
-    if (!visible?.title) throw new Error("No visible titled scene");
-    visibleScene = { id: visible.id, title: visible.title };
+    if (!visible[0]?.title || !visible[1]?.title) {
+      throw new Error("Fewer than two visible titled scenes");
+    }
+    visibleScene = { id: visible[0].id, title: visible[0].title };
+    otherVisibleScene = { id: visible[1].id, title: visible[1].title };
   }, 120000);
 
   afterEach(async () => {
@@ -215,7 +219,23 @@ describe("Hidden items and content restrictions (integration)", () => {
     expect(items[0].entity?.title).toBe(visibleScene.title);
   });
 
-  it("a bulk hide with one restricted target writes nothing", async () => {
+  it("a repeat hide without an instance finds a hide stored for one instance", async () => {
+    const first = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+      instanceId: testInstanceId,
+    });
+    expect(first.status).toBe(200);
+
+    const second = await hider.client.post("/api/user/hidden-entities", {
+      entityType: "scene",
+      entityId: visibleScene.id,
+    });
+    expect(second.status).toBe(200);
+    expect(await hiddenRowCount()).toBe(1);
+  });
+
+  it("a bulk hide with one restricted target writes nothing and names it", async () => {
     const response = await hider.client.post("/api/user/hidden-entities/bulk", {
       entities: [
         { entityType: "scene", entityId: visibleScene.id },
@@ -224,8 +244,34 @@ describe("Hidden items and content restrictions (integration)", () => {
     });
 
     expect(response.status).toBe(404);
-    expect(response.data).toEqual({ error: "Not found" });
+    expect(response.data).toEqual({ error: "entities[1]: Not found" });
     expect(await hiddenRowCount()).toBe(0);
+  });
+
+  it("a bulk hide takes targets with and without an instance, and repeats cleanly", async () => {
+    const entities = [
+      {
+        entityType: "scene",
+        entityId: visibleScene.id,
+        instanceId: testInstanceId,
+      },
+      { entityType: "scene", entityId: otherVisibleScene.id },
+    ];
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await hider.client.post<{
+        successCount: number;
+        failCount: number;
+      }>("/api/user/hidden-entities/bulk", { entities });
+      expect(response.status).toBe(200);
+      expect(response.data).toMatchObject({ successCount: 2, failCount: 0 });
+    }
+    expect(await hiddenRowCount()).toBe(2);
+
+    const titles = (await list("scene")).map((i) => i.entity?.title).sort();
+    expect(titles).toEqual(
+      [visibleScene.title, otherVisibleScene.title].sort()
+    );
   });
 
   it("lists an existing hide of a restricted entity without its details", async () => {

@@ -170,25 +170,40 @@ class UserHiddenEntityService {
   }
 
   /**
-   * Is this entity already hidden by this user? A hide stored with instance
-   * "" covers every instance.
+   * For each target, has this user already hidden it? A target on an
+   * instance is covered by a hide on that instance or one stored for every
+   * instance (""); a target without an instance by any hide of that type and
+   * id. One query for the whole batch.
    */
-  async isHiddenByUser(
+  async findAlreadyHidden(
     userId: number,
-    entityType: EntityType,
-    entityId: string,
-    instanceId: string
-  ): Promise<boolean> {
-    const row = await prisma.userHiddenEntity.findFirst({
+    targets: ReadonlyArray<{
+      entityType: EntityType;
+      entityId: string;
+      instanceId: string;
+    }>
+  ): Promise<boolean[]> {
+    if (targets.length === 0) return [];
+
+    const rows = await prisma.userHiddenEntity.findMany({
       where: {
         userId,
-        entityType,
-        entityId,
-        instanceId: { in: instanceId ? [instanceId, ""] : [""] },
+        entityId: { in: [...new Set(targets.map((t) => t.entityId))] },
       },
-      select: { id: true },
+      select: { entityType: true, entityId: true, instanceId: true },
     });
-    return row !== null;
+    const key = (...parts: string[]) => parts.join("\0");
+    const stored = new Set(
+      rows.map((r) => key(r.entityType, r.entityId, r.instanceId))
+    );
+    const anyInstance = new Set(rows.map((r) => key(r.entityType, r.entityId)));
+
+    return targets.map((t) =>
+      t.instanceId
+        ? stored.has(key(t.entityType, t.entityId, t.instanceId)) ||
+          stored.has(key(t.entityType, t.entityId, ""))
+        : anyInstance.has(key(t.entityType, t.entityId))
+    );
   }
 
   /**
