@@ -149,7 +149,7 @@ npm test
 
 ### Integration Tests
 
-Integration tests require a running Stash server. See the [Regression Testing Guide](regression-testing.md) for details.
+`cd server && npm run test:integration:replay` runs the integration tests against a synthetic replay of the test Stash, with no setup. `npm run test:integration` runs them against a live test Stash (`STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env`). See the [Regression Testing Guide](regression-testing.md) for manual checks.
 
 ## Debugging
 
@@ -223,7 +223,7 @@ cd server && npm run typecheck
 cd client && npm run typecheck
 ```
 
-The server tests are checked with the same flags as the source. The check needs `server/integration/fixtures/testEntities.ts`; if you have none, copy it from `testEntities.example.ts` in the same folder. CI runs the server check.
+The server tests are checked with the same flags as the source. CI runs the server check.
 
 ## Building for Production
 

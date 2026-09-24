@@ -250,10 +250,30 @@ describe("Tag API", () => {
       expect(userResponse.ok).toBe(true);
       const userTagCount = userResponse.data.tags.length;
 
-      // User should see a meaningful subset of tags
+      // The minimal endpoint applies the user's exclusions, "empty" ones
+      // included (tags with no content anywhere, since 106a2580). This user
+      // has no restrictions and hides nothing, so empty tags are all it
+      // loses against the admin, who gets no empty exclusions.
+      const statsResponse = await adminClient.get<
+        Array<{
+          userId: number;
+          entityType: string;
+          reason: string;
+          _count: number;
+        }>
+      >("/api/exclusions/stats");
+      expect(statsResponse.ok).toBe(true);
+      const tagExclusions = statsResponse.data.filter(
+        (row) => row.userId === testUserId && row.entityType === "tag"
+      );
+      expect(tagExclusions.filter((row) => row.reason !== "empty")).toEqual([]);
+      const emptyTagCount = tagExclusions.reduce(
+        (sum, row) => sum + row._count,
+        0
+      );
+
       expect(userTagCount).toBeGreaterThan(0);
-      // User should see at least 90% of tags (minimal endpoint returns more since it doesn't filter empty)
-      expect(userTagCount).toBeGreaterThan(adminTagCount * 0.9);
+      expect(userTagCount).toBe(adminTagCount - emptyTagCount);
     });
   });
 });

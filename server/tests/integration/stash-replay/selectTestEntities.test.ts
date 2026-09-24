@@ -1,7 +1,7 @@
 /**
  * The integration suite's test entities are picked from the generated
- * library (sweep item 83) by the criteria testEntities.example.ts describes,
- * the lowest id winning, and only among recorded entities, so each id also
+ * library (sweep item 83) by the criteria in TEST_ENTITY_CRITERIA, the
+ * lowest id winning, and only among recorded entities, so each id also
  * exists in the live test Stash.
  */
 import { describe, expect, it } from "vitest";

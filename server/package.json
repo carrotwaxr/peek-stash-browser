@@ -23,6 +23,7 @@
     "analyze": "npm run depcheck && npm run knip",
     "generate-api-docs": "npx tsx scripts/generate-api-docs.ts",
     "test:integration": "vitest run --config integration/vitest.integration.config.ts",
+    "test:integration:replay": "STASH_REPLAY=1 vitest run --config integration/vitest.integration.config.ts",
     "test:integration:watch": "vitest --config integration/vitest.integration.config.ts",
     "test:integration:fresh": "FRESH_DB=true npm run test:integration",
     "test:integration:ci": "vitest run --config integration/vitest.integration.config.ts --reporter=json --reporter=./integration/helpers/summaryReporter.ts --outputFile.json=integration/results/test-results.json",

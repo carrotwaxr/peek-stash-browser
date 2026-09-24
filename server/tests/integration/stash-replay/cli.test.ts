@@ -15,8 +15,8 @@ import {
   FIXTURE_PATHS,
 } from "../../../integration/stash-replay/generate.js";
 import {
-  deriveSecondLibrary,
   parseReplayLibrary,
+  secondLibraryOf,
 } from "../../../integration/stash-replay/library.js";
 import { fixtureLibrary } from "./fixtureLibrary.js";
 
@@ -211,7 +211,7 @@ describe("stash-replay CLI", () => {
   );
 
   it(
-    "--library second serves deriveSecondLibrary's scene count",
+    "--library second serves secondLibraryOf's scene count",
     { timeout: 60_000 },
     async () => {
       const test = parseReplayLibrary(
@@ -221,10 +221,7 @@ describe("stash-replay CLI", () => {
         "library.json"
       );
       const scenes = test.entities.scene.length;
-      const expected = deriveSecondLibrary(test, {
-        idOffset: 100000,
-        sceneCount: Math.max(200, 10 * scenes + 1),
-      }).entities.scene.length;
+      const expected = secondLibraryOf(test).entities.scene.length;
       expect(expected).toBeGreaterThan(10 * scenes);
 
       const replay = startReplay(["--port", "0", "--library", "second"]);

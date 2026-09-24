@@ -3,9 +3,19 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  FIXTURE_API_KEY,
+  FIXTURE_LIBRARY,
+} from "../stash-replay/fixture/manifest.js";
+import {
+  parseReplayLibrary,
+  secondLibraryOf,
+} from "../stash-replay/library.js";
+import { type ReplayServer, startStashReplay } from "../stash-replay/server.js";
 import { TEST_CONFIG } from "./config.js";
 import { setServerInstance, stopServer } from "./serverManager.js";
 import {
+  type StashEndpoint,
   StashTargetError,
   findDisallowedInstances,
   resolveStashTarget,
@@ -14,6 +24,11 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const REPLAY_LIBRARY_FILE = path.resolve(
+  __dirname,
+  "../stash-replay/fixture/library.json"
+);
 
 export async function setup() {
   console.log("[Integration Tests] Starting global setup...");
@@ -31,31 +46,63 @@ export async function setup() {
     fileEnv = dotenv.parse(fs.readFileSync(envPath));
   }
 
-  // Refuses (StashTargetError) unless a test Stash is configured or
-  // ALLOW_PROD_STASH=1 comes from the shell; see stashTarget.ts
+  // Refuses (StashTargetError) unless STASH_REPLAY=1, a test Stash is
+  // configured or ALLOW_PROD_STASH=1 comes from the shell; see stashTarget.ts
   const target = resolveStashTarget(fileEnv, shellEnv);
-  process.env.STASH_URL = target.primary.url;
-  process.env.STASH_API_KEY = target.primary.apiKey;
-  if (target.second) {
-    process.env.STASH_SECOND_URL = target.second.url;
-    process.env.STASH_SECOND_API_KEY = target.second.apiKey;
+  let primary: StashEndpoint;
+  let second: StashEndpoint | undefined;
+  let replay: ReplayServer | undefined;
+  if (target.mode === "replay") {
+    // The test workers fork after this and inherit every variable set here:
+    // STASH_REPLAY picks the replay's ids in fixtures/testEntities.ts and
+    // the replay database in config.ts
+    process.env.STASH_REPLAY = "1";
+    const library = parseReplayLibrary(
+      JSON.parse(fs.readFileSync(REPLAY_LIBRARY_FILE, "utf8")) as unknown,
+      REPLAY_LIBRARY_FILE
+    );
+    const secondLibrary = secondLibraryOf(library);
+    replay = await startStashReplay([
+      { name: "test", library, apiKey: FIXTURE_API_KEY },
+      {
+        name: "second",
+        library: secondLibrary,
+        apiKey: `${FIXTURE_API_KEY}-second`,
+      },
+    ]);
+    const [testStash, secondStash] = replay.libraries;
+    if (testStash === undefined || secondStash === undefined) {
+      await replay.close();
+      throw new Error("The Stash replay did not start both libraries");
+    }
+    primary = testStash;
+    second = secondStash;
+    process.env.STASH_REPLAY_STATS_URL = replay.statsUrl;
+
+    // Every replay run starts from an empty database, so its ids and sync
+    // state come from the fixture alone
+    for (const suffix of ["", "-wal", "-shm"]) {
+      fs.rmSync(`${TEST_CONFIG.databasePath}${suffix}`, { force: true });
+    }
+    console.log(
+      `[Integration Tests] Stash: replay (${library.entities.scene.length} scenes; second library ${secondLibrary.entities.scene.length} scenes)`
+    );
+  } else {
+    primary = target.primary;
+    second = target.second;
+    delete process.env.STASH_REPLAY_STATS_URL;
+    console.log(
+      `[Integration Tests] Stash: ${target.source} (${stashHost(primary.url)}), second instance: ${second ? stashHost(second.url) : "none"}`
+    );
+  }
+  process.env.STASH_URL = primary.url;
+  process.env.STASH_API_KEY = primary.apiKey;
+  if (second) {
+    process.env.STASH_SECOND_URL = second.url;
+    process.env.STASH_SECOND_API_KEY = second.apiKey;
   } else {
     delete process.env.STASH_SECOND_URL;
     delete process.env.STASH_SECOND_API_KEY;
-  }
-  console.log(
-    `[Integration Tests] Stash: ${target.source} (${stashHost(target.primary.url)}), second instance: ${target.second ? stashHost(target.second.url) : "none"}`
-  );
-
-  // Check if testEntities.ts exists
-  const testEntitiesPath = path.resolve(
-    __dirname,
-    "../fixtures/testEntities.ts"
-  );
-  if (!fs.existsSync(testEntitiesPath)) {
-    throw new Error(
-      `Missing testEntities.ts. Copy testEntities.example.ts to testEntities.ts and fill in entity IDs from your Stash.`
-    );
   }
 
   // Set test database URL
@@ -119,14 +166,16 @@ export async function setup() {
   // this run's Stash (a production row left from an earlier run, say).
   const { default: prisma } = await import("../../prisma/singleton.js");
   // Close what setup opened, so a refused run exits at once
-  const refuse = async (message: string): Promise<never> => {
+  const abort = async (error: Error): Promise<never> => {
     await stopServer();
     fs.rmSync(configDir, { recursive: true, force: true });
     await prisma.$disconnect();
-    throw new StashTargetError(message);
+    await replay?.close();
+    throw error;
   };
-  const allowedUrls = [target.primary.url];
-  if (target.second) allowedUrls.push(target.second.url);
+  const refuse = (message: string) => abort(new StashTargetError(message));
+  const allowedUrls = [primary.url];
+  if (second) allowedUrls.push(second.url);
   const disallowed = findDisallowedInstances(
     await prisma.stashInstance.findMany({
       select: { id: true, url: true, enabled: true },
@@ -184,6 +233,40 @@ export async function setup() {
     throw new Error("Sync did not complete within timeout");
   }
 
+  // A replay run must have synced the whole fixture: a request the replay
+  // could not answer shows up here as missing rows
+  if (replay) {
+    const { syncScheduler } = await import("../../services/SyncScheduler.js");
+    const instance = await prisma.stashInstance.findFirst({
+      where: { url: primary.url },
+      select: { id: true },
+    });
+    const where = { stashInstanceId: instance?.id ?? "", deletedAt: null };
+    const stored = {
+      scenes: await prisma.stashScene.count({ where }),
+      performers: await prisma.stashPerformer.count({ where }),
+      studios: await prisma.stashStudio.count({ where }),
+      tags: await prisma.stashTag.count({ where }),
+      groups: await prisma.stashGroup.count({ where }),
+      galleries: await prisma.stashGallery.count({ where }),
+      images: await prisma.stashImage.count({ where }),
+    };
+    const short = (Object.keys(stored) as Array<keyof typeof stored>)
+      .filter((type) => stored[type] !== FIXTURE_LIBRARY[type])
+      .map(
+        (type) =>
+          `Replay sync stored ${stored[type]} of ${FIXTURE_LIBRARY[type]} ${type}`
+      );
+    if (short.length > 0) {
+      syncScheduler.stop();
+      await abort(
+        new Error(
+          `${short.join("; ")}. Requests the Stash replay could not answer: ${JSON.stringify(replay.stats().unsupported)}`
+        )
+      );
+    }
+  }
+
   console.log("[Integration Tests] Global setup complete");
 
   // Return teardown function for Vitest
@@ -197,6 +280,10 @@ export async function setup() {
 
     // Close the HTTP server
     await stopServer();
+
+    // What the Stash replay was sent over the whole run
+    const audit = replay?.stats();
+    await replay?.close();
 
     fs.rmSync(configDir, { recursive: true, force: true });
 
@@ -224,6 +311,16 @@ export async function setup() {
           teardownLog.join("")
         );
       }
+    }
+
+    // replayAudit.ts names the file; this catches what no file owned (the
+    // startup sync, say). vitest reports a teardown error as a startup error
+    // but sets exit code 1 only when process.exitCode is still unset.
+    if (audit && (audit.mutations.length > 0 || audit.unsupported.length > 0)) {
+      process.exitCode = 1;
+      throw new Error(
+        `The Stash replay refused requests during the run. Mutations: ${JSON.stringify(audit.mutations)}. Requests it cannot answer: ${JSON.stringify(audit.unsupported)}`
+      );
     }
 
     console.log("[Integration Tests] Global teardown complete");

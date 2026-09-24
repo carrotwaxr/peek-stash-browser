@@ -9,8 +9,12 @@ export const TEST_CONFIG = {
   get baseUrl() {
     return `http://localhost:${this.serverPort}`;
   },
+  /** A replay run (STASH_REPLAY=1) starts from its own, fresh database. */
   get databasePath() {
-    return path.resolve(__dirname, "../test.db");
+    return path.resolve(
+      __dirname,
+      process.env.STASH_REPLAY === "1" ? "../test-replay.db" : "../test.db"
+    );
   },
   get databaseUrl() {
     return `file:${this.databasePath}`;

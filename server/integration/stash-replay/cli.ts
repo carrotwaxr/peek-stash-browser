@@ -19,8 +19,8 @@ import { parseArgs } from "util";
 import { FIXTURE_API_KEY } from "./fixture/manifest.js";
 import {
   type ReplayLibrary,
-  deriveSecondLibrary,
   parseReplayLibrary,
+  secondLibraryOf,
 } from "./library.js";
 import { startStashReplay } from "./server.js";
 
@@ -30,12 +30,6 @@ const USAGE =
 const FIXTURE_LIBRARY_FILE = fileURLToPath(
   new URL("./fixture/library.json", import.meta.url)
 );
-
-/**
- * The second instance's ids start after the test library's; item 34's PR
- * should set this to 0 (bare tag ids match every instance until then).
- */
-const SECOND_ID_OFFSET = 100000;
 
 function fail(message: string): never {
   process.stderr.write(`stash-replay: ${message}\n${USAGE}\n`);
@@ -102,14 +96,7 @@ async function main(): Promise<void> {
   } else {
     name = which ?? "test";
     const test = readLibrary(FIXTURE_LIBRARY_FILE);
-    // More than ten times the test library's scenes, as multi-instance asserts
-    library =
-      name === "second"
-        ? deriveSecondLibrary(test, {
-            idOffset: SECOND_ID_OFFSET,
-            sceneCount: Math.max(200, 10 * test.entities.scene.length + 1),
-          })
-        : test;
+    library = name === "second" ? secondLibraryOf(test) : test;
   }
   const replay = await startStashReplay([
     { name, library, apiKey, port, host },

@@ -1,7 +1,9 @@
 /**
  * Which Stash the integration suite may talk to (sweep item 83).
  *
- * The suite runs against a dedicated test Stash (STASH_TEST_URL and
+ * STASH_REPLAY=1 runs it against the Stash replay (stash-replay/), a
+ * synthetic copy of the test Stash that globalSetup starts in-process.
+ * Otherwise it runs against a dedicated test Stash (STASH_TEST_URL and
  * STASH_TEST_API_KEY). It uses the production Stash (STASH_URL), as the
  * primary instance or as multi-instance's second one, only when
  * ALLOW_PROD_STASH=1 comes from the shell: a value in the root .env never
@@ -13,12 +15,14 @@ export interface StashEndpoint {
   apiKey: string;
 }
 
-export type StashTarget = {
-  mode: "live";
-  source: "STASH_TEST" | "STASH_URL";
-  primary: StashEndpoint;
-  second?: StashEndpoint;
-};
+export type StashTarget =
+  | { mode: "replay" }
+  | {
+      mode: "live";
+      source: "STASH_TEST" | "STASH_URL";
+      primary: StashEndpoint;
+      second?: StashEndpoint;
+    };
 
 export class StashTargetError extends Error {
   constructor(message: string) {
@@ -31,7 +35,7 @@ export class StashTargetError extends Error {
 export const UNREACHABLE_STASH_URL = "http://127.0.0.1:9/graphql";
 
 const REFUSAL =
-  "Integration tests need a test Stash: set STASH_TEST_URL and STASH_TEST_API_KEY in the root .env. They will not use STASH_URL unless you run with ALLOW_PROD_STASH=1 in the shell (the suite only reads from Stash today, but nothing stops a future test from writing).";
+  "Integration tests need a test Stash: set STASH_TEST_URL and STASH_TEST_API_KEY in the root .env. They will not use STASH_URL unless you run with ALLOW_PROD_STASH=1 in the shell (the suite only reads from Stash today, but nothing stops a future test from writing). Or run npm run test:integration:replay to use the recorded Stash.";
 
 type Env = Record<string, string | undefined>;
 
@@ -62,13 +66,17 @@ export function stashHost(url: string): string {
  * Picks the Stash the suite runs against. `fileEnv` is the parsed root .env,
  * `shellEnv` is process.env captured before the .env loaded. A key present in
  * the shell wins even when empty (dotenv's rule); a value counts only when
- * non-empty. ALLOW_PROD_STASH counts only from the shell, as exactly "1".
+ * non-empty. STASH_REPLAY=1, from either, selects the replay before anything
+ * else. ALLOW_PROD_STASH counts only from the shell, as exactly "1".
  */
 export function resolveStashTarget(fileEnv: Env, shellEnv: Env): StashTarget {
   const read = (key: string): string | undefined => {
     const value = key in shellEnv ? shellEnv[key] : fileEnv[key];
     return value ? value : undefined;
   };
+  if (read("STASH_REPLAY") === "1") {
+    return { mode: "replay" };
+  }
   const allowProd = shellEnv.ALLOW_PROD_STASH === "1";
 
   const stashUrl = read("STASH_URL");

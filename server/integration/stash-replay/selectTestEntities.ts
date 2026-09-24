@@ -2,12 +2,11 @@
  * The integration suite's test entities (TEST_ENTITIES in the fixture
  * manifest), picked from the generated library (sweep item 83).
  *
- * Each key has the criterion testEntities.example.ts describes for it, and
- * the lowest id that meets it wins. Only recorded entities are candidates,
- * and only their recorded relations count, so every pick meets its
- * criterion in the live test Stash too, where live runs use it (the id less
- * FIXTURE_ID_OFFSET). On the test Stash's shape this picks the ids the
- * owner chose by hand.
+ * Each key has its criterion in TEST_ENTITY_CRITERIA, and the lowest id
+ * that meets it wins. Only recorded entities are candidates, and only their
+ * recorded relations count, so every pick meets its criterion in the live
+ * test Stash too, where live runs use it (the id less FIXTURE_ID_OFFSET). On
+ * the test Stash's shape this picks the ids the owner chose by hand.
  */
 import {
   ENTITY_TYPES,
@@ -117,7 +116,7 @@ function galleriesOf(view: RecordedView, image: Entity): Entity[] {
     .flatMap((id) => view.byId("gallery", id) ?? []);
 }
 
-/** In testEntities.example.ts order, which is the manifest's. */
+/** In the manifest's key order. */
 export const TEST_ENTITY_CRITERIA: readonly Criterion[] = [
   {
     key: "sceneWithRelations",
