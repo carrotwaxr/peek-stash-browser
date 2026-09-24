@@ -269,7 +269,7 @@ describe("EntityAccessService", () => {
       expect(sql).toContain("ORDER BY si.priority, x.stashInstanceId");
     });
 
-    it("ignores only the user's own hides: any other exclusion row still excludes", async () => {
+    it("ignores only the user's own hides; any other exclusion row still excludes", async () => {
       await resolveVisibleApartFromOwnHides(7, "scene", [
         { id: "1", instanceId: "A" },
       ]);

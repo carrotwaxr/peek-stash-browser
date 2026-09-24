@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TimelineService } from "../../services/TimelineService.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 vi.mock("../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -38,7 +39,7 @@ describe("TimelineService", () => {
 
     it("defaults to months for invalid granularity", () => {
       const service = new TimelineService();
-      expect(service.getStrftimeFormat("invalid" as any)).toBe("%Y-%m");
+      expect(service.getStrftimeFormat(untrusted("invalid"))).toBe("%Y-%m");
     });
   });
 

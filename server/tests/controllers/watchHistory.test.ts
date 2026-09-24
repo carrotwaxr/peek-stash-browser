@@ -12,7 +12,7 @@
  * - the entity access check on every write
  */
 import type { WatchHistory } from "@prisma/client";
-import { Response } from "express";
+import type { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import {
@@ -30,8 +30,9 @@ import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import {
-  authReq,
   malformed,
+  reqFor,
+  resFor,
   testUser,
 } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -90,10 +91,6 @@ const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 
 describe("Watch History Controller", () => {
-  let mockResponse: Partial<Response>;
-  let responseJson: ReturnType<typeof vi.fn>;
-  let responseStatus: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.stashScene.findFirst.mockResolvedValue(
@@ -102,14 +99,6 @@ describe("Watch History Controller", () => {
     mockResolve.mockImplementation(
       async (_userId, _type, _id, requested) => requested ?? "test-instance"
     );
-
-    responseJson = vi.fn();
-    responseStatus = vi.fn(() => ({ json: responseJson }));
-
-    mockResponse = {
-      json: responseJson,
-      status: responseStatus,
-    };
   });
 
   afterEach(() => {
@@ -122,29 +111,31 @@ describe("Watch History Controller", () => {
 
   describe("saveActivity", () => {
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
-      expect(responseJson).toHaveBeenCalledWith({ error: "User not found" });
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: "User not found" });
     });
 
     it("should return 400 if sceneId is missing", async () => {
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: malformed({ resumeTime: 60, playDuration: 10 }),
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Missing required field: sceneId",
       });
     });
@@ -171,12 +162,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
@@ -202,7 +194,7 @@ describe("Watch History Controller", () => {
         })
       );
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           watchHistory: expect.objectContaining({
@@ -235,16 +227,17 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 120, playDuration: 10 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalled();
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
         })
@@ -273,15 +266,16 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60, playDuration: 0 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ success: true })
       );
     });
@@ -308,12 +302,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
@@ -332,27 +327,29 @@ describe("Watch History Controller", () => {
 
   describe("incrementPlayCount", () => {
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it("should return 400 if sceneId is missing", async () => {
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: malformed({}),
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(400);
     });
 
     it("should create new record with playCount=1 if none exists", async () => {
@@ -378,12 +375,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
@@ -395,7 +393,7 @@ describe("Watch History Controller", () => {
         })
       );
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           watchHistory: expect.objectContaining({
@@ -436,12 +434,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
@@ -481,12 +480,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       // Stored as an array, never a JSON string
@@ -506,27 +506,29 @@ describe("Watch History Controller", () => {
 
   describe("incrementOCounter", () => {
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(incrementOCounter);
       await incrementOCounter(
-        authReq({
+        reqFor(incrementOCounter, {
           body: { sceneId: "123" },
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it("should return 400 if sceneId is missing", async () => {
+      const res = resFor(incrementOCounter);
       await incrementOCounter(
-        authReq({
+        reqFor(incrementOCounter, {
           body: malformed({}),
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(400);
     });
 
     it("should create new record with oCount=1 if none exists", async () => {
@@ -545,12 +547,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementOCounter);
       await incrementOCounter(
-        authReq({
+        reqFor(incrementOCounter, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.create).toHaveBeenCalledWith(
@@ -561,7 +564,7 @@ describe("Watch History Controller", () => {
         })
       );
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           oCount: 1,
@@ -592,12 +595,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementOCounter);
       await incrementOCounter(
-        authReq({
+        reqFor(incrementOCounter, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.update).toHaveBeenCalledWith(
@@ -609,7 +613,7 @@ describe("Watch History Controller", () => {
         })
       );
       expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ success: true, oCount: 4 })
       );
     });
@@ -621,41 +625,44 @@ describe("Watch History Controller", () => {
 
   describe("getWatchHistory", () => {
     it("should return 400 if sceneId is missing", async () => {
+      const res = resFor(getWatchHistory);
       await getWatchHistory(
-        authReq({
+        reqFor(getWatchHistory, {
           params: malformed({}),
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(400);
     });
 
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(getWatchHistory);
       await getWatchHistory(
-        authReq({
+        reqFor(getWatchHistory, {
           params: { sceneId: "123" },
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it("should return exists:false when no watch history found", async () => {
       mockPrisma.watchHistory.findUnique.mockResolvedValue(null);
 
+      const res = resFor(getWatchHistory);
       await getWatchHistory(
-        authReq({
+        reqFor(getWatchHistory, {
           params: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         exists: false,
         resumeTime: null,
         playCount: 0,
@@ -677,15 +684,16 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(getWatchHistory);
       await getWatchHistory(
-        authReq({
+        reqFor(getWatchHistory, {
           params: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           exists: true,
           resumeTime: 120,
@@ -703,15 +711,16 @@ describe("Watch History Controller", () => {
 
   describe("getAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(getAllWatchHistory);
       await getAllWatchHistory(
-        authReq({
+        reqFor(getAllWatchHistory, {
           query: {},
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it("should return all watch history for user", async () => {
@@ -734,12 +743,13 @@ describe("Watch History Controller", () => {
         }),
       ]);
 
+      const res = resFor(getAllWatchHistory);
       await getAllWatchHistory(
-        authReq({
+        reqFor(getAllWatchHistory, {
           query: { limit: "20" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
@@ -750,7 +760,7 @@ describe("Watch History Controller", () => {
         })
       );
 
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         watchHistory: expect.arrayContaining([
           expect.objectContaining({ sceneId: "123" }),
           expect.objectContaining({ sceneId: "456" }),
@@ -761,12 +771,13 @@ describe("Watch History Controller", () => {
     it("should filter by inProgress when requested", async () => {
       mockPrisma.watchHistory.findMany.mockResolvedValue([]);
 
+      const res = resFor(getAllWatchHistory);
       await getAllWatchHistory(
-        authReq({
+        reqFor(getAllWatchHistory, {
           query: { limit: "20", inProgress: "true" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.findMany).toHaveBeenCalledWith(
@@ -786,14 +797,15 @@ describe("Watch History Controller", () => {
 
   describe("clearAllWatchHistory", () => {
     it("should return 401 if user is not authenticated", async () => {
+      const res = resFor(clearAllWatchHistory);
       await clearAllWatchHistory(
-        authReq({
+        reqFor(clearAllWatchHistory, {
           user: undefined,
         }),
-        mockResponse as Response
+        res
       );
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
+      expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it("should delete all watch history and stats for user", async () => {
@@ -813,11 +825,12 @@ describe("Watch History Controller", () => {
         count: 20,
       });
 
+      const res = resFor(clearAllWatchHistory);
       await clearAllWatchHistory(
-        authReq({
+        reqFor(clearAllWatchHistory, {
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockPrisma.watchHistory.deleteMany).toHaveBeenCalledWith({
@@ -836,7 +849,7 @@ describe("Watch History Controller", () => {
         where: { userId: 1 },
       });
 
-      expect(responseJson).toHaveBeenCalledWith(
+      expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           deletedCounts: {
@@ -883,17 +896,18 @@ describe("Watch History Controller", () => {
         );
         mockResolve.mockResolvedValueOnce(null);
 
+        const res = resFor(handler);
         await handler(
-          authReq({
+          reqFor(handler, {
             body: { sceneId: "123", instanceId: "inst-b", ...extra },
             user: testUser({ id: 1 }),
           }),
-          mockResponse as Response
+          res
         );
 
         expect(mockResolve).toHaveBeenCalledWith(1, "scene", "123", "inst-b");
-        expect(responseStatus).toHaveBeenCalledWith(404);
-        expect(responseJson).toHaveBeenCalledWith({
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({
           error: "Scene not found",
         });
         expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
@@ -920,8 +934,9 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: {
             sceneId: "123",
             instanceId: "inst-b",
@@ -930,7 +945,7 @@ describe("Watch History Controller", () => {
           },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockResolve).toHaveBeenCalledWith(1, "scene", "123", "inst-b");
@@ -950,16 +965,17 @@ describe("Watch History Controller", () => {
     it.each([[5], [""]])(
       "returns 400 when instanceId is %j",
       async (instanceId) => {
+        const res = resFor(incrementOCounter);
         await incrementOCounter(
-          authReq({
+          reqFor(incrementOCounter, {
             body: malformed({ sceneId: "123", instanceId }),
             user: testUser({ id: 1 }),
           }),
-          mockResponse as Response
+          res
         );
 
-        expect(responseStatus).toHaveBeenCalledWith(400);
-        expect(responseJson).toHaveBeenCalledWith({
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({
           error: "instanceId must be a non-empty string",
         });
         expect(mockResolve).not.toHaveBeenCalled();
@@ -991,12 +1007,13 @@ describe("Watch History Controller", () => {
       mockPrisma.watchHistory.create.mockResolvedValue(record);
       mockPrisma.watchHistory.update.mockResolvedValue(record);
 
+      const res = resFor(pingWatchHistory);
       await pingWatchHistory(
-        authReq({
+        reqFor(pingWatchHistory, {
           body: { sceneId: "scene-1", currentTime: 1 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       expect(mockResolve).toHaveBeenCalledWith(
@@ -1049,18 +1066,19 @@ describe("Watch History Controller", () => {
       mockPrisma.watchHistory.update.mockResolvedValue(record);
 
       // A scene id no other test pings, so the session starts clean
+      const res = resFor(pingWatchHistory);
       const ping = () =>
         pingWatchHistory(
           {
             body: { sceneId: "session-guard", currentTime: 400 },
             user: { id: 1 },
           } as never,
-          mockResponse as Response
+          res
         );
       await Promise.all([ping(), ping()]);
 
-      expect(responseStatus).not.toHaveBeenCalled();
-      expect(responseJson).toHaveBeenCalledTimes(2);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledTimes(2);
       expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
       expect(userStatsService.updateStatsForScene).toHaveBeenCalledWith(
         1,
@@ -1099,12 +1117,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(saveActivity);
       await saveActivity(
-        authReq({
+        reqFor(saveActivity, {
           body: { sceneId: "123", resumeTime: 60, playDuration: 10 },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       // Verify upsert was called instead of findUnique + create/update
@@ -1135,12 +1154,13 @@ describe("Watch History Controller", () => {
         })
       );
 
+      const res = resFor(incrementPlayCount);
       await incrementPlayCount(
-        authReq({
+        reqFor(incrementPlayCount, {
           body: { sceneId: "123" },
           user: testUser({ id: 1 }),
         }),
-        mockResponse as Response
+        res
       );
 
       // The play history append needs the row read in the same transaction,

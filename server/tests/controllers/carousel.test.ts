@@ -22,9 +22,11 @@ import {
   updateCarousel,
 } from "../../controllers/carousel.js";
 import { addStreamabilityInfo } from "../../controllers/library/scenes.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import type { PeekSceneFilter } from "../../types/peekFilters.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { userRow } from "../helpers/fixtures.js";
 import { createMockScene } from "../helpers/mockDataGenerators.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -50,7 +52,7 @@ vi.mock("../../services/EntityExclusionHelper.js", () => ({
     getExcludedIds: vi.fn().mockResolvedValue(new Set()),
     getExclusionData: vi.fn().mockResolvedValue({ excludedIds: new Set() }),
     isExcluded: vi.fn().mockReturnValue(false),
-    filterExcluded: vi.fn((scenes: any[]) => scenes),
+    filterExcluded: vi.fn((scenes: unknown[]) => scenes),
   },
 }));
 
@@ -63,11 +65,11 @@ vi.mock("../../services/SceneQueryBuilder.js", () => ({
 
 // Mock library/scenes helpers
 vi.mock("../../controllers/library/scenes.js", () => ({
-  mergeScenesWithUserData: vi.fn((scenes: any[]) => scenes),
-  applyQuickSceneFilters: vi.fn((scenes: any[]) => scenes),
-  applyExpensiveSceneFilters: vi.fn((scenes: any[]) => scenes),
-  sortScenes: vi.fn((scenes: any[]) => scenes),
-  addStreamabilityInfo: vi.fn((scenes: any[]) => scenes),
+  mergeScenesWithUserData: vi.fn((scenes: unknown[]) => scenes),
+  applyQuickSceneFilters: vi.fn((scenes: unknown[]) => scenes),
+  applyExpensiveSceneFilters: vi.fn((scenes: unknown[]) => scenes),
+  sortScenes: vi.fn((scenes: unknown[]) => scenes),
+  addStreamabilityInfo: vi.fn((scenes: unknown[]) => scenes),
 }));
 
 // Mock logger
@@ -80,6 +82,11 @@ const mockQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockAddStreamability = vi.mocked(addStreamabilityInfo);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
+
+/** A carousel's rules: the scene filter the client saves with it */
+const RULES: PeekSceneFilter = {
+  rating100: { value: 80, modifier: CriterionModifier.GreaterThan },
+};
 
 /** Sample carousel record from the database */
 const SAMPLE_CAROUSEL: UserCarousel = {
@@ -113,8 +120,8 @@ describe("Carousel Controller", () => {
 
   describe("getUserCarousels", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq();
-      const res = mockRes();
+      const req = reqFor(getUserCarousels);
+      const res = resFor(getUserCarousels);
       await getUserCarousels(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -126,8 +133,8 @@ describe("Carousel Controller", () => {
       ];
       mockPrisma.userCarousel.findMany.mockResolvedValue(carousels);
 
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getUserCarousels, { user: USER });
+      const res = resFor(getUserCarousels);
       await getUserCarousels(req, res);
 
       expect(mockPrisma.userCarousel.findMany).toHaveBeenCalledWith(
@@ -135,15 +142,15 @@ describe("Carousel Controller", () => {
           where: { userId: 1 },
         })
       );
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(Array.isArray(body.carousels || body)).toBe(true);
     });
 
     it("returns 500 on unexpected error", async () => {
       mockPrisma.userCarousel.findMany.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getUserCarousels, { user: USER });
+      const res = resFor(getUserCarousels);
       await getUserCarousels(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -156,8 +163,8 @@ describe("Carousel Controller", () => {
 
   describe("getCarousel", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({}, { id: "1" });
-      const res = mockRes();
+      const req = reqFor(getCarousel, { params: { id: "1" } });
+      const res = resFor(getCarousel);
       await getCarousel(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -165,8 +172,8 @@ describe("Carousel Controller", () => {
     it("returns 404 when carousel is not found", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "999" }, USER);
-      const res = mockRes();
+      const req = reqFor(getCarousel, { params: { id: "999" }, user: USER });
+      const res = resFor(getCarousel);
       await getCarousel(req, res);
 
       expect(res._getStatus()).toBe(404);
@@ -175,12 +182,12 @@ describe("Carousel Controller", () => {
     it("returns carousel on success", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getCarousel, { params: { id: "1" }, user: USER });
+      const res = resFor(getCarousel);
       await getCarousel(req, res);
 
-      const body = res._getBody();
-      expect(body.id || body.carousel?.id).toBeDefined();
+      const body = res._getOkBody();
+      expect(body.carousel.id).toBe(SAMPLE_CAROUSEL.id);
     });
 
     it("returns 500 on unexpected error", async () => {
@@ -188,8 +195,8 @@ describe("Carousel Controller", () => {
         new Error("DB error")
       );
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getCarousel, { params: { id: "1" }, user: USER });
+      const res = resFor(getCarousel);
       await getCarousel(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -202,52 +209,58 @@ describe("Carousel Controller", () => {
 
   describe("createCarousel", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ title: "New", rules: [{ field: "rating" }] });
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: { title: "New", rules: RULES },
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 when title is empty", async () => {
-      const req = mockReq(
-        { title: "", rules: [{ field: "rating" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: { title: "", rules: RULES },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Title is required/i);
+      expect(res._getErrorBody().error).toMatch(/Title is required/i);
     });
 
     it("returns 400 when title is missing", async () => {
-      const req = mockReq({ rules: [{ field: "rating" }] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: malformed({ rules: RULES }),
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 when rules are missing", async () => {
-      const req = mockReq({ title: "New Carousel" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: malformed({ title: "New Carousel" }),
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Rules are required/i);
+      expect(res._getErrorBody().error).toMatch(/Rules are required/i);
     });
 
     it("returns 400 when user is at maximum carousel limit (15)", async () => {
       mockPrisma.userCarousel.count.mockResolvedValue(15);
 
-      const req = mockReq(
-        { title: "One Too Many", rules: [{ field: "rating" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: { title: "One Too Many", rules: RULES },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
 
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Maximum 15/i);
+      expect(res._getErrorBody().error).toMatch(/Maximum 15/i);
     });
 
     it("creates carousel with defaults on happy path", async () => {
@@ -268,15 +281,14 @@ describe("Carousel Controller", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq(
-        {
+      const req = reqFor(createCarousel, {
+        body: {
           title: "New Carousel",
-          rules: [{ field: "rating", operator: "gte", value: 50 }],
+          rules: RULES,
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
 
       expect(res._getStatus()).toBe(201);
@@ -306,12 +318,14 @@ describe("Carousel Controller", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq(
-        { title: "Defaults Test", rules: [{ field: "tag", value: "action" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: {
+          title: "Defaults Test",
+          rules: RULES,
+        },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
 
       expect(mockPrisma.userCarousel.create).toHaveBeenCalledWith(
@@ -342,12 +356,11 @@ describe("Carousel Controller", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq(
-        { title: "Prefs Test", rules: [{ field: "rating" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: { title: "Prefs Test", rules: RULES },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -365,12 +378,11 @@ describe("Carousel Controller", () => {
     it("returns 500 on unexpected error", async () => {
       mockPrisma.userCarousel.count.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq(
-        { title: "Error Test", rules: [{ field: "rating" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(createCarousel, {
+        body: { title: "Error Test", rules: RULES },
+        user: USER,
+      });
+      const res = resFor(createCarousel);
       await createCarousel(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -383,8 +395,11 @@ describe("Carousel Controller", () => {
 
   describe("updateCarousel", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ title: "Updated" }, { id: "1" });
-      const res = mockRes();
+      const req = reqFor(updateCarousel, {
+        body: { title: "Updated" },
+        params: { id: "1" },
+      });
+      const res = resFor(updateCarousel);
       await updateCarousel(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -392,8 +407,12 @@ describe("Carousel Controller", () => {
     it("returns 404 when carousel is not found", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({ title: "Updated" }, { id: "999" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateCarousel, {
+        body: { title: "Updated" },
+        params: { id: "999" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
       await updateCarousel(req, res);
 
       expect(res._getStatus()).toBe(404);
@@ -402,12 +421,16 @@ describe("Carousel Controller", () => {
     it("returns 400 when title is set to empty string", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
 
-      const req = mockReq({ title: "" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateCarousel, {
+        body: { title: "" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
       await updateCarousel(req, res);
 
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Title/i);
+      expect(res._getErrorBody().error).toMatch(/Title/i);
     });
 
     it("allows partial update (only title)", async () => {
@@ -417,13 +440,17 @@ describe("Carousel Controller", () => {
         title: "Updated Title",
       });
 
-      const req = mockReq({ title: "Updated Title" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateCarousel, {
+        body: { title: "Updated Title" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
       await updateCarousel(req, res);
 
       expect(mockPrisma.userCarousel.update).toHaveBeenCalled();
-      const body = res._getBody();
-      expect(body.title || body.carousel?.title).toBe("Updated Title");
+      const body = res._getOkBody();
+      expect(body.carousel.title).toBe("Updated Title");
     });
 
     it("returns 500 on unexpected error", async () => {
@@ -431,8 +458,12 @@ describe("Carousel Controller", () => {
         new Error("DB error")
       );
 
-      const req = mockReq({ title: "Updated" }, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateCarousel, {
+        body: { title: "Updated" },
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(updateCarousel);
       await updateCarousel(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -445,8 +476,8 @@ describe("Carousel Controller", () => {
 
   describe("deleteCarousel", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({}, { id: "1" });
-      const res = mockRes();
+      const req = reqFor(deleteCarousel, { params: { id: "1" } });
+      const res = resFor(deleteCarousel);
       await deleteCarousel(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -454,8 +485,8 @@ describe("Carousel Controller", () => {
     it("returns 404 when carousel is not found", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "999" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteCarousel, { params: { id: "999" }, user: USER });
+      const res = resFor(deleteCarousel);
       await deleteCarousel(req, res);
 
       expect(res._getStatus()).toBe(404);
@@ -465,12 +496,12 @@ describe("Carousel Controller", () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockPrisma.userCarousel.delete.mockResolvedValue(SAMPLE_CAROUSEL);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteCarousel, { params: { id: "1" }, user: USER });
+      const res = resFor(deleteCarousel);
       await deleteCarousel(req, res);
 
       expect(mockPrisma.userCarousel.delete).toHaveBeenCalled();
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("returns 500 on unexpected error", async () => {
@@ -478,8 +509,8 @@ describe("Carousel Controller", () => {
         new Error("DB error")
       );
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteCarousel, { params: { id: "1" }, user: USER });
+      const res = resFor(deleteCarousel);
       await deleteCarousel(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -492,15 +523,17 @@ describe("Carousel Controller", () => {
 
   describe("previewCarousel", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ rules: [{ field: "rating" }] });
-      const res = mockRes();
+      const req = reqFor(previewCarousel, {
+        body: { rules: RULES },
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 when rules are missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(previewCarousel, { user: USER });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -513,31 +546,29 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(scenes);
 
-      const req = mockReq(
-        {
-          rules: [{ field: "rating", operator: "gte", value: 80 }],
+      const req = reqFor(previewCarousel, {
+        body: {
+          rules: RULES,
           sort: "rating",
           direction: "DESC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.scenes || body).toBeDefined();
     });
 
     it("returns 500 on unexpected error", async () => {
       mockQueryBuilder.execute.mockRejectedValue(new Error("Query failed"));
 
-      const req = mockReq(
-        { rules: [{ field: "rating" }], sort: "rating" },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(previewCarousel, {
+        body: { rules: RULES, sort: "rating" },
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -550,8 +581,8 @@ describe("Carousel Controller", () => {
 
   describe("executeCarouselById", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({}, { id: "1" });
-      const res = mockRes();
+      const req = reqFor(executeCarouselById, { params: { id: "1" } });
+      const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -559,8 +590,11 @@ describe("Carousel Controller", () => {
     it("returns 404 when carousel is not found", async () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, { id: "999" }, USER);
-      const res = mockRes();
+      const req = reqFor(executeCarouselById, {
+        params: { id: "999" },
+        user: USER,
+      });
+      const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
 
       expect(res._getStatus()).toBe(404);
@@ -575,11 +609,14 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(scenes);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(executeCarouselById, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.scenes || body.carousel).toBeDefined();
     });
 
@@ -587,8 +624,11 @@ describe("Carousel Controller", () => {
       mockPrisma.userCarousel.findFirst.mockResolvedValue(SAMPLE_CAROUSEL);
       mockQueryBuilder.execute.mockRejectedValue(new Error("Execution failed"));
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(executeCarouselById, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -608,16 +648,15 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(scenes);
 
-      const req = mockReq(
-        {
-          rules: [{ field: "rating", operator: "gte", value: 70 }],
+      const req = reqFor(previewCarousel, {
+        body: {
+          rules: RULES,
           sort: "rating",
           direction: "DESC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
@@ -632,15 +671,14 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(streamableScenes);
 
-      const req = mockReq(
-        {
-          rules: [{ field: "tag", value: "action" }],
+      const req = reqFor(previewCarousel, {
+        body: {
+          rules: RULES,
           sort: "random",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
       // The viewer decides whether scenes carry the admin-only stashUrl
@@ -656,8 +694,11 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(scenes);
 
-      const req = mockReq({}, { id: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(executeCarouselById, {
+        params: { id: "1" },
+        user: USER,
+      });
+      const res = resFor(executeCarouselById);
       await executeCarouselById(req, res);
 
       expect(mockAddStreamability).toHaveBeenCalledWith(scenes, USER);
@@ -671,16 +712,15 @@ describe("Carousel Controller", () => {
       });
       mockAddStreamability.mockReturnValue(scenes);
 
-      const req = mockReq(
-        {
-          rules: [{ field: "rating", operator: "gte", value: 0 }],
+      const req = reqFor(previewCarousel, {
+        body: {
+          rules: RULES,
           sort: "title",
           direction: "ASC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(previewCarousel);
       await previewCarousel(req, res);
 
       expect(mockQueryBuilder.execute).toHaveBeenCalledWith(

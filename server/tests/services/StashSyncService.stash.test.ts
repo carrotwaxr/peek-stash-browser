@@ -12,6 +12,7 @@ import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // Import after mocking
 import { StashClient } from "../../graphql/StashClient.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import { must } from "../helpers/must.js";
 
 // Load environment variables from project root
@@ -272,10 +273,10 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 10 },
         scene_filter: {
           updated_at: {
-            modifier: "GREATER_THAN",
+            modifier: CriterionModifier.GreaterThan,
             value: oneYearAgo.toISOString(),
           },
-        } as any,
+        },
       });
 
       // The query should succeed - we just verify it doesn't throw
@@ -291,10 +292,10 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
         filter: { page: 1, per_page: 10 },
         performer_filter: {
           updated_at: {
-            modifier: "GREATER_THAN",
+            modifier: CriterionModifier.GreaterThan,
             value: oneYearAgo.toISOString(),
           },
-        } as any,
+        },
       });
 
       expect(result.findPerformers).toBeDefined();

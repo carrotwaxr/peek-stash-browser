@@ -16,7 +16,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted before imports. Interactive transactions run their
@@ -75,12 +75,11 @@ describe("Image View History Controller", () => {
           })
         );
         mockResolve.mockResolvedValueOnce(null);
-        const req = mockReq(
-          { imageId: "img-1", instanceId: "inst-b" },
-          {},
-          USER
-        );
-        const res = mockRes();
+        const req = reqFor(handler, {
+          body: { imageId: "img-1", instanceId: "inst-b" },
+          user: USER,
+        });
+        const res = resFor(handler);
         await handler(req, res);
 
         expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", "inst-b");
@@ -95,8 +94,11 @@ describe("Image View History Controller", () => {
       "%s returns 400 when instanceId is not a non-empty string",
       async (_name, handler) => {
         for (const instanceId of [5, ""]) {
-          const req = mockReq({ imageId: "img-1", instanceId }, {}, USER);
-          const res = mockRes();
+          const req = reqFor(handler, {
+            body: malformed({ imageId: "img-1", instanceId }),
+            user: USER,
+          });
+          const res = resFor(handler);
           await handler(req, res);
 
           expect(res._getStatus()).toBe(400);
@@ -115,16 +117,18 @@ describe("Image View History Controller", () => {
 
   describe("incrementImageOCounter", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ imageId: "img-1" });
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
       expect(res._getStatus()).toBe(401);
       expect(res._getBody()).toEqual({ error: "User not found" });
     });
 
     it("returns 400 when imageId is missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, { user: USER });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getBody()).toEqual({
@@ -134,8 +138,11 @@ describe("Image View History Controller", () => {
 
     it("returns 401 when user is not found in database", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -160,8 +167,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(mockPrisma.imageViewHistory.create).toHaveBeenCalledWith(
@@ -175,7 +185,7 @@ describe("Image View History Controller", () => {
           }),
         })
       );
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.oCount).toBe(1);
       expect(body.timestamp).toBeDefined();
@@ -207,8 +217,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
@@ -222,7 +235,7 @@ describe("Image View History Controller", () => {
           oHistory: [...existingHistory, expect.any(String)],
         },
       });
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.oCount).toBe(4);
     });
@@ -243,12 +256,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq(
-        { imageId: "img-1", instanceId: "custom-instance" },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1", instanceId: "custom-instance" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(
@@ -284,8 +296,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(mockResolve).toHaveBeenCalledWith(1, "image", "img-1", undefined);
@@ -309,12 +324,15 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(logger.warn).toHaveBeenCalled();
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("handles oHistory stored as JSON string", async () => {
@@ -342,8 +360,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       // Read through readHistory, written back as an array
@@ -358,7 +379,7 @@ describe("Image View History Controller", () => {
           }),
         })
       );
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("returns 500 on unexpected error", async () => {
@@ -366,8 +387,11 @@ describe("Image View History Controller", () => {
         new Error("DB connection lost")
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(incrementImageOCounter, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(incrementImageOCounter);
       await incrementImageOCounter(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -380,16 +404,16 @@ describe("Image View History Controller", () => {
 
   describe("recordImageView", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({ imageId: "img-1" });
-      const res = mockRes();
+      const req = reqFor(recordImageView, { body: { imageId: "img-1" } });
+      const res = resFor(recordImageView);
       await recordImageView(req, res);
       expect(res._getStatus()).toBe(401);
       expect(res._getBody()).toEqual({ error: "User not found" });
     });
 
     it("returns 400 when imageId is missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(recordImageView, { user: USER });
+      const res = resFor(recordImageView);
       await recordImageView(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getBody()).toEqual({
@@ -412,8 +436,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(recordImageView, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(recordImageView);
       await recordImageView(req, res);
 
       expect(mockPrisma.imageViewHistory.create).toHaveBeenCalledWith(
@@ -426,7 +453,7 @@ describe("Image View History Controller", () => {
           }),
         })
       );
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.viewCount).toBe(1);
       expect(body.lastViewedAt).toBeDefined();
@@ -453,8 +480,11 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(recordImageView, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(recordImageView);
       await recordImageView(req, res);
 
       expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith({
@@ -465,7 +495,7 @@ describe("Image View History Controller", () => {
           lastViewedAt: expect.any(Date),
         },
       });
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.viewCount).toBe(6);
     });
@@ -475,8 +505,11 @@ describe("Image View History Controller", () => {
         new Error("Query failed")
       );
 
-      const req = mockReq({ imageId: "img-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(recordImageView, {
+        body: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(recordImageView);
       await recordImageView(req, res);
 
       expect(res._getStatus()).toBe(500);
@@ -489,16 +522,16 @@ describe("Image View History Controller", () => {
 
   describe("getImageViewHistory", () => {
     it("returns 401 when user is not authenticated", async () => {
-      const req = mockReq({}, { imageId: "img-1" });
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, { params: { imageId: "img-1" } });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
       expect(res._getStatus()).toBe(401);
       expect(res._getBody()).toEqual({ error: "User not authenticated" });
     });
 
     it("returns 400 when imageId is missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, { user: USER });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
       expect(res._getStatus()).toBe(400);
       expect(res._getBody()).toEqual({
@@ -509,8 +542,11 @@ describe("Image View History Controller", () => {
     it("returns exists:false when no history found", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
 
-      const req = mockReq({}, { imageId: "img-1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
       expect(res._getBody()).toEqual({
@@ -540,11 +576,14 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({}, { imageId: "img-1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.exists).toBe(true);
       expect(body.viewCount).toBe(10);
       expect(body.oCount).toBe(3);
@@ -568,11 +607,14 @@ describe("Image View History Controller", () => {
         })
       );
 
-      const req = mockReq({}, { imageId: "img-1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.exists).toBe(true);
       expect(Array.isArray(body.viewHistory)).toBe(true);
       expect(body.viewHistory).toHaveLength(2);
@@ -583,10 +625,14 @@ describe("Image View History Controller", () => {
     it("uses instanceId from query param when provided", async () => {
       mockPrisma.imageViewHistory.findUnique.mockResolvedValue(null);
 
-      const req = mockReq({}, { imageId: "img-1" }, USER, {
-        instanceId: "query-instance",
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+        query: {
+          instanceId: "query-instance",
+        },
       });
-      const res = mockRes();
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
       expect(mockGetEntityInstanceId).not.toHaveBeenCalled();
@@ -606,8 +652,11 @@ describe("Image View History Controller", () => {
         new Error("DB timeout")
       );
 
-      const req = mockReq({}, { imageId: "img-1" }, USER);
-      const res = mockRes();
+      const req = reqFor(getImageViewHistory, {
+        params: { imageId: "img-1" },
+        user: USER,
+      });
+      const res = resFor(getImageViewHistory);
       await getImageViewHistory(req, res);
 
       expect(res._getStatus()).toBe(500);

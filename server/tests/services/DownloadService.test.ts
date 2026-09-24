@@ -460,19 +460,19 @@ describe("DownloadService", () => {
   describe("sanitizeFileName", () => {
     it("should remove invalid characters from filename", () => {
       // Access private method via any cast for testing
-      const result = (service as any).sanitizeFileName("Test/File:Name*.mp4");
+      const result = service["sanitizeFileName"]("Test/File:Name*.mp4");
 
       expect(result).toBe("Test_File_Name_.mp4");
     });
 
     it("should handle empty string", () => {
-      const result = (service as any).sanitizeFileName("");
+      const result = service["sanitizeFileName"]("");
 
       expect(result).toBe("download");
     });
 
     it("should trim whitespace", () => {
-      const result = (service as any).sanitizeFileName("  Test File  ");
+      const result = service["sanitizeFileName"]("  Test File  ");
 
       expect(result).toBe("Test File");
     });

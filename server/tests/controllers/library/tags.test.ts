@@ -5,7 +5,7 @@
  * and findTagsForScenes.
  */
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyTagFilters,
   findTags,
@@ -20,7 +20,7 @@ import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { tagQueryBuilder } from "../../../services/TagQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockTag } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 import { partialRow } from "../../helpers/prismaMock.js";
@@ -98,8 +98,8 @@ const mockStashEntityService = vi.mocked(stashEntityService);
 const mockTagQueryBuilder = vi.mocked(tagQueryBuilder);
 const mockUserStatsService = vi.mocked(userStatsService);
 
-const defaultUser = { id: 1, role: "USER" };
-const adminUser = { id: 1, role: "ADMIN" };
+const defaultUser = testUser();
+const adminUser = testUser({ role: "ADMIN" });
 
 describe("Tags Controller", () => {
   beforeEach(() => {
@@ -402,13 +402,16 @@ describe("Tags Controller", () => {
       const tags = [createMockTag({ id: "t1", name: "TestTag" })];
       mockTagQueryBuilder.execute.mockResolvedValue({ tags, total: 1 });
 
-      const req = mockReq({ filter: {}, tag_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { filter: {}, tag_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.findTags.count).toBe(1);
       expect(body.findTags.tags).toHaveLength(1);
     });
@@ -419,12 +422,16 @@ describe("Tags Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, tag_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { filter: {}, tag_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
-      expect(res._getBody().findTags.tags[0].stashUrl).toBe(
+      expect(must(res._getOkBody().findTags.tags[0])).toHaveProperty(
+        "stashUrl",
         "http://stash/tags/t1"
       );
     });
@@ -435,14 +442,17 @@ describe("Tags Controller", () => {
         total: 2,
       });
 
-      const req = mockReq({ filter: {}, tag_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { filter: {}, tag_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
-      const tags = res._getBody().findTags.tags;
+      const tags = res._getOkBody().findTags.tags;
       expect(tags).toHaveLength(2);
-      for (const tag of tags) expect(tag.stashUrl).toBeNull();
+      for (const tag of tags) expect(tag).toHaveProperty("stashUrl", null);
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
@@ -452,17 +462,17 @@ describe("Tags Controller", () => {
       ];
       mockTagQueryBuilder.execute.mockResolvedValue({ tags, total: 2 });
 
-      const req = mockReq(
-        { ids: ["t1"], filter: {}, tag_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { ids: ["t1"], filter: {}, tag_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
       expect(res._getStatus()).toBe(400);
       const body = res._getBody();
+      assert("matches" in body, "expected an ambiguous-lookup body");
       expect(body.error).toBe("Ambiguous lookup");
       expect(body.matches).toHaveLength(2);
     });
@@ -470,13 +480,13 @@ describe("Tags Controller", () => {
     it("returns 500 when query builder throws", async () => {
       mockTagQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTags, { body: { filter: {} }, user: defaultUser });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find tags");
+      expect(res._getErrorBody().error).toBe("Failed to find tags");
     });
 
     it("fetches detail counts for single-ID lookup", async () => {
@@ -497,12 +507,11 @@ describe("Tags Controller", () => {
       });
       mockStashEntityService.getAllTags.mockResolvedValue([tag]);
 
-      const req = mockReq(
-        { ids: ["t1"], filter: {}, tag_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { ids: ["t1"], filter: {}, tag_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
@@ -516,8 +525,11 @@ describe("Tags Controller", () => {
     it("does not skip exclusions when fetching by ids", async () => {
       mockTagQueryBuilder.execute.mockResolvedValue({ tags: [], total: 0 });
 
-      const req = mockReq({ ids: ["t1"], tag_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTags, {
+        body: { ids: ["t1"], tag_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTags);
 
       await findTags(req, res);
 
@@ -537,13 +549,16 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().tags).toHaveLength(2);
+      expect(res._getOkBody().tags).toHaveLength(2);
     });
 
     it("applies search query filtering", async () => {
@@ -553,12 +568,15 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq({ filter: { q: "act" } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: { q: "act" } },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      expect(res._getBody().tags).toHaveLength(1);
+      expect(res._getOkBody().tags).toHaveLength(1);
     });
 
     it("applies sorting by specified field", async () => {
@@ -568,18 +586,17 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq(
-        { filter: { sort: "name", direction: "ASC" } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: { sort: "name", direction: "ASC" } },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      const result = res._getBody().tags;
-      expect(result[0].name).toBe("Alpha");
-      expect(result[1].name).toBe("Zebra");
+      const result = res._getOkBody().tags;
+      expect(must(result[0]).name).toBe("Alpha");
+      expect(must(result[1]).name).toBe("Zebra");
     });
 
     it("respects per_page pagination", async () => {
@@ -590,12 +607,15 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq({ filter: { per_page: 2 } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: { per_page: 2 } },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      expect(res._getBody().tags).toHaveLength(2);
+      expect(res._getOkBody().tags).toHaveLength(2);
     });
 
     it("applies count_filter with min_scene_count", async () => {
@@ -605,16 +625,15 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(tags);
 
-      const req = mockReq(
-        { filter: {}, count_filter: { min_scene_count: 5 } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: {}, count_filter: { min_scene_count: 5 } },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
-      expect(res._getBody().tags).toHaveLength(1);
+      expect(res._getOkBody().tags).toHaveLength(1);
     });
 
     it("returns 500 on error", async () => {
@@ -622,8 +641,11 @@ describe("Tags Controller", () => {
         new Error("cache failure")
       );
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsMinimal);
 
       await findTagsMinimal(req, res);
 
@@ -645,37 +667,40 @@ describe("Tags Controller", () => {
       ];
       mockStashEntityService.getAllTags.mockResolvedValue(allTags);
 
-      const req = mockReq({ performerId: "p1" }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsForScenes, {
+        body: { performerId: "p1" },
+        user: defaultUser,
+      });
+      const res = resFor(findTagsForScenes);
 
       await findTagsForScenes(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().tags.length).toBeGreaterThanOrEqual(2);
+      expect(res._getOkBody().tags.length).toBeGreaterThanOrEqual(2);
     });
 
     it("returns empty tags when no scene tags found", async () => {
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
 
-      const req = mockReq({}, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsForScenes, { user: defaultUser });
+      const res = resFor(findTagsForScenes);
 
       await findTagsForScenes(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().tags).toEqual([]);
+      expect(res._getOkBody().tags).toEqual([]);
     });
 
     it("returns 500 on error", async () => {
       mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error("SQL error"));
 
-      const req = mockReq({}, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findTagsForScenes, { user: defaultUser });
+      const res = resFor(findTagsForScenes);
 
       await findTagsForScenes(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find tags for scenes");
+      expect(res._getErrorBody().error).toBe("Failed to find tags for scenes");
     });
   });
 });

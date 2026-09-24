@@ -53,7 +53,7 @@ import {
   generateRecoveryKey,
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import {
   type MembershipWithGroup,
   userPermissions,
@@ -188,16 +188,16 @@ describe("User Controller — Features", () => {
 
   describe("getFilterPresets", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(getFilterPresets, { user: malformed({}) });
+      const res = resFor(getFilterPresets);
       await getFilterPresets(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 404 when user not found", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getFilterPresets, { user: USER });
+      const res = resFor(getFilterPresets);
       await getFilterPresets(req, res);
       expect(res._getStatus()).toBe(404);
     });
@@ -208,10 +208,10 @@ describe("User Controller — Features", () => {
           filterPresets: null,
         })
       );
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getFilterPresets, { user: USER });
+      const res = resFor(getFilterPresets);
       await getFilterPresets(req, res);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.presets).toEqual({
         scene: [],
         performer: [],
@@ -227,50 +227,52 @@ describe("User Controller — Features", () => {
           filterPresets: presets,
         })
       );
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getFilterPresets, { user: USER });
+      const res = resFor(getFilterPresets);
       await getFilterPresets(req, res);
-      expect(res._getBody().presets).toEqual(presets);
+      expect(res._getOkBody().presets).toEqual(presets);
     });
   });
 
   describe("saveFilterPreset", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(saveFilterPreset, { user: malformed({}) });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 when required fields missing", async () => {
-      const req = mockReq({ artifactType: "scene" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(saveFilterPreset, {
+        body: malformed({ artifactType: "scene" }),
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Missing required/);
+      expect(res._getErrorBody().error).toMatch(/Missing required/);
     });
 
     it("returns 400 for invalid artifact type", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(saveFilterPreset, {
+        body: {
           artifactType: "invalid",
           name: "Test",
           filters: {},
           sort: "title",
           direction: "ASC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Invalid artifact type/);
+      expect(res._getErrorBody().error).toMatch(/Invalid artifact type/);
     });
 
     it("returns 400 for invalid context", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(saveFilterPreset, {
+        body: {
           artifactType: "scene",
           context: "invalid_context",
           name: "Test",
@@ -278,13 +280,12 @@ describe("User Controller — Features", () => {
           sort: "title",
           direction: "ASC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Invalid context/);
+      expect(res._getErrorBody().error).toMatch(/Invalid context/);
     });
 
     it("saves preset with defaults for optional fields", async () => {
@@ -296,20 +297,19 @@ describe("User Controller — Features", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq(
-        {
+      const req = reqFor(saveFilterPreset, {
+        body: {
           artifactType: "scene",
           name: "My Filter",
           filters: { rating: 80 },
           sort: "rating",
           direction: "DESC",
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.preset.name).toBe("My Filter");
       expect(body.preset.viewMode).toBe("grid");
@@ -328,8 +328,8 @@ describe("User Controller — Features", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq(
-        {
+      const req = reqFor(saveFilterPreset, {
+        body: {
           artifactType: "scene",
           context: "scene_performer",
           name: "Fav Filter",
@@ -338,10 +338,9 @@ describe("User Controller — Features", () => {
           direction: "ASC",
           setAsDefault: true,
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(saveFilterPreset);
       await saveFilterPreset(req, res);
 
       // Check that defaultFilterPresets was updated in the prisma call
@@ -356,16 +355,22 @@ describe("User Controller — Features", () => {
 
   describe("deleteFilterPreset", () => {
     it("returns 400 for invalid artifact type", async () => {
-      const req = mockReq({}, { artifactType: "invalid", presetId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteFilterPreset, {
+        params: { artifactType: "invalid", presetId: "1" },
+        user: USER,
+      });
+      const res = resFor(deleteFilterPreset);
       await deleteFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 404 when user not found", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const req = mockReq({}, { artifactType: "scene", presetId: "1" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteFilterPreset, {
+        params: { artifactType: "scene", presetId: "1" },
+        user: USER,
+      });
+      const res = resFor(deleteFilterPreset);
       await deleteFilterPreset(req, res);
       expect(res._getStatus()).toBe(404);
     });
@@ -380,10 +385,13 @@ describe("User Controller — Features", () => {
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
 
-      const req = mockReq({}, { artifactType: "scene", presetId }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteFilterPreset, {
+        params: { artifactType: "scene", presetId },
+        user: USER,
+      });
+      const res = resFor(deleteFilterPreset);
       await deleteFilterPreset(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
 
       const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
       const presets = updateCall?.data.filterPresets as Record<
@@ -401,8 +409,8 @@ describe("User Controller — Features", () => {
 
   describe("getDefaultFilterPresets", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(getDefaultFilterPresets, { user: malformed({}) });
+      const res = resFor(getDefaultFilterPresets);
       await getDefaultFilterPresets(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -413,25 +421,28 @@ describe("User Controller — Features", () => {
           defaultFilterPresets: null,
         })
       );
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getDefaultFilterPresets, { user: USER });
+      const res = resFor(getDefaultFilterPresets);
       await getDefaultFilterPresets(req, res);
-      expect(res._getBody().defaults).toEqual({});
+      expect(res._getOkBody().defaults).toEqual({});
     });
   });
 
   describe("setDefaultFilterPreset", () => {
     it("returns 400 when context missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(setDefaultFilterPreset, { user: USER });
+      const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Missing context/);
+      expect(res._getErrorBody().error).toMatch(/Missing context/);
     });
 
     it("returns 400 for invalid context", async () => {
-      const req = mockReq({ context: "bogus" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(setDefaultFilterPreset, {
+        body: { context: "bogus" },
+        user: USER,
+      });
+      const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -443,15 +454,14 @@ describe("User Controller — Features", () => {
           filterPresets: { scene: [] },
         })
       );
-      const req = mockReq(
-        { context: "scene", presetId: "nonexistent" },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(setDefaultFilterPreset, {
+        body: { context: "scene", presetId: "nonexistent" },
+        user: USER,
+      });
+      const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Preset not found/);
+      expect(res._getErrorBody().error).toMatch(/Preset not found/);
     });
 
     it("clears default when presetId is null", async () => {
@@ -462,10 +472,13 @@ describe("User Controller — Features", () => {
         })
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
-      const req = mockReq({ context: "scene" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(setDefaultFilterPreset, {
+        body: { context: "scene" },
+        user: USER,
+      });
+      const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
 
     it("validates scene grid contexts against scene presets", async () => {
@@ -477,10 +490,13 @@ describe("User Controller — Features", () => {
         })
       );
       mockPrisma.user.update.mockResolvedValue(userRow());
-      const req = mockReq({ context: "scene_performer", presetId }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(setDefaultFilterPreset, {
+        body: { context: "scene_performer", presetId },
+        user: USER,
+      });
+      const res = resFor(setDefaultFilterPreset);
       await setDefaultFilterPreset(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
@@ -488,15 +504,18 @@ describe("User Controller — Features", () => {
 
   describe("getUserRestrictions", () => {
     it("returns 401 when user missing", async () => {
-      const req = { params: { userId: "2" }, user: undefined } as any;
-      const res = mockRes();
+      const req = reqFor(getUserRestrictions, { params: { userId: "2" } });
+      const res = resFor(getUserRestrictions);
       await getUserRestrictions(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({}, { userId: "2" }, USER);
-      const res = mockRes();
+      const req = reqFor(getUserRestrictions, {
+        params: { userId: "2" },
+        user: USER,
+      });
+      const res = resFor(getUserRestrictions);
       await getUserRestrictions(req, res);
       expect(res._getStatus()).toBe(403);
     });
@@ -513,67 +532,78 @@ describe("User Controller — Features", () => {
       mockPrisma.userContentRestriction.findMany.mockResolvedValue(
         restrictions
       );
-      const req = mockReq({}, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(getUserRestrictions, {
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserRestrictions);
       await getUserRestrictions(req, res);
-      expect(res._getBody().restrictions).toEqual(restrictions);
+      expect(res._getOkBody().restrictions).toEqual(restrictions);
     });
   });
 
   describe("updateUserRestrictions", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({ restrictions: [] }, { userId: "2" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserRestrictions, {
+        body: { restrictions: [] },
+        params: { userId: "2" },
+        user: USER,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(403);
     });
 
     it("returns 400 when restrictions not an array", async () => {
-      const req = mockReq({ restrictions: "bad" }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserRestrictions, {
+        body: malformed({ restrictions: "bad" }),
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 for invalid entity type", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(updateUserRestrictions, {
+        body: {
           restrictions: [
             { entityType: "users", mode: "EXCLUDE", entityIds: [] },
           ],
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 for invalid mode", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(updateUserRestrictions, {
+        body: {
           restrictions: [{ entityType: "tags", mode: "BLOCK", entityIds: [] }],
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 when entityIds not an array", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(updateUserRestrictions, {
+        body: {
           restrictions: [
             { entityType: "tags", mode: "EXCLUDE", entityIds: "1,2" },
           ],
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -594,18 +624,18 @@ describe("User Controller — Features", () => {
       mockPrisma.userContentRestriction.findMany.mockResolvedValue([
         partialRow({ id: 1, entityType: "tags", mode: "EXCLUDE" }),
       ]);
-      const req = mockReq(
-        {
+      const req = reqFor(updateUserRestrictions, {
+        body: {
           restrictions: [
             { entityType: "tags", mode: "EXCLUDE", entityIds: ["1", "2"] },
           ],
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserRestrictions);
       await updateUserRestrictions(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.userContentRestriction.deleteMany).toHaveBeenCalledWith(
         {
           where: { userId: 2 },
@@ -615,14 +645,17 @@ describe("User Controller — Features", () => {
         mockPrisma.userContentRestriction.createMany
       ).toHaveBeenCalledTimes(1);
       expect(mockExclusionService.recomputeForUser).toHaveBeenCalledWith(2);
-      expect(res._getBody().restrictions).toHaveLength(1);
+      expect(res._getOkBody().restrictions).toHaveLength(1);
     });
   });
 
   describe("deleteUserRestrictions", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({}, { userId: "2" }, USER);
-      const res = mockRes();
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "2" },
+        user: USER,
+      });
+      const res = resFor(deleteUserRestrictions);
       await deleteUserRestrictions(req, res);
       expect(res._getStatus()).toBe(403);
     });
@@ -631,10 +664,13 @@ describe("User Controller — Features", () => {
       mockPrisma.userContentRestriction.deleteMany.mockResolvedValue({
         count: 3,
       });
-      const req = mockReq({}, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(deleteUserRestrictions, {
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(deleteUserRestrictions);
       await deleteUserRestrictions(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockExclusionService.recomputeForUser).toHaveBeenCalledWith(2);
     });
   });
@@ -643,35 +679,40 @@ describe("User Controller — Features", () => {
 
   describe("hideEntity", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq(
-        { entityType: "scene", entityId: "1" },
-        {},
-        {} as any
-      );
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "scene", entityId: "1" },
+        user: malformed({}),
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 when entityType or entityId missing", async () => {
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, { user: USER });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 for invalid entity type", async () => {
-      const req = mockReq({ entityType: "user", entityId: "1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "user", entityId: "1" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("hides entity successfully", async () => {
-      const req = mockReq({ entityType: "scene", entityId: "42" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "scene", entityId: "42" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       // No instance: visible on some instance, stored for every instance
       expect(mockVisibleIds).toHaveBeenCalledWith(USER.id, "scene", ["42"]);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
@@ -684,8 +725,11 @@ describe("User Controller — Features", () => {
 
     it("returns 404 and writes nothing for an entity the user cannot see", async () => {
       visibleIds();
-      const req = mockReq({ entityType: "tag", entityId: "7" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "tag", entityId: "7" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(404);
       expect(res._getBody()).toEqual({ error: "Not found" });
@@ -694,12 +738,11 @@ describe("User Controller — Features", () => {
 
     it("checks the given instance when the request names one", async () => {
       visibleIds();
-      const req = mockReq(
-        { entityType: "scene", entityId: "42", instanceId: "inst-1" },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "scene", entityId: "42", instanceId: "inst-1" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(mockVisibleKeys).toHaveBeenCalledWith(USER.id, "scene", [
         { id: "42", instanceId: "inst-1" },
@@ -713,11 +756,14 @@ describe("User Controller — Features", () => {
       mockAlreadyHidden.mockResolvedValueOnce([true]);
       // Hidden entities are excluded for their owner, so access says no
       visibleIds();
-      const req = mockReq({ entityType: "scene", entityId: "42" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "scene", entityId: "42" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockAlreadyHidden).toHaveBeenCalledWith(USER.id, [
         { entityType: "scene", entityId: "42", instanceId: "" },
       ]);
@@ -725,20 +771,22 @@ describe("User Controller — Features", () => {
     });
 
     it("returns 400 when entityId is not a numeric Stash id", async () => {
-      const req = mockReq(
-        { entityType: "tag", entityId: "x') OR 1=1 --" },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: { entityType: "tag", entityId: "x') OR 1=1 --" },
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(400);
       expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
     });
 
     it("returns 400 when entityId is not a string", async () => {
-      const req = mockReq({ entityType: "scene", entityId: 42 }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntity, {
+        body: malformed({ entityType: "scene", entityId: 42 }),
+        user: USER,
+      });
+      const res = resFor(hideEntity);
       await hideEntity(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -746,80 +794,78 @@ describe("User Controller — Features", () => {
 
   describe("unhideEntity", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq(
-        {},
-        { entityType: "scene", entityId: "1" },
-        {} as any
-      );
-      const res = mockRes();
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "scene", entityId: "1" },
+        user: malformed({}),
+      });
+      const res = resFor(unhideEntity);
       await unhideEntity(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 for invalid entity type", async () => {
-      const req = mockReq(
-        {},
-        { entityType: "invalid", entityId: "1" },
-        USER,
-        {}
-      );
-      const res = mockRes();
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "invalid", entityId: "1" },
+        user: USER,
+      });
+      const res = resFor(unhideEntity);
       await unhideEntity(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("unhides entity successfully", async () => {
-      const req = mockReq(
-        {},
-        { entityType: "scene", entityId: "42" },
-        USER,
-        {}
-      );
-      const res = mockRes();
+      const req = reqFor(unhideEntity, {
+        params: { entityType: "scene", entityId: "42" },
+        user: USER,
+      });
+      const res = resFor(unhideEntity);
       await unhideEntity(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
   describe("unhideAllEntities", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any, {});
-      const res = mockRes();
+      const req = reqFor(unhideAllEntities, { user: malformed({}) });
+      const res = resFor(unhideAllEntities);
       await unhideAllEntities(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 400 for invalid entity type filter", async () => {
-      const req = mockReq({}, {}, USER, { entityType: "invalid" });
-      const res = mockRes();
+      const req = reqFor(unhideAllEntities, {
+        user: USER,
+        query: { entityType: "invalid" },
+      });
+      const res = resFor(unhideAllEntities);
       await unhideAllEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("unhides all and returns count", async () => {
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(unhideAllEntities, { user: USER });
+      const res = resFor(unhideAllEntities);
       await unhideAllEntities(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().count).toBe(5);
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().count).toBe(5);
     });
   });
 
   describe("getHiddenEntities", () => {
     it("returns hidden entities list", async () => {
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getHiddenEntities, { user: USER });
+      const res = resFor(getHiddenEntities);
       await getHiddenEntities(req, res);
-      expect(res._getBody().hiddenEntities).toEqual([]);
+      expect(res._getOkBody().hiddenEntities).toEqual([]);
     });
   });
 
   describe("getHiddenEntityIds", () => {
     it("returns hidden IDs organized by type", async () => {
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getHiddenEntityIds, { user: USER });
+      const res = resFor(getHiddenEntityIds);
       await getHiddenEntityIds(req, res);
-      const ids = res._getBody().hiddenIds;
+      const ids = res._getOkBody().hiddenIds;
       expect(ids.scenes).toEqual([]);
       expect(ids.performers).toEqual([]);
     });
@@ -827,70 +873,73 @@ describe("User Controller — Features", () => {
 
   describe("hideEntities (bulk)", () => {
     it("returns 400 when entities not an array", async () => {
-      const req = mockReq({ entities: "bad" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntities, {
+        body: malformed({ entities: "bad" }),
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 when entities is empty", async () => {
-      const req = mockReq({ entities: [] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntities, { body: { entities: [] }, user: USER });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 for missing entityType/entityId", async () => {
-      const req = mockReq({ entities: [{ entityType: "scene" }] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntities, {
+        body: malformed({ entities: [{ entityType: "scene" }] }),
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 for invalid entity type in bulk", async () => {
-      const req = mockReq(
-        { entities: [{ entityType: "invalid", entityId: "1" }] },
-        {},
-        USER
-      );
-      const res = mockRes();
+      const req = reqFor(hideEntities, {
+        body: { entities: [{ entityType: "invalid", entityId: "1" }] },
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("hides multiple entities and reports counts", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(hideEntities, {
+        body: {
           entities: [
             { entityType: "scene", entityId: "1" },
             { entityType: "performer", entityId: "2" },
           ],
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().successCount).toBe(2);
-      expect(res._getBody().failCount).toBe(0);
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().successCount).toBe(2);
+      expect(res._getOkBody().failCount).toBe(0);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(2);
     });
 
     it("returns 404 naming the first target not visible, and hides nothing", async () => {
       visibleIds("1", "3");
-      const req = mockReq(
-        {
+      const req = reqFor(hideEntities, {
+        body: {
           entities: [
             { entityType: "scene", entityId: "1" },
             { entityType: "tag", entityId: "2" },
             { entityType: "performer", entityId: "3" },
           ],
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(404);
       expect(res._getBody()).toEqual({ error: "entities[1]: Not found" });
@@ -900,20 +949,19 @@ describe("User Controller — Features", () => {
     it("counts a target already hidden as hidden without writing it again", async () => {
       mockAlreadyHidden.mockResolvedValueOnce([true, false]);
       visibleIds("2");
-      const req = mockReq(
-        {
+      const req = reqFor(hideEntities, {
+        body: {
           entities: [
             { entityType: "scene", entityId: "1" },
             { entityType: "scene", entityId: "2" },
           ],
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
-      expect(res._getBody().successCount).toBe(2);
-      expect(res._getBody().failCount).toBe(0);
+      expect(res._getOkBody().successCount).toBe(2);
+      expect(res._getOkBody().failCount).toBe(0);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(1);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledWith(
         USER.id,
@@ -929,11 +977,11 @@ describe("User Controller — Features", () => {
           ? { entityType: "scene", entityId: String(i), instanceId: "inst-1" }
           : { entityType: "performer", entityId: String(i) }
       );
-      const req = mockReq({ entities }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(hideEntities, { body: { entities }, user: USER });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
 
-      expect(res._getBody().successCount).toBe(200);
+      expect(res._getOkBody().successCount).toBe(200);
       // One read of the user's hides, one visibility query per type and form
       expect(mockAlreadyHidden).toHaveBeenCalledTimes(1);
       expect(mockVisibleKeys).toHaveBeenCalledTimes(1);
@@ -944,17 +992,16 @@ describe("User Controller — Features", () => {
     });
 
     it("returns 400 and hides nothing when any entityId is not a numeric Stash id", async () => {
-      const req = mockReq(
-        {
+      const req = reqFor(hideEntities, {
+        body: {
           entities: [
             { entityType: "scene", entityId: "1" },
             { entityType: "tag", entityId: "1' OR '1'='1" },
           ],
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
       expect(userHiddenEntityService.hideEntity).not.toHaveBeenCalled();
@@ -962,16 +1009,15 @@ describe("User Controller — Features", () => {
 
     it("returns 400 for an unknown instanceId in bulk", async () => {
       vi.mocked(stashInstanceManager.getConfig).mockReturnValueOnce(undefined);
-      const req = mockReq(
-        {
+      const req = reqFor(hideEntities, {
+        body: {
           entities: [
             { entityType: "scene", entityId: "1", instanceId: "nope" },
           ],
         },
-        {},
-        USER
-      );
-      const res = mockRes();
+        user: USER,
+      });
+      const res = resFor(hideEntities);
       await hideEntities(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -979,19 +1025,25 @@ describe("User Controller — Features", () => {
 
   describe("updateHideConfirmation", () => {
     it("returns 400 when value not boolean", async () => {
-      const req = mockReq({ hideConfirmationDisabled: "yes" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateHideConfirmation, {
+        body: malformed({ hideConfirmationDisabled: "yes" }),
+        user: USER,
+      });
+      const res = resFor(updateHideConfirmation);
       await updateHideConfirmation(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("updates preference successfully", async () => {
       mockPrisma.user.update.mockResolvedValue(userRow());
-      const req = mockReq({ hideConfirmationDisabled: true }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateHideConfirmation, {
+        body: { hideConfirmationDisabled: true },
+        user: USER,
+      });
+      const res = resFor(updateHideConfirmation);
       await updateHideConfirmation(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().hideConfirmationDisabled).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().hideConfirmationDisabled).toBe(true);
     });
   });
 
@@ -999,16 +1051,16 @@ describe("User Controller — Features", () => {
 
   describe("getUserPermissions", () => {
     it("returns 401 when user missing", async () => {
-      const req = { user: undefined } as any;
-      const res = mockRes();
+      const req = reqFor(getUserPermissions);
+      const res = resFor(getUserPermissions);
       await getUserPermissions(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 404 when permissions null", async () => {
       mockResolvePermissions.mockResolvedValue(null);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getUserPermissions, { user: USER });
+      const res = resFor(getUserPermissions);
       await getUserPermissions(req, res);
       expect(res._getStatus()).toBe(404);
     });
@@ -1019,24 +1071,30 @@ describe("User Controller — Features", () => {
         canDownloadFiles: false,
       });
       mockResolvePermissions.mockResolvedValue(perms);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getUserPermissions, { user: USER });
+      const res = resFor(getUserPermissions);
       await getUserPermissions(req, res);
-      expect(res._getBody().permissions).toEqual(perms);
+      expect(res._getOkBody().permissions).toEqual(perms);
     });
   });
 
   describe("getAnyUserPermissions", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({}, { userId: "3" }, USER);
-      const res = mockRes();
+      const req = reqFor(getAnyUserPermissions, {
+        params: { userId: "3" },
+        user: USER,
+      });
+      const res = resFor(getAnyUserPermissions);
       await getAnyUserPermissions(req, res);
       expect(res._getStatus()).toBe(403);
     });
 
     it("returns 400 for invalid user ID", async () => {
-      const req = mockReq({}, { userId: "abc" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(getAnyUserPermissions, {
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(getAnyUserPermissions);
       await getAnyUserPermissions(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -1044,39 +1102,57 @@ describe("User Controller — Features", () => {
     it("returns permissions for specified user", async () => {
       const perms = userPermissions({ canShare: false });
       mockResolvePermissions.mockResolvedValue(perms);
-      const req = mockReq({}, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(getAnyUserPermissions, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getAnyUserPermissions);
       await getAnyUserPermissions(req, res);
-      expect(res._getBody().permissions).toEqual(perms);
+      expect(res._getOkBody().permissions).toEqual(perms);
     });
   });
 
   describe("updateUserPermissionOverrides", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({ canShareOverride: true }, { userId: "3" }, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        body: { canShareOverride: true },
+        params: { userId: "3" },
+        user: USER,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
       expect(res._getStatus()).toBe(403);
     });
 
     it("returns 400 for invalid user ID", async () => {
-      const req = mockReq({ canShareOverride: true }, { userId: "abc" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        body: { canShareOverride: true },
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
       expect(res._getStatus()).toBe(400);
     });
 
     it("returns 400 when no valid updates", async () => {
-      const req = mockReq({}, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/No valid updates/);
+      expect(res._getErrorBody().error).toMatch(/No valid updates/);
     });
 
     it("returns 400 for invalid override value", async () => {
-      const req = mockReq({ canShareOverride: "yes" }, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        body: malformed({ canShareOverride: "yes" }),
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -1085,27 +1161,38 @@ describe("User Controller — Features", () => {
       mockPrisma.user.update.mockResolvedValue(userRow());
       const perms = userPermissions({ canShare: true });
       mockResolvePermissions.mockResolvedValue(perms);
-      const req = mockReq({ canShareOverride: true }, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        body: { canShareOverride: true },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().permissions).toEqual(perms);
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().permissions).toEqual(perms);
     });
 
     it("accepts null to clear overrides", async () => {
       mockPrisma.user.update.mockResolvedValue(userRow());
       mockResolvePermissions.mockResolvedValue(userPermissions());
-      const req = mockReq({ canShareOverride: null }, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(updateUserPermissionOverrides, {
+        body: { canShareOverride: null },
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(updateUserPermissionOverrides);
       await updateUserPermissionOverrides(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
   describe("getUserGroupMemberships", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({}, { userId: "3" }, USER);
-      const res = mockRes();
+      const req = reqFor(getUserGroupMemberships, {
+        params: { userId: "3" },
+        user: USER,
+      });
+      const res = resFor(getUserGroupMemberships);
       await getUserGroupMemberships(req, res);
       expect(res._getStatus()).toBe(403);
     });
@@ -1123,11 +1210,14 @@ describe("User Controller — Features", () => {
           }),
         }),
       ]);
-      const req = mockReq({}, { userId: "3" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(getUserGroupMemberships, {
+        params: { userId: "3" },
+        user: ADMIN,
+      });
+      const res = resFor(getUserGroupMemberships);
       await getUserGroupMemberships(req, res);
-      expect(res._getBody().groups).toHaveLength(1);
-      expect(res._getBody().groups[0].name).toBe("Group A");
+      expect(res._getOkBody().groups).toHaveLength(1);
+      expect(res._getOkBody().groups[0]).toHaveProperty("name", "Group A");
     });
   });
 
@@ -1135,8 +1225,8 @@ describe("User Controller — Features", () => {
 
   describe("getUserStashInstances", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(getUserStashInstances, { user: malformed({}) });
+      const res = resFor(getUserStashInstances);
       await getUserStashInstances(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -1149,10 +1239,10 @@ describe("User Controller — Features", () => {
         partialRow({ id: "inst-1", name: "Stash 1", description: null }),
         partialRow({ id: "inst-2", name: "Stash 2", description: null }),
       ]);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getUserStashInstances, { user: USER });
+      const res = resFor(getUserStashInstances);
       await getUserStashInstances(req, res);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.selectedInstanceIds).toEqual(["inst-1"]);
       expect(body.availableInstances).toHaveLength(2);
     });
@@ -1160,8 +1250,11 @@ describe("User Controller — Features", () => {
 
   describe("updateUserStashInstances", () => {
     it("returns 400 when instanceIds not an array", async () => {
-      const req = mockReq({ instanceIds: "inst-1" }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserStashInstances, {
+        body: malformed({ instanceIds: "inst-1" }),
+        user: USER,
+      });
+      const res = resFor(updateUserStashInstances);
       await updateUserStashInstances(req, res);
       expect(res._getStatus()).toBe(400);
     });
@@ -1170,23 +1263,29 @@ describe("User Controller — Features", () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
         partialRow({ id: "inst-1" }),
       ]);
-      const req = mockReq({ instanceIds: ["inst-1", "inst-99"] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserStashInstances, {
+        body: { instanceIds: ["inst-1", "inst-99"] },
+        user: USER,
+      });
+      const res = resFor(updateUserStashInstances);
       await updateUserStashInstances(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Invalid instance IDs");
-      expect(res._getBody().details).toBe("inst-99");
+      expect(res._getErrorBody().error).toBe("Invalid instance IDs");
+      expect(res._getErrorBody().details).toBe("inst-99");
     });
 
     it("clears selections when empty array", async () => {
       mockPrisma.userStashInstance.deleteMany.mockResolvedValue({
         count: 1,
       });
-      const req = mockReq({ instanceIds: [] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserStashInstances, {
+        body: { instanceIds: [] },
+        user: USER,
+      });
+      const res = resFor(updateUserStashInstances);
       await updateUserStashInstances(req, res);
-      expect(res._getBody().success).toBe(true);
-      expect(res._getBody().selectedInstanceIds).toEqual([]);
+      expect(res._getOkBody().success).toBe(true);
+      expect(res._getOkBody().selectedInstanceIds).toEqual([]);
       expect(mockPrisma.userStashInstance.createMany).not.toHaveBeenCalled();
     });
 
@@ -1200,10 +1299,13 @@ describe("User Controller — Features", () => {
       mockPrisma.userStashInstance.createMany.mockResolvedValue({
         count: 1,
       });
-      const req = mockReq({ instanceIds: ["inst-2"] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(updateUserStashInstances, {
+        body: { instanceIds: ["inst-2"] },
+        user: USER,
+      });
+      const res = resFor(updateUserStashInstances);
       await updateUserStashInstances(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(mockPrisma.userStashInstance.createMany).toHaveBeenCalledWith({
         data: [{ userId: 2, instanceId: "inst-2" }],
       });
@@ -1214,16 +1316,16 @@ describe("User Controller — Features", () => {
 
   describe("getSetupStatus", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(getSetupStatus, { user: malformed({}) });
+      const res = resFor(getSetupStatus);
       await getSetupStatus(req, res);
       expect(res._getStatus()).toBe(401);
     });
 
     it("returns 404 when user not found", async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getSetupStatus, { user: USER });
+      const res = resFor(getSetupStatus);
       await getSetupStatus(req, res);
       expect(res._getStatus()).toBe(404);
     });
@@ -1237,10 +1339,10 @@ describe("User Controller — Features", () => {
       mockPrisma.stashInstance.findMany.mockResolvedValue([
         partialRow({ id: "inst-1", name: "Stash 1", description: null }),
       ]);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(getSetupStatus, { user: USER });
+      const res = resFor(getSetupStatus);
       await getSetupStatus(req, res);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.setupCompleted).toBe(false);
       expect(body).not.toHaveProperty("recoveryKey");
       expect(body.instances).toHaveLength(1);
@@ -1250,8 +1352,8 @@ describe("User Controller — Features", () => {
 
   describe("completeSetup", () => {
     it("returns 401 when user has no id", async () => {
-      const req = mockReq({}, {}, {} as any);
-      const res = mockRes();
+      const req = reqFor(completeSetup, { user: malformed({}) });
+      const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(res._getStatus()).toBe(401);
     });
@@ -1262,8 +1364,8 @@ describe("User Controller — Features", () => {
       vi.mocked(generateRecoveryKey).mockReturnValue("RAWKEY");
       vi.mocked(hashRecoveryKey).mockReturnValue("hashed-key");
       vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(completeSetup, { user: USER });
+      const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
         where: { id: 2, setupCompleted: false },
@@ -1280,19 +1382,19 @@ describe("User Controller — Features", () => {
       mockPrisma.stashInstance.count.mockResolvedValue(1);
       mockPrisma.user.updateMany.mockResolvedValue({ count: 0 });
       vi.mocked(formatRecoveryKey).mockReturnValue("RAWK-EY");
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(completeSetup, { user: USER });
+      const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(res._getBody()).toEqual({ success: true, recoveryKey: null });
     });
 
     it("returns 400 for multi-instance with no selections", async () => {
       mockPrisma.stashInstance.count.mockResolvedValue(3);
-      const req = mockReq({}, {}, USER);
-      const res = mockRes();
+      const req = reqFor(completeSetup, { user: USER });
+      const res = resFor(completeSetup);
       await completeSetup(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/At least one/);
+      expect(res._getErrorBody().error).toMatch(/At least one/);
     });
 
     it("completes setup for multi-instance with valid selections", async () => {
@@ -1307,10 +1409,13 @@ describe("User Controller — Features", () => {
         count: 1,
       });
       mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
-      const req = mockReq({ selectedInstanceIds: ["inst-1"] }, {}, USER);
-      const res = mockRes();
+      const req = reqFor(completeSetup, {
+        body: { selectedInstanceIds: ["inst-1"] },
+        user: USER,
+      });
+      const res = resFor(completeSetup);
       await completeSetup(req, res);
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
@@ -1318,15 +1423,21 @@ describe("User Controller — Features", () => {
 
   describe("syncFromStash", () => {
     it("returns 403 when non-admin", async () => {
-      const req = mockReq({}, { userId: "2" }, USER);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: USER,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(403);
     });
 
     it("returns 400 for invalid user ID", async () => {
-      const req = mockReq({}, { userId: "abc" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(400);
     });

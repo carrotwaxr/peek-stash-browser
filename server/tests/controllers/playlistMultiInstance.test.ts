@@ -18,8 +18,9 @@ import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { type PlaylistWithItems } from "../helpers/fixtures.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 type PlaylistWithCountAndItems = Prisma.PlaylistGetPayload<{
@@ -104,7 +105,7 @@ function stubScene(
   instanceId: string,
   title: string
 ): NormalizedScene {
-  return {
+  return partialRow<NormalizedScene>({
     id,
     instanceId,
     title,
@@ -122,8 +123,6 @@ function stubScene(
     o_history: [],
     last_played_at: null,
     last_o_at: null,
-    interactive: false,
-    interactive_speed: null,
     captions: [],
     created_at: "",
     updated_at: "",
@@ -139,14 +138,13 @@ function stubScene(
       screenshot: null,
       preview: null,
       stream: null,
-      funscript: null,
       sprite: null,
       vtt: null,
       chapters_vtt: null,
+      caption: null,
     },
     sceneStreams: [],
-    stash_ids: [],
-  } as unknown as NormalizedScene;
+  });
 }
 
 describe("Playlist multi-instance scene map (#393)", () => {
@@ -204,15 +202,15 @@ describe("Playlist multi-instance scene map (#393)", () => {
       .mockResolvedValueOnce([sceneA]) // inst-A batch
       .mockResolvedValueOnce([sceneB]); // inst-B batch
 
-    const req = mockReq({}, {}, USER);
-    const res = mockRes();
-    await getUserPlaylists(req as any, res);
+    const req = reqFor(getUserPlaylists, { user: USER });
+    const res = resFor(getUserPlaylists);
+    await getUserPlaylists(req, res);
 
-    const body = res._getBody();
-    const items = body.playlists[0].items;
+    const body = res._getOkBody();
+    const items = must(must(body.playlists[0]).items);
     expect(items).toHaveLength(2);
-    expect(items[0].scene?.title).toBe("Scene from A");
-    expect(items[1].scene?.title).toBe("Scene from B");
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
+    expect(must(items[1]).scene?.title).toBe("Scene from B");
   });
 
   it("getSharedPlaylists maps scenes by composite key, not bare ID", async () => {
@@ -263,15 +261,15 @@ describe("Playlist multi-instance scene map (#393)", () => {
       .mockResolvedValueOnce([sceneA])
       .mockResolvedValueOnce([sceneB]);
 
-    const req = mockReq({}, {}, USER);
-    const res = mockRes();
-    await getSharedPlaylists(req as any, res);
+    const req = reqFor(getSharedPlaylists, { user: USER });
+    const res = resFor(getSharedPlaylists);
+    await getSharedPlaylists(req, res);
 
-    const body = res._getBody();
-    const items = body.playlists[0].items;
+    const body = res._getOkBody();
+    const items = must(must(body.playlists[0]).items);
     expect(items).toHaveLength(2);
-    expect(items[0].scene?.title).toBe("Scene from A");
-    expect(items[1].scene?.title).toBe("Scene from B");
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
+    expect(must(items[1]).scene?.title).toBe("Scene from B");
   });
 
   it("getPlaylist maps scenes by composite key, not bare ID", async () => {
@@ -315,14 +313,14 @@ describe("Playlist multi-instance scene map (#393)", () => {
       .mockResolvedValueOnce([sceneA])
       .mockResolvedValueOnce([sceneB]);
 
-    const req = mockReq({}, { id: "3" }, USER);
-    const res = mockRes();
-    await getPlaylist(req as any, res);
+    const req = reqFor(getPlaylist, { params: { id: "3" }, user: USER });
+    const res = resFor(getPlaylist);
+    await getPlaylist(req, res);
 
-    const body = res._getBody();
-    const items = body.playlist.items;
+    const body = res._getOkBody();
+    const items = must(body.playlist.items);
     expect(items).toHaveLength(2);
-    expect(items[0].scene?.title).toBe("Scene from A");
-    expect(items[1].scene?.title).toBe("Scene from B");
+    expect(must(items[0]).scene?.title).toBe("Scene from A");
+    expect(must(items[1]).scene?.title).toBe("Scene from B");
   });
 });

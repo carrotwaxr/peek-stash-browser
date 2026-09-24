@@ -13,6 +13,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { must } from "../../tests/helpers/must.js";
+import { untrusted } from "../../tests/helpers/untrusted.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -20,7 +21,12 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const TEST_INSTANCE = "streams-it-instance";
 const SCENE_ID = "9001";
 
-const scene = {
+/** A scene as Stash's compact scene query returns it */
+type SyncScene = Parameters<
+  (typeof stashSyncService)["processScenesBatch"]
+>[0][number];
+
+const scene: SyncScene = {
   id: SCENE_ID,
   title: "Streams IT",
   code: null,
@@ -54,6 +60,8 @@ const scene = {
       size: 1000,
       format: "avi",
       fingerprints: [],
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
     },
   ],
   paths: {
@@ -65,12 +73,13 @@ const scene = {
     caption: null,
   },
   captions: [],
-  // The url field proves a URL is ignored even if Stash sends one.
+  // The url field, which the query does not ask for, proves a URL is ignored
+  // even if Stash sends one.
   sceneStreams: [
-    {
+    untrusted({
       label: "Direct stream",
       url: "http://stash.test/scene/9001/stream?apikey=IT-SECRET",
-    },
+    }),
     { label: "MP4" },
     { label: "MP4 Low (240p)" },
     { label: "WEBM" },
@@ -82,22 +91,8 @@ const scene = {
   ],
 };
 
-type SyncInternals = {
-  processScenesBatch(
-    s: unknown[],
-    i: string,
-    a: number,
-    b: number
-  ): Promise<void>;
-};
-
 async function syncScene(): Promise<void> {
-  await (stashSyncService as unknown as SyncInternals).processScenesBatch(
-    [scene],
-    TEST_INSTANCE,
-    0,
-    1
-  );
+  await stashSyncService["processScenesBatch"]([scene], TEST_INSTANCE, 0, 1);
 }
 
 async function readRow(): Promise<Record<string, unknown>> {

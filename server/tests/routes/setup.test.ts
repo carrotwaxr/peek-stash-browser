@@ -8,8 +8,23 @@
  * and imports the router again for a fresh limiter, along with the mocked
  * prisma and StashClient that router uses.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UserRole } from "@prisma/client";
+import {
+  type MockedObject,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import type { StashClient } from "../../graphql/StashClient.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
+import {
+  type PrismaMock,
+  partialRow,
+  prismaImpl,
+} from "../helpers/prismaMock.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
@@ -51,8 +66,9 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
-const USER = { id: 2, username: "viewer", role: "USER" };
+type TestUser = { id: number; username: string; role: UserRole };
+const ADMIN: TestUser = { id: 1, username: "admin", role: "ADMIN" };
+const USER: TestUser = { id: 2, username: "viewer", role: "USER" };
 const STASH_BODY = { url: "http://stash:9999/graphql", apiKey: "test-key" };
 
 type Json = Record<string, unknown>;
@@ -60,8 +76,8 @@ type Json = Record<string, unknown>;
 describe("setup routes", () => {
   let baseUrl: string;
   let close: () => Promise<void>;
-  let mockPrisma: any;
-  let MockStashClient: any;
+  let mockPrisma: PrismaMock;
+  let MockStashClient: MockedObject<typeof StashClient>;
   let generateToken: (user: typeof ADMIN) => string;
   let verifyToken: (token: string) => { id: number; authTime?: number };
   let CONNECTION_TEST_FAILED: string;
@@ -79,43 +95,55 @@ describe("setup routes", () => {
   const sessionFor = (user: typeof ADMIN) => `token=${generateToken(user)}`;
 
   const stashConnects = () =>
-    MockStashClient.mockImplementation(() => ({
-      configuration: vi
-        .fn()
-        .mockResolvedValue({ configuration: { general: {} } }),
-      version: vi.fn().mockResolvedValue({ version: { version: "0.27.0" } }),
-    }));
+    MockStashClient.mockImplementation(() =>
+      partialRow({
+        configuration: vi
+          .fn()
+          .mockResolvedValue({ configuration: { general: {} } }),
+        version: vi.fn().mockResolvedValue({ version: { version: "0.27.0" } }),
+      })
+    );
 
   const stashFails = (message: string) =>
-    MockStashClient.mockImplementation(() => ({
-      configuration: vi.fn().mockRejectedValue(new Error(message)),
-      version: vi.fn(),
-    }));
+    MockStashClient.mockImplementation(() =>
+      partialRow({
+        configuration: vi.fn().mockRejectedValue(new Error(message)),
+        version: vi.fn(),
+      })
+    );
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
     const { default: setupRoutes } = await import("../../routes/setup.js");
-    ({ default: mockPrisma } = await import("../../prisma/singleton.js"));
-    ({ StashClient: MockStashClient } =
-      await import("../../graphql/StashClient.js"));
+    mockPrisma = vi.mocked(
+      (await import("../../prisma/singleton.js")).default,
+      true
+    );
+    MockStashClient = vi.mocked(
+      (await import("../../graphql/StashClient.js")).StashClient
+    );
     ({ generateToken, verifyToken } = await import("../../middleware/auth.js"));
     ({ CONNECTION_TEST_FAILED } = await import("../../controllers/setup.js"));
 
     mockPrisma.user.count.mockResolvedValue(0);
     mockPrisma.stashInstance.count.mockResolvedValue(0);
     mockPrisma.user.findUnique.mockImplementation(
-      async ({ where }: { where: { id?: number } }) =>
-        [ADMIN, USER].find((u) => u.id === where.id) ?? null
+      prismaImpl(({ where }) => {
+        const user = [ADMIN, USER].find((u) => u.id === where.id);
+        return user ? partialRow(user) : null;
+      })
     );
-    mockPrisma.stashInstance.create.mockResolvedValue({
-      id: "inst-1",
-      name: "Default",
-      url: STASH_BODY.url,
-      uiUrl: null,
-      enabled: true,
-      createdAt: new Date(),
-    });
+    mockPrisma.stashInstance.create.mockResolvedValue(
+      partialRow({
+        id: "inst-1",
+        name: "Default",
+        url: STASH_BODY.url,
+        uiUrl: null,
+        enabled: true,
+        createdAt: new Date(),
+      })
+    );
     stashConnects();
 
     ({ baseUrl, close } = await startTestApp((app) => {
@@ -134,10 +162,12 @@ describe("setup routes", () => {
   });
 
   it("create-admin signs the new admin in", async () => {
-    mockPrisma.user.create.mockResolvedValue({
-      ...ADMIN,
-      createdAt: new Date(),
-    });
+    mockPrisma.user.create.mockResolvedValue(
+      partialRow({
+        ...ADMIN,
+        createdAt: new Date(),
+      })
+    );
 
     const res = await post("/create-admin", {
       username: "admin",

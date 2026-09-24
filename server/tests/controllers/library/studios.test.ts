@@ -19,7 +19,7 @@ import prisma from "../../../prisma/singleton.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockStudio } from "../../helpers/mockDataGenerators.js";
 import { must } from "../../helpers/must.js";
 
@@ -93,8 +93,8 @@ const mockStashEntityService = vi.mocked(stashEntityService);
 const mockStudioQueryBuilder = vi.mocked(studioQueryBuilder);
 const mockUserStatsService = vi.mocked(userStatsService);
 
-const defaultUser = { id: 1, role: "USER" };
-const adminUser = { id: 1, role: "ADMIN" };
+const defaultUser = testUser();
+const adminUser = testUser({ role: "ADMIN" });
 
 describe("Studios Controller", () => {
   beforeEach(() => {
@@ -196,11 +196,11 @@ describe("Studios Controller", () => {
       const studios = [
         createMockStudio({
           id: "s1",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
         createMockStudio({
           id: "s2",
-          tags: [{ id: "t2", name: "B" }] as any,
+          tags: [{ id: "t2", name: "B", image_path: null }],
         }),
       ];
       const result = applyStudioFilters(studios, {
@@ -215,13 +215,13 @@ describe("Studios Controller", () => {
         createMockStudio({
           id: "s1",
           tags: [
-            { id: "t1", name: "A" },
-            { id: "t2", name: "B" },
-          ] as any,
+            { id: "t1", name: "A", image_path: null },
+            { id: "t2", name: "B", image_path: null },
+          ],
         }),
         createMockStudio({
           id: "s2",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
       ];
       const result = applyStudioFilters(studios, {
@@ -235,11 +235,11 @@ describe("Studios Controller", () => {
       const studios = [
         createMockStudio({
           id: "s1",
-          tags: [{ id: "t1", name: "A" }] as any,
+          tags: [{ id: "t1", name: "A", image_path: null }],
         }),
         createMockStudio({
           id: "s2",
-          tags: [{ id: "t2", name: "B" }] as any,
+          tags: [{ id: "t2", name: "B", image_path: null }],
         }),
       ];
       const result = applyStudioFilters(studios, {
@@ -380,13 +380,16 @@ describe("Studios Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, studio_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { filter: {}, studio_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
       expect(res._getStatus()).toBe(200);
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.findStudios.count).toBe(1);
       expect(body.findStudios.studios).toHaveLength(1);
     });
@@ -397,12 +400,16 @@ describe("Studios Controller", () => {
         total: 1,
       });
 
-      const req = mockReq({ filter: {}, studio_filter: {} }, {}, adminUser);
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { filter: {}, studio_filter: {} },
+        user: adminUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
-      expect(res._getBody().findStudios.studios[0].stashUrl).toBe(
+      expect(must(res._getOkBody().findStudios.studios[0])).toHaveProperty(
+        "stashUrl",
         "http://stash/studios/s1"
       );
     });
@@ -416,14 +423,18 @@ describe("Studios Controller", () => {
         total: 2,
       });
 
-      const req = mockReq({ filter: {}, studio_filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { filter: {}, studio_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
-      const studios = res._getBody().findStudios.studios;
+      const studios = res._getOkBody().findStudios.studios;
       expect(studios).toHaveLength(2);
-      for (const studio of studios) expect(studio.stashUrl).toBeNull();
+      for (const studio of studios)
+        expect(studio).toHaveProperty("stashUrl", null);
     });
 
     it("returns 400 for ambiguous single-ID lookup", async () => {
@@ -436,29 +447,31 @@ describe("Studios Controller", () => {
         total: 2,
       });
 
-      const req = mockReq(
-        { ids: ["s1"], filter: {}, studio_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { ids: ["s1"], filter: {}, studio_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toBe("Ambiguous lookup");
+      expect(res._getErrorBody().error).toBe("Ambiguous lookup");
     });
 
     it("returns 500 when query builder throws", async () => {
       mockStudioQueryBuilder.execute.mockRejectedValue(new Error("DB error"));
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
       expect(res._getStatus()).toBe(500);
-      expect(res._getBody().error).toBe("Failed to find studios");
+      expect(res._getErrorBody().error).toBe("Failed to find studios");
     });
 
     it("fetches detail counts for single-ID lookup", async () => {
@@ -477,12 +490,11 @@ describe("Studios Controller", () => {
       });
       mockStashEntityService.getAllStudios.mockResolvedValue([studio]);
 
-      const req = mockReq(
-        { ids: ["s1"], filter: {}, studio_filter: {} },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findStudios, {
+        body: { ids: ["s1"], filter: {}, studio_filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudios);
 
       await findStudios(req, res);
 
@@ -504,13 +516,16 @@ describe("Studios Controller", () => {
       ];
       mockStashEntityService.getAllStudios.mockResolvedValue(studios);
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudiosMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
       expect(res._getStatus()).toBe(200);
-      expect(res._getBody().studios).toHaveLength(2);
+      expect(res._getOkBody().studios).toHaveLength(2);
     });
 
     it("applies search query filtering", async () => {
@@ -520,12 +535,15 @@ describe("Studios Controller", () => {
       ];
       mockStashEntityService.getAllStudios.mockResolvedValue(studios);
 
-      const req = mockReq({ filter: { q: "alpha" } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudiosMinimal, {
+        body: { filter: { q: "alpha" } },
+        user: defaultUser,
+      });
+      const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
-      expect(res._getBody().studios).toHaveLength(1);
+      expect(res._getOkBody().studios).toHaveLength(1);
     });
 
     it("applies count_filter with min_scene_count", async () => {
@@ -535,16 +553,15 @@ describe("Studios Controller", () => {
       ];
       mockStashEntityService.getAllStudios.mockResolvedValue(studios);
 
-      const req = mockReq(
-        { filter: {}, count_filter: { min_scene_count: 10 } },
-        {},
-        defaultUser
-      );
-      const res = mockRes();
+      const req = reqFor(findStudiosMinimal, {
+        body: { filter: {}, count_filter: { min_scene_count: 10 } },
+        user: defaultUser,
+      });
+      const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
-      expect(res._getBody().studios).toHaveLength(1);
+      expect(res._getOkBody().studios).toHaveLength(1);
     });
 
     it("applies pagination via per_page", async () => {
@@ -555,12 +572,15 @@ describe("Studios Controller", () => {
       ];
       mockStashEntityService.getAllStudios.mockResolvedValue(studios);
 
-      const req = mockReq({ filter: { per_page: 2 } }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudiosMinimal, {
+        body: { filter: { per_page: 2 } },
+        user: defaultUser,
+      });
+      const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 
-      expect(res._getBody().studios).toHaveLength(2);
+      expect(res._getOkBody().studios).toHaveLength(2);
     });
 
     it("returns 500 on error", async () => {
@@ -568,8 +588,11 @@ describe("Studios Controller", () => {
         new Error("cache failure")
       );
 
-      const req = mockReq({ filter: {} }, {}, defaultUser);
-      const res = mockRes();
+      const req = reqFor(findStudiosMinimal, {
+        body: { filter: {} },
+        user: defaultUser,
+      });
+      const res = resFor(findStudiosMinimal);
 
       await findStudiosMinimal(req, res);
 

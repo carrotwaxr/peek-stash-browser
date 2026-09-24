@@ -8,8 +8,8 @@
  * - POST /api/admin/orphaned-scenes/:id/discard - Delete orphaned data
  * - POST /api/admin/reconcile-all - Auto-reconcile all with exact matches
  *
- * These tests follow the pattern from watchHistory.test.ts, testing the route
- * handlers directly with mock request/response objects.
+ * The handler tests call each route's real handler from the router, with the
+ * service and the auth middleware mocked.
  */
 import { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ import {
   type OrphanedSceneInfo,
   mergeReconciliationService,
 } from "../../services/MergeReconciliationService.js";
-import { must } from "../helpers/must.js";
+import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock MergeReconciliationService - hoisted to top level
@@ -56,33 +56,14 @@ const mockService = vi.mocked(mergeReconciliationService);
 const mockAuthenticate = vi.mocked(authenticate);
 const mockRequireAdmin = vi.mocked(requireAdmin);
 
-// Helper to create mock request
-interface MockRequestOptions {
-  params?: Record<string, string>;
-  body?: Record<string, unknown>;
-  user?: { id: number; username: string; role: string } | undefined;
+/** The route's handler, from the real router (auth middleware is mocked). */
+async function routeHandler(method: "get" | "post", path: string) {
+  const { default: router } =
+    await import("../../routes/mergeReconciliation.js");
+  return findHandler(router, method, path);
 }
 
-function createMockRequest(options: MockRequestOptions = {}): Partial<Request> {
-  return {
-    params: options.params || {},
-    body: options.body || {},
-    user: options.user,
-  } as Partial<Request>;
-}
-
-// Helper to create mock response with chainable status
-function createMockResponse() {
-  const responseJson = vi.fn();
-  const responseStatus = vi.fn(() => ({ json: responseJson }));
-
-  return {
-    json: responseJson,
-    status: responseStatus,
-    responseJson,
-    responseStatus,
-  };
-}
+const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 
 describe("Merge Reconciliation Routes", () => {
   beforeEach(() => {
@@ -99,12 +80,8 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("Authentication Requirements", () => {
     it("should have authenticate middleware that returns 401 for unauthenticated requests", async () => {
-      const mockReq = createMockRequest();
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const req = reqFor(authenticate);
+      const res = resFor(authenticate);
 
       // Configure authenticate to return 401
       mockAuthenticate.mockImplementation(async (_req, res, _next) => {
@@ -113,10 +90,10 @@ describe("Merge Reconciliation Routes", () => {
           .json({ error: "Access denied. No token provided." });
       });
 
-      await mockAuthenticate(mockReq as Request, mockRes, vi.fn());
+      await mockAuthenticate(req, res, vi.fn());
 
-      expect(responseStatus).toHaveBeenCalledWith(401);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Access denied. No token provided.",
       });
     });
@@ -124,14 +101,10 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("Admin Requirement", () => {
     it("should have requireAdmin middleware that returns 403 for non-admin users", async () => {
-      const mockReq = createMockRequest({
+      const req = reqFor(requireAdmin, {
         user: { id: 1, username: "user", role: "USER" },
       });
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const res = resFor(requireAdmin);
 
       // Configure requireAdmin to return 403 for non-admin
       mockRequireAdmin.mockImplementation((req, res, _next) => {
@@ -141,19 +114,17 @@ describe("Merge Reconciliation Routes", () => {
         }
       });
 
-      await mockRequireAdmin(mockReq as Request, mockRes, vi.fn());
+      await mockRequireAdmin(req, res, vi.fn());
 
-      expect(responseStatus).toHaveBeenCalledWith(403);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Admin access required.",
       });
     });
 
     it("should allow admin users through requireAdmin middleware", async () => {
-      const mockReq = createMockRequest({
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const mockRes = {} as Response;
+      const req = reqFor(requireAdmin, { user: ADMIN });
+      const res = resFor(requireAdmin);
       const mockNext = vi.fn();
 
       // Configure requireAdmin to pass admin through
@@ -165,7 +136,7 @@ describe("Merge Reconciliation Routes", () => {
         return undefined;
       });
 
-      await mockRequireAdmin(mockReq as Request, mockRes, mockNext);
+      await mockRequireAdmin(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
     });
@@ -202,20 +173,11 @@ describe("Merge Reconciliation Routes", () => {
 
       mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
 
-      const mockReq = createMockRequest({
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("get", "/orphaned-scenes");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      // Simulate handler logic
-      const orphans = await mockService.findOrphanedScenesWithActivity();
-      mockRes.json({
-        scenes: orphans,
-        totalCount: orphans.length,
-      });
-
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         scenes: mockOrphans,
         totalCount: 2,
       });
@@ -227,16 +189,11 @@ describe("Merge Reconciliation Routes", () => {
     it("should return empty list when no orphaned scenes exist", async () => {
       mockService.findOrphanedScenesWithActivity.mockResolvedValue([]);
 
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("get", "/orphaned-scenes");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      const orphans = await mockService.findOrphanedScenesWithActivity();
-      mockRes.json({
-        scenes: orphans,
-        totalCount: orphans.length,
-      });
-
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         scenes: [],
         totalCount: 0,
       });
@@ -247,23 +204,12 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Database error")
       );
 
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const handler = await routeHandler("get", "/orphaned-scenes");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      try {
-        await mockService.findOrphanedScenesWithActivity();
-      } catch (error) {
-        mockRes.status(500).json({
-          error: "Failed to fetch orphaned scenes",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to fetch orphaned scenes",
         message: "Database error",
       });
@@ -293,33 +239,27 @@ describe("Merge Reconciliation Routes", () => {
 
       mockService.findPhashMatches.mockResolvedValue(mockMatches);
 
-      const mockReq = createMockRequest({
+      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
+      const req = reqFor(handler, {
         params: { id: "scene-123" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: ADMIN,
       });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      const id = must(mockReq.params!.id);
-      const matches = await mockService.findPhashMatches(id);
-      mockRes.json({ matches });
-
-      expect(responseJson).toHaveBeenCalledWith({ matches: mockMatches });
+      expect(res.json).toHaveBeenCalledWith({ matches: mockMatches });
       expect(mockService.findPhashMatches).toHaveBeenCalledWith("scene-123");
     });
 
     it("should return empty matches when no phash matches found", async () => {
       mockService.findPhashMatches.mockResolvedValue([]);
 
-      const mockReq = createMockRequest({ params: { id: "scene-123" } });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
+      const req = reqFor(handler, { params: { id: "scene-123" } });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      const id = must(mockReq.params!.id);
-      const matches = await mockService.findPhashMatches(id);
-      mockRes.json({ matches });
-
-      expect(responseJson).toHaveBeenCalledWith({ matches: [] });
+      expect(res.json).toHaveBeenCalledWith({ matches: [] });
     });
 
     it("should return 500 on service error", async () => {
@@ -327,24 +267,13 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Lookup failed")
       );
 
-      const mockReq = createMockRequest({ params: { id: "scene-123" } });
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
+      const req = reqFor(handler, { params: { id: "scene-123" } });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      try {
-        await mockService.findPhashMatches(must(mockReq.params!.id));
-      } catch (error) {
-        mockRes.status(500).json({
-          error: "Failed to fetch matches",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to fetch matches",
         message: "Lookup failed",
       });
@@ -357,24 +286,20 @@ describe("Merge Reconciliation Routes", () => {
 
   describe("POST /orphaned-scenes/:id/reconcile handler", () => {
     it("should return 400 when targetSceneId is missing", async () => {
-      const mockReq = createMockRequest({
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:id/reconcile"
+      );
+      const req = reqFor(handler, {
         params: { id: "scene-123" },
         body: {},
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: ADMIN,
       });
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      const { targetSceneId } = mockReq.body as { targetSceneId?: string };
-      if (!targetSceneId) {
-        mockRes.status(400).json({ error: "targetSceneId is required" });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(400);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
         error: "targetSceneId is required",
       });
     });
@@ -389,29 +314,17 @@ describe("Merge Reconciliation Routes", () => {
 
       mockService.reconcileScene.mockResolvedValue(mockResult);
 
-      const mockReq = createMockRequest({
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:id/reconcile"
+      );
+      const req = reqFor(handler, {
         params: { id: "scene-123" },
         body: { targetSceneId: "target-456" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: ADMIN,
       });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
-
-      const id = must(mockReq.params!.id);
-      const { targetSceneId } = mockReq.body as { targetSceneId: string };
-      const userId = (mockReq as { user: { id: number } }).user.id;
-
-      const result = await mockService.reconcileScene(
-        id,
-        targetSceneId,
-        null,
-        userId
-      );
-
-      mockRes.json({
-        ok: true,
-        ...result,
-      });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
       expect(mockService.reconcileScene).toHaveBeenCalledWith(
         "scene-123",
@@ -419,7 +332,7 @@ describe("Merge Reconciliation Routes", () => {
         null,
         1
       );
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         ok: true,
         sourceSceneId: "scene-123",
         targetSceneId: "target-456",
@@ -433,28 +346,26 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Transfer failed")
       );
 
-      const mockReq = createMockRequest({
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:id/reconcile"
+      );
+      const req = reqFor(handler, {
         params: { id: "scene-123" },
         body: { targetSceneId: "target-456" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: ADMIN,
       });
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      try {
-        await mockService.reconcileScene("scene-123", "target-456", null, 1);
-      } catch (error) {
-        mockRes.status(500).json({
-          error: "Failed to reconcile scene",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(mockService.reconcileScene).toHaveBeenCalledWith(
+        "scene-123",
+        "target-456",
+        null,
+        1
+      );
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to reconcile scene",
         message: "Transfer failed",
       });
@@ -474,23 +385,19 @@ describe("Merge Reconciliation Routes", () => {
 
       mockService.discardOrphanedData.mockResolvedValue(mockResult);
 
-      const mockReq = createMockRequest({
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:id/discard"
+      );
+      const req = reqFor(handler, {
         params: { id: "scene-123" },
-        user: { id: 1, username: "admin", role: "ADMIN" },
+        user: ADMIN,
       });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
-
-      const id = must(mockReq.params!.id);
-      const result = await mockService.discardOrphanedData(id);
-
-      mockRes.json({
-        ok: true,
-        ...result,
-      });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
       expect(mockService.discardOrphanedData).toHaveBeenCalledWith("scene-123");
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         ok: true,
         watchHistoryDeleted: 5,
         ratingsDeleted: 2,
@@ -502,24 +409,16 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Delete failed")
       );
 
-      const mockReq = createMockRequest({ params: { id: "scene-123" } });
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:id/discard"
+      );
+      const req = reqFor(handler, { params: { id: "scene-123" } });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
 
-      try {
-        await mockService.discardOrphanedData(must(mockReq.params!.id));
-      } catch (error) {
-        mockRes.status(500).json({
-          error: "Failed to discard orphaned data",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to discard orphaned data",
         message: "Delete failed",
       });
@@ -569,47 +468,11 @@ describe("Merge Reconciliation Routes", () => {
         mergeRecordsCreated: 2,
       });
 
-      const mockReq = createMockRequest({
-        user: { id: 1, username: "admin", role: "ADMIN" },
-      });
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("post", "/reconcile-all");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      // Simulate the reconcile-all handler logic
-      const orphans = await mockService.findOrphanedScenesWithActivity();
-      let reconciled = 0;
-      let skipped = 0;
-      const userId = (mockReq as { user: { id: number } }).user.id;
-
-      for (const orphan of orphans) {
-        if (!orphan.phash) {
-          skipped++;
-          continue;
-        }
-
-        const matches = await mockService.findPhashMatches(orphan.id);
-        const exactMatch = matches.find((m) => m.similarity === "exact");
-
-        if (exactMatch) {
-          await mockService.reconcileScene(
-            orphan.id,
-            exactMatch.sceneId,
-            orphan.phash,
-            userId
-          );
-          reconciled++;
-        } else {
-          skipped++;
-        }
-      }
-
-      mockRes.json({
-        ok: true,
-        reconciled,
-        skipped,
-      });
-
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         ok: true,
         reconciled: 1,
         skipped: 2, // orphan-2 (no exact) + orphan-3 (no phash)
@@ -628,28 +491,11 @@ describe("Merge Reconciliation Routes", () => {
     it("should handle no orphans gracefully", async () => {
       mockService.findOrphanedScenesWithActivity.mockResolvedValue([]);
 
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("post", "/reconcile-all");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      const orphans = await mockService.findOrphanedScenesWithActivity();
-      let reconciled = 0;
-      let skipped = 0;
-
-      for (const orphan of orphans) {
-        if (!orphan.phash) {
-          skipped++;
-          continue;
-        }
-        // ... rest of logic
-      }
-
-      mockRes.json({
-        ok: true,
-        reconciled,
-        skipped,
-      });
-
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         ok: true,
         reconciled: 0,
         skipped: 0,
@@ -671,37 +517,11 @@ describe("Merge Reconciliation Routes", () => {
         },
       ]);
 
-      const { responseJson } = createMockResponse();
-      const mockRes = { json: responseJson } as unknown as Response;
+      const handler = await routeHandler("post", "/reconcile-all");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      // Simulate handler logic
-      const orphans = await mockService.findOrphanedScenesWithActivity();
-      let reconciled = 0;
-      let skipped = 0;
-
-      for (const orphan of orphans) {
-        if (!orphan.phash) {
-          skipped++;
-          continue;
-        }
-
-        const matches = await mockService.findPhashMatches(orphan.id);
-        const exactMatch = matches.find((m) => m.similarity === "exact");
-
-        if (exactMatch) {
-          reconciled++;
-        } else {
-          skipped++;
-        }
-      }
-
-      mockRes.json({
-        ok: true,
-        reconciled,
-        skipped,
-      });
-
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.json).toHaveBeenCalledWith({
         ok: true,
         reconciled: 0,
         skipped: 1,
@@ -714,23 +534,12 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Database unavailable")
       );
 
-      const { responseStatus, responseJson } = createMockResponse();
-      const mockRes = {
-        json: responseJson,
-        status: responseStatus,
-      } as unknown as Response;
+      const handler = await routeHandler("post", "/reconcile-all");
+      const res = resFor(handler);
+      await handler(reqFor(handler, { user: ADMIN }), res, vi.fn());
 
-      try {
-        await mockService.findOrphanedScenesWithActivity();
-      } catch (error) {
-        mockRes.status(500).json({
-          error: "Failed to reconcile all",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      expect(responseStatus).toHaveBeenCalledWith(500);
-      expect(responseJson).toHaveBeenCalledWith({
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
         error: "Failed to reconcile all",
         message: "Database unavailable",
       });

@@ -3,7 +3,6 @@
  * PROXY_AUTH_TRUSTED_IPS, checked against the address that connected to the
  * container's nginx.
  */
-import type { Request } from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   getProxyAuthTrust,
@@ -11,13 +10,13 @@ import {
   parseTrustedAddresses,
   proxyPeerAddress,
 } from "../../utils/proxyAuthTrust.js";
+import { reqFor } from "../helpers/controllerTestUtils.js";
 
 const reqFrom = (remoteAddress: string | undefined, realIp?: string) =>
-  ({
-    socket: { remoteAddress },
-    header: (name: string) =>
-      name.toLowerCase() === "x-real-ip" ? realIp : undefined,
-  }) as unknown as Request;
+  reqFor(proxyPeerAddress, {
+    remoteAddress,
+    headers: realIp === undefined ? {} : { "X-Real-IP": realIp },
+  });
 
 describe("parseTrustedAddresses", () => {
   it("parses single addresses and CIDRs, IPv4 and IPv6", () => {
@@ -98,8 +97,6 @@ describe("proxyPeerAddress", () => {
   });
 
   it("tolerates a request without a socket", () => {
-    expect(
-      proxyPeerAddress({ header: () => undefined } as unknown as Request)
-    ).toBe("");
+    expect(proxyPeerAddress(reqFor(proxyPeerAddress))).toBe("");
   });
 });

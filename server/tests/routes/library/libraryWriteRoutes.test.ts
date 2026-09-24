@@ -21,6 +21,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { AuthenticatedRequest } from "../../../middleware/auth.js";
 import libraryPerformersRoutes from "../../../routes/library/performers.js";
 import libraryScenesRoutes from "../../../routes/library/scenes.js";
 import libraryStudiosRoutes from "../../../routes/library/studios.js";
@@ -30,7 +31,7 @@ import { partialRow } from "../../helpers/prismaMock.js";
 
 vi.mock("../../../middleware/auth.js", () => ({
   authenticate: vi.fn((req: Request, _res: Response, next: NextFunction) => {
-    (req as unknown as { user: unknown }).user = {
+    (req as AuthenticatedRequest).user = {
       id: 2,
       username: "restricted",
       role: "USER",

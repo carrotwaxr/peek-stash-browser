@@ -11,7 +11,7 @@ import prisma from "../../prisma/singleton.js";
 import rankingComputeService from "../../services/RankingComputeService.js";
 import { userStatsAggregationService } from "../../services/UserStatsAggregationService.js";
 import type { UserStatsResponse } from "../../types/api/index.js";
-import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock dependencies BEFORE imports
@@ -88,8 +88,8 @@ describe("UserStats Controller", () => {
 
   describe("authentication", () => {
     it("returns 401 when req.user is undefined", async () => {
-      const req = mockReq({}, {}, undefined, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats);
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -97,8 +97,8 @@ describe("UserStats Controller", () => {
     });
 
     it("returns 401 when req.user has no id", async () => {
-      const req = mockReq({}, {}, {} as any, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: malformed({}) });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -110,8 +110,8 @@ describe("UserStats Controller", () => {
 
   describe("sortBy parameter", () => {
     it("defaults to 'engagement' when no sortBy is provided", async () => {
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -122,8 +122,11 @@ describe("UserStats Controller", () => {
     });
 
     it("accepts 'oCount' as a valid sortBy", async () => {
-      const req = mockReq({}, {}, USER, { sortBy: "oCount" });
-      const res = mockRes();
+      const req = reqFor(getUserStats, {
+        user: USER,
+        query: { sortBy: "oCount" },
+      });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -134,8 +137,11 @@ describe("UserStats Controller", () => {
     });
 
     it("accepts 'playCount' as a valid sortBy", async () => {
-      const req = mockReq({}, {}, USER, { sortBy: "playCount" });
-      const res = mockRes();
+      const req = reqFor(getUserStats, {
+        user: USER,
+        query: { sortBy: "playCount" },
+      });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -146,8 +152,11 @@ describe("UserStats Controller", () => {
     });
 
     it("falls back to 'engagement' for an invalid sortBy value", async () => {
-      const req = mockReq({}, {}, USER, { sortBy: "invalidField" });
-      const res = mockRes();
+      const req = reqFor(getUserStats, {
+        user: USER,
+        query: { sortBy: "invalidField" },
+      });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -168,8 +177,8 @@ describe("UserStats Controller", () => {
         })
       );
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -184,8 +193,8 @@ describe("UserStats Controller", () => {
         })
       );
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -195,8 +204,8 @@ describe("UserStats Controller", () => {
     it("recomputes when no rankings exist at all", async () => {
       mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -208,8 +217,8 @@ describe("UserStats Controller", () => {
 
   describe("happy path", () => {
     it("returns stats from the aggregation service", async () => {
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 
@@ -226,8 +235,8 @@ describe("UserStats Controller", () => {
         new Error("Service failure")
       );
 
-      const req = mockReq({}, {}, USER, {});
-      const res = mockRes();
+      const req = reqFor(getUserStats, { user: USER });
+      const res = resFor(getUserStats);
 
       await getUserStats(req, res);
 

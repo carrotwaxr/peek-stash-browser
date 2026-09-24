@@ -1,7 +1,7 @@
 /**
  * Unit Tests for DatabaseBackupService
  */
-import type { PathLike } from "fs";
+import type { PathLike, Stats } from "fs";
 import fs from "fs/promises";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,6 +30,8 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 /** `fs.readdir` as the service calls it: it lists names, not `Dirent`s. */
+/** `fs.stat` as the service calls it: plain `Stats`, not `BigIntStats`. */
+const mockStat = vi.mocked<(path: PathLike) => Promise<Stats>>(fs.stat);
 const mockReaddir = vi.mocked<(path: PathLike) => Promise<string[]>>(
   fs.readdir
 );
@@ -69,18 +71,18 @@ describe("DatabaseBackupService", () => {
         "peek-stash-browser.db.backup-20260117-093045",
       ]);
 
-      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+      mockStat.mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
         if (filename === "peek-stash-browser.db.backup-20260118-104532") {
-          return {
+          return partialRow({
             size: 246747136,
             mtime: new Date("2026-01-18T10:45:32.000Z"),
-          } as any;
+          });
         }
-        return {
+        return partialRow({
           size: 123456789,
           mtime: new Date("2026-01-17T09:30:45.000Z"),
-        } as any;
+        });
       });
 
       const { databaseBackupService } =
@@ -103,18 +105,18 @@ describe("DatabaseBackupService", () => {
         "peek-stash-browser.db.backup-20260118-104532",
       ]);
 
-      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+      mockStat.mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
         if (filename.includes("20260118")) {
-          return {
+          return partialRow({
             size: 100,
             mtime: new Date("2026-01-18T10:45:32.000Z"),
-          } as any;
+          });
         }
-        return {
+        return partialRow({
           size: 100,
           mtime: new Date("2026-01-17T09:30:45.000Z"),
-        } as any;
+        });
       });
 
       const { databaseBackupService } =
@@ -152,22 +154,22 @@ describe("DatabaseBackupService", () => {
         "peek-stash-browser.db.backup-20260116-080000",
       ]);
 
-      vi.mocked(fs.stat).mockImplementation(async (filePath) => {
+      mockStat.mockImplementation(async (filePath) => {
         const filename = path.basename(filePath as string);
         // Simulate file deletion - middle file throws ENOENT
         if (filename.includes("20260117")) {
           throw new Error("ENOENT: no such file or directory");
         }
         if (filename.includes("20260118")) {
-          return {
+          return partialRow({
             size: 200,
             mtime: new Date("2026-01-18T10:45:32.000Z"),
-          } as any;
+          });
         }
-        return {
+        return partialRow({
           size: 100,
           mtime: new Date("2026-01-16T08:00:00.000Z"),
-        } as any;
+        });
       });
 
       const { databaseBackupService } =

@@ -14,7 +14,9 @@ import {
   vi,
 } from "vitest";
 import { getDownloadFile } from "../../controllers/download.js";
+import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import { downloadService } from "../../services/DownloadService.js";
+import { authenticated } from "../../utils/routeHelpers.js";
 
 // Real Express and real HTTP: Node validates header bytes only when a header
 // is actually written, and sendFile writes its headers asynchronously.
@@ -100,17 +102,14 @@ describe("GET /api/downloads/:id/file over real HTTP", () => {
 
     const app = express();
     app.use((req, _res, next) => {
-      (req as unknown as { user: unknown }).user = {
+      (req as AuthenticatedRequest).user = {
         id: 1,
         username: "u",
         role: "USER",
       };
       next();
     });
-    app.get(
-      "/api/downloads/:id/file",
-      getDownloadFile as unknown as express.RequestHandler
-    );
+    app.get("/api/downloads/:id/file", authenticated(getDownloadFile));
     peekServer = await new Promise<http.Server>((resolve) => {
       const server = app.listen(0, () => resolve(server));
     });

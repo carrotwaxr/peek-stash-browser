@@ -12,6 +12,7 @@
  * swap on the main client; both are the one mocked prisma here, so fakeRaw
  * routes the compute's queries whichever client issues them.
  */
+import type { Prisma, UserContentRestriction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   disconnectComputeClient,
@@ -21,6 +22,7 @@ import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { must } from "../helpers/must.js";
+import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Mock UserInstanceService before importing service
 vi.mock("../../services/UserInstanceService.js", () => ({
@@ -84,27 +86,27 @@ vi.mock("../../prisma/computeClient.js", async () => {
   };
 });
 
-const mockPrisma = prisma as any;
+const mockPrisma = vi.mocked(prisma, true);
 const mockAllowedInstances = vi.mocked(getUserAllowedInstanceIds);
 
 /** Route $queryRawUnsafe by SQL shape; unmatched queries return no rows. */
 function fakeRaw(routes: Array<[RegExp, unknown[]]>) {
-  mockPrisma.$queryRawUnsafe.mockImplementation(async (sql: string) => {
-    const hit = routes.find(([re]) => re.test(sql));
-    return hit ? hit[1] : [];
-  });
+  mockPrisma.$queryRawUnsafe.mockImplementation(
+    prismaImpl(async (sql: string) => {
+      const hit = routes.find(([re]) => re.test(sql));
+      return hit ? hit[1] : [];
+    })
+  );
 }
 
 /** Every $queryRawUnsafe call as [sql, ...params]. */
 function rawCalls(): Array<[string, ...unknown[]]> {
-  return mockPrisma.$queryRawUnsafe.mock.calls as Array<[string, ...unknown[]]>;
+  return mockPrisma.$queryRawUnsafe.mock.calls;
 }
 
 /** Every $executeRawUnsafe call as [sql, ...params] (temp-table fills). */
 function execCalls(): Array<[string, ...unknown[]]> {
-  return mockPrisma.$executeRawUnsafe.mock.calls as Array<
-    [string, ...unknown[]]
-  >;
+  return mockPrisma.$executeRawUnsafe.mock.calls;
 }
 
 function queriesMatching(re: RegExp) {
@@ -112,15 +114,9 @@ function queriesMatching(re: RegExp) {
 }
 
 /** Rows handed to the write phase (createMany payloads, flattened). */
-function createdRows(): Array<{
-  userId: number;
-  entityType: string;
-  entityId: string;
-  instanceId: string;
-  reason: string;
-}> {
+function createdRows(): Prisma.UserExcludedEntityCreateManyInput[] {
   return mockPrisma.userExcludedEntity.createMany.mock.calls.flatMap(
-    (c: any) => c[0].data || []
+    ([args]) => must(args).data
   );
 }
 
@@ -135,9 +131,9 @@ function rowKeys(rows: ReturnType<typeof createdRows>): Set<string> {
 /** Upsert payloads from addHiddenEntity as the same keys. */
 function upsertKeys(): Set<string> {
   return new Set(
-    mockPrisma.userExcludedEntity.upsert.mock.calls.map((c: any) => {
-      const w = c[0].where.userId_entityType_entityId_instanceId;
-      return `${w.entityType}:${w.entityId}@${w.instanceId}:${c[0].create.reason}`;
+    mockPrisma.userExcludedEntity.upsert.mock.calls.map(([args]) => {
+      const w = must(args.where.userId_entityType_entityId_instanceId);
+      return `${w.entityType}:${w.entityId}@${w.instanceId}:${args.create.reason}`;
     })
   );
 }
@@ -146,17 +142,17 @@ function upsertKeys(): Set<string> {
 function setupPipeline(allowed: string[] = ["A"]) {
   vi.clearAllMocks();
   mockAllowedInstances.mockResolvedValue(allowed);
-  mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+  mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
   mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
   mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
   mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
-  mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
+  mockPrisma.userExcludedEntity.upsert.mockResolvedValue(partialRow({}));
   mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-  mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+  mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
   mockPrisma.$queryRaw.mockResolvedValue([]);
   mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-  mockPrisma.$executeRaw.mockResolvedValue(undefined);
+  mockPrisma.$executeRaw.mockResolvedValue(0);
   mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
   for (const model of [
     "stashScene",
@@ -167,12 +163,14 @@ function setupPipeline(allowed: string[] = ["A"]) {
     "stashGallery",
     "stashImage",
     "stashClip",
-  ]) {
+  ] as const) {
     mockPrisma[model].count.mockResolvedValue(0);
   }
-  mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-    return callback(mockPrisma);
-  });
+  mockPrisma.$transaction.mockImplementation(
+    prismaImpl(async (callback) => {
+      return callback(mockPrisma);
+    })
+  );
 }
 
 function restriction(
@@ -181,13 +179,13 @@ function restriction(
   entityIds: string[],
   restrictEmpty = false
 ) {
-  return {
+  return partialRow<UserContentRestriction>({
     userId: 1,
     entityType,
     mode,
     entityIds: JSON.stringify(entityIds),
     restrictEmpty,
-  };
+  });
 }
 
 // Route shapes (by table name, never by call order)
@@ -235,7 +233,7 @@ const EMPTY_TAG = /FROM StashTag t[\s\S]*FROM GalleryTag gt/;
 describe("ExclusionComputationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
     mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
@@ -263,9 +261,9 @@ describe("ExclusionComputationService", () => {
       mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
       mockPrisma.$queryRaw.mockResolvedValue([]);
-      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.$executeRaw.mockResolvedValue(0);
       mockPrisma.stashScene.count.mockResolvedValue(0);
       mockPrisma.stashPerformer.count.mockResolvedValue(0);
       mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -276,14 +274,16 @@ describe("ExclusionComputationService", () => {
       mockPrisma.stashClip.count.mockResolvedValue(0);
 
       // First call: block inside transaction to simulate slow recompute
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        computeCount++;
-        if (computeCount === 1) {
-          // First call: wait for blocker before completing
-          await firstBlocker;
-        }
-        return callback(mockPrisma);
-      });
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl(async (callback) => {
+          computeCount++;
+          if (computeCount === 1) {
+            // First call: wait for blocker before completing
+            await firstBlocker;
+          }
+          return callback(mockPrisma);
+        })
+      );
 
       // Start first recompute (will block in transaction)
       const first = exclusionComputationService.recomputeForUser(1);
@@ -321,9 +321,9 @@ describe("ExclusionComputationService", () => {
       mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
       mockPrisma.$queryRaw.mockResolvedValue([]);
-      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.$executeRaw.mockResolvedValue(0);
       mockPrisma.stashScene.count.mockResolvedValue(0);
       mockPrisma.stashPerformer.count.mockResolvedValue(0);
       mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -334,13 +334,15 @@ describe("ExclusionComputationService", () => {
       mockPrisma.stashClip.count.mockResolvedValue(0);
 
       // Block the first transaction to simulate a slow recompute
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        computeCount++;
-        if (computeCount === 1) {
-          await firstBlocker;
-        }
-        return callback(mockPrisma);
-      });
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl(async (callback) => {
+          computeCount++;
+          if (computeCount === 1) {
+            await firstBlocker;
+          }
+          return callback(mockPrisma);
+        })
+      );
 
       // Start first recompute (will block in transaction)
       const first = exclusionComputationService.recomputeForUser(2);
@@ -382,9 +384,9 @@ describe("ExclusionComputationService", () => {
       mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
       mockPrisma.$queryRaw.mockResolvedValue([]);
-      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.$executeRaw.mockResolvedValue(0);
       mockPrisma.stashScene.count.mockResolvedValue(0);
       mockPrisma.stashPerformer.count.mockResolvedValue(0);
       mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -394,17 +396,19 @@ describe("ExclusionComputationService", () => {
       mockPrisma.stashImage.count.mockResolvedValue(0);
       mockPrisma.stashClip.count.mockResolvedValue(0);
 
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        computeCount++;
-        const currentRun = computeCount;
-        executionOrder.push(`start-${currentRun}`);
-        if (currentRun === 1) {
-          await firstBlocker;
-        }
-        const result = await callback(mockPrisma);
-        executionOrder.push(`end-${currentRun}`);
-        return result;
-      });
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl(async (callback) => {
+          computeCount++;
+          const currentRun = computeCount;
+          executionOrder.push(`start-${currentRun}`);
+          if (currentRun === 1) {
+            await firstBlocker;
+          }
+          const result = await callback(mockPrisma);
+          executionOrder.push(`end-${currentRun}`);
+          return result;
+        })
+      );
 
       // Start first recompute (will block)
       const first = exclusionComputationService.recomputeForUser(3);
@@ -435,9 +439,9 @@ describe("ExclusionComputationService", () => {
       mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 0 });
       mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-      mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+      mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
       mockPrisma.$queryRaw.mockResolvedValue([]);
-      mockPrisma.$executeRaw.mockResolvedValue(undefined);
+      mockPrisma.$executeRaw.mockResolvedValue(0);
       mockPrisma.stashScene.count.mockResolvedValue(0);
       mockPrisma.stashPerformer.count.mockResolvedValue(0);
       mockPrisma.stashStudio.count.mockResolvedValue(0);
@@ -449,16 +453,18 @@ describe("ExclusionComputationService", () => {
 
       // Track per-user invocations via userContentRestriction.findMany calls
       mockPrisma.userContentRestriction.findMany.mockImplementation(
-        async (args: any) => {
+        prismaImpl(async (args) => {
           if (args?.where?.userId === 10) user1Count++;
           if (args?.where?.userId === 11) user2Count++;
           return [];
-        }
+        })
       );
 
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        return callback(mockPrisma);
-      });
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl(async (callback) => {
+          return callback(mockPrisma);
+        })
+      );
 
       await Promise.all([
         exclusionComputationService.recomputeForUser(10),
@@ -479,16 +485,19 @@ describe("ExclusionComputationService", () => {
       const firstBlocker = new Promise<void>((resolve) => {
         releaseFirst = resolve;
       });
-      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
-        if (sql === "BEGIN" || sql === "ROLLBACK") events.push(sql);
-        return 0;
-      });
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl(async (sql: string) => {
+          if (sql === "BEGIN" || sql === "ROLLBACK") events.push(sql);
+          return 0;
+        })
+      );
       mockPrisma.userContentRestriction.findMany.mockImplementation(
-        async (args: any) => {
-          events.push(`rules-${args.where.userId}`);
-          if (args.where.userId === 20) await firstBlocker;
+        prismaImpl(async (args) => {
+          const { userId } = must(args?.where);
+          events.push(`rules-${String(userId)}`);
+          if (userId === 20) await firstBlocker;
           return [];
-        }
+        })
       );
 
       const first = exclusionComputationService.recomputeForUser(20);
@@ -514,18 +523,24 @@ describe("ExclusionComputationService", () => {
     it("computes in a deferred BEGIN on the compute client; only the write swap is a Prisma transaction", async () => {
       setupPipeline();
       const events: string[] = [];
-      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
-        events.push(sql === "BEGIN" || sql === "ROLLBACK" ? sql : "exec");
-        return 0;
-      });
-      mockPrisma.$queryRawUnsafe.mockImplementation(async () => {
-        events.push("query");
-        return [];
-      });
-      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-        events.push("transaction");
-        return callback(mockPrisma);
-      });
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl(async (sql: string) => {
+          events.push(sql === "BEGIN" || sql === "ROLLBACK" ? sql : "exec");
+          return 0;
+        })
+      );
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl(async () => {
+          events.push("query");
+          return [];
+        })
+      );
+      mockPrisma.$transaction.mockImplementation(
+        prismaImpl(async (callback) => {
+          events.push("transaction");
+          return callback(mockPrisma);
+        })
+      );
 
       await exclusionComputationService.recomputeForUser(1);
 
@@ -566,10 +581,12 @@ describe("ExclusionComputationService", () => {
 
     it("a snapshot that cannot be ended drops the compute connection", async () => {
       setupPipeline();
-      mockPrisma.$executeRawUnsafe.mockImplementation(async (sql: string) => {
-        if (sql === "ROLLBACK") throw new Error("cannot rollback");
-        return 0;
-      });
+      mockPrisma.$executeRawUnsafe.mockImplementation(
+        prismaImpl(async (sql: string) => {
+          if (sql === "ROLLBACK") throw new Error("cannot rollback");
+          return 0;
+        })
+      );
 
       // The computed rows are still written
       await exclusionComputationService.recomputeForUser(1);
@@ -647,8 +664,18 @@ describe("computeDirectExclusions", () => {
 
   it("should process UserHiddenEntity records", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "perf1", instanceId: "" },
-      { userId: 1, entityType: "scene", entityId: "scene1", instanceId: "" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "perf1",
+        instanceId: "",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "scene1",
+        instanceId: "",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_PERFORMER, [{ id: "perf1", instanceId: "A" }]],
@@ -670,18 +697,27 @@ describe("computeDirectExclusions", () => {
 
   it("should delete existing exclusions before creating new ones", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "scene", entityId: "scene1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "scene1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([[RESOLVE_SCENE, [{ id: "scene1", instanceId: "A" }]]]);
     const order: string[] = [];
-    mockPrisma.userExcludedEntity.deleteMany.mockImplementation(async () => {
-      order.push("delete");
-      return { count: 1 };
-    });
-    mockPrisma.userExcludedEntity.createMany.mockImplementation(async () => {
-      order.push("create");
-      return { count: 1 };
-    });
+    mockPrisma.userExcludedEntity.deleteMany.mockImplementation(
+      prismaImpl(async () => {
+        order.push("delete");
+        return { count: 1 };
+      })
+    );
+    mockPrisma.userExcludedEntity.createMany.mockImplementation(
+      prismaImpl(async () => {
+        order.push("create");
+        return { count: 1 };
+      })
+    );
 
     await exclusionComputationService.recomputeForUser(1);
 
@@ -703,7 +739,12 @@ describe("computeDirectExclusions", () => {
       restriction("groups", "EXCLUDE", ["g1:A"]),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "scene", entityId: "s9", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "s9",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_GROUP, [{ id: "g1", instanceId: "A" }]],
@@ -1163,7 +1204,12 @@ describe("cascades (Rule 3)", () => {
 
   it("performer hide cascades to scenes, galleries and images", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_PERFORMER, [{ id: "p1", instanceId: "A" }]],
@@ -1216,7 +1262,12 @@ describe("cascades (Rule 3)", () => {
       restriction("tags", "EXCLUDE", ["2:A"]),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
@@ -1248,7 +1299,12 @@ describe("cascades (Rule 3)", () => {
   it("a hide with an empty instance cascades on every allowed instance", async () => {
     setupPipeline(["A", "B"]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p1",
+        instanceId: "",
+      }),
     ]);
     fakeRaw([
       [
@@ -1341,9 +1397,24 @@ describe("computeEmptyExclusions", () => {
     // A hidden gallery and a hidden image are loaded into the temp exclusion
     // sets the empty queries probe (indexed lookups, never a JSON rescan).
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "gallery", entityId: "g9", instanceId: "A" },
-      { userId: 1, entityType: "image", entityId: "i9", instanceId: "A" },
-      { userId: 1, entityType: "scene", entityId: "s9", instanceId: "" },
+      partialRow({
+        userId: 1,
+        entityType: "gallery",
+        entityId: "g9",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "image",
+        entityId: "i9",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "s9",
+        instanceId: "",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_GALLERY, [{ id: "g9", instanceId: "A" }]],
@@ -1379,8 +1450,18 @@ describe("computeEmptyExclusions", () => {
 
   it("empty-tag query counts gallery and image tags", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "gallery", entityId: "g9", instanceId: "A" },
-      { userId: 1, entityType: "image", entityId: "i9", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "gallery",
+        entityId: "g9",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "image",
+        entityId: "i9",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_GALLERY, [{ id: "g9", instanceId: "A" }]],
@@ -1460,7 +1541,12 @@ describe("reason precedence (restrictions before hides)", () => {
       restriction("tags", "EXCLUDE", ["2:A"]),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_TAG, [{ id: "2", instanceId: "A" }]],
@@ -1480,7 +1566,12 @@ describe("reason precedence (restrictions before hides)", () => {
       restriction("tags", "EXCLUDE", ["2:A"], true),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "scene", entityId: "s4", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "s4",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [CONTENT_TAG_SCENE, [{ id: "s4", instanceId: "A" }]],
@@ -1497,8 +1588,18 @@ describe("reason precedence (restrictions before hides)", () => {
 
   it("a hidden entity empty under the restrictions alone stores empty", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p2", instanceId: "A" },
-      { userId: 1, entityType: "scene", entityId: "s1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p2",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "s1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_PERFORMER, [{ id: "p2", instanceId: "A" }]],
@@ -1528,27 +1629,39 @@ describe("reason precedence (restrictions before hides)", () => {
 
   it("the empty check under the restrictions alone runs before the hides join the sets", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "gallery", entityId: "g1", instanceId: "A" },
-      { userId: 1, entityType: "image", entityId: "i1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "gallery",
+        entityId: "g1",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "image",
+        entityId: "i1",
+        instanceId: "A",
+      }),
     ]);
     const events: string[] = [];
     mockPrisma.$executeRawUnsafe.mockImplementation(
-      async (sql: string, json?: string) => {
+      prismaImpl(async (sql: string, json?: string) => {
         if (sql.includes("INSERT OR IGNORE INTO _peek_ex_image")) {
           events.push(`image set += ${json}`);
         }
         return 0;
-      }
+      })
     );
-    mockPrisma.$queryRawUnsafe.mockImplementation(async (sql: string) => {
-      if (/CROSS JOIN StashGallery AS g/.test(sql)) {
-        events.push("empty check for the hidden gallery");
+    mockPrisma.$queryRawUnsafe.mockImplementation(
+      prismaImpl(async (sql: string) => {
+        if (/CROSS JOIN StashGallery AS g/.test(sql)) {
+          events.push("empty check for the hidden gallery");
+          return [];
+        }
+        if (RESOLVE_GALLERY.test(sql)) return [{ id: "g1", instanceId: "A" }];
+        if (RESOLVE_IMAGE.test(sql)) return [{ id: "i1", instanceId: "A" }];
         return [];
-      }
-      if (RESOLVE_GALLERY.test(sql)) return [{ id: "g1", instanceId: "A" }];
-      if (RESOLVE_IMAGE.test(sql)) return [{ id: "i1", instanceId: "A" }];
-      return [];
-    });
+      })
+    );
 
     await exclusionComputationService.recomputeForUser(1);
 
@@ -1561,8 +1674,18 @@ describe("reason precedence (restrictions before hides)", () => {
 
   it("own hides stay hidden under their own cascades and emptiness", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "studio", entityId: "st1", instanceId: "A" },
-      { userId: 1, entityType: "scene", entityId: "s1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "studio",
+        entityId: "st1",
+        instanceId: "A",
+      }),
+      partialRow({
+        userId: 1,
+        entityType: "scene",
+        entityId: "s1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_STUDIO, [{ id: "st1", instanceId: "A" }]],
@@ -1594,12 +1717,17 @@ describe("admins (Rule 7)", () => {
   beforeEach(() => setupPipeline());
 
   it("admin: restriction rows are ignored, hides still cascade, no empty phase", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "ADMIN" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "ADMIN" }));
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
       restriction("tags", "INCLUDE", ["1:A"], true),
     ]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "performer", entityId: "p1", instanceId: "A" },
+      partialRow({
+        userId: 1,
+        entityType: "performer",
+        entityId: "p1",
+        instanceId: "A",
+      }),
     ]);
     fakeRaw([
       [RESOLVE_TAG, [{ id: "1", instanceId: "A" }]],
@@ -1761,9 +1889,14 @@ describe("addHiddenEntity", () => {
 
     setupPipeline(["A", "B"]);
     fakeRaw(routes);
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "ADMIN" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "ADMIN" }));
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "tag", entityId: "2", instanceId: "" },
+      partialRow({
+        userId: 1,
+        entityType: "tag",
+        entityId: "2",
+        instanceId: "",
+      }),
     ]);
 
     await exclusionComputationService.recomputeForUser(1);
@@ -1785,7 +1918,7 @@ describe("removeHiddenEntity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Setup mocks for recomputeForUser which will be called async
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
@@ -1800,10 +1933,12 @@ describe("removeHiddenEntity", () => {
     mockPrisma.stashGallery.count.mockResolvedValue(0);
     mockPrisma.stashImage.count.mockResolvedValue(0);
     mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
+    mockPrisma.$transaction.mockImplementation(
+      prismaImpl(async (callback) => {
+        return callback(mockPrisma);
+      })
+    );
   });
 
   it("should queue async recompute via setImmediate", async () => {
@@ -1868,12 +2003,12 @@ describe("recomputeAllUsers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default mocks for a successful recompute pipeline
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.userExcludedEntity.count.mockResolvedValue(0);
-    mockPrisma.userEntityStats.upsert.mockResolvedValue({});
+    mockPrisma.userEntityStats.upsert.mockResolvedValue(partialRow({}));
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
     mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
@@ -1885,16 +2020,18 @@ describe("recomputeAllUsers", () => {
     mockPrisma.stashGallery.count.mockResolvedValue(0);
     mockPrisma.stashImage.count.mockResolvedValue(0);
     mockPrisma.stashClip.count.mockResolvedValue(0);
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    mockPrisma.$transaction.mockImplementation(
+      prismaImpl(async (callback) => {
+        return callback(mockPrisma);
+      })
+    );
   });
 
   it("should iterate all users and recompute exclusions for each", async () => {
     mockPrisma.user.findMany.mockResolvedValue([
-      { id: 1 },
-      { id: 2 },
-      { id: 3 },
+      partialRow({ id: 1 }),
+      partialRow({ id: 2 }),
+      partialRow({ id: 3 }),
     ]);
 
     const result = await exclusionComputationService.recomputeAllUsers();
@@ -1910,19 +2047,21 @@ describe("recomputeAllUsers", () => {
 
   it("should continue processing other users when one fails", async () => {
     mockPrisma.user.findMany.mockResolvedValue([
-      { id: 1 },
-      { id: 2 },
-      { id: 3 },
+      partialRow({ id: 1 }),
+      partialRow({ id: 2 }),
+      partialRow({ id: 3 }),
     ]);
 
     let callCount = 0;
-    mockPrisma.userContentRestriction.findMany.mockImplementation(async () => {
-      callCount++;
-      if (callCount === 2) {
-        throw new Error("DB error for user 2");
-      }
-      return [];
-    });
+    mockPrisma.userContentRestriction.findMany.mockImplementation(
+      prismaImpl(async () => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error("DB error for user 2");
+        }
+        return [];
+      })
+    );
 
     const result = await exclusionComputationService.recomputeAllUsers();
 
@@ -1949,7 +2088,7 @@ describe("recomputeAllUsers", () => {
 describe("error handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.user.findUnique.mockResolvedValue({ role: "USER" });
+    mockPrisma.user.findUnique.mockResolvedValue(partialRow({ role: "USER" }));
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
@@ -1969,9 +2108,11 @@ describe("error handling", () => {
     mockPrisma.userContentRestriction.findMany.mockRejectedValue(
       new Error("DB read error")
     );
-    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
-      return callback(mockPrisma);
-    });
+    mockPrisma.$transaction.mockImplementation(
+      prismaImpl(async (callback) => {
+        return callback(mockPrisma);
+      })
+    );
 
     await expect(
       exclusionComputationService.recomputeForUser(1)
@@ -1987,7 +2128,12 @@ describe("hidden and restricted ids never reach SQL text", () => {
 
   it("binds a hostile hidden id and a hostile listed id as JSON parameters", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "" },
+      partialRow({
+        userId: 1,
+        entityType: "tag",
+        entityId: HOSTILE,
+        instanceId: "",
+      }),
     ]);
     mockPrisma.userContentRestriction.findMany.mockResolvedValue([
       restriction("tags", "EXCLUDE", [`${HOSTILE_LISTED}:A`]),
@@ -2012,7 +2158,12 @@ describe("hidden and restricted ids never reach SQL text", () => {
 
   it("a hostile id that matches nothing hides nothing beyond the stored row", async () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
-      { userId: 1, entityType: "tag", entityId: HOSTILE, instanceId: "instB" },
+      partialRow({
+        userId: 1,
+        entityType: "tag",
+        entityId: HOSTILE,
+        instanceId: "instB",
+      }),
     ]);
 
     await exclusionComputationService.recomputeForUser(1);

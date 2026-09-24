@@ -17,8 +17,9 @@ import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.j
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
-import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { reqFor, resFor, testUser } from "../../helpers/controllerTestUtils.js";
 import { createMockPerformer } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 import { partialRow } from "../../helpers/prismaMock.js";
 
 // ---------------------------------------------------------------------------
@@ -569,20 +570,20 @@ describe("findPerformers", () => {
       total: 1,
     });
 
-    const req = mockReq(
-      { filter: { page: 1, per_page: 20 } },
-      {},
-      { id: 1, role: "ADMIN" }
-    );
-    const res = mockRes();
+    const req = reqFor(findPerformers, {
+      body: { filter: { page: 1, per_page: 20 } },
+      user: testUser({ role: "ADMIN" }),
+    });
+    const res = resFor(findPerformers);
 
     await findPerformers(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     expect(body.findPerformers.count).toBe(1);
     expect(body.findPerformers.performers).toHaveLength(1);
-    expect(body.findPerformers.performers[0].stashUrl).toBe(
+    expect(must(body.findPerformers.performers[0])).toHaveProperty(
+      "stashUrl",
       "http://stash/performers/p1"
     );
   });
@@ -596,18 +597,18 @@ describe("findPerformers", () => {
       total: 2,
     });
 
-    const req = mockReq(
-      { filter: { page: 1, per_page: 20 } },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findPerformers, {
+      body: { filter: { page: 1, per_page: 20 } },
+      user: testUser(),
+    });
+    const res = resFor(findPerformers);
 
     await findPerformers(req, res);
 
-    const performers = res._getBody().findPerformers.performers;
+    const performers = res._getOkBody().findPerformers.performers;
     expect(performers).toHaveLength(2);
-    for (const performer of performers) expect(performer.stashUrl).toBeNull();
+    for (const performer of performers)
+      expect(performer).toHaveProperty("stashUrl", null);
   });
 
   it("returns 400 for ambiguous single-ID lookup (multiple instances)", async () => {
@@ -620,8 +621,11 @@ describe("findPerformers", () => {
       total: 2,
     });
 
-    const req = mockReq({ ids: ["p1"] }, {}, { id: 1, role: "USER" });
-    const res = mockRes();
+    const req = reqFor(findPerformers, {
+      body: { ids: ["p1"] },
+      user: testUser(),
+    });
+    const res = resFor(findPerformers);
 
     await findPerformers(req, res);
 
@@ -634,8 +638,8 @@ describe("findPerformers", () => {
       new Error("DB down")
     );
 
-    const req = mockReq({}, {}, { id: 1, role: "USER" });
-    const res = mockRes();
+    const req = reqFor(findPerformers, { user: testUser() });
+    const res = resFor(findPerformers);
 
     await findPerformers(req, res);
 
@@ -656,19 +660,18 @@ describe("findPerformersMinimal", () => {
       performers
     );
 
-    const req = mockReq(
-      { filter: { q: "alice", sort: "name", direction: "ASC" } },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findPerformersMinimal, {
+      body: { filter: { q: "alice", sort: "name", direction: "ASC" } },
+      user: testUser(),
+    });
+    const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 
     expect(res._getStatus()).toBe(200);
-    const body = res._getBody();
+    const body = res._getOkBody();
     expect(body.performers).toHaveLength(1);
-    expect(body.performers[0].name).toBe("Alice");
+    expect(must(body.performers[0]).name).toBe("Alice");
   });
 
   it("applies count_filter to exclude performers below threshold", async () => {
@@ -680,18 +683,17 @@ describe("findPerformersMinimal", () => {
       performers
     );
 
-    const req = mockReq(
-      { count_filter: { min_scene_count: 5 } },
-      {},
-      { id: 1, role: "USER" }
-    );
-    const res = mockRes();
+    const req = reqFor(findPerformersMinimal, {
+      body: { count_filter: { min_scene_count: 5 } },
+      user: testUser(),
+    });
+    const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 
     expect(res._getStatus()).toBe(200);
-    expect(res._getBody().performers).toHaveLength(1);
-    expect(res._getBody().performers[0].id).toBe("p1");
+    expect(res._getOkBody().performers).toHaveLength(1);
+    expect(must(res._getOkBody().performers[0]).id).toBe("p1");
   });
 
   it("applies exclusion filtering for admin users", async () => {
@@ -700,8 +702,10 @@ describe("findPerformersMinimal", () => {
       createMockPerformer({ id: "p1" }),
     ]);
 
-    const req = mockReq({}, {}, { id: 1, role: "ADMIN" });
-    const res = mockRes();
+    const req = reqFor(findPerformersMinimal, {
+      user: testUser({ role: "ADMIN" }),
+    });
+    const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 
@@ -718,8 +722,8 @@ describe("findPerformersMinimal", () => {
       new Error("fail")
     );
 
-    const req = mockReq({}, {}, { id: 1, role: "USER" });
-    const res = mockRes();
+    const req = reqFor(findPerformersMinimal, { user: testUser() });
+    const res = resFor(findPerformersMinimal);
 
     await findPerformersMinimal(req, res);
 

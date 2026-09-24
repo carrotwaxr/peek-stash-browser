@@ -20,6 +20,7 @@ import {
   transformTag,
 } from "../../utils/stashUrlProxy.js";
 import { must } from "../helpers/must.js";
+import { untrusted } from "../helpers/untrusted.js";
 
 // Mock logger to suppress output and allow assertion on error logging
 vi.mock("../../utils/logger.js", () => ({
@@ -120,18 +121,15 @@ describe("stashUrlProxy", () => {
     });
 
     it("returns null unchanged", () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(convertToProxyUrl(null as any)).toBeNull();
+      expect(convertToProxyUrl(untrusted(null))).toBeNull();
     });
 
     it("returns undefined unchanged", () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(convertToProxyUrl(undefined as any)).toBeUndefined();
+      expect(convertToProxyUrl(untrusted(undefined))).toBeUndefined();
     });
 
     it("returns a non-string value unchanged", () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(convertToProxyUrl(42 as any)).toBe(42);
+      expect(convertToProxyUrl(untrusted(42))).toBe(42);
     });
 
     // --- URL with apikey in query ---

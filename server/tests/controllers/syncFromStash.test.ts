@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syncFromStash } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Build a mock StashClient using vi.hoisted so it's available in vi.mock factories
@@ -73,27 +74,6 @@ const mockInstanceManager = vi.mocked(stashInstanceManager);
 
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };
 const USER = { id: 2, username: "testuser", role: "USER" };
-
-function mockReq(
-  body: Record<string, unknown> = {},
-  params: Record<string, string> = {},
-  user: typeof ADMIN | typeof USER | Record<string, unknown> = ADMIN
-) {
-  return { body, params, user } as any;
-}
-
-function mockRes() {
-  const res: any = {
-    json: vi.fn().mockReturnThis(),
-    status: vi.fn().mockReturnThis(),
-    _getStatus: () => res.status.mock.calls[0]?.[0] ?? 200,
-    _getBody: () => {
-      const jsonCalls = res.json.mock.calls;
-      return jsonCalls[jsonCalls.length - 1]?.[0];
-    },
-  };
-  return res;
-}
 
 /** Default sync options (match the code defaults) */
 const DEFAULT_OPTIONS = {
@@ -175,35 +155,47 @@ describe("syncFromStash", () => {
 
   describe("auth and validation", () => {
     it("returns 403 when user is not admin", async () => {
-      const req = mockReq({}, { userId: "2" }, USER);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: USER,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(403);
-      expect(res._getBody().error).toMatch(/Only admins/);
+      expect(res._getErrorBody().error).toMatch(/Only admins/);
     });
 
     it("returns 403 when user is missing", async () => {
-      const req = mockReq({}, { userId: "2" }, {} as any);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: malformed({}),
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(403);
     });
 
     it("returns 400 when userId param is not a number", async () => {
-      const req = mockReq({}, { userId: "abc" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "abc" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/Invalid user ID/);
+      expect(res._getErrorBody().error).toMatch(/Invalid user ID/);
     });
 
     it("returns 400 when no Stash instances configured", async () => {
       mockInstanceManager.getAll.mockReturnValue([]);
-      const req = mockReq({}, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
       expect(res._getStatus()).toBe(400);
-      expect(res._getBody().error).toMatch(/No Stash instances/);
+      expect(res._getErrorBody().error).toMatch(/No Stash instances/);
     });
   });
 
@@ -216,8 +208,8 @@ describe("syncFromStash", () => {
         findScenes: { scenes, count: 2 },
       });
 
-      const req = mockReq(
-        {
+      const req = reqFor(syncFromStash, {
+        body: {
           options: {
             ...DEFAULT_OPTIONS,
             performers: { rating: false, favorite: false },
@@ -227,10 +219,10 @@ describe("syncFromStash", () => {
             groups: { rating: false },
           },
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findScenes).toHaveBeenCalledTimes(1);
@@ -239,7 +231,7 @@ describe("syncFromStash", () => {
           filter: { page: 1, per_page: 1000 },
         })
       );
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.stats.scenes.created).toBe(2);
     });
@@ -265,8 +257,8 @@ describe("syncFromStash", () => {
           },
         });
 
-      const req = mockReq(
-        {
+      const req = reqFor(syncFromStash, {
+        body: {
           options: {
             scenes: { rating: true, favorite: false, oCounter: false },
             performers: { rating: false, favorite: false },
@@ -276,10 +268,10 @@ describe("syncFromStash", () => {
             groups: { rating: false },
           },
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findScenes).toHaveBeenCalledTimes(2);
@@ -291,7 +283,7 @@ describe("syncFromStash", () => {
         2,
         expect.objectContaining({ filter: { page: 2, per_page: 1000 } })
       );
-      expect(res._getBody().stats.scenes.created).toBe(5);
+      expect(res._getOkBody().stats.scenes.created).toBe(5);
     });
 
     it("stops pagination when empty page is returned", async () => {
@@ -310,8 +302,8 @@ describe("syncFromStash", () => {
           },
         });
 
-      const req = mockReq(
-        {
+      const req = reqFor(syncFromStash, {
+        body: {
           options: {
             scenes: { rating: true, favorite: false, oCounter: false },
             performers: { rating: false, favorite: false },
@@ -321,24 +313,28 @@ describe("syncFromStash", () => {
             groups: { rating: false },
           },
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findScenes).toHaveBeenCalledTimes(2);
-      expect(res._getBody().stats.scenes.created).toBe(1);
+      expect(res._getOkBody().stats.scenes.created).toBe(1);
     });
 
     it("handles zero results gracefully", async () => {
       // Already set up in beforeEach: all return empty
 
-      const req = mockReq({ options: DEFAULT_OPTIONS }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: DEFAULT_OPTIONS },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.success).toBe(true);
       expect(body.stats.scenes.checked).toBe(0);
       expect(body.stats.scenes.created).toBe(0);
@@ -366,15 +362,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: scenesOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: scenesOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.stats.scenes.checked).toBe(3);
       // Only scenes with rating > 0 get created (scene "1" and "3")
       expect(body.stats.scenes.created).toBe(2);
@@ -392,15 +388,15 @@ describe("syncFromStash", () => {
         partialRow({ sceneId: "1", rating: 60 }),
       ]);
 
-      const req = mockReq(
-        { options: scenesOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: scenesOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.stats.scenes.updated).toBe(1);
       expect(body.stats.scenes.created).toBe(0);
     });
@@ -416,15 +412,15 @@ describe("syncFromStash", () => {
         partialRow({ sceneId: "1", rating: 80 }),
       ]);
 
-      const req = mockReq(
-        { options: scenesOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: scenesOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.stats.scenes.updated).toBe(0);
       expect(body.stats.scenes.created).toBe(0);
     });
@@ -441,11 +437,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq({ options: oCounterOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: oCounterOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // Only scene "1" has o_counter > 0
       expect(body.stats.scenes.created).toBe(1);
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -468,11 +468,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq({ options: bothOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: bothOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // Scene "2" is filtered out by the in-code filter (neither rating nor o_counter)
       // Scenes "1", "3", "4" pass the filter
       expect(body.stats.scenes.checked).toBe(3);
@@ -492,11 +496,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq({ options: bothOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: bothOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // The scene should be counted as created once, not twice
       expect(body.stats.scenes.created).toBe(1);
     });
@@ -507,12 +515,16 @@ describe("syncFromStash", () => {
         scenes: { rating: false, favorite: false, oCounter: false },
       };
 
-      const req = mockReq({ options: noScenesOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: noScenesOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findScenes).not.toHaveBeenCalled();
-      expect(res._getBody().stats.scenes.checked).toBe(0);
+      expect(res._getOkBody().stats.scenes.checked).toBe(0);
     });
   });
 
@@ -536,15 +548,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: performerOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: performerOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.stats.performers.checked).toBe(2);
       expect(body.stats.performers.created).toBe(2);
     });
@@ -560,15 +572,15 @@ describe("syncFromStash", () => {
         partialRow({ performerId: "1", rating: 50, favorite: false }),
       ]);
 
-      const req = mockReq(
-        { options: performerOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: performerOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      expect(res._getBody().stats.performers.updated).toBe(1);
+      expect(res._getOkBody().stats.performers.updated).toBe(1);
     });
 
     it("detects updates when existing favorite differs", async () => {
@@ -582,15 +594,15 @@ describe("syncFromStash", () => {
         partialRow({ performerId: "1", rating: 90, favorite: false }),
       ]);
 
-      const req = mockReq(
-        { options: performerOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: performerOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      expect(res._getBody().stats.performers.updated).toBe(1);
+      expect(res._getOkBody().stats.performers.updated).toBe(1);
     });
 
     it("uses in-code filter when both rating and favorite options are selected", async () => {
@@ -606,16 +618,16 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: performerOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: performerOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       // Only "1" and "3" pass the filter
-      expect(res._getBody().stats.performers.checked).toBe(2);
+      expect(res._getOkBody().stats.performers.checked).toBe(2);
     });
 
     it("applies GraphQL rating filter when only rating option is selected", async () => {
@@ -627,12 +639,12 @@ describe("syncFromStash", () => {
         findPerformers: { performers: [], count: 0 },
       });
 
-      const req = mockReq(
-        { options: ratingOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: ratingOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findPerformers).toHaveBeenCalledWith(
@@ -653,12 +665,12 @@ describe("syncFromStash", () => {
         findPerformers: { performers: [], count: 0 },
       });
 
-      const req = mockReq(
-        { options: favoriteOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: favoriteOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findPerformers).toHaveBeenCalledWith(
@@ -674,12 +686,12 @@ describe("syncFromStash", () => {
         performers: { rating: false, favorite: false },
       };
 
-      const req = mockReq(
-        { options: noPerformerOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: noPerformerOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findPerformers).not.toHaveBeenCalled();
@@ -706,15 +718,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: studioOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: studioOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      expect(res._getBody().stats.studios.created).toBe(1);
+      expect(res._getOkBody().stats.studios.created).toBe(1);
     });
 
     it("applies GraphQL rating filter when only rating selected", async () => {
@@ -726,8 +738,12 @@ describe("syncFromStash", () => {
         findStudios: { studios: [], count: 0 },
       });
 
-      const req = mockReq({ options: ratingOnly }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: ratingOnly },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findStudios).toHaveBeenCalledWith(
@@ -748,8 +764,12 @@ describe("syncFromStash", () => {
         findStudios: { studios: [], count: 0 },
       });
 
-      const req = mockReq({ options: favOnly }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: favOnly },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findStudios).toHaveBeenCalledWith(
@@ -780,11 +800,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: tagOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       expect(body.stats.tags.created).toBe(2);
       expect(body.stats.tags.checked).toBe(2);
     });
@@ -794,8 +818,12 @@ describe("syncFromStash", () => {
         findTags: { tags: [], count: 0 },
       });
 
-      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: tagOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findTags).toHaveBeenCalledWith(
@@ -816,11 +844,15 @@ describe("syncFromStash", () => {
         partialRow({ tagId: "1", favorite: false }),
       ]);
 
-      const req = mockReq({ options: tagOnlyOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: tagOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      expect(res._getBody().stats.tags.updated).toBe(1);
+      expect(res._getOkBody().stats.tags.updated).toBe(1);
     });
 
     it("skips tag sync when favorite is disabled", async () => {
@@ -829,8 +861,12 @@ describe("syncFromStash", () => {
         tags: { rating: false, favorite: false },
       };
 
-      const req = mockReq({ options: noTagOptions }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: noTagOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findTags).not.toHaveBeenCalled();
@@ -861,15 +897,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: galleryOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: galleryOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // Only "1" and "3" have rating > 0
       expect(body.stats.galleries.created).toBe(2);
       expect(body.stats.galleries.checked).toBe(2);
@@ -880,12 +916,12 @@ describe("syncFromStash", () => {
         findGalleries: { galleries: [], count: 0 },
       });
 
-      const req = mockReq(
-        { options: galleryOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: galleryOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findGalleries).toHaveBeenCalledWith(
@@ -916,15 +952,15 @@ describe("syncFromStash", () => {
         },
       });
 
-      const req = mockReq(
-        { options: groupOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: groupOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
-      const body = res._getBody();
+      const body = res._getOkBody();
       // Only "1" has rating > 0
       expect(body.stats.groups.created).toBe(1);
     });
@@ -963,14 +999,18 @@ describe("syncFromStash", () => {
         ["instance-2", partialRow(mockStash2)],
       ]);
 
-      const req = mockReq({ options: DEFAULT_OPTIONS }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: DEFAULT_OPTIONS },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockStashClient.findScenes).toHaveBeenCalled();
       expect(mockStash2.findScenes).toHaveBeenCalled();
       // Stats accumulate across instances
-      expect(res._getBody().stats.scenes.created).toBe(2);
+      expect(res._getOkBody().stats.scenes.created).toBe(2);
     });
   });
 
@@ -1013,14 +1053,18 @@ describe("syncFromStash", () => {
         ["working-instance", partialRow(workingStash)],
       ]);
 
-      const req = mockReq({ options: DEFAULT_OPTIONS }, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: DEFAULT_OPTIONS },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       // Should still succeed overall — only the failing instance is skipped
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
       expect(workingStash.findScenes).toHaveBeenCalled();
-      expect(res._getBody().stats.scenes.created).toBe(1);
+      expect(res._getOkBody().stats.scenes.created).toBe(1);
     });
 
     it("returns 500 when top-level error occurs", async () => {
@@ -1043,8 +1087,8 @@ describe("syncFromStash", () => {
       // Make the scene sync throw inside the instance loop — this is caught per-instance
       mockStashClient.findScenes.mockRejectedValue(new Error("GraphQL Error"));
 
-      const req = mockReq(
-        {
+      const req = reqFor(syncFromStash, {
+        body: {
           options: {
             scenes: { rating: true, favorite: false, oCounter: false },
             performers: { rating: false, favorite: false },
@@ -1054,14 +1098,14 @@ describe("syncFromStash", () => {
             groups: { rating: false },
           },
         },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       // Per-instance errors are caught, so sync still succeeds
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
@@ -1069,8 +1113,11 @@ describe("syncFromStash", () => {
 
   describe("default options", () => {
     it("uses default sync options when none provided in body", async () => {
-      const req = mockReq({}, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       // With defaults: scenes.rating=true, performers.rating+favorite=true,
@@ -1082,7 +1129,7 @@ describe("syncFromStash", () => {
       expect(mockStashClient.findTags).toHaveBeenCalled();
       expect(mockStashClient.findGalleries).toHaveBeenCalled();
       expect(mockStashClient.findGroups).toHaveBeenCalled();
-      expect(res._getBody().success).toBe(true);
+      expect(res._getOkBody().success).toBe(true);
     });
   });
 
@@ -1106,12 +1153,12 @@ describe("syncFromStash", () => {
         groups: { rating: false },
       };
 
-      const req = mockReq(
-        { options: scenesOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: scenesOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -1135,12 +1182,12 @@ describe("syncFromStash", () => {
         groups: { rating: false },
       };
 
-      const req = mockReq(
-        { options: scenesOnlyOptions },
-        { userId: "2" },
-        ADMIN
-      );
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        body: { options: scenesOnlyOptions },
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       // No upserts should be generated, so no transaction call
@@ -1152,8 +1199,11 @@ describe("syncFromStash", () => {
 
   describe("response shape", () => {
     it("returns expected response structure", async () => {
-      const req = mockReq({}, { userId: "2" }, ADMIN);
-      const res = mockRes();
+      const req = reqFor(syncFromStash, {
+        params: { userId: "2" },
+        user: ADMIN,
+      });
+      const res = resFor(syncFromStash);
       await syncFromStash(req, res);
 
       const body = res._getBody();

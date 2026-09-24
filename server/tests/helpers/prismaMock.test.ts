@@ -20,7 +20,7 @@ describe("createPrismaMock", () => {
   it("is not thenable", async () => {
     const prisma = createPrismaMock();
 
-    expect((prisma as unknown as { then?: unknown }).then).toBeUndefined();
+    expect(Reflect.get(prisma, "then")).toBeUndefined();
     // A module default export and an awaited value must be the mock itself
     const mod = await Promise.resolve({ default: prisma });
     expect(mod.default).toBe(prisma);
