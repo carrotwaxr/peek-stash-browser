@@ -75,6 +75,8 @@ vi.mock("../../prisma/singleton.js", () => ({
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    // A batch transaction resolves its operations in order
+    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
   },
 }));
 
