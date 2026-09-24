@@ -61,7 +61,9 @@ const main = async () => {
 
   // Start API server (needed for setup wizard if no Stash configured)
   const app = setupAPI();
-  startServer(app);
+  // PEEK_SERVER_PORT is for development and tests (E2E runs beside the dev
+  // stack); the Docker image's nginx forwards to 8000
+  startServer(app, Number(process.env.PEEK_SERVER_PORT) || 8000);
 
   // Schedule background jobs
   scheduleDownloadCleanup();

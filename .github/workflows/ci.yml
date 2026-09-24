@@ -193,12 +193,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
+      # Hermetic: Playwright starts its own server and client on a throwaway
+      # database, and global setup creates the run admin (e2e/support/env.ts)
       - name: Run E2E tests
         run: npx playwright test
         env:
           CI: true
-          E2E_USERNAME: admin
-          E2E_PASSWORD: admin123
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
