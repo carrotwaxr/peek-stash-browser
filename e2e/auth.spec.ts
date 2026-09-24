@@ -1,4 +1,11 @@
 import { expect, test } from "@playwright/test";
+import {
+  type TestUser,
+  completeSetup,
+  createUser,
+  deleteUser,
+  signIn,
+} from "./support/users";
 
 test.describe("Authentication", () => {
   test("authenticated user can access the home page", async ({ page }) => {
@@ -13,29 +20,55 @@ test.describe("Authentication", () => {
     await expect(page).toHaveURL(/\/settings/);
   });
 
-  test("logout redirects to login page", async ({ page }) => {
-    await page.goto("/settings");
-    await expect(page.getByRole("navigation").first()).toBeVisible();
+  // Sign Out sits in a different menu at each width: the top bar's user menu
+  // below 1024px (UserMenu.tsx), the collapsed sidebar's flyout up to 1279px,
+  // and the expanded sidebar's menu, under the username, from 1280px (the
+  // suite's width). Each gets a run.
+  const layouts = [
+    { layout: "top bar", width: 800, menu: () => "User menu" },
+    { layout: "collapsed sidebar", width: 1100, menu: () => "User menu" },
+    {
+      layout: "expanded sidebar",
+      width: 1280,
+      menu: (user: TestUser) => user.username,
+    },
+  ];
 
-    // Look for a logout button or link anywhere on the page
-    const logoutButton = page.getByRole("button", { name: /log\s?out/i });
-    const logoutLink = page.getByRole("link", { name: /log\s?out/i });
-    const logoutText = page.getByText(/log\s?out/i).first();
+  for (const { layout, width, menu } of layouts) {
+    test(`logout redirects to login page (${layout})`, async ({
+      request,
+      browser,
+      baseURL,
+    }) => {
+      // A throwaway user, so signing out leaves the run admin's session alone
+      const user = await createUser(request, "logout");
+      try {
+        const context = await signIn(browser, baseURL, user);
+        try {
+          await completeSetup(context);
+          const page = await context.newPage();
+          await page.setViewportSize({ width, height: 720 });
+          await page.goto("/");
+          await page
+            .getByRole("button", { name: menu(user), exact: true })
+            .click();
+          await page.getByRole("button", { name: "Sign Out" }).click();
+          await expect(page).toHaveURL(/\/login/);
 
-    if (await logoutButton.isVisible().catch(() => false)) {
-      await logoutButton.click();
-    } else if (await logoutLink.isVisible().catch(() => false)) {
-      await logoutLink.click();
-    } else if (await logoutText.isVisible().catch(() => false)) {
-      await logoutText.click();
-    } else {
-      // Skip if we can't find a logout control on this page
-      test.skip(true, "Could not find logout button");
-    }
-
-    await page.waitForURL(/\/login/, { timeout: 10_000 });
-    expect(page.url()).toContain("/login");
-  });
+          // The session cookie is gone, so a protected route goes back to the
+          // login page
+          await page.goto("/scenes");
+          await expect(page).toHaveURL(/\/login/);
+          const cookies = await context.cookies();
+          expect(cookies.map((cookie) => cookie.name)).not.toContain("token");
+        } finally {
+          await context.close();
+        }
+      } finally {
+        await deleteUser(request, user.id);
+      }
+    });
+  }
 });
 
 test.describe("Unauthenticated access", () => {
@@ -44,8 +77,9 @@ test.describe("Unauthenticated access", () => {
 
   test("unauthenticated user is redirected to login", async ({ page }) => {
     await page.goto("/");
-    await page.waitForURL(/\/(login|setup)/, { timeout: 10_000 });
-    expect(page.url()).toMatch(/\/(login|setup)/);
+    // Setup is complete in every mode, so /setup would be a bug
+    await page.waitForURL(/\/login/, { timeout: 10_000 });
+    expect(page.url()).toMatch(/\/login/);
   });
 
   test("login page renders correctly", async ({ page }) => {
@@ -104,7 +138,7 @@ test.describe("Unauthenticated access", () => {
     ).toBeVisible();
   });
 
-  test("protected routes redirect to login", async ({ page }) => {
+  test("protected routes redirect to login", async ({ context }) => {
     const protectedRoutes = [
       "/scenes",
       "/performers",
@@ -113,9 +147,13 @@ test.describe("Unauthenticated access", () => {
     ];
 
     for (const route of protectedRoutes) {
+      // A fresh page per route: a stray second navigation left by one route
+      // fails that route's assertions rather than interrupting the next goto
+      const page = await context.newPage();
       await page.goto(route);
-      await page.waitForURL(/\/(login|setup)/, { timeout: 10_000 });
-      expect(page.url()).toMatch(/\/(login|setup)/);
+      await expect(page, `${route} redirects to login`).toHaveURL(/\/login/);
+      await expect(page.getByLabel("Username")).toBeVisible();
+      await page.close();
     }
   });
 });
