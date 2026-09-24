@@ -228,6 +228,19 @@ try {
     );
   });
 
+  await check(
+    "@peek/shared-types is a package directory in /app/node_modules",
+    () => {
+      docker(
+        "exec",
+        name,
+        "sh",
+        "-c",
+        "test -d /app/node_modules/@peek/shared-types && test ! -L /app/node_modules/@peek/shared-types && test -f /app/node_modules/@peek/shared-types/dist/instanceAwareId.js && test ! -e /shared"
+      );
+    }
+  );
+
   await check("@peek/shared-types resolves from the backend", () => {
     docker(
       "exec",
