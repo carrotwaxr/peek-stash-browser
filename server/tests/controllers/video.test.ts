@@ -18,6 +18,7 @@ import {
   isStreamLinkSignatureValid,
 } from "../../utils/streamLink.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
+import { must } from "../helpers/must.js";
 
 // ---------------------------------------------------------------------------
 // Mocks (must come before imports)
@@ -625,8 +626,9 @@ describe("Video Controller", () => {
           createMockRes()
         );
 
-        const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock
-          .calls[0];
+        const fetchCall = must(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        );
         expect(fetchCall[1].headers, streamPath).not.toHaveProperty("Range");
       }
     });
@@ -679,8 +681,9 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
-        const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock
-          .calls[0];
+        const fetchCall = must(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        );
         expect(fetchCall[1].headers).toEqual(
           expect.objectContaining({ Range: "bytes=0-1024" })
         );
@@ -801,8 +804,9 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
-          .calls[0][0];
+        const stashUrl: string = must(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        )[0];
         expect(stashUrl).toBe(
           "http://stash:9999/scene/123/stream.mp4?resolution=LOW&start=12.5"
         );
@@ -955,8 +959,9 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
-          .calls[0][0];
+        const stashUrl: string = must(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        )[0];
         expect(stashUrl).not.toContain("instanceId");
         expect(stashUrl).toContain("resolution=FULL_HD");
       });
@@ -978,8 +983,9 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
-        const stashUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
-          .calls[0][0];
+        const stashUrl: string = must(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        )[0];
         expect(stashUrl).toBe("http://stash:9999/scene/123/stream.m3u8/0.ts");
       });
 
@@ -1111,8 +1117,9 @@ describe("Video Controller", () => {
 
       await getCaption(req, res);
 
-      const fetchUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
-        .calls[0][0];
+      const fetchUrl: string = must(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      )[0];
       expect(fetchUrl).toBe(
         "http://stash:9999/scene/456/caption?lang=en&type=srt"
       );
@@ -1157,8 +1164,9 @@ describe("Video Controller", () => {
 
       await getCaption(req, res);
 
-      const fetchUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
-        .calls[0][0];
+      const fetchUrl: string = must(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      )[0];
       const url = new URL(fetchUrl);
       expect(url.pathname).toBe("/scene/456/caption");
       expect([...url.searchParams.entries()]).toEqual([
@@ -1237,8 +1245,9 @@ describe("Video Controller", () => {
 
       await getCaption(req, res);
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock
-        .calls[0];
+      const fetchCall = must(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      );
       const fetchUrl: string = fetchCall[0];
       const fetchOptions = fetchCall[1];
 
@@ -1429,8 +1438,9 @@ describe("Video Controller", () => {
 
       await proxyStashStream(req, res);
 
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock
-        .calls[0];
+      const fetchCall = must(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      );
       const fetchUrl: string = fetchCall[0];
       const fetchOptions = fetchCall[1];
 

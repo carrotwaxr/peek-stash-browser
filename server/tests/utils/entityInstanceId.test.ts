@@ -12,6 +12,7 @@ import {
   getEntityInstanceId,
   getEntityInstanceIds,
 } from "../../utils/entityInstanceId.js";
+import { must } from "../helpers/must.js";
 
 // Hoist mock function so it can be referenced in vi.mock factory
 const { mockGetAllConfigs } = vi.hoisted(() => ({
@@ -404,9 +405,9 @@ describe("entityInstanceId", () => {
       ]);
 
       // Default instance never gets suffix
-      expect(result[0].name).toBe("Shared Name");
+      expect(must(result[0]).name).toBe("Shared Name");
       // Non-default gets suffix
-      expect(result[1].name).toBe("Shared Name (Secondary Stash)");
+      expect(must(result[1]).name).toBe("Shared Name (Secondary Stash)");
     });
 
     it("handles empty entity list", () => {
@@ -452,12 +453,12 @@ describe("entityInstanceId", () => {
         { id: "6", name: "Another Dup", instanceId: "bbb-222" },
       ]);
 
-      expect(result[0].name).toBe("Jane Doe");
-      expect(result[1].name).toBe("Jane Doe (Secondary Stash)");
-      expect(result[2].name).toBe("Unique Name"); // No dup, no suffix
-      expect(result[3].name).toBe("Unique Name 2"); // No dup, no suffix
-      expect(result[4].name).toBe("Another Dup");
-      expect(result[5].name).toBe("Another Dup (Secondary Stash)");
+      expect(must(result[0]).name).toBe("Jane Doe");
+      expect(must(result[1]).name).toBe("Jane Doe (Secondary Stash)");
+      expect(must(result[2]).name).toBe("Unique Name"); // No dup, no suffix
+      expect(must(result[3]).name).toBe("Unique Name 2"); // No dup, no suffix
+      expect(must(result[4]).name).toBe("Another Dup");
+      expect(must(result[5]).name).toBe("Another Dup (Secondary Stash)");
     });
   });
 });

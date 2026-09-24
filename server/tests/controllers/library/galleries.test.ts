@@ -20,6 +20,7 @@ import { galleryQueryBuilder } from "../../../services/GalleryQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockGallery } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -130,7 +131,7 @@ describe("Galleries Controller", () => {
       ];
       const result = await applyGalleryFilters(galleries, { favorite: true });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by rating100 GREATER_THAN", async () => {
@@ -142,7 +143,7 @@ describe("Galleries Controller", () => {
         rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by rating100 BETWEEN", async () => {
@@ -159,7 +160,7 @@ describe("Galleries Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by image_count GREATER_THAN", async () => {
@@ -171,7 +172,7 @@ describe("Galleries Controller", () => {
         image_count: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by image_count EQUALS", async () => {
@@ -183,7 +184,7 @@ describe("Galleries Controller", () => {
         image_count: { modifier: CriterionModifier.Equals, value: 10 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by title text search", async () => {
@@ -195,7 +196,7 @@ describe("Galleries Controller", () => {
         title: { value: "beach", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by studios (with hierarchy expansion)", async () => {
@@ -217,7 +218,7 @@ describe("Galleries Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by performers", async () => {
@@ -238,7 +239,7 @@ describe("Galleries Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
 
     it("filters by tags (with hierarchy expansion)", async () => {
@@ -259,7 +260,7 @@ describe("Galleries Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("g1");
+      expect(must(result[0]).id).toBe("g1");
     });
   });
 

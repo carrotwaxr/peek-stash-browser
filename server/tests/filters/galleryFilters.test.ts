@@ -18,6 +18,7 @@ import {
   createMockStudios,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Gallery Filters", () => {
   let mockTags: ReturnType<typeof createMockTags>;
@@ -36,7 +37,7 @@ describe("Gallery Filters", () => {
     it("should filter galleries by single ID", async () => {
       const filter: PeekGalleryFilter = {
         ids: {
-          value: coerceEntityRefs([mockGalleries[0].id]),
+          value: coerceEntityRefs([must(mockGalleries[0]).id]),
           modifier: "INCLUDES",
         },
       };
@@ -44,14 +45,14 @@ describe("Gallery Filters", () => {
       const result = await applyGalleryFilters(mockGalleries, filter);
 
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(mockGalleries[0].id);
+      expect(must(result[0]).id).toBe(must(mockGalleries[0]).id);
     });
 
     it("should filter galleries by multiple IDs", async () => {
       const targetIds = [
-        mockGalleries[0].id,
-        mockGalleries[5].id,
-        mockGalleries[10].id,
+        must(mockGalleries[0]).id,
+        must(mockGalleries[5]).id,
+        must(mockGalleries[10]).id,
       ];
       const filter: PeekGalleryFilter = {
         ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
@@ -290,7 +291,7 @@ describe("Gallery Filters", () => {
 
   describe("Studio Filter", () => {
     it("should filter galleries by studio", async () => {
-      const studioId = mockStudios[0].id;
+      const studioId = must(mockStudios[0]).id;
       const filter: PeekGalleryFilter = {
         studios: {
           value: coerceEntityRefs([studioId]),
@@ -301,7 +302,7 @@ describe("Gallery Filters", () => {
       // Add studio to some galleries
       const galleriesWithStudio = mockGalleries.map((g, i) => ({
         ...g,
-        studio: i % 3 === 0 ? mockStudios[0] : null,
+        studio: i % 3 === 0 ? must(mockStudios[0]) : null,
       }));
 
       const result = await applyGalleryFilters(galleriesWithStudio, filter);
@@ -313,7 +314,7 @@ describe("Gallery Filters", () => {
     });
 
     it("should filter galleries by multiple studios", async () => {
-      const studioIds = [mockStudios[0].id, mockStudios[1].id];
+      const studioIds = [must(mockStudios[0]).id, must(mockStudios[1]).id];
       const filter: PeekGalleryFilter = {
         studios: {
           value: coerceEntityRefs(studioIds),
@@ -325,7 +326,11 @@ describe("Gallery Filters", () => {
       const galleriesWithStudios = mockGalleries.map((g, i) => ({
         ...g,
         studio:
-          i % 2 === 0 ? mockStudios[0] : i % 3 === 0 ? mockStudios[1] : null,
+          i % 2 === 0
+            ? must(mockStudios[0])
+            : i % 3 === 0
+              ? must(mockStudios[1])
+              : null,
       }));
 
       const result = await applyGalleryFilters(galleriesWithStudios, filter);
@@ -344,7 +349,7 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         studios: {
-          value: coerceEntityRefs([mockStudios[0].id]),
+          value: coerceEntityRefs([must(mockStudios[0]).id]),
           modifier: CriterionModifier.Includes,
         },
       };
@@ -357,7 +362,7 @@ describe("Gallery Filters", () => {
 
   describe("Performers Filter", () => {
     it("should filter galleries by performer", async () => {
-      const performerId = mockPerformers[0].id;
+      const performerId = must(mockPerformers[0]).id;
       const filter: PeekGalleryFilter = {
         performers: {
           value: coerceEntityRefs([performerId]),
@@ -368,7 +373,7 @@ describe("Gallery Filters", () => {
       // Add performers to some galleries
       const galleriesWithPerformers = mockGalleries.map((g, i) => ({
         ...g,
-        performers: i % 3 === 0 ? [mockPerformers[0]] : [],
+        performers: i % 3 === 0 ? [must(mockPerformers[0])] : [],
       }));
 
       const result = await applyGalleryFilters(galleriesWithPerformers, filter);
@@ -380,7 +385,10 @@ describe("Gallery Filters", () => {
     });
 
     it("should filter galleries by multiple performers", async () => {
-      const performerIds = [mockPerformers[0].id, mockPerformers[1].id];
+      const performerIds = [
+        must(mockPerformers[0]).id,
+        must(mockPerformers[1]).id,
+      ];
       const filter: PeekGalleryFilter = {
         performers: {
           value: coerceEntityRefs(performerIds),
@@ -393,9 +401,9 @@ describe("Gallery Filters", () => {
         ...g,
         performers:
           i % 2 === 0
-            ? [mockPerformers[0]]
+            ? [must(mockPerformers[0])]
             : i % 3 === 0
-              ? [mockPerformers[1]]
+              ? [must(mockPerformers[1])]
               : [],
       }));
 
@@ -413,7 +421,7 @@ describe("Gallery Filters", () => {
 
   describe("Tags Filter", () => {
     it("should filter galleries by tag", async () => {
-      const tagId = mockTags[0].id;
+      const tagId = must(mockTags[0]).id;
       const filter: PeekGalleryFilter = {
         tags: {
           value: coerceEntityRefs([tagId]),
@@ -424,7 +432,7 @@ describe("Gallery Filters", () => {
       // Add tags to some galleries
       const galleriesWithTags = mockGalleries.map((g, i) => ({
         ...g,
-        tags: i % 3 === 0 ? [mockTags[0]] : [],
+        tags: i % 3 === 0 ? [must(mockTags[0])] : [],
       }));
 
       const result = await applyGalleryFilters(galleriesWithTags, filter);
@@ -436,7 +444,7 @@ describe("Gallery Filters", () => {
     });
 
     it("should filter galleries by multiple tags", async () => {
-      const tagIds = [mockTags[0].id, mockTags[1].id];
+      const tagIds = [must(mockTags[0]).id, must(mockTags[1]).id];
       const filter: PeekGalleryFilter = {
         tags: {
           value: coerceEntityRefs(tagIds),
@@ -447,7 +455,12 @@ describe("Gallery Filters", () => {
       // Add tags to some galleries
       const galleriesWithTags = mockGalleries.map((g, i) => ({
         ...g,
-        tags: i % 2 === 0 ? [mockTags[0]] : i % 3 === 0 ? [mockTags[1]] : [],
+        tags:
+          i % 2 === 0
+            ? [must(mockTags[0])]
+            : i % 3 === 0
+              ? [must(mockTags[1])]
+              : [],
       }));
 
       const result = await applyGalleryFilters(galleriesWithTags, filter);
@@ -517,7 +530,7 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         tags: {
-          value: coerceEntityRefs([mockTags[0].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id]),
           modifier: CriterionModifier.Includes,
         },
       };
@@ -535,7 +548,7 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         performers: {
-          value: coerceEntityRefs([mockPerformers[0].id]),
+          value: coerceEntityRefs([must(mockPerformers[0]).id]),
           modifier: CriterionModifier.Includes,
         },
       };

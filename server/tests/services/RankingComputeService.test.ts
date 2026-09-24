@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -108,7 +109,7 @@ describe("RankingComputeService", () => {
 
       const rankings = getWrittenRankings(txMock, "performer");
       expect(rankings).toHaveLength(1);
-      expect(rankings[0].engagementScore).toBe(15);
+      expect(must(rankings[0]).engagementScore).toBe(15);
     });
 
     it("normalizes duration by average scene duration", async () => {
@@ -131,7 +132,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      expect(rankings[0].engagementScore).toBe(2);
+      expect(must(rankings[0]).engagementScore).toBe(2);
     });
   });
 
@@ -156,7 +157,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      expect(rankings[0].engagementRate).toBeCloseTo(2.2, 5);
+      expect(must(rankings[0]).engagementRate).toBeCloseTo(2.2, 5);
     });
 
     it("uses Math.max(libraryPresence, 1) to avoid division by zero", async () => {
@@ -178,9 +179,9 @@ describe("RankingComputeService", () => {
 
       const rankings = getWrittenRankings(txMock, "performer");
       // Should not be Infinity — divides by max(0, 1) = 1
-      expect(Number.isFinite(rankings[0].engagementRate)).toBe(true);
+      expect(Number.isFinite(must(rankings[0]).engagementRate)).toBe(true);
       // score = (1 × 5) + 1 + 5 = 11, rate = 11 / 1 = 11
-      expect(rankings[0].engagementRate).toBe(11);
+      expect(must(rankings[0]).engagementRate).toBe(11);
     });
   });
 
@@ -225,9 +226,9 @@ describe("RankingComputeService", () => {
       expect(rankings).toHaveLength(3);
 
       const byId = Object.fromEntries(rankings.map((r) => [r.entityId, r]));
-      expect(byId["top"].percentileRank).toBe(100);
-      expect(byId["low"].percentileRank).toBe(0);
-      expect(byId["mid"].percentileRank).toBe(50);
+      expect(must(byId["top"]).percentileRank).toBe(100);
+      expect(must(byId["low"]).percentileRank).toBe(0);
+      expect(must(byId["mid"]).percentileRank).toBe(50);
     });
 
     it("assigns 100 to a single entity", async () => {
@@ -254,7 +255,7 @@ describe("RankingComputeService", () => {
       // Hmm, that means a single entity gets 0, not 100. Let me verify...
       // Actually looking at the code: Math.round((100 * (n - i - 1)) / Math.max(n - 1, 1))
       // n=1, i=0: 100 * (1 - 0 - 1) / max(0, 1) = 100 * 0 / 1 = 0
-      expect(rankings[0].percentileRank).toBe(0);
+      expect(must(rankings[0]).percentileRank).toBe(0);
     });
 
     it("handles ties — entities with same engagement rate get same percentile", async () => {
@@ -295,9 +296,13 @@ describe("RankingComputeService", () => {
       const byId = Object.fromEntries(rankings.map((r) => [r.entityId, r]));
 
       // a and b have identical engagement rates, so they must share the same percentile
-      expect(byId["a"].percentileRank).toBe(byId["b"].percentileRank);
+      expect(must(byId["a"]).percentileRank).toBe(
+        must(byId["b"]).percentileRank
+      );
       // c has lower engagement rate, so lower percentile
-      expect(byId["c"].percentileRank).toBeLessThan(byId["a"].percentileRank);
+      expect(must(byId["c"]).percentileRank).toBeLessThan(
+        must(byId["a"]).percentileRank
+      );
     });
   });
 
@@ -455,7 +460,7 @@ describe("RankingComputeService", () => {
 
       const rankings = getWrittenRankings(txMock, "performer");
       // normalized = 2400 / 1200 = 2.0, score = 0 + 2.0 + 0 = 2.0
-      expect(rankings[0].engagementScore).toBe(2);
+      expect(must(rankings[0]).engagementScore).toBe(2);
     });
   });
 
@@ -479,7 +484,7 @@ describe("RankingComputeService", () => {
       const rankings = getWrittenRankings(txMock, "performer");
       expect(rankings).toHaveLength(1);
 
-      const record = rankings[0];
+      const record = must(rankings[0]);
       expect(Number.isInteger(record.playCount)).toBe(true);
       expect(Number.isInteger(record.oCount)).toBe(true);
       expect(Number.isInteger(record.libraryPresence)).toBe(true);
@@ -502,9 +507,9 @@ describe("RankingComputeService", () => {
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      expect(rankings[0].playCount).toBe(5);
-      expect(rankings[0].oCount).toBe(3);
-      expect(rankings[0].libraryPresence).toBe(10);
+      expect(must(rankings[0]).playCount).toBe(5);
+      expect(must(rankings[0]).oCount).toBe(3);
+      expect(must(rankings[0]).libraryPresence).toBe(10);
     });
   });
 
@@ -526,7 +531,7 @@ describe("RankingComputeService", () => {
       await rankingComputeService.recomputeAllRankings(1);
 
       const rankings = getWrittenRankings(txMock, "performer");
-      expect(rankings[0].instanceId).toBe("");
+      expect(must(rankings[0]).instanceId).toBe("");
     });
   });
 });

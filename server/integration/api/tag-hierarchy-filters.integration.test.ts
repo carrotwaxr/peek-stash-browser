@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -180,7 +181,7 @@ describe("Tag Hierarchy Filters", () => {
       );
 
       if (parentResponse.data.findTags.count > 0) {
-        const parentTagId = parentResponse.data.findTags.tags[0].id;
+        const parentTagId = must(parentResponse.data.findTags.tags[0]).id;
 
         // Now filter scenes by this parent tag
         const response = await adminClient.post<FindScenesResponse>(
@@ -212,7 +213,7 @@ describe("Tag Hierarchy Filters", () => {
 
       expect(response.ok).toBe(true);
       expect(response.data.findTags.tags).toHaveLength(1);
-      expect(response.data.findTags.tags[0].id).toBe(
+      expect(must(response.data.findTags.tags[0]).id).toBe(
         TEST_ENTITIES.tagWithEntities
       );
     });

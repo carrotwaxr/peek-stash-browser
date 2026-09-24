@@ -1,4 +1,5 @@
 import { expect } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 
 export interface BenchmarkResult {
   name: string;
@@ -57,10 +58,10 @@ export async function measureEndpoint(
   times.sort((a, b) => a - b);
 
   const avg = times.reduce((sum, t) => sum + t, 0) / times.length;
-  const min = times[0];
-  const max = times[times.length - 1];
+  const min = must(times[0], "fastest time");
+  const max = must(times[times.length - 1], "slowest time");
   const p95Index = Math.ceil(times.length * 0.95) - 1;
-  const p95 = times[p95Index];
+  const p95 = must(times[p95Index], "p95 time");
 
   let status: BenchmarkResult["status"];
   if (avg <= opts.passThreshold) {

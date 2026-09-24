@@ -14,6 +14,7 @@ import {
   createMockGroups,
   createMockTags,
 } from "../helpers/mockDataGenerators.js";
+import { must } from "../helpers/must.js";
 
 describe("Group Filters", () => {
   let mockTags: ReturnType<typeof createMockTags>;
@@ -28,7 +29,7 @@ describe("Group Filters", () => {
     it("should filter groups by single ID", async () => {
       const filter: PeekGroupFilter = {
         ids: {
-          value: coerceEntityRefs([mockGroups[0].id]),
+          value: coerceEntityRefs([must(mockGroups[0]).id]),
           modifier: "INCLUDES",
         },
       };
@@ -36,11 +37,15 @@ describe("Group Filters", () => {
       const result = await applyGroupFilters(mockGroups, filter);
 
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(mockGroups[0].id);
+      expect(must(result[0]).id).toBe(must(mockGroups[0]).id);
     });
 
     it("should filter groups by multiple IDs", async () => {
-      const targetIds = [mockGroups[0].id, mockGroups[5].id, mockGroups[10].id];
+      const targetIds = [
+        must(mockGroups[0]).id,
+        must(mockGroups[5]).id,
+        must(mockGroups[10]).id,
+      ];
       const filter: PeekGroupFilter = {
         ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
@@ -115,7 +120,7 @@ describe("Group Filters", () => {
 
   describe("Tags Filter", () => {
     it("should filter groups by tags with INCLUDES modifier", async () => {
-      const tagId = mockTags[0].id;
+      const tagId = must(mockTags[0]).id;
       const filter: PeekGroupFilter = {
         tags: {
           value: coerceEntityRefs([tagId]),
@@ -126,7 +131,7 @@ describe("Group Filters", () => {
       // Add tags to some groups
       const groupsWithTags = mockGroups.map((g, i) => ({
         ...g,
-        tags: i % 3 === 0 ? [mockTags[0]] : [],
+        tags: i % 3 === 0 ? [must(mockTags[0])] : [],
       }));
 
       const result = await applyGroupFilters(groupsWithTags, filter);
@@ -138,7 +143,7 @@ describe("Group Filters", () => {
     });
 
     it("should filter groups by tags with INCLUDES_ALL modifier", async () => {
-      const tagIds = [mockTags[0].id, mockTags[1].id];
+      const tagIds = [must(mockTags[0]).id, must(mockTags[1]).id];
       const filter: PeekGroupFilter = {
         tags: {
           value: coerceEntityRefs(tagIds),
@@ -151,9 +156,9 @@ describe("Group Filters", () => {
         ...g,
         tags:
           i % 5 === 0
-            ? [mockTags[0], mockTags[1]]
+            ? [must(mockTags[0]), must(mockTags[1])]
             : i % 3 === 0
-              ? [mockTags[0]]
+              ? [must(mockTags[0])]
               : [],
       }));
 
@@ -168,7 +173,7 @@ describe("Group Filters", () => {
     });
 
     it("should filter groups by tags with EXCLUDES modifier", async () => {
-      const tagId = mockTags[0].id;
+      const tagId = must(mockTags[0]).id;
       const filter: PeekGroupFilter = {
         tags: {
           value: coerceEntityRefs([tagId]),
@@ -179,7 +184,7 @@ describe("Group Filters", () => {
       // Add tags to some groups
       const groupsWithTags = mockGroups.map((g, i) => ({
         ...g,
-        tags: i % 3 === 0 ? [mockTags[0]] : [],
+        tags: i % 3 === 0 ? [must(mockTags[0])] : [],
       }));
 
       const result = await applyGroupFilters(groupsWithTags, filter);
@@ -316,7 +321,7 @@ describe("Group Filters", () => {
 
       const filter: PeekGroupFilter = {
         tags: {
-          value: coerceEntityRefs([mockTags[0].id]),
+          value: coerceEntityRefs([must(mockTags[0]).id]),
           modifier: CriterionModifier.Includes,
         },
       };

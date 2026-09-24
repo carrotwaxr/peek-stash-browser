@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
@@ -488,7 +489,7 @@ describe("Image Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findImages.images.length).toBe(1);
 
-      const image = response.data.findImages.images[0];
+      const image = must(response.data.findImages.images[0]);
 
       // Image should have its own title (title is never inherited)
       // The image file should have a title derived from its filename or set manually
@@ -560,7 +561,7 @@ describe("Image Filters", () => {
       );
 
       expect(imageResponse.ok).toBe(true);
-      const image = imageResponse.data.findImages.images[0];
+      const image = must(imageResponse.data.findImages.images[0]);
 
       if (!image.tags || image.tags.length === 0) {
         console.log("Skipping tag filter test - test image has no tags");
@@ -568,7 +569,7 @@ describe("Image Filters", () => {
       }
 
       // Now filter by that tag - should find the image
-      const tagId = image.tags[0].id;
+      const tagId = must(image.tags[0]).id;
       const filterResponse = await adminClient.post<FindImagesResponse>(
         "/api/library/images",
         {
@@ -612,7 +613,7 @@ describe("Image Filters", () => {
       );
 
       expect(imageResponse.ok).toBe(true);
-      const image = imageResponse.data.findImages.images[0];
+      const image = must(imageResponse.data.findImages.images[0]);
 
       if (!image.studio) {
         console.log("Skipping studio filter test - test image has no studio");
@@ -636,7 +637,7 @@ describe("Image Filters", () => {
       expect(filterResponse.ok).toBe(true);
       // The key assertion: image with inherited studio should match studio filter
       expect(filterResponse.data.findImages.count).toBe(1);
-      expect(filterResponse.data.findImages.images[0].id).toBe(imageId);
+      expect(must(filterResponse.data.findImages.images[0]).id).toBe(imageId);
     });
 
     it("verifies image with own properties is not overwritten by gallery", async () => {
@@ -667,7 +668,7 @@ describe("Image Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findImages.images.length).toBe(1);
 
-      const image = response.data.findImages.images[0];
+      const image = must(response.data.findImages.images[0]);
 
       // Image should have its own title
       expect(image.id).toBe(imageId);

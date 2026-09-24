@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient, guestClient } from "../helpers/testClient.js";
 
@@ -68,7 +69,7 @@ describe("Timeline API", () => {
       expect(response.ok).toBe(true);
 
       if (response.data.distribution.length > 0) {
-        const item = response.data.distribution[0];
+        const item = must(response.data.distribution[0]);
         expect(item.period).toBeDefined();
         expect(typeof item.period).toBe("string");
         expect(item.count).toBeDefined();

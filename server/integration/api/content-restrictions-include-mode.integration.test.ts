@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import {
   TestClient,
@@ -98,9 +99,9 @@ describe("Content Restrictions INCLUDE Mode Integration Tests", () => {
     }
 
     // Use first 3 tags
-    tag1Id = tagsResponse.data.findTags.tags[0].id;
-    tag2Id = tagsResponse.data.findTags.tags[1].id;
-    tag3Id = tagsResponse.data.findTags.tags[2].id;
+    tag1Id = must(tagsResponse.data.findTags.tags[0]).id;
+    tag2Id = must(tagsResponse.data.findTags.tags[1]).id;
+    tag3Id = must(tagsResponse.data.findTags.tags[2]).id;
 
     // Clean up any existing restrictions for this user
     await adminClient.delete(`/api/user/${testUserId}/restrictions`);

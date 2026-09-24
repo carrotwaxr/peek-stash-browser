@@ -19,6 +19,7 @@ import {
   transformStudio,
   transformTag,
 } from "../../utils/stashUrlProxy.js";
+import { must } from "../helpers/must.js";
 
 // Mock logger to suppress output and allow assertion on error logging
 vi.mock("../../utils/logger.js", () => ({
@@ -71,7 +72,7 @@ type FlattenedSceneGroup = {
 const decodedPath = (proxyUrl: string): string => {
   const match = proxyUrl.match(/\?path=(.+)$/);
   if (!match) throw new Error(`Not a proxy URL: ${proxyUrl}`);
-  return decodeURIComponent(match[1]);
+  return decodeURIComponent(must(match[1], "path param"));
 };
 
 describe("stashUrlProxy", () => {
@@ -268,8 +269,8 @@ describe("stashUrlProxy", () => {
 
       const result = transformPerformer(performer);
 
-      expect(result.tags![0].image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(result.tags![1].image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![1]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles nested tag with null image_path", () => {
@@ -280,7 +281,7 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformPerformer(performer);
-      expect(result.tags![0].image_path).toBeNull();
+      expect(must(result.tags![0]).image_path).toBeNull();
     });
 
     it("does not crash with no tags array", () => {
@@ -312,12 +313,12 @@ describe("stashUrlProxy", () => {
         tags: [{ id: "t1", image_path: stashUrl("/tag/t1/image") }],
       };
       const originalImagePath = original.image_path;
-      const originalTagImagePath = original.tags[0].image_path;
+      const originalTagImagePath = must(original.tags[0]).image_path;
 
       transformPerformer(original);
 
       expect(original.image_path).toBe(originalImagePath);
-      expect(original.tags[0].image_path).toBe(originalTagImagePath);
+      expect(must(original.tags[0]).image_path).toBe(originalTagImagePath);
     });
 
     it("preserves extra fields on the performer object", () => {
@@ -367,8 +368,8 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformStudio(studio);
-      expect(result.tags![0].image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(result.tags![1].image_path).toBeNull();
+      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![1]).image_path).toBeNull();
     });
 
     it("does not crash with no tags array", () => {
@@ -441,7 +442,7 @@ describe("stashUrlProxy", () => {
       const result = transformTag(tag);
       // transformTag does not recurse into nested tags
       // The nested tag's image_path should NOT be transformed
-      expect(result.tags![0].image_path).toBe(stashUrl("/tag/t2/image"));
+      expect(must(result.tags![0]).image_path).toBe(stashUrl("/tag/t2/image"));
     });
 
     it("preserves extra fields", () => {
@@ -572,7 +573,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      const streamUrl = result.sceneStreams![0].url;
+      const streamUrl = must(result.sceneStreams![0]).url;
 
       expect(streamUrl).not.toContain("apikey");
       expect(streamUrl).not.toContain("SECRET");
@@ -595,7 +596,7 @@ describe("stashUrlProxy", () => {
       // URL.searchParams.delete is case-sensitive for param names,
       // but our regex fallback handles case insensitivity
       // Test the actual behavior
-      const streamUrl = result.sceneStreams![0].url;
+      const streamUrl = must(result.sceneStreams![0]).url;
       // "apikey" (lowercase) would be deleted by searchParams.delete("apikey")
       // "ApiKey" would NOT be deleted by searchParams.delete("apikey"),
       // but the URL constructor normalizes, so test against actual behavior
@@ -616,9 +617,11 @@ describe("stashUrlProxy", () => {
     it("preserves sceneStreams mime_type and label", () => {
       const result = transformScene(makeScene());
 
-      expect(result.sceneStreams![0].mime_type).toBe("video/mp4");
-      expect(result.sceneStreams![0].label).toBe("Direct");
-      expect(result.sceneStreams![1].mime_type).toBe("application/x-mpegURL");
+      expect(must(result.sceneStreams![0]).mime_type).toBe("video/mp4");
+      expect(must(result.sceneStreams![0]).label).toBe("Direct");
+      expect(must(result.sceneStreams![1]).mime_type).toBe(
+        "application/x-mpegURL"
+      );
     });
 
     it("handles empty sceneStreams array", () => {
@@ -645,7 +648,7 @@ describe("stashUrlProxy", () => {
       });
 
       const result = transformScene(scene);
-      expect(result.sceneStreams![0].url).toBe(
+      expect(must(result.sceneStreams![0]).url).toBe(
         stashUrl("/scene/42/stream.mp4")
       );
     });
@@ -655,13 +658,15 @@ describe("stashUrlProxy", () => {
     it("transforms nested performers image_paths", () => {
       const result = transformScene(makeScene());
 
-      expect(result.performers![0].image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.performers![0]).image_path).toMatch(
+        /^\/api\/proxy\/stash/
+      );
     });
 
     it("transforms nested performer tags image_paths", () => {
       const result = transformScene(makeScene());
 
-      expect(result.performers![0].tags![0].image_path).toMatch(
+      expect(must(must(result.performers![0]).tags![0]).image_path).toMatch(
         /^\/api\/proxy\/stash/
       );
     });
@@ -677,7 +682,7 @@ describe("stashUrlProxy", () => {
 
     it("transforms nested tags image_paths", () => {
       const result = transformScene(makeScene());
-      expect(result.tags![0].image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles missing tags array", () => {
@@ -712,7 +717,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(makeScene());
 
       // Groups should be flattened from { group: {...}, scene_index } to { ...groupFields, scene_index }
-      const group = (result.groups! as FlattenedSceneGroup[])[0];
+      const group = must((result.groups! as FlattenedSceneGroup[])[0]);
       expect(group.front_image_path).toMatch(/^\/api\/proxy\/stash/);
       expect(group.back_image_path).toMatch(/^\/api\/proxy\/stash/);
     });
@@ -770,7 +775,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(scene);
       const group = result.groups![0] as Record<string, unknown>;
       const groupTags = group.tags as Array<{ image_path: string }>;
-      expect(groupTags[0].image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(groupTags[0]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles missing groups array", () => {
@@ -819,14 +824,14 @@ describe("stashUrlProxy", () => {
       const original = makeScene();
       const originalScreenshot = (original.paths as Record<string, string>)
         .screenshot;
-      const originalStreamUrl = original.sceneStreams[0].url;
+      const originalStreamUrl = must(original.sceneStreams[0]).url;
 
       transformScene(original);
 
       expect((original.paths as Record<string, string>).screenshot).toBe(
         originalScreenshot
       );
-      expect(original.sceneStreams[0].url).toBe(originalStreamUrl);
+      expect(must(original.sceneStreams[0]).url).toBe(originalStreamUrl);
     });
 
     // --- SECURITY: comprehensive check ---
@@ -1004,8 +1009,8 @@ describe("stashUrlProxy", () => {
       };
 
       const result = transformGroup(group);
-      expect(result.tags![0].image_path).toMatch(/^\/api\/proxy\/stash/);
-      expect(result.tags![1].image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![0]).image_path).toMatch(/^\/api\/proxy\/stash/);
+      expect(must(result.tags![1]).image_path).toMatch(/^\/api\/proxy\/stash/);
     });
 
     it("handles empty tags array", () => {
@@ -1073,7 +1078,7 @@ describe("stashUrlProxy", () => {
       const result = transformScene(
         makeStreamScene(stashUrl("/scene/1/stream.mp4?apikey=SECRET"))
       );
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
 
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1089,7 +1094,7 @@ describe("stashUrlProxy", () => {
           )
         )
       );
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
 
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1101,14 +1106,14 @@ describe("stashUrlProxy", () => {
       const original = stashUrl("/scene/1/stream.mp4?resolution=720");
       const result = transformScene(makeStreamScene(original));
 
-      expect(result.sceneStreams![0].url).toContain("resolution=720");
+      expect(must(result.sceneStreams![0]).url).toContain("resolution=720");
     });
 
     it("handles URL with no query params (no-op)", () => {
       const original = stashUrl("/scene/1/stream.mp4");
       const result = transformScene(makeStreamScene(original));
 
-      expect(result.sceneStreams![0].url).toBe(original);
+      expect(must(result.sceneStreams![0]).url).toBe(original);
     });
 
     it("handles malformed URL gracefully via regex fallback", () => {
@@ -1116,7 +1121,7 @@ describe("stashUrlProxy", () => {
       const malformed = "not-a-url?apikey=SECRET&other=value";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
       // Regex fallback should strip the apikey
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
@@ -1126,7 +1131,7 @@ describe("stashUrlProxy", () => {
       const malformed = "broken-url?apikey=SECRET";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
       expect(url).not.toContain("apikey");
       expect(url).not.toContain("SECRET");
     });
@@ -1135,7 +1140,7 @@ describe("stashUrlProxy", () => {
       const malformed = "broken-url?a=1&apikey=SECRET&b=2";
       const result = transformScene(makeStreamScene(malformed));
 
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
       expect(url).not.toContain("SECRET");
     });
 
@@ -1146,7 +1151,7 @@ describe("stashUrlProxy", () => {
           stashUrl("/scene/1/stream.mp4?apikey=KEY1&other=val&apikey=KEY2")
         )
       );
-      const url = result.sceneStreams![0].url;
+      const url = must(result.sceneStreams![0]).url;
 
       expect(url).not.toContain("KEY1");
       expect(url).not.toContain("KEY2");

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -68,14 +69,17 @@ describe("GroupQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("g.stashInstanceId = ?");
 
       // The instance ID must be in the params
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("instance-abc");
     });
 
@@ -88,8 +92,9 @@ describe("GroupQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("g.stashInstanceId = ?");

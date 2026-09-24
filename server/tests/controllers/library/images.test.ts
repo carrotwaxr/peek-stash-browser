@@ -12,6 +12,7 @@ import { findImages } from "../../../controllers/library/images.js";
 import prisma from "../../../prisma/singleton.js";
 import { imageQueryBuilder } from "../../../services/ImageQueryBuilder.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
+import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -215,7 +216,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.filters?.performers).toEqual({
         value: ["p1"],
         modifier: "INCLUDES",
@@ -249,7 +250,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.filters?.ids).toEqual({
         value: ["img1", "img2"],
         modifier: "INCLUDES",
@@ -271,7 +272,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.sort).toBe("random");
       expect(callArgs.randomSeed).toBe(12345);
     });
@@ -291,7 +292,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.randomSeed).toBeDefined();
       expect(typeof callArgs.randomSeed).toBe("number");
     });
@@ -308,7 +309,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.applyExclusions).toBe(true);
     });
 
@@ -323,7 +324,7 @@ describe("Images Controller", () => {
 
       await findImages(req, res);
 
-      const callArgs = mockImageQueryBuilder.execute.mock.calls[0][0];
+      const callArgs = must(mockImageQueryBuilder.execute.mock.calls[0])[0];
       expect(callArgs.applyExclusions).toBe(true);
     });
 

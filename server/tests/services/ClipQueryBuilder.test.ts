@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { clipQueryBuilder } from "../../services/ClipQueryBuilder.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -45,13 +46,16 @@ describe("ClipQueryBuilder", () => {
         allowedInstanceIds: ["inst-a", "inst-b"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("c.stashInstanceId IN (?, ?)");
       expect(mainQuerySql).toContain("c.stashInstanceId IS NULL");
 
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("inst-a");
       expect(mainQueryParams).toContain("inst-b");
     });
@@ -62,8 +66,9 @@ describe("ClipQueryBuilder", () => {
         allowedInstanceIds: [],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).not.toContain("c.stashInstanceId IN");
     });
@@ -73,8 +78,9 @@ describe("ClipQueryBuilder", () => {
     it("always joins UserExcludedEntity for scene-based exclusions", async () => {
       await clipQueryBuilder.getClips({ userId: 1 });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("UserExcludedEntity");
       expect(mainQuerySql).toContain("entityType = 'scene'");
@@ -107,7 +113,7 @@ describe("ClipQueryBuilder", () => {
 
       await clipQueryBuilder.getClipById("c1", 1);
 
-      const sql = mockPrisma.$queryRawUnsafe.mock.calls[0][0] as string;
+      const sql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0] as string;
       expect(sql).toContain("entityType = 'scene'");
       expect(sql).toContain("entityType = 'clip'");
       expect(sql).toContain("e.id IS NULL");
@@ -117,8 +123,9 @@ describe("ClipQueryBuilder", () => {
     it("filters both clip and scene deletedAt", async () => {
       await clipQueryBuilder.getClips({ userId: 1 });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("c.deletedAt IS NULL");
       expect(mainQuerySql).toContain("s.deletedAt IS NULL");
@@ -132,9 +139,12 @@ describe("ClipQueryBuilder", () => {
         sceneId: "42",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       expect(mainQuerySql).toContain("c.sceneId = ?");
       expect(mainQueryParams).toContain("42");
@@ -146,9 +156,12 @@ describe("ClipQueryBuilder", () => {
         isGenerated: true,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       expect(mainQuerySql).toContain("c.isGenerated = ?");
       expect(mainQueryParams).toContain(1);
@@ -160,9 +173,12 @@ describe("ClipQueryBuilder", () => {
         q: "test clip",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       expect(mainQuerySql).toContain("c.title LIKE ?");
       expect(mainQueryParams).toContain("%test clip%");
@@ -174,8 +190,9 @@ describe("ClipQueryBuilder", () => {
         tagIds: ["5:inst-a"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should check both primaryTagId and ClipTag junction
       expect(mainQuerySql).toContain("c.primaryTagId");
@@ -188,8 +205,9 @@ describe("ClipQueryBuilder", () => {
         performerIds: ["10"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ScenePerformer");
       expect(mainQuerySql).toContain("sp.performerId IN (?)");
@@ -201,8 +219,9 @@ describe("ClipQueryBuilder", () => {
         studioId: "studio-1",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("s.studioId");
     });
@@ -213,8 +232,9 @@ describe("ClipQueryBuilder", () => {
         sceneTagIds: ["20"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("SceneTag");
       expect(mainQuerySql).toContain("st.tagId IN (?)");
@@ -225,8 +245,9 @@ describe("ClipQueryBuilder", () => {
     it("sorts by stashCreatedAt by default", async () => {
       await clipQueryBuilder.getClips({ userId: 1 });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ORDER BY c.stashCreatedAt");
     });
@@ -238,8 +259,9 @@ describe("ClipQueryBuilder", () => {
         sortDir: "asc",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ORDER BY c.seconds ASC");
     });
@@ -250,8 +272,9 @@ describe("ClipQueryBuilder", () => {
         sortDir: "asc, (SELECT password FROM User)" as never,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ORDER BY c.stashCreatedAt DESC");
       expect(mainQuerySql).not.toMatch(/select password/i);
@@ -265,8 +288,9 @@ describe("ClipQueryBuilder", () => {
         })
       ).resolves.toBeDefined();
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ORDER BY c.stashCreatedAt DESC");
     });
@@ -278,8 +302,9 @@ describe("ClipQueryBuilder", () => {
         sortDir: "ASC" as never,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("ORDER BY c.seconds ASC");
     });
@@ -293,9 +318,12 @@ describe("ClipQueryBuilder", () => {
         perPage: 20,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       expect(mainQuerySql).toContain("LIMIT ? OFFSET ?");
 

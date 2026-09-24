@@ -20,6 +20,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import { must } from "../helpers/must.js";
 
 // Mock UserInstanceService before importing service
 vi.mock("../../services/UserInstanceService.js", () => ({
@@ -747,7 +748,7 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     const recursive = queriesMatching(/WITH RECURSIVE/);
     expect(recursive).toHaveLength(1);
-    const [sql, ...params] = recursive[0];
+    const [sql, ...params] = must(recursive[0]);
     expect(sql).toContain("json_each(COALESCE(c.parentIds, '[]'))");
     expect(sql).toContain("CROSS JOIN StashTag t ON");
     // Bare ids, allowed instances and scoped refs are bound, never spliced
@@ -791,7 +792,7 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     const recursive = queriesMatching(/WITH RECURSIVE/);
     expect(recursive).toHaveLength(1);
-    expect(recursive[0][0]).toContain(
+    expect(must(recursive[0])[0]).toContain(
       "c.parentId = p.id AND c.stashInstanceId = p.inst"
     );
     expect(rowKeys(createdRows())).toEqual(
@@ -836,7 +837,7 @@ describe("resolution of listed ids (Rules 2 and 8)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const [, ...params] = queriesMatching(RESOLVE_GROUP)[0];
+    const [, ...params] = must(queriesMatching(RESOLVE_GROUP)[0]);
     expect(params[0]).toBe(JSON.stringify(["5"]));
     expect(rowKeys(createdRows())).toEqual(
       new Set(["group:5@A:restricted", "group:5@B:restricted"])
@@ -934,7 +935,7 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
 
     const content = queriesMatching(CONTENT_TAG_SCENE);
     expect(content).toHaveLength(1);
-    const [sql, ...params] = content[0];
+    const [sql, ...params] = must(content[0]);
     expect(sql).toContain("FROM StashScene s");
     expect(sql).toContain("json_each(COALESCE(s.inheritedTagIds");
     expect(sql).toContain("JOIN _peek_refs r");
@@ -960,7 +961,7 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const [, ...params] = queriesMatching(CONTENT_TAG_SCENE)[0];
+    const [, ...params] = must(queriesMatching(CONTENT_TAG_SCENE)[0]);
     expect(params[params.length - 1]).toBe(0);
   });
 
@@ -1044,8 +1045,8 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
       /FROM StashScene s[\s\S]*NOT EXISTS \(SELECT 1 FROM SceneTag st WHERE/
     );
     expect(noItem).toHaveLength(1);
-    expect(noItem[0][0]).not.toContain("_peek_refs");
-    expect(noItem[0][0]).toContain(
+    expect(must(noItem[0])[0]).not.toContain("_peek_refs");
+    expect(must(noItem[0])[0]).toContain(
       "NOT EXISTS (SELECT 1 FROM json_each(COALESCE(s.inheritedTagIds, '[]')))"
     );
     expect(createdRows()).toEqual(
@@ -1093,7 +1094,7 @@ describe("INCLUDE rules (Rules 4, 5 and 6)", () => {
 
     const content = queriesMatching(CONTENT_TAG_SCENE);
     expect(content).toHaveLength(1);
-    const [, ...params] = content[0];
+    const [, ...params] = must(content[0]);
     expect(params[params.length - 1]).toBe(1);
   });
 });
@@ -1126,7 +1127,7 @@ describe("cascades (Rule 3)", () => {
     );
     // The closure is bound into the temp refs table, and the primary-tag edge
     // joins it on the clip's own tag columns
-    expect(queriesMatching(EDGE_CLIP_PRIMARY)[0][0]).toContain(
+    expect(must(queriesMatching(EDGE_CLIP_PRIMARY)[0])[0]).toContain(
       "r.id = x.primaryTagId AND r.inst = x.primaryTagInstanceId"
     );
   });
@@ -1152,10 +1153,10 @@ describe("cascades (Rule 3)", () => {
         "image:i7@A:cascade",
       ])
     );
-    expect(queriesMatching(EDGE_STUDIO_GALLERY)[0][0]).toContain(
+    expect(must(queriesMatching(EDGE_STUDIO_GALLERY)[0])[0]).toContain(
       "r.inst = x.studioInstanceId"
     );
-    expect(queriesMatching(EDGE_STUDIO_SCENE)[0][0]).toContain(
+    expect(must(queriesMatching(EDGE_STUDIO_SCENE)[0])[0]).toContain(
       "r.inst = x.stashInstanceId"
     );
   });
@@ -1195,7 +1196,7 @@ describe("cascades (Rule 3)", () => {
     await exclusionComputationService.recomputeForUser(1);
 
     expect(queriesMatching(EDGE_INHERITED)).toHaveLength(1);
-    expect(queriesMatching(EDGE_INHERITED)[0][0]).toContain(
+    expect(must(queriesMatching(EDGE_INHERITED)[0])[0]).toContain(
       "JOIN _peek_refs r ON r.id = it.value AND r.inst = s.stashInstanceId"
     );
     expect(createdRows()).toEqual(
@@ -1230,7 +1231,7 @@ describe("cascades (Rule 3)", () => {
       (r) => r.entityType === "scene" && r.entityId === "s1"
     );
     expect(sceneRows).toHaveLength(1);
-    expect(sceneRows[0].reason).toBe("cascade");
+    expect(must(sceneRows[0]).reason).toBe("cascade");
   });
 
   it("should handle empty cascade results gracefully", async () => {
@@ -1268,7 +1269,7 @@ describe("cascades (Rule 3)", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const [, ...resolveParams] = queriesMatching(RESOLVE_PERFORMER)[0];
+    const [, ...resolveParams] = must(queriesMatching(RESOLVE_PERFORMER)[0]);
     expect(resolveParams[0]).toBe(JSON.stringify(["p1"]));
     expect(rowKeys(createdRows())).toEqual(
       new Set([
@@ -1390,7 +1391,7 @@ describe("computeEmptyExclusions", () => {
 
     const tagQuery = queriesMatching(EMPTY_TAG);
     expect(tagQuery).toHaveLength(1);
-    const [sql] = tagQuery[0];
+    const [sql] = must(tagQuery[0]);
     expect(sql).toContain("FROM GalleryTag gt");
     expect(sql).toContain("FROM ImageTag it");
     expect(sql).toContain("FROM _peek_ex_gallery");
@@ -1414,7 +1415,7 @@ describe("computeEmptyExclusions", () => {
   it("empty-tag exemption needs a child tag on the same instance", async () => {
     await exclusionComputationService.recomputeForUser(1);
 
-    const [sql] = queriesMatching(EMPTY_TAG)[0];
+    const [sql] = must(queriesMatching(EMPTY_TAG)[0]);
     expect(sql).toContain("json_each(COALESCE(child.parentIds, '[]'))");
     expect(sql).toContain("child.stashInstanceId = t.stashInstanceId");
     expect(sql).not.toContain("LIKE");
@@ -1516,7 +1517,7 @@ describe("reason precedence (restrictions before hides)", () => {
     // Checked only for the hidden organisational entities, driving from them
     const targeted = queriesMatching(EMPTY_UNDER_RESTRICTIONS);
     expect(targeted).toHaveLength(1);
-    expect(targeted[0][0]).toMatch(EMPTY_PERFORMER_UNDER_RESTRICTIONS);
+    expect(must(targeted[0])[0]).toMatch(EMPTY_PERFORMER_UNDER_RESTRICTIONS);
     const refsFill = execCalls().find(
       ([sql, json]) =>
         sql.includes("INSERT OR IGNORE INTO _peek_refs") &&
@@ -1666,7 +1667,9 @@ describe("addHiddenEntity", () => {
       })
     );
     // Hides of a tag expand to descendants through the same recursive resolve
-    expect(queriesMatching(RESOLVE_TAG)[0][0]).toContain("WITH RECURSIVE");
+    expect(must(queriesMatching(RESOLVE_TAG)[0])[0]).toContain(
+      "WITH RECURSIVE"
+    );
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
   });
 

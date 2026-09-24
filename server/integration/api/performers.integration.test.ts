@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -69,10 +70,12 @@ describe("Performer API", () => {
 
       expect(response.ok).toBe(true);
       expect(response.data.findPerformers.performers).toHaveLength(1);
-      expect(response.data.findPerformers.performers[0].id).toBe(
+      expect(must(response.data.findPerformers.performers[0]).id).toBe(
         TEST_ENTITIES.performerWithScenes
       );
-      expect(response.data.findPerformers.performers[0].name).toBeDefined();
+      expect(
+        must(response.data.findPerformers.performers[0]).name
+      ).toBeDefined();
     });
 
     it("returns performer with tooltip entity data (tags, groups, galleries, studios)", async () => {
@@ -84,7 +87,7 @@ describe("Performer API", () => {
       );
 
       expect(response.ok).toBe(true);
-      const performer = response.data.findPerformers.performers[0];
+      const performer = must(response.data.findPerformers.performers[0]);
 
       // Tags should have image_path for TooltipEntityGrid
       if (performer.tags && performer.tags.length > 0) {

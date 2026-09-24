@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
 import type { NormalizedImage } from "../../types/index.js";
+import { must } from "../helpers/must.js";
 
 /**
  * The rows the builder returns carry the user's rating columns its query
@@ -18,7 +19,7 @@ describe("ImageQueryBuilder", () => {
   const testInstanceId = "test-instance-iqb";
 
   // Use numeric string IDs to match real Stash IDs (which are numeric)
-  const testImageIds = ["999001", "999002", "999003"];
+  const testImageIds: [string, string, string] = ["999001", "999002", "999003"];
 
   beforeEach(async () => {
     // Clean up any leftover data from previous failed runs
@@ -92,7 +93,7 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.total).toBe(3);
       expect(result.images).toHaveLength(2);
-      expect(result.images[0].id).toBe(testImageIds[2]); // Most recent first
+      expect(must(result.images[0]).id).toBe(testImageIds[2]); // Most recent first
     });
 
     it("respects page parameter", async () => {
@@ -106,7 +107,7 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.total).toBe(3);
       expect(result.images).toHaveLength(1);
-      expect(result.images[0].id).toBe(testImageIds[0]); // Third image on page 2
+      expect(must(result.images[0]).id).toBe(testImageIds[0]); // Third image on page 2
     });
 
     it("returns instanceId on each image", async () => {
@@ -120,7 +121,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.images).toHaveLength(3);
-      expect(result.images[0].instanceId).toBe(testInstanceId);
+      expect(must(result.images[0]).instanceId).toBe(testInstanceId);
       for (const image of result.images) {
         expect(image.instanceId).toBe(testInstanceId);
       }
@@ -187,7 +188,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
 
     it("filters by rating100 GREATER_THAN", async () => {
@@ -201,7 +202,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
 
     it("filters by o_counter GREATER_THAN", async () => {
@@ -215,7 +216,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
   });
 
@@ -340,7 +341,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
 
     it("filters by tag INCLUDES", async () => {
@@ -354,7 +355,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[1]);
+      expect(must(result.images[0]).id).toBe(testImageIds[1]);
     });
 
     it("filters by studio INCLUDES", async () => {
@@ -368,7 +369,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
 
     it("filters by gallery INCLUDES", async () => {
@@ -382,7 +383,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[0]);
+      expect(must(result.images[0]).id).toBe(testImageIds[0]);
     });
   });
 
@@ -398,7 +399,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe(testImageIds[1]);
+      expect(must(result.images[0]).id).toBe(testImageIds[1]);
     });
 
     it("filters by IDs", async () => {

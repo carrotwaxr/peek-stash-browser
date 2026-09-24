@@ -15,6 +15,7 @@ import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { defaultRestrictEmpty } from "../../services/exclusionPolicy.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
 
@@ -795,7 +796,7 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       instanceId: A,
       restricted: false,
     });
-    expect(listed[0].entity).toMatchObject({ name: "Explicit" });
+    expect(must(listed[0]).entity).toMatchObject({ name: "Explicit" });
 
     await userHiddenEntityService.unhideEntity(adminId, "tag", "2", A);
     // unhide queues a background recompute; let it start, then coalesce with it

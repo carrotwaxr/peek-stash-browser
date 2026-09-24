@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -64,7 +65,7 @@ describe("Group API", () => {
 
       expect(response.ok).toBe(true);
       expect(response.data.findGroups.groups).toHaveLength(1);
-      expect(response.data.findGroups.groups[0].id).toBe(
+      expect(must(response.data.findGroups.groups[0]).id).toBe(
         TEST_ENTITIES.groupWithScenes
       );
     });
@@ -78,7 +79,7 @@ describe("Group API", () => {
       );
 
       expect(response.ok).toBe(true);
-      const group = response.data.findGroups.groups[0];
+      const group = must(response.data.findGroups.groups[0]);
 
       // Tags should have image_path
       expect(group).toHaveProperty("tags");

@@ -12,6 +12,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { must } from "../../tests/helpers/must.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -106,7 +107,7 @@ async function readRow(): Promise<Record<string, unknown>> {
     TEST_INSTANCE
   );
   expect(rows).toHaveLength(1);
-  return rows[0];
+  return must(rows[0]);
 }
 
 async function clearTestScenes(): Promise<void> {

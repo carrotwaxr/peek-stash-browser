@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { adminClient } from "../helpers/testClient.js";
 
@@ -95,7 +96,7 @@ describe("Tag Parent Name Hydration", () => {
     expect(detailResponse.ok).toBe(true);
     expect(detailResponse.data.findTags.tags).toHaveLength(1);
 
-    const tag = detailResponse.data.findTags.tags[0];
+    const tag = must(detailResponse.data.findTags.tags[0]);
     expect(tag.parents).toBeDefined();
     expect(tag.parents!.length).toBeGreaterThan(0);
 

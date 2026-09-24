@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -68,8 +69,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Rating JOIN must match on instanceId
       expect(mainQuerySql).toContain("s.stashInstanceId = r.instanceId");
@@ -87,8 +89,9 @@ describe("SceneQueryBuilder", () => {
         allowedInstanceIds: ["inst-a", "inst-b"],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should contain IN clause for allowed instances
       expect(mainQuerySql).toContain("s.stashInstanceId IN (?, ?)");
@@ -96,7 +99,9 @@ describe("SceneQueryBuilder", () => {
       expect(mainQuerySql).toContain("s.stashInstanceId IS NULL");
 
       // Params should contain the instance IDs
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("inst-a");
       expect(mainQueryParams).toContain("inst-b");
     });
@@ -111,8 +116,9 @@ describe("SceneQueryBuilder", () => {
         allowedInstanceIds: [],
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT contain the IN clause
       expect(mainQuerySql).not.toContain("s.stashInstanceId IN");
@@ -128,12 +134,15 @@ describe("SceneQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("s.stashInstanceId = ?");
 
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("instance-abc");
     });
 
@@ -146,8 +155,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT have a bare equality check
       expect(mainQuerySql).not.toContain("s.stashInstanceId = ?");
@@ -164,8 +174,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should JOIN UserExcludedEntity
       expect(mainQuerySql).toContain("UserExcludedEntity");
@@ -184,8 +195,9 @@ describe("SceneQueryBuilder", () => {
         applyExclusions: false,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should NOT JOIN UserExcludedEntity
       expect(mainQuerySql).not.toContain("UserExcludedEntity");
@@ -204,8 +216,9 @@ describe("SceneQueryBuilder", () => {
         searchQuery: "test search",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should search across multiple fields
       expect(mainQuerySql).toContain("LOWER(s.title) LIKE LOWER(?)");
@@ -220,7 +233,9 @@ describe("SceneQueryBuilder", () => {
       expect(mainQuerySql).toContain("StashTag");
 
       // Search param should be wrapped in wildcards
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
       expect(mainQueryParams).toContain("%test search%");
     });
 
@@ -234,8 +249,9 @@ describe("SceneQueryBuilder", () => {
         searchQuery: "",
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // Should not contain search-specific LIKE patterns on s.filePath
       expect(mainQuerySql).not.toContain("LOWER(s.filePath) LIKE LOWER(?)");
@@ -252,7 +268,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 25,
       });
 
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       // Last two params are LIMIT and OFFSET
       const limit = mainQueryParams[mainQueryParams.length - 2];
@@ -270,7 +288,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQueryParams = mockPrisma.$queryRawUnsafe.mock.calls[0].slice(1);
+      const mainQueryParams = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      ).slice(1);
 
       const limit = mainQueryParams[mainQueryParams.length - 2];
       const offset = mainQueryParams[mainQueryParams.length - 1];
@@ -289,8 +309,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("s.stashCreatedAt DESC");
     });
@@ -304,8 +325,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).toContain("COLLATE NOCASE ASC");
     });
@@ -319,8 +341,9 @@ describe("SceneQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       // ORDER BY should end with secondary id sort
       expect(mainQuerySql).toContain("s.id ASC");
@@ -338,8 +361,9 @@ describe("SceneQueryBuilder", () => {
       });
 
       // Second call is the count query
-      const countQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[1][0] as string;
+      const countQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[1]
+      )[0] as string;
 
       expect(countQuerySql).toContain(
         "COUNT(DISTINCT s.id || ':' || s.stashInstanceId)"
@@ -356,8 +380,9 @@ describe("SceneQueryBuilder", () => {
         applyExclusions: false,
       });
 
-      const countQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[1][0] as string;
+      const countQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[1]
+      )[0] as string;
 
       // Fast path: simple COUNT(*) from StashScene only
       expect(countQuerySql).toContain("COUNT(*)");
@@ -377,8 +402,9 @@ describe("SceneQueryBuilder", () => {
     it("does not select the streams column", async () => {
       await sceneQueryBuilder.execute(executeOptions);
 
-      const mainQuerySql = mockPrisma.$queryRawUnsafe.mock
-        .calls[0][0] as string;
+      const mainQuerySql = must(
+        mockPrisma.$queryRawUnsafe.mock.calls[0]
+      )[0] as string;
 
       expect(mainQuerySql).not.toMatch(/\bs\.streams\b/);
     });
@@ -444,7 +470,7 @@ describe("SceneQueryBuilder", () => {
       const json = JSON.stringify(result.scenes);
       expect(json).not.toContain("apikey");
       expect(json).not.toContain("stash.test:9999/scene/1/stream");
-      expect(result.scenes[0].sceneStreams).toEqual([]);
+      expect(must(result.scenes[0]).sceneStreams).toEqual([]);
     });
 
     it("returns null paths.stream and paths.caption", async () => {
@@ -504,9 +530,11 @@ describe("SceneQueryBuilder", () => {
 
       const result = await sceneQueryBuilder.execute(executeOptions);
 
-      expect(result.scenes[0].paths.stream).toBeNull();
-      expect(result.scenes[0].paths.caption).toBeNull();
-      expect(result.scenes[0].paths.screenshot).toContain("/api/proxy/stash");
+      expect(must(result.scenes[0]).paths.stream).toBeNull();
+      expect(must(result.scenes[0]).paths.caption).toBeNull();
+      expect(must(result.scenes[0]).paths.screenshot).toContain(
+        "/api/proxy/stash"
+      );
     });
   });
 });

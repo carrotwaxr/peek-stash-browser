@@ -12,6 +12,7 @@ import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // Import after mocking
 import { StashClient } from "../../graphql/StashClient.js";
+import { must } from "../helpers/must.js";
 
 // Load environment variables from project root
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
@@ -309,14 +310,14 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
       });
 
       if (allScenes.findScenes.scenes.length > 0) {
-        const sceneId = allScenes.findScenes.scenes[0].id;
+        const sceneId = must(allScenes.findScenes.scenes[0]).id;
 
         const result = await stash.findScenes({
           ids: [sceneId],
         });
 
         expect(result.findScenes.scenes.length).toBe(1);
-        expect(result.findScenes.scenes[0].id).toBe(sceneId);
+        expect(must(result.findScenes.scenes[0]).id).toBe(sceneId);
       }
     });
 
@@ -327,14 +328,14 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
       });
 
       if (allPerformers.findPerformers.performers.length > 0) {
-        const performerId = allPerformers.findPerformers.performers[0].id;
+        const performerId = must(allPerformers.findPerformers.performers[0]).id;
 
         const result = await stash.findPerformers({
           ids: [performerId],
         });
 
         expect(result.findPerformers.performers.length).toBe(1);
-        expect(result.findPerformers.performers[0].id).toBe(performerId);
+        expect(must(result.findPerformers.performers[0]).id).toBe(performerId);
       }
     });
 
@@ -345,14 +346,14 @@ describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
       });
 
       if (allTags.findTags.tags.length > 0) {
-        const tagId = allTags.findTags.tags[0].id;
+        const tagId = must(allTags.findTags.tags[0]).id;
 
         const result = await stash.findTags({
           ids: [tagId],
         });
 
         expect(result.findTags.tags.length).toBe(1);
-        expect(result.findTags.tags[0].id).toBe(tagId);
+        expect(must(result.findTags.tags[0]).id).toBe(tagId);
       }
     });
   });

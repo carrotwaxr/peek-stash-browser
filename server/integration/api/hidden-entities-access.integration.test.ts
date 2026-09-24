@@ -17,6 +17,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   FX,
@@ -216,7 +217,7 @@ describe("Hidden items and content restrictions (integration)", () => {
       entityId: visibleScene.id,
       restricted: false,
     });
-    expect(items[0].entity?.title).toBe(visibleScene.title);
+    expect(must(items[0]).entity?.title).toBe(visibleScene.title);
   });
 
   it("a repeat hide without an instance finds a hide stored for one instance", async () => {
@@ -336,7 +337,7 @@ describe("Hidden items and content restrictions (integration)", () => {
       instanceId: "",
       restricted: false,
     });
-    expect(items[0].entity?.title).toBe(`B-${FX_ID.SAME}`);
+    expect(must(items[0]).entity?.title).toBe(`B-${FX_ID.SAME}`);
     expect(JSON.stringify(items)).not.toContain(`A-${FX_ID.SAME}`);
   });
 });

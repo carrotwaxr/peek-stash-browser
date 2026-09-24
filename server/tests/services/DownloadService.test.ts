@@ -5,6 +5,7 @@ import {
   entityRefKey,
   getVisibleEntityKeys,
 } from "../../services/EntityAccessService.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
@@ -97,7 +98,7 @@ describe("DownloadService", () => {
         })
       );
       expect(
-        vi.mocked(prisma.download.create).mock.calls[0][0].data.instanceId
+        must(vi.mocked(prisma.download.create).mock.calls[0])[0].data.instanceId
       ).toBe("inst-a");
     });
 
@@ -158,7 +159,7 @@ describe("DownloadService", () => {
         })
       );
       expect(
-        vi.mocked(prisma.download.create).mock.calls[0][0].data.instanceId
+        must(vi.mocked(prisma.download.create).mock.calls[0])[0].data.instanceId
       ).toBe("inst-a");
     });
 
@@ -239,7 +240,9 @@ describe("DownloadService", () => {
 
       expect(size).toBe(BigInt(3000000));
       expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
-      const [sql, ...params] = vi.mocked(prisma.$queryRawUnsafe).mock.calls[0];
+      const [sql, ...params] = must(
+        vi.mocked(prisma.$queryRawUnsafe).mock.calls[0]
+      );
       expect(params).toEqual([
         JSON.stringify([
           ["s1", "inst-a"],

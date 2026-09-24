@@ -28,6 +28,7 @@ import {
 } from "../../utils/jwtSecret.js";
 import { _resetLogThrottleForTesting } from "../../utils/logThrottle.js";
 import { logger } from "../../utils/logger.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -420,7 +421,7 @@ describe("Auth Middleware", () => {
         expect.any(String),
         expect.anything()
       );
-      return jwt.decode(cookieFn.mock.calls[0][1] as string) as {
+      return jwt.decode(must(cookieFn.mock.calls[0])[1] as string) as {
         authTime?: number;
       };
     };

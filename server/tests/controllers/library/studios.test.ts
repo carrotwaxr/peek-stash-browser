@@ -21,6 +21,7 @@ import { studioQueryBuilder } from "../../../services/StudioQueryBuilder.js";
 import { userStatsService } from "../../../services/UserStatsService.js";
 import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 import { createMockStudio } from "../../helpers/mockDataGenerators.js";
+import { must } from "../../helpers/must.js";
 
 // --- Mocks (must come before module import) ---
 
@@ -111,8 +112,8 @@ describe("Studios Controller", () => {
       const result = await mergeStudiosWithUserData(studios, 1);
 
       expect(result).toHaveLength(1);
-      expect(result[0].o_counter).toBe(0);
-      expect(result[0].play_count).toBe(0);
+      expect(must(result[0]).o_counter).toBe(0);
+      expect(must(result[0]).play_count).toBe(0);
     });
 
     it("merges ratings via composite key", async () => {
@@ -133,9 +134,9 @@ describe("Studios Controller", () => {
       const studios = [createMockStudio({ id: "s1", instanceId: "default" })];
       const result = await mergeStudiosWithUserData(studios, 1);
 
-      expect(result[0].rating).toBe(90);
-      expect(result[0].rating100).toBe(90);
-      expect(result[0].favorite).toBe(true);
+      expect(must(result[0]).rating).toBe(90);
+      expect(must(result[0]).rating100).toBe(90);
+      expect(must(result[0]).favorite).toBe(true);
     });
 
     it("merges pre-computed stats from UserStatsService", async () => {
@@ -148,8 +149,8 @@ describe("Studios Controller", () => {
       const studios = [createMockStudio({ id: "s1", instanceId: "default" })];
       const result = await mergeStudiosWithUserData(studios, 1);
 
-      expect(result[0].o_counter).toBe(7);
-      expect(result[0].play_count).toBe(20);
+      expect(must(result[0]).o_counter).toBe(7);
+      expect(must(result[0]).play_count).toBe(20);
     });
   });
 
@@ -188,7 +189,7 @@ describe("Studios Controller", () => {
       ];
       const result = applyStudioFilters(studios, { favorite: true });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by tags INCLUDES", () => {
@@ -206,7 +207,7 @@ describe("Studios Controller", () => {
         tags: { value: ["t1"], modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by tags INCLUDES_ALL", () => {
@@ -227,7 +228,7 @@ describe("Studios Controller", () => {
         tags: { value: ["t1", "t2"], modifier: CriterionModifier.IncludesAll },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by tags EXCLUDES", () => {
@@ -245,7 +246,7 @@ describe("Studios Controller", () => {
         tags: { value: ["t1"], modifier: CriterionModifier.Excludes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s2");
+      expect(must(result[0]).id).toBe("s2");
     });
 
     it("filters by rating100 GREATER_THAN", () => {
@@ -257,7 +258,7 @@ describe("Studios Controller", () => {
         rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by rating100 BETWEEN", () => {
@@ -274,7 +275,7 @@ describe("Studios Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by o_counter EQUALS", () => {
@@ -286,7 +287,7 @@ describe("Studios Controller", () => {
         o_counter: { modifier: "EQUALS", value: 10 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by play_count LESS_THAN", () => {
@@ -298,7 +299,7 @@ describe("Studios Controller", () => {
         play_count: { modifier: "LESS_THAN", value: 10 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by scene_count NOT_EQUALS", () => {
@@ -310,7 +311,7 @@ describe("Studios Controller", () => {
         scene_count: { modifier: CriterionModifier.NotEquals, value: 10 },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s2");
+      expect(must(result[0]).id).toBe("s2");
     });
 
     it("filters by name text search (case insensitive)", () => {
@@ -322,7 +323,7 @@ describe("Studios Controller", () => {
         name: { value: "brazz", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by details text search", () => {
@@ -334,7 +335,7 @@ describe("Studios Controller", () => {
         details: { value: "premium", modifier: CriterionModifier.Includes },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by created_at GREATER_THAN", () => {
@@ -349,7 +350,7 @@ describe("Studios Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
 
     it("filters by updated_at BETWEEN", () => {
@@ -365,7 +366,7 @@ describe("Studios Controller", () => {
         },
       });
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("s1");
+      expect(must(result[0]).id).toBe("s1");
     });
   });
 

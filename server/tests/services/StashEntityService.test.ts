@@ -16,6 +16,7 @@ import {
 import prisma from "../../services/../prisma/singleton.js";
 // Import service after mocking
 import { stashEntityService } from "../../services/StashEntityService.js";
+import { must } from "../helpers/must.js";
 
 // Mock StashInstanceManager to provide a default config for stream URL generation
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -288,13 +289,13 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllScenes();
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe("scene-1");
-      expect(result[0].title).toBe("Test Scene");
+      expect(must(result[0]).id).toBe("scene-1");
+      expect(must(result[0]).title).toBe("Test Scene");
       // Check default user fields are applied
-      expect(result[0].favorite).toBe(false);
-      expect(result[0].o_counter).toBe(0);
-      expect(result[0].play_count).toBe(0);
-      expect(result[0].rating100).toBeNull();
+      expect(must(result[0]).favorite).toBe(false);
+      expect(must(result[0]).o_counter).toBe(0);
+      expect(must(result[0]).play_count).toBe(0);
+      expect(must(result[0]).rating100).toBeNull();
     });
 
     it("should get a single scene by ID", async () => {
@@ -361,11 +362,11 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllPerformers();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("performer-1");
-      expect(result[0].name).toBe("Test Performer");
+      expect(must(result[0]).id).toBe("performer-1");
+      expect(must(result[0]).name).toBe("Test Performer");
       // Check default user fields
-      expect(result[0].favorite).toBe(false);
-      expect(result[0].o_counter).toBe(0);
+      expect(must(result[0]).favorite).toBe(false);
+      expect(must(result[0]).o_counter).toBe(0);
     });
 
     it("should get performer by ID", async () => {
@@ -436,11 +437,11 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllStudios();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("studio-1");
-      expect(result[0].name).toBe("Test Studio");
+      expect(must(result[0]).id).toBe("studio-1");
+      expect(must(result[0]).name).toBe("Test Studio");
       // Check default user fields
-      expect(result[0].favorite).toBe(false);
-      expect(result[0].o_counter).toBe(0);
+      expect(must(result[0]).favorite).toBe(false);
+      expect(must(result[0]).o_counter).toBe(0);
     });
 
     it("should get studio by ID", async () => {
@@ -493,11 +494,11 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllTags();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("tag-1");
-      expect(result[0].name).toBe("Test Tag");
+      expect(must(result[0]).id).toBe("tag-1");
+      expect(must(result[0]).name).toBe("Test Tag");
       // Check default user fields
-      expect(result[0].favorite).toBe(false);
-      expect(result[0].rating100).toBeNull();
+      expect(must(result[0]).favorite).toBe(false);
+      expect(must(result[0]).rating100).toBeNull();
     });
 
     it("should get tag by ID", async () => {
@@ -550,10 +551,10 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllGalleries();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("gallery-1");
-      expect(result[0].title).toBe("Test Gallery");
+      expect(must(result[0]).id).toBe("gallery-1");
+      expect(must(result[0]).title).toBe("Test Gallery");
       // Check default user fields
-      expect(result[0].favorite).toBe(false);
+      expect(must(result[0]).favorite).toBe(false);
     });
 
     it("should get gallery by ID", async () => {
@@ -602,10 +603,10 @@ describe("StashEntityService", () => {
       const result = await stashEntityService.getAllGroups();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("group-1");
-      expect(result[0].name).toBe("Test Group");
+      expect(must(result[0]).id).toBe("group-1");
+      expect(must(result[0]).name).toBe("Test Group");
       // Check default user fields
-      expect(result[0].favorite).toBe(false);
+      expect(must(result[0]).favorite).toBe(false);
     });
 
     it("should get group by ID", async () => {
@@ -822,8 +823,8 @@ describe("StashEntityService", () => {
       const results = await stashEntityService.searchScenes("test query");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("scene-fts-1");
-      expect(results[0].title).toBe("FTS Match");
+      expect(must(results[0]).id).toBe("scene-fts-1");
+      expect(must(results[0]).title).toBe("FTS Match");
     });
 
     it("searchScenes falls back to LIKE on FTS error", async () => {
@@ -839,7 +840,7 @@ describe("StashEntityService", () => {
       const results = await stashEntityService.searchScenes("test");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("scene-like-1");
+      expect(must(results[0]).id).toBe("scene-like-1");
     });
 
     it("searchPerformers returns transformed results from FTS5", async () => {
@@ -855,8 +856,8 @@ describe("StashEntityService", () => {
       const results = await stashEntityService.searchPerformers("test");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("perf-fts-1");
-      expect(results[0].name).toBe("FTS Performer");
+      expect(must(results[0]).id).toBe("perf-fts-1");
+      expect(must(results[0]).name).toBe("FTS Performer");
     });
 
     it("searchPerformers falls back to LIKE on FTS error", async () => {
@@ -873,7 +874,7 @@ describe("StashEntityService", () => {
       const results = await stashEntityService.searchPerformers("query");
 
       expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("perf-like-1");
+      expect(must(results[0]).id).toBe("perf-like-1");
     });
   });
 
@@ -1143,10 +1144,10 @@ describe("StashEntityService", () => {
       expect(json).not.toContain("http");
       expect(json).not.toContain("localhost:9999");
       expect(json).not.toContain("apikey");
-      expect(streams[0].url).toBe(
+      expect(must(streams[0]).url).toBe(
         "/api/scene/7/proxy-stream/stream?instanceId=inst-a"
       );
-      expect(streams[2].url).toBe(
+      expect(must(streams[2]).url).toBe(
         "/api/scene/7/proxy-stream/stream.mp4?resolution=LOW&instanceId=inst-a"
       );
     });
@@ -1186,7 +1187,7 @@ describe("StashEntityService", () => {
         "HLS",
         "DASH",
       ]);
-      expect(streams[0].url).toBe(
+      expect(must(streams[0]).url).toBe(
         "/api/scene/42/proxy-stream/stream.mkv?instanceId=inst-a"
       );
 

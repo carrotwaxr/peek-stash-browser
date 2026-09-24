@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 import {
   adminClient,
@@ -87,7 +88,7 @@ describe("Studio API", () => {
       );
 
       expect(response.ok).toBe(true);
-      const studio = response.data.findStudios.studios[0];
+      const studio = must(response.data.findStudios.studios[0]);
 
       // Tags should have image_path (already exists, verify structure)
       expect(studio).toHaveProperty("tags");

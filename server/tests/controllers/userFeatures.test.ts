@@ -53,6 +53,7 @@ import {
   hashRecoveryKey,
 } from "../../utils/recoveryKey.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { must } from "../helpers/must.js";
 
 // Mock prisma
 vi.mock(
@@ -904,9 +905,9 @@ describe("User Controller — Features", () => {
       // One read of the user's hides, one visibility query per type and form
       expect(mockAlreadyHidden).toHaveBeenCalledTimes(1);
       expect(mockVisibleKeys).toHaveBeenCalledTimes(1);
-      expect(mockVisibleKeys.mock.calls[0][2]).toHaveLength(100);
+      expect(must(mockVisibleKeys.mock.calls[0])[2]).toHaveLength(100);
       expect(mockVisibleIds).toHaveBeenCalledTimes(1);
-      expect(mockVisibleIds.mock.calls[0][2]).toHaveLength(100);
+      expect(must(mockVisibleIds.mock.calls[0])[2]).toHaveLength(100);
       expect(userHiddenEntityService.hideEntity).toHaveBeenCalledTimes(200);
     });
 

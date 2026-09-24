@@ -8,6 +8,7 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { logger } from "../../utils/logger.js";
+import { must } from "../helpers/must.js";
 
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
@@ -60,7 +61,7 @@ describe("processHandlers", () => {
         error: expect.stringContaining("rejected boom"),
       })
     );
-    const context = mockLoggerError.mock.calls[0][1] as { error: string };
+    const context = must(mockLoggerError.mock.calls[0])[1] as { error: string };
     expect(err.stack).toBeDefined();
     expect(context.error).toContain(err.stack);
   });
@@ -79,7 +80,7 @@ describe("processHandlers", () => {
     );
     expect(mockAbort).toHaveBeenCalled();
     expect(mockDisconnect).toHaveBeenCalled();
-    const exitOrder = exit.mock.invocationCallOrder[0];
+    const exitOrder = must(exit.mock.invocationCallOrder[0]);
     expect(mockAbort.mock.invocationCallOrder[0]).toBeLessThan(exitOrder);
     expect(mockDisconnect.mock.invocationCallOrder[0]).toBeLessThan(exitOrder);
   });

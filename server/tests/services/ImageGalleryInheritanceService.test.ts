@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { must } from "../helpers/must.js";
 
 describe("ImageGalleryInheritanceService", () => {
   // Clean up test data
@@ -195,7 +196,7 @@ describe("ImageGalleryInheritanceService", () => {
         where: { imageId: `${PREFIX}image-1` },
       });
       expect(imagePerformers).toHaveLength(1);
-      expect(imagePerformers[0].performerId).toBe(`${PREFIX}performer-1`);
+      expect(must(imagePerformers[0]).performerId).toBe(`${PREFIX}performer-1`);
     });
 
     it("should inherit tags from gallery when image has none", async () => {
@@ -252,7 +253,7 @@ describe("ImageGalleryInheritanceService", () => {
         where: { imageId: `${PREFIX}image-1` },
       });
       expect(imageTags).toHaveLength(1);
-      expect(imageTags[0].tagId).toBe(`${PREFIX}tag-1`);
+      expect(must(imageTags[0]).tagId).toBe(`${PREFIX}tag-1`);
     });
 
     it("should NOT inherit performers when image already has performers", async () => {
@@ -324,7 +325,7 @@ describe("ImageGalleryInheritanceService", () => {
         where: { imageId: `${PREFIX}image-1` },
       });
       expect(imagePerformers).toHaveLength(1);
-      expect(imagePerformers[0].performerId).toBe(`${PREFIX}performer-2`);
+      expect(must(imagePerformers[0]).performerId).toBe(`${PREFIX}performer-2`);
     });
 
     it("should handle image in multiple galleries (use first)", async () => {
