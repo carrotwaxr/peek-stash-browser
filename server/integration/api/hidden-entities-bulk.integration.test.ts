@@ -53,9 +53,9 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
   describe("POST /api/user/hidden-entities/bulk", () => {
     it("should hide multiple entities at once", async () => {
       const entities = [
-        { entityType: "scene", entityId: "990000001" },
-        { entityType: "scene", entityId: "990000002" },
-        { entityType: "scene", entityId: "990000003" },
+        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithRelations },
+        { entityType: "scene", entityId: TEST_ENTITIES.sceneInGroup },
+        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithInheritedTags },
       ];
 
       const response = await testUserClient.post<{
@@ -141,9 +141,13 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
 
     it("should handle mixed entity types", async () => {
       const entities = [
-        { entityType: "scene", entityId: "990000011" },
-        { entityType: "performer", entityId: "990000012" },
-        { entityType: "studio", entityId: "990000013" },
+        // Hidden by the test above: a repeat hide still counts as hidden
+        { entityType: "scene", entityId: TEST_ENTITIES.sceneWithRelations },
+        {
+          entityType: "performer",
+          entityId: TEST_ENTITIES.performerWithScenes,
+        },
+        { entityType: "studio", entityId: TEST_ENTITIES.studioWithScenes },
       ];
 
       const response = await testUserClient.post<{
@@ -155,6 +159,28 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.ok).toBe(true);
       expect(response.data.success).toBe(true);
       expect(response.data.successCount).toBe(3);
+    });
+
+    it("should hide nothing when any target does not exist", async () => {
+      const entities = [
+        { entityType: "tag", entityId: TEST_ENTITIES.tagWithEntities },
+        { entityType: "scene", entityId: "990000001" },
+      ];
+
+      const response = await testUserClient.post<{ error: string }>(
+        "/api/user/hidden-entities/bulk",
+        { entities }
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.data.error).toBe("Not found");
+
+      const hidden = await testUserClient.get<{
+        hiddenEntities: Array<{ entityType: string; entityId: string }>;
+      }>("/api/user/hidden-entities?entityType=tag");
+      expect(hidden.data.hiddenEntities.map((e) => e.entityId)).not.toContain(
+        TEST_ENTITIES.tagWithEntities
+      );
     });
 
     it("should require authentication", async () => {

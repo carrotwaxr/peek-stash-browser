@@ -114,20 +114,28 @@ export const useHiddenEntities = () => {
   );
 
   /**
-   * Unhide (restore) an entity
+   * Unhide (restore) an entity. Pass the hidden row's instanceId; a row
+   * stored for every instance has none.
    */
   const unhideEntity = useCallback(
     async ({
       entityType,
       entityId,
       entityName,
+      instanceId,
     }: {
       entityType: string;
       entityId: string;
       entityName: string;
+      instanceId?: string;
     }) => {
       try {
-        await apiDelete(`/user/hidden-entities/${entityType}/${entityId}`);
+        const query = instanceId
+          ? `?instanceId=${encodeURIComponent(instanceId)}`
+          : "";
+        await apiDelete(
+          `/user/hidden-entities/${entityType}/${entityId}${query}`
+        );
         showSuccess(`${entityName} has been restored`);
         return true;
       } catch (error: any) {

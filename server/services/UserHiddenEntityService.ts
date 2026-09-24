@@ -8,9 +8,12 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "../types/index.js";
+import {
+  entityRefKey,
+  resolveVisibleApartFromOwnHides,
+} from "./EntityAccessService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { stashEntityService } from "./StashEntityService.js";
-import { stashInstanceManager } from "./StashInstanceManager.js";
 
 type NormalizedEntity =
   | NormalizedScene
@@ -30,6 +33,21 @@ export type EntityType =
   | "gallery"
   | "image";
 
+/**
+ * One row of the Hidden Items list. `restricted` rows carry no entity: the
+ * user could not see it even without their own hides.
+ */
+export interface HiddenEntityItem {
+  id: number;
+  entityType: EntityType;
+  entityId: string;
+  /** As stored: "" for a hide that applies to every instance */
+  instanceId: string;
+  hiddenAt: Date;
+  restricted: boolean;
+  entity: NormalizedEntity | null;
+}
+
 export interface HiddenEntityIds {
   scenes: Set<string>;
   performers: Set<string>;
@@ -39,6 +57,16 @@ export interface HiddenEntityIds {
   galleries: Set<string>;
   images: Set<string>;
 }
+
+const HIDEABLE_TYPES: ReadonlySet<string> = new Set<EntityType>([
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "group",
+  "gallery",
+  "image",
+]);
 
 /**
  * Service for managing user-hidden entities
@@ -142,20 +170,41 @@ class UserHiddenEntityService {
   }
 
   /**
-   * Get all hidden entities for a user with full entity details from cache
+   * Is this entity already hidden by this user? A hide stored with instance
+   * "" covers every instance.
+   */
+  async isHiddenByUser(
+    userId: number,
+    entityType: EntityType,
+    entityId: string,
+    instanceId: string
+  ): Promise<boolean> {
+    const row = await prisma.userHiddenEntity.findFirst({
+      where: {
+        userId,
+        entityType,
+        entityId,
+        instanceId: { in: instanceId ? [instanceId, ""] : [""] },
+      },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
+  /**
+   * The user's hidden rows for the Hidden Items list, newest first.
+   *
+   * A row carries the entity's cached data only when the user could see the
+   * entity if they had hidden nothing (resolveVisibleApartFromOwnHides, one
+   * query per entity type). A hide stored for every instance shows the
+   * first instance where that holds. Every other row (restricted or empty
+   * for the user, deleted, or on an instance they do not use) comes back as
+   * restricted, with no entity, so its owner can still unhide it.
    */
   async getHiddenEntities(
     userId: number,
     entityType?: EntityType
-  ): Promise<
-    Array<{
-      id: number;
-      entityType: EntityType;
-      entityId: string;
-      hiddenAt: Date;
-      entity: NormalizedEntity | null; // Full entity data from Stash cache
-    }>
-  > {
+  ): Promise<HiddenEntityItem[]> {
     const where: { userId: number; entityType?: EntityType } = { userId };
     if (entityType) {
       where.entityType = entityType;
@@ -166,59 +215,76 @@ class UserHiddenEntityService {
       orderBy: { hiddenAt: "desc" },
     });
 
-    // Enrich with entity details from cache
-    const enriched = await Promise.all(
-      hiddenEntities.map(async (hidden) => {
-        let entity = null;
+    const byType = new Map<EntityType, typeof hiddenEntities>();
+    for (const hidden of hiddenEntities) {
+      const type = hidden.entityType as EntityType;
+      const list = byType.get(type) ?? [];
+      list.push(hidden);
+      byType.set(type, list);
+    }
+    // Row id -> the instance to show the entity from
+    const shownOn = new Map<number, string>();
+    for (const [type, rows] of byType) {
+      if (!HIDEABLE_TYPES.has(type)) continue;
+      const resolved = await resolveVisibleApartFromOwnHides(
+        userId,
+        type,
+        rows.map((row) => ({ id: row.entityId, instanceId: row.instanceId }))
+      );
+      for (const row of rows) {
+        const instanceId = resolved.get(
+          entityRefKey(row.entityId, row.instanceId)
+        );
+        if (instanceId) shownOn.set(row.id, instanceId);
+      }
+    }
 
-        const instId =
-          hidden.instanceId || stashInstanceManager.getDefaultConfig().id;
-        switch (hidden.entityType) {
-          case "scene":
-            entity = await stashEntityService.getScene(hidden.entityId, instId);
-            break;
-          case "performer":
-            entity = await stashEntityService.getPerformer(
+    return Promise.all(
+      hiddenEntities.map(async (hidden): Promise<HiddenEntityItem> => {
+        const shownInstanceId = shownOn.get(hidden.id);
+        const entity = shownInstanceId
+          ? await this.getCachedEntity(
+              hidden.entityType as EntityType,
               hidden.entityId,
-              instId
-            );
-            break;
-          case "studio":
-            entity = await stashEntityService.getStudio(
-              hidden.entityId,
-              instId
-            );
-            break;
-          case "tag":
-            entity = await stashEntityService.getTag(hidden.entityId, instId);
-            break;
-          case "group":
-            entity = await stashEntityService.getGroup(hidden.entityId, instId);
-            break;
-          case "gallery":
-            entity = await stashEntityService.getGallery(
-              hidden.entityId,
-              instId
-            );
-            break;
-          case "image":
-            entity = await stashEntityService.getImage(hidden.entityId, instId);
-            break;
-        }
-
+              shownInstanceId
+            )
+          : null;
         return {
           id: hidden.id,
           entityType: hidden.entityType as EntityType,
           entityId: hidden.entityId,
           instanceId: hidden.instanceId,
           hiddenAt: hidden.hiddenAt,
+          restricted: entity === null,
           entity,
         };
       })
     );
+  }
 
-    // Filter out entities that no longer exist in Stash cache
-    return enriched.filter((item) => item.entity !== null);
+  private async getCachedEntity(
+    entityType: EntityType,
+    entityId: string,
+    instanceId: string
+  ): Promise<NormalizedEntity | null> {
+    switch (entityType) {
+      case "scene":
+        return stashEntityService.getScene(entityId, instanceId);
+      case "performer":
+        return stashEntityService.getPerformer(entityId, instanceId);
+      case "studio":
+        return stashEntityService.getStudio(entityId, instanceId);
+      case "tag":
+        return stashEntityService.getTag(entityId, instanceId);
+      case "group":
+        return stashEntityService.getGroup(entityId, instanceId);
+      case "gallery":
+        return stashEntityService.getGallery(entityId, instanceId);
+      case "image":
+        return stashEntityService.getImage(entityId, instanceId);
+      default:
+        return null;
+    }
   }
 
   /**

@@ -14,8 +14,22 @@ import {
   TabNavigation,
 } from "../ui/index";
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  scene: "Scene",
+  performer: "Performer",
+  studio: "Studio",
+  tag: "Tag",
+  group: "Collection",
+  gallery: "Gallery",
+  image: "Image",
+};
+
 /**
  * HiddenItemsPage - View and restore hidden entities
+ *
+ * A hidden item the user may no longer see (restricted for them, or gone
+ * from the library) comes without its details; it shows as its type, and
+ * Restore still removes it.
  */
 const HiddenItemsPage = () => {
   const { getHiddenEntities, unhideEntity, unhideAll } = useHiddenEntities();
@@ -60,6 +74,7 @@ const HiddenItemsPage = () => {
       entityType: item.entityType as string,
       entityId: item.entityId as string,
       entityName,
+      instanceId: (item.instanceId as string | undefined) || undefined,
     });
 
     if (success) {
@@ -114,7 +129,9 @@ const HiddenItemsPage = () => {
    * Get display name for an entity based on its type
    */
   const getEntityName = (item: Record<string, unknown>): string => {
-    if (!item.entity) return "Unknown";
+    if (!item.entity) {
+      return ENTITY_TYPE_LABELS[item.entityType as string] ?? "Item";
+    }
 
     // Scenes use getSceneTitle which handles basename fallback
     if (item.entityType === "scene") {
@@ -192,6 +209,7 @@ const HiddenItemsPage = () => {
                       | Record<string, unknown>
                       | undefined;
                     const hasImage = entity?.image_path;
+                    const unavailable = !entity;
 
                     return (
                       <div
@@ -225,6 +243,7 @@ const HiddenItemsPage = () => {
                             className="text-sm opacity-70"
                             style={{ color: "var(--text-secondary)" }}
                           >
+                            {unavailable && "Details unavailable · "}
                             Hidden on {formatDate(item.hiddenAt as string)}
                           </div>
                         </div>

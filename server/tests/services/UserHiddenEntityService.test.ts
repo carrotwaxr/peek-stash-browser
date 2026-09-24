@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import {
+  entityRefKey,
+  resolveVisibleApartFromOwnHides,
+} from "../../services/EntityAccessService.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
@@ -12,9 +16,21 @@ vi.mock("../../prisma/singleton.js", () => ({
       upsert: vi.fn(),
       deleteMany: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }));
+
+// The access check is mocked; entityRefKey stays real
+vi.mock("../../services/EntityAccessService.js", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../services/EntityAccessService.js")
+  >("../../services/EntityAccessService.js");
+  return {
+    entityRefKey: actual.entityRefKey,
+    resolveVisibleApartFromOwnHides: vi.fn(),
+  };
+});
 
 // Mock ExclusionComputationService
 vi.mock("../../services/ExclusionComputationService.js", () => ({
@@ -38,16 +54,22 @@ vi.mock("../../services/StashEntityService.js", () => ({
   },
 }));
 
-// Mock StashInstanceManager
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "default-instance" }),
-  },
-}));
-
 const mockPrisma = vi.mocked(prisma);
 const mockExclusion = vi.mocked(exclusionComputationService);
 const mockEntity = vi.mocked(stashEntityService);
+const mockResolveVisible = vi.mocked(resolveVisibleApartFromOwnHides);
+
+/** Every ref visible: on its own instance, or "shown-instance" for "". */
+function everyRefVisible() {
+  mockResolveVisible.mockImplementation(async (_userId, _type, refs) => {
+    return new Map(
+      refs.map((r) => [
+        entityRefKey(r.id, r.instanceId),
+        r.instanceId || "shown-instance",
+      ])
+    );
+  });
+}
 
 describe("UserHiddenEntityService", () => {
   beforeEach(() => {
@@ -385,7 +407,8 @@ describe("UserHiddenEntityService", () => {
       });
     });
 
-    it("enriches each entity with details from StashEntityService", async () => {
+    it("enriches each visible row from the instance the access check resolved", async () => {
+      everyRefVisible();
       (
         mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
       ).mockResolvedValue(mockHiddenRecords);
@@ -405,94 +428,159 @@ describe("UserHiddenEntityService", () => {
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
       expect(mockEntity.getScene).toHaveBeenCalledWith("10", "inst-a");
-      // Performer has empty instanceId — should fall back to default instance
+      // A hide stored for every instance shows the instance that was resolved
       expect(mockEntity.getPerformer).toHaveBeenCalledWith(
         "20",
-        "default-instance"
+        "shown-instance"
       );
       expect(mockEntity.getTag).toHaveBeenCalledWith("30", "inst-b");
       expect(result).toHaveLength(3);
-      expect(result[0].entity).toEqual({ id: "10", title: "Scene 10" });
+      expect(result[0]).toMatchObject({
+        entityId: "10",
+        restricted: false,
+        entity: { id: "10", title: "Scene 10" },
+      });
     });
 
-    it("calls the correct StashEntityService method per entity type", async () => {
-      const allTypes = [
+    it("checks visibility once per entity type with each row's stored instance", async () => {
+      everyRefVisible();
+      (
+        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([
+        ...mockHiddenRecords,
+        {
+          id: 4,
+          entityType: "scene",
+          entityId: "11",
+          instanceId: "",
+          hiddenAt: new Date("2026-01-04"),
+        },
+      ]);
+
+      await userHiddenEntityService.getHiddenEntities(7);
+
+      expect(mockResolveVisible).toHaveBeenCalledTimes(3);
+      expect(mockResolveVisible).toHaveBeenCalledWith(7, "scene", [
+        { id: "10", instanceId: "inst-a" },
+        { id: "11", instanceId: "" },
+      ]);
+      expect(mockResolveVisible).toHaveBeenCalledWith(7, "performer", [
+        { id: "20", instanceId: "" },
+      ]);
+      expect(mockResolveVisible).toHaveBeenCalledWith(7, "tag", [
+        { id: "30", instanceId: "inst-b" },
+      ]);
+    });
+
+    it("returns a row the user may not see as restricted, without its entity", async () => {
+      mockResolveVisible.mockResolvedValue(
+        new Map([[entityRefKey("10", "i"), "i"]])
+      );
+      (
+        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([
         {
           id: 1,
           entityType: "scene",
-          entityId: "1",
+          entityId: "10",
           instanceId: "i",
-          hiddenAt: new Date(),
+          hiddenAt: new Date("2026-01-01"),
         },
         {
           id: 2,
-          entityType: "performer",
-          entityId: "2",
+          entityType: "scene",
+          entityId: "99",
           instanceId: "i",
-          hiddenAt: new Date(),
+          hiddenAt: new Date("2026-01-02"),
+        },
+      ]);
+      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "10",
+        title: "Visible",
+      });
+
+      const result = await userHiddenEntityService.getHiddenEntities(1);
+
+      expect(mockEntity.getScene).toHaveBeenCalledTimes(1);
+      expect(mockEntity.getScene).toHaveBeenCalledWith("10", "i");
+      expect(result).toEqual([
+        {
+          id: 1,
+          entityType: "scene",
+          entityId: "10",
+          instanceId: "i",
+          hiddenAt: new Date("2026-01-01"),
+          restricted: false,
+          entity: { id: "10", title: "Visible" },
         },
         {
-          id: 3,
-          entityType: "studio",
-          entityId: "3",
+          id: 2,
+          entityType: "scene",
+          entityId: "99",
           instanceId: "i",
-          hiddenAt: new Date(),
+          hiddenAt: new Date("2026-01-02"),
+          restricted: true,
+          entity: null,
         },
+      ]);
+    });
+
+    it("keeps a row whose entity left the cache, as restricted", async () => {
+      everyRefVisible();
+      (
+        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue([
         {
-          id: 4,
-          entityType: "tag",
-          entityId: "4",
+          id: 2,
+          entityType: "scene",
+          entityId: "99",
           instanceId: "i",
           hiddenAt: new Date(),
         },
-        {
-          id: 5,
-          entityType: "group",
-          entityId: "5",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        },
-        {
-          id: 6,
-          entityType: "gallery",
-          entityId: "6",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        },
-        {
-          id: 7,
-          entityType: "image",
-          entityId: "7",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        },
-      ];
+      ]);
+      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      const result = await userHiddenEntityService.getHiddenEntities(1);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        entityId: "99",
+        restricted: true,
+        entity: null,
+      });
+    });
+
+    it("calls the correct StashEntityService method per entity type", async () => {
+      everyRefVisible();
+      const allTypes = [
+        "scene",
+        "performer",
+        "studio",
+        "tag",
+        "group",
+        "gallery",
+        "image",
+      ].map((entityType, i) => ({
+        id: i + 1,
+        entityType,
+        entityId: String(i + 1),
+        instanceId: "i",
+        hiddenAt: new Date(),
+      }));
       (
         mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
       ).mockResolvedValue(allTypes);
-
-      // All return a valid entity
-      (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "1",
-      });
-      (mockEntity.getPerformer as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "2",
-      });
-      (mockEntity.getStudio as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "3",
-      });
-      (mockEntity.getTag as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "4",
-      });
-      (mockEntity.getGroup as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "5",
-      });
-      (mockEntity.getGallery as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "6",
-      });
-      (mockEntity.getImage as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "7",
-      });
+      for (const getter of [
+        mockEntity.getScene,
+        mockEntity.getPerformer,
+        mockEntity.getStudio,
+        mockEntity.getTag,
+        mockEntity.getGroup,
+        mockEntity.getGallery,
+        mockEntity.getImage,
+      ]) {
+        (getter as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "x" });
+      }
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
@@ -504,62 +592,11 @@ describe("UserHiddenEntityService", () => {
       expect(mockEntity.getGallery).toHaveBeenCalledWith("6", "i");
       expect(mockEntity.getImage).toHaveBeenCalledWith("7", "i");
       expect(result).toHaveLength(7);
+      expect(result.every((r) => r.restricted === false)).toBe(true);
     });
 
-    it("filters out entities that no longer exist in Stash cache (null)", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        {
-          id: 1,
-          entityType: "scene",
-          entityId: "10",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        },
-        {
-          id: 2,
-          entityType: "scene",
-          entityId: "99",
-          instanceId: "i",
-          hiddenAt: new Date(),
-        },
-      ]);
-      (mockEntity.getScene as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ id: "10", title: "Exists" })
-        .mockResolvedValueOnce(null); // Deleted from Stash
-
-      const result = await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].entityId).toBe("10");
-    });
-
-    it("uses default instance ID when record has empty instanceId", async () => {
-      (
-        mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue([
-        {
-          id: 1,
-          entityType: "studio",
-          entityId: "5",
-          instanceId: "",
-          hiddenAt: new Date(),
-        },
-      ]);
-      (mockEntity.getStudio as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: "5",
-      });
-
-      await userHiddenEntityService.getHiddenEntities(1);
-
-      expect(mockEntity.getStudio).toHaveBeenCalledWith(
-        "5",
-        "default-instance"
-      );
-    });
-
-    it("returns instanceId in the result objects", async () => {
+    it("returns instanceId as stored", async () => {
+      everyRefVisible();
       (
         mockPrisma.userHiddenEntity.findMany as ReturnType<typeof vi.fn>
       ).mockResolvedValue([
@@ -570,6 +607,13 @@ describe("UserHiddenEntityService", () => {
           instanceId: "inst-x",
           hiddenAt: new Date(),
         },
+        {
+          id: 2,
+          entityType: "scene",
+          entityId: "11",
+          instanceId: "",
+          hiddenAt: new Date(),
+        },
       ]);
       (mockEntity.getScene as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "10",
@@ -577,7 +621,55 @@ describe("UserHiddenEntityService", () => {
 
       const result = await userHiddenEntityService.getHiddenEntities(1);
 
-      expect(result[0].instanceId).toBe("inst-x");
+      expect(result.map((r) => r.instanceId)).toEqual(["inst-x", ""]);
+    });
+  });
+
+  // ─── isHiddenByUser ───────────────────────────────────────────────
+
+  describe("isHiddenByUser", () => {
+    it("matches the instance or a hide stored for every instance", async () => {
+      (
+        mockPrisma.userHiddenEntity.findFirst as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ id: 1 });
+
+      const hidden = await userHiddenEntityService.isHiddenByUser(
+        1,
+        "scene",
+        "42",
+        "inst-a"
+      );
+
+      expect(hidden).toBe(true);
+      expect(mockPrisma.userHiddenEntity.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 1,
+          entityType: "scene",
+          entityId: "42",
+          instanceId: { in: ["inst-a", ""] },
+        },
+        select: { id: true },
+      });
+    });
+
+    it("without an instance, matches only a hide stored for every instance", async () => {
+      (
+        mockPrisma.userHiddenEntity.findFirst as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(null);
+
+      const hidden = await userHiddenEntityService.isHiddenByUser(
+        1,
+        "tag",
+        "7",
+        ""
+      );
+
+      expect(hidden).toBe(false);
+      expect(mockPrisma.userHiddenEntity.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ instanceId: { in: [""] } }),
+        })
+      );
     });
   });
 

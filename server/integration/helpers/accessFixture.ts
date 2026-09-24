@@ -265,7 +265,8 @@ export async function seedAccessFixture(): Promise<void> {
 
 /**
  * Upserts a UserHiddenEntity row and its UserExcludedEntity row (reason
- * "hidden"). instanceId "" writes a legacy global row.
+ * "hidden"). instanceId "" writes a legacy global row. Like a hide, an
+ * existing exclusion row keeps its reason.
  */
 export async function hideFor(
   userId: number,
@@ -282,7 +283,7 @@ export async function hideFor(
   await prisma.userExcludedEntity.upsert({
     where: { userId_entityType_entityId_instanceId: key },
     create: { ...key, reason: "hidden" },
-    update: { reason: "hidden" },
+    update: {},
   });
 }
 

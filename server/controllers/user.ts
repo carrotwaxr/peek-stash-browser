@@ -2,6 +2,10 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import {
+  canUserAccessEntity,
+  resolveAccessibleInstanceId,
+} from "../services/EntityAccessService.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { setUserPassword } from "../services/PasswordService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -2434,6 +2438,53 @@ async function validateHideTarget(target: {
   };
 }
 
+interface HideTarget {
+  entityType: EntityType;
+  entityId: string;
+  instanceId: string;
+}
+
+/**
+ * May this user hide this target? Hiding requires visibility: the user must
+ * see the entity on the given instance, or on some instance when none is
+ * given (the rule ratings use). A target this user has already hidden is
+ * "already-hidden": a repeat hide succeeds without writing. Anything else is
+ * "not-found", the same answer as an id that does not exist, so a hide never
+ * reveals whether a restricted entity exists.
+ */
+async function checkHideTarget(
+  userId: number,
+  target: HideTarget
+): Promise<"hide" | "already-hidden" | "not-found"> {
+  const { userHiddenEntityService } =
+    await import("../services/UserHiddenEntityService.js");
+  if (
+    await userHiddenEntityService.isHiddenByUser(
+      userId,
+      target.entityType,
+      target.entityId,
+      target.instanceId
+    )
+  ) {
+    return "already-hidden";
+  }
+
+  const visible = target.instanceId
+    ? await canUserAccessEntity(
+        userId,
+        target.entityType,
+        target.entityId,
+        target.instanceId
+      )
+    : (await resolveAccessibleInstanceId(
+        userId,
+        target.entityType,
+        target.entityId,
+        undefined
+      )) !== null;
+  return visible ? "hide" : "not-found";
+}
+
 /**
  * Hide an entity for the current user
  */
@@ -2453,16 +2504,22 @@ export const hideEntity = async (
       return res.status(400).json({ error: target.error });
     }
 
-    // Import service
-    const { userHiddenEntityService } =
-      await import("../services/UserHiddenEntityService.js");
+    const access = await checkHideTarget(userId, target);
+    if (access === "not-found") {
+      return res.status(404).json({ error: "Not found" });
+    }
 
-    await userHiddenEntityService.hideEntity(
-      userId,
-      target.entityType,
-      target.entityId,
-      target.instanceId
-    );
+    if (access === "hide") {
+      const { userHiddenEntityService } =
+        await import("../services/UserHiddenEntityService.js");
+
+      await userHiddenEntityService.hideEntity(
+        userId,
+        target.entityType,
+        target.entityId,
+        target.instanceId
+      );
+    }
 
     res.json({ success: true, message: "Entity hidden successfully" });
   } catch (error) {
@@ -2706,12 +2763,8 @@ export const hideEntities = async (
         .json({ error: "entities must be a non-empty array" });
     }
 
-    // Validate every entity before hiding any
-    const targets: Array<{
-      entityType: EntityType;
-      entityId: string;
-      instanceId: string;
-    }> = [];
+    // Validate and check every entity before hiding any
+    const targets: HideTarget[] = [];
     for (const [i, entity] of entities.entries()) {
       const target = await validateHideTarget(entity);
       if (!target.ok) {
@@ -2721,16 +2774,24 @@ export const hideEntities = async (
       }
       targets.push(target);
     }
+    const toHide: HideTarget[] = [];
+    for (const target of targets) {
+      const access = await checkHideTarget(userId, target);
+      if (access === "not-found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      if (access === "hide") toHide.push(target);
+    }
 
     // Import service
     const { userHiddenEntityService } =
       await import("../services/UserHiddenEntityService.js");
 
-    // Hide all entities
-    let successCount = 0;
+    // Hide all entities; the ones already hidden count as hidden
+    let successCount = targets.length - toHide.length;
     let failCount = 0;
 
-    for (const target of targets) {
+    for (const target of toHide) {
       try {
         await userHiddenEntityService.hideEntity(
           userId,
