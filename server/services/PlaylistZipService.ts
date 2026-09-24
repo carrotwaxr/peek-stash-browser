@@ -2,6 +2,7 @@ import archiver from "archiver";
 import * as fs from "fs";
 import * as path from "path";
 import { Readable } from "stream";
+import type { ReadableStream as WebReadableStream } from "stream/web";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { generateSceneNfo } from "../utils/nfoGenerator.js";
@@ -241,9 +242,7 @@ export class PlaylistZipService {
         }
 
         // Convert web stream to node stream and add to archive
-        const nodeStream = Readable.fromWeb(
-          response.body as import("stream/web").ReadableStream
-        );
+        const nodeStream = Readable.fromWeb(response.body as WebReadableStream);
         archive.append(nodeStream, {
           name: `${playlistDirName}/${videoFileName}`,
         });

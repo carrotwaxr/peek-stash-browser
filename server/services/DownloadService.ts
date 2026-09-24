@@ -198,9 +198,7 @@ WHERE s.deletedAt IS NULL`,
     );
 
     const total = rows[0]?.total;
-    return typeof total === "bigint"
-      ? total
-      : BigInt(Math.round(Number(total ?? 0)));
+    return typeof total === "bigint" ? total : BigInt(Math.round(total ?? 0));
   }
 
   /**

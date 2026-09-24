@@ -5,11 +5,11 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type * as authModule from "../../middleware/auth.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 
 vi.mock("../../middleware/auth.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../middleware/auth.js")>();
+  const actual = await importOriginal<typeof authModule>();
   return {
     ...actual,
     requireAdmin: actual.requireAdmin,

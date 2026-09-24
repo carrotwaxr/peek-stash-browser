@@ -1,8 +1,8 @@
-import {
+import type {
   ClipQueryOptions as QueryBuilderOptions,
   ClipWithRelations as RawClipWithRelations,
-  clipQueryBuilder,
 } from "./ClipQueryBuilder.js";
+import { clipQueryBuilder } from "./ClipQueryBuilder.js";
 
 export interface ClipQueryOptions {
   page?: number;

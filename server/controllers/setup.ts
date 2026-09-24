@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { Request } from "express";
+import type { Request } from "express";
 import { StashClient } from "../graphql/StashClient.js";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
@@ -392,7 +392,7 @@ export const createFirstStashInstance = async (
     // Initialize the Stash cache now that we have an instance
     // This runs in the background - we don't want to block the response
     logger.info("Triggering Stash cache initialization...");
-    stashSyncService.fullSync().catch((err) => {
+    stashSyncService.fullSync().catch((err: unknown) => {
       logger.error("Failed to initialize Stash cache after instance creation", {
         error: err instanceof Error ? err.message : String(err),
       });
@@ -436,7 +436,7 @@ export const getStashInstance = async (
     });
 
     // For commit 1, we only support one instance
-    const instance = instances[0] || null;
+    const instance = instances[0] ?? null;
 
     res.json({
       instance,
@@ -596,7 +596,7 @@ export const createStashInstance = async (
     // Trigger sync for the new instance in background
     if (enabled) {
       logger.info("Triggering sync for new Stash instance...");
-      stashSyncService.fullSync(instance.id).catch((err) => {
+      stashSyncService.fullSync(instance.id).catch((err: unknown) => {
         logger.error("Failed to sync new Stash instance", {
           instanceId: instance.id,
           error: err instanceof Error ? err.message : String(err),
@@ -717,7 +717,7 @@ export const updateStashInstance = async (
       logger.info(
         "Connection details changed, triggering re-sync for instance..."
       );
-      stashSyncService.fullSync(instance.id).catch((err) => {
+      stashSyncService.fullSync(instance.id).catch((err: unknown) => {
         logger.error("Failed to re-sync Stash instance after update", {
           instanceId: instance.id,
           error: err instanceof Error ? err.message : String(err),

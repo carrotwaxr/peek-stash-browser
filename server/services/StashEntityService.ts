@@ -530,7 +530,7 @@ class StashEntityService {
     const rows = await prisma.$queryRawUnsafe<
       Array<{
         sceneId: string;
-        totalWeight: number;
+        totalWeight: bigint; // SUM of integers
         date: string | null;
       }>
     >(sql, ...params);
@@ -1056,7 +1056,7 @@ class StashEntityService {
     ]);
 
     // Get group count by counting distinct groups from scenes
-    const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
+    const groupCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT sg.groupId) as count
       FROM ScenePerformer sp
       INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
@@ -1297,7 +1297,7 @@ class StashEntityService {
     ]);
 
     // Get performer count by counting distinct performers from scenes
-    const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
+    const performerCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT sp.performerId) as count
       FROM ScenePerformer sp
       INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
@@ -1308,7 +1308,7 @@ class StashEntityService {
     const performerCount = Number(performerCountResult[0]?.count ?? 0);
 
     // Get group count by counting distinct groups from scenes
-    const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
+    const groupCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT sg.groupId) as count
       FROM SceneGroup sg
       INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
@@ -1611,7 +1611,7 @@ class StashEntityService {
     });
 
     // Get performer count by counting distinct performers from scenes in this group
-    const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
+    const performerCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT sp.performerId) as count
       FROM SceneGroup sg
       INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
@@ -2342,7 +2342,7 @@ class StashEntityService {
         base.inheritedTags = inheritedTagIds.map((tagId: string) => {
           // Find in existing tags or create minimal stub
           const existingTag = base.tags?.find((t) => t.id === tagId);
-          return existingTag || { id: tagId, name: "Unknown" };
+          return existingTag ?? { id: tagId, name: "Unknown" };
         });
       }
     }
@@ -2359,7 +2359,7 @@ class StashEntityService {
         image_path: pt.tag?.imagePath
           ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId)
           : null,
-      })) || [];
+      })) ?? [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -2411,7 +2411,7 @@ class StashEntityService {
         image_path: st.tag?.imagePath
           ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId)
           : null,
-      })) || [];
+      })) ?? [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -2470,7 +2470,7 @@ class StashEntityService {
         image_path: gt.tag?.imagePath
           ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId)
           : null,
-      })) || [];
+      })) ?? [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
@@ -2515,7 +2515,7 @@ class StashEntityService {
           gt.tag?.imagePath ?? null,
           gt.tag?.stashInstanceId
         ),
-      })) || [];
+      })) ?? [];
 
     // Transform performers from junction table
     // Include image_path and gender for TooltipEntityGrid display
@@ -2528,7 +2528,7 @@ class StashEntityService {
           gp.performer.imagePath,
           gp.performer.stashInstanceId
         ),
-      })) || [];
+      })) ?? [];
 
     // Transform scenes from junction table
     // Include minimal data for display (id, title, screenshot)
@@ -2542,7 +2542,7 @@ class StashEntityService {
             gs.scene.stashInstanceId
           ),
         },
-      })) || [];
+      })) ?? [];
 
     // Build files array for frontend title fallback (zip galleries)
     const files = gallery.fileBasename

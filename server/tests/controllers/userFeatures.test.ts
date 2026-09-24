@@ -40,6 +40,7 @@ import {
   updateUserStashInstances,
 } from "../../controllers/user.js";
 import prisma from "../../prisma/singleton.js";
+import type * as entityAccessModule from "../../services/EntityAccessService.js";
 import {
   getIdsVisibleOnAnyInstance,
   getVisibleEntityKeys,
@@ -105,9 +106,9 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
 
 // Mock EntityAccessService (hiding requires visibility); entityRefKey stays real
 vi.mock("../../services/EntityAccessService.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../services/EntityAccessService.js")
-  >("../../services/EntityAccessService.js");
+  const actual = await vi.importActual<typeof entityAccessModule>(
+    "../../services/EntityAccessService.js"
+  );
   return {
     entityRefKey: actual.entityRefKey,
     getVisibleEntityKeys: vi.fn(),

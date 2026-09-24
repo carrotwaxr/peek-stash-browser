@@ -900,8 +900,8 @@ describe("stashUrlProxy", () => {
 
       // Verify all paths were proxied (no raw Stash host exposure)
       for (const val of Object.values(must(result.paths))) {
-        expect(val as string).toMatch(/^\/api\/proxy\/stash/);
-        expect(val as string).not.toContain(STASH_HOST);
+        expect(val).toMatch(/^\/api\/proxy\/stash/);
+        expect(val).not.toContain(STASH_HOST);
       }
     });
   });

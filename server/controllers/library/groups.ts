@@ -86,9 +86,7 @@ export async function applyGroupFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((g) => {
-        const groupTagIds = (g.tags || []).map((t: { id: string }) =>
-          String(t.id)
-        );
+        const groupTagIds = (g.tags || []).map((t: { id: string }) => t.id);
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
@@ -119,9 +117,7 @@ export async function applyGroupFilters(
   // Filter by studios
   if (filters.studios && filters.studios.value) {
     const studioIds = new Set(filters.studios.value.map(String));
-    filtered = filtered.filter(
-      (g) => g.studio && studioIds.has(String(g.studio.id))
-    );
+    filtered = filtered.filter((g) => g.studio && studioIds.has(g.studio.id));
   }
 
   // Filter by rating100
@@ -164,7 +160,7 @@ export const findGroups = async (
     const { filter, group_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "name";
-    const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
@@ -189,7 +185,7 @@ export const findGroups = async (
     };
 
     // Extract specific instance ID for disambiguation (from group_filter.instance_id)
-    const specificInstanceId = group_filter?.instance_id as string | undefined;
+    const specificInstanceId = group_filter?.instance_id;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);

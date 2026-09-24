@@ -193,12 +193,16 @@ export const updateGroup = async (
     return res.status(404).json({ error: "Group not found" });
   }
 
+  const { name, description } = req.body;
+  // The body is not validated: only a literal true grants a permission
   const {
-    name,
-    description,
     canShare,
     canDownloadFiles,
     canDownloadPlaylists,
+  }: {
+    canShare?: unknown;
+    canDownloadFiles?: unknown;
+    canDownloadPlaylists?: unknown;
   } = req.body;
 
   // Build update data, only including provided fields

@@ -4,7 +4,7 @@
  * Bug #423: Client sends POST with no body, causing
  * "Cannot destructure property 'instanceId' of 'req.body' as it is undefined"
  */
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";

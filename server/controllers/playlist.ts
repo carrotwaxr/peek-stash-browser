@@ -148,7 +148,7 @@ export const getUserPlaylists = async (
             scene:
               sceneMap.get(
                 `${item.sceneId}${KEY_SEP}${item.instanceId || ""}`
-              ) || null,
+              ) ?? null,
           }));
 
           return {
@@ -292,7 +292,7 @@ export const getSharedPlaylists = async (
               scene:
                 sceneMap.get(
                   `${item.sceneId}${KEY_SEP}${item.instanceId || ""}`
-                ) || null,
+                ) ?? null,
             }));
           } catch (cacheError) {
             logger.error(`Error fetching scenes for shared playlist ${p.id}`, {
@@ -432,7 +432,7 @@ export const getPlaylist = async (
         const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
           scene:
-            sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) ||
+            sceneMap.get(`${item.sceneId}${KEY_SEP}${item.instanceId || ""}`) ??
             null,
         }));
 
@@ -538,7 +538,10 @@ export const updatePlaylist = async (
       return res.status(400).json({ error: "Invalid playlist ID" });
     }
 
-    const { name, description, isPublic, shuffle, repeat } = req.body;
+    const { name, description, repeat } = req.body;
+    // The body is not validated: only a literal true turns these on
+    const { isPublic, shuffle }: { isPublic?: unknown; shuffle?: unknown } =
+      req.body;
 
     // Check ownership
     const existing = await prisma.playlist.findFirst({

@@ -202,7 +202,7 @@ export function enrichTypes(
   const enrich = (info?: TypeInfo): TypeInfo | undefined => {
     if (!info) return undefined;
     const resolved = resolveTypeDefinition(info.name, serverDir);
-    return resolved || info;
+    return resolved ?? info;
   };
 
   return {

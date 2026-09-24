@@ -464,7 +464,7 @@ class StudioQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -485,7 +485,7 @@ class StudioQueryBuilder {
         FROM StashStudio s
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -784,7 +784,7 @@ class StudioQueryBuilder {
       const tag = tagsById.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
       const studioKey = `${junction.studioId}:${junction.studioInstanceId}`;
-      const list = tagsByStudio.get(studioKey) || [];
+      const list = tagsByStudio.get(studioKey) ?? [];
       list.push(tag);
       tagsByStudio.set(studioKey, list);
     }
@@ -799,7 +799,7 @@ class StudioQueryBuilder {
       if (!studioInfo) continue;
       const studioKey = `${studioInfo.studioId}:${studioInfo.instanceId}`;
       const performerKey = `${sp.performerId}:${sp.performerInstanceId}`;
-      const set = performersByStudio.get(studioKey) || new Set();
+      const set = performersByStudio.get(studioKey) ?? new Set();
       set.add(performerKey);
       performersByStudio.set(studioKey, set);
     }
@@ -810,7 +810,7 @@ class StudioQueryBuilder {
       if (!studioInfo) continue;
       const studioKey = `${studioInfo.studioId}:${studioInfo.instanceId}`;
       const groupKey = `${sg.groupId}:${sg.groupInstanceId}`;
-      const set = groupsByStudio.get(studioKey) || new Set();
+      const set = groupsByStudio.get(studioKey) ?? new Set();
       set.add(groupKey);
       groupsByStudio.set(studioKey, set);
     }
@@ -821,7 +821,7 @@ class StudioQueryBuilder {
       if (!g.studioId) continue;
       const studioKey = `${g.studioId}:${g.stashInstanceId}`;
       const galleryKey = `${g.id}:${g.stashInstanceId}`;
-      const set = galleriesByStudio.get(studioKey) || new Set();
+      const set = galleriesByStudio.get(studioKey) ?? new Set();
       set.add(galleryKey);
       galleriesByStudio.set(studioKey, set);
     }
@@ -829,14 +829,14 @@ class StudioQueryBuilder {
     // Populate studios using composite keys
     for (const studio of studios) {
       const studioKey = `${studio.id}:${studio.instanceId}`;
-      studio.tags = tagsByStudio.get(studioKey) || [];
-      studio.performers = [...(performersByStudio.get(studioKey) || [])]
+      studio.tags = tagsByStudio.get(studioKey) ?? [];
+      studio.performers = [...(performersByStudio.get(studioKey) ?? [])]
         .map((key) => performersById.get(key))
         .filter((p): p is PerformerRef => !!p);
-      studio.groups = [...(groupsByStudio.get(studioKey) || [])]
+      studio.groups = [...(groupsByStudio.get(studioKey) ?? [])]
         .map((key) => groupsById.get(key))
         .filter((g): g is GroupRef => !!g);
-      studio.galleries = [...(galleriesByStudio.get(studioKey) || [])]
+      studio.galleries = [...(galleriesByStudio.get(studioKey) ?? [])]
         .map((key) => galleriesById.get(key))
         .filter((g): g is GalleryRef => !!g);
     }

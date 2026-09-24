@@ -217,6 +217,7 @@ class GroupQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -270,6 +271,7 @@ class GroupQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -327,6 +329,7 @@ class GroupQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -638,7 +641,7 @@ class GroupQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -659,7 +662,7 @@ class GroupQueryBuilder {
         FROM StashGroup g
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -969,7 +972,7 @@ class GroupQueryBuilder {
       const tag = tagsByKey.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
       const groupKey = `${junction.groupId}:${junction.groupInstanceId}`;
-      const list = tagsByGroup.get(groupKey) || [];
+      const list = tagsByGroup.get(groupKey) ?? [];
       list.push(tag);
       tagsByGroup.set(groupKey, list);
     }
@@ -980,7 +983,7 @@ class GroupQueryBuilder {
     for (const sg of sceneGroups) {
       const groupKey = `${sg.groupId}:${sg.groupInstanceId}`;
       const sceneKey = `${sg.sceneId}:${sg.sceneInstanceId}`;
-      const set = scenesByGroup.get(groupKey) || new Set();
+      const set = scenesByGroup.get(groupKey) ?? new Set();
       set.add(sceneKey);
       scenesByGroup.set(groupKey, set);
     }
@@ -991,7 +994,7 @@ class GroupQueryBuilder {
     for (const sp of scenePerformers) {
       const sceneKey = `${sp.sceneId}:${sp.sceneInstanceId}`;
       const performerKey = `${sp.performerId}:${sp.performerInstanceId}`;
-      const set = performersByScene.get(sceneKey) || new Set();
+      const set = performersByScene.get(sceneKey) ?? new Set();
       set.add(performerKey);
       performersByScene.set(sceneKey, set);
     }
@@ -1000,7 +1003,7 @@ class GroupQueryBuilder {
     for (const sg of sceneGalleries) {
       const sceneKey = `${sg.sceneId}:${sg.sceneInstanceId}`;
       const galleryKey = `${sg.galleryId}:${sg.galleryInstanceId}`;
-      const set = galleriesByScene.get(sceneKey) || new Set();
+      const set = galleriesByScene.get(sceneKey) ?? new Set();
       set.add(galleryKey);
       galleriesByScene.set(sceneKey, set);
     }
@@ -1008,7 +1011,7 @@ class GroupQueryBuilder {
     // Populate groups using composite keys
     for (const group of groups) {
       const groupKey = `${group.id}:${group.instanceId}`;
-      group.tags = tagsByGroup.get(groupKey) || [];
+      group.tags = tagsByGroup.get(groupKey) ?? [];
 
       // Hydrate studio with tooltip data (id, name, image_path) using composite key
       if (group.studio?.id) {
@@ -1020,15 +1023,15 @@ class GroupQueryBuilder {
       }
 
       // Derive performers and galleries from group's scenes using composite keys
-      const groupSceneKeys = scenesByGroup.get(groupKey) || new Set();
+      const groupSceneKeys = scenesByGroup.get(groupKey) ?? new Set();
 
       const groupPerformerKeys = new Set<string>();
       const groupGalleryKeys = new Set<string>();
 
       for (const sceneKey of groupSceneKeys) {
-        for (const performerKey of performersByScene.get(sceneKey) || [])
+        for (const performerKey of performersByScene.get(sceneKey) ?? [])
           groupPerformerKeys.add(performerKey);
-        for (const galleryKey of galleriesByScene.get(sceneKey) || [])
+        for (const galleryKey of galleriesByScene.get(sceneKey) ?? [])
           groupGalleryKeys.add(galleryKey);
       }
 

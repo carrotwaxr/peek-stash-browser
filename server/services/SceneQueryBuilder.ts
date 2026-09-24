@@ -383,6 +383,7 @@ class SceneQueryBuilder {
         return { sql: `${col} > ?`, params: [height] };
       case "LESS_THAN":
         return { sql: `${col} < ?`, params: [height] };
+      case null:
       default:
         return { sql: `${col} >= ?`, params: [height] };
     }
@@ -422,6 +423,7 @@ class SceneQueryBuilder {
         return { sql: "(s.title IS NULL OR s.title = '')", params: [] };
       case "NOT_NULL":
         return { sql: "(s.title IS NOT NULL AND s.title != '')", params: [] };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -467,6 +469,7 @@ class SceneQueryBuilder {
           sql: "(s.details IS NOT NULL AND s.details != '')",
           params: [],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -601,6 +604,7 @@ class SceneQueryBuilder {
           sql: "(s.fileVideoCodec IS NOT NULL AND s.fileVideoCodec != '')",
           params: [],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -649,6 +653,7 @@ class SceneQueryBuilder {
           sql: "(s.fileAudioCodec IS NOT NULL AND s.fileAudioCodec != '')",
           params: [],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -692,6 +697,7 @@ class SceneQueryBuilder {
           };
         }
         return { sql: `${subquery} >= ?`, params: [value] };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -735,6 +741,7 @@ class SceneQueryBuilder {
           };
         }
         return { sql: `${subquery} >= ?`, params: [value] };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -831,6 +838,7 @@ class SceneQueryBuilder {
           };
         }
         return { sql: `${ageSubquery} >= ?`, params: [value] };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -879,6 +887,7 @@ class SceneQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -958,6 +967,7 @@ class SceneQueryBuilder {
           params: [...ids, ...ids],
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -1373,7 +1383,7 @@ class SceneQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -1395,7 +1405,7 @@ class SceneQueryBuilder {
         FROM StashScene s
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -1749,7 +1759,7 @@ class SceneQueryBuilder {
       const performer = performersByKey.get(performerKey);
       if (!performer) continue; // Skip orphaned junction records
       const sceneKey = `${junction.sceneId}:${junction.sceneInstanceId}`;
-      const list = performersByScene.get(sceneKey) || [];
+      const list = performersByScene.get(sceneKey) ?? [];
       list.push(performer);
       performersByScene.set(sceneKey, list);
     }
@@ -1760,7 +1770,7 @@ class SceneQueryBuilder {
       const tag = tagsByKey.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
       const sceneKey = `${junction.sceneId}:${junction.sceneInstanceId}`;
-      const list = tagsByScene.get(sceneKey) || [];
+      const list = tagsByScene.get(sceneKey) ?? [];
       list.push(tag);
       tagsByScene.set(sceneKey, list);
     }
@@ -1774,7 +1784,7 @@ class SceneQueryBuilder {
       const group = groupsByKey.get(groupKey);
       if (!group) continue; // Skip orphaned junction records
       const sceneKey = `${junction.sceneId}:${junction.sceneInstanceId}`;
-      const list = groupsByScene.get(sceneKey) || [];
+      const list = groupsByScene.get(sceneKey) ?? [];
       list.push({ ...group, scene_index: junction.sceneIndex });
       groupsByScene.set(sceneKey, list);
     }
@@ -1785,7 +1795,7 @@ class SceneQueryBuilder {
       const gallery = galleriesByKey.get(galleryKey);
       if (!gallery) continue; // Skip orphaned junction records
       const sceneKey = `${junction.sceneId}:${junction.sceneInstanceId}`;
-      const list = galleriesByScene.get(sceneKey) || [];
+      const list = galleriesByScene.get(sceneKey) ?? [];
       list.push(gallery);
       galleriesByScene.set(sceneKey, list);
     }
@@ -1794,14 +1804,14 @@ class SceneQueryBuilder {
     for (const scene of scenes) {
       const normalizedSceneInstanceId = normalizeInstanceId(scene.instanceId);
       const sceneKey = `${scene.id}:${normalizedSceneInstanceId}`;
-      scene.performers = performersByScene.get(sceneKey) || [];
-      scene.tags = tagsByScene.get(sceneKey) || [];
-      scene.groups = groupsByScene.get(sceneKey) || [];
-      scene.galleries = galleriesByScene.get(sceneKey) || [];
+      scene.performers = performersByScene.get(sceneKey) ?? [];
+      scene.tags = tagsByScene.get(sceneKey) ?? [];
+      scene.groups = groupsByScene.get(sceneKey) ?? [];
+      scene.galleries = galleriesByScene.get(sceneKey) ?? [];
       const studioId = scene.studioId;
       if (studioId) {
         const studioKey = `${studioId}:${normalizedSceneInstanceId}`;
-        scene.studio = studiosByKey.get(studioKey) || null;
+        scene.studio = studiosByKey.get(studioKey) ?? null;
       }
 
       // Hydrate inherited tags with full tag objects

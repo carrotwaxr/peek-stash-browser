@@ -68,9 +68,7 @@ describe("StudioQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // The Stats JOIN (UserStudioStats) must match on instanceId
       // StudioQueryBuilder uses 's' for entity and 'us' for stats
@@ -90,9 +88,7 @@ describe("StudioQueryBuilder", () => {
       });
 
       // The count query (second call) also uses the same FROM clause with JOINs
-      const countQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[1]
-      )[0] as string;
+      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
       expect(countQuerySql).toContain("s.stashInstanceId = us.instanceId");
       expect(countQuerySql).toContain("s.stashInstanceId = r.instanceId");
     });
@@ -107,9 +103,7 @@ describe("StudioQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("s.stashInstanceId = ?");
@@ -130,9 +124,7 @@ describe("StudioQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("s.stashInstanceId = ?");

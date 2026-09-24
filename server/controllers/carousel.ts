@@ -159,7 +159,7 @@ export const createCarousel = async (
     });
 
     const existingPrefs =
-      (user?.carouselPreferences as CarouselPreference[] | null) || [];
+      (user?.carouselPreferences as CarouselPreference[] | null) ?? [];
     const customCarouselId = `custom-${carousel.id}`;
 
     // Only add if not already present
@@ -310,7 +310,7 @@ export const previewCarousel = async (
     // Execute the carousel query
     const scenes = await executeCarouselQuery(
       userId,
-      rules as PeekSceneFilter,
+      rules,
       sort || "random",
       direction || "DESC",
       req.user

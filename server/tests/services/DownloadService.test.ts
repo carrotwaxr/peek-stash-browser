@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { DownloadService } from "../../services/DownloadService.js";
+import type * as entityAccessModule from "../../services/EntityAccessService.js";
 import {
   entityRefKey,
   getVisibleEntityKeys,
@@ -16,10 +17,7 @@ vi.mock(
 );
 
 vi.mock("../../services/EntityAccessService.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../../services/EntityAccessService.js")
-    >();
+  const actual = await importOriginal<typeof entityAccessModule>();
   return { ...actual, getVisibleEntityKeys: vi.fn() };
 });
 

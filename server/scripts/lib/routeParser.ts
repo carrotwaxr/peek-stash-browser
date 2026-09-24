@@ -62,7 +62,7 @@ export function parseRouteFile(
     // Extract controller name - check for authenticated() wrapper first, then standalone
     const authenticatedMatch = routeBody.match(/authenticated\(\s*(\w+)\s*\)/);
     const standaloneMatch = routeBody.match(/,\s*(\w+)\s*$/);
-    const controllerMatch = authenticatedMatch || standaloneMatch;
+    const controllerMatch = authenticatedMatch ?? standaloneMatch;
     const controllerName = controllerMatch ? controllerMatch[1] : null;
 
     // Skip inline arrow functions or invalid matches

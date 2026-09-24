@@ -849,7 +849,7 @@ class ExclusionComputationService {
       SELECT id, inst AS instanceId FROM listed`;
     }
 
-    return (await tx.$queryRawUnsafe(sql, ...params)) as ResolvedRef[];
+    return await tx.$queryRawUnsafe<ResolvedRef[]>(sql, ...params);
   }
 
   /**
@@ -1048,13 +1048,13 @@ class ExclusionComputationService {
           "t.stashInstanceId"
         );
         await this.fillRefs(tx, rule.include);
-        const inverted = (await tx.$queryRawUnsafe(
+        const inverted = await tx.$queryRawUnsafe<ResolvedRef[]>(
           `SELECT t.id, t.stashInstanceId AS instanceId
            FROM ${table} t
            WHERE t.deletedAt IS NULL AND ${inst.sql}
              AND NOT EXISTS (SELECT 1 FROM ${REFS_TABLE} r WHERE r.id = t.id AND r.inst = t.stashInstanceId)`,
           ...inst.params
-        )) as ResolvedRef[];
+        );
         for (const row of inverted) {
           records.push({
             userId,
@@ -1191,10 +1191,7 @@ class ExclusionComputationService {
       await this.fillRefs(tx, [...merged.values()]);
       for (const edge of edges) {
         const { sql, params } = this.edgeQuery(edge, allowedInstanceIds);
-        const rows = (await tx.$queryRawUnsafe(
-          sql,
-          ...params
-        )) as ResolvedRef[];
+        const rows = await tx.$queryRawUnsafe<ResolvedRef[]>(sql, ...params);
         for (const row of rows) addCascade(edge.target, row.id, row.instanceId);
       }
     }
@@ -1329,10 +1326,7 @@ class ExclusionComputationService {
           rule.restrictEmpty,
           allowedInstanceIds
         );
-        const rows = (await tx.$queryRawUnsafe(
-          sql,
-          ...params
-        )) as ResolvedRef[];
+        const rows = await tx.$queryRawUnsafe<ResolvedRef[]>(sql, ...params);
         for (const row of rows) {
           records.push({
             userId,
@@ -1451,7 +1445,9 @@ class ExclusionComputationService {
     const galFrom = await fromFor("gallery", "StashGallery", "g");
     const emptyGalleries = !galFrom
       ? []
-      : ((await tx.$queryRawUnsafe(
+      : await tx.$queryRawUnsafe<
+          Array<{ galleryId: string; instanceId: string }>
+        >(
           `
       SELECT g.id AS galleryId, g.stashInstanceId AS instanceId
       FROM ${galFrom}
@@ -1466,7 +1462,7 @@ class ExclusionComputationService {
       )
     `,
           ...galFilter.params
-        )) as Array<{ galleryId: string; instanceId: string }>);
+        );
 
     for (const row of emptyGalleries) {
       emptyExclusions.push({
@@ -1486,7 +1482,9 @@ class ExclusionComputationService {
     const perfFrom = await fromFor("performer", "StashPerformer", "p");
     const emptyPerformers = !perfFrom
       ? []
-      : ((await tx.$queryRawUnsafe(
+      : await tx.$queryRawUnsafe<
+          Array<{ performerId: string; instanceId: string }>
+        >(
           `
       SELECT p.id AS performerId, p.stashInstanceId AS instanceId
       FROM ${perfFrom}
@@ -1509,7 +1507,7 @@ class ExclusionComputationService {
       )
     `,
           ...perfFilter.params
-        )) as Array<{ performerId: string; instanceId: string }>);
+        );
 
     for (const row of emptyPerformers) {
       emptyExclusions.push({
@@ -1532,7 +1530,9 @@ class ExclusionComputationService {
     const stuFrom = await fromFor("studio", "StashStudio", "st");
     const emptyStudios = !stuFrom
       ? []
-      : ((await tx.$queryRawUnsafe(
+      : await tx.$queryRawUnsafe<
+          Array<{ studioId: string; instanceId: string }>
+        >(
           `
       SELECT st.id AS studioId, st.stashInstanceId AS instanceId
       FROM ${stuFrom}
@@ -1555,7 +1555,7 @@ class ExclusionComputationService {
       )
     `,
           ...stuFilter.params
-        )) as Array<{ studioId: string; instanceId: string }>);
+        );
 
     for (const row of emptyStudios) {
       emptyExclusions.push({
@@ -1575,7 +1575,9 @@ class ExclusionComputationService {
     const grpFrom = await fromFor("group", "StashGroup", "g");
     const emptyGroups = !grpFrom
       ? []
-      : ((await tx.$queryRawUnsafe(
+      : await tx.$queryRawUnsafe<
+          Array<{ groupId: string; instanceId: string }>
+        >(
           `
       SELECT g.id AS groupId, g.stashInstanceId AS instanceId
       FROM ${grpFrom}
@@ -1591,7 +1593,7 @@ class ExclusionComputationService {
       )
     `,
           ...grpFilter.params
-        )) as Array<{ groupId: string; instanceId: string }>);
+        );
 
     for (const row of emptyGroups) {
       emptyExclusions.push({
@@ -1614,7 +1616,7 @@ class ExclusionComputationService {
     const tagFrom = await fromFor("tag", "StashTag", "t");
     const emptyTags = !tagFrom
       ? []
-      : ((await tx.$queryRawUnsafe(
+      : await tx.$queryRawUnsafe<Array<{ tagId: string; instanceId: string }>>(
           `
       SELECT t.id AS tagId, t.stashInstanceId AS instanceId
       FROM ${tagFrom}
@@ -1670,7 +1672,7 @@ class ExclusionComputationService {
       )
     `,
           ...tagFilter.params
-        )) as Array<{ tagId: string; instanceId: string }>);
+        );
 
     for (const row of emptyTags) {
       emptyExclusions.push({
@@ -1914,7 +1916,7 @@ class ExclusionComputationService {
     // Queue async recompute - the unhide might affect cascade exclusions
     // that need to be recalculated based on remaining hidden entities
     setImmediate(() => {
-      this.recomputeForUser(userId).catch((err) => {
+      this.recomputeForUser(userId).catch((err: unknown) => {
         logger.error("Failed to recompute exclusions after unhide", {
           userId,
           entityType,

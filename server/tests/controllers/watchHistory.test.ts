@@ -24,7 +24,7 @@ import {
   pingWatchHistory,
   saveActivity,
 } from "../../controllers/watchHistory.js";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";

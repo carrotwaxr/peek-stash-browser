@@ -463,9 +463,9 @@ class ImageQueryBuilder {
     // Hydrate each row
     return rows.map((row) => ({
       ...row,
-      performers: performersByImage.get(row.id as string) || [],
-      tags: tagsByImage.get(row.id as string) || [],
-      galleries: galleriesByImage.get(row.id as string) || [],
+      performers: performersByImage.get(row.id as string) ?? [],
+      tags: tagsByImage.get(row.id as string) ?? [],
+      galleries: galleriesByImage.get(row.id as string) ?? [],
       studio: row.studioId ? studiosById.get(row.studioId as string) : null,
     })) as unknown as NormalizedImage[];
   }
@@ -638,7 +638,7 @@ class ImageQueryBuilder {
       WHERE ${whereSQL}
     `;
     const countParams = [...fromClause.params, ...whereParams];
-    const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+    const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
       countSql,
       ...countParams
     );

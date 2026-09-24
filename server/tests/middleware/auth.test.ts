@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import type * as authModule from "../../middleware/auth.js";
 import { generateToken, verifyToken } from "../../middleware/auth.js";
 import { must } from "../helpers/must.js";
 
 // Mock the JWT secret to match what auth.ts uses
 vi.mock("../../middleware/auth.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../middleware/auth.js")>();
+  const actual = await importOriginal<typeof authModule>();
   return {
     ...actual,
   };

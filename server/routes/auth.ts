@@ -1,12 +1,13 @@
 import bcrypt from "bcryptjs";
-import express, { Response } from "express";
+import type { Response } from "express";
+import express from "express";
 import {
   checkAccountLockout,
   clearFailedAttempts,
   recordFailedAttempt,
 } from "../middleware/accountLockout.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 import {
-  AuthenticatedRequest,
   authenticate,
   generateToken,
   setTokenCookie,
@@ -89,11 +90,13 @@ router.post("/login", authRateLimiter, async (req, res) => {
     setTokenCookie(res, token);
 
     // Recompute rankings asynchronously on login (fire-and-forget)
-    rankingComputeService.recomputeAllRankings(user.id).catch((err) => {
-      logger.error("Failed to recompute rankings on login", {
-        error: err instanceof Error ? err.message : "Unknown error",
+    rankingComputeService
+      .recomputeAllRankings(user.id)
+      .catch((err: unknown) => {
+        logger.error("Failed to recompute rankings on login", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       });
-    });
 
     res.json({
       success: true,

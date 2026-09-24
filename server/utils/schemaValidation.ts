@@ -3,7 +3,8 @@
  *
  * Helpers for validating API responses with Zod schemas.
  */
-import { ZodError, ZodObject, z } from "zod";
+import type { ZodObject, z } from "zod";
+import { ZodError } from "zod";
 import { logger } from "./logger.js";
 
 /**

@@ -198,13 +198,12 @@ export const transformScene = <T extends SceneLike>(scene: T): T => {
 
     // Transform paths object if present
     if (scene.paths) {
-      mutated.paths = Object.entries(scene.paths).reduce(
-        (acc, [key, val]) => {
-          acc[key] = appendApiKeyToUrl(val as string);
-          return acc;
-        },
-        {} as Record<string, string>
-      );
+      mutated.paths = Object.entries(scene.paths).reduce<
+        Record<string, string>
+      >((acc, [key, val]) => {
+        acc[key] = appendApiKeyToUrl(val as string);
+        return acc;
+      }, {});
     }
 
     // Transform sceneStreams to strip API keys from URLs

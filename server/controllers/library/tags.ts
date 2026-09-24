@@ -50,7 +50,7 @@ export async function mergeTagsWithUserData(
   // Merge data
   return tags.map((tag) => {
     const compositeKey = `${tag.id}\0${tag.instanceId || ""}`;
-    const stats = tagStats.get(compositeKey) || {
+    const stats = tagStats.get(compositeKey) ?? {
       oCounter: 0,
       playCount: 0,
     };
@@ -102,7 +102,7 @@ export const findTags = async (
     };
 
     // Extract specific instance ID for disambiguation (from tag_filter.instance_id)
-    const specificInstanceId = tag_filter?.instance_id as string | undefined;
+    const specificInstanceId = tag_filter?.instance_id;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -416,7 +416,7 @@ export async function applyTagFilters(
     if (performerIdSet.size > 0) {
       const allPerformers = await stashEntityService.getAllPerformers();
       const matchingPerformers = allPerformers.filter((p) =>
-        performerIdSet.has(String(p.id))
+        performerIdSet.has(p.id)
       );
 
       // Get all tag IDs from matching performers
@@ -441,7 +441,7 @@ export async function applyTagFilters(
       const tagIdSet = new Set<string>();
 
       allStudios.forEach((studio) => {
-        if (studioIdSet.has(String(studio.id))) {
+        if (studioIdSet.has(studio.id)) {
           if (studio.tags) {
             studio.tags.forEach((tag) => tagIdSet.add(tag.id));
           }
@@ -461,9 +461,7 @@ export async function applyTagFilters(
       // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional legacy fallback path when USE_SQL_QUERY_BUILDER=false
       const allScenes = await stashEntityService.getAllScenes();
       const allPerformers = await stashEntityService.getAllPerformers();
-      const matchingScenes = allScenes.filter((s) =>
-        sceneIdSet.has(String(s.id))
-      );
+      const matchingScenes = allScenes.filter((s) => sceneIdSet.has(s.id));
 
       // Get all tag IDs from matching scenes
       const tagIdSet = new Set<string>();
@@ -663,7 +661,7 @@ export const findTagsForScenes = async (
       LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
       WHERE s.deletedAt IS NULL AND e.id IS NULL
     `;
-    const params: (string | number)[] = [userId as number];
+    const params: (string | number)[] = [userId];
 
     if (performerId) {
       sceneTagQuery += ` AND EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId = ?)`;
@@ -759,7 +757,7 @@ export const findTagsForScenes = async (
         t.parents
           ?.filter((p) => expandedTagIds.has(p.id))
           .map((p) => ({ id: p.id })) || [],
-      children: childrenMap.get(t.id) || [],
+      children: childrenMap.get(t.id) ?? [],
     }));
 
     res.json({ tags: tagsWithHierarchy });

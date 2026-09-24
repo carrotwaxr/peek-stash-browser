@@ -264,6 +264,7 @@ class GalleryQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -635,7 +636,7 @@ class GalleryQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -656,7 +657,7 @@ class GalleryQueryBuilder {
         FROM StashGallery g
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -882,7 +883,7 @@ class GalleryQueryBuilder {
       const performer = performersByKey.get(performerKey);
       if (!performer) continue; // Skip orphaned junction records
       const galleryKey = `${junction.galleryId}:${junction.galleryInstanceId}`;
-      const list = performersByGallery.get(galleryKey) || [];
+      const list = performersByGallery.get(galleryKey) ?? [];
       list.push(performer);
       performersByGallery.set(galleryKey, list);
     }
@@ -893,7 +894,7 @@ class GalleryQueryBuilder {
       const tag = tagsByKey.get(tagKey);
       if (!tag) continue; // Skip orphaned junction records
       const galleryKey = `${junction.galleryId}:${junction.galleryInstanceId}`;
-      const list = tagsByGallery.get(galleryKey) || [];
+      const list = tagsByGallery.get(galleryKey) ?? [];
       list.push(tag);
       tagsByGallery.set(galleryKey, list);
     }
@@ -901,8 +902,8 @@ class GalleryQueryBuilder {
     // Populate galleries using composite keys
     for (const gallery of galleries) {
       const galleryKey = `${gallery.id}:${gallery.instanceId}`;
-      gallery.performers = performersByGallery.get(galleryKey) || [];
-      gallery.tags = tagsByGallery.get(galleryKey) || [];
+      gallery.performers = performersByGallery.get(galleryKey) ?? [];
+      gallery.tags = tagsByGallery.get(galleryKey) ?? [];
 
       // Hydrate studio with full data using composite key
       if (gallery.studio?.id) {

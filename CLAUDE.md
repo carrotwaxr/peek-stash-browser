@@ -24,6 +24,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - Migrations are written by hand (see `.claude/rules/prisma.md`). Never run `prisma migrate dev` or `prisma db push`.
 - Tests live in `client/tests/` and `server/tests/`, mirroring the source tree, never beside the source.
 - Server tests and `integration/` are type-checked by `server/tsconfig.tests.json` with the source flags (`npm run typecheck:tests`; plain `tsc` skips them). Client `typecheck` includes its tests. Mock Prisma in server tests with `tests/helpers/prismaMock.ts` (see `.claude/rules/tests.md`).
+- Lint ratchet: `eslint-suppressions.json` holds counts that may only fall; after fixing suppressed sites run `npx eslint . --prune-suppressions`; never add entries.
 - Releases push the version-bump commit straight to main and tag it. That is the only push to main without a pull request.
 - Rules for specific areas live in `.claude/rules/` and load with the files they cover. Plans and design docs go in `docs/plans/`, which is gitignored: they stay local.
 

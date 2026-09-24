@@ -206,6 +206,7 @@ class PerformerQueryBuilder {
           sql: "(p.gender IS NULL OR UPPER(p.gender) != UPPER(?))",
           params: [value],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -295,6 +296,7 @@ class PerformerQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -351,6 +353,7 @@ class PerformerQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -398,6 +401,7 @@ class PerformerQueryBuilder {
           params: ids,
         };
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -427,6 +431,7 @@ class PerformerQueryBuilder {
           sql: `(${column} IS NULL OR UPPER(${column}) != UPPER(?))`,
           params: [value],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -485,6 +490,7 @@ class PerformerQueryBuilder {
           sql: `(p.birthdate IS NOT NULL AND ${yearExpr} >= ?)`,
           params: [value],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -542,6 +548,7 @@ class PerformerQueryBuilder {
           sql: `(p.deathDate IS NOT NULL AND ${yearExpr} >= ?)`,
           params: [value],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -601,6 +608,7 @@ class PerformerQueryBuilder {
           sql: `(p.birthdate IS NOT NULL AND ${ageExpr} >= ?)`,
           params: [value],
         };
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -1046,7 +1054,7 @@ class PerformerQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -1067,7 +1075,7 @@ class PerformerQueryBuilder {
         FROM StashPerformer p
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -1362,7 +1370,7 @@ class PerformerQueryBuilder {
     const scenesByPerformer = new Map<string, Set<string>>();
     for (const sp of scenePerformers) {
       const key = `${sp.performerId}${KEY_SEP}${sp.performerInstanceId}`;
-      const set = scenesByPerformer.get(key) || new Set();
+      const set = scenesByPerformer.get(key) ?? new Set();
       set.add(sp.sceneId);
       scenesByPerformer.set(key, set);
     }
@@ -1370,14 +1378,14 @@ class PerformerQueryBuilder {
     // Build scene -> entities mappings (using composite keys id:instanceId)
     const groupsByScene = new Map<string, Set<string>>();
     for (const sg of sceneGroups) {
-      const set = groupsByScene.get(sg.sceneId) || new Set();
+      const set = groupsByScene.get(sg.sceneId) ?? new Set();
       set.add(`${sg.groupId}:${sg.groupInstanceId}`);
       groupsByScene.set(sg.sceneId, set);
     }
 
     const galleriesByScene = new Map<string, Set<string>>();
     for (const sg of sceneGalleries) {
-      const set = galleriesByScene.get(sg.sceneId) || new Set();
+      const set = galleriesByScene.get(sg.sceneId) ?? new Set();
       set.add(`${sg.galleryId}:${sg.galleryInstanceId}`);
       galleriesByScene.set(sg.sceneId, set);
     }
@@ -1394,7 +1402,7 @@ class PerformerQueryBuilder {
       const tag = tagsByKey.get(`${junction.tagId}:${junction.tagInstanceId}`);
       if (!tag) continue;
       const key = `${junction.performerId}${KEY_SEP}${junction.performerInstanceId}`;
-      const list = tagsByPerformer.get(key) || [];
+      const list = tagsByPerformer.get(key) ?? [];
       list.push(tag);
       tagsByPerformer.set(key, list);
     }
@@ -1403,7 +1411,7 @@ class PerformerQueryBuilder {
     const galleriesByPerformer = new Map<string, Set<string>>();
     for (const gp of galleryPerformers) {
       const key = `${gp.performerId}${KEY_SEP}${gp.performerInstanceId}`;
-      const set = galleriesByPerformer.get(key) || new Set();
+      const set = galleriesByPerformer.get(key) ?? new Set();
       set.add(`${gp.galleryId}:${gp.galleryInstanceId}`);
       galleriesByPerformer.set(key, set);
     }
@@ -1411,17 +1419,17 @@ class PerformerQueryBuilder {
     // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
       const performerKey = `${performer.id}${KEY_SEP}${performer.instanceId || ""}`;
-      performer.tags = tagsByPerformer.get(performerKey) || [];
+      performer.tags = tagsByPerformer.get(performerKey) ?? [];
 
       // Derive groups and studios from performer's scenes
       const performerSceneIds =
-        scenesByPerformer.get(performerKey) || new Set();
+        scenesByPerformer.get(performerKey) ?? new Set();
 
       const performerGroupKeys = new Set<string>();
       const performerStudioKeys = new Set<string>();
 
       for (const sceneId of performerSceneIds) {
-        for (const gkey of groupsByScene.get(sceneId) || [])
+        for (const gkey of groupsByScene.get(sceneId) ?? [])
           performerGroupKeys.add(gkey);
         const skey = studioByScene.get(sceneId);
         if (skey) performerStudioKeys.add(skey);
@@ -1429,7 +1437,7 @@ class PerformerQueryBuilder {
 
       // Galleries come from direct GalleryPerformer association
       const performerGalleryKeys =
-        galleriesByPerformer.get(performerKey) || new Set();
+        galleriesByPerformer.get(performerKey) ?? new Set();
 
       performer.groups = [...performerGroupKeys]
         .map((key) => groupsByKey.get(key))

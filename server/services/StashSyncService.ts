@@ -828,6 +828,9 @@ class StashSyncService extends EventEmitter {
           });
           return result.findImages.count;
         }
+        // No change count for clips yet, so the startup smart sync skips them
+        // once they have synced; the scheduled incremental sync still runs them
+        case "clip":
         default:
           return 0;
       }
@@ -1185,6 +1188,9 @@ class StashSyncService extends EventEmitter {
         }
         break;
       }
+      case "clip":
+        // The webhook route (routes/sync.ts) rejects clips
+        break;
     }
   }
 
@@ -1396,7 +1402,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(pathsExtended?.chapters_vtt as string | undefined)},
       ${this.escapeNullable(pathsExtended?.stream as string | undefined)},
       ${this.escapeNullable(paths?.caption)},
-      ${this.escapeNullable(JSON.stringify(scene.captions || []))},
+      ${this.escapeNullable(JSON.stringify(scene.captions ?? []))},
       ${streamOptions.direct ? 1 : 0},
       ${streamOptions.mkv ? 1 : 0},
       ${this.escapeNullable(streamOptions.resolutions.join(","))},
@@ -3783,7 +3789,7 @@ class StashSyncService extends EventEmitter {
 
     return {
       states,
-      settings: settings || {
+      settings: settings ?? {
         syncIntervalMinutes: 60,
         enableScanSubscription: true,
         enablePluginWebhook: false,

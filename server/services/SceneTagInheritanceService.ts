@@ -203,12 +203,12 @@ class SceneTagInheritanceService {
     for (const scene of scenes) {
       const sceneKey = compositeKey(scene.id, scene.stashInstanceId);
       const inheritedTags = new Set<string>();
-      const directTagsForScene = directTagsByScene.get(sceneKey) || new Set();
+      const directTagsForScene = directTagsByScene.get(sceneKey) ?? new Set();
 
       // Collect performer tags (using composite performer keys)
-      const performers = performersByScene.get(sceneKey) || [];
+      const performers = performersByScene.get(sceneKey) ?? [];
       for (const performerKey of performers) {
-        const tags = tagsByPerformer.get(performerKey) || [];
+        const tags = tagsByPerformer.get(performerKey) ?? [];
         for (const tagId of tags) {
           if (!directTagsForScene.has(tagId)) {
             inheritedTags.add(tagId);
@@ -219,7 +219,7 @@ class SceneTagInheritanceService {
       // Collect studio tags (studio is on the same instance as the scene)
       if (scene.studioId) {
         const studioKey = compositeKey(scene.studioId, scene.stashInstanceId);
-        const tags = tagsByStudio.get(studioKey) || [];
+        const tags = tagsByStudio.get(studioKey) ?? [];
         for (const tagId of tags) {
           if (!directTagsForScene.has(tagId)) {
             inheritedTags.add(tagId);
@@ -228,9 +228,9 @@ class SceneTagInheritanceService {
       }
 
       // Collect group tags (using composite group keys)
-      const groups = groupsByScene.get(sceneKey) || [];
+      const groups = groupsByScene.get(sceneKey) ?? [];
       for (const groupKey of groups) {
-        const tags = tagsByGroup.get(groupKey) || [];
+        const tags = tagsByGroup.get(groupKey) ?? [];
         for (const tagId of tags) {
           if (!directTagsForScene.has(tagId)) {
             inheritedTags.add(tagId);

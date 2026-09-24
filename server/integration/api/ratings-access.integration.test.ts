@@ -19,7 +19,8 @@ import {
   hideFixtureDefaults,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import type { TestClient } from "../helpers/testClient.js";
+import { adminClient } from "../helpers/testClient.js";
 
 const RATED_TYPES = [
   "scene",

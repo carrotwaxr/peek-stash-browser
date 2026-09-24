@@ -1,16 +1,13 @@
 // server/scripts/generate-api-docs.ts
 import * as fs from "fs";
 import * as path from "path";
-import {
+import type {
   DocumentedGroup,
   DocumentedRoute,
-  generateMarkdown,
 } from "./lib/markdownGenerator.js";
-import {
-  RouteDefinition,
-  parseApiMounts,
-  parseRouteFile,
-} from "./lib/routeParser.js";
+import { generateMarkdown } from "./lib/markdownGenerator.js";
+import type { RouteDefinition } from "./lib/routeParser.js";
+import { parseApiMounts, parseRouteFile } from "./lib/routeParser.js";
 import { enrichTypes, extractControllerTypes } from "./lib/typeExtractor.js";
 
 const SERVER_DIR = path.resolve(import.meta.dirname, "..");
@@ -227,7 +224,7 @@ async function main() {
     );
 
     // Add to group
-    const existing = groupedRoutes.get(basePath) || [];
+    const existing = groupedRoutes.get(basePath) ?? [];
     groupedRoutes.set(basePath, [...existing, ...documentedRoutes]);
   }
 

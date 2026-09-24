@@ -247,7 +247,7 @@ export async function startPlaylistDownload(
     });
 
     // Start zip creation in background (don't await)
-    playlistZipService.createZip(download.id).catch((error) => {
+    playlistZipService.createZip(download.id).catch((error: unknown) => {
       logger.error("Background zip creation failed", {
         downloadId: download.id,
         error: error instanceof Error ? error.message : String(error),
@@ -577,7 +577,7 @@ export async function retryDownload(
     logger.info("Retrying playlist download", { downloadId, userId });
 
     // Start zip creation in background (don't await)
-    playlistZipService.createZip(downloadId).catch((error) => {
+    playlistZipService.createZip(downloadId).catch((error: unknown) => {
       logger.error("Background zip retry failed", {
         downloadId,
         error: error instanceof Error ? error.message : String(error),
