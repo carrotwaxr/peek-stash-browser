@@ -93,4 +93,51 @@ describe("buildPlayerSources", () => {
       },
     ]);
   });
+
+  it("falls back to a direct stream with no query when the scene has no instance", () => {
+    const sources = buildPlayerSources({ id: "a/b 5", instanceId: null });
+
+    expect(sources).toEqual([
+      {
+        src: "/api/scene/a%2Fb%205/proxy-stream/stream",
+        label: "Direct",
+        offset: false,
+      },
+    ]);
+  });
+
+  it("leaves type, label and duration unset when the server omits them", () => {
+    const sources = buildPlayerSources({
+      id: "5",
+      instanceId: "i",
+      sceneStreams: [
+        {
+          url: "/api/scene/5/proxy-stream/stream.mp4?instanceId=i",
+          mime_type: null,
+          label: null,
+        },
+      ],
+      files: [{ duration: 0 }],
+    });
+
+    expect(sources).toEqual([
+      {
+        src: "/api/scene/5/proxy-stream/stream.mp4?instanceId=i",
+        type: undefined,
+        label: undefined,
+        offset: true,
+        duration: undefined,
+      },
+    ]);
+  });
+
+  it("leaves duration unset for a scene with no files", () => {
+    const [source] = buildPlayerSources({
+      id: "5",
+      sceneStreams: [{ url: "/api/scene/5/proxy-stream/stream" }],
+    });
+
+    expect(source.duration).toBeUndefined();
+    expect(source.offset).toBe(false);
+  });
 });
