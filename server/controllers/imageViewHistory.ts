@@ -247,13 +247,9 @@ export async function getImageViewHistory(
     res.json({
       exists: true,
       viewCount: viewHistory.viewCount,
-      viewHistory: (Array.isArray(viewHistory.viewHistory)
-        ? viewHistory.viewHistory
-        : JSON.parse((viewHistory.viewHistory as string) || "[]")) as string[],
+      viewHistory: readHistory(viewHistory.viewHistory),
       oCount: viewHistory.oCount,
-      oHistory: (Array.isArray(viewHistory.oHistory)
-        ? viewHistory.oHistory
-        : JSON.parse((viewHistory.oHistory as string) || "[]")) as string[],
+      oHistory: readHistory(viewHistory.oHistory),
       lastViewedAt: viewHistory.lastViewedAt,
     });
   } catch (error) {

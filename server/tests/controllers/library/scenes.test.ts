@@ -1,5 +1,13 @@
 import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
-import { assert, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  assert,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 // ---------------------------------------------------------------------------
 // Imports — after all vi.mock() calls
 // ---------------------------------------------------------------------------
@@ -21,7 +29,10 @@ import {
 } from "../../../graphql/generated/graphql.js";
 import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
-import { hasAnyCriteria } from "../../../services/RecommendationScoringService.js";
+import {
+  hasAnyCriteria,
+  scoreScoringDataByPreferences,
+} from "../../../services/RecommendationScoringService.js";
 import { sceneQueryBuilder } from "../../../services/SceneQueryBuilder.js";
 import { stashEntityService } from "../../../services/StashEntityService.js";
 import { isSceneStreamable } from "../../../utils/codecDetection.js";
@@ -191,6 +202,7 @@ const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockHasAnyCriteria = vi.mocked(hasAnyCriteria);
+const mockScore = vi.mocked(scoreScoringDataByPreferences);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -1524,6 +1536,51 @@ describe("mergeScenesWithUserData", () => {
     });
   });
 
+  it("reads histories stored as JSON-encoded strings", async () => {
+    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
+    mockPrisma.watchHistory.findMany.mockResolvedValue([
+      partialRow({
+        sceneId: "s1",
+        instanceId: "inst1",
+        playHistory: JSON.stringify([
+          "2025-06-01T00:00:00Z",
+          "2025-06-02T00:00:00Z",
+        ]),
+        oHistory: JSON.stringify(["2025-05-01T00:00:00Z"]),
+      }),
+    ]);
+
+    const result = await mergeScenesWithUserData(scenes, 1);
+    expect(result[0]).toMatchObject({
+      play_history: ["2025-06-01T00:00:00Z", "2025-06-02T00:00:00Z"],
+      o_history: ["2025-05-01T00:00:00Z"],
+      last_played_at: "2025-06-02T00:00:00Z",
+      last_o_at: "2025-05-01T00:00:00Z",
+    });
+  });
+
+  it("reads a malformed history as an empty list", async () => {
+    const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
+    mockPrisma.watchHistory.findMany.mockResolvedValue([
+      partialRow({
+        sceneId: "s1",
+        instanceId: "inst1",
+        oCount: 1,
+        playHistory: "not json",
+        oHistory: "not json",
+      }),
+    ]);
+
+    const result = await mergeScenesWithUserData(scenes, 1);
+    expect(result[0]).toMatchObject({
+      o_counter: 1,
+      play_history: [],
+      o_history: [],
+      last_played_at: null,
+      last_o_at: null,
+    });
+  });
+
   it("merges scene ratings (rating100 and favorite)", async () => {
     const scenes = [createMockScene({ id: "s1", instanceId: "inst1" })];
     mockPrisma.watchHistory.findMany.mockResolvedValue([]);
@@ -1904,6 +1961,85 @@ describe("getRecommendedScenes", () => {
     const body = res._getOkBody();
     expect(body.scenes).toEqual([]);
     expect(body.message).toBe("No recommendations yet");
+  });
+
+  describe("play history", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const scoringRow = (id: string) => ({
+      id,
+      instanceId: "default",
+      studioId: null,
+      performerIds: [],
+      tagIds: [],
+      oCounter: 0,
+      date: null,
+    });
+    afterEach(() => {
+      mockHasAnyCriteria.mockReturnValue(false);
+      mockScore.mockReturnValue(0);
+    });
+
+    // Every scene matches the user's criteria with the same base score, so
+    // the watch status alone decides which are recommended
+    const recommend = async (ids: string[]) => {
+      mockHasAnyCriteria.mockReturnValue(true);
+      mockScore.mockReturnValue(10);
+      mockStashEntityService.getScenesForScoring.mockResolvedValueOnce(
+        ids.map(scoringRow)
+      );
+      const req = reqFor(getRecommendedScenes, {
+        user: testUser(),
+        query: { page: "1" },
+      });
+      const res = resFor(getRecommendedScenes);
+      await getRecommendedScenes(req, res);
+      return res;
+    };
+    const requestedIds = () =>
+      must(mockSceneQueryBuilder.getByIds.mock.calls[0])[0].ids;
+
+    it("reads a play history stored as a JSON-encoded string", async () => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        // Played an hour ago: marked down below zero, so left out
+        partialRow({
+          sceneId: "recent",
+          playCount: 1,
+          playHistory: JSON.stringify([
+            new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          ]),
+        }),
+        // Played a month ago: marked up
+        partialRow({
+          sceneId: "old",
+          playCount: 1,
+          playHistory: JSON.stringify([
+            new Date(Date.now() - 30 * DAY_MS).toISOString(),
+          ]),
+        }),
+      ]);
+
+      const res = await recommend(["recent", "old", "unwatched"]);
+
+      expect(res._getStatus()).toBe(200);
+      expect(res._getOkBody().count).toBe(2);
+      expect([...requestedIds()].sort()).toEqual(["old", "unwatched"]);
+    });
+
+    it("reads a malformed play history as an empty list", async () => {
+      mockPrisma.watchHistory.findMany.mockResolvedValue([
+        partialRow({
+          sceneId: "malformed",
+          playCount: 1,
+          playHistory: "not json",
+        }),
+      ]);
+
+      const res = await recommend(["malformed", "unwatched"]);
+
+      expect(res._getStatus()).toBe(200);
+      expect(res._getOkBody().count).toBe(2);
+      expect([...requestedIds()].sort()).toEqual(["malformed", "unwatched"]);
+    });
   });
 
   it("returns 500 on unexpected error", async () => {

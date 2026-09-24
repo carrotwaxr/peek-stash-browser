@@ -523,18 +523,8 @@ export async function getWatchHistory(
       return;
     }
 
-    // Parse JSON fields
-    const oHistory = (
-      Array.isArray(watchHistory.oHistory)
-        ? watchHistory.oHistory
-        : JSON.parse((watchHistory.oHistory as string) || "[]")
-    ) as string[];
-
-    const playHistory = (
-      Array.isArray(watchHistory.playHistory)
-        ? watchHistory.playHistory
-        : JSON.parse((watchHistory.playHistory as string) || "[]")
-    ) as string[];
+    const oHistory = readHistory(watchHistory.oHistory);
+    const playHistory = readHistory(watchHistory.playHistory);
 
     res.json({
       exists: true,
@@ -593,12 +583,8 @@ export async function getAllWatchHistory(
     // Parse JSON fields for each record
     const parsed = watchHistory.map((record: WatchHistory) => ({
       ...record,
-      oHistory: (Array.isArray(record.oHistory)
-        ? record.oHistory
-        : JSON.parse((record.oHistory as string) || "[]")) as string[],
-      playHistory: (Array.isArray(record.playHistory)
-        ? record.playHistory
-        : JSON.parse((record.playHistory as string) || "[]")) as string[],
+      oHistory: readHistory(record.oHistory),
+      playHistory: readHistory(record.playHistory),
     }));
 
     res.json({ watchHistory: parsed });

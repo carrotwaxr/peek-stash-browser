@@ -33,6 +33,7 @@ import type {
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
+import { readHistory } from "../../utils/historyJson.js";
 import { logger } from "../../utils/logger.js";
 import {
   SeededRandom,
@@ -92,16 +93,8 @@ export async function mergeScenesWithUserData(
   // Create lookup maps for O(1) access
   const watchMap = new Map(
     watchHistory.map((wh) => {
-      const oHistory = (
-        Array.isArray(wh.oHistory)
-          ? wh.oHistory
-          : JSON.parse((wh.oHistory as string) || "[]")
-      ) as NormalizedScene["o_history"];
-      const playHistory = (
-        Array.isArray(wh.playHistory)
-          ? wh.playHistory
-          : JSON.parse((wh.playHistory as string) || "[]")
-      ) as NormalizedScene["play_history"];
+      const oHistory = readHistory(wh.oHistory);
+      const playHistory = readHistory(wh.playHistory);
 
       return [
         `${wh.sceneId}${KEY_SEP}${wh.instanceId || ""}`,
@@ -111,14 +104,15 @@ export async function mergeScenesWithUserData(
           play_duration: wh.playDuration || 0,
           resume_time: wh.resumeTime || 0,
           play_history: playHistory,
-          o_history: oHistory,
+          // The stored ISO strings, which the response has always carried
+          o_history: oHistory as unknown as NormalizedScene["o_history"],
           last_played_at:
             playHistory.length > 0
               ? (playHistory[playHistory.length - 1] ?? null)
               : null,
           last_o_at:
             oHistory.length > 0
-              ? String(oHistory[oHistory.length - 1] ?? "")
+              ? (oHistory[oHistory.length - 1] ?? null)
               : null,
         },
       ];
@@ -1613,11 +1607,7 @@ export const getRecommendedScenes = async (
     // Build watch history map
     const watchMap = new Map(
       watchHistory.map((wh) => {
-        const playHistory = (
-          Array.isArray(wh.playHistory)
-            ? wh.playHistory
-            : JSON.parse((wh.playHistory as string) || "[]")
-        ) as string[];
+        const playHistory = readHistory(wh.playHistory);
         const lastEntry = playHistory[playHistory.length - 1];
         const lastPlayedAt = lastEntry != null ? new Date(lastEntry) : null;
 
