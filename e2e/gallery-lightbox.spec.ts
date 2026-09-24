@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { ListPage } from "./pages/ListPage";
+import { requireData } from "./support/data";
 import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
@@ -10,9 +12,9 @@ import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
  *
  * It runs as a throwaway user created through the admin session from storage
  * state and deleted afterwards. The user's view history is deleted with it,
- * so the O press and the recorded view leave the database as it was. It
- * returns early when there is no gallery with images (the CI database is
- * empty).
+ * so the O press and the recorded view leave the database as it was. The
+ * replay library's galleries have images; a dev-stack library without a
+ * gallery skips (requireData).
  */
 
 test.describe("Gallery lightbox", () => {
@@ -39,31 +41,36 @@ test.describe("Gallery lightbox", () => {
       const userPage = await context.newPage();
 
       // 1. Open the first gallery
-      await userPage.goto("/galleries");
-      await expect(userPage.getByPlaceholder("Search...")).toBeVisible({
-        timeout: 10_000,
-      });
-      const galleryLink = userPage.locator('a[href*="/gallery/"]').first();
-      const hasGalleries = await galleryLink
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false);
-      if (!hasGalleries) return;
-      await galleryLink.click();
+      const list = new ListPage(userPage);
+      await list.goto("/galleries");
+      const galleries = await list.waitForResults("Gallery");
+      requireData(galleries > 0, "a gallery");
+      await list.cards("Gallery").first().locator("a:has(.card-title)").click();
 
       // 2. Wait for its images and remember the page
       const firstImage = userPage.locator(".wall-item").first();
-      const hasImages = await firstImage
-        .waitFor({ state: "visible", timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!hasImages) return;
+      await expect(firstImage).toBeVisible({ timeout: 15_000 });
       const galleryUrl = userPage.url();
 
       // 3. Open the lightbox and its info drawer
       await firstImage.click();
       await userPage.getByRole("button", { name: "Show image info" }).click();
 
-      // 4. Press O and read the count the server stored
+      // 4. The image the lightbox shows: its full-size src goes through
+      //    Peek's media proxy, /api/proxy/stash?path=/image/<id>/image
+      const src = await userPage
+        .locator(".react-transform-component img")
+        .getAttribute("src");
+      const path = new URL(String(src), userPage.url()).searchParams.get(
+        "path"
+      );
+      const currentImageId = /^\/image\/([^/?]+)\//.exec(path ?? "")?.[1];
+      expect(
+        currentImageId,
+        `the lightbox image's id (src ${src})`
+      ).toBeTruthy();
+
+      // 5. Press O and read the count the server stored for that image
       const oButton = userPage.getByRole("button", {
         name: /^Increment O counter/,
       });
@@ -74,15 +81,31 @@ test.describe("Gallery lightbox", () => {
         ),
         oButton.click(),
       ]);
+      expect(response.request().postDataJSON()).toMatchObject({
+        imageId: currentImageId,
+      });
       const { oCount } = (await response.json()) as { oCount: number };
       expect(oCount).toBeGreaterThanOrEqual(1);
 
-      // 5. Reload the gallery and reopen the same image
+      // 6. Reload the gallery and reopen the same image, wherever the
+      //    reloaded list puts it (each wall item links to /image/<id>)
       await userPage.goto(galleryUrl);
-      await userPage.locator(".wall-item").first().click();
+      const wallItems = userPage.locator(".wall-item");
+      await expect(wallItems.first()).toBeVisible({ timeout: 15_000 });
+      const ids = await wallItems.evaluateAll((items) =>
+        items.map(
+          (a) => /^\/image\/([^/?]+)/.exec(a.getAttribute("href") ?? "")?.[1]
+        )
+      );
+      const index = ids.indexOf(currentImageId);
+      expect(
+        index,
+        `image ${currentImageId} in ${ids.join(", ")}`
+      ).toBeGreaterThanOrEqual(0);
+      await wallItems.nth(index).click();
       await userPage.getByRole("button", { name: "Show image info" }).click();
 
-      // 6. The drawer shows the user's own count
+      // 7. The drawer shows the user's own count
       await expect(
         userPage.getByRole("button", {
           name: `Increment O counter (current: ${oCount})`,
