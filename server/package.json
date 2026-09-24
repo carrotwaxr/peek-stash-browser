@@ -29,7 +29,7 @@
     "stash:refresh": "echo 'Copy schema.json from stashapp-api or run introspection, then run npm run stash:codegen'"
   },
   "prisma": {
-    "seed": "node --loader ts-node/esm prisma/seed.ts"
+    "seed": "node --import tsx prisma/seed.ts"
   },
   "author": "",
   "license": "ISC",
@@ -55,7 +55,6 @@
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",
     "prisma": "^6.17.0",
-    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript-eslint": "^8.56.1",
     "vitest": "^3.2.4"

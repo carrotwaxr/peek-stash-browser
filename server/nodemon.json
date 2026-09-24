@@ -20,6 +20,6 @@
     "prisma/migrations/**"
   ],
   "ext": "ts",
-  "exec": "node --loader ts-node/esm index.ts",
+  "exec": "node --import tsx index.ts",
   "legacyWatch": true
 }
