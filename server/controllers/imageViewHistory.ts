@@ -12,7 +12,8 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
-import { HISTORY_TX, readHistory } from "../utils/historyJson.js";
+import { readHistory } from "../utils/historyJson.js";
+import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -68,7 +69,7 @@ export async function incrementImageOCounter(
 
     // Read, then create or update, in one transaction: a view or another O
     // press on this image waits for it to commit, then sees its row.
-    const viewHistory = await prisma.$transaction(async (tx) => {
+    const viewHistory = await historyTransaction(async (tx) => {
       const existing = await tx.imageViewHistory.findUnique({
         where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
       });
@@ -93,7 +94,7 @@ export async function incrementImageOCounter(
           oHistory: [...readHistory(existing.oHistory), now.toISOString()],
         },
       });
-    }, HISTORY_TX);
+    });
 
     // Sync to Stash if user has sync enabled
     // Note: imageIncrementO is not yet in stashapp-api, so we log a warning for now
@@ -162,7 +163,7 @@ export async function recordImageView(
 
     // Read, then create or update, in one transaction: an O press or another
     // view of this image waits for it to commit, then sees its row.
-    const viewHistory = await prisma.$transaction(async (tx) => {
+    const viewHistory = await historyTransaction(async (tx) => {
       const existing = await tx.imageViewHistory.findUnique({
         where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
       });
@@ -191,7 +192,7 @@ export async function recordImageView(
           lastViewedAt: now,
         },
       });
-    }, HISTORY_TX);
+    });
 
     res.json({
       success: true,

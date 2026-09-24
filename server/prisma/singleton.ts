@@ -8,9 +8,11 @@ const prisma = new PrismaClient();
  * Must be called once after database initialization (migrations),
  * before any application queries.
  *
- * Note: Prisma's SQLite driver uses a single connection (connection_limit=1),
- * so per-connection PRAGMAs only need to be set once. WAL mode is persistent
- * (database-level) and survives reconnections.
+ * Note: Prisma pools several SQLite connections here (its default limit, no
+ * connection_limit in the URL), so a per-connection PRAGMA reaches only the
+ * connection that runs it; busy_timeout is 5 s on every connection anyway,
+ * the driver's default. WAL mode is persistent (database-level) and survives
+ * reconnections.
  */
 async function configureSQLite(client: PrismaClient = prisma): Promise<void> {
   // Critical PRAGMAs — server should not start without these

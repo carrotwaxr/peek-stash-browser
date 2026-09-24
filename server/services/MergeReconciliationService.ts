@@ -7,7 +7,7 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
-import { HISTORY_TX } from "../utils/historyJson.js";
+import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -259,7 +259,7 @@ class MergeReconciliationService {
           sceneId: targetSceneId,
         },
       };
-      await prisma.$transaction(async (tx) => {
+      await historyTransaction(async (tx) => {
         const targetHistory = await tx.watchHistory.findUnique({
           where: targetKey,
         });
@@ -310,7 +310,7 @@ class MergeReconciliationService {
             },
           });
         }
-      }, HISTORY_TX);
+      });
     }
 
     // Transfer SceneRating

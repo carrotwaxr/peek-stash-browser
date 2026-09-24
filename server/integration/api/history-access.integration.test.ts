@@ -6,6 +6,7 @@
  * helpers/accessFixture.ts): SAME on B for every type, GLOBAL on every
  * instance, HIDDEN_A's image on A.
  */
+import os from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
@@ -176,6 +177,14 @@ describe("History access (integration)", () => {
    */
   describe("writes that arrive together", () => {
     const ROUNDS = 10;
+    /**
+     * More writes at once than the Prisma query engine has worker threads
+     * (one per CPU): were they to wait for the write lock inside the engine,
+     * they would leave the one holding it no thread to commit on. A burst
+     * this size shows that on any machine; CI's runner has 4 CPUs.
+     */
+    const BURST = 2 * os.availableParallelism() + 2;
+    const counted = Array.from({ length: BURST }, (_, i) => i + 1);
     const image = { imageId: FX_ID.SAME, instanceId: FX.A };
     const scene = { sceneId: FX_ID.SAME, instanceId: FX.A };
 
@@ -236,10 +245,10 @@ describe("History access (integration)", () => {
       );
     });
 
-    it("ten image O presses at once count ten", async () => {
+    it("a burst of image O presses all count", async () => {
       await clearImageRow();
       const responses = await Promise.all(
-        Array.from({ length: 10 }, () =>
+        Array.from({ length: BURST }, () =>
           viewer.client.post<{ oCount?: number }>(
             "/api/image-view-history/increment-o",
             image
@@ -258,10 +267,10 @@ describe("History access (integration)", () => {
         oCount: row?.oCount,
         oHistory: shape(row?.oHistory),
       }).toEqual({
-        statuses: Array(10).fill(200),
-        returned: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        oCount: 10,
-        oHistory: 10,
+        statuses: Array(BURST).fill(200),
+        returned: counted,
+        oCount: BURST,
+        oHistory: BURST,
       });
     });
 
@@ -310,10 +319,10 @@ describe("History access (integration)", () => {
       );
     });
 
-    it("ten scene O presses at once count ten", async () => {
+    it("a burst of scene O presses all count", async () => {
       await clearSceneRow();
       const responses = await Promise.all(
-        Array.from({ length: 10 }, () =>
+        Array.from({ length: BURST }, () =>
           viewer.client.post<{ oCount?: number }>(
             "/api/watch-history/increment-o",
             scene
@@ -330,17 +339,17 @@ describe("History access (integration)", () => {
         oCount: row?.oCount,
         oHistory: shape(row?.oHistory),
       }).toEqual({
-        statuses: Array(10).fill(200),
-        returned: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        oCount: 10,
-        oHistory: 10,
+        statuses: Array(BURST).fill(200),
+        returned: counted,
+        oCount: BURST,
+        oHistory: BURST,
       });
     });
 
-    it("ten play-count increments at once record ten plays", async () => {
+    it("a burst of play-count increments records every play", async () => {
       await clearSceneRow();
       const responses = await Promise.all(
-        Array.from({ length: 10 }, () =>
+        Array.from({ length: BURST }, () =>
           viewer.client.post("/api/watch-history/increment-play-count", scene)
         )
       );
@@ -351,9 +360,9 @@ describe("History access (integration)", () => {
         playCount: row?.playCount,
         playHistory: shape(row?.playHistory),
       }).toEqual({
-        statuses: Array(10).fill(200),
-        playCount: 10,
-        playHistory: 10,
+        statuses: Array(BURST).fill(200),
+        playCount: BURST,
+        playHistory: BURST,
       });
     });
   });
