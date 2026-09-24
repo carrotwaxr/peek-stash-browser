@@ -11,7 +11,7 @@
  * - pingWatchHistory (player progress pings)
  * - the entity access check on every write
  */
-import type { WatchHistory } from "@prisma/client";
+import { Prisma, type WatchHistory } from "@prisma/client";
 import type { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
@@ -36,6 +36,7 @@ import {
   testUser,
 } from "../helpers/controllerTestUtils.js";
 import { arrayContaining, objectContaining } from "../helpers/matchers.js";
+import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted to top level. Interactive transactions run their
@@ -1090,6 +1091,63 @@ describe("Watch History Controller", () => {
         undefined,
         "test-instance"
       );
+    });
+
+    it("a ping whose first attempt found the database busy counts the play when tried again", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        partialRow({
+          id: 1,
+          minimumPlayPercent: 50,
+          syncToStash: false,
+        })
+      );
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({
+          duration: 600,
+        })
+      );
+      // 400 of 600 seconds played: past the 50% threshold
+      const record: WatchHistory = partialRow({
+        id: 1,
+        playCount: 0,
+        playDuration: 400,
+        resumeTime: 390,
+        lastPlayedAt: new Date(),
+        oHistory: [],
+        playHistory: [],
+      });
+      mockPrisma.watchHistory.findUnique.mockResolvedValue(record);
+      // The first attempt's write finds another writer holding the database
+      mockPrisma.watchHistory.update
+        .mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError(
+            "Operations timed out after 5s",
+            { code: "P1008", clientVersion: "test" }
+          )
+        )
+        .mockResolvedValue(record);
+
+      // A scene id no other test pings, so the session starts clean
+      const res = resFor(pingWatchHistory);
+      await pingWatchHistory(
+        {
+          body: { sceneId: "session-busy-retry", currentTime: 400 },
+          user: { id: 1 },
+        } as never,
+        res
+      );
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledTimes(1);
+      // Both attempts counted the play: the flag the failed one set did not
+      // stop the second
+      expect(mockPrisma.watchHistory.update).toHaveBeenCalledTimes(2);
+      for (const call of mockPrisma.watchHistory.update.mock.calls) {
+        expect(must(call)[0].data).toMatchObject({
+          playCount: { increment: 1 },
+        });
+      }
+      expect(userStatsService.updateStatsForScene).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -22,7 +22,8 @@ import type {
   TypedResponse,
 } from "../types/api/index.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
-import { HISTORY_TX, readHistory } from "../utils/historyJson.js";
+import { readHistory } from "../utils/historyJson.js";
+import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
@@ -116,169 +117,171 @@ export async function pingWatchHistory(
     // an O press, a play count, an activity save or another ping on this
     // scene waits for it to commit, then sees its row.
     const { updated, playbackDelta, playCountIncremented, resumeTime } =
-      await prisma
-        .$transaction(async (tx) => {
-          const watchHistory =
-            (await tx.watchHistory.findUnique({
-              where: {
-                userId_instanceId_sceneId: { userId, instanceId, sceneId },
-              },
-            })) ??
-            (await tx.watchHistory.create({
-              data: {
-                userId,
-                instanceId,
-                sceneId,
-                playCount: 0,
-                playDuration: 0,
-                resumeTime: currentTime,
-                lastPlayedAt: now,
-                oCount: 0,
-                oHistory: [],
-                playHistory: [],
-              },
-            }));
+      await historyTransaction(async (tx) => {
+        // An earlier attempt of this ping found the database busy and
+        // committed nothing: take back the flag it set
+        if (countedPlay) {
+          sessionPlayCountIncrements.delete(sessionKey);
+          countedPlay = false;
+        }
 
-          // Calculate actual playback duration delta
-          let playbackDelta = 0;
+        const watchHistory =
+          (await tx.watchHistory.findUnique({
+            where: {
+              userId_instanceId_sceneId: { userId, instanceId, sceneId },
+            },
+          })) ??
+          (await tx.watchHistory.create({
+            data: {
+              userId,
+              instanceId,
+              sceneId,
+              playCount: 0,
+              playDuration: 0,
+              resumeTime: currentTime,
+              lastPlayedAt: now,
+              oCount: 0,
+              oHistory: [],
+              playHistory: [],
+            },
+          }));
 
-          if (sessionStart) {
-            const sessionStartTime = new Date(sessionStart);
+        // Calculate actual playback duration delta
+        let playbackDelta = 0;
 
-            // Detect if this is a new session vs continuing an existing session
-            // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
-            const SESSION_BOUNDARY_SECONDS = 120;
-            let lastPingTime = sessionStartTime;
+        if (sessionStart) {
+          const sessionStartTime = new Date(sessionStart);
 
-            if (watchHistory.lastPlayedAt) {
-              const timeSinceLastPlayed =
-                (sessionStartTime.getTime() -
-                  watchHistory.lastPlayedAt.getTime()) /
-                1000;
+          // Detect if this is a new session vs continuing an existing session
+          // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
+          const SESSION_BOUNDARY_SECONDS = 120;
+          let lastPingTime = sessionStartTime;
 
-              if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
-                // Continuing recent session, use lastPlayedAt
-                lastPingTime = watchHistory.lastPlayedAt;
-              } else {
-                // New session after significant gap, use sessionStart
-                logger.info("New viewing session detected", {
-                  userId,
-                  sceneId,
-                  timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
-                  usingSessionStart: true,
-                });
-              }
-            }
+          if (watchHistory.lastPlayedAt) {
+            const timeSinceLastPlayed =
+              (sessionStartTime.getTime() -
+                watchHistory.lastPlayedAt.getTime()) /
+              1000;
 
-            const timeSinceLastPing =
-              (now.getTime() - lastPingTime.getTime()) / 1000;
-
-            // Start with the time delta
-            playbackDelta = timeSinceLastPing;
-
-            // Subtract seek distances from the delta
-            if (
-              seekEvents &&
-              Array.isArray(seekEvents) &&
-              seekEvents.length > 0
-            ) {
-              let totalSeekDistance = 0;
-              for (const seek of seekEvents) {
-                const distance = Math.abs(seek.to - seek.from);
-                totalSeekDistance += distance;
-              }
-
-              // Don't let seek distance exceed the time delta (prevent negative values)
-              playbackDelta = Math.max(
-                0,
-                timeSinceLastPing - totalSeekDistance
-              );
-
-              logger.info("Adjusted playback delta for seeks", {
+            if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
+              // Continuing recent session, use lastPlayedAt
+              lastPingTime = watchHistory.lastPlayedAt;
+            } else {
+              // New session after significant gap, use sessionStart
+              logger.info("New viewing session detected", {
                 userId,
                 sceneId,
-                timeSinceLastPing: timeSinceLastPing.toFixed(2),
-                totalSeekDistance: totalSeekDistance.toFixed(2),
-                playbackDelta: playbackDelta.toFixed(2),
+                timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
+                usingSessionStart: true,
               });
-            }
-
-            // Cap playback delta to reasonable maximum (60 seconds)
-            // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
-            const MAX_PING_DELTA = 60;
-            if (playbackDelta > MAX_PING_DELTA) {
-              logger.warn("Capping excessive playback delta", {
-                userId,
-                sceneId,
-                originalDelta: playbackDelta.toFixed(2),
-                cappedDelta: MAX_PING_DELTA,
-                timeSinceLastPing: timeSinceLastPing.toFixed(2),
-              });
-              playbackDelta = MAX_PING_DELTA;
             }
           }
 
-          // Total play duration after this ping
-          const newPlayDuration = watchHistory.playDuration + playbackDelta;
+          const timeSinceLastPing =
+            (now.getTime() - lastPingTime.getTime()) / 1000;
 
-          // Calculate percentages (Stash's pattern)
-          const percentPlayed =
-            sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
-          const percentCompleted =
-            sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
+          // Start with the time delta
+          playbackDelta = timeSinceLastPing;
 
-          // Increment play count ONCE per session when threshold is met. The
-          // check and the set run while this transaction holds the write lock,
-          // so a second ping of the session queued behind it sees the flag.
-          const hasIncrementedThisSession =
-            sessionPlayCountIncrements.get(sessionKey) || false;
-          let playCountIncremented = false;
-          const playHistory = readHistory(watchHistory.playHistory);
-
+          // Subtract seek distances from the delta
           if (
-            !hasIncrementedThisSession &&
-            percentPlayed >= user.minimumPlayPercent
+            seekEvents &&
+            Array.isArray(seekEvents) &&
+            seekEvents.length > 0
           ) {
-            playCountIncremented = true;
-            sessionPlayCountIncrements.set(sessionKey, true);
-            countedPlay = true;
+            let totalSeekDistance = 0;
+            for (const seek of seekEvents) {
+              const distance = Math.abs(seek.to - seek.from);
+              totalSeekDistance += distance;
+            }
 
-            // Append timestamp to play history (Stash's pattern)
-            playHistory.push(now.toISOString());
+            // Don't let seek distance exceed the time delta (prevent negative values)
+            playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
 
-            logger.info("Play count incremented (percentage threshold met)", {
+            logger.info("Adjusted playback delta for seeks", {
               userId,
               sceneId,
-              newPlayCount: watchHistory.playCount + 1,
-              percentPlayed: percentPlayed.toFixed(2),
-              threshold: user.minimumPlayPercent,
+              timeSinceLastPing: timeSinceLastPing.toFixed(2),
+              totalSeekDistance: totalSeekDistance.toFixed(2),
+              playbackDelta: playbackDelta.toFixed(2),
             });
           }
 
-          // Reset resume_time to 0 when video is 98%+ complete (Stash's pattern)
-          const resumeTime = percentCompleted >= 98 ? 0 : currentTime;
-
-          // Counts are incremented, never set from the values read above
-          const updated = await tx.watchHistory.update({
-            where: { id: watchHistory.id },
-            data: {
-              resumeTime,
-              lastPlayedAt: now,
-              playCount: { increment: playCountIncremented ? 1 : 0 },
-              playDuration: { increment: playbackDelta },
-              playHistory,
-            },
-          });
-
-          return { updated, playbackDelta, playCountIncremented, resumeTime };
-        }, HISTORY_TX)
-        .catch((error: unknown) => {
-          // Nothing was stored, so a retry of this session can still count
-          if (countedPlay) {
-            sessionPlayCountIncrements.delete(sessionKey);
+          // Cap playback delta to reasonable maximum (60 seconds)
+          // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
+          const MAX_PING_DELTA = 60;
+          if (playbackDelta > MAX_PING_DELTA) {
+            logger.warn("Capping excessive playback delta", {
+              userId,
+              sceneId,
+              originalDelta: playbackDelta.toFixed(2),
+              cappedDelta: MAX_PING_DELTA,
+              timeSinceLastPing: timeSinceLastPing.toFixed(2),
+            });
+            playbackDelta = MAX_PING_DELTA;
           }
-          throw error;
+        }
+
+        // Total play duration after this ping
+        const newPlayDuration = watchHistory.playDuration + playbackDelta;
+
+        // Calculate percentages (Stash's pattern)
+        const percentPlayed =
+          sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
+        const percentCompleted =
+          sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
+
+        // Increment play count ONCE per session when threshold is met. The
+        // check and the set run while this transaction holds the write lock,
+        // so a second ping of the session queued behind it sees the flag.
+        const hasIncrementedThisSession =
+          sessionPlayCountIncrements.get(sessionKey) || false;
+        let playCountIncremented = false;
+        const playHistory = readHistory(watchHistory.playHistory);
+
+        if (
+          !hasIncrementedThisSession &&
+          percentPlayed >= user.minimumPlayPercent
+        ) {
+          playCountIncremented = true;
+          sessionPlayCountIncrements.set(sessionKey, true);
+          countedPlay = true;
+
+          // Append timestamp to play history (Stash's pattern)
+          playHistory.push(now.toISOString());
+
+          logger.info("Play count incremented (percentage threshold met)", {
+            userId,
+            sceneId,
+            newPlayCount: watchHistory.playCount + 1,
+            percentPlayed: percentPlayed.toFixed(2),
+            threshold: user.minimumPlayPercent,
+          });
+        }
+
+        // Reset resume_time to 0 when video is 98%+ complete (Stash's pattern)
+        const resumeTime = percentCompleted >= 98 ? 0 : currentTime;
+
+        // Counts are incremented, never set from the values read above
+        const updated = await tx.watchHistory.update({
+          where: { id: watchHistory.id },
+          data: {
+            resumeTime,
+            lastPlayedAt: now,
+            playCount: { increment: playCountIncremented ? 1 : 0 },
+            playDuration: { increment: playbackDelta },
+            playHistory,
+          },
         });
+
+        return { updated, playbackDelta, playCountIncremented, resumeTime };
+      }).catch((error: unknown) => {
+        // Nothing was stored, so a retry of this session can still count
+        if (countedPlay) {
+          sessionPlayCountIncrements.delete(sessionKey);
+        }
+        throw error;
+      });
 
     // Update pre-computed stats if playCount was incremented
     if (playCountIncremented) {
@@ -407,7 +410,7 @@ export async function incrementOCounter(
 
     // Read, then create or update, in one transaction: another write to this
     // scene's history waits for it to commit, then sees its row.
-    const watchHistory = await prisma.$transaction(async (tx) => {
+    const watchHistory = await historyTransaction(async (tx) => {
       const existing = await tx.watchHistory.findUnique({
         where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
       });
@@ -433,7 +436,7 @@ export async function incrementOCounter(
           oHistory: [...readHistory(existing.oHistory), now.toISOString()],
         },
       });
-    }, HISTORY_TX);
+    });
 
     // Update pre-computed stats once, after the commit
     await userStatsService.updateStatsForScene(
@@ -850,7 +853,7 @@ export async function incrementPlayCount(
     // Read, then create or update, in one transaction: the play history
     // append needs the row as it is when the write lands, and another write
     // to this scene's history waits for it to commit.
-    const watchHistory = await prisma.$transaction(async (tx) => {
+    const watchHistory = await historyTransaction(async (tx) => {
       const existing = await tx.watchHistory.findUnique({
         where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
       });
@@ -881,7 +884,7 @@ export async function incrementPlayCount(
           lastPlayedAt: now,
         },
       });
-    }, HISTORY_TX);
+    });
 
     // Update pre-computed stats
     await userStatsService.updateStatsForScene(
