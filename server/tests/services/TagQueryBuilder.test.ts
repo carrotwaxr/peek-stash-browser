@@ -69,9 +69,7 @@ describe("TagQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // The Stats JOIN (UserTagStats) must match on instanceId
       // TagQueryBuilder uses 't' for entity and 'us' for stats
@@ -91,9 +89,7 @@ describe("TagQueryBuilder", () => {
       });
 
       // The count query (second call) also uses the same FROM clause with JOINs
-      const countQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[1]
-      )[0] as string;
+      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
       expect(countQuerySql).toContain("t.stashInstanceId = us.instanceId");
       expect(countQuerySql).toContain("t.stashInstanceId = r.instanceId");
     });
@@ -108,9 +104,7 @@ describe("TagQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("t.stashInstanceId = ?");
@@ -131,9 +125,7 @@ describe("TagQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Should NOT have a bare equality check for stashInstanceId
       // (allowedInstanceIds uses IN, not =)

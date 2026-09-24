@@ -28,7 +28,8 @@ import {
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
 import { TEST_CONFIG } from "../helpers/config.js";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import type { TestClient } from "../helpers/testClient.js";
+import { adminClient } from "../helpers/testClient.js";
 
 const GROUP_NAME = "access-it-group";
 const DL_PASSWORD = "access_it_pass_1";

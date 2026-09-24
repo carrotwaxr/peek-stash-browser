@@ -111,7 +111,7 @@ function execCalls(): Array<[string, ...unknown[]]> {
 }
 
 function queriesMatching(re: RegExp) {
-  return rawCalls().filter((c) => re.test(String(c[0])));
+  return rawCalls().filter((c) => re.test(c[0]));
 }
 
 /** Rows handed to the write phase (createMany payloads, flattened). */
@@ -2132,7 +2132,7 @@ describe("hidden and restricted ids never reach SQL text", () => {
 
     await exclusionComputationService.recomputeForUser(1);
 
-    const allSql = [...rawCalls(), ...execCalls()].map((c) => String(c[0]));
+    const allSql = [...rawCalls(), ...execCalls()].map((c) => c[0]);
     expect(allSql.length).toBeGreaterThan(0);
     for (const sql of allSql) {
       expect(sql).not.toContain(HOSTILE);

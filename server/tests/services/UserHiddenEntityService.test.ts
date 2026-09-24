@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import type * as entityAccessModule from "../../services/EntityAccessService.js";
 import {
   entityRefKey,
   resolveVisibleApartFromOwnHides,
@@ -19,9 +20,9 @@ vi.mock(
 
 // The access check is mocked; entityRefKey stays real
 vi.mock("../../services/EntityAccessService.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../services/EntityAccessService.js")
-  >("../../services/EntityAccessService.js");
+  const actual = await vi.importActual<typeof entityAccessModule>(
+    "../../services/EntityAccessService.js"
+  );
   return {
     entityRefKey: actual.entityRefKey,
     resolveVisibleApartFromOwnHides: vi.fn(),
@@ -548,7 +549,7 @@ describe("UserHiddenEntityService", () => {
       expect(mockEntity.getGallery).toHaveBeenCalledWith("6", "i");
       expect(mockEntity.getImage).toHaveBeenCalledWith("7", "i");
       expect(result).toHaveLength(7);
-      expect(result.every((r) => r.restricted === false)).toBe(true);
+      expect(result.every((r) => !r.restricted)).toBe(true);
     });
 
     it("returns instanceId as stored", async () => {

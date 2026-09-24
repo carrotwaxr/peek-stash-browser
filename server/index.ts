@@ -81,7 +81,7 @@ const main = async () => {
   }
 };
 
-main().catch(async (e) => {
+main().catch(async (e: unknown) => {
   logger.error("Fatal error", {
     error: e instanceof Error ? e.message : String(e),
   });

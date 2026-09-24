@@ -126,7 +126,7 @@ export async function mergePerformersWithUserData(
   // Merge data
   return performers.map((performer) => {
     const compositeKey = `${performer.id}\0${performer.instanceId || ""}`;
-    const stats = performerStats.get(compositeKey) || {
+    const stats = performerStats.get(compositeKey) ?? {
       oCounter: 0,
       playCount: 0,
       lastPlayedAt: null,
@@ -183,9 +183,7 @@ export const findPerformers = async (
     };
 
     // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
-    const specificInstanceId = performer_filter?.instance_id as
-      | string
-      | undefined;
+    const specificInstanceId = performer_filter?.instance_id;
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
     const applyExclusions = true;
@@ -311,9 +309,7 @@ export async function applyPerformerFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((p) => {
-        const performerTagIds = (p.tags || []).map((t: { id: string }) =>
-          String(t.id)
-        );
+        const performerTagIds = (p.tags || []).map((t: { id: string }) => t.id);
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {

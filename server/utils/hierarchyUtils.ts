@@ -39,11 +39,11 @@ export async function getDescendantTagIds(
   for (const tag of allTags) {
     if (tag.parents && Array.isArray(tag.parents)) {
       for (const parent of tag.parents) {
-        const parentId = String(parent.id);
+        const parentId = parent.id;
         if (!childrenMap.has(parentId)) {
           childrenMap.set(parentId, []);
         }
-        childrenMap.get(parentId)?.push(String(tag.id));
+        childrenMap.get(parentId)?.push(tag.id);
       }
     }
   }
@@ -62,7 +62,7 @@ export async function getDescendantTagIds(
       continue;
     }
 
-    const children = childrenMap.get(id) || [];
+    const children = childrenMap.get(id) ?? [];
     for (const childId of children) {
       if (!result.has(childId)) {
         result.add(childId);
@@ -100,11 +100,11 @@ export async function getDescendantStudioIds(
   const childrenMap = new Map<string, string[]>();
   for (const studio of allStudios) {
     if (studio.parent_studio?.id) {
-      const parentId = String(studio.parent_studio.id);
+      const parentId = studio.parent_studio.id;
       if (!childrenMap.has(parentId)) {
         childrenMap.set(parentId, []);
       }
-      childrenMap.get(parentId)?.push(String(studio.id));
+      childrenMap.get(parentId)?.push(studio.id);
     }
   }
 
@@ -123,7 +123,7 @@ export async function getDescendantStudioIds(
       continue;
     }
 
-    const children = childrenMap.get(id) || [];
+    const children = childrenMap.get(id) ?? [];
     for (const childId of children) {
       if (!result.has(childId)) {
         result.add(childId);
@@ -151,7 +151,10 @@ export async function expandTagIds(
   }
 
   const expandedSet = new Set<string>();
-  for (const tagId of tagIds) {
+  // parseEntityRef returns a falsy ref as it is, so an id from request JSON
+  // can be null or 0 here: String() keeps it a string
+  const ids: readonly unknown[] = tagIds;
+  for (const tagId of ids) {
     const descendants = await getDescendantTagIds(String(tagId), depth);
     for (const id of descendants) {
       expandedSet.add(id);
@@ -177,7 +180,9 @@ export async function expandStudioIds(
   }
 
   const expandedSet = new Set<string>();
-  for (const studioId of studioIds) {
+  // As in expandTagIds: an id from request JSON can be null or 0 here
+  const ids: readonly unknown[] = studioIds;
+  for (const studioId of ids) {
     const descendants = await getDescendantStudioIds(String(studioId), depth);
     for (const id of descendants) {
       expandedSet.add(id);
@@ -232,12 +237,12 @@ export async function hydrateTagRelationships<
   return tags.map((tag) => ({
     ...tag,
     // Hydrate parents with names
-    parents: (tag.parents || []).map((p) => ({
+    parents: (tag.parents ?? []).map((p) => ({
       id: p.id,
       name: tagNameMap.get(p.id) || "Unknown",
     })),
     // Add computed children
-    children: childrenMap.get(tag.id) || [],
+    children: childrenMap.get(tag.id) ?? [],
   }));
 }
 
@@ -272,7 +277,7 @@ export async function hydrateEntityTags<
   // Hydrate each entity's tags, preserving existing data
   return entities.map((entity) => ({
     ...entity,
-    tags: (entity.tags || []).map((t) => {
+    tags: (entity.tags ?? []).map((t) => {
       const tagData = tagDataMap.get(t.id);
       return {
         ...t,
@@ -337,6 +342,6 @@ export async function hydrateStudioRelationships<
         }
       : null,
     // Add computed children
-    child_studios: childrenMap.get(studio.id) || [],
+    child_studios: childrenMap.get(studio.id) ?? [],
   }));
 }

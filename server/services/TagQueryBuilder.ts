@@ -221,6 +221,7 @@ class TagQueryBuilder {
         return { sql: `(${conditions})`, params };
       }
 
+      case null:
       default:
         return { sql: "", params: [] };
     }
@@ -653,7 +654,7 @@ class TagQueryBuilder {
         WHERE ${whereSQL}
       `;
       const countParams = [...fromClause.params, ...whereParams];
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...countParams
       );
@@ -674,7 +675,7 @@ class TagQueryBuilder {
         FROM StashTag t
         WHERE ${baseWhereSQL || "1=1"}
       `;
-      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+      const countResult = await prisma.$queryRawUnsafe<{ total: bigint }[]>(
         countSql,
         ...baseWhereParams
       );
@@ -1022,7 +1023,7 @@ class TagQueryBuilder {
       const performer = performersById.get(performerKey);
       if (!performer) continue; // Skip orphaned junction records
       const tagKey = `${pt.tagId}:${pt.tagInstanceId}`;
-      const list = performersByTag.get(tagKey) || [];
+      const list = performersByTag.get(tagKey) ?? [];
       list.push(performer);
       performersByTag.set(tagKey, list);
     }
@@ -1033,7 +1034,7 @@ class TagQueryBuilder {
       const studio = studiosById.get(studioKey);
       if (!studio) continue; // Skip orphaned junction records
       const tagKey = `${st.tagId}:${st.tagInstanceId}`;
-      const list = studiosByTag.get(tagKey) || [];
+      const list = studiosByTag.get(tagKey) ?? [];
       list.push(studio);
       studiosByTag.set(tagKey, list);
     }
@@ -1044,7 +1045,7 @@ class TagQueryBuilder {
       const group = groupsById.get(groupKey);
       if (!group) continue; // Skip orphaned junction records
       const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
-      const list = groupsByTag.get(tagKey) || [];
+      const list = groupsByTag.get(tagKey) ?? [];
       list.push(group);
       groupsByTag.set(tagKey, list);
     }
@@ -1055,7 +1056,7 @@ class TagQueryBuilder {
       const gallery = galleriesById.get(galleryKey);
       if (!gallery) continue; // Skip orphaned junction records
       const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
-      const list = galleriesByTag.get(tagKey) || [];
+      const list = galleriesByTag.get(tagKey) ?? [];
       list.push(gallery);
       galleriesByTag.set(tagKey, list);
     }
@@ -1064,10 +1065,10 @@ class TagQueryBuilder {
     for (const tag of tags) {
       const tagInstanceId = tag.instanceId;
       const tagKey = `${tag.id}:${tagInstanceId}`;
-      tag.performers = performersByTag.get(tagKey) || [];
-      tag.studios = studiosByTag.get(tagKey) || [];
-      tag.groups = groupsByTag.get(tagKey) || [];
-      tag.galleries = galleriesByTag.get(tagKey) || [];
+      tag.performers = performersByTag.get(tagKey) ?? [];
+      tag.studios = studiosByTag.get(tagKey) ?? [];
+      tag.groups = groupsByTag.get(tagKey) ?? [];
+      tag.galleries = galleriesByTag.get(tagKey) ?? [];
     }
   }
 

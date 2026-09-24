@@ -18,6 +18,7 @@ import prisma from "../../prisma/singleton.js";
 import { getPlaylistAccess } from "../../services/PlaylistAccessService.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import type { NormalizedScene } from "../../types/index.js";
+import type * as instanceUtilsModule from "../../utils/instanceUtils.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { type PlaylistWithItems } from "../helpers/fixtures.js";
 import { must } from "../helpers/must.js";
@@ -90,8 +91,7 @@ vi.mock("../../controllers/library/scenes.js", () => ({
 }));
 
 vi.mock("../../utils/instanceUtils.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../utils/instanceUtils.js")>();
+  const actual = await importOriginal<typeof instanceUtilsModule>();
   return { ...actual };
 });
 

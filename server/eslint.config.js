@@ -57,19 +57,30 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
 
-      // --- Strict rules deferred to follow-up PRs ---
-      // These are valid improvements but out of scope for #465.
-      // no-unnecessary-condition: ~414 violations, mostly redundant null checks
-      "@typescript-eslint/no-unnecessary-condition": "off",
-      // no-unsafe-enum-comparison: ~218 violations, Prisma enum patterns
+      // A default does not excuse a missing union member, so a new entity
+      // type cannot fall silently into it
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      "@typescript-eslint/consistent-type-imports": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      // Raw SQL rows are typed as SQLite returns them (a COUNT or SUM is a
+      // bigint, a BOOLEAN column a boolean), so a flagged Number() is dropped
+      // only when the value's type is honest
+      "@typescript-eslint/no-unnecessary-type-conversion": "error",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
+      "@typescript-eslint/prefer-reduce-type-parameter": "error",
+      "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
+
+      // Ratcheted in eslint-suppressions.json, fixed by the PRs that own the
+      // code: a `||` on a string or number (where "" or 0 can mean something,
+      // such as "every instance"), and conditions that only become checkable
+      // once rows are honestly typed. The counts may only fall.
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
+
+      // Not adopted. Prisma enums are string-literal unions, so TypeScript
+      // already rejects a comparison with a non-member; the other is style.
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
-      // Cosmetic/style rules — enable incrementally later
-      "@typescript-eslint/no-unnecessary-type-conversion": "off",
-      "@typescript-eslint/no-unnecessary-type-assertion": "off",
-      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
-      "@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
-      "@typescript-eslint/prefer-reduce-type-parameter": "off",
     },
   },
   // Tests: the source rules above, plus vitest's. tsconfig.json excludes

@@ -40,6 +40,12 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 - In-memory maps key on `` `${id}${KEY_SEP}${instanceId}` ``, with `KEY_SEP = "\0"` exported from `UserStatsService`; several controllers redefine it locally.
 - A query that drives from a bound JSON list (`json_each(?)`) into an entity table joins it with `CROSS JOIN`, so SQLite keeps `json_each` as the outer loop and looks each ref up by primary key. A plain `JOIN` can make it scan the table and re-read the JSON for every row (27.7 s for 5,000 refs against 26k scenes; 10 ms with `CROSS JOIN`). Check with `EXPLAIN QUERY PLAN`: `SCAN j`, then `SEARCH x USING ... PRIMARY KEY`.
 
+## `||` defaults
+
+A `||` on an id, an instance id or a count needs a `??` review before it changes: `""` means every instance (in the exclusion and hidden-entity tables, say) and `0` is a real count, so `||` may be replacing a meaningful value. `prefer-nullish-coalescing` flags them; the unreviewed ones sit in `server/eslint-suppressions.json`.
+
 ## SQLite numbers
 
 SQLite can return `5.0000000001` from an integer column, and BigInt from a large one. Wrap counts in `Math.round(Number(x))` before writing them to an `Int` field (#410), and convert BigInt with `Number()` before JSON.
+
+Prisma's raw queries return `COUNT`, `SUM` and `COALESCE` over integers as `bigint`, a `BIGINT` column such as `fileSize` as `bigint`, and a `BOOLEAN` column as `boolean`. A raw row type says so, and its `Number()` stays: `no-unnecessary-type-conversion` flags one only when the row type wrongly claims `number`.

@@ -11,7 +11,7 @@
  * The handler tests call each route's real handler from the router, with the
  * service and the auth middleware mocked.
  */
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate, requireAdmin } from "../../middleware/auth.js";
 // Import after mocks are set up

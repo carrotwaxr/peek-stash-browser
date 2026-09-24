@@ -5,11 +5,13 @@
  * for the corresponding QueryBuilder's SELECT clause. Column names correspond
  * to SQL aliases (e.g. `s.rating100 AS stashRating100`).
  *
- * SQLite type mapping:
+ * Types as Prisma's raw queries return them from SQLite:
  *   - INTEGER -> number
+ *   - BIGINT (fileSize) -> bigint
+ *   - COUNT, SUM and COALESCE over integers -> bigint
+ *   - BOOLEAN -> boolean (fields below that still say 0 | 1 are wrong)
  *   - TEXT -> string
  *   - NULL -> null
- *   - BOOLEAN -> number (0 | 1)
  *   - JSON columns -> string (parsed in transformRow)
  *   - LEFT JOIN columns -> T | null
  */
@@ -45,7 +47,7 @@ export interface SceneQueryRow {
   fileHeight: number | null;
   fileVideoCodec: string | null;
   fileAudioCodec: string | null;
-  fileSize: number | null; // BigInt stored as number
+  fileSize: bigint | null; // BIGINT column: Prisma returns a bigint
   pathScreenshot: string | null;
   pathPreview: string | null;
   pathSprite: string | null;

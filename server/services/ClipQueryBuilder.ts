@@ -67,7 +67,7 @@ interface ClipRow {
   primaryTagId: string | null;
   primaryTagInstanceId: string | null;
   screenshotPath: string | null;
-  isGenerated: number; // SQLite returns 0/1
+  isGenerated: boolean | number; // BOOLEAN column: Prisma returns a boolean
   stashCreatedAt: string | null;
   stashUpdatedAt: string | null;
   // Scene fields
@@ -477,7 +477,7 @@ class ClipQueryBuilder {
               color: row.primaryTagColor,
             }
           : null,
-        tags: tagMap.get(key) || [],
+        tags: tagMap.get(key) ?? [],
         scene: {
           id: row.sceneId,
           title: row.sceneTitle,

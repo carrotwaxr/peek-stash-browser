@@ -80,7 +80,7 @@ export async function resolveUserPermissions(
     }
 
     // Find first group that grants permission (most permissive wins)
-    const grantingGroup = groups.find((g) => g[permission] === true);
+    const grantingGroup = groups.find((g) => g[permission]);
     if (grantingGroup) {
       result[permission] = true;
       result.sources[permission] = grantingGroup.name;

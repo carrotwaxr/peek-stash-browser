@@ -120,7 +120,7 @@ export function buildDerivedWeightsFromScenes(
     // Accumulate performer weights
     if (scene.performers) {
       for (const performer of scene.performers) {
-        const performerId = String(performer.id);
+        const performerId = performer.id;
         const current = derivedPerformerWeights.get(performerId) || 0;
         derivedPerformerWeights.set(performerId, current + multiplier);
       }
@@ -128,7 +128,7 @@ export function buildDerivedWeightsFromScenes(
 
     // Accumulate studio weight
     if (scene.studio) {
-      const studioId = String(scene.studio.id);
+      const studioId = scene.studio.id;
       const current = derivedStudioWeights.get(studioId) || 0;
       derivedStudioWeights.set(studioId, current + multiplier);
     }
@@ -136,7 +136,7 @@ export function buildDerivedWeightsFromScenes(
     // Accumulate tag weights (scene tags only, not performer/studio tags)
     if (scene.tags) {
       for (const tag of scene.tags) {
-        const tagId = String(tag.id);
+        const tagId = tag.id;
         const current = derivedTagWeights.get(tagId) || 0;
         derivedTagWeights.set(tagId, current + multiplier);
       }
@@ -225,7 +225,7 @@ export function scoreSceneByPreferences(
     let implicitPerformerWeight = 0;
 
     for (const performer of scene.performers) {
-      const performerId = String(performer.id);
+      const performerId = performer.id;
       const perfKey = `${performerId}\0${instId}`;
 
       if (prefs.favoritePerformers.has(perfKey)) {
@@ -269,7 +269,7 @@ export function scoreSceneByPreferences(
 
   // Score studio (using composite key for multi-instance)
   if (scene.studio) {
-    const studioId = String(scene.studio.id);
+    const studioId = scene.studio.id;
     const studioKey = `${studioId}\0${instId}`;
 
     if (prefs.favoriteStudios.has(studioKey)) {
@@ -296,12 +296,12 @@ export function scoreSceneByPreferences(
   const performerTags = new Set<string>();
   const studioTags = new Set<string>();
 
-  (scene.tags || []).forEach((t) => sceneTags.add(String(t.id)));
+  (scene.tags || []).forEach((t) => sceneTags.add(t.id));
   (scene.performers || []).forEach((p) => {
-    (p.tags || []).forEach((t) => performerTags.add(String(t.id)));
+    (p.tags ?? []).forEach((t) => performerTags.add(t.id));
   });
   if (scene.studio?.tags) {
-    scene.studio.tags.forEach((t) => studioTags.add(String(t.id)));
+    scene.studio.tags.forEach((t) => studioTags.add(t.id));
   }
 
   let favoriteSceneTagCount = 0;

@@ -208,7 +208,7 @@ export async function getImageViewHistory(
 ) {
   try {
     const { imageId } = req.params;
-    const requestInstanceId = req.query.instanceId as string | undefined;
+    const requestInstanceId = req.query.instanceId;
     const userId = req.user?.id;
 
     if (!userId) {

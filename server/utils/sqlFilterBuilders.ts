@@ -240,6 +240,7 @@ export function buildNumericFilter(
         };
       }
       return { sql: `${columnExpr} < ?`, params: [value] };
+    case null:
     default:
       return { sql: "", params: [] };
   }
@@ -307,6 +308,7 @@ export function buildDateFilter(
         };
       }
       return { sql: `${column} < ?`, params: [value] };
+    case null:
     default:
       return { sql: "", params: [] };
   }
@@ -380,6 +382,7 @@ export function buildTextFilter(
         sql: `(${column} IS NULL OR LOWER(${column}) != LOWER(?))`,
         params: [value],
       };
+    case null:
     default:
       return { sql: "", params: [] };
   }

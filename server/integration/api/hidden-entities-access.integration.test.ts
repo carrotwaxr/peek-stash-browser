@@ -27,8 +27,8 @@ import {
   hideFor,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
+import type { TestClient } from "../helpers/testClient.js";
 import {
-  TestClient,
   adminClient,
   selectAllInstances,
   selectTestInstanceOnly,

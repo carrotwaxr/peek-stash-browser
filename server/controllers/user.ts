@@ -87,7 +87,6 @@ import type {
   UpdateUserSettingsParams,
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
-  UserRestriction,
 } from "../types/api/user.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
@@ -383,7 +382,7 @@ export const updateUserSettings = async (
             });
           }
 
-          const typedConfig = config as TableColumnsConfig;
+          const typedConfig = config;
           if (
             !typedConfig ||
             !Array.isArray(typedConfig.visible) ||
@@ -1090,9 +1089,9 @@ export const saveFilterPreset = async (
       select: { filterPresets: true, defaultFilterPresets: true },
     });
 
-    const currentPresets = (user?.filterPresets as FilterPresets | null) || {};
+    const currentPresets = (user?.filterPresets as FilterPresets | null) ?? {};
     const currentDefaults =
-      (user?.defaultFilterPresets as DefaultFilterPresets | null) || {};
+      (user?.defaultFilterPresets as DefaultFilterPresets | null) ?? {};
 
     // Create new preset
     const newPreset = {
@@ -1111,7 +1110,7 @@ export const saveFilterPreset = async (
 
     // Add preset to the appropriate artifact type array
     currentPresets[artifactType] = [
-      ...(currentPresets[artifactType] || []),
+      ...(currentPresets[artifactType] ?? []),
       newPreset,
     ];
 
@@ -1185,7 +1184,7 @@ export const deleteFilterPreset = async (
       (user.defaultFilterPresets as DefaultFilterPresets) || {};
 
     // Remove preset from the appropriate artifact type array
-    currentPresets[artifactType] = (currentPresets[artifactType] || []).filter(
+    currentPresets[artifactType] = (currentPresets[artifactType] ?? []).filter(
       (preset: FilterPreset) => preset.id !== presetId
     );
 
@@ -1309,7 +1308,7 @@ export const setDefaultFilterPreset = async (
     // For scene grid contexts (scene_performer, etc.), validate against "scene" presets
     if (presetId) {
       const artifactType = context.startsWith("scene_") ? "scene" : context;
-      const presetExists = (currentPresets[artifactType] || []).some(
+      const presetExists = (currentPresets[artifactType] ?? []).some(
         (preset: FilterPreset) => preset.id === presetId
       );
 
@@ -2253,18 +2252,16 @@ export const updateUserRestrictions = async (
       entityIds: string;
       restrictEmpty: boolean;
     }> = [];
-    for (const r of restrictions as UserRestriction[]) {
+    for (const r of restrictions) {
       if (
         !(RESTRICTABLE_ENTITY_TYPES as readonly string[]).includes(r.entityType)
       ) {
         return res
           .status(400)
-          .json({ error: `Invalid entity type: ${String(r.entityType)}` });
+          .json({ error: `Invalid entity type: ${r.entityType}` });
       }
       if (!(RESTRICTION_MODES as readonly string[]).includes(r.mode)) {
-        return res
-          .status(400)
-          .json({ error: `Invalid mode: ${String(r.mode)}` });
+        return res.status(400).json({ error: `Invalid mode: ${r.mode}` });
       }
       const mode = r.mode as RestrictionMode;
       const pair = `${r.entityType}:${mode}`;
@@ -2282,7 +2279,7 @@ export const updateUserRestrictions = async (
       for (const id of r.entityIds) {
         if (typeof id !== "string" || !/^\d+(:[^:\s]+)?$/.test(id)) {
           return res.status(400).json({
-            error: `Invalid entity id in ${r.entityType} ${mode}: ${String(id)}`,
+            error: `Invalid entity id in ${r.entityType} ${mode}: ${id}`,
           });
         }
       }
@@ -3411,7 +3408,7 @@ export const completeSetup = async (
       if (invalidIds.length > 0) {
         return res.status(400).json({
           error: "Invalid instance IDs",
-          details: (invalidIds as string[]).join(", "),
+          details: invalidIds.join(", "),
         });
       }
 

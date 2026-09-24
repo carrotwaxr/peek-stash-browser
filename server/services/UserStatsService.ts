@@ -493,7 +493,7 @@ class UserStatsService {
         // Aggregate performers (using composite key: performerId + instanceId)
         for (const performer of scene.performers || []) {
           const statsKey = `${performer.id}${KEY_SEP}${whInstanceId}`;
-          const existing = performerStatsMap.get(statsKey) || {
+          const existing = performerStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,
             lastPlayedAt: null,
@@ -518,7 +518,7 @@ class UserStatsService {
         // Aggregate studio (using composite key: studioId + instanceId)
         if (scene.studio) {
           const statsKey = `${scene.studio.id}${KEY_SEP}${whInstanceId}`;
-          const existing = studioStatsMap.get(statsKey) || {
+          const existing = studioStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,
           };
@@ -532,7 +532,7 @@ class UserStatsService {
         // Aggregate tags (using composite key: tagId + instanceId)
         for (const tag of scene.tags || []) {
           const statsKey = `${tag.id}${KEY_SEP}${whInstanceId}`;
-          const existing = tagStatsMap.get(statsKey) || {
+          const existing = tagStatsMap.get(statsKey) ?? {
             oCounter: 0,
             playCount: 0,
           };

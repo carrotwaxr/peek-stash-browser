@@ -227,8 +227,10 @@ export const refreshCache = (
   try {
     logger.info("Manual cache refresh triggered by admin");
     // Trigger a full sync (non-blocking - runs in background)
-    stashSyncService.fullSync().catch((err: Error) => {
-      logger.error("Background full sync failed", { error: err.message });
+    stashSyncService.fullSync().catch((err: unknown) => {
+      logger.error("Background full sync failed", {
+        error: (err as Error).message,
+      });
     });
 
     res.json({

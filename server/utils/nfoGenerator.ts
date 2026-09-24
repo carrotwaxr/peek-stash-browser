@@ -12,7 +12,7 @@ export interface SceneNfoInput {
 
 function escapeXml(text: string | null | undefined): string {
   if (text == null) return "";
-  return String(text)
+  return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

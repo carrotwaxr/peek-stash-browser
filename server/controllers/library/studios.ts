@@ -50,7 +50,7 @@ export async function mergeStudiosWithUserData(
   // Merge data
   return studios.map((studio) => {
     const compositeKey = `${studio.id}\0${studio.instanceId || ""}`;
-    const stats = studioStats.get(compositeKey) || {
+    const stats = studioStats.get(compositeKey) ?? {
       oCounter: 0,
       playCount: 0,
     };
@@ -102,7 +102,7 @@ export const findStudios = async (
     };
 
     // Extract specific instance ID for disambiguation (from studio_filter.instance_id)
-    const specificInstanceId = studio_filter?.instance_id as string | undefined;
+    const specificInstanceId = studio_filter?.instance_id;
 
     // Exclusions apply to every user; an admin's rows hold only their own hides
     const applyExclusions = true;
@@ -275,9 +275,7 @@ export function applyStudioFilters(
     const { modifier, value: tagIds } = filters.tags;
     if (tagIds && tagIds.length > 0) {
       filtered = filtered.filter((s) => {
-        const studioTagIds = (s.tags || []).map((t: { id: string }) =>
-          String(t.id)
-        );
+        const studioTagIds = (s.tags || []).map((t: { id: string }) => t.id);
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {

@@ -86,9 +86,7 @@ let cachedSecret: string | null = null;
 
 /** The signing secret, resolved on first use and then kept for the process. */
 export function getJwtSecret(): string {
-  if (cachedSecret === null) {
-    cachedSecret = resolveJwtSecret().secret;
-  }
+  cachedSecret ??= resolveJwtSecret().secret;
   return cachedSecret;
 }
 

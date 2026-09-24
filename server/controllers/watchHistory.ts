@@ -1,4 +1,4 @@
-import { WatchHistory } from "@prisma/client";
+import type { WatchHistory } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../services/EntityAccessService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";

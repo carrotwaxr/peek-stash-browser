@@ -69,9 +69,7 @@ describe("GroupQueryBuilder", () => {
         specificInstanceId: "instance-abc",
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Must contain a WHERE clause pinning to the specific instance
       expect(mainQuerySql).toContain("g.stashInstanceId = ?");
@@ -92,9 +90,7 @@ describe("GroupQueryBuilder", () => {
         perPage: 10,
       });
 
-      const mainQuerySql = must(
-        mockPrisma.$queryRawUnsafe.mock.calls[0]
-      )[0] as string;
+      const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
       // Should NOT have a bare equality check for stashInstanceId
       expect(mainQuerySql).not.toContain("g.stashInstanceId = ?");

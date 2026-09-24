@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
+import type { ReadableStream as WebReadableStream } from "stream/web";
 import { logger } from "./logger.js";
 
 /**
@@ -38,9 +39,7 @@ export async function pipeResponseToClient(
     return;
   }
 
-  const nodeStream = Readable.fromWeb(
-    fetchResponse.body as import("stream/web").ReadableStream
-  );
+  const nodeStream = Readable.fromWeb(fetchResponse.body as WebReadableStream);
 
   try {
     await pipeline(nodeStream, res);

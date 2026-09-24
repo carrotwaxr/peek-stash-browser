@@ -273,7 +273,7 @@ describe("Multi-Instance Isolation", () => {
     /** The closure loaded into the temp refs table before the edge queries. */
     function refsFill(): string | undefined {
       const call = mockPrisma.$executeRawUnsafe.mock.calls.find((c) =>
-        /INSERT OR IGNORE INTO _peek_refs/.test(String(c[0]))
+        /INSERT OR IGNORE INTO _peek_refs/.test(c[0])
       );
       return call ? String(call[1]) : undefined;
     }
@@ -320,7 +320,7 @@ describe("Multi-Instance Isolation", () => {
 
       // The resolve query binds the scoped ref, never a bare id
       const resolve = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
-        /CROSS JOIN StashPerformer t ON/.test(String(c[0]))
+        /CROSS JOIN StashPerformer t ON/.test(c[0])
       );
       expect(resolve).toBeDefined();
       expect(must(resolve).slice(1)).toContain(
@@ -368,7 +368,7 @@ describe("Multi-Instance Isolation", () => {
       );
 
       const resolve = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
-        /CROSS JOIN StashPerformer t ON/.test(String(c[0]))
+        /CROSS JOIN StashPerformer t ON/.test(c[0])
       );
       expect(must(resolve).slice(1)).toContain(JSON.stringify(["perf1"]));
 
@@ -407,12 +407,12 @@ describe("Multi-Instance Isolation", () => {
       // The studio edge filters deleted scenes and the allowed instances
       const edge = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
         /FROM StashScene x[\s\S]*JOIN _peek_refs r ON r\.id = x\.studioId/.test(
-          String(c[0])
+          c[0]
         )
       );
       expect(edge).toBeDefined();
-      expect(String(must(edge)[0])).toContain("x.deletedAt IS NULL");
-      expect(String(must(edge)[0])).toContain("r.inst = x.stashInstanceId");
+      expect(must(edge)[0]).toContain("x.deletedAt IS NULL");
+      expect(must(edge)[0]).toContain("r.inst = x.stashInstanceId");
       expect(must(edge).slice(1)).toEqual([INST_A, INST_B]);
       expect(refsFill()).toBe(JSON.stringify([{ id: "studio1", iid: INST_A }]));
 
@@ -443,14 +443,12 @@ describe("Multi-Instance Isolation", () => {
       expect(refsFill()).toBe(JSON.stringify([{ id: "tag1", iid: INST_A }]));
       const inherited = mockPrisma.$queryRawUnsafe.mock.calls.find((c) =>
         /AND EXISTS \(SELECT 1 FROM json_each\(COALESCE\(s\.inheritedTagIds/.test(
-          String(c[0])
+          c[0]
         )
       );
       expect(inherited).toBeDefined();
-      expect(String(must(inherited)[0])).toContain(
-        "s.stashInstanceId IN (?, ?)"
-      );
-      expect(String(must(inherited)[0])).not.toContain("tag1");
+      expect(must(inherited)[0]).toContain("s.stashInstanceId IN (?, ?)");
+      expect(must(inherited)[0]).not.toContain("tag1");
       expect(must(inherited).slice(1)).toEqual([INST_A, INST_B]);
 
       // 1 hidden tag + 1 direct scene + 1 inherited scene + 1 performer = 4 upserts
@@ -488,7 +486,7 @@ describe("Multi-Instance Isolation", () => {
 
       const resolved = watchHistory.map((wh) => ({
         ...wh,
-        scene: sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ""}`) || null,
+        scene: sceneMap.get(`${wh.sceneId}\0${wh.instanceId || ""}`) ?? null,
       }));
 
       // inst-a scene1 → Scene A

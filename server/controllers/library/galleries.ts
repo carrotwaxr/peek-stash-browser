@@ -14,7 +14,10 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../../types/api/index.js";
-import { NormalizedGallery, PeekGalleryFilter } from "../../types/index.js";
+import type {
+  NormalizedGallery,
+  PeekGalleryFilter,
+} from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -51,7 +54,8 @@ async function mergeGalleriesWithUserData(
 }
 
 /**
- * Apply gallery filters
+ * Apply gallery filters. Filter values are not validated, so an id can
+ * arrive as a number: String() normalizes it.
  */
 export async function applyGalleryFilters(
   galleries: NormalizedGallery[],
@@ -129,12 +133,12 @@ export async function applyGalleryFilters(
     // Expand studio IDs to include descendants if depth is specified
     const expandedStudioIds = new Set(
       await expandStudioIds(
-        studioIds.map((id: string) => String(id)),
+        studioIds.map((id: unknown) => String(id)),
         depth ?? 0
       )
     );
     filtered = filtered.filter(
-      (g) => g.studio && expandedStudioIds.has(String(g.studio.id))
+      (g) => g.studio && expandedStudioIds.has(g.studio.id)
     );
   }
 
@@ -142,7 +146,7 @@ export async function applyGalleryFilters(
   if (filters.performers && filters.performers.value) {
     const performerIds = new Set(filters.performers.value.map(String));
     filtered = filtered.filter((g) =>
-      g.performers?.some((p) => performerIds.has(String(p.id)))
+      g.performers?.some((p) => performerIds.has(p.id))
     );
   }
 
@@ -153,12 +157,12 @@ export async function applyGalleryFilters(
     // Expand tag IDs to include descendants if depth is specified
     const expandedTagIds = new Set(
       await expandTagIds(
-        tagIds.map((id: string) => String(id)),
+        tagIds.map((id: unknown) => String(id)),
         depth ?? 0
       )
     );
     filtered = filtered.filter((g) =>
-      g.tags?.some((t) => expandedTagIds.has(String(t.id)))
+      g.tags?.some((t) => expandedTagIds.has(t.id))
     );
   }
 
@@ -181,7 +185,7 @@ export const findGalleries = async (
     const { filter, gallery_filter, ids } = req.body;
 
     const sortFieldRaw = filter?.sort || "title";
-    const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
@@ -206,9 +210,7 @@ export const findGalleries = async (
     };
 
     // Extract specific instance ID for disambiguation (from gallery_filter.instance_id)
-    const specificInstanceId = gallery_filter?.instance_id as
-      | string
-      | undefined;
+    const specificInstanceId = gallery_filter?.instance_id;
 
     // Get user's allowed instance IDs for multi-instance filtering
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);

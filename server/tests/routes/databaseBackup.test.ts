@@ -1,7 +1,7 @@
 /**
  * Unit Tests for Database Backup Routes (Admin API)
  */
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { databaseBackupService } from "../../services/DatabaseBackupService.js";
 import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";

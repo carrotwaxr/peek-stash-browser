@@ -133,7 +133,7 @@ const ACCESS_WHERE_APART_FROM_OWN_HIDES = `${LIVE_AND_ALLOWED_WHERE}
 
 function sourceFor(entityType: AccessEntityType): EntitySource {
   if (!Object.prototype.hasOwnProperty.call(ENTITY_SOURCES, entityType)) {
-    throw new Error(`Unknown entity type: ${String(entityType)}`);
+    throw new Error(`Unknown entity type: ${entityType}`);
   }
   return ENTITY_SOURCES[entityType];
 }
@@ -191,8 +191,8 @@ export async function getVisibleEntityKeys(
 
   const unique = new Map<string, [string, string]>();
   for (const ref of refs) {
-    const id = String(ref.id ?? "");
-    const instanceId = String(ref.instanceId ?? "");
+    const id = ref.id ?? "";
+    const instanceId = ref.instanceId ?? "";
     if (!id || !instanceId) continue;
     unique.set(entityRefKey(id, instanceId), [id, instanceId]);
   }
@@ -229,9 +229,7 @@ export async function getIdsVisibleOnAnyInstance(
   ids: ReadonlyArray<string>
 ): Promise<Set<string>> {
   const source = sourceFor(entityType);
-  const unique = [...new Set(ids.map((id) => String(id ?? "")))].filter(
-    Boolean
-  );
+  const unique = [...new Set(ids.map((id) => id ?? ""))].filter(Boolean);
   if (unique.length === 0) return new Set();
 
   const sql = `SELECT DISTINCT x.id AS id
@@ -341,8 +339,8 @@ export async function resolveVisibleApartFromOwnHides(
 
   const unique = new Map<string, [string, string]>();
   for (const ref of refs) {
-    const id = String(ref.id ?? "");
-    const instanceId = String(ref.instanceId ?? "");
+    const id = ref.id ?? "";
+    const instanceId = ref.instanceId ?? "";
     if (!id) continue;
     unique.set(entityRefKey(id, instanceId), [id, instanceId]);
   }

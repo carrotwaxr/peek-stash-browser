@@ -4,7 +4,7 @@
  * Handles detection of merged scenes and transfer of user activity data
  * from orphaned scenes to their merge targets.
  */
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { HISTORY_TX } from "../utils/historyJson.js";
@@ -47,7 +47,7 @@ function parseJsonArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") {
     try {
-      const parsed: unknown = JSON.parse(value as string);
+      const parsed: unknown = JSON.parse(value);
       return Array.isArray(parsed) ? (parsed as unknown[]) : [];
     } catch {
       return [];
@@ -99,10 +99,11 @@ class MergeReconciliationService {
         title: string | null;
         phash: string | null;
         deletedAt: Date;
-        watchHistoryCount: number;
-        totalPlayCount: number;
-        ratingCount: number;
-        favoriteCount: number;
+        // COUNT and SUM of integers come back as bigint
+        watchHistoryCount: bigint;
+        totalPlayCount: bigint;
+        ratingCount: bigint;
+        favoriteCount: bigint;
       }>
     >`
       SELECT

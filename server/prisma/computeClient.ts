@@ -53,12 +53,10 @@ async function createClient(): Promise<PrismaClient> {
 
 /** The single-connection client, created and configured on first use. */
 export function getComputeClient(): Promise<PrismaClient> {
-  if (!clientPromise) {
-    clientPromise = createClient().catch((error: unknown) => {
-      clientPromise = null; // let the next call retry
-      throw error;
-    });
-  }
+  clientPromise ??= createClient().catch((error: unknown) => {
+    clientPromise = null; // let the next call retry
+    throw error;
+  });
   return clientPromise;
 }
 

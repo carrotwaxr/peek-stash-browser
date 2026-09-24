@@ -224,7 +224,9 @@ export function addStreamabilityInfo(
 
 /**
  * Apply quick scene filters (don't require merged user data)
- * These filters only access data already present in the scene object from cache
+ * These filters only access data already present in the scene object from cache.
+ * Filter values come from request JSON and saved carousel rules without
+ * validation, so an id can arrive as a number: String() normalizes it.
  */
 export async function applyQuickSceneFilters(
   scenes: NormalizedScene[],
@@ -259,10 +261,10 @@ export async function applyQuickSceneFilters(
     if (!rawPerformerIds || rawPerformerIds.length === 0) return filtered;
     // Strip composite keys ("42:instance-1" -> "42") since UI sends composite format
     const { parsed: parsedPerformers } = parseCompositeFilterValues(
-      rawPerformerIds.map((id) => String(id))
+      rawPerformerIds.map((id: unknown) => String(id))
     );
     filtered = filtered.filter((s) => {
-      const scenePerformerIds = (s.performers || []).map((p) => String(p.id));
+      const scenePerformerIds = (s.performers || []).map((p) => p.id);
       const filterPerformerIds = parsedPerformers.map((p) => p.id);
       if (modifier === "INCLUDES") {
         return filterPerformerIds.some((id: string) =>
@@ -291,7 +293,7 @@ export async function applyQuickSceneFilters(
 
     // Strip composite keys ("284:instance-1" -> "284") since UI sends composite format
     const { parsed } = parseCompositeFilterValues(
-      rawTagIds.map((id) => String(id))
+      rawTagIds.map((id: unknown) => String(id))
     );
     const tagIds = parsed.map((p) => p.id);
 
@@ -303,11 +305,8 @@ export async function applyQuickSceneFilters(
     const expandedTagSets = new Map<string, string[]>();
     if (modifier === "INCLUDES_ALL") {
       for (const originalTagId of tagIds) {
-        const expanded = await expandTagIds(
-          [String(originalTagId)],
-          depth ?? 0
-        );
-        expandedTagSets.set(String(originalTagId), expanded);
+        const expanded = await expandTagIds([originalTagId], depth ?? 0);
+        expandedTagSets.set(originalTagId, expanded);
       }
     }
 
@@ -316,16 +315,16 @@ export async function applyQuickSceneFilters(
       const allTagIds = new Set<string>();
 
       // Add scene tags
-      (s.tags || []).forEach((t) => allTagIds.add(String(t.id)));
+      (s.tags || []).forEach((t) => allTagIds.add(t.id));
 
       // Add performer tags
       (s.performers || []).forEach((p) => {
-        (p.tags || []).forEach((t) => allTagIds.add(String(t.id)));
+        (p.tags ?? []).forEach((t) => allTagIds.add(t.id));
       });
 
       // Add studio tags
       if (s.studio?.tags) {
-        s.studio.tags.forEach((t) => allTagIds.add(String(t.id)));
+        s.studio.tags.forEach((t) => allTagIds.add(t.id));
       }
 
       if (modifier === "INCLUDES") {
@@ -335,8 +334,7 @@ export async function applyQuickSceneFilters(
         // For INCLUDES_ALL with hierarchy, we check that the scene has at least
         // one tag from each original filter tag's expanded set
         return tagIds.every((originalTagId) => {
-          const expandedForThisTag =
-            expandedTagSets.get(String(originalTagId)) || [];
+          const expandedForThisTag = expandedTagSets.get(originalTagId) ?? [];
           return expandedForThisTag.some((id) => allTagIds.has(id));
         });
       }
@@ -355,7 +353,7 @@ export async function applyQuickSceneFilters(
 
     // Strip composite keys ("5:instance-1" -> "5") since UI sends composite format
     const { parsed: parsedStudios } = parseCompositeFilterValues(
-      rawStudioIds.map((id) => String(id))
+      rawStudioIds.map((id: unknown) => String(id))
     );
     const studioIds = parsedStudios.map((p) => p.id);
 
@@ -367,7 +365,7 @@ export async function applyQuickSceneFilters(
 
     filtered = filtered.filter((s) => {
       if (!s.studio) return modifier === "EXCLUDES";
-      const studioId = String(s.studio.id);
+      const studioId = s.studio.id;
       if (modifier === "INCLUDES") {
         return expandedStudioIds.has(studioId);
       }
@@ -385,7 +383,7 @@ export async function applyQuickSceneFilters(
 
     // Strip composite keys ("7:instance-1" -> "7") since UI sends composite format
     const { parsed: parsedGroups } = parseCompositeFilterValues(
-      rawGroupIds.map((id) => String(id))
+      rawGroupIds.map((id: unknown) => String(id))
     );
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
@@ -981,9 +979,7 @@ export const findScenes = async (
       }
 
       // Extract specific instance ID for disambiguation (from scene_filter.instance_id)
-      const specificInstanceId = scene_filter?.instance_id as
-        | string
-        | undefined;
+      const specificInstanceId = scene_filter?.instance_id;
 
       // Execute query (applyExclusions defaults to true)
       const result = await sceneQueryBuilder.execute({
@@ -1541,12 +1537,14 @@ export const getRecommendedScenes = async (
       Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS;
 
     if (isStale) {
-      rankingComputeService.recomputeAllRankings(userId).catch((err) => {
-        logger.error("Background ranking recompute failed", {
-          userId,
-          error: (err as Error).message,
+      rankingComputeService
+        .recomputeAllRankings(userId)
+        .catch((err: unknown) => {
+          logger.error("Background ranking recompute failed", {
+            userId,
+            error: (err as Error).message,
+          });
         });
-      });
     }
 
     // Build sets of favorite and highly-rated entities using composite keys (id + instanceId)

@@ -21,16 +21,26 @@ const RANKING_WEIGHTS = {
 
 type EntityType = "performer" | "studio" | "tag" | "scene";
 
+// Raw SQL hands integers back as bigint (a COUNT, a SUM, a COALESCE with a
+// literal), and a column can read as a float (#410): every number here goes
+// through Number(), and the Int ones through Math.round()
 interface RawEntityStats {
   entityId: string;
   instanceId: string;
+  playCount: number | bigint;
+  oCount: number | bigint;
+  playDuration: number | bigint;
+  libraryPresence: number | bigint;
+}
+
+interface ComputedRanking extends Omit<
+  RawEntityStats,
+  "playCount" | "oCount" | "playDuration" | "libraryPresence"
+> {
   playCount: number;
   oCount: number;
   playDuration: number;
   libraryPresence: number;
-}
-
-interface ComputedRanking extends RawEntityStats {
   engagementScore: number;
   engagementRate: number;
   percentileRank: number;

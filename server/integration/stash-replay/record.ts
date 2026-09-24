@@ -140,7 +140,7 @@ const LABELS: Record<EntityType, [string, string]> = {
 export function recordTarget(fileEnv: Env, shellEnv: Env): StashTestTarget {
   const read = (key: string): string | undefined => {
     const value = key in shellEnv ? shellEnv[key] : fileEnv[key];
-    return value ? value : undefined;
+    return value === "" ? undefined : value;
   };
   const url = read("STASH_TEST_URL");
   const apiKey = read("STASH_TEST_API_KEY");
@@ -1029,13 +1029,12 @@ export async function main(
   const outDir = options.outDir ?? FIXTURE_PATHS.outDir;
   let check: boolean;
   try {
-    check =
-      parseArgs({
-        args: argv,
-        options: { check: { type: "boolean", default: false } },
-        strict: true,
-        allowPositionals: false,
-      }).values.check ?? false;
+    check = parseArgs({
+      args: argv,
+      options: { check: { type: "boolean", default: false } },
+      strict: true,
+      allowPositionals: false,
+    }).values.check;
   } catch (error) {
     log(
       `fixtures:record: ${error instanceof Error ? error.message : String(error)}\nUsage: npm run fixtures:record [-- --check]`,

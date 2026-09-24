@@ -481,7 +481,7 @@ export function disambiguateEntityNames(
   const nameGroups = new Map<string, EntityWithInstance[]>();
   entities.forEach((entity) => {
     const normalizedName = (entity.name || "").toLowerCase();
-    const group = nameGroups.get(normalizedName) || [];
+    const group = nameGroups.get(normalizedName) ?? [];
     group.push(entity);
     nameGroups.set(normalizedName, group);
   });

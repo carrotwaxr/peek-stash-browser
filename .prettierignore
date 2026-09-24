@@ -9,6 +9,7 @@ mkdocs.yml
 server/graphql/generated/
 server/integration/stash-replay/fixture/
 package-lock.json
+**/eslint-suppressions.json
 
 # A separate Stash plugin, not Peek code
 plugins/

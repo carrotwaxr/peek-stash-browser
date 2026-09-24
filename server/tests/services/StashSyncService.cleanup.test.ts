@@ -547,7 +547,7 @@ describe("StashSyncService Cleanup", () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       const execSql = vi
         .mocked(prisma.$executeRawUnsafe)
-        .mock.calls.map((c) => String(c[0]));
+        .mock.calls.map((c) => c[0]);
       expect(execSql.some((sql) => /CREATE TEMP TABLE/i.test(sql))).toBe(true);
       expect(
         execSql.some((sql) =>
@@ -567,22 +567,22 @@ describe("StashSyncService Cleanup", () => {
       const execCalls = vi.mocked(prisma).$executeRawUnsafe.mock.calls;
       const queryCalls = vi.mocked(prisma).$queryRawUnsafe.mock.calls;
       for (const call of [...execCalls, ...queryCalls]) {
-        const sql = String(call[0]);
+        const sql = call[0];
         expect(sql).not.toContain("inst-'q");
         expect(sql).not.toContain("x'y");
       }
 
       const insertCall = execCalls.find((c) =>
-        /INSERT OR IGNORE INTO _stash_scene_ids/.test(String(c[0]))
+        /INSERT OR IGNORE INTO _stash_scene_ids/.test(c[0])
       );
       expect(insertCall).toBeDefined();
       expect(must(insertCall).slice(1)).toEqual([JSON.stringify(["1", "x'y"])]);
 
       const selectCall = queryCalls.find((c) =>
-        String(c[0]).includes("SELECT id, phash")
+        c[0].includes("SELECT id, phash")
       );
       expect(selectCall).toBeDefined();
-      expect(String(must(selectCall)[0])).toContain("stashInstanceId = ?");
+      expect(must(selectCall)[0]).toContain("stashInstanceId = ?");
       expect(must(selectCall).slice(1)).toEqual(["inst-'q"]);
     });
   });

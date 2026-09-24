@@ -17,7 +17,8 @@ import {
   hideFixtureDefaults,
   seedAccessFixture,
 } from "../helpers/accessFixture.js";
-import { TestClient, adminClient } from "../helpers/testClient.js";
+import type { TestClient } from "../helpers/testClient.js";
+import { adminClient } from "../helpers/testClient.js";
 
 /** The four watch-history writes, with the extra fields each one needs. */
 const WATCH_WRITES: [string, Record<string, unknown>][] = [

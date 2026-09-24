@@ -14,6 +14,7 @@ import {
   mergeScenesWithUserData,
   sortScenes,
 } from "../../../controllers/library/scenes.js";
+import type * as graphqlModule from "../../../graphql/generated/graphql.js";
 import {
   OrientationEnum,
   ResolutionEnum,
@@ -160,10 +161,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
 }));
 
 vi.mock("../../../graphql/generated/graphql.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../../../graphql/generated/graphql.js")
-    >();
+  const actual = await importOriginal<typeof graphqlModule>();
   return {
     CriterionModifier: actual.CriterionModifier,
     OrientationEnum: {
