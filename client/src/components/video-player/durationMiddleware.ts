@@ -104,7 +104,7 @@ function offsetMiddleware(player: any) {
       return seconds;
     },
 
-    buffered(buffers: any) {
+    buffered(buffers: TimeRanges) {
       if (offsetStart === undefined) {
         return buffers;
       }

@@ -86,7 +86,7 @@ export const setupSubtitles = (
     }
 
     // Include caption type in label (matching Stash)
-    label = label + " (" + caption.caption_type + ")";
+    label = `${label} (${caption.caption_type})`;
 
     // Set first matching browser language as default
     const setAsDefault = !hasDefault && defaultLanguageCode === lang;

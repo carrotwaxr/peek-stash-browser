@@ -163,10 +163,9 @@ export const BaseCard = forwardRef<HTMLDivElement, BaseCardProps>(
     // Merge display preferences with explicit props (props take precedence)
     // When hideDescription is explicitly true, respect it
     // Otherwise, check displayPreferences.showDescription (default: true)
-    const shouldShowDescription =
-      hideDescription === true
-        ? false
-        : (displayPreferences.showDescription ?? true);
+    const shouldShowDescription = hideDescription
+      ? false
+      : (displayPreferences.showDescription ?? true);
 
     // Selection styling
     const selectionStyle = isSelected

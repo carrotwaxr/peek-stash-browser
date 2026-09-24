@@ -108,14 +108,13 @@ const ViewModeToggle = ({
     ? modes.map((mode) => ({
         ...mode,
         icon:
-          mode.icon ||
-          MODE_ICONS[mode.id as keyof typeof MODE_ICONS] ||
+          (mode.icon ?? MODE_ICONS[mode.id as keyof typeof MODE_ICONS]) ||
           LucideGrid2X2,
       }))
     : DEFAULT_MODES;
 
   const currentMode =
-    effectiveModes.find((m) => m.id === localValue) || effectiveModes[0];
+    effectiveModes.find((m) => m.id === localValue) ?? effectiveModes[0];
   if (!currentMode) return null;
   const CurrentIcon = currentMode.icon;
 

@@ -33,7 +33,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         setConfig((prev) => ({ ...prev, isLoading: false }));
       }
     };
-    fetchConfig();
+    void fetchConfig();
   }, []);
 
   return (

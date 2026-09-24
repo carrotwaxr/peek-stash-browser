@@ -10,7 +10,7 @@ interface Props {
   titleIcon?: ReactNode;
   scenes: NormalizedScene[];
   loading?: boolean;
-  onSceneClick?: (scene: NormalizedScene) => boolean | void;
+  onSceneClick?: (scene: NormalizedScene) => void;
   showProgress?: boolean;
   selectedScenes?: NormalizedScene[];
   onToggleSelect?: (scene: NormalizedScene) => void;

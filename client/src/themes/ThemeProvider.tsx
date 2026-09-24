@@ -40,11 +40,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     const loadCustomThemes = async () => {
       try {
-        const data = (await apiGet("/themes/custom")) as {
+        const data = await apiGet<{
           themes?: CustomTheme[];
-        };
+        }>("/themes/custom");
         if (cancelled) return;
-        const themes = data.themes || [];
+        const themes = data.themes ?? [];
         setCustomThemes(themes);
 
         // Merge built-in themes with custom themes
@@ -69,7 +69,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    loadCustomThemes();
+    void loadCustomThemes();
     return () => {
       cancelled = true;
     };
@@ -84,10 +84,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshCustomThemes = async () => {
     try {
-      const data = (await apiGet("/themes/custom")) as {
+      const data = await apiGet<{
         themes?: CustomTheme[];
-      };
-      const themes = data.themes || [];
+      }>("/themes/custom");
+      const themes = data.themes ?? [];
       setCustomThemes(themes);
 
       // Merge built-in themes with custom themes

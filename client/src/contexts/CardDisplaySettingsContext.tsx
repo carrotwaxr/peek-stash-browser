@@ -56,7 +56,7 @@ export const CardDisplaySettingsProvider = ({
             cardDisplaySettings?: Record<string, Record<string, unknown>>;
           };
         }>("/user/settings");
-        if (!cancelled) setSettings(data.settings.cardDisplaySettings || {});
+        if (!cancelled) setSettings(data.settings.cardDisplaySettings ?? {});
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to load card display settings:", error);
@@ -65,7 +65,7 @@ export const CardDisplaySettingsProvider = ({
         if (!cancelled) setIsLoading(false);
       }
     };
-    loadSettings();
+    void loadSettings();
     return () => {
       cancelled = true;
     };
@@ -75,7 +75,7 @@ export const CardDisplaySettingsProvider = ({
   const getSettings = useCallback(
     (entityType: string) => {
       const defaults = getDefaultSettings(entityType);
-      const entitySettings = settings[entityType] || {};
+      const entitySettings = settings[entityType] ?? {};
       return { ...defaults, ...entitySettings };
     },
     [settings]
@@ -85,7 +85,7 @@ export const CardDisplaySettingsProvider = ({
   const updateSettings = useCallback(
     async (entityType: string, key: string, value: unknown) => {
       const newEntitySettings = {
-        ...(settings[entityType] || {}),
+        ...(settings[entityType] ?? {}),
         [key]: value,
       };
       const newSettings = {

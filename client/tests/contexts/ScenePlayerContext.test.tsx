@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
+import type { Mock, MockInstance } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks are registered)
 // ---------------------------------------------------------------------------
@@ -74,6 +74,8 @@ function createWrapper(props = {}) {
 // ---------------------------------------------------------------------------
 
 describe("ScenePlayerContext", () => {
+  let replaceState: MockInstance<History["replaceState"]>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: API returns a scene
@@ -81,7 +83,9 @@ describe("ScenePlayerContext", () => {
     // Suppress console.error from intentional error tests
     vi.spyOn(console, "error").mockImplementation(() => {});
     // Spy on window.history.replaceState
-    vi.spyOn(window.history, "replaceState").mockImplementation(() => {});
+    replaceState = vi
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => {});
   });
 
   // =========================================================================
@@ -567,15 +571,11 @@ describe("ScenePlayerContext", () => {
         );
       });
 
-      expect(window.history.replaceState).toHaveBeenCalledWith(
-        null,
-        "",
-        "/scene/scene-42"
-      );
+      expect(replaceState).toHaveBeenCalledWith(null, "", "/scene/scene-42");
     });
 
     it("does not update URL when there is no playlist", async () => {
-      (window.history.replaceState as Mock).mockClear();
+      replaceState.mockClear();
 
       const { result } = renderHook(() => useScenePlayer(), {
         wrapper: createWrapper({ playlist: null }),
@@ -586,7 +586,7 @@ describe("ScenePlayerContext", () => {
       });
 
       // replaceState should not have been called because playlist is null
-      expect(window.history.replaceState).not.toHaveBeenCalled();
+      expect(replaceState).not.toHaveBeenCalled();
     });
 
     it("passes hasMultipleInstances to getEntityPath", async () => {
@@ -635,7 +635,7 @@ describe("ScenePlayerContext", () => {
       });
 
       // replaceState should not be called when URL already matches
-      expect(window.history.replaceState).not.toHaveBeenCalled();
+      expect(replaceState).not.toHaveBeenCalled();
     });
   });
 });

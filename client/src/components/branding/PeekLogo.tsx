@@ -18,7 +18,7 @@ export const PeekLogo = ({
       user?.landingPagePreference,
       location.pathname
     );
-    navigate(destination);
+    void navigate(destination);
   };
 
   // Size configurations

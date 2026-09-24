@@ -51,6 +51,9 @@ export const LayoutRenderer = ({
     //     />
     //   );
 
+    // "list" and "compact" render the grid until their layouts exist
+    case "list":
+    case "compact":
     case "grid":
     default:
       return (

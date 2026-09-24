@@ -1,13 +1,15 @@
 import {
   LucideDatabase,
-  LucideFacebook,
   LucideFilm,
   LucideGlobe,
-  LucideInstagram,
   LucideLink,
-  LucideTwitter,
   LucideVideo,
 } from "lucide-react";
+import {
+  FacebookIcon,
+  InstagramIcon,
+  TwitterIcon,
+} from "../components/ui/icons/BrandIcons";
 
 /**
  * Site information for URL display
@@ -18,13 +20,13 @@ export const getSiteInfo = (url: string) => {
 
   // === Social Media ===
   if (urlLower.includes("twitter.com") || urlLower.includes("x.com")) {
-    return { name: "Twitter", icon: LucideTwitter, color: "#1DA1F2" };
+    return { name: "Twitter", icon: TwitterIcon, color: "#1DA1F2" };
   }
   if (urlLower.includes("instagram.com")) {
-    return { name: "Instagram", icon: LucideInstagram, color: "#E4405F" };
+    return { name: "Instagram", icon: InstagramIcon, color: "#E4405F" };
   }
   if (urlLower.includes("facebook.com")) {
-    return { name: "Facebook", icon: LucideFacebook, color: "#1877F2" };
+    return { name: "Facebook", icon: FacebookIcon, color: "#1877F2" };
   }
   if (urlLower.includes("onlyfans.com")) {
     return { name: "OnlyFans", icon: LucideVideo, color: "#00AFF0" };

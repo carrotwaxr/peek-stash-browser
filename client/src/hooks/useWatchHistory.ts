@@ -66,7 +66,7 @@ export function useWatchHistory(
 
   // Fetch watch history on mount
   useEffect(() => {
-    fetchWatchHistory();
+    void fetchWatchHistory();
   }, [fetchWatchHistory]);
 
   return {
@@ -113,7 +113,7 @@ export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
       const response = await apiGet<{ watchHistory?: WatchHistoryData[] }>(
         `/watch-history?${queryParams}`
       );
-      setData(response.watchHistory || []);
+      setData(response.watchHistory ?? []);
     } catch (err) {
       console.error("Error fetching all watch history:", err);
       setError(
@@ -125,7 +125,7 @@ export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
   }, [isAuthenticated, inProgress, limit]);
 
   useEffect(() => {
-    fetchAll();
+    void fetchAll();
   }, [fetchAll]);
 
   return {

@@ -21,7 +21,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
     landingPagePreference?.randomize || false
   );
   const [selectedPages, setSelectedPages] = useState(
-    landingPagePreference?.pages || ["home"]
+    landingPagePreference?.pages ?? ["home"]
   );
   const [hasChanges, setHasChanges] = useState(false);
   const [validationError, setValidationError] = useState("");
@@ -29,7 +29,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
   // Sync state when prop changes (e.g., after settings reload)
   useEffect(() => {
     setRandomize(landingPagePreference?.randomize || false);
-    setSelectedPages(landingPagePreference?.pages || ["home"]);
+    setSelectedPages(landingPagePreference?.pages ?? ["home"]);
     setHasChanges(false);
     setValidationError("");
   }, [landingPagePreference]);
@@ -84,7 +84,7 @@ const LandingPageSettings = ({ landingPagePreference, onSave }: Props) => {
 
   const handleReset = () => {
     setRandomize(landingPagePreference?.randomize || false);
-    setSelectedPages(landingPagePreference?.pages || ["home"]);
+    setSelectedPages(landingPagePreference?.pages ?? ["home"]);
     setHasChanges(false);
     setValidationError("");
   };

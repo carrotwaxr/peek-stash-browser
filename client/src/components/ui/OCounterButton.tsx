@@ -94,7 +94,7 @@ const OCounterButton = ({
 
   return (
     <button
-      onClick={handleClick}
+      onClick={(e) => void handleClick(e)}
       disabled={incrementMutation.isPending}
       className={`flex items-center ${config.gap} ${config.padding} rounded transition-all hover:scale-105 active:scale-95 relative ${
         isAnimating ? "animate-pulse" : ""

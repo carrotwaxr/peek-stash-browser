@@ -83,8 +83,8 @@ export function buildTagTree(
   });
 
   // If filtering, determine which tags match and which are ancestors of matches
-  let matchingIds = new Set();
-  let ancestorIds = new Set();
+  const matchingIds = new Set();
+  const ancestorIds = new Set();
 
   if (filterQuery) {
     const query = filterQuery.toLowerCase();

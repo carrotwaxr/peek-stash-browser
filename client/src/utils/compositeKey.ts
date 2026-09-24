@@ -26,10 +26,10 @@ export const makeCompositeKey = (
  * Only splits on the first colon, so instance IDs containing colons
  * (e.g. UUIDs in some formats) are preserved intact.
  *
- * @param {string} key - The composite key to parse
+ * @param {string|number} key - The composite key to parse; a number is a bare id
  * @returns {{ id: string, instanceId: string|undefined }}
  */
-export const parseCompositeKey = (key: string) => {
+export const parseCompositeKey = (key: string | number) => {
   if (!key) return { id: key, instanceId: undefined };
   const str = String(key);
   const colonIdx = str.indexOf(":");

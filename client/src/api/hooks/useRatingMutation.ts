@@ -32,7 +32,7 @@ export function useUpdateRating() {
       };
       const keyFn = keyMap[entityType];
       if (keyFn) {
-        queryClient.invalidateQueries({ queryKey: keyFn() });
+        void queryClient.invalidateQueries({ queryKey: keyFn() });
       }
     },
   });

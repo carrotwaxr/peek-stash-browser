@@ -50,7 +50,7 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
   const fetchPage = useCallback(
     async (page: number) => {
       const result = await fetchImagesRef.current(page, perPage);
-      return { images: result.images || [] };
+      return { images: result.images ?? [] };
     },
     [perPage]
   );
@@ -74,7 +74,7 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
           lightbox.currentPage,
           perPage
         );
-        setImages(result.images || []);
+        setImages(result.images ?? []);
         setTotalCount(result.count || 0);
 
         // Handle pending lightbox navigation after page loads
@@ -87,7 +87,7 @@ export function useImagesPagination<T extends ImageItem = ImageItem>({
       }
     };
 
-    loadImages();
+    void loadImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lightbox.currentPage, ...dependencies]);
 

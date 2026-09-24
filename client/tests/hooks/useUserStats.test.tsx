@@ -73,7 +73,7 @@ describe("useUserStats", () => {
   });
 
   describe("auth gate", () => {
-    it("does not fetch when not authenticated", async () => {
+    it("does not fetch when not authenticated", () => {
       useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
 
       const { result } = renderHook(() => useUserStats(), {

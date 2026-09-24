@@ -41,10 +41,10 @@ const CustomThemeManager = () => {
   }) => {
     try {
       setLoading(true);
-      const data = (await apiPost("/themes/custom", themeData)) as Record<
-        string,
-        any
-      >;
+      const data = await apiPost<Record<string, any>>(
+        "/themes/custom",
+        themeData
+      );
       await refreshCustomThemes();
       showSuccess(`Theme "${themeData.name}" created successfully!`);
       setIsCreating(false);
@@ -97,9 +97,9 @@ const CustomThemeManager = () => {
   const handleDuplicate = async (theme: CustomThemeWithDates) => {
     try {
       setLoading(true);
-      const data = (await apiPost(
+      const data = await apiPost<Record<string, any>>(
         `/themes/custom/${theme.id}/duplicate`
-      )) as Record<string, any>;
+      );
       await refreshCustomThemes();
       showSuccess(`Theme duplicated as "${data.theme.name}"!`);
     } catch (error) {
@@ -138,7 +138,9 @@ const CustomThemeManager = () => {
               typeof CustomThemeEditor
             >["theme"]
           }
-          onSave={isCreating ? handleSaveNew : handleSaveEdit}
+          onSave={(themeData) =>
+            void (isCreating ? handleSaveNew : handleSaveEdit)(themeData)
+          }
           onCancel={handleCancel}
           isNew={isCreating}
         />
@@ -284,7 +286,7 @@ const CustomThemeManager = () => {
                       </Button>
                       <Button
                         variant="secondary"
-                        onClick={() => handleDuplicate(theme)}
+                        onClick={() => void handleDuplicate(theme)}
                         disabled={loading}
                         className="p-2"
                         title="Duplicate"
@@ -317,7 +319,7 @@ const CustomThemeManager = () => {
           message={`Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
-          onConfirm={() => handleDelete(deleteConfirm)}
+          onConfirm={() => void handleDelete(deleteConfirm)}
           onClose={() => setDeleteConfirm(null)}
           confirmStyle="danger"
         />

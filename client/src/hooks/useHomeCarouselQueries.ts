@@ -24,7 +24,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
         commonFilters.favoritePerformerScenes(1, perCarousel)
       )) as FindScenesResponse;
       // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
+      return response?.findScenes?.scenes ?? [];
     },
     favoriteStudioScenes: async () => {
       const response = (await libraryApi.findStudios(
@@ -32,7 +32,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       )) as FindStudiosResponse;
 
       // Extract scenes from server response structure
-      const favoriteStudios = response?.findStudios?.studios || [];
+      const favoriteStudios = response?.findStudios?.studios ?? [];
       const favoriteStudioIds = favoriteStudios.map((studio) => studio.id);
 
       if (favoriteStudioIds.length === 0) {
@@ -55,7 +55,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
         },
       })) as FindScenesResponse;
 
-      return scenesResponse?.findScenes?.scenes || [];
+      return scenesResponse?.findScenes?.scenes ?? [];
     },
     favoriteTagScenes: async () => {
       const response = (await libraryApi.findTags(
@@ -63,7 +63,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       )) as FindTagsResponse;
 
       // Extract scenes from server response structure
-      const favoriteTags = response?.findTags?.tags || [];
+      const favoriteTags = response?.findTags?.tags ?? [];
       const favoriteTagIds = favoriteTags.map((tag) => tag.id);
 
       if (favoriteTagIds.length === 0) {
@@ -86,7 +86,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
         },
       })) as FindScenesResponse;
 
-      return scenesResponse?.findScenes?.scenes || [];
+      return scenesResponse?.findScenes?.scenes ?? [];
     },
     highRatedScenes: async () => {
       const response = (await libraryApi.findScenes(
@@ -94,7 +94,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       )) as FindScenesResponse;
 
       // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
+      return response?.findScenes?.scenes ?? [];
     },
     recentlyAddedScenes: async () => {
       const response = (await libraryApi.findScenes(
@@ -102,7 +102,7 @@ export const useHomeCarouselQueries = (perCarousel: number = 12) => {
       )) as FindScenesResponse;
 
       // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
+      return response?.findScenes?.scenes ?? [];
     },
   };
 };

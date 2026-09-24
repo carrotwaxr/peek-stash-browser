@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Hook for card selection behavior: long-press to select, selection mode click handling

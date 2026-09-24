@@ -18,7 +18,7 @@ import { SceneCardPreview, TooltipEntityGrid } from "./index";
 
 interface Props {
   scene: NormalizedScene;
-  onClick?: (scene: NormalizedScene) => boolean | void;
+  onClick?: (scene: NormalizedScene) => void;
   onFocus?: (event: React.FocusEvent<HTMLElement>) => void;
   tabIndex?: number;
   className?: string;

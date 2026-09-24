@@ -206,9 +206,9 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
             } else if (item.name === "TV Mode") {
               toggleTVMode();
             } else if (item.name === "Sign Out") {
-              logout();
+              void logout();
             } else if (item.path) {
-              navigate(item.path);
+              void navigate(item.path);
             }
           }
           break;
@@ -445,7 +445,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                               {isTVMode && <span className="text-sm">✓</span>}
                             </button>
                             <button
-                              onClick={logout}
+                              onClick={() => void logout()}
                               className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 text-red-600 hover:bg-red-50"
                             >
                               <ThemedIcon
@@ -534,7 +534,7 @@ const Sidebar = ({ navPreferences = [] }: Props) => {
                                 ref={(el: HTMLElement | null) => {
                                   itemRefs.current[subItemIndex] = el;
                                 }}
-                                onClick={logout}
+                                onClick={() => void logout()}
                                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
                                 tabIndex={isSubItemFocused ? 0 : -1}
                               >

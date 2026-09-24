@@ -4,6 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../src/contexts/AuthContext";
 import { useAuth } from "../../src/hooks/useAuth";
+import { actAsync } from "../testUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,7 +122,7 @@ describe("AuthProvider", () => {
     expect(result.current.isAuthenticated).toBe(false);
 
     // Resolve the auth check
-    await act(async () => {
+    await actAsync(() => {
       resolveAuth!({
         ok: true,
         json: () => Promise.resolve({ user: mockUser }),

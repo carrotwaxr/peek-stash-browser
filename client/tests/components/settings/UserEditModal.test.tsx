@@ -125,7 +125,7 @@ describe("UserEditModal", () => {
   };
 
   describe("Rendering", () => {
-    it("renders user info correctly", async () => {
+    it("renders user info correctly", () => {
       render(
         <UserEditModal
           user={mockUser}
@@ -364,7 +364,7 @@ describe("UserEditModal", () => {
   });
 
   describe("Current User Restrictions", () => {
-    it("disables account actions for current user", async () => {
+    it("disables account actions for current user", () => {
       render(
         <UserEditModal
           user={mockCurrentUser}
@@ -380,7 +380,7 @@ describe("UserEditModal", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows delete button for other users", async () => {
+    it("shows delete button for other users", () => {
       render(
         <UserEditModal
           user={mockUser}
@@ -396,7 +396,7 @@ describe("UserEditModal", () => {
   });
 
   describe("Modal Actions", () => {
-    it("calls onClose when cancel is clicked", async () => {
+    it("calls onClose when cancel is clicked", () => {
       const onClose = vi.fn();
       render(
         <UserEditModal
@@ -412,7 +412,7 @@ describe("UserEditModal", () => {
       expect(onClose).toHaveBeenCalled();
     });
 
-    it("calls onClose when X button is clicked", async () => {
+    it("calls onClose when X button is clicked", () => {
       const onClose = vi.fn();
       render(
         <UserEditModal
@@ -446,7 +446,7 @@ describe("UserEditModal", () => {
   });
 
   describe("Content Restrictions Section", () => {
-    it("does not offer Manage Restrictions for admin accounts", async () => {
+    it("does not offer Manage Restrictions for admin accounts", () => {
       render(
         <UserEditModal
           user={{ id: 3, username: "otheradmin", role: "ADMIN" }}
@@ -500,7 +500,7 @@ describe("UserEditModal", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("offers Manage Restrictions for user accounts", async () => {
+    it("offers Manage Restrictions for user accounts", () => {
       render(
         <UserEditModal
           user={mockUser}

@@ -121,7 +121,7 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
             label={SETTING_LABELS.defaultViewMode}
             value={settings.defaultViewMode as string}
             options={viewModes}
-            onChange={(v) => handleChange("defaultViewMode", v)}
+            onChange={(v) => void handleChange("defaultViewMode", v)}
           />
         )}
 
@@ -142,7 +142,7 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
                     : (settings.defaultWallZoom as string) || "medium"
                 }
                 onChange={(density) =>
-                  handleChange(
+                  void handleChange(
                     settings.defaultViewMode === "grid"
                       ? "defaultGridDensity"
                       : "defaultWallZoom",
@@ -172,7 +172,7 @@ const EntitySettingsSection = ({ entityType }: EntitySettingsSectionProps) => {
                 settingKey
               }
               checked={settings[settingKey] as boolean}
-              onChange={(v) => handleChange(settingKey, v)}
+              onChange={(v) => void handleChange(settingKey, v)}
               description={
                 (SETTING_DESCRIPTIONS as Record<string, string>)[settingKey]
               }

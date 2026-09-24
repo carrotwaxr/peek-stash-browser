@@ -132,8 +132,8 @@ const SceneListItem = ({
     // Don't navigate if clicking on interactive elements
     const target = e.target as HTMLElement;
     const isInteractive =
-      target.closest("button") ||
-      target.closest("a") ||
+      target.closest("button") ??
+      target.closest("a") ??
       target.closest('[role="button"]');
 
     if (isInteractive) return;
@@ -156,9 +156,9 @@ const SceneListItem = ({
 
       // Also check if video is fullscreen
       const isFullscreen =
-        document.fullscreenElement ||
-        (document as unknown as Record<string, unknown>)
-          .webkitFullscreenElement ||
+        (document.fullscreenElement ??
+          (document as unknown as Record<string, unknown>)
+            .webkitFullscreenElement) ||
         (document as unknown as Record<string, unknown>).mozFullScreenElement ||
         (document as unknown as Record<string, unknown>).msFullscreenElement;
       if (isFullscreen) {
@@ -166,7 +166,7 @@ const SceneListItem = ({
       }
     }
 
-    navigate(
+    void navigate(
       getEntityPath(
         "scene",
         scene as unknown as Parameters<typeof getEntityPath>[1],

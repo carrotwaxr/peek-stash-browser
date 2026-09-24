@@ -176,7 +176,7 @@ export const SearchableGrid = ({
     <SearchControls
       artifactType={entityType}
       initialSort={defaultSort}
-      onQueryChange={handleQueryChange}
+      onQueryChange={(newQuery) => void handleQueryChange(newQuery)}
       permanentFilters={lockedFilters}
       permanentFiltersMetadata={permanentFiltersMetadata}
       totalPages={totalPages}

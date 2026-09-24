@@ -21,10 +21,10 @@ function pressKey(
     ...options,
   });
   // Spy on preventDefault / stopPropagation so tests can assert
-  vi.spyOn(event, "preventDefault");
-  vi.spyOn(event, "stopPropagation");
+  const preventDefault = vi.spyOn(event, "preventDefault");
+  const stopPropagation = vi.spyOn(event, "stopPropagation");
   document.dispatchEvent(event);
-  return event;
+  return { preventDefault, stopPropagation };
 }
 
 describe("useKeyboardShortcuts", () => {
@@ -243,11 +243,11 @@ describe("useKeyboardShortcuts", () => {
     const handler = vi.fn(() => false);
     renderHook(() => useKeyboardShortcuts({ k: handler }));
 
-    const event = pressKey("k");
+    const { preventDefault, stopPropagation } = pressKey("k");
 
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(event.preventDefault).not.toHaveBeenCalled();
-    expect(event.stopPropagation).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
   });
 
   // ─── Handler error ────────────────────────────────────────────────────
@@ -276,10 +276,10 @@ describe("useKeyboardShortcuts", () => {
     const handler = vi.fn();
     renderHook(() => useKeyboardShortcuts({ k: handler }));
 
-    const event = pressKey("k");
+    const { preventDefault, stopPropagation } = pressKey("k");
 
-    expect(event.preventDefault).toHaveBeenCalledTimes(1);
-    expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
   });
 
   // ─── shouldHandle returning false ──────────────────────────────────────

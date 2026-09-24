@@ -188,7 +188,7 @@ function mergeUrls(
 
   // Add gallery URLs
   for (const gallery of galleries) {
-    for (const url of gallery?.urls || []) {
+    for (const url of gallery?.urls ?? []) {
       if (url && !seen.has(url)) {
         seen.add(url);
         result.push(url);
@@ -229,22 +229,22 @@ export function getEffectiveImageMetadata(
     };
   }
 
-  const galleries = image.galleries || [];
+  const galleries = image.galleries ?? [];
 
   // Merge performers: image's own + inherited from galleries
   const effectivePerformers = mergeEntitiesById(
-    image.performers || [],
+    image.performers ?? [],
     getInheritedPerformers(galleries)
   );
 
   // Merge tags: image's own + inherited from galleries
   const effectiveTags = mergeEntitiesById(
-    image.tags || [],
+    image.tags ?? [],
     getInheritedTags(galleries)
   );
 
   // Studio: prefer image's own, fallback to gallery's
-  const effectiveStudio = image.studio || getInheritedStudio(galleries);
+  const effectiveStudio = image.studio ?? getInheritedStudio(galleries);
 
   // Date: prefer image's own, fallback to gallery's
   const effectiveDate = image.date || getInheritedDate(galleries);
@@ -257,7 +257,7 @@ export function getEffectiveImageMetadata(
     image.photographer || getInheritedPhotographer(galleries);
 
   // URLs: merge image URLs with gallery URLs
-  const effectiveUrls = mergeUrls(image.urls || [], galleries);
+  const effectiveUrls = mergeUrls(image.urls ?? [], galleries);
 
   return {
     effectivePerformers,

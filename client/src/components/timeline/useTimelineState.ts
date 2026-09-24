@@ -204,7 +204,7 @@ export function useTimelineState({
       }
     }
 
-    fetchDistribution();
+    void fetchDistribution();
 
     return () => {
       cancelled = true;

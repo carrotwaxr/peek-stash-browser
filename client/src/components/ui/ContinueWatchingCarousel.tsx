@@ -84,7 +84,7 @@ const ContinueWatchingCarousel = ({
         const response = await libraryApi.findScenes({ ids: sceneIds });
         const fetchedScenes =
           (response as { findScenes?: { scenes?: NormalizedScene[] } })
-            ?.findScenes?.scenes || [];
+            ?.findScenes?.scenes ?? [];
 
         // Match scenes with watch history data and add progress info
         const scenesWithProgress = fetchedScenes.map(
@@ -92,7 +92,7 @@ const ContinueWatchingCarousel = ({
             const watchHistory = whList.find((wh) => wh.sceneId === scene.id);
             return {
               ...scene,
-              watchHistory: watchHistory || null,
+              watchHistory: watchHistory ?? null,
               resumeTime: watchHistory?.resumeTime || 0,
               playCount: watchHistory?.playCount || 0,
               lastPlayedAt:
@@ -106,9 +106,7 @@ const ContinueWatchingCarousel = ({
         const MIN_WATCH_PERCENT = 2;
         const filteredScenes = scenesWithProgress.filter((scene) => {
           const duration = scene.files?.[0]?.duration;
-          const playDuration = scene.watchHistory?.playDuration as
-            | number
-            | undefined;
+          const playDuration = scene.watchHistory?.playDuration;
 
           if (!duration || !playDuration) {
             return false; // No duration data, exclude
@@ -136,7 +134,7 @@ const ContinueWatchingCarousel = ({
       }
     };
 
-    fetchScenes();
+    void fetchScenes();
   }, [watchHistoryList, loadingHistory, retryTrigger]);
 
   // Handle server initialization state
@@ -149,7 +147,7 @@ const ContinueWatchingCarousel = ({
       onInitializing(true);
       const timer = setTimeout(() => {
         setRetryCount((prev) => prev + 1);
-        refresh(); // Retry watch history fetch
+        void refresh(); // Retry watch history fetch
         setRetryTrigger((prev) => prev + 1); // Trigger scenes refetch
       }, 5000);
       return () => clearTimeout(timer);
@@ -168,7 +166,7 @@ const ContinueWatchingCarousel = ({
   const handleSceneClick = (scene: NormalizedScene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(
+    void navigate(
       getEntityPath(
         "scene",
         scene as unknown as Parameters<typeof getEntityPath>[1],

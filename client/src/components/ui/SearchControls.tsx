@@ -125,9 +125,7 @@ interface SearchControlsProps {
   initialSort?: string;
   onQueryChange: (query: Record<string, unknown>) => void;
   onPerPageStateChange?: (perPage: number) => void;
-  paginationHandlerRef?: React.MutableRefObject<
-    ((page: number) => void) | null
-  >;
+  paginationHandlerRef?: React.RefObject<((page: number) => void) | null>;
   permanentFilters?: Record<string, unknown>;
   permanentFiltersMetadata?: Record<string, unknown>;
   totalPages: number;
@@ -569,8 +567,7 @@ const SearchControls = ({
       removeFilterAction(filterKey); // Hook handles URL sync and resets to page 1
 
       // Calculate updated filters for query
-      const newFilters = { ...filters };
-      delete newFilters[filterKey];
+      const { [filterKey]: _removed, ...newFilters } = filters;
       const updatedFilters = { ...newFilters, ...permanentFilters };
 
       // Trigger search with updated filters
@@ -893,7 +890,7 @@ const SearchControls = ({
     );
   }, [filters]);
 
-  const groupFilters = (filters as Record<string, any>)?.groups;
+  const groupFilters = filters?.groups;
 
   const sortOptions = useMemo(() => {
     const baseOptions = getSortOptions(artifactType);
@@ -1059,14 +1056,12 @@ const SearchControls = ({
                         {
                           Object.keys(filters).filter(
                             (key) =>
-                              (filters as Record<string, any>)[key] !==
-                                undefined &&
-                              (filters as Record<string, any>)[key] !== "" &&
-                              (typeof (filters as Record<string, any>)[key] !==
-                                "object" ||
-                                Object.values(
-                                  (filters as Record<string, any>)[key]
-                                ).some((v: any) => v !== "" && v !== undefined))
+                              filters[key] !== undefined &&
+                              filters[key] !== "" &&
+                              (typeof filters[key] !== "object" ||
+                                Object.values(filters[key]).some(
+                                  (v: any) => v !== "" && v !== undefined
+                                ))
                           ).length
                         }
                       </span>
@@ -1224,8 +1219,7 @@ const SearchControls = ({
 
           // Render section header
           if (type === "section-header") {
-            const isCollapsed =
-              (collapsedSections as Record<string, boolean>)[key] || false;
+            const isCollapsed = collapsedSections[key] || false;
             const toggleSection = () => {
               setCollapsedSections((prev) => ({
                 ...prev,
@@ -1289,8 +1283,7 @@ const SearchControls = ({
           }
 
           const isInCollapsedSection =
-            currentSectionKey &&
-            (collapsedSections as Record<string, boolean>)[currentSectionKey];
+            currentSectionKey && collapsedSections[currentSectionKey];
 
           if (isInCollapsedSection) {
             return null;
@@ -1315,7 +1308,7 @@ const SearchControls = ({
               }}
               isHighlighted={highlightedFilterKey === key}
               onChange={(value: unknown) => handleFilterChange(key, value)}
-              value={(localFilters as Record<string, any>)[key] || defaultValue}
+              value={localFilters[key] || defaultValue}
               type={
                 type as
                   | "select"
@@ -1332,9 +1325,7 @@ const SearchControls = ({
               label={filterProps.label!}
               modifierOptions={modifierOptions}
               modifierValue={
-                modifierKey
-                  ? (localFilters as Record<string, any>)[modifierKey]
-                  : defaultModifier
+                modifierKey ? localFilters[modifierKey] : defaultModifier
               }
               onModifierChange={(value: unknown) =>
                 modifierKey && handleFilterChange(modifierKey, value)
@@ -1342,9 +1333,7 @@ const SearchControls = ({
               supportsHierarchy={supportsHierarchy}
               hierarchyLabel={hierarchyLabel}
               hierarchyValue={
-                hierarchyKey
-                  ? (localFilters as Record<string, any>)[hierarchyKey]
-                  : undefined
+                hierarchyKey ? localFilters[hierarchyKey] : undefined
               }
               onHierarchyChange={
                 hierarchyKey
@@ -1369,7 +1358,11 @@ const SearchControls = ({
         }}
       >
         {typeof children === "function"
-          ? (children as Function)({
+          ? (
+              children as (
+                renderProps: Record<string, unknown>
+              ) => React.ReactNode
+            )({
               viewMode,
               zoomLevel,
               gridDensity,

@@ -49,7 +49,7 @@ export const BaseGrid = ({
     />
   );
 
-  const skeletonRenderer = renderSkeleton || defaultRenderSkeleton;
+  const skeletonRenderer = renderSkeleton ?? defaultRenderSkeleton;
 
   // Loading state
   if (loading) {

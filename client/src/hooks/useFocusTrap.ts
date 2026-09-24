@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import type React from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Custom hook for trapping focus within a container (modal, dropdown, etc.)
@@ -36,8 +37,8 @@ export const useFocusTrap = (
       ].join(", ");
 
       return Array.from(
-        container.querySelectorAll(focusableSelectors)
-      ) as HTMLElement[];
+        container.querySelectorAll<HTMLElement>(focusableSelectors)
+      );
     };
 
     // Focus the first focusable element

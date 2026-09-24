@@ -69,7 +69,7 @@ const UserManagementSection = ({
   };
 
   useEffect(() => {
-    loadGroups();
+    void loadGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,7 +96,7 @@ const UserManagementSection = ({
     try {
       await deleteGroup(String(group.id));
       onMessage(`Group "${group.name}" deleted successfully`);
-      loadGroups();
+      void loadGroups();
       onUsersChanged(); // Refresh users to update their group badges
     } catch (err) {
       onError((err as Error).message || "Failed to delete group");
@@ -114,7 +114,7 @@ const UserManagementSection = ({
     onMessage(
       editingGroup ? "Group updated successfully" : "Group created successfully"
     );
-    loadGroups();
+    void loadGroups();
     onUsersChanged(); // Refresh users to update their group badges
   };
 
@@ -340,7 +340,7 @@ const UserManagementSection = ({
                             variant="destructive"
                             size="sm"
                             icon={<Trash2 size={14} />}
-                            onClick={() => handleDeleteGroup(group)}
+                            onClick={() => void handleDeleteGroup(group)}
                           >
                             Delete
                           </Button>
@@ -506,7 +506,7 @@ const UserManagementSection = ({
                         type="checkbox"
                         checked={user.syncToStash || false}
                         onChange={() =>
-                          toggleSyncToStash(
+                          void toggleSyncToStash(
                             user.id,
                             user.username,
                             user.syncToStash
@@ -627,7 +627,7 @@ const UserManagementSection = ({
             setEditingUser(null);
             onMessage(`User "${editingUser.username}" updated successfully`);
             onUsersChanged();
-            loadGroups();
+            void loadGroups();
           }}
           onMessage={onMessage}
           onError={onError}

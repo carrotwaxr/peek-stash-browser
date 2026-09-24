@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import type React from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Reusable keyboard shortcut hook for the entire application

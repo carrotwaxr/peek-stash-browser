@@ -91,7 +91,7 @@ const iconSets = {
 
 const getIconSet = (themeName: string) => {
   return (
-    (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] ||
+    (iconSets as unknown as Record<string, typeof iconSets.peek>)[themeName] ??
     iconSets.peek
   );
 };

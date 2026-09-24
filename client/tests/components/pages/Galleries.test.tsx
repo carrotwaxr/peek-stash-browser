@@ -1,5 +1,6 @@
 import React from "react";
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { actAsync } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import Galleries from "@/components/pages/Galleries";
@@ -118,7 +119,7 @@ vi.mock("@/components/ui/index", () => ({
         data-artifact-type={props.artifactType}
       >
         {typeof children === "function"
-          ? (children as Function)({
+          ? children({
               viewMode: "grid",
               gridDensity: "medium",
               zoomLevel: "medium",
@@ -266,7 +267,7 @@ describe("Galleries", () => {
         error: null,
       });
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Galleries />);
       });
       const cards = screen.getAllByTestId("gallery-card");
@@ -276,7 +277,7 @@ describe("Galleries", () => {
   });
 
   describe("View Modes", () => {
-    it("has 5 view modes configured", async () => {
+    it("has 5 view modes configured", () => {
       // Import the module to access VIEW_MODES indirectly
       // We verify by checking that the SearchControls receives viewModes prop
       // and the component renders in grid mode by default (showing gallery cards or skeletons)

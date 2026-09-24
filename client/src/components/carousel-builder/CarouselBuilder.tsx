@@ -93,7 +93,7 @@ const CarouselBuilder = () => {
       }
     };
 
-    loadCarousel();
+    void loadCarousel();
   }, [id, isEditing]);
 
   /**
@@ -388,7 +388,7 @@ const CarouselBuilder = () => {
         await libraryApi.createCarousel(carouselData);
       }
 
-      navigate("/settings?section=user&tab=customization");
+      void navigate("/settings?section=user&tab=customization");
     } catch (err) {
       setError((err as Error).message || "Failed to save carousel");
     } finally {
@@ -397,7 +397,7 @@ const CarouselBuilder = () => {
   };
 
   const IconComponent =
-    (LucideIcons as unknown as Record<string, LucideIcon>)[icon] ||
+    (LucideIcons as unknown as Record<string, LucideIcon>)[icon] ??
     LucideIcons.Film;
   const canSave = title.trim() && rules.length > 0 && previewValid;
   const usedFilterKeys = new Set(rules.map((r) => r.filterKey));
@@ -434,7 +434,7 @@ const CarouselBuilder = () => {
             <Button
               variant="secondary"
               onClick={() =>
-                navigate("/settings?section=user&tab=customization")
+                void navigate("/settings?section=user&tab=customization")
               }
               icon={<ArrowLeft className="w-4 h-4" />}
             >
@@ -451,7 +451,7 @@ const CarouselBuilder = () => {
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              onClick={handlePreview}
+              onClick={() => void handlePreview()}
               disabled={previewing || rules.length === 0}
               icon={
                 previewing ? (
@@ -465,7 +465,7 @@ const CarouselBuilder = () => {
             </Button>
             <Button
               variant="primary"
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               disabled={!canSave || saving}
               icon={
                 saving ? (
@@ -687,7 +687,7 @@ const CarouselBuilder = () => {
           }
           error={previewError}
           loading={previewing}
-          onPreview={handlePreview}
+          onPreview={() => void handlePreview()}
         />
 
         {/* Save Hint */}

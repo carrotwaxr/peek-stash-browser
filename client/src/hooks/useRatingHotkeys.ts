@@ -40,7 +40,7 @@ export const useRatingHotkeys = ({
   toggleFavorite = null,
 }: {
   enabled?: boolean;
-  setRating: (rating: any) => void;
+  setRating: (rating: number | null) => void;
   toggleFavorite?: (() => void) | null;
 }) => {
   const ratingModeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -118,7 +118,8 @@ export const useRatingHotkeys = ({
   Object.keys(ratingMap).forEach((key) => {
     shortcuts[key] = () => {
       if (inRatingModeRef.current) {
-        const ratingValue = ratingMap[key];
+        // Every key comes from ratingMap, so the lookup always finds one
+        const ratingValue = ratingMap[key] ?? null;
         setRating(ratingValue);
         exitRatingMode();
       }

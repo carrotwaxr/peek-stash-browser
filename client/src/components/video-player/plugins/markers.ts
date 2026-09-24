@@ -109,7 +109,9 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   addDotMarkers(markers: Marker[]) {
-    markers.forEach(this.addDotMarker, this);
+    markers.forEach((marker) => {
+      this.addDotMarker(marker);
+    });
   }
 
   /**
@@ -250,11 +252,11 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
 
     // Initialize M[j]
     // Compute M[j] for each marker. This is the maximum total duration of markers that don't overlap with marker j
-    const M = new Array(n).fill(0);
+    const M = new Array<number>(n).fill(0);
     for (const [j, markerJ] of markers.entries()) {
       const include =
         (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
-      const exclude = j > 0 ? M[j - 1] : 0;
+      const exclude = j > 0 ? (M[j - 1] ?? 0) : 0;
       M[j] = Math.max(include, exclude);
     }
 
@@ -264,7 +266,7 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
       if (j < 0 || !markerJ) return [];
       const include =
         (markerJ.end_seconds || 0) - markerJ.seconds + (M[p[j]] || 0);
-      const exclude = j > 0 ? M[j - 1] : 0;
+      const exclude = j > 0 ? (M[j - 1] ?? 0) : 0;
       if (include >= exclude) {
         return [...findSolution(p[j]), markerJ];
       } else {
@@ -292,7 +294,9 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
   }
 
   removeMarkers(markers: Marker[]) {
-    markers.forEach(this.removeMarker, this);
+    markers.forEach((marker) => {
+      this.removeMarker(marker);
+    });
   }
 
   clearMarkers() {

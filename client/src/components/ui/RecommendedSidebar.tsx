@@ -31,9 +31,9 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
         setLoading(true);
         setError(null);
 
-        const data = (await apiGet(
+        const data = await apiGet<{ scenes: NormalizedScene[] }>(
           `/library/scenes/${sceneId}/similar?page=1`
-        )) as { scenes: NormalizedScene[] };
+        );
 
         // Only take first 12 scenes for sidebar
         setScenes(data.scenes.slice(0, 12));
@@ -46,13 +46,13 @@ const RecommendedSidebar = ({ sceneId, maxHeight }: Props) => {
     };
 
     if (sceneId) {
-      fetchRecommendedScenes();
+      void fetchRecommendedScenes();
     }
   }, [sceneId]);
 
   const handleSceneClick = (scene: NormalizedScene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
-    navigate(
+    void navigate(
       getEntityPath(
         "scene",
         scene as unknown as Parameters<typeof getEntityPath>[1],

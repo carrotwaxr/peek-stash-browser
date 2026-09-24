@@ -36,15 +36,13 @@ const WallView = ({
     if (!items || !config) return [];
 
     return items.map((item) => {
-      const aspectRatio = config.getAspectRatio(
-        item as Record<string, unknown>
-      );
+      const aspectRatio = config.getAspectRatio(item);
       // react-photo-album needs width/height, we use aspect ratio to derive them
       const baseHeight = targetRowHeight;
       const baseWidth = baseHeight * aspectRatio;
 
       return {
-        src: config.getImageUrl(item as Record<string, unknown>) || "",
+        src: config.getImageUrl(item) || "",
         width: baseWidth,
         height: baseHeight,
         key: item.id as string,

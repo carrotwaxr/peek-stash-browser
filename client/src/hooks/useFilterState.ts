@@ -109,7 +109,7 @@ export const useFilterState = ({
         const presetArtifactType = effectiveContext.startsWith("scene_")
           ? "scene"
           : effectiveContext;
-        const presets = allPresets[presetArtifactType] || [];
+        const presets = allPresets[presetArtifactType] ?? [];
         const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
         // Parse URL params
@@ -189,10 +189,10 @@ export const useFilterState = ({
           perPage: finalState.perPage,
         });
         setSearchTextState(finalState.searchText);
-        setViewModeState(finalState.viewMode as string);
-        setZoomLevelState(finalState.zoomLevel as string);
-        setGridDensityState(finalState.gridDensity as string);
-        setTimelinePeriodState(finalState.timelinePeriod as string | null);
+        setViewModeState(finalState.viewMode);
+        setZoomLevelState(finalState.zoomLevel);
+        setGridDensityState(finalState.gridDensity);
+        setTimelinePeriodState(finalState.timelinePeriod);
       } catch (err) {
         console.error("Error loading presets:", err);
         // Fallback to URL/defaults
@@ -211,17 +211,17 @@ export const useFilterState = ({
           perPage: urlState.perPage,
         });
         setSearchTextState(urlState.searchText);
-        setViewModeState(urlState.viewMode as string);
-        setZoomLevelState(urlState.zoomLevel as string);
-        setGridDensityState(urlState.gridDensity as string);
-        setTimelinePeriodState(urlState.timelinePeriod as string | null);
+        setViewModeState(urlState.viewMode);
+        setZoomLevelState(urlState.zoomLevel);
+        setGridDensityState(urlState.gridDensity);
+        setTimelinePeriodState(urlState.timelinePeriod);
       } finally {
         setIsLoadingPresets(false);
         setIsInitialized(true);
       }
     };
 
-    initialize();
+    void initialize();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup search debounce on unmount
@@ -440,8 +440,7 @@ export const useFilterState = ({
 
   const removeFilter = useCallback(
     (key: string) => {
-      const newFilters: Record<string, any> = { ...filters };
-      delete newFilters[key];
+      const { [key]: _removed, ...newFilters } = filters;
       // Re-apply permanent filters
       Object.assign(newFilters, permanentFilters);
       setFiltersState(newFilters);

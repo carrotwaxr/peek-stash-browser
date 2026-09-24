@@ -14,7 +14,9 @@ const ForgotPasswordPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const handleUsernameSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUsernameSubmit = async (
+    e: React.SubmitEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -35,7 +37,7 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  const handleResetSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleResetSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
@@ -101,7 +103,7 @@ const ForgotPasswordPage = () => {
           <Button
             variant="primary"
             className="w-full"
-            onClick={() => navigate("/login")}
+            onClick={() => void navigate("/login")}
           >
             Go to Login
           </Button>
@@ -142,7 +144,7 @@ const ForgotPasswordPage = () => {
         )}
 
         {step === 1 ? (
-          <form onSubmit={handleUsernameSubmit}>
+          <form onSubmit={(e) => void handleUsernameSubmit(e)}>
             <div className="mb-4">
               <label
                 htmlFor="username"
@@ -186,7 +188,7 @@ const ForgotPasswordPage = () => {
             </div>
           </form>
         ) : (
-          <form onSubmit={handleResetSubmit}>
+          <form onSubmit={(e) => void handleResetSubmit(e)}>
             <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
               Enter your recovery key and choose a new password.
             </p>

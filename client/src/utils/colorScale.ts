@@ -15,9 +15,9 @@ function hexToHSL(hex: string): [number, number, number] {
   hex = hex.replace(/^#/, "");
 
   // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16) / 255;
-  const g = parseInt(hex.substr(2, 2), 16) / 255;
-  const b = parseInt(hex.substr(4, 2), 16) / 255;
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -25,7 +25,7 @@ function hexToHSL(hex: string): [number, number, number] {
 
   let h = 0;
   let s = 0;
-  let l = (max + min) / 2;
+  const l = (max + min) / 2;
 
   if (diff !== 0) {
     s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
@@ -139,9 +139,9 @@ export function generateShadows(
 ): Record<string, string> {
   // Extract RGB from hex for rgba shadows
   const hex = accentColor.replace(/^#/, "");
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
 
   const opacity = mode === "dark" ? [0.05, 0.1, 0.15] : [0.1, 0.15, 0.2];
 
@@ -160,9 +160,9 @@ export function generateShadows(
 export function generateFocusRing(accentColor: string): Record<string, string> {
   // Extract RGB for rgba shadow
   const hex = accentColor.replace(/^#/, "");
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
 
   return {
     "--focus-ring-color": accentColor,
@@ -181,9 +181,9 @@ export function generateFocusRing(accentColor: string): Record<string, string> {
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace(/^#/, "");
   return {
-    r: parseInt(h.substr(0, 2), 16),
-    g: parseInt(h.substr(2, 2), 16),
-    b: parseInt(h.substr(4, 2), 16),
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
   };
 }
 

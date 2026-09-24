@@ -42,7 +42,7 @@ const ContentTab = () => {
       }
     };
 
-    fetchInstances();
+    void fetchInstances();
   }, []);
 
   const handleInstanceToggle = async (instanceId: string) => {
@@ -104,7 +104,7 @@ const ContentTab = () => {
                 <input
                   type="checkbox"
                   checked={selectedIds.includes(instance.id)}
-                  onChange={() => handleInstanceToggle(instance.id)}
+                  onChange={() => void handleInstanceToggle(instance.id)}
                   disabled={saving}
                   className="mt-1 w-4 h-4"
                   style={{ accentColor: "var(--accent-primary)" }}
@@ -183,7 +183,7 @@ const ContentTab = () => {
               <input
                 type="checkbox"
                 checked={hideConfirmationDisabled}
-                onChange={(e) => updateHideConfirmation(e.target.checked)}
+                onChange={(e) => void updateHideConfirmation(e.target.checked)}
                 className="w-5 h-5 cursor-pointer"
                 style={{ accentColor: "var(--accent-primary)" }}
               />

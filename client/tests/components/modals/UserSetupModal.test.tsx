@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userSetupApi } from "../../../src/api";
 import UserSetupModal from "../../../src/components/modals/UserSetupModal";
 import { showError } from "../../../src/utils/toast";
+import { actAsync } from "../../testUtils";
 
 // Mock the API
 vi.mock("../../../src/api", () => ({
@@ -314,7 +315,7 @@ describe("UserSetupModal", () => {
       expect(writeText).toHaveBeenCalledWith(KEY);
       expect(copyButton.querySelector(".lucide-check")).toBeNull();
 
-      await act(async () => {
+      await actAsync(() => {
         resolveWrite();
       });
 

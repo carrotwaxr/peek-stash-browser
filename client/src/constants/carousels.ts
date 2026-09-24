@@ -98,7 +98,7 @@ export const migrateCarouselPreferences = (
 
   // Filter out removed hardcoded carousels (barelyLegalScenes, longScenes, highBitrateScenes)
   const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
-  let validHardcoded = hardcodedPrefs.filter((pref: CarouselPreference) =>
+  const validHardcoded = hardcodedPrefs.filter((pref: CarouselPreference) =>
     validIds.has(pref.id)
   );
 

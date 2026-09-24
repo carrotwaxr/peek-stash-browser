@@ -1,9 +1,10 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useUpdateFavorite } from "../../../src/api/hooks/useFavoriteMutation";
 import { libraryApi } from "../../../src/api/library";
+import { actAsync } from "../../testUtils";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -69,7 +70,7 @@ describe("useUpdateFavorite", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -94,7 +95,7 @@ describe("useUpdateFavorite", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "performer",
         entityId: "perf-1",
@@ -120,7 +121,7 @@ describe("useUpdateFavorite", () => {
 
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -143,7 +144,7 @@ describe("useUpdateFavorite", () => {
 
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "performer",
         entityId: "perf-1",
@@ -164,7 +165,7 @@ describe("useUpdateFavorite", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "unknown" as any,
         entityId: "id-1",
@@ -182,7 +183,7 @@ describe("useUpdateFavorite", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -201,7 +202,7 @@ describe("useUpdateFavorite", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateFavorite(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",

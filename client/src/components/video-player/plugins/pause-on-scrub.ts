@@ -42,9 +42,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     this.originalCurrentTime = null;
     this.wasScrubbing = false;
 
-    // Bind event handlers
-    this.onTimeUpdate = this.onTimeUpdate.bind(this);
-
     // Override currentTime immediately
     this.installCurrentTimeOverride();
 
@@ -60,43 +57,43 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     if (this.originalCurrentTime) return; // Already installed
 
     this.originalCurrentTime = this.player.currentTime.bind(this.player);
-    const self = this;
 
-    this.player.currentTime = function (time?: number) {
+    this.player.currentTime = (time?: number) => {
       // If getting current time (no argument), always use original
       if (time === undefined) {
-        return self.originalCurrentTime!();
+        return this.originalCurrentTime!();
       }
 
       // Check if we're scrubbing using Video.js's state
-      const isScrubbing = self.player.scrubbing();
+      const isScrubbing = this.player.scrubbing();
 
       if (isScrubbing) {
         // Track that we started scrubbing (for detecting wasPlaying state)
-        if (!self.wasScrubbing) {
-          self.wasScrubbing = true;
-          self.wasPlayingBeforeScrub = !self.player.paused() && !self.player.ended();
+        if (!this.wasScrubbing) {
+          this.wasScrubbing = true;
+          this.wasPlayingBeforeScrub = !this.player.paused() && !this.player.ended();
         }
 
         // During scrub: capture the time but don't actually seek
-        self.pendingSeekTime = time;
+        this.pendingSeekTime = time;
         return time;
       }
 
       // Not scrubbing - pass through to original
-      return self.originalCurrentTime!(time);
+      return this.originalCurrentTime!(time);
     };
   }
 
   /**
-   * Called on timeupdate - detect when scrubbing ends
+   * Called on timeupdate - detect when scrubbing ends. An arrow function, so
+   * it can be passed to player.on() and off() as is.
    */
-  onTimeUpdate() {
+  onTimeUpdate = () => {
     // Detect transition from scrubbing to not scrubbing
     if (this.wasScrubbing && !this.player.scrubbing()) {
       this.finalizeScrub();
     }
-  }
+  };
 
   /**
    * Finalize the scrub - seek to final position and resume if needed

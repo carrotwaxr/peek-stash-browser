@@ -112,7 +112,7 @@ vi.mock("@/components/ui/index", () => ({
         data-artifact-type={props.artifactType}
       >
         {typeof children === "function"
-          ? (children as Function)({
+          ? children({
               viewMode: "grid",
               gridDensity: "medium",
               zoomLevel: "medium",

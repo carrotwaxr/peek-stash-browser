@@ -75,7 +75,7 @@ export const useGlobalNavigation = () => {
     shortcuts[key] = () => {
       // Only handle if in navigation mode
       if (inNavModeRef.current) {
-        navigate(path);
+        void navigate(path);
 
         // Exit navigation mode immediately after navigating
         inNavModeRef.current = false;

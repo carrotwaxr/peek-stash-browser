@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedTag } from "@peek/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { type LibrarySearchParams, libraryApi } from "../../api";
 import { ApiError } from "../../api/client";
@@ -117,7 +118,7 @@ const Tags = () => {
       columns,
       totalPages,
       onItemSelect: (tag) =>
-        navigate(getEntityPath("tag", tag, hasMultipleInstances), {
+        void navigate(getEntityPath("tag", tag, hasMultipleInstances), {
           state: { fromPageTitle: "Tags" },
         }),
     });
@@ -202,7 +203,7 @@ const Tags = () => {
               if (viewMode === "table") {
                 return (
                   <TableView
-                    items={currentTags as Record<string, unknown>[]}
+                    items={currentTags}
                     columns={
                       visibleColumns as {
                         id: string;
@@ -264,7 +265,7 @@ const Tags = () => {
                         <TagCard
                           key={tag.id as string}
                           tag={
-                            tag as unknown as import("@peek/shared-types").NormalizedTag & {
+                            tag as unknown as NormalizedTag & {
                               child_count?: number;
                             }
                           }

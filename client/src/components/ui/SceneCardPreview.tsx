@@ -237,7 +237,7 @@ const SceneCardPreview = ({
       }
     };
 
-    loadPreview();
+    void loadPreview();
   }, [
     isHovering,
     isInView,

@@ -45,6 +45,10 @@ interface Props {
   entityType?: string | null;
 }
 
+/** A stored card setting, or the default when it is unset or not a string. */
+const settingText = (value: unknown, fallback: string) =>
+  typeof value === "string" && value ? value : fallback;
+
 const ContextSettings = ({
   settings = [],
   currentValues = {},
@@ -208,7 +212,7 @@ const ContextSettings = ({
                       id={`context-${setting.key}`}
                       value={String(currentValues[setting.key] || "")}
                       onChange={(e) =>
-                        handleSettingChange(setting.key, e.target.value)
+                        void handleSettingChange(setting.key, e.target.value)
                       }
                       disabled={saving}
                       className="w-full px-2 py-1.5 rounded text-sm"
@@ -237,7 +241,7 @@ const ContextSettings = ({
                       type="checkbox"
                       checked={!!currentValues[setting.key]}
                       onChange={(e) =>
-                        handleSettingChange(setting.key, e.target.checked)
+                        void handleSettingChange(setting.key, e.target.checked)
                       }
                       disabled={saving}
                       className="w-4 h-4"
@@ -287,9 +291,12 @@ const ContextSettings = ({
                       </label>
                       <select
                         id="context-defaultViewMode"
-                        value={String(cardSettings?.defaultViewMode || "grid")}
+                        value={settingText(
+                          cardSettings?.defaultViewMode,
+                          "grid"
+                        )}
                         onChange={(e) =>
-                          handleCardSettingChange(
+                          void handleCardSettingChange(
                             "defaultViewMode",
                             e.target.value
                           )
@@ -302,7 +309,7 @@ const ContextSettings = ({
                         }}
                       >
                         {(
-                          getViewModes(entityType!) as Array<{
+                          getViewModes(entityType) as Array<{
                             id: string;
                             label: string;
                           }>
@@ -329,13 +336,17 @@ const ContextSettings = ({
                       <ZoomSlider
                         value={
                           cardSettings?.defaultViewMode === "grid"
-                            ? String(
-                                cardSettings?.defaultGridDensity || "medium"
+                            ? settingText(
+                                cardSettings?.defaultGridDensity,
+                                "medium"
                               )
-                            : String(cardSettings?.defaultWallZoom || "medium")
+                            : settingText(
+                                cardSettings?.defaultWallZoom,
+                                "medium"
+                              )
                         }
                         onChange={(density) =>
-                          handleCardSettingChange(
+                          void handleCardSettingChange(
                             cardSettings?.defaultViewMode === "grid"
                               ? "defaultGridDensity"
                               : "defaultWallZoom",
@@ -346,7 +357,7 @@ const ContextSettings = ({
                     </div>
                   )}
                   {/* Toggle settings */}
-                  {(getAvailableSettings(entityType!) as string[])
+                  {(getAvailableSettings(entityType) as string[])
                     .filter(
                       (key) =>
                         ![
@@ -363,13 +374,9 @@ const ContextSettings = ({
                       >
                         <input
                           type="checkbox"
-                          checked={Boolean(
-                            (cardSettings as Record<string, unknown> | null)?.[
-                              settingKey
-                            ] ?? true
-                          )}
+                          checked={Boolean(cardSettings?.[settingKey] ?? true)}
                           onChange={(e) =>
-                            handleCardSettingChange(
+                            void handleCardSettingChange(
                               settingKey,
                               e.target.checked
                             )

@@ -27,9 +27,9 @@ const GlobalLayout = ({ children }: Props) => {
   useEffect(() => {
     const loadNavPreferences = async () => {
       try {
-        const response = (await apiGet("/user/settings")) as {
+        const response = await apiGet<{
           settings: Record<string, unknown>;
-        };
+        }>("/user/settings");
         const { settings } = response;
         const migratedPrefs = migrateNavPreferences(
           settings.navPreferences as NavPreference[]
@@ -42,7 +42,7 @@ const GlobalLayout = ({ children }: Props) => {
       }
     };
 
-    loadNavPreferences();
+    void loadNavPreferences();
   }, []);
 
   useGlobalNavigation();

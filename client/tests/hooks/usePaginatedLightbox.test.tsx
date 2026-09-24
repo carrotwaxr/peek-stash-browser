@@ -121,7 +121,7 @@ describe("usePaginatedLightbox", () => {
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary!("next");
+        handled = result.current.onPageBoundary("next");
       });
 
       expect(handled).toBe(true);
@@ -142,7 +142,7 @@ describe("usePaginatedLightbox", () => {
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary!("prev");
+        handled = result.current.onPageBoundary("prev");
       });
 
       expect(handled).toBe(true);
@@ -163,7 +163,7 @@ describe("usePaginatedLightbox", () => {
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary!("prev");
+        handled = result.current.onPageBoundary("prev");
       });
 
       expect(handled).toBe(false);
@@ -183,7 +183,7 @@ describe("usePaginatedLightbox", () => {
 
       let handled;
       act(() => {
-        handled = result.current.onPageBoundary!("next");
+        handled = result.current.onPageBoundary("next");
       });
 
       expect(handled).toBe(false);
@@ -288,7 +288,7 @@ describe("usePaginatedLightbox", () => {
 
       // Trigger page boundary navigation (forward)
       act(() => {
-        result.current.onPageBoundary!("next");
+        result.current.onPageBoundary("next");
       });
 
       expect(result.current.isPageTransitioning).toBe(true);
@@ -316,7 +316,7 @@ describe("usePaginatedLightbox", () => {
 
       // Trigger page boundary navigation (backward)
       act(() => {
-        result.current.onPageBoundary!("prev");
+        result.current.onPageBoundary("prev");
       });
 
       // Consume the pending navigation
@@ -341,7 +341,7 @@ describe("usePaginatedLightbox", () => {
 
       // Trigger page boundary navigation
       act(() => {
-        result.current.onPageBoundary!("next");
+        result.current.onPageBoundary("next");
       });
 
       // Consume once

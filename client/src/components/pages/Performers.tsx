@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedPerformer } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
 import { usePerformerList } from "../../api/hooks";
@@ -87,9 +88,12 @@ const Performers = () => {
       columns,
       totalPages,
       onItemSelect: (performer) =>
-        navigate(getEntityPath("performer", performer, hasMultipleInstances), {
-          state: { fromPageTitle: "Performers" },
-        }),
+        void navigate(
+          getEntityPath("performer", performer, hasMultipleInstances),
+          {
+            state: { fromPageTitle: "Performers" },
+          }
+        ),
     });
 
   // Initial focus
@@ -222,7 +226,7 @@ const Performers = () => {
                 )
               ) : viewMode === "table" ? (
                 <TableView
-                  items={currentPerformers as Record<string, unknown>[]}
+                  items={currentPerformers}
                   columns={
                     visibleColumns as {
                       id: string;
@@ -262,7 +266,7 @@ const Performers = () => {
                         <PerformerCard
                           key={performer.id as string}
                           performer={
-                            performer as unknown as import("@peek/shared-types").NormalizedPerformer
+                            performer as unknown as NormalizedPerformer
                           }
                           isTVMode={isTVMode}
                           fromPageTitle="Performers"

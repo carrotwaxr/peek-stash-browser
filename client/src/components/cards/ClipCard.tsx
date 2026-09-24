@@ -186,7 +186,7 @@ const ClipCard = forwardRef<HTMLDivElement, Props>(
       if (onClick) {
         onClick(clip);
       } else {
-        navigate(clipUrl, {
+        void navigate(clipUrl, {
           state: { fromPageTitle, shouldAutoplay: true },
         });
       }

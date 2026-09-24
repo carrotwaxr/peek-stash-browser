@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedGroup } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
 import { useGroupList } from "../../api/hooks";
@@ -86,7 +87,7 @@ const Groups = () => {
       columns,
       totalPages,
       onItemSelect: (group) =>
-        navigate(getEntityPath("group", group, hasMultipleInstances), {
+        void navigate(getEntityPath("group", group, hasMultipleInstances), {
           state: { fromPageTitle: "Collections" },
         }),
     });
@@ -201,7 +202,7 @@ const Groups = () => {
                 )
               ) : viewMode === "table" ? (
                 <TableView
-                  items={currentGroups as Record<string, unknown>[]}
+                  items={currentGroups}
                   columns={
                     visibleColumns as {
                       id: string;
@@ -242,7 +243,7 @@ const Groups = () => {
                         <GroupCard
                           key={group.id as string}
                           group={
-                            group as unknown as import("@peek/shared-types").NormalizedGroup & {
+                            group as unknown as NormalizedGroup & {
                               sub_group_count?: number;
                               description?: string | null;
                             }

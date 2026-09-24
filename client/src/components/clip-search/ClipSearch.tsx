@@ -144,9 +144,8 @@ const ClipSearch = ({
       }
 
       // Merge permanent filters
-      if ((permanentFilters as Record<string, unknown>).sceneId) {
-        params.sceneId = (permanentFilters as Record<string, unknown>)
-          .sceneId as string;
+      if (permanentFilters.sceneId) {
+        params.sceneId = permanentFilters.sceneId as string;
       }
 
       setClipQueryParams(params);
@@ -155,7 +154,7 @@ const ClipSearch = ({
   );
 
   const handleClipClick = (clip: Record<string, unknown>) => {
-    navigate(
+    void navigate(
       getScenePathWithTime(
         {
           id: clip.sceneId as string,

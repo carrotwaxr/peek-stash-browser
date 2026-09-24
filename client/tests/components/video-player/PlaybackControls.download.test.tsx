@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as uiModule from "@/components/ui/index";
 import PlaybackControls from "@/components/video-player/PlaybackControls";
 
 const mockApiPost = vi.fn();
@@ -40,7 +41,7 @@ vi.mock("@/themes/useTheme", () => ({
 
 // These two need a QueryClient; the download button doesn't.
 vi.mock("@/components/ui/index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/components/ui/index")>()),
+  ...(await importOriginal<typeof uiModule>()),
   OCounterButton: () => null,
   AddToPlaylistButton: () => null,
 }));

@@ -114,7 +114,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
             continue;
           }
           // One setting per type: the OR of its rows, and stored means set
-          state.restrictEmpty = state.restrictEmpty || !!row.restrictEmpty;
+          state.restrictEmpty = state.restrictEmpty || row.restrictEmpty;
           state.restrictEmptyTouched = true;
         }
         if (!cancelled) setRestrictions(next);
@@ -458,7 +458,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }: Props) => {
 
             <div className="flex gap-3 pt-4">
               <Button
-                onClick={handleSave}
+                onClick={() => void handleSave()}
                 disabled={saving || loading}
                 variant="primary"
                 fullWidth

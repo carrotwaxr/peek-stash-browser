@@ -118,7 +118,7 @@ const UserStats = () => {
   const { data, loading, error, refresh } = useUserStats({ sortBy });
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     setRefreshing(true);
     try {
       refresh();

@@ -36,7 +36,7 @@ const UserMenu = () => {
   }, [isOpen]);
 
   const handleLogout = () => {
-    logout();
+    void logout();
     setIsOpen(false);
   };
 

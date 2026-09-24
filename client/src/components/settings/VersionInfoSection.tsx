@@ -51,8 +51,8 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
   }, []);
 
   useEffect(() => {
-    loadServerVersion();
-    checkForUpdates();
+    void loadServerVersion();
+    void checkForUpdates();
   }, [loadServerVersion, checkForUpdates]);
 
   const parseVersion = (v: string) => {
@@ -95,7 +95,7 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
             </Paper.Subtitle>
           </div>
           <Button
-            onClick={checkForUpdates}
+            onClick={() => void checkForUpdates()}
             disabled={checkingUpdate}
             variant="secondary"
             loading={checkingUpdate}

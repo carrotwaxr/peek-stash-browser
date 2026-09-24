@@ -132,7 +132,7 @@ export function useFullscreen({
 
         // Auto-fullscreen on landscape if: not already fullscreen and user hasn't declined
         if (isLandscape && !isCurrentlyFullscreen && !userDeclinedRef.current) {
-          enterFullscreen();
+          void enterFullscreen();
         }
       }, 150); // 150ms delay for dimensions to settle
     };

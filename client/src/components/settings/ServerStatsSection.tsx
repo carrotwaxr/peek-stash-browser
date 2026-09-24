@@ -73,7 +73,7 @@ const ServerStatsSection = () => {
       setRefreshingCache(true);
       await apiPost("/stats/refresh-cache");
       // Wait a moment then reload stats to show refreshing status
-      setTimeout(loadStats, 500);
+      setTimeout(() => void loadStats(), 500);
     } catch (err) {
       console.error("Failed to refresh cache:", err);
       // Silently fail - will show error in console
@@ -96,7 +96,7 @@ const ServerStatsSection = () => {
         updated: data.updated,
       });
       // Reload stats to reflect updated counts
-      loadStats();
+      void loadStats();
     } catch (err) {
       console.error("Failed to re-probe clips:", err);
       setReprobeResult({
@@ -109,9 +109,9 @@ const ServerStatsSection = () => {
   };
 
   useEffect(() => {
-    loadStats();
+    void loadStats();
     // Auto-refresh every 10 seconds
-    const interval = setInterval(loadStats, 10000);
+    const interval = setInterval(() => void loadStats(), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -186,7 +186,7 @@ const ServerStatsSection = () => {
               Library Statistics
             </h3>
             <Button
-              onClick={refreshCache}
+              onClick={() => void refreshCache()}
               disabled={refreshingCache || stats.cache?.isRefreshing}
               variant="secondary"
               size="sm"
@@ -299,7 +299,7 @@ const ServerStatsSection = () => {
                   </p>
                 </div>
                 <Button
-                  onClick={reprobeClips}
+                  onClick={() => void reprobeClips()}
                   disabled={reprobingClips || stats.cache?.isRefreshing}
                   variant="secondary"
                   size="sm"

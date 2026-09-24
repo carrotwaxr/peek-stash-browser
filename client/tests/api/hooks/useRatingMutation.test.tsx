@@ -1,9 +1,10 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useUpdateRating } from "../../../src/api/hooks/useRatingMutation";
 import { libraryApi } from "../../../src/api/library";
+import { actAsync } from "../../testUtils";
 
 vi.mock("../../../src/api/library", () => ({
   libraryApi: {
@@ -69,7 +70,7 @@ describe("useUpdateRating", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -94,7 +95,7 @@ describe("useUpdateRating", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -119,7 +120,7 @@ describe("useUpdateRating", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "performer",
         entityId: "perf-1",
@@ -145,7 +146,7 @@ describe("useUpdateRating", () => {
 
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -168,7 +169,7 @@ describe("useUpdateRating", () => {
 
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "performer",
         entityId: "perf-1",
@@ -189,7 +190,7 @@ describe("useUpdateRating", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "scene",
         entityId: "scene-1",
@@ -208,7 +209,7 @@ describe("useUpdateRating", () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateRating(), { wrapper });
 
-    await act(async () => {
+    await actAsync(() => {
       result.current.mutate({
         entityType: "unknown" as any,
         entityId: "id-1",

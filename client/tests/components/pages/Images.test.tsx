@@ -1,5 +1,6 @@
 import React from "react";
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { actAsync } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import Images from "@/components/pages/Images";
@@ -148,7 +149,7 @@ vi.mock("@/components/ui/index", () => ({
         data-artifact-type={props.artifactType}
       >
         {typeof children === "function"
-          ? (children as Function)({
+          ? children({
               viewMode: "grid",
               gridDensity: "medium",
               zoomLevel: "medium",
@@ -302,7 +303,7 @@ describe("Images", () => {
         error: null,
       });
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Images />);
       });
       const cards = screen.getAllByTestId("image-card");
@@ -328,7 +329,7 @@ describe("Images", () => {
         error: null,
       });
 
-      await act(async () => {
+      await actAsync(() => {
         render(<Images />);
       });
       expect(screen.getByTestId("lightbox")).toBeInTheDocument();

@@ -298,7 +298,7 @@ export default function ExternalPlayerButton({
           >
             {/* Copy Stream URL option */}
             <button
-              onClick={handleCopyUrl}
+              onClick={(e) => void handleCopyUrl(e)}
               disabled={!streamUrl}
               className="w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-white transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
               style={{ color: "var(--text-primary)" }}

@@ -27,7 +27,7 @@ export const useHideBulkAction = ({
 
   const handleHideClick = () => {
     if (hideConfirmationDisabled) {
-      handleHideConfirm(true);
+      void handleHideConfirm(true);
     } else {
       setHideDialogOpen(true);
     }

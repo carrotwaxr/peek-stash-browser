@@ -64,7 +64,7 @@ const SettingsPage = () => {
   // Redirect if non-admin tries to access server section
   useEffect(() => {
     if (sectionParam === "server" && !isAdmin) {
-      navigate("/settings?section=user&tab=theme", { replace: true });
+      void navigate("/settings?section=user&tab=theme", { replace: true });
     }
   }, [sectionParam, isAdmin, navigate]);
 
@@ -80,7 +80,7 @@ const SettingsPage = () => {
       const params = new URLSearchParams();
       params.set("section", activeSection);
       params.set("tab", defaultTab);
-      navigate(`/settings?${params.toString()}`, { replace: true });
+      void navigate(`/settings?${params.toString()}`, { replace: true });
     }
   }, [tabParam, activeSection, defaultTab, tabs, navigate]);
 
@@ -88,7 +88,7 @@ const SettingsPage = () => {
   const handleSectionChange = (newSection: string) => {
     const newDefaultTab =
       newSection === "user" ? USER_TABS[0].id : SERVER_TABS[0].id;
-    navigate(`/settings?section=${newSection}&tab=${newDefaultTab}`, {
+    void navigate(`/settings?section=${newSection}&tab=${newDefaultTab}`, {
       replace: true,
     });
   };
@@ -97,7 +97,7 @@ const SettingsPage = () => {
   const handleTabChange = (newTab: string) => {
     const params = new URLSearchParams(searchParams);
     params.set("tab", newTab);
-    navigate(`/settings?${params.toString()}`, { replace: true });
+    void navigate(`/settings?${params.toString()}`, { replace: true });
   };
 
   return (

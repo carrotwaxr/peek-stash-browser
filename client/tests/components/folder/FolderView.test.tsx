@@ -35,7 +35,7 @@ const sampleItems = [
 
 describe("FolderView", () => {
   describe("pagination state on folder navigation", () => {
-    it("resets page to 1 when navigating into a folder", async () => {
+    it("resets page to 1 when navigating into a folder", () => {
       // Start on page 5
       const Wrapper = createWrapper(["/?page=5"]);
       const onFolderPathChange = vi.fn();
@@ -69,7 +69,7 @@ describe("FolderView", () => {
       expect(capturedSearchParams!.get("page")).toBeNull();
     });
 
-    it("resets page to 1 when navigating out of a folder via breadcrumb", async () => {
+    it("resets page to 1 when navigating out of a folder via breadcrumb", () => {
       // Start inside a folder on page 3
       const Wrapper = createWrapper(["/?folderPath=tag1&page=3"]);
       const onFolderPathChange = vi.fn();
@@ -103,7 +103,7 @@ describe("FolderView", () => {
       expect(capturedSearchParams!.get("page")).toBeNull();
     });
 
-    it("resets page when clicking deeper into nested folders", async () => {
+    it("resets page when clicking deeper into nested folders", () => {
       // Start inside Photo folder on page 2
       const Wrapper = createWrapper(["/?folderPath=tag1&page=2"]);
       const onFolderPathChange = vi.fn();

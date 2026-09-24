@@ -255,7 +255,7 @@ describe("BaseCard menu placement logic", () => {
       title: "Test",
       ratingControlsProps,
     });
-    expect(element.props.ratingControlsProps!.showMenu).toBe(true);
+    expect(element.props.ratingControlsProps.showMenu).toBe(true);
   });
 
   it("accepts showMenu=false to hide menu", () => {
@@ -272,7 +272,7 @@ describe("BaseCard menu placement logic", () => {
       title: "Test",
       ratingControlsProps,
     });
-    expect(element.props.ratingControlsProps!.showMenu).toBe(false);
+    expect(element.props.ratingControlsProps.showMenu).toBe(false);
   });
 
   it("defaults showMenu to true when not specified", () => {

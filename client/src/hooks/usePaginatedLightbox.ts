@@ -38,7 +38,7 @@ export function usePaginatedLightbox({
   const [internalPage, setInternalPage] = useState(1);
 
   // Use external page if provided, otherwise internal
-  const currentPage = externalPage !== undefined ? externalPage : internalPage;
+  const currentPage = externalPage ?? internalPage;
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);

@@ -329,7 +329,11 @@ const SyncFromStashModal = ({ user, onClose, onSyncComplete }: Props) => {
             <div className="flex gap-3 pt-4">
               {!syncing && !syncResult && (
                 <>
-                  <Button onClick={syncFromStash} variant="primary" fullWidth>
+                  <Button
+                    onClick={() => void syncFromStash()}
+                    variant="primary"
+                    fullWidth
+                  >
                     Start Sync
                   </Button>
                   <Button onClick={handleClose} variant="secondary">

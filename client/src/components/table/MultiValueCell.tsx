@@ -40,7 +40,7 @@ const MultiValueCell = ({ items, maxVisible = 2, emptyText = "-" }: Props) => {
     const GAP = 4;
     const EDGE_PADDING = 16;
 
-    let top = buttonRect.bottom + GAP;
+    const top = buttonRect.bottom + GAP;
     let left = buttonRect.left;
 
     // Check if popover would go off the right edge

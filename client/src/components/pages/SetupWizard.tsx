@@ -466,7 +466,7 @@ const SignInToFinishStep = ({ onSignIn }: SignInToFinishStepProps) => {
   const [error, setError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
 
-  const signIn = async (e: React.FormEvent) => {
+  const signIn = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setSigningIn(true);
     setError("");
@@ -489,7 +489,7 @@ const SignInToFinishStep = ({ onSignIn }: SignInToFinishStepProps) => {
   };
 
   return (
-    <form className="space-y-6" onSubmit={signIn}>
+    <form className="space-y-6" onSubmit={(e) => void signIn(e)}>
       <div>
         <h2
           className="text-2xl font-bold mb-2"
@@ -771,7 +771,7 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
               setConfirmPassword(e.target.value)
             }
             onBack={() => setCurrentStep(0)}
-            onSubmit={createAdminUser}
+            onSubmit={() => void createAdminUser()}
           />
         );
       case 2:
@@ -799,13 +799,13 @@ const SetupWizard = ({ onSetupComplete, setupStatus }: SetupWizardProps) => {
               setStashApiKey(e.target.value);
               setTestSuccess(false); // Reset test status when API key changes
             }}
-            onTestConnection={testStashConnection}
+            onTestConnection={() => void testStashConnection()}
             onBack={() => {
               setCurrentStep(1);
               setError("");
               setTestSuccess(false);
             }}
-            onSubmit={createStashInstance}
+            onSubmit={() => void createStashInstance()}
           />
         );
       case 3:

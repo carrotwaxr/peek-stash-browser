@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import type { NormalizedStudio } from "@peek/shared-types";
 import { type LibrarySearchParams } from "../../api";
 import { ApiError } from "../../api/client";
 import { useStudioList } from "../../api/hooks";
@@ -86,7 +87,7 @@ const Studios = () => {
       columns,
       totalPages,
       onItemSelect: (studio) =>
-        navigate(getEntityPath("studio", studio, hasMultipleInstances), {
+        void navigate(getEntityPath("studio", studio, hasMultipleInstances), {
           state: { fromPageTitle: "Studios" },
         }),
     });
@@ -201,7 +202,7 @@ const Studios = () => {
                 )
               ) : viewMode === "table" ? (
                 <TableView
-                  items={currentStudios as Record<string, unknown>[]}
+                  items={currentStudios}
                   columns={
                     visibleColumns as {
                       id: string;
@@ -241,9 +242,7 @@ const Studios = () => {
                       return (
                         <StudioCard
                           key={studio.id as string}
-                          studio={
-                            studio as unknown as import("@peek/shared-types").NormalizedStudio
-                          }
+                          studio={studio as unknown as NormalizedStudio}
                           fromPageTitle="Studios"
                           tabIndex={isTVMode ? _tabIndex : -1}
                           {...restItemProps}

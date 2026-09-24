@@ -31,20 +31,12 @@ export function useMediaQuery(query: string) {
       setMatches(event.matches);
     };
 
-    // Modern browsers support addEventListener, older use addListener
-    if (mediaQueryList.addEventListener) {
-      mediaQueryList.addEventListener("change", handleChange);
-    } else {
-      // Fallback for older browsers (Safari < 14)
-      mediaQueryList.addListener(handleChange);
-    }
+    // Every browser the build targets (Safari 16 and later) has
+    // addEventListener here; addListener was the Safari < 14 fallback
+    mediaQueryList.addEventListener("change", handleChange);
 
     return () => {
-      if (mediaQueryList.removeEventListener) {
-        mediaQueryList.removeEventListener("change", handleChange);
-      } else {
-        mediaQueryList.removeListener(handleChange);
-      }
+      mediaQueryList.removeEventListener("change", handleChange);
     };
   }, [query]);
 

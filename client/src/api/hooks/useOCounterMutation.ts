@@ -37,10 +37,14 @@ export function useIncrementOCounter() {
     },
     onSuccess: (_data, { sceneId, imageId }) => {
       if (sceneId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scenes.all() });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.scenes.all(),
+        });
       }
       if (imageId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.images.all() });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.images.all(),
+        });
       }
     },
   });

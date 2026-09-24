@@ -429,16 +429,16 @@ const Lightbox = ({
       handleOCounterChange(newCount);
       imageViewHistoryApi
         .incrementO(currentImage.id, currentImage.instanceId)
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error("Failed to increment O counter:", err);
         });
       setDoubleTapFeedback("o_counter");
     } else if (doubleTapAction === "fullscreen") {
-      toggleFullscreen();
+      void toggleFullscreen();
       setDoubleTapFeedback("fullscreen");
     } else {
       const newFavoriteValue = !isFavorite;
-      handleFavoriteChange(newFavoriteValue);
+      void handleFavoriteChange(newFavoriteValue);
       setDoubleTapFeedback(
         newFavoriteValue ? "favorite_add" : "favorite_remove"
       );
@@ -590,7 +590,7 @@ const Lightbox = ({
     viewTimerRef.current = setTimeout(() => {
       imageViewHistoryApi
         .recordView(currentImage.id, currentImage.instanceId)
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error("Failed to record image view:", err);
         });
       viewTimerRef.current = null;
@@ -608,8 +608,8 @@ const Lightbox = ({
   // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
   useRatingHotkeys({
     enabled: isOpen && images.length > 0,
-    setRating: handleRatingChange,
-    toggleFavorite: () => handleFavoriteChange(!isFavorite),
+    setRating: (newRating) => void handleRatingChange(newRating),
+    toggleFavorite: () => void handleFavoriteChange(!isFavorite),
   });
 
   // Auto-advance slideshow
@@ -668,7 +668,7 @@ const Lightbox = ({
           break;
         case "f":
         case "F":
-          toggleFullscreen();
+          void toggleFullscreen();
           break;
         default:
           break;
@@ -873,7 +873,7 @@ const Lightbox = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleFullscreen();
+                void toggleFullscreen();
               }}
               className="p-2 rounded-full transition-colors"
               style={{
@@ -1095,8 +1095,10 @@ const Lightbox = ({
         rating={rating}
         isFavorite={isFavorite}
         oCounter={oCounter}
-        onRatingChange={handleRatingChange}
-        onFavoriteChange={handleFavoriteChange}
+        onRatingChange={(newRating) => void handleRatingChange(newRating)}
+        onFavoriteChange={(newFavorite) =>
+          void handleFavoriteChange(newFavorite)
+        }
         onOCounterChange={handleOCounterChange}
       />
     </div>

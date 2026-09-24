@@ -56,7 +56,7 @@ const VideoPlayer = () => {
         console.error("Failed to fetch user settings:", error);
       }
     };
-    fetchSettings();
+    void fetchSettings();
   }, []);
 
   // ============================================================================
@@ -100,8 +100,8 @@ const VideoPlayer = () => {
       }
       try {
         const response: any = await getClipsForScene(
-          scene.id as string,
-          scene.instanceId as string,
+          scene.id,
+          scene.instanceId,
           true
         );
         setClips(response.clips || []);
@@ -110,7 +110,7 @@ const VideoPlayer = () => {
         setClips([]);
       }
     }
-    fetchClips();
+    void fetchClips();
   }, [scene?.id, scene?.instanceId]);
 
   // Add clip markers to timeline using the markers plugin

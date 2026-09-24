@@ -1,3 +1,4 @@
+import type * as routerModule from "react-router-dom";
 import { render } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,7 +40,7 @@ vi.mock("../../../src/contexts/CardDisplaySettingsContext", () => ({
 
 // Mock react-router-dom's useNavigate to avoid requiring router context
 vi.mock("react-router-dom", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router-dom")>();
+  const actual = await importOriginal<typeof routerModule>();
   return {
     ...actual,
     useNavigate: () => vi.fn(),
@@ -84,7 +85,7 @@ describe("SceneCard (TV Mode) preview activation wiring", () => {
     render(<SceneCard scene={scene} tvPreviewActive={true} tabIndex={0} />);
 
     expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0] as any;
+    const props = must(previewSpy.mock.calls[0])[0];
 
     expect(props.disableHover).toBe(true);
     expect(props.active).toBe(true);
@@ -96,7 +97,7 @@ describe("SceneCard (TV Mode) preview activation wiring", () => {
     render(<SceneCard scene={scene} tvPreviewActive={false} tabIndex={-1} />);
 
     expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0] as any;
+    const props = must(previewSpy.mock.calls[0])[0];
 
     expect(props.disableHover).toBe(true);
     expect(props.active).toBe(false);
@@ -108,7 +109,7 @@ describe("SceneCard (TV Mode) preview activation wiring", () => {
     render(<SceneCard scene={scene} tvPreviewActive={true} tabIndex={0} />);
 
     expect(previewSpy).toHaveBeenCalledTimes(1);
-    const props = must(previewSpy.mock.calls[0])[0] as any;
+    const props = must(previewSpy.mock.calls[0])[0];
 
     expect(props.disableHover).toBe(false);
     expect(props.active).toBeUndefined();

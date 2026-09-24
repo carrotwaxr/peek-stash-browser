@@ -123,7 +123,7 @@ const PlaylistDetail = () => {
   usePageTitle((playlist?.name as string) || "Playlist");
 
   useEffect(() => {
-    loadPlaylist();
+    void loadPlaylist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistId]); // loadPlaylist is stable and doesn't need to be in dependencies
 
@@ -138,7 +138,7 @@ const PlaylistDetail = () => {
         console.error("Failed to fetch permissions:", error);
       }
     };
-    fetchPermissions();
+    void fetchPermissions();
   }, []);
 
   const loadPlaylist = async () => {
@@ -183,7 +183,7 @@ const PlaylistDetail = () => {
     }
   };
 
-  const updatePlaylist = async (e: React.FormEvent<HTMLFormElement>) => {
+  const updatePlaylist = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       await apiPut(`/playlists/${playlistId}`, {
@@ -192,7 +192,7 @@ const PlaylistDetail = () => {
       });
       showSuccess("Playlist updated successfully!");
       setIsEditing(false);
-      loadPlaylist();
+      void loadPlaylist();
     } catch {
       showError("Failed to update playlist");
     }
@@ -208,7 +208,7 @@ const PlaylistDetail = () => {
 
     try {
       await apiDelete(
-        `/playlists/${playlistId}/items/${sceneToRemove.sceneId}`
+        `/playlists/${playlistId}/items/${String(sceneToRemove.sceneId)}`
       );
       // Optimistically update local state instead of refetching
       setScenes((prev) =>
@@ -294,13 +294,13 @@ const PlaylistDetail = () => {
     } catch {
       showError("Failed to save playlist order");
       // Reload to reset order
-      loadPlaylist();
+      void loadPlaylist();
     }
   };
 
   const cancelReorder = () => {
     setReorderMode(false);
-    loadPlaylist(); // Reset to original order
+    void loadPlaylist(); // Reset to original order
   };
 
   const toggleShuffle = async () => {
@@ -348,7 +348,7 @@ const PlaylistDetail = () => {
       const startScene = validScenes[startIndex];
       if (!startScene) return;
 
-      navigate(
+      void navigate(
         getEntityPath(
           "scene",
           startScene.scene as Record<string, unknown>,
@@ -382,7 +382,7 @@ const PlaylistDetail = () => {
   const handleDownload = async () => {
     try {
       setDownloading(true);
-      await apiPost(`/downloads/playlist/${playlist!.id}`);
+      await apiPost(`/downloads/playlist/${String(playlist!.id)}`);
       showSuccess("Download started - check Downloads page for progress");
     } catch (err) {
       const error = err as ApiError;
@@ -404,7 +404,9 @@ const PlaylistDetail = () => {
       setDuplicating(true);
       const result = await duplicatePlaylist(parseInt(playlistId!, 10));
       showSuccess("Playlist duplicated!");
-      navigate(`/playlist/${(result.playlist as Record<string, unknown>).id}`);
+      void navigate(
+        `/playlist/${String((result.playlist as Record<string, unknown>).id)}`
+      );
     } catch {
       showError("Failed to duplicate playlist");
     } finally {
@@ -424,7 +426,7 @@ const PlaylistDetail = () => {
 
     for (const scene of selectedScenes) {
       try {
-        await apiDelete(`/playlists/${playlistId}/items/${scene.id}`);
+        await apiDelete(`/playlists/${playlistId}/items/${String(scene.id)}`);
         successCount++;
       } catch {
         failCount++;
@@ -530,7 +532,7 @@ const PlaylistDetail = () => {
                 {/* Download button: owner or shared viewer with the permission */}
                 {!!permissions?.canDownloadPlaylists && scenes.length > 0 && (
                   <Button
-                    onClick={handleDownload}
+                    onClick={() => void handleDownload()}
                     variant="secondary"
                     disabled={downloading}
                     icon={<ThemedIcon name="download" size={16} />}
@@ -557,7 +559,7 @@ const PlaylistDetail = () => {
                 {/* Duplicate button - non-owners only */}
                 {!isOwner && (
                   <Button
-                    onClick={handleDuplicate}
+                    onClick={() => void handleDuplicate()}
                     variant="secondary"
                     disabled={duplicating}
                     icon={<Copy size={16} />}
@@ -575,7 +577,7 @@ const PlaylistDetail = () => {
               <>
                 {/* Save Order button */}
                 <Button
-                  onClick={saveReorder}
+                  onClick={() => void saveReorder()}
                   variant="primary"
                   icon={<Save size={16} className="sm:w-4 sm:h-4" />}
                   title="Save Order"
@@ -599,7 +601,7 @@ const PlaylistDetail = () => {
               <>
                 {/* Shuffle button */}
                 <Button
-                  onClick={toggleShuffle}
+                  onClick={() => void toggleShuffle()}
                   variant="secondary"
                   className="p-1.5 sm:p-2"
                   {...(shuffle && {
@@ -614,7 +616,7 @@ const PlaylistDetail = () => {
 
                 {/* Repeat button */}
                 <Button
-                  onClick={cycleRepeat}
+                  onClick={() => void cycleRepeat()}
                   variant="secondary"
                   className="p-1.5 sm:p-2"
                   {...(repeat !== "none" && {
@@ -656,7 +658,7 @@ const PlaylistDetail = () => {
           </div>
 
           {isEditing ? (
-            <form onSubmit={updatePlaylist}>
+            <form onSubmit={(e) => void updatePlaylist(e)}>
               <Paper className="max-w-2xl">
                 <Paper.Body className="space-y-4">
                   <div>
@@ -1006,7 +1008,7 @@ const PlaylistDetail = () => {
           setRemoveConfirmOpen(false);
           setSceneToRemove(null);
         }}
-        onConfirm={confirmRemove}
+        onConfirm={() => void confirmRemove()}
         title="Remove Scene"
         message={`Remove "${
           sceneToRemove?.scene
@@ -1022,7 +1024,7 @@ const PlaylistDetail = () => {
       <ConfirmDialog
         isOpen={bulkRemoveConfirmOpen}
         onClose={() => setBulkRemoveConfirmOpen(false)}
-        onConfirm={confirmBulkRemove}
+        onConfirm={() => void confirmBulkRemove()}
         title="Remove Scenes"
         message={`Remove ${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""} from this playlist?`}
         confirmText="Remove"

@@ -105,7 +105,7 @@ const MediaImage = ({
       className={className}
       style={style}
       onLoad={onLoad}
-      onError={handleImageError}
+      onError={() => void handleImageError()}
       {...props}
     />
   );

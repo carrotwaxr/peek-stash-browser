@@ -103,7 +103,7 @@ const UserEditModalContent = ({
     };
 
     if (user?.id) {
-      loadUserGroups();
+      void loadUserGroups();
     }
   }, [user?.id]);
 
@@ -121,7 +121,7 @@ const UserEditModalContent = ({
     };
 
     if (user?.id) {
-      loadPermissions();
+      void loadPermissions();
     }
   }, [user?.id, userGroups]); // Re-fetch when groups change
 
@@ -153,7 +153,7 @@ const UserEditModalContent = ({
       const overrideKey = `${permissionKey}Override`;
       const response = (await updateUserPermissionOverrides(user.id, {
         [overrideKey]: newValue,
-      })) as unknown as { permissions: UserPermissions };
+      })) as { permissions: UserPermissions };
       setPermissions(response.permissions);
       onMessage?.(`Permission updated for ${user.username}`);
       setHasChanges(true);
@@ -436,7 +436,7 @@ const UserEditModalContent = ({
                             type="checkbox"
                             checked={isMember}
                             onChange={() =>
-                              handleGroupToggle(group.id, isMember)
+                              void handleGroupToggle(group.id, isMember)
                             }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
@@ -509,7 +509,7 @@ const UserEditModalContent = ({
                           }
                           onChange={(e) => {
                             const val = e.target.value;
-                            handlePermissionOverride(
+                            void handlePermissionOverride(
                               "canShare",
                               val === "inherit" ? null : val === "true"
                             );
@@ -555,7 +555,7 @@ const UserEditModalContent = ({
                           }
                           onChange={(e) => {
                             const val = e.target.value;
-                            handlePermissionOverride(
+                            void handlePermissionOverride(
                               "canDownloadFiles",
                               val === "inherit" ? null : val === "true"
                             );
@@ -602,7 +602,7 @@ const UserEditModalContent = ({
                           }
                           onChange={(e) => {
                             const val = e.target.value;
-                            handlePermissionOverride(
+                            void handlePermissionOverride(
                               "canDownloadPlaylists",
                               val === "inherit" ? null : val === "true"
                             );
@@ -714,7 +714,7 @@ const UserEditModalContent = ({
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={handleResetPassword}
+                          onClick={() => void handleResetPassword()}
                           disabled={loading}
                         >
                           Set
@@ -742,7 +742,7 @@ const UserEditModalContent = ({
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={handleRegenerateRecoveryKey}
+                          onClick={() => void handleRegenerateRecoveryKey()}
                           disabled={loading}
                         >
                           <Key size={14} className="mr-1" />
@@ -751,7 +751,7 @@ const UserEditModalContent = ({
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={handleDeleteUser}
+                          onClick={() => void handleDeleteUser()}
                           disabled={loading}
                         >
                           <Trash2 size={14} className="mr-1" />
@@ -813,7 +813,7 @@ const UserEditModalContent = ({
             variant="primary"
             disabled={!hasChanges || loading}
             loading={loading}
-            onClick={handleSave}
+            onClick={() => void handleSave()}
           >
             Save Changes
           </Button>

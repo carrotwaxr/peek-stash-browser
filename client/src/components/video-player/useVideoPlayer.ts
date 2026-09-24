@@ -161,7 +161,7 @@ export function useVideoPlayer({
   minimumPlayPercent = 20,
 }: {
   videoRef: React.RefObject<HTMLDivElement | null>;
-  playerRef: React.MutableRefObject<any>;
+  playerRef: React.RefObject<any>;
   scene: any;
   quality: string;
   isAutoFallback: boolean;
@@ -174,8 +174,8 @@ export function useVideoPlayer({
   prevScene: () => void;
   updateQuality: (quality: string) => void;
   location: any;
-  hasResumedRef: React.MutableRefObject<boolean>;
-  initialResumeTimeRef: React.MutableRefObject<number | null>;
+  hasResumedRef: React.RefObject<boolean>;
+  initialResumeTimeRef: React.RefObject<number | null>;
   watchHistory: any;
   loadingWatchHistory: boolean;
   enableCast?: boolean;

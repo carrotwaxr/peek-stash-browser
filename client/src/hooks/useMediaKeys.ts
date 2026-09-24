@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo } from "react";
+import type React from "react";
+import { useEffect, useMemo } from "react";
 import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts";
 import { isInRatingMode } from "./useRatingHotkeys";
 
@@ -31,7 +32,7 @@ interface VideoPlayer {
 }
 
 interface UsePlaylistMediaKeysOptions {
-  playerRef: React.MutableRefObject<VideoPlayer | null>;
+  playerRef: React.RefObject<VideoPlayer | null>;
   playlist: { scenes?: unknown[] } | null;
   playNext: (() => void) | null;
   playPrevious: (() => void) | null;
@@ -318,7 +319,7 @@ export const usePlaylistMediaKeys = ({
  * @param {number} percentage - Percentage (0-100)
  */
 function jumpToPercentage(
-  playerRef: React.MutableRefObject<VideoPlayer | null>,
+  playerRef: React.RefObject<VideoPlayer | null>,
   percentage: number
 ) {
   const player = playerRef.current;

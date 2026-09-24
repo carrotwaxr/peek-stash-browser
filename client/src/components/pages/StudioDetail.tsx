@@ -135,7 +135,7 @@ const StudioDetail = () => {
       }
     };
 
-    fetchStudio();
+    void fetchStudio();
   }, [studioId, instanceId]);
 
   const handleRatingChange = async (newRating: number | null) => {
@@ -164,14 +164,14 @@ const StudioDetail = () => {
   };
 
   const toggleFavorite = () => {
-    handleFavoriteChange(!isFavorite);
+    void handleFavoriteChange(!isFavorite);
   };
 
   // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
 
   useRatingHotkeys({
     enabled: !isLoading && !!studio,
-    setRating: handleRatingChange,
+    setRating: (newRating) => void handleRatingChange(newRating),
     toggleFavorite,
   });
 
@@ -182,6 +182,8 @@ const StudioDetail = () => {
       </div>
     );
   }
+
+  const studioName = typeof studio?.name === "string" ? studio.name : "";
 
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
@@ -210,7 +212,9 @@ const StudioDetail = () => {
                   {!!settings.showFavorite && (
                     <FavoriteButton
                       isFavorite={isFavorite}
-                      onChange={handleFavoriteChange}
+                      onChange={(newValue) =>
+                        void handleFavoriteChange(newValue)
+                      }
                       size="large"
                     />
                   )}
@@ -233,7 +237,7 @@ const StudioDetail = () => {
             <div className="mt-4 max-w-md">
               <RatingSlider
                 rating={rating}
-                onChange={handleRatingChange}
+                onChange={(newRating) => void handleRatingChange(newRating)}
                 showClearButton={true}
               />
             </div>
@@ -335,7 +339,7 @@ const StudioDetail = () => {
                       },
                     ],
                   }}
-                  title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
+                  title={`Scenes from ${studioName || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
                   fromPageTitle={(studio?.name as string) || "Studio"}
                 />
               )}
@@ -353,7 +357,7 @@ const StudioDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No galleries found for ${studio?.name}`}
+                  emptyMessage={`No galleries found for ${studioName}`}
                 />
               )}
 
@@ -377,7 +381,7 @@ const StudioDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No performers found for ${studio?.name}`}
+                  emptyMessage={`No performers found for ${studioName}`}
                 />
               )}
 
@@ -392,7 +396,7 @@ const StudioDetail = () => {
                     },
                   }}
                   hideLockedFilters
-                  emptyMessage={`No collections found for ${studio?.name}`}
+                  emptyMessage={`No collections found for ${studioName}`}
                 />
               )}
             </>
@@ -550,7 +554,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
               className="text-2xl font-bold"
               style={{ color: "var(--accent-primary)" }}
             >
-              {studio!.rating100 as React.ReactNode}/100
+              {studio.rating100 as React.ReactNode}/100
             </span>
           </div>
           <div
@@ -560,7 +564,7 @@ const StudioStats = ({ studio, studioId: _studioId }: StudioStatsProps) => {
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
-                width: `${studio!.rating100}%`,
+                width: `${Number(studio.rating100)}%`,
                 backgroundColor: "var(--accent-primary)",
               }}
             />
@@ -814,7 +818,7 @@ const ImagesTab = ({
         },
       })) as { findImages?: { images?: NormalizedImage[]; count?: number } };
       return {
-        images: data.findImages?.images || [],
+        images: data.findImages?.images ?? [],
         count: data.findImages?.count || 0,
       };
     },

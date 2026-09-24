@@ -209,7 +209,7 @@ describe("useFullscreen", () => {
 
   // ─── Reset declined on disable ─────────────────────────────────────────
 
-  it("resets userDeclined when enabled changes to false", async () => {
+  it("resets userDeclined when enabled changes to false", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
 
     // Start with autoOnLandscape=true, enabled=true

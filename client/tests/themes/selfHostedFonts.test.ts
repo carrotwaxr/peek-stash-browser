@@ -28,7 +28,7 @@ function usableFontStacks(): string[] {
   const fromThemes = Object.values(themes).flatMap((theme) =>
     Object.entries(theme.properties)
       .filter(([name]) => name.startsWith("--font-"))
-      .map(([, value]) => String(value))
+      .map(([, value]) => value)
   );
   return [...fromEditor, ...fromThemes];
 }
