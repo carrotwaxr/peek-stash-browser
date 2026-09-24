@@ -2,7 +2,8 @@
  * The test Stash alone is smaller than E2E's minimum library (sweep item
  * 83), so the generator extends the recorded graph with a fixed,
  * deterministic set of scenes, images and markers before it synthesises
- * values.
+ * values. It also adds the few relations between recorded entities that
+ * integration tests need and the test Stash lacks.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -10,16 +11,32 @@ import {
   extend,
   starPerformer,
 } from "../../../integration/stash-replay/extend.js";
+import { buildFixture } from "../../../integration/stash-replay/generate.js";
+import {
+  ENTITY_TYPES,
+  type EntityType,
+} from "../../../integration/stash-replay/library.js";
 import type {
   GraphEntity,
   LibraryGraph,
 } from "../../../integration/stash-replay/synth.js";
 import { arrayContaining } from "../../helpers/matchers.js";
 import { must } from "../../helpers/must.js";
-import { testStashShape } from "./shapeFixture.js";
+import { OWNER_TEST_ENTITIES, testStashShape } from "./shapeFixture.js";
 
 function ids(entity: GraphEntity, relation: string): string[] {
   return (entity.relations[relation] ?? []).map((link) => link.id);
+}
+
+function entity(
+  graph: LibraryGraph,
+  type: EntityType,
+  id: string
+): GraphEntity {
+  return must(
+    graph.entities[type].find((each) => each.id === id),
+    `${type} ${id}`
+  );
 }
 
 function withPerformer(graph: LibraryGraph, type: "scene" | "image") {
@@ -57,8 +74,14 @@ describe("extend", () => {
         },
       ]);
     });
-    // The recorded scenes are left as they were
-    expect(scenes.slice(0, 16)).toEqual(testStashShape().entities.scene);
+    // The recorded scenes are left as they were, but for scene 100010 joining
+    // group 100001 (the relations integration tests need)
+    const recordedScenes = testStashShape().entities.scene;
+    must(
+      recordedScenes.find((scene) => scene.id === "100010"),
+      "scene 100010"
+    ).relations.groups = [{ id: "100001", present: [] }];
+    expect(scenes.slice(0, 16)).toEqual(recordedScenes);
     // A shape at 36 scenes or more gets none
     const full = extend(graph);
     expect(full.entities.scene).toHaveLength(36);
@@ -127,7 +150,14 @@ describe("extend", () => {
     const graph = extend(shape);
 
     expect(graph.entities.image.slice(0, 6)).toEqual(shape.entities.image);
-    expect(graph.entities.gallery).toEqual(shape.entities.gallery);
+    // The galleries are as recorded, but for the studio gallery 100002 gets
+    // (the relations integration tests need)
+    const galleries = structuredClone(shape.entities.gallery);
+    must(
+      galleries.find((gallery) => gallery.id === "100002"),
+      "gallery 100002"
+    ).relations.studio = [{ id: "100005" }];
+    expect(graph.entities.gallery).toEqual(galleries);
     // No image is added to a gallery
     const inGalleries = graph.entities.image.filter(
       (image) => ids(image, "galleries").length > 0
@@ -140,5 +170,61 @@ describe("extend", () => {
       "100005",
       "100006",
     ]);
+  });
+
+  it("adds the relations integration tests need, and changes no TEST_ENTITIES pick", () => {
+    const shape = testStashShape();
+    const graph = extend(shape);
+
+    // The test Stash lacks them: its group has no studio, and the studio the
+    // tests use has no tag, no gallery and no scene in a group
+    expect(ids(entity(shape, "group", "100001"), "studio")).toEqual([]);
+    expect(ids(entity(shape, "studio", "100005"), "tags")).toEqual([]);
+    expect(ids(entity(shape, "gallery", "100002"), "studio")).toEqual([]);
+    expect(ids(entity(shape, "scene", "100010"), "studio")).toEqual(["100005"]);
+    expect(ids(entity(shape, "scene", "100010"), "groups")).toEqual([]);
+
+    const group = entity(graph, "group", "100001");
+    const studio = entity(graph, "studio", "100005");
+    const gallery = entity(graph, "gallery", "100002");
+    expect(ids(group, "studio")).toEqual(["100005"]);
+    expect(ids(studio, "groups")).toEqual(["100001"]);
+    expect(ids(studio, "movies")).toEqual(["100001"]);
+    expect(ids(studio, "tags")).toEqual(["100001"]);
+    expect(ids(gallery, "studio")).toEqual(["100005"]);
+    expect(entity(graph, "scene", "100010").relations.groups).toEqual([
+      { id: "100001", present: [] },
+    ]);
+
+    // Nothing else of a recorded entity changes
+    const reverted = structuredClone(graph);
+    entity(reverted, "group", "100001").relations.studio = [];
+    const revertedStudio = entity(reverted, "studio", "100005");
+    revertedStudio.relations.groups = [];
+    revertedStudio.relations.movies = [];
+    revertedStudio.relations.tags = [];
+    entity(reverted, "gallery", "100002").relations.studio = [];
+    entity(reverted, "scene", "100010").relations.groups = [];
+    for (const type of ENTITY_TYPES) {
+      expect(
+        reverted.entities[type].filter((each) => each.extension !== true),
+        type
+      ).toEqual(shape.entities[type]);
+    }
+
+    // The counts follow, and the picks are the ones the test Stash gives
+    const { library, testEntities } = buildFixture(shape);
+    const studioEntity = must(
+      library.entities.studio.find((each) => each.id === "100005")
+    );
+    expect(studioEntity.group_count).toBe(1);
+    expect(
+      must(library.entities.group.find((each) => each.id === "100001"))
+        .scene_count
+    ).toBe(4);
+    expect(studioEntity.gallery_count).toBe(1);
+    const tag = must(library.entities.tag.find((each) => each.id === "100001"));
+    expect(tag.studio_count).toBe(1);
+    expect(testEntities).toEqual(OWNER_TEST_ENTITIES);
   });
 });

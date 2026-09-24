@@ -51,7 +51,7 @@ Expected: No type or lint errors (warnings OK), the build succeeds, all tests pa
 ```bash
 (cd server && npx prisma generate && npm run lint && npm run typecheck && npm run test:coverage)
 ```
-Expected: No lint or type errors (warnings OK), all tests pass and the coverage thresholds hold. `npm run typecheck` is CI's two type checks in order: `tsc --noEmit` (source), then `npm run typecheck:tests` (`tests/` and `integration/`). Lint and the test type check need `server/integration/fixtures/testEntities.ts`; copy `testEntities.example.ts` if you have none.
+Expected: No lint or type errors (warnings OK), all tests pass and the coverage thresholds hold. `npm run typecheck` is CI's two type checks in order: `tsc --noEmit` (source), then `npm run typecheck:tests` (`tests/` and `integration/`).
 
 ### 2d. Dependency Audit (CI: `Dependency Audit`)
 ```bash
@@ -67,10 +67,10 @@ Covered by Step 0: CI ran the suite on this commit.
 
 ### 2f. Integration Tests (CI: `Integration Tests`, skipped there: CI has no test Stash)
 ```bash
-(cd server && npm run test:integration:fresh)
+(cd server && npm run test:integration:replay)
 ```
-Expected: All tests pass
-Note: Needs `STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env` and `server/integration/fixtures/testEntities.ts` configured for that Stash. `:fresh` (`FRESH_DB=true`) deletes `server/integration/test.db` first: the multi-instance tests add the main Stash (`STASH_URL`) to it read-only and keep it there, and a run on the kept database syncs it again at startup.
+Expected: All tests pass, none skipped (`server/integration/results/summary.json`)
+Note: Runs against the synthetic replay of the test Stash and needs no setup. When the test Stash is reachable (`STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env`), also run `npm run fixtures:record -- --check` from the root: it exits 1 when the test Stash has drifted from the recorded fixture.
 
 ## Step 3: Docker image
 

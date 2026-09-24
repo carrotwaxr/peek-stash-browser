@@ -4,8 +4,8 @@
  * The test Stash alone is smaller than what E2E needs (30 or more scenes, a
  * performer with 12 scenes and 3 images, markers, a rated scene with a
  * caption), so the generator adds a fixed set of entities before it builds
- * values. The recorded entities stay as they are, and the additions depend
- * only on the shape, so the output stays deterministic:
+ * values. The additions depend only on the shape, so the output stays
+ * deterministic:
  * - scenes continuing the ids up to EXTENDED_SCENE_COUNT, each with P* (the
  *   recorded performer with the most scenes) as its only performer, no
  *   tags, and the studios in turn; the first is rated 80 and has a caption
@@ -13,6 +13,24 @@
  * - EXTENSION_CLIPS markers on the first recorded scene, with the lowest
  *   tag as their primary tag
  * An added entity has every recorded field set and one of each list.
+ *
+ * The recorded entities stay as they are, but for one rule, "relations the
+ * test Stash lacks that integration tests need". Each relation joins two
+ * recorded entities and is added only where it is missing. S is the studio
+ * the tests use (studioWithScenes: the lowest recorded studio with two or
+ * more scenes) and G the group (groupWithScenes: the lowest recorded group
+ * with scenes):
+ * - G gets S as its studio (and S lists G among its groups), for
+ *   groups.integration "returns group studio with tooltip data"
+ * - the lowest recorded scene of S joins G when no scene of S is in a group,
+ *   for studios.integration "returns groups with tooltip data" (Peek lists
+ *   a studio's groups from its scenes)
+ * - S gets the lowest recorded tag, for studios.integration "returns tags
+ *   with image_path"; it changes no TEST_ENTITIES pick
+ * - the lowest recorded gallery with no studio gets S, when no gallery has
+ *   S, for studios.integration "returns galleries with tooltip data"
+ * The counts follow from the relations (synth.ts). Live runs still skip
+ * those tests until the test Stash has these relations.
  */
 import type { EntityType } from "./library.js";
 import { RELATIONS } from "./selections.js";
@@ -68,6 +86,70 @@ export function starPerformer(shape: RecordedShape): string | undefined {
     }
   }
   return star;
+}
+
+/**
+ * Adds "relations the test Stash lacks that integration tests need" (see
+ * the file header) to the recorded entities in `entities`, choosing them
+ * from `recorded`.
+ */
+function addIntegrationRelations(
+  recorded: Record<EntityType, GraphEntity[]>,
+  entities: Record<EntityType, GraphEntity[]>
+): void {
+  const inOutput = (type: EntityType, id: string | undefined) =>
+    id === undefined
+      ? undefined
+      : entities[type].find((entity) => entity.id === id);
+  const sceneCount = (field: string, id: string) =>
+    recorded.scene.filter((scene) => refIds(scene, field).includes(id)).length;
+
+  const studio = inOutput(
+    "studio",
+    recorded.studio.find((each) => sceneCount("studio", each.id) >= 2)?.id
+  );
+  if (studio === undefined) return;
+
+  const group = inOutput(
+    "group",
+    recorded.group.find((each) => sceneCount("groups", each.id) > 0)?.id
+  );
+  if (group !== undefined && refIds(group, "studio").length === 0) {
+    group.relations.studio = links(studio.id);
+    // A studio's groups and (deprecated) movies both list the group
+    for (const field of ["groups", "movies"]) {
+      const list = studio.relations[field];
+      if (list !== undefined) list.push({ id: group.id });
+    }
+  }
+
+  const studioScenes = recorded.scene.filter((scene) =>
+    refIds(scene, "studio").includes(studio.id)
+  );
+  const scene = inOutput("scene", studioScenes[0]?.id);
+  const inGroup = studioScenes.some(
+    (each) => refIds(each, "groups").length > 0
+  );
+  if (group !== undefined && scene !== undefined && !inGroup) {
+    // As a recorded link without scene_index
+    scene.relations.groups?.push({ id: group.id, present: [] });
+  }
+
+  const [lowestTag] = recorded.tag;
+  if (lowestTag !== undefined && refIds(studio, "tags").length === 0) {
+    studio.relations.tags = links(lowestTag.id);
+  }
+
+  const hasGallery = entities.gallery.some((gallery) =>
+    refIds(gallery, "studio").includes(studio.id)
+  );
+  const gallery = inOutput(
+    "gallery",
+    recorded.gallery.find((each) => refIds(each, "studio").length === 0)?.id
+  );
+  if (!hasGallery && gallery !== undefined) {
+    gallery.relations.studio = links(studio.id);
+  }
 }
 
 /** Every recorded path of a type and the paths above them, but relations and files. */
@@ -205,6 +287,8 @@ export function extend(shape: RecordedShape): LibraryGraph {
       );
     }
   }
+
+  addIntegrationRelations(recorded, entities);
 
   return { fields, entities };
 }

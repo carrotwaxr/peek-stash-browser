@@ -85,7 +85,6 @@ screenshots/output/
 screenshots/config.json
 
 # Integration test secrets, data, and results
-server/integration/fixtures/testEntities.ts
 server/integration/*.db
 server/integration/*.db-shm
 server/integration/*.db-wal

@@ -32,7 +32,7 @@ Run `/pre-release` to execute all checks; checks 3-8 follow CI's jobs and their 
 5. Server checks: `(cd server && npx prisma generate && npm run lint && npm run typecheck && npm run test:coverage)`; `typecheck` covers the source and the tests
 6. Dependency audit: `npm audit --omit=dev --audit-level=high` in `server`, `client`, `shared` and the root
 7. E2E tests: covered by check 1
-8. Integration tests: `(cd server && npm run test:integration:fresh)`
+8. Integration tests: `(cd server && npm run test:integration:replay)`
 9. Docker image: covered by check 1 (CI built and booted it on amd64 and arm64); to debug one locally, `docker build -f Dockerfile.production -t peek:test . && node docker/smoke-test.mjs peek:test`
 
 All 9 checks must pass before proceeding.

@@ -1,12 +1,14 @@
 /**
  * Unit tests for the integration suite's Stash guard (sweep item 83).
  *
- * The suite runs against a dedicated test Stash. It refuses the production
- * Stash (STASH_URL) unless ALLOW_PROD_STASH=1 comes from the shell, so a
- * value left in the root .env can never opt in.
+ * The suite runs against the Stash replay (STASH_REPLAY=1) or a dedicated
+ * test Stash. It refuses the production Stash (STASH_URL) unless
+ * ALLOW_PROD_STASH=1 comes from the shell, so a value left in the root .env
+ * can never opt in.
  */
 import { describe, expect, it } from "vitest";
 import {
+  type StashTarget,
   StashTargetError,
   UNREACHABLE_STASH_URL,
   findDisallowedInstances,
@@ -24,6 +26,14 @@ const prodAndTest = {
   STASH_TEST_URL: TEST_URL,
   STASH_TEST_API_KEY: TEST_KEY,
 };
+
+/** The target as a live one, failing the test when it is the replay. */
+function live(target: StashTarget) {
+  if (target.mode !== "live") {
+    throw new Error(`expected a live target, got ${target.mode}`);
+  }
+  return target;
+}
 
 describe("resolveStashTarget", () => {
   it("uses the test Stash when STASH_TEST_URL and STASH_TEST_API_KEY are set", () => {
@@ -64,10 +74,11 @@ describe("resolveStashTarget", () => {
 
   it("adds STASH_URL as the second instance only with the shell opt-in", () => {
     expect(
-      resolveStashTarget(prodAndTest, { ALLOW_PROD_STASH: "1" }).second
+      live(resolveStashTarget(prodAndTest, { ALLOW_PROD_STASH: "1" })).second
     ).toEqual({ url: PROD_URL, apiKey: PROD_KEY });
     expect(
-      resolveStashTarget({ ...prodAndTest, ALLOW_PROD_STASH: "1" }, {}).second
+      live(resolveStashTarget({ ...prodAndTest, ALLOW_PROD_STASH: "1" }, {}))
+        .second
     ).toBeUndefined();
   });
 
@@ -95,15 +106,43 @@ describe("resolveStashTarget", () => {
     const emptyKey = { ...prodAndTest, STASH_TEST_API_KEY: "" };
 
     expect(() => resolveStashTarget(emptyKey, {})).toThrow(StashTargetError);
-    expect(resolveStashTarget(emptyKey, { ALLOW_PROD_STASH: "1" }).source).toBe(
-      "STASH_URL"
-    );
+    expect(
+      live(resolveStashTarget(emptyKey, { ALLOW_PROD_STASH: "1" })).source
+    ).toBe("STASH_URL");
   });
 
   it("an empty shell value hides the .env value", () => {
     expect(() =>
       resolveStashTarget(prodAndTest, { STASH_TEST_URL: "" })
     ).toThrow("Integration tests need a test Stash");
+  });
+
+  it("STASH_REPLAY=1 in the shell or the .env selects replay, even with STASH_TEST_* set", () => {
+    expect(resolveStashTarget(prodAndTest, { STASH_REPLAY: "1" })).toEqual({
+      mode: "replay",
+    });
+    expect(
+      resolveStashTarget({ ...prodAndTest, STASH_REPLAY: "1" }, {})
+    ).toEqual({ mode: "replay" });
+    expect(resolveStashTarget({}, { STASH_REPLAY: "1" })).toEqual({
+      mode: "replay",
+    });
+    // Only "1" selects it, and an empty shell value hides the .env's
+    expect(resolveStashTarget(prodAndTest, { STASH_REPLAY: "true" }).mode).toBe(
+      "live"
+    );
+    expect(
+      resolveStashTarget(
+        { ...prodAndTest, STASH_REPLAY: "1" },
+        { STASH_REPLAY: "" }
+      ).mode
+    ).toBe("live");
+  });
+
+  it("the refusal names npm run test:integration:replay", () => {
+    expect(() => resolveStashTarget(prodOnly, {})).toThrow(
+      "npm run test:integration:replay"
+    );
   });
 });
 

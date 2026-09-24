@@ -601,3 +601,21 @@ export function deriveSecondLibrary(
 
   return { stash: structuredClone(a.stash), entities };
 }
+
+/**
+ * The second instance's ids start after the test library's; item 34's PR
+ * should set this to 0 (bare tag ids match every instance until then).
+ */
+export const SECOND_ID_OFFSET = 100000;
+
+/**
+ * The second Stash of multi-instance runs, as the integration suite and
+ * `stash:replay --library second` serve it: the test library renumbered,
+ * with more than ten times its scenes, as multi-instance asserts.
+ */
+export function secondLibraryOf(test: ReplayLibrary): ReplayLibrary {
+  return deriveSecondLibrary(test, {
+    idOffset: SECOND_ID_OFFSET,
+    sceneCount: Math.max(200, 10 * test.entities.scene.length + 1),
+  });
+}

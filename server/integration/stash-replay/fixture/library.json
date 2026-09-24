@@ -1719,7 +1719,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [
           {
@@ -1863,7 +1870,15 @@
           }
         ],
         "galleries": [],
-        "groups": [],
+        "groups": [
+          {
+            "scene_index": null,
+            "group": {
+              "id": "100001",
+              "name": "Group 100001"
+            }
+          }
+        ],
         "urls": [],
         "captions": []
       },
@@ -1894,7 +1909,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [],
         "tags": [
@@ -2221,7 +2243,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [],
         "tags": [
@@ -2361,7 +2390,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [],
         "tags": [
@@ -2625,7 +2661,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [],
         "tags": [
@@ -3420,7 +3463,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [
           {
@@ -4966,7 +5016,14 @@
           "rating100": null,
           "updated_at": "2003-12-03T10:46:23+00:00",
           "url": null,
-          "tags": []
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001",
+              "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+              "favorite": false
+            }
+          ]
         },
         "performers": [
           {
@@ -6585,19 +6642,37 @@
         "created_at": "2003-05-26T01:28:48+00:00",
         "details": null,
         "favorite": true,
-        "gallery_count": 0,
-        "group_count": 0,
-        "groups": [],
+        "gallery_count": 1,
+        "group_count": 1,
+        "groups": [
+          {
+            "id": "100001",
+            "name": "Group 100001"
+          }
+        ],
         "image_count": 0,
         "image_path": "{{STASH_ORIGIN}}/studio/100005/image?t=1070448383&default=true",
-        "movie_count": 0,
-        "movies": [],
+        "movie_count": 1,
+        "movies": [
+          {
+            "id": "100001",
+            "name": "Group 100001"
+          }
+        ],
         "name": "Studio 100005",
         "parent_studio": null,
         "performer_count": 1,
         "rating100": null,
         "scene_count": 7,
-        "tags": [],
+        "tags": [
+          {
+            "id": "100001",
+            "description": null,
+            "name": "Tag 100001",
+            "image_path": "{{STASH_ORIGIN}}/tag/100001/image?t=1056790308&default=true",
+            "favorite": false
+          }
+        ],
         "updated_at": "2003-12-03T10:46:23+00:00",
         "url": null,
         "stash_ids": []
@@ -6766,7 +6841,7 @@
         "performer_count": 0,
         "scene_count": 4,
         "scene_marker_count": 2,
-        "studio_count": 0,
+        "studio_count": 1,
         "updated_at": "2003-06-28T08:51:48+00:00",
         "stash_ids": []
       },
@@ -7067,7 +7142,11 @@
         "duration": null,
         "date": null,
         "rating100": null,
-        "studio": null,
+        "studio": {
+          "id": "100005",
+          "name": "Studio 100005",
+          "image_path": "{{STASH_ORIGIN}}/studio/100005/image?t=1070448383&default=true"
+        },
         "director": null,
         "synopsis": null,
         "urls": [],
@@ -7083,7 +7162,7 @@
         "sub_groups": [],
         "front_image_path": "{{STASH_ORIGIN}}/group/100001/frontimage?t=1083419399&default=true",
         "back_image_path": null,
-        "scene_count": 3,
+        "scene_count": 4,
         "performer_count": 2,
         "sub_group_count": 0
       }
@@ -7198,7 +7277,22 @@
         "created_at": "2003-12-11T15:17:01+00:00",
         "updated_at": "2004-03-14T02:59:15+00:00",
         "image_count": 3,
-        "studio": null,
+        "studio": {
+          "id": "100005",
+          "name": "Studio 100005",
+          "aliases": [],
+          "details": null,
+          "favorite": true,
+          "rating100": null,
+          "url": null,
+          "parent_studio": null,
+          "tags": [
+            {
+              "id": "100001",
+              "name": "Tag 100001"
+            }
+          ]
+        },
         "performers": [],
         "tags": [
           {
