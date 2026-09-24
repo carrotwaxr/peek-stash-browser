@@ -56,7 +56,9 @@ describe("self-hosted fonts", () => {
   it("the build never inlines font files into the CSS", async () => {
     // A file URL keeps tsc from resolving the untyped JS config
     const configUrl = pathToFileURL(resolve(clientRoot, "vite.config.js")).href;
-    const { default: viteConfig } = await import(configUrl);
+    const { default: configFn } = await import(configUrl);
+    // The config is a function of the mode, as Vite calls it for `vite build`
+    const viteConfig = configFn({ command: "build", mode: "production" });
     const inline = viteConfig.build.assetsInlineLimit as (
       filePath: string,
       content: Buffer
