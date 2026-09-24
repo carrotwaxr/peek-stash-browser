@@ -2,7 +2,8 @@
  * Throwaway databases for migration tests.
  *
  * `createDatabaseAt(name)` copies `schema.prisma` and the migrations up to
- * `name` into a temp directory and deploys them into a new SQLite file there.
+ * `name` into a temp directory and deploys them into a new SQLite file there;
+ * `createEmptyDatabase()` makes a file with no tables, for a test to shape.
  * The sandbox has its own Prisma client and URL, so a test migrates it and
  * never the suite's database, which the worker's Prisma singleton points at.
  */
@@ -41,6 +42,32 @@ export interface MigrationSandbox {
   remove: () => Promise<void>;
 }
 
+function sandboxDir(): string {
+  return mkdtempSync(path.join(SANDBOX_ROOT, "peek-migration-sandbox-"));
+}
+
+function sandboxIn(dir: string, prismaDir: string): MigrationSandbox {
+  const url = `file:${path.join(dir, "peek.db")}`;
+  const client = new PrismaClient({ datasourceUrl: url });
+  return {
+    url,
+    client,
+    prismaDir,
+    remove: async () => {
+      await client.$disconnect();
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+/**
+ * A database with no tables, which SQLite creates at the client's first
+ * query. Its `prismaDir` is the server's own.
+ */
+export function createEmptyDatabase(): MigrationSandbox {
+  return sandboxIn(sandboxDir(), PRISMA_DIR);
+}
+
 /** A database with every migration up to and including `name` applied. */
 export async function createDatabaseAt(
   name: string
@@ -49,7 +76,7 @@ export async function createDatabaseAt(
   const last = folders.indexOf(name);
   if (last === -1) throw new Error(`No migration folder named ${name}`);
 
-  const dir = mkdtempSync(path.join(SANDBOX_ROOT, "peek-migration-sandbox-"));
+  const dir = sandboxDir();
   const prismaDir = path.join(dir, "prisma");
   const migrationsDir = path.join(prismaDir, "migrations");
   mkdirSync(migrationsDir, { recursive: true });
@@ -69,22 +96,15 @@ export async function createDatabaseAt(
     );
   }
 
-  const url = `file:${path.join(dir, "peek.db")}`;
+  const sandbox = sandboxIn(dir, prismaDir);
   try {
-    await runPrismaCli(["migrate", "deploy"], { prismaDir, databaseUrl: url });
+    await runPrismaCli(["migrate", "deploy"], {
+      prismaDir,
+      databaseUrl: sandbox.url,
+    });
   } catch (error) {
-    rmSync(dir, { recursive: true, force: true });
+    await sandbox.remove();
     throw error;
   }
-
-  const client = new PrismaClient({ datasourceUrl: url });
-  return {
-    url,
-    client,
-    prismaDir,
-    remove: async () => {
-      await client.$disconnect();
-      rmSync(dir, { recursive: true, force: true });
-    },
-  };
+  return sandbox;
 }

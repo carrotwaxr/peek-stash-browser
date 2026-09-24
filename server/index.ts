@@ -84,9 +84,9 @@ const main = async () => {
 };
 
 main().catch(async (e: unknown) => {
-  logger.error("Fatal error", {
-    error: e instanceof Error ? e.message : String(e),
-  });
+  // The message as it is, not escaped into JSON: a refusal such as
+  // LegacyDatabaseError's tells the admin what to do
+  logger.error(`Fatal error: ${e instanceof Error ? e.message : String(e)}`);
   await Promise.all([prisma.$disconnect(), disconnectComputeClient()]);
   process.exit(1);
 });
