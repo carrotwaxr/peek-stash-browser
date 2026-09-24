@@ -34,8 +34,8 @@ test.describe("Pagination", () => {
     await listPage.goto("/scenes");
 
     // Check if per-page selector exists
-    if (await listPage.perPageSelect.isVisible().catch(() => false)) {
-      const value = await listPage.perPageSelect.inputValue();
+    if (await listPage.perPage.isVisible().catch(() => false)) {
+      const value = await listPage.perPage.inputValue();
       expect(["12", "24", "48", "96", "120"]).toContain(value);
     }
   });

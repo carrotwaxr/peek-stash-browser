@@ -1,11 +1,5 @@
-import {
-  type APIRequestContext,
-  type Browser,
-  type BrowserContext,
-  expect,
-  request,
-  test,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { completeSetup, createUser, deleteUser, signIn } from "./support/users";
 
 /**
  * E2E tests for recovery keys shown once and sessions ending on a password
@@ -19,83 +13,19 @@ import {
 const KEY_PATTERN = /^([A-Z2-9]{4}-){6}[A-Z2-9]{4}$/;
 const ACCOUNT_TAB = "/settings?section=user&tab=account";
 
-interface TestUser {
-  id: number;
-  username: string;
-  password: string;
-}
-
 test.describe("Account security", () => {
   const createdUserIds: number[] = [];
-  let userCount = 0;
 
   test.afterEach(async ({ page }) => {
     for (const id of createdUserIds.splice(0)) {
-      await page.request.delete(`/api/user/${id}`);
+      await deleteUser(page.request, id);
     }
   });
 
-  async function createUser(admin: APIRequestContext): Promise<TestUser> {
-    // Parallel workers can share a millisecond: the worker index keeps n unique
-    const n = `${test.info().workerIndex}${++userCount}`;
-    const username = `e2e-sec-${Date.now()}-${n}`;
-    const password = "E2eSecurity1";
-    const res = await admin.post("/api/user/create", {
-      data: { username, password, role: "USER" },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
-    const { user } = (await res.json()) as { user: { id: number } };
-    createdUserIds.push(user.id);
-    return { id: user.id, username, password };
-  }
-
-  /** A fresh browser context signed in as the user. */
-  async function signIn(
-    browser: Browser,
-    baseURL: string,
-    user: TestUser
-  ): Promise<BrowserContext> {
-    const api = await request.newContext({ baseURL });
-    try {
-      const res = await api.post("/api/auth/login", {
-        data: { username: user.username, password: user.password },
-      });
-      expect(res.ok(), await res.text()).toBeTruthy();
-      const token = (res.headers()["set-cookie"] || "").match(
-        /token=([^;]+)/
-      )?.[1];
-      expect(token).toBeTruthy();
-
-      const context = await browser.newContext({ baseURL });
-      await context.addCookies([
-        {
-          name: "token",
-          value: token!,
-          domain: new URL(baseURL).hostname,
-          path: "/",
-        },
-      ]);
-      return context;
-    } finally {
-      await api.dispose();
-    }
-  }
-
-  /** Finish first sign-in setup through the API so the modal stays away. */
-  async function completeSetup(context: BrowserContext): Promise<void> {
-    const status = await context.request.get("/api/user/setup-status");
-    const { instances } = (await status.json()) as {
-      instances: Array<{ id: string }>;
-    };
-    const res = await context.request.post("/api/user/complete-setup", {
-      data: { selectedInstanceIds: instances.map((i) => i.id) },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
-  }
-
   test("the recovery key is shown once", async ({ page, browser, baseURL }) => {
-    const user = await createUser(page.request);
-    const context = await signIn(browser, baseURL!, user);
+    const user = await createUser(page.request, "sec");
+    createdUserIds.push(user.id);
+    const context = await signIn(browser, baseURL, user);
     try {
       const userPage = await context.newPage();
 
@@ -148,9 +78,10 @@ test.describe("Account security", () => {
     browser,
     baseURL,
   }) => {
-    const user = await createUser(page.request);
-    const contextA = await signIn(browser, baseURL!, user);
-    const contextB = await signIn(browser, baseURL!, user);
+    const user = await createUser(page.request, "sec");
+    createdUserIds.push(user.id);
+    const contextA = await signIn(browser, baseURL, user);
+    const contextB = await signIn(browser, baseURL, user);
     try {
       await completeSetup(contextA);
       const pageA = await contextA.newPage();
