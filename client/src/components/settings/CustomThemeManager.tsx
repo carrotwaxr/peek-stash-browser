@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import { apiDelete, apiPost, apiPut } from "../../api";
 import type { CustomTheme } from "../../themes/ThemeContext";
+import type { ThemeConfig } from "../../themes/themes";
 import { useTheme } from "../../themes/useTheme";
 import { showError, showSuccess } from "../../utils/toast";
 import { Button, ConfirmDialog, Paper } from "../ui/index";
@@ -9,6 +10,16 @@ import CustomThemeEditor from "./CustomThemeEditor";
 
 interface CustomThemeWithDates extends CustomTheme {
   createdAt?: string;
+}
+
+interface ThemeSaveData {
+  name: string;
+  config: ThemeConfig;
+}
+
+/** The body of a create or duplicate response (the fields read here) */
+interface CustomThemeResponse {
+  theme: CustomTheme;
 }
 
 /**
@@ -35,13 +46,10 @@ const CustomThemeManager = () => {
     setIsCreating(false);
   };
 
-  const handleSaveNew = async (themeData: {
-    name: string;
-    config: Record<string, any>;
-  }) => {
+  const handleSaveNew = async (themeData: ThemeSaveData) => {
     try {
       setLoading(true);
-      const data = await apiPost<Record<string, any>>(
+      const data = await apiPost<CustomThemeResponse>(
         "/themes/custom",
         themeData
       );
@@ -58,13 +66,12 @@ const CustomThemeManager = () => {
     }
   };
 
-  const handleSaveEdit = async (themeData: {
-    name: string;
-    config: Record<string, any>;
-  }) => {
+  const handleSaveEdit = async (themeData: ThemeSaveData) => {
+    // The editor saves an edit only while a theme is being edited
+    if (!editingTheme) return;
     try {
       setLoading(true);
-      await apiPut(`/themes/custom/${editingTheme!.id}`, themeData);
+      await apiPut(`/themes/custom/${editingTheme.id}`, themeData);
       await refreshCustomThemes();
       showSuccess(`Theme "${themeData.name}" updated successfully!`);
       setEditingTheme(null);
@@ -97,7 +104,7 @@ const CustomThemeManager = () => {
   const handleDuplicate = async (theme: CustomThemeWithDates) => {
     try {
       setLoading(true);
-      const data = await apiPost<Record<string, any>>(
+      const data = await apiPost<CustomThemeResponse>(
         `/themes/custom/${theme.id}/duplicate`
       );
       await refreshCustomThemes();
@@ -123,9 +130,9 @@ const CustomThemeManager = () => {
             className="text-xl font-semibold"
             style={{ color: "var(--text-primary)" }}
           >
-            {isCreating
+            {isCreating || !editingTheme
               ? "Create Custom Theme"
-              : `Edit "${editingTheme!.name}"`}
+              : `Edit "${editingTheme.name}"`}
           </h3>
           <Button variant="secondary" onClick={handleCancel} disabled={loading}>
             <X size={16} className="mr-2" />

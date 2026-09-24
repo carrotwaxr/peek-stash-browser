@@ -7,12 +7,31 @@
  * lookups on multi-instance setups.
  */
 import { fireEvent, render, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks are set up
 import SearchableSelect from "../../../src/components/ui/SearchableSelect";
 
 // --- Hoisted mocks (available before vi.mock factory runs) ---
+
+/** The instance filter SearchableSelect adds to a lookup by id */
+interface InstanceFilter {
+  instance_id: string;
+}
+
+/** What SearchableSelect sends to look entities up by id */
+interface IdLookupParams {
+  ids?: string[];
+  tag_filter?: InstanceFilter;
+  performer_filter?: InstanceFilter;
+  studio_filter?: InstanceFilter;
+  group_filter?: InstanceFilter;
+  gallery_filter?: InstanceFilter;
+}
+
+type FindMock = (params: IdLookupParams) => Promise<unknown>;
+type FindMinimalMock = (params: unknown) => Promise<unknown[]>;
 
 const {
   mockFindTags,
@@ -26,16 +45,16 @@ const {
   mockFindGroupsMinimal,
   mockFindGalleriesMinimal,
 } = vi.hoisted(() => ({
-  mockFindTags: vi.fn(),
-  mockFindPerformers: vi.fn(),
-  mockFindStudios: vi.fn(),
-  mockFindGroups: vi.fn(),
-  mockFindGalleries: vi.fn(),
-  mockFindTagsMinimal: vi.fn().mockResolvedValue([]),
-  mockFindPerformersMinimal: vi.fn().mockResolvedValue([]),
-  mockFindStudiosMinimal: vi.fn().mockResolvedValue([]),
-  mockFindGroupsMinimal: vi.fn().mockResolvedValue([]),
-  mockFindGalleriesMinimal: vi.fn().mockResolvedValue([]),
+  mockFindTags: vi.fn<FindMock>(),
+  mockFindPerformers: vi.fn<FindMock>(),
+  mockFindStudios: vi.fn<FindMock>(),
+  mockFindGroups: vi.fn<FindMock>(),
+  mockFindGalleries: vi.fn<FindMock>(),
+  mockFindTagsMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
+  mockFindPerformersMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
+  mockFindStudiosMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
+  mockFindGroupsMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
+  mockFindGalleriesMinimal: vi.fn<FindMinimalMock>().mockResolvedValue([]),
 }));
 
 // Mock filterCache so localStorage is never hit
@@ -195,7 +214,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
       (c) => c[0].ids && c[0].ids.includes("82")
     )?.[0];
     expect(callArg).toBeDefined();
-    expect(callArg.tag_filter).toBeUndefined();
+    expect(must(callArg).tag_filter).toBeUndefined();
   });
 
   it("handles multiple IDs from same instance in one call", async () => {
@@ -218,7 +237,8 @@ describe("SearchableSelect fetchItemsByIds", () => {
     await waitFor(() => {
       expect(mockFindTags).toHaveBeenCalledWith(
         expect.objectContaining({
-          ids: expect.arrayContaining(["82", "15"]),
+          // vitest types asymmetric matchers as any
+          ids: expect.arrayContaining(["82", "15"]) as unknown,
           tag_filter: { instance_id: "inst-1" },
         })
       );
@@ -365,7 +385,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
     // One call without instance filter (bare IDs)
     const bareCall = calls.find((c) => !c.tag_filter);
     expect(bareCall).toBeDefined();
-    expect(bareCall.ids).toEqual(["99"]);
+    expect(must(bareCall).ids).toEqual(["99"]);
   });
 
   it("deduplicates IDs within the same instance group", async () => {
@@ -435,7 +455,7 @@ describe("SearchableSelect fetchItemsByIds", () => {
   it("returns empty array for unsupported entity type in fetchItemsByIds", async () => {
     render(
       <SearchableSelect
-        entityType={"unsupported" as any}
+        entityType={untrusted("unsupported")}
         value={["1:inst-1"]}
         onChange={vi.fn()}
         multi
@@ -477,7 +497,7 @@ describe("SearchableSelect loadOptions guard", () => {
 
     const { container } = render(
       <SearchableSelect
-        entityType={"unsupported" as any}
+        entityType={untrusted("unsupported")}
         value={[]}
         onChange={vi.fn()}
         multi
@@ -485,7 +505,7 @@ describe("SearchableSelect loadOptions guard", () => {
     );
 
     // Open the dropdown to trigger loadOptions
-    const trigger = container.querySelector("[class*='cursor-pointer']")!;
+    const trigger = must(container.querySelector("[class*='cursor-pointer']"));
     fireEvent.click(trigger);
 
     // Wait for component to settle - loadOptions should bail out gracefully

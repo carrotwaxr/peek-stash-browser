@@ -120,37 +120,31 @@ const ActiveFilterChips = ({
   }> = [];
 
   // Check for performer permanent filters
-  if ((permanentFiltersMetadata.performers?.length ?? 0) > 0) {
-    permanentFiltersMetadata.performers!.forEach((performer) => {
-      permanentChips.push({
-        key: `permanent-performer-${performer.id}`,
-        label: `Performer: ${performer.name}`,
-        isPermanent: true,
-      });
+  permanentFiltersMetadata.performers?.forEach((performer) => {
+    permanentChips.push({
+      key: `permanent-performer-${performer.id}`,
+      label: `Performer: ${performer.name}`,
+      isPermanent: true,
     });
-  }
+  });
 
   // Check for studio permanent filters
-  if ((permanentFiltersMetadata.studios?.length ?? 0) > 0) {
-    permanentFiltersMetadata.studios!.forEach((studio) => {
-      permanentChips.push({
-        key: `permanent-studio-${studio.id}`,
-        label: `Studio: ${studio.name}`,
-        isPermanent: true,
-      });
+  permanentFiltersMetadata.studios?.forEach((studio) => {
+    permanentChips.push({
+      key: `permanent-studio-${studio.id}`,
+      label: `Studio: ${studio.name}`,
+      isPermanent: true,
     });
-  }
+  });
 
   // Check for tag permanent filters
-  if ((permanentFiltersMetadata.tags?.length ?? 0) > 0) {
-    permanentFiltersMetadata.tags!.forEach((tag) => {
-      permanentChips.push({
-        key: `permanent-tag-${tag.id}`,
-        label: `Tag: ${tag.name}`,
-        isPermanent: true,
-      });
+  permanentFiltersMetadata.tags?.forEach((tag) => {
+    permanentChips.push({
+      key: `permanent-tag-${tag.id}`,
+      label: `Tag: ${tag.name}`,
+      isPermanent: true,
     });
-  }
+  });
 
   // Build array of regular active filter chips (exclude permanent filters)
   const activeChips: Array<{

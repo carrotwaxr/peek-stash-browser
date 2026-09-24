@@ -2,6 +2,19 @@ import React, { useEffect, useState } from "react";
 import { AuthContext } from "./AuthContextProvider";
 import type { AuthUser } from "./AuthContextProvider";
 
+/** GET /api/auth/check when signed in */
+interface AuthCheckResponse {
+  user: AuthUser;
+}
+
+/** POST /api/auth/login: the user on success, an error message otherwise */
+interface LoginSuccessResponse {
+  user: AuthUser;
+}
+interface LoginErrorResponse {
+  error?: string;
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,7 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (response.ok) {
-        const userData = await response.json();
+        const userData = (await response.json()) as AuthCheckResponse;
         setIsAuthenticated(true);
         setUser(userData.user);
       } else {
@@ -39,14 +52,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       body: JSON.stringify(credentials),
     });
 
-    const data = await response.json();
+    const data: unknown = await response.json();
 
     if (response.ok) {
+      const { user } = data as LoginSuccessResponse;
       setIsAuthenticated(true);
-      setUser(data.user);
-      return { success: true, user: data.user };
+      setUser(user);
+      return { success: true, user };
     } else {
-      return { success: false, error: data.error || "Login failed" };
+      const { error } = data as LoginErrorResponse;
+      return { success: false, error: error || "Login failed" };
     }
   };
 

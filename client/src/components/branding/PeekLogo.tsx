@@ -2,10 +2,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 
+interface PeekLogoProps {
+  size?: "small" | "default" | "large";
+  variant?: "auto" | "active" | "inactive" | "text-only" | "icon-only";
+}
+
 export const PeekLogo = ({
-  size = "default", // 'small', 'default', 'large'
-  variant = "auto", // 'auto', 'active', 'inactive', 'text-only', 'icon-only'
-}) => {
+  size = "default",
+  variant = "auto",
+}: PeekLogoProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -40,7 +45,7 @@ export const PeekLogo = ({
     },
   };
 
-  const config = (sizeConfig as Record<string, any>)[size];
+  const config = sizeConfig[size];
 
   // Get logo image paths
   const getLogoPath = () => {

@@ -35,7 +35,9 @@ interface KeyboardShortcutOptions {
 }
 
 export const useKeyboardShortcuts = (
-  shortcuts: Record<string, (event: KeyboardEvent) => any> = {},
+  // A handler returns false when it did not handle the key; any other result
+  // counts as handled
+  shortcuts: Record<string, (event: KeyboardEvent) => unknown> = {},
   {
     enabled = true,
     context = "global",

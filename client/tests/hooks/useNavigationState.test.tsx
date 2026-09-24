@@ -13,7 +13,7 @@ const createWrapper = (
     ? [{ pathname: initialEntries[0], state }]
     : initialEntries;
   return ({ children }: { children: React.ReactNode }) => (
-    <MemoryRouter initialEntries={entries as any}>{children}</MemoryRouter>
+    <MemoryRouter initialEntries={entries}>{children}</MemoryRouter>
   );
 };
 

@@ -136,7 +136,7 @@ const FolderView = ({
   // Loading skeleton for content area
   const loadingSkeleton = (
     <div className={gridClasses}>
-      {[...Array(12)].map((_, i) => (
+      {Array.from({ length: 12 }).map((_, i) => (
         <div
           key={i}
           className="rounded-lg animate-pulse"

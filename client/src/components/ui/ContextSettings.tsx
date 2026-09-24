@@ -124,8 +124,10 @@ const ContextSettings = ({
 
   const handleCardSettingChange = useCallback(
     async (key: string, value: string | boolean) => {
+      // Card settings are shown only when there is an entity type
+      if (!entityType) return;
       try {
-        await updateSettings(entityType!, key, value);
+        await updateSettings(entityType, key, value);
         showSuccess("Setting saved");
       } catch {
         showError("Failed to save setting");
@@ -222,7 +224,7 @@ const ContextSettings = ({
                         color: "var(--text-primary)",
                       }}
                     >
-                      {setting.options!.map((option) => (
+                      {setting.options?.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>

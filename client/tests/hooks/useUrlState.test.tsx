@@ -1,6 +1,7 @@
 // client/src/hooks/__tests__/useUrlState.test.jsx
 import { MemoryRouter } from "react-router-dom";
 import { act, renderHook } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { describe, expect, it } from "vitest";
 import { useUrlState } from "../../src/hooks/useUrlState";
 
@@ -15,7 +16,7 @@ describe("useUrlState", () => {
   describe("initialization", () => {
     it("parses initial URL params on mount", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1, sort: "date" } as any }),
+        () => useUrlState({ defaults: untrusted({ page: 1, sort: "date" }) }),
         { wrapper: createWrapper(["/?page=3&sort=rating"]) }
       );
 
@@ -25,7 +26,7 @@ describe("useUrlState", () => {
 
     it("uses defaults when URL params are missing", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1, sort: "date" } as any }),
+        () => useUrlState({ defaults: untrusted({ page: 1, sort: "date" }) }),
         { wrapper: createWrapper(["/"]) }
       );
 
@@ -37,12 +38,12 @@ describe("useUrlState", () => {
   describe("setValue", () => {
     it("updates URL with history push by default", () => {
       const { result } = renderHook(
-        () => useUrlState({ defaults: { page: 1 } as any }),
+        () => useUrlState({ defaults: untrusted({ page: 1 }) }),
         { wrapper: createWrapper(["/?page=1"]) }
       );
 
       act(() => {
-        result.current.setValue("page", 2 as any);
+        result.current.setValue("page", untrusted(2));
       });
 
       // Check internal state updated

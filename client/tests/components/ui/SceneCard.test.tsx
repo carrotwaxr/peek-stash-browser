@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { describe, expect, it, vi } from "vitest";
@@ -19,8 +20,16 @@ vi.mock("../../../src/components/ui/index", () => ({
   TooltipEntityGrid: () => null,
 }));
 
+/** SceneCard renders from these fields; the rest are left out */
+const partialScene = (
+  fields: Partial<Omit<NormalizedScene, "paths" | "files">> & {
+    paths: Partial<NormalizedScene["paths"]>;
+    files: Partial<NormalizedScene["files"][number]>[];
+  }
+) => fields as NormalizedScene;
+
 describe("SceneCard", () => {
-  const mockScene = {
+  const mockScene = partialScene({
     id: "1",
     title: "Test Scene",
     paths: { screenshot: "/screenshot.jpg" },
@@ -33,7 +42,7 @@ describe("SceneCard", () => {
     performers: [],
     tags: [],
     studio: null,
-  };
+  });
 
   it("is a React forwardRef component", () => {
     expect(typeof SceneCard).toBe("object");
@@ -41,7 +50,7 @@ describe("SceneCard", () => {
   });
 
   it("accepts expected props", () => {
-    const element = createElement(SceneCard as any, {
+    const element = createElement(SceneCard, {
       scene: mockScene,
       fromPageTitle: "Performers",
       tabIndex: 0,
@@ -52,7 +61,7 @@ describe("SceneCard", () => {
   });
 
   it("accepts fromPageTitle prop", () => {
-    const element = createElement(SceneCard as any, {
+    const element = createElement(SceneCard, {
       scene: mockScene,
       fromPageTitle: "My Tag Name",
     });
@@ -64,7 +73,7 @@ describe("SceneCard", () => {
 
   it("accepts onClick callback", () => {
     const onClick = () => {};
-    const element = createElement(SceneCard as any, {
+    const element = createElement(SceneCard, {
       scene: mockScene,
       onClick,
     });
@@ -74,7 +83,7 @@ describe("SceneCard", () => {
 
   it("accepts onHideSuccess callback", () => {
     const onHideSuccess = () => {};
-    const element = createElement(SceneCard as any, {
+    const element = createElement(SceneCard, {
       scene: mockScene,
       onHideSuccess,
     });
@@ -84,7 +93,7 @@ describe("SceneCard", () => {
 });
 
 describe("navigation", () => {
-  const scene = {
+  const scene = partialScene({
     id: "1",
     instanceId: "inst-1",
     title: "Test Scene",
@@ -95,7 +104,7 @@ describe("navigation", () => {
     galleries: [],
     tags: [],
     inheritedTags: [],
-  };
+  });
 
   const renderCard = (onClick?: (s: unknown) => void) => {
     const router = createMemoryRouter(
@@ -103,11 +112,7 @@ describe("navigation", () => {
         {
           path: "/scenes",
           element: (
-            <SceneCard
-              scene={scene as any}
-              onClick={onClick}
-              hideRatingControls
-            />
+            <SceneCard scene={scene} onClick={onClick} hideRatingControls />
           ),
         },
         { path: "/scene/:id", element: <div>scene page</div> },
@@ -118,7 +123,10 @@ describe("navigation", () => {
     const [imageLink] = Array.from(
       utils.container.querySelectorAll<HTMLAnchorElement>('a[href="/scene/1"]')
     );
-    const titleLink = screen.getByText("Test Scene").closest("a")!;
+    const titleLink = must(
+      screen.getByText("Test Scene").closest("a"),
+      "title link"
+    );
     return { router, imageLink, titleLink };
   };
 

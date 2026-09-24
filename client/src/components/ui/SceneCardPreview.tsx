@@ -164,7 +164,9 @@ const SceneCardPreview = ({
       try {
         // Handle sprite preference (low quality, always use sprite)
         if (preferredPreviewType === "sprite") {
-          const parsedCues = await fetchAndParseVTT(scene.paths.vtt!);
+          // "sprite" is preferred only when the scene has a VTT
+          const vtt = scene.paths.vtt;
+          const parsedCues = vtt ? await fetchAndParseVTT(vtt) : [];
           if (parsedCues.length > 0) {
             const evenlySpaced = getEvenlySpacedSprites(
               parsedCues,

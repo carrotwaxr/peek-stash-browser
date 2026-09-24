@@ -6,10 +6,17 @@ import { getEntityPath } from "../../utils/entityLinks";
 import { CardCountIndicators, MediaImage } from "../ui/index";
 
 /**
+ * A direct tag, or an inherited one: the server can send an inherited tag as
+ * just its id and name, so the other fields may be missing.
+ */
+type SceneTag = Pick<TagRef, "id" | "name"> &
+  Partial<Omit<TagRef, "id" | "name">>;
+
+/**
  * Combine direct tags with inherited tags from server
  */
-const getAllTags = (scene: NormalizedScene): TagRef[] => {
-  const tagMap = new Map();
+const getAllTags = (scene: NormalizedScene): SceneTag[] => {
+  const tagMap = new Map<string, SceneTag>();
   // Direct scene tags
   if (scene.tags) {
     scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
@@ -22,7 +29,7 @@ const getAllTags = (scene: NormalizedScene): TagRef[] => {
 };
 
 interface TagThumbnailLinkProps {
-  tag: TagRef;
+  tag: SceneTag;
   hasMultipleInstances: boolean;
 }
 

@@ -41,16 +41,14 @@ export const useTableColumns = (
 
   // Get all column IDs for validation
   const allColumnIds = useMemo(
-    () => new Set(allColumns.map((col: any) => col.id)),
+    () => new Set(allColumns.map((col) => col.id)),
     [allColumns]
   );
 
   // Get mandatory column IDs
   const mandatoryColumnIds = useMemo(
     () =>
-      new Set(
-        allColumns.filter((col: any) => col.mandatory).map((col: any) => col.id)
-      ),
+      new Set(allColumns.filter((col) => col.mandatory).map((col) => col.id)),
     [allColumns]
   );
 
@@ -110,8 +108,8 @@ export const useTableColumns = (
     // Find any columns in allColumns that aren't in the order (new columns)
     const orderedSet = new Set(orderedIds);
     const missingIds = allColumns
-      .filter((col: any) => !orderedSet.has(col.id))
-      .map((col: any) => col.id);
+      .filter((col) => !orderedSet.has(col.id))
+      .map((col) => col.id);
 
     // Combine: ordered columns + missing columns at end
     const fullOrder = [...orderedIds, ...missingIds];
@@ -123,8 +121,10 @@ export const useTableColumns = (
     );
 
     // Map to full column objects
-    const columnMap = new Map(allColumns.map((col: any) => [col.id, col]));
-    return filteredIds.map((id) => columnMap.get(id)).filter(Boolean);
+    const columnMap = new Map(allColumns.map((col) => [col.id, col]));
+    return filteredIds
+      .map((id) => columnMap.get(id))
+      .filter((col) => col !== undefined);
   }, [
     columnOrder,
     allColumnIds,

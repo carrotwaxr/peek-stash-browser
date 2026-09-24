@@ -1,13 +1,18 @@
+import type { ComponentProps, ReactNode } from "react";
 import type * as routerModule from "react-router-dom";
+import type { NormalizedScene } from "@peek/shared-types";
 import { render } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Import after mocks
 import SceneCard from "../../../src/components/ui/SceneCard";
+import type SceneCardPreview from "../../../src/components/ui/SceneCardPreview";
+
+type PreviewProps = ComponentProps<typeof SceneCardPreview>;
 
 // Hoisted spies that can be inspected from tests
 const { previewSpy, mockUseTVMode } = vi.hoisted(() => ({
-  previewSpy: vi.fn(),
+  previewSpy: vi.fn<(props: PreviewProps) => void>(),
   mockUseTVMode: vi.fn(() => ({ isTVMode: false })),
 }));
 
@@ -49,21 +54,30 @@ vi.mock("react-router-dom", async (importOriginal) => {
 
 // Mock BaseCard so we only render the image content slot (where SceneCardPreview is mounted)
 vi.mock("../../../src/components/ui/BaseCard", () => ({
-  default: ({ renderImageContent }: { renderImageContent?: () => unknown }) => (
-    <div data-testid="base-card">{renderImageContent?.() as any}</div>
-  ),
+  default: ({
+    renderImageContent,
+  }: {
+    renderImageContent?: () => ReactNode;
+  }) => <div data-testid="base-card">{renderImageContent?.()}</div>,
 }));
 
 // Mock SceneCardPreview to capture props passed from SceneCard
 vi.mock("../../../src/components/ui/SceneCardPreview", () => ({
-  default: (props: Record<string, unknown>) => {
+  default: (props: PreviewProps) => {
     previewSpy(props);
     return <div data-testid="scene-preview" />;
   },
 }));
 
+/** SceneCard renders from these fields; the rest are left out */
+const partialScene = (
+  fields: Partial<Omit<NormalizedScene, "paths">> & {
+    paths: Partial<NormalizedScene["paths"]>;
+  }
+) => fields as NormalizedScene;
+
 describe("SceneCard (TV Mode) preview activation wiring", () => {
-  const scene = {
+  const scene = partialScene({
     id: "scene-1",
     title: "Test Scene",
     paths: { screenshot: "/screenshot.jpg" },
@@ -73,7 +87,7 @@ describe("SceneCard (TV Mode) preview activation wiring", () => {
     galleries: [],
     tags: [],
     inheritedTags: [],
-  } as any;
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();

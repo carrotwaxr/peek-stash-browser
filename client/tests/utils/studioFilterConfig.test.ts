@@ -103,7 +103,7 @@ describe("buildStudioFilter", () => {
         value: ["1", "2"],
         modifier: "INCLUDES_ALL",
       });
-      expect(result.tags.depth).toBeUndefined();
+      expect((result.tags as { depth?: unknown }).depth).toBeUndefined();
     });
   });
 

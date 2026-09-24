@@ -241,7 +241,7 @@ const TagHierarchyView = ({
   if (isLoading) {
     return (
       <div className="space-y-2">
-        {[...Array(8)].map((_, i) => (
+        {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
             className="h-14 rounded-lg animate-pulse"

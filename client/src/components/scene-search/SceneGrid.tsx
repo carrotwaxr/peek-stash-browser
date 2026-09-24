@@ -128,7 +128,7 @@ const SceneGrid = ({
   if (loading) {
     return (
       <div className={gridClasses}>
-        {[...Array(12)].map((_, i) => (
+        {Array.from({ length: 12 }).map((_, i) => (
           <SkeletonSceneCard key={i} />
         ))}
       </div>

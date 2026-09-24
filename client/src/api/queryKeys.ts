@@ -13,7 +13,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["scenes", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["scenes", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["scenes", instanceId, "detail", id] as const,
     externalPlayerLink: (instanceId: string | undefined, id: string) =>
       ["scenes", instanceId, "externalPlayerLink", id] as const,
@@ -22,7 +22,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["performers", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["performers", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["performers", instanceId, "detail", id] as const,
     minimal: (
       instanceId: string | undefined,
@@ -33,7 +33,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["studios", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["studios", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["studios", instanceId, "detail", id] as const,
     minimal: (
       instanceId: string | undefined,
@@ -44,7 +44,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["tags", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["tags", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["tags", instanceId, "detail", id] as const,
     minimal: (
       instanceId: string | undefined,
@@ -55,7 +55,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["galleries", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["galleries", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["galleries", instanceId, "detail", id] as const,
     minimal: (
       instanceId: string | undefined,
@@ -66,7 +66,7 @@ export const queryKeys = {
     all: (instanceId?: string) => ["groups", instanceId] as const,
     list: (instanceId: string | undefined, params: Record<string, unknown>) =>
       ["groups", instanceId, "list", params] as const,
-    detail: (instanceId: string | undefined, id: string) =>
+    detail: (instanceId: string | undefined, id: string | undefined) =>
       ["groups", instanceId, "detail", id] as const,
     minimal: (
       instanceId: string | undefined,

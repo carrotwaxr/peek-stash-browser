@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { libraryApi } from "../api";
 import { apiPost } from "../api";
+import type { FolderTreeTag } from "../utils/buildFolderTree";
 
 /**
  * Hook to fetch all tags with hierarchy for folder view.
@@ -18,9 +19,9 @@ export function useFolderViewTags(
   isActive: boolean,
   filters: FolderViewFilters | null = null
 ) {
-  const [tags, setTags] = useState<any[]>([]);
+  const [tags, setTags] = useState<FolderTreeTag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<unknown>(null);
   const fetchedRef = useRef(false);
 
   // Memoize filter key to prevent unnecessary refetches
@@ -46,7 +47,7 @@ export function useFolderViewTags(
       setError(null);
 
       try {
-        let fetchedTags;
+        let fetchedTags: FolderTreeTag[];
 
         // Use filtered endpoint if filters are provided
         if (
@@ -56,14 +57,15 @@ export function useFolderViewTags(
             filters.studioId ||
             filters.groupId)
         ) {
-          const result = await apiPost<{
-            tags: Array<{ id: string; name: string }>;
-          }>("/library/tags/for-scenes", {
-            performerId: filters.performerId,
-            tagId: filters.tagId,
-            studioId: filters.studioId,
-            groupId: filters.groupId,
-          });
+          const result = await apiPost<{ tags: FolderTreeTag[] }>(
+            "/library/tags/for-scenes",
+            {
+              performerId: filters.performerId,
+              tagId: filters.tagId,
+              studioId: filters.studioId,
+              groupId: filters.groupId,
+            }
+          );
           fetchedTags = result?.tags || [];
         } else {
           // Fetch all tags (existing behavior)
@@ -75,11 +77,8 @@ export function useFolderViewTags(
             },
           });
           fetchedTags =
-            (
-              result as {
-                findTags?: { tags?: Array<{ id: string; name: string }> };
-              }
-            )?.findTags?.tags ?? [];
+            (result as { findTags?: { tags?: FolderTreeTag[] } })?.findTags
+              ?.tags ?? [];
         }
 
         setTags(fetchedTags);

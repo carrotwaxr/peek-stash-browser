@@ -3,7 +3,8 @@ import { formatDurationCompact, formatResolution } from "../../utils/format";
 import { SceneCardPreview } from "../ui/index";
 
 interface Props {
-  scene: NormalizedScene;
+  /** Without a scene (or its screenshot) the thumbnail is a placeholder */
+  scene: NormalizedScene | null;
   watchHistory?: WatchHistoryData | null;
   className?: string;
   autoplayOnScroll?: boolean;

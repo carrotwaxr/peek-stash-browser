@@ -76,7 +76,8 @@ interface MockListResult {
 const mockUseSceneList = vi.fn(
   (): MockListResult => ({ data: null, isLoading: false, error: null })
 );
-const mockSearchControlsProps = vi.fn();
+const mockSearchControlsProps =
+  vi.fn<(props: Record<string, unknown>) => void>();
 vi.mock("@/api/hooks", () => ({
   useSceneList: (..._args: unknown[]) => mockUseSceneList(),
 }));
@@ -96,14 +97,21 @@ vi.mock("@/components/ui/index", () => ({
     children,
     onQueryChange,
     ...props
-  }: Record<string, unknown>) => {
+  }: {
+    // SceneSearch passes a render function as its children
+    children?:
+      | React.ReactNode
+      | ((state: Record<string, unknown>) => React.ReactNode);
+    onQueryChange?: (query: unknown) => void;
+    [key: string]: unknown;
+  }) => {
     mockSearchControlsProps(props);
     // Call onQueryChange once on mount to set queryParams (simulates SearchControls behavior)
     const calledRef = React.useRef(false);
     React.useEffect(() => {
       if (!calledRef.current && typeof onQueryChange === "function") {
         calledRef.current = true;
-        (onQueryChange as (q: unknown) => void)({ page: 1, per_page: 24 });
+        onQueryChange({ page: 1, per_page: 24 });
       }
     }, [onQueryChange]);
     return (

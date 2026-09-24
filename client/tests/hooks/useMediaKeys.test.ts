@@ -1,7 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
 import { useVideoPlayerShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { usePlaylistMediaKeys } from "@/hooks/useMediaKeys";
 import { isInRatingMode } from "@/hooks/useRatingHotkeys";
@@ -14,42 +13,50 @@ vi.mock("@/hooks/useRatingHotkeys", () => ({
   isInRatingMode: vi.fn(() => false),
 }));
 
-const mockUseVideoPlayerShortcuts = useVideoPlayerShortcuts as Mock;
-const mockIsInRatingMode = isInRatingMode as Mock;
+const mockUseVideoPlayerShortcuts = vi.mocked(useVideoPlayerShortcuts);
+const mockIsInRatingMode = vi.mocked(isInRatingMode);
+
+type MediaKeysOptions = Parameters<typeof usePlaylistMediaKeys>[0];
+
+/** A shortcut handler; the tests call them without an event */
+type ShortcutHandler = (event?: KeyboardEvent) => unknown;
 
 /**
  * Creates a mock Video.js player with sensible defaults.
  */
-function createMockPlayer(overrides: Record<string, any> = {}) {
-  return {
-    paused: vi.fn(() => true),
-    play: vi.fn(),
-    pause: vi.fn(),
-    currentTime: vi.fn((t?: number) => t ?? 30),
-    duration: vi.fn(() => 100),
-    volume: vi.fn((v?: number) => v ?? 0.5),
-    muted: vi.fn((m?: boolean) => m ?? false),
-    playbackRate: vi.fn((r?: number) => r ?? 1),
-    isFullscreen: vi.fn(() => false),
-    exitFullscreen: vi.fn(),
-    requestFullscreen: vi.fn(),
-    ...overrides,
-  };
+const baseMockPlayer = () => ({
+  paused: vi.fn(() => true),
+  play: vi.fn(),
+  pause: vi.fn(),
+  currentTime: vi.fn((t?: number) => t ?? 30),
+  duration: vi.fn(() => 100),
+  volume: vi.fn((v?: number) => v ?? 0.5),
+  muted: vi.fn((m?: boolean) => m ?? false),
+  playbackRate: vi.fn((r?: number) => r ?? 1),
+  isFullscreen: vi.fn(() => false),
+  exitFullscreen: vi.fn(),
+  requestFullscreen: vi.fn(),
+});
+
+type MockPlayer = ReturnType<typeof baseMockPlayer>;
+
+function createMockPlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
+  return { ...baseMockPlayer(), ...overrides };
 }
 
 /**
  * Captures the shortcuts object passed to useVideoPlayerShortcuts.
  */
 function captureShortcuts(
-  playerOverrides: Record<string, any> = {},
-  hookOptions: Record<string, any> = {}
+  playerOverrides: Partial<MockPlayer> = {},
+  hookOptions: Partial<MediaKeysOptions> = {}
 ) {
   const player = createMockPlayer(playerOverrides);
   const playerRef = { current: player };
 
   renderHook(() =>
     usePlaylistMediaKeys({
-      playerRef: playerRef as any,
+      playerRef,
       playlist: hookOptions.playlist ?? null,
       playNext: hookOptions.playNext ?? null,
       playPrevious: hookOptions.playPrevious ?? null,
@@ -63,7 +70,7 @@ function captureShortcuts(
       mockUseVideoPlayerShortcuts.mock.calls.length - 1
     ]
   );
-  const shortcuts = lastCall[1] as Record<string, (event?: any) => any>;
+  const shortcuts = lastCall[1] as Record<string, ShortcutHandler>;
 
   return { player, playerRef, shortcuts };
 }
@@ -310,7 +317,7 @@ describe("usePlaylistMediaKeys", () => {
 
     renderHook(() =>
       usePlaylistMediaKeys({
-        playerRef: { current: createMockPlayer() } as any,
+        playerRef: { current: createMockPlayer() },
         playlist: { scenes: [{}, {}] },
         playNext,
         playPrevious,
@@ -338,7 +345,7 @@ describe("usePlaylistMediaKeys", () => {
 
     renderHook(() =>
       usePlaylistMediaKeys({
-        playerRef: { current: createMockPlayer() } as any,
+        playerRef: { current: createMockPlayer() },
         playlist: { scenes: [{}, {}] },
         playNext,
         playPrevious,

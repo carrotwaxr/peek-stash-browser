@@ -6,6 +6,11 @@ interface Props {
   clientVersion: string;
 }
 
+/** The field read from GitHub's latest-release response */
+interface GitHubRelease {
+  tag_name: string;
+}
+
 const VersionInfoSection = ({ clientVersion }: Props) => {
   const [serverVersion, setServerVersion] = useState<string | null>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -39,7 +44,7 @@ const VersionInfoSection = ({ clientVersion }: Props) => {
         return;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as GitHubRelease;
       const latestTag = data.tag_name.replace("v", "");
       setLatestVersion(latestTag);
     } catch (err) {

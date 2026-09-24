@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { untrusted } from "@tests/helpers/untrusted";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "../../src/api";
 import type { AuthContextValue } from "../../src/contexts/AuthContextProvider";
@@ -55,7 +56,9 @@ describe("useWatchHistory", () => {
     });
 
     it("does not fetch without sceneId", async () => {
-      const { result } = renderHook(() => useWatchHistory(null as any));
+      const { result } = renderHook(() =>
+        useWatchHistory(untrusted<string>(null))
+      );
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

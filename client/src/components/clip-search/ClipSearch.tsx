@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { type GetClipsOptions, getClips } from "../../api";
 import { queryKeys } from "../../api/queryKeys";
 import { useConfig } from "../../contexts/ConfigContext";
@@ -64,8 +64,8 @@ const ClipSearch = ({
     queryKey: queryKeys.clips.list(
       (clipQueryParams ?? {}) as Record<string, unknown>
     ),
-    queryFn: () => getClips(clipQueryParams!),
-    enabled: clipQueryParams !== null,
+    queryFn:
+      clipQueryParams === null ? skipToken : () => getClips(clipQueryParams),
   });
   const isLoading = clipQueryParams === null || queryLoading;
 

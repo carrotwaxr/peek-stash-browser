@@ -10,6 +10,8 @@
 import { MemoryRouter } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { untrusted } from "@tests/helpers/untrusted";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TabNavigation, {
   TAB_COUNT_LOADING,
@@ -173,7 +175,9 @@ describe("TabNavigation", () => {
         />
       );
 
-      const galleriesTab = screen.getByText("Galleries").closest("button")!;
+      const galleriesTab = must(
+        screen.getByText("Galleries").closest("button")
+      );
       await user.click(galleriesTab);
 
       expect(onTabChange).toHaveBeenCalledWith("galleries");
@@ -191,7 +195,7 @@ describe("TabNavigation", () => {
         />
       );
 
-      const scenesTab = screen.getByText("Scenes").closest("button")!;
+      const scenesTab = must(screen.getByText("Scenes").closest("button"));
       // Tab is disabled so click shouldn't do anything
       await user.click(scenesTab);
 
@@ -230,10 +234,12 @@ describe("TabNavigation", () => {
 
   describe("Edge Cases", () => {
     it("handles tabs with undefined count", () => {
-      const tabsWithUndefined = [
+      const tabsWithUndefined = untrusted<
+        React.ComponentProps<typeof TabNavigation>["tabs"]
+      >([
         { id: "scenes", label: "Scenes", count: 50 },
         { id: "settings", label: "Settings" }, // No count
-      ] as any[];
+      ]);
 
       render(
         <TabNavigationTestWrapper

@@ -1,3 +1,4 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -136,7 +137,7 @@ describe("spriteSheet utilities", () => {
     });
 
     it("returns empty array for null/undefined cues", () => {
-      expect(getEvenlySpacedSprites(null as any)).toEqual([]);
+      expect(getEvenlySpacedSprites(untrusted(null))).toEqual([]);
     });
 
     it("returns single sprite when count is 1", () => {

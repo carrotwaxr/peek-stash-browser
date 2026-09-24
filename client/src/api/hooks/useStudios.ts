@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { type LibrarySearchParams, libraryApi } from "../library";
 import { queryKeys } from "../queryKeys";
 
@@ -11,8 +11,10 @@ export function useStudioList(
       instanceId,
       (params ?? {}) as Record<string, unknown>
     ),
-    queryFn: ({ signal }) => libraryApi.findStudios(params!, signal),
-    enabled: params !== null,
+    queryFn:
+      params === null
+        ? skipToken
+        : ({ signal }) => libraryApi.findStudios(params, signal),
     // Keep the current results on screen while the next page loads
     placeholderData: keepPreviousData,
   });
@@ -20,8 +22,9 @@ export function useStudioList(
 
 export function useStudioDetail(id: string | undefined, instanceId?: string) {
   return useQuery({
-    queryKey: queryKeys.studios.detail(instanceId, id!),
-    queryFn: () => libraryApi.findStudioById(id!, instanceId ?? null),
-    enabled: !!id,
+    queryKey: queryKeys.studios.detail(instanceId, id),
+    queryFn: id
+      ? () => libraryApi.findStudioById(id, instanceId ?? null)
+      : skipToken,
   });
 }

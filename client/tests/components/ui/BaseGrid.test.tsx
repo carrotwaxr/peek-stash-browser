@@ -1,5 +1,12 @@
+import type { FunctionComponent, ReactElement, ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { BaseGrid } from "../../../src/components/ui/BaseGrid";
+
+/** The props of the grid's root element */
+interface GridRootProps {
+  className: string;
+  children: ReactNode;
+}
 
 describe("BaseGrid", () => {
   const mockItems = [
@@ -9,7 +16,7 @@ describe("BaseGrid", () => {
   ];
 
   it("renders with standard grid type", () => {
-    const element = BaseGrid({
+    const element: ReactElement<GridRootProps> = BaseGrid({
       items: mockItems,
       renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "standard",
@@ -21,7 +28,7 @@ describe("BaseGrid", () => {
   });
 
   it("renders with scene grid type", () => {
-    const element = BaseGrid({
+    const element: ReactElement<GridRootProps> = BaseGrid({
       items: mockItems,
       renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "scene",
@@ -33,7 +40,7 @@ describe("BaseGrid", () => {
   });
 
   it("shows loading skeleton when loading=true", () => {
-    const element = BaseGrid({
+    const element: ReactElement<GridRootProps> = BaseGrid({
       items: [],
       renderItem: () => null,
       gridType: "standard",
@@ -46,7 +53,7 @@ describe("BaseGrid", () => {
   });
 
   it("shows empty state when items is empty", () => {
-    const element = BaseGrid({
+    const element: ReactElement<unknown, FunctionComponent> = BaseGrid({
       items: [],
       renderItem: () => null,
       gridType: "standard",
@@ -59,7 +66,7 @@ describe("BaseGrid", () => {
   });
 
   it("renders fragment with grid and pagination when totalPages > 1", () => {
-    const element = BaseGrid({
+    const element: ReactElement<GridRootProps> = BaseGrid({
       items: mockItems,
       renderItem: (item: unknown) => (item as { name: string }).name,
       gridType: "standard",

@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { renderHook } from "@testing-library/react";
 import { type Mock, describe, expect, it, vi } from "vitest";
@@ -8,6 +9,14 @@ vi.mock("react-router-dom", () => ({
 }));
 
 const useNavigateMock = useNavigate as unknown as Mock;
+
+/** A keydown event with only the fields the hook reads */
+const keyEvent = (
+  fields: Pick<
+    KeyboardEvent<HTMLElement>,
+    "key" | "preventDefault" | "stopPropagation" | "target" | "currentTarget"
+  >
+) => fields as KeyboardEvent<HTMLElement>;
 
 describe("useCardKeyboardNav", () => {
   it("navigates on Enter key", () => {
@@ -21,13 +30,15 @@ describe("useCardKeyboardNav", () => {
     const preventDefault = vi.fn();
     const stopPropagation = vi.fn();
 
-    result.current.onKeyDown({
-      key: "Enter",
-      preventDefault,
-      stopPropagation,
-      target: document.body,
-      currentTarget: document.body,
-    } as any);
+    result.current.onKeyDown(
+      keyEvent({
+        key: "Enter",
+        preventDefault,
+        stopPropagation,
+        target: document.body,
+        currentTarget: document.body,
+      })
+    );
 
     expect(preventDefault).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("/scene/123");
@@ -41,13 +52,15 @@ describe("useCardKeyboardNav", () => {
       useCardKeyboardNav({ linkTo: "/scene/123" })
     );
 
-    result.current.onKeyDown({
-      key: " ",
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
-      target: document.body,
-      currentTarget: document.body,
-    } as any);
+    result.current.onKeyDown(
+      keyEvent({
+        key: " ",
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        target: document.body,
+        currentTarget: document.body,
+      })
+    );
 
     expect(navigate).toHaveBeenCalledWith("/scene/123");
   });
@@ -61,13 +74,15 @@ describe("useCardKeyboardNav", () => {
       useCardKeyboardNav({ linkTo: "/scene/123", onCustomAction })
     );
 
-    result.current.onKeyDown({
-      key: "Enter",
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
-      target: document.body,
-      currentTarget: document.body,
-    } as any);
+    result.current.onKeyDown(
+      keyEvent({
+        key: "Enter",
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        target: document.body,
+        currentTarget: document.body,
+      })
+    );
 
     expect(onCustomAction).toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
@@ -83,13 +98,15 @@ describe("useCardKeyboardNav", () => {
 
     const input = document.createElement("input");
 
-    result.current.onKeyDown({
-      key: "Enter",
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
-      target: input,
-      currentTarget: document.body,
-    } as any);
+    result.current.onKeyDown(
+      keyEvent({
+        key: "Enter",
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        target: input,
+        currentTarget: document.body,
+      })
+    );
 
     expect(navigate).not.toHaveBeenCalled();
   });

@@ -1,6 +1,31 @@
 // client/src/utils/buildTagTree.ts
 
-type TagNode = Record<string, any>;
+/**
+ * The tag fields the tree reads. Callers pass richer tags; every other field
+ * is carried into the tree nodes unchanged.
+ */
+export interface TagTreeSource {
+  id: string;
+  name?: string | null;
+  parents?: readonly { id: string }[] | null;
+  children?: readonly { id: string }[] | null;
+  scene_count?: number | null;
+  performer_count?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** A tag in the tree: its own fields, with `children` as nested nodes. */
+export type TagTreeNode<T extends TagTreeSource> = Omit<T, "children"> & {
+  children: TagTreeNode<T>[];
+  /** Set (to true) only on ancestors of a search match, not on matches */
+  isAncestorOnly?: boolean;
+};
+
+type SortableTag = Pick<
+  TagTreeSource,
+  "name" | "scene_count" | "performer_count" | "created_at" | "updated_at"
+>;
 
 /**
  * Get sort compare function for a given field and direction
@@ -8,7 +33,7 @@ type TagNode = Record<string, any>;
 const getSortFn = (sortField: string, sortDirection: string) => {
   const dir = sortDirection === "ASC" ? 1 : -1;
 
-  return (a: TagNode, b: TagNode) => {
+  return (a: SortableTag, b: SortableTag) => {
     let valA, valB;
 
     switch (sortField) {
@@ -59,14 +84,14 @@ const getSortFn = (sortField: string, sortDirection: string) => {
  * @param {string} options.sortDirection - Sort direction (ASC or DESC)
  * @returns {Array} Array of root tree nodes, each with nested `children` array
  */
-export function buildTagTree(
-  tags: TagNode[],
+export function buildTagTree<T extends TagTreeSource>(
+  tags: readonly T[],
   options: {
     filterQuery?: string;
     sortField?: string;
     sortDirection?: string;
   } = {}
-) {
+): TagTreeNode<T>[] {
   const {
     filterQuery = "",
     sortField = "name",
@@ -77,20 +102,20 @@ export function buildTagTree(
   }
 
   // Create a map for quick lookup
-  const tagMap = new Map();
-  tags.forEach((tag: TagNode) => {
+  const tagMap = new Map<string, T>();
+  tags.forEach((tag) => {
     tagMap.set(tag.id, { ...tag, children: [] });
   });
 
   // If filtering, determine which tags match and which are ancestors of matches
-  const matchingIds = new Set();
-  const ancestorIds = new Set();
+  const matchingIds = new Set<string>();
+  const ancestorIds = new Set<string>();
 
   if (filterQuery) {
     const query = filterQuery.toLowerCase();
 
     // Find all matching tags
-    tags.forEach((tag: TagNode) => {
+    tags.forEach((tag) => {
       if (tag.name?.toLowerCase().includes(query)) {
         matchingIds.add(tag.id);
       }
@@ -106,9 +131,9 @@ export function buildTagTree(
       if (visited.has(tagId)) return;
       visited.add(tagId);
 
-      const tag = tags.find((t: TagNode) => t.id === tagId);
+      const tag = tags.find((t) => t.id === tagId);
       if (tag?.parents) {
-        tag.parents.forEach((parent: TagNode) => {
+        tag.parents.forEach((parent) => {
           if (!matchingIds.has(parent.id)) {
             ancestorIds.add(parent.id);
           }
@@ -117,18 +142,18 @@ export function buildTagTree(
       }
     };
 
-    matchingIds.forEach((id) => findAncestors(id as string));
+    matchingIds.forEach((id) => findAncestors(id));
   }
 
   // Build tree by nesting children under parents
-  const roots: TagNode[] = [];
+  const roots: TagTreeNode<T>[] = [];
   const sortFn = getSortFn(sortField, sortDirection);
 
   // Recursive function to build tree node with children
   const buildNode = (
     tagId: string,
     visitedPath = new Set<string>()
-  ): TagNode | null => {
+  ): TagTreeNode<T> | null => {
     // Prevent infinite loops from circular references
     if (visitedPath.has(tagId)) return null;
 
@@ -140,7 +165,7 @@ export function buildTagTree(
       return null;
     }
 
-    const node = {
+    const node: TagTreeNode<T> = {
       ...tag,
       children: [],
     };
@@ -150,14 +175,14 @@ export function buildTagTree(
     }
 
     // Build children
-    const originalTag = tags.find((t: TagNode) => t.id === tagId);
+    const originalTag = tags.find((t) => t.id === tagId);
     if (originalTag?.children) {
       const newPath = new Set(visitedPath);
       newPath.add(tagId);
 
       node.children = originalTag.children
-        .map((childRef: TagNode) => buildNode(childRef.id, newPath))
-        .filter(Boolean)
+        .map((childRef) => buildNode(childRef.id, newPath))
+        .filter((child) => child !== null)
         .sort(sortFn);
     }
 
@@ -165,7 +190,7 @@ export function buildTagTree(
   };
 
   // Find root tags and build tree
-  tags.forEach((tag: TagNode) => {
+  tags.forEach((tag) => {
     if (!tag.parents || tag.parents.length === 0) {
       const node = buildNode(tag.id);
       if (node) {

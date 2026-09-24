@@ -1,6 +1,9 @@
+import { untrusted } from "@tests/helpers/untrusted";
 import { must } from "@tests/testUtils";
 import { describe, expect, it } from "vitest";
 import {
+  type FolderTreeItem,
+  type FolderTreeTag,
   UNTAGGED_FOLDER_ID,
   buildFolderTree,
 } from "../../src/utils/buildFolderTree";
@@ -27,12 +30,12 @@ const createItem = (id: string, tagIds: string[] = []) => ({
 
 describe("buildFolderTree - empty/null handling", () => {
   it("returns empty result for null items", () => {
-    const result = buildFolderTree(null as any, []);
+    const result = buildFolderTree(untrusted<FolderTreeItem[]>(null), []);
     expect(result).toEqual({ folders: [], items: [], breadcrumbs: [] });
   });
 
   it("returns empty result for null tags", () => {
-    const result = buildFolderTree([], null as any);
+    const result = buildFolderTree([], untrusted<FolderTreeTag[]>(null));
     expect(result).toEqual({ folders: [], items: [], breadcrumbs: [] });
   });
 
@@ -74,7 +77,7 @@ describe("buildFolderTree - root level behavior", () => {
       (f) => f.id === UNTAGGED_FOLDER_ID
     );
     expect(untaggedFolder).toBeDefined();
-    expect(untaggedFolder!.totalCount).toBe(2);
+    expect(must(untaggedFolder).totalCount).toBe(2);
     expect(result.items).toHaveLength(0);
   });
 
@@ -108,7 +111,7 @@ describe("buildFolderTree - root level behavior", () => {
     const comedyFolder = result.folders.find((f) => f.name === "Comedy");
     expect(comedyFolder).toBeDefined();
     // Should use pre-computed count since no items on page
-    expect(comedyFolder!.totalCount).toBe(50);
+    expect(must(comedyFolder).totalCount).toBe(50);
   });
 
   it("hides folders that are truly empty (zero pre-computed count)", () => {
@@ -206,11 +209,11 @@ describe("buildFolderTree - inside tag folder (with pre-computed counts)", () =>
 
     // B&W should use pre-computed count
     const bwFolder = result.folders.find((f) => f.name === "B&W");
-    expect(bwFolder!.totalCount).toBe(40);
+    expect(must(bwFolder).totalCount).toBe(40);
 
     // Color should use item count (more accurate for current page)
     const colorFolder = result.folders.find((f) => f.name === "Color");
-    expect(colorFolder!.totalCount).toBe(1);
+    expect(must(colorFolder).totalCount).toBe(1);
   });
 });
 
@@ -296,8 +299,12 @@ describe("buildFolderTree - inside tag folder", () => {
 
     // Should appear in both Action and Comedy folders
     expect(result.folders).toHaveLength(2);
-    expect(result.folders.find((f) => f.name === "Action")!.totalCount).toBe(1);
-    expect(result.folders.find((f) => f.name === "Comedy")!.totalCount).toBe(1);
+    expect(
+      must(result.folders.find((f) => f.name === "Action")).totalCount
+    ).toBe(1);
+    expect(
+      must(result.folders.find((f) => f.name === "Comedy")).totalCount
+    ).toBe(1);
     // Should NOT be a loose item
     expect(result.items).toHaveLength(0);
   });
@@ -536,8 +543,12 @@ describe("buildFolderTree - multi-tag items at root", () => {
     const result = buildFolderTree(items, tags, []);
 
     expect(result.folders).toHaveLength(2);
-    expect(result.folders.find((f) => f.name === "Action")!.totalCount).toBe(1);
-    expect(result.folders.find((f) => f.name === "Comedy")!.totalCount).toBe(1);
+    expect(
+      must(result.folders.find((f) => f.name === "Action")).totalCount
+    ).toBe(1);
+    expect(
+      must(result.folders.find((f) => f.name === "Comedy")).totalCount
+    ).toBe(1);
     expect(result.items).toHaveLength(0);
   });
 });

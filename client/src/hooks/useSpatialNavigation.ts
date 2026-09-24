@@ -17,11 +17,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {number} options.initialFocusIndex Initial focus index (default: 0)
  * @returns {Object} Navigation state and helpers
  */
-interface SpatialNavigationOptions {
-  items?: any[];
+interface SpatialNavigationOptions<T> {
+  items?: T[];
   columns?: number;
   enabled?: boolean;
-  onSelect?: (item: any, index: number) => void;
+  onSelect?: (item: T, index: number) => void;
   onPageUp?: () => void;
   onPageDown?: () => void;
   onEscapeUp?: () => void;
@@ -30,7 +30,7 @@ interface SpatialNavigationOptions {
   initialFocusIndex?: number;
 }
 
-export const useSpatialNavigation = ({
+export const useSpatialNavigation = <T>({
   items = [],
   columns = 4,
   enabled = true,
@@ -41,7 +41,7 @@ export const useSpatialNavigation = ({
   onEscapeDown,
   onEscapeLeft,
   initialFocusIndex = 0,
-}: SpatialNavigationOptions) => {
+}: SpatialNavigationOptions<T>) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
   const itemRefs = useRef<HTMLElement[]>([]);
 
@@ -121,13 +121,15 @@ export const useSpatialNavigation = ({
         }
 
         case "Enter":
-        case " ":
+        case " ": {
           e.preventDefault();
-          if (items[focusedIndex] && onSelect) {
-            onSelect(items[focusedIndex], focusedIndex);
+          const focusedItem = items[focusedIndex];
+          if (focusedItem && onSelect) {
+            onSelect(focusedItem, focusedIndex);
           }
           handled = true;
           break;
+        }
 
         case "PageUp":
           e.preventDefault();

@@ -96,13 +96,6 @@ const AppContent = () => {
     void checkSetup();
   }, []);
 
-  // Handler for when setup completes - triggers re-check and navigation
-  const handleSetupComplete = () => {
-    setSetupStatus({ ...setupStatus!, setupComplete: true });
-    // Navigate to home after setup (user is already logged in via auto-login)
-    window.location.href = "/";
-  };
-
   // Ensure setupStatus has defaults to prevent null access in guards
   const safeSetupStatus = setupStatus ?? {
     setupComplete: false,
@@ -110,6 +103,13 @@ const AppContent = () => {
     hasStashInstance: false,
     userCount: 0,
     stashInstanceCount: 0,
+  };
+
+  // Handler for when setup completes - triggers re-check and navigation
+  const handleSetupComplete = () => {
+    setSetupStatus({ ...safeSetupStatus, setupComplete: true });
+    // Navigate to home after setup (user is already logged in via auto-login)
+    window.location.href = "/";
   };
 
   return (

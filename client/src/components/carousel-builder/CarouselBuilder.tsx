@@ -382,8 +382,8 @@ const CarouselBuilder = () => {
         direction,
       };
 
-      if (isEditing) {
-        await libraryApi.updateCarousel(id!, carouselData);
+      if (id) {
+        await libraryApi.updateCarousel(id, carouselData);
       } else {
         await libraryApi.createCarousel(carouselData);
       }

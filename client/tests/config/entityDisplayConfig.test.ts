@@ -22,7 +22,7 @@ describe("entityDisplayConfig", () => {
       );
 
       expect(timelineMode).toBeDefined();
-      expect(timelineMode!.label).toBe("Timeline");
+      expect(must(timelineMode).label).toBe("Timeline");
     });
 
     it("gallery entity includes timeline view mode", () => {
@@ -32,7 +32,7 @@ describe("entityDisplayConfig", () => {
       );
 
       expect(timelineMode).toBeDefined();
-      expect(timelineMode!.label).toBe("Timeline");
+      expect(must(timelineMode).label).toBe("Timeline");
     });
 
     it("image entity includes timeline view mode", () => {
@@ -42,7 +42,7 @@ describe("entityDisplayConfig", () => {
       );
 
       expect(timelineMode).toBeDefined();
-      expect(timelineMode!.label).toBe("Timeline");
+      expect(must(timelineMode).label).toBe("Timeline");
     });
 
     it("performer entity does NOT include timeline view mode", () => {
@@ -143,7 +143,8 @@ describe("entityDisplayConfig", () => {
     it("all entity types have required properties", () => {
       const entityTypes = Object.keys(ENTITY_DISPLAY_CONFIG);
       entityTypes.forEach((type) => {
-        const config = (ENTITY_DISPLAY_CONFIG as Record<string, any>)[type];
+        const config =
+          ENTITY_DISPLAY_CONFIG[type as keyof typeof ENTITY_DISPLAY_CONFIG];
         expect(config).toHaveProperty("label");
         expect(config).toHaveProperty("viewModes");
         expect(config).toHaveProperty("defaultSettings");
@@ -156,7 +157,8 @@ describe("entityDisplayConfig", () => {
     it("all view modes have id and label", () => {
       const entityTypes = Object.keys(ENTITY_DISPLAY_CONFIG);
       entityTypes.forEach((type) => {
-        const config = (ENTITY_DISPLAY_CONFIG as Record<string, any>)[type];
+        const config =
+          ENTITY_DISPLAY_CONFIG[type as keyof typeof ENTITY_DISPLAY_CONFIG];
         config.viewModes.forEach((mode: ViewMode) => {
           expect(mode).toHaveProperty("id");
           expect(mode).toHaveProperty("label");

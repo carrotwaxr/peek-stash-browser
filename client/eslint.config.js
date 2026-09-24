@@ -63,23 +63,35 @@ export default defineConfig([
       "@typescript-eslint/prefer-reduce-type-parameter": "error",
       "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
 
-      // Not yet at zero: warnings until the client ratchet (TT-B6) makes
-      // them errors with eslint-suppressions.json
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/no-unsafe-assignment": "warn",
-      "@typescript-eslint/no-unsafe-member-access": "warn",
-      "@typescript-eslint/no-unsafe-call": "warn",
-      "@typescript-eslint/no-unsafe-return": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/prefer-nullish-coalescing": "warn",
-      "@typescript-eslint/no-unnecessary-condition": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+
+      // Ratcheted in eslint-suppressions.json, fixed by the PRs that own the
+      // code: `any`, unsafe access and non-null assertions in the filters,
+      // playback, list and detail-page code (only there), a `||` on a string
+      // or number (where "" or 0 can mean something), and conditions that
+      // only become checkable once types are honest. The counts may only fall.
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      "@typescript-eslint/no-unnecessary-condition": "error",
 
       // Not adopted, as on the server. Enums are string-literal unions, so
       // TypeScript already rejects a comparison with a non-member; the other
       // is style.
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
+    },
+  },
+  // untrusted() is the deliberate cast for invalid input: its type parameter
+  // is the target type, used once by design (as on the server).
+  {
+    files: ["tests/helpers/untrusted.ts"],
+    rules: {
+      "@typescript-eslint/no-unnecessary-type-parameters": "off",
     },
   },
 ]);

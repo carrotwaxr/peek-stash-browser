@@ -4,6 +4,19 @@ import { useSpatialNavigation } from "./useSpatialNavigation";
 import { useTVMode } from "./useTVMode";
 import { useTVNavigation } from "./useTVNavigation";
 
+// The TV navigation events pages and the sidebar exchange on window
+declare global {
+  interface WindowEventMap {
+    /** The active zone of a grid page; null on a page without zones */
+    tvZoneChange: CustomEvent<{ zone: string | null }>;
+    tvSearchZoneEscape: CustomEvent<{ direction: "up" | "down" }>;
+    tvPaginationEscape: CustomEvent<{
+      zone: "top" | "bottom";
+      direction: "up" | "down";
+    }>;
+  }
+}
+
 /**
  * Shared TV navigation logic for grid pages (Performers, Scenes, Studios, etc.)
  * Manages zones: search, topPagination, grid, bottomPagination, mainNav
@@ -15,16 +28,16 @@ import { useTVNavigation } from "./useTVNavigation";
  * @param {Function} options.onItemSelect Callback when item is selected (Enter)
  * @returns {Object} TV navigation state and handlers
  */
-export const useGridPageTVNavigation = ({
+export const useGridPageTVNavigation = <T>({
   items = [],
   columns = 6,
   totalPages = 1,
   onItemSelect,
 }: {
-  items?: any[];
+  items?: T[];
   columns?: number;
   totalPages?: number;
-  onItemSelect?: (item: any) => void;
+  onItemSelect?: (item: T) => void;
 }) => {
   const { isTVMode } = useTVMode();
   const [searchParams] = useSearchParams();
@@ -97,7 +110,9 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode) return;
 
-    const handleSearchZoneEscape = (e: any) => {
+    const handleSearchZoneEscape = (
+      e: WindowEventMap["tvSearchZoneEscape"]
+    ) => {
       const { direction } = e.detail;
       if (direction === "up") {
         const moved = tvNavigation.goToPreviousZone();
@@ -121,7 +136,9 @@ export const useGridPageTVNavigation = ({
   useEffect(() => {
     if (!isTVMode) return;
 
-    const handlePaginationEscape = (e: any) => {
+    const handlePaginationEscape = (
+      e: WindowEventMap["tvPaginationEscape"]
+    ) => {
       const { zone, direction } = e.detail;
 
       if (zone === "top") {
