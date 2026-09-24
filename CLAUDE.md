@@ -12,7 +12,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 - E2E: `npm run test:e2e` from the root, against the running compose stack
 - Lint: `npm run lint` in `client/` and `server/`
 - Format: `npm run format` from the root; CI runs `npm run format:check`. `.prettierignore` leaves out `docs/`, `.claude/` and generated code.
-- Types: `cd server && npm run typecheck` (source, then tests; the tests need `integration/fixtures/testEntities.ts`, as for Integration) and `cd client && npm run typecheck` (CI runs only the server one)
+- Types: `cd server && npm run typecheck` (source, then tests; the tests need `integration/fixtures/testEntities.ts`, as for Integration) and `cd client && npm run typecheck` (CI runs both)
 - Build: `cd client && npm run build`
 - Release: `/pre-release`, then `/release-beta` or `/release-stable`
 
