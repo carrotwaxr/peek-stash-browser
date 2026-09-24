@@ -5,21 +5,20 @@ description: Run all validation checks before tagging a new release
 
 # Pre-Release Checks
 
-Run this before tagging a new version to ensure everything works.
+Run this before tagging a new version to ensure everything works. Step 2 goes through CI's jobs (`.github/workflows/ci.yml`) in order and runs each one's steps locally in the same order; the image and E2E jobs are left to CI (Step 0).
 
-## Step 0: Verify main is green on CI
+## Step 0: Verify HEAD is green on CI
 
-**Do this first, before any local checks.**
+**Do this first, before any local checks.** All branches should already be merged to main.
 
 ```bash
-# Must be on main
-git branch --show-current  # expect: main
-
-# Check the latest CI run on main
-gh run list --branch main --limit 1 --json conclusion,displayTitle,databaseId
+git branch --show-current                      # expect: main
+git fetch origin && git status -sb | head -1   # expect: ## main...origin/main, nothing ahead or behind
+gh run list --commit "$(git rev-parse HEAD)" --workflow CI --json status,conclusion,databaseId
+gh run view <databaseId> --json jobs -q '.jobs[] | "\(.name): \(.conclusion)"'
 ```
 
-Expected: `conclusion: "success"`. If CI is failing or in-progress, **stop and resolve before continuing**. All branches should already be merged to main before starting the pre-release process.
+Expected: one run, `completed` and `success`. Check this commit's run, not the latest run on main: that one can belong to another commit, or be cancelled. Its jobs include `Image Smoke Test / amd64` and `Image Smoke Test / arm64`, both `success`: CI built the production image natively on each architecture and booted it against an empty volume. If the run is still in progress, `gh run watch <databaseId>`. If it failed, or there is no run, **stop and resolve before continuing**.
 
 ## Step 1: Clean shared types build
 
@@ -27,60 +26,61 @@ Nuke the shared dist to simulate CI's clean checkout. This catches missing build
 
 ```bash
 rm -rf shared/dist shared/tsconfig.tsbuildinfo
-cd shared && npm run build
+(cd shared && npm run build)
 ```
 
 Expected: Build succeeds and `shared/dist/` is populated.
 
-## Step 2: Local checks (parallel)
+## Step 2: Local checks
 
-Run steps 2a-2e in parallel where possible (server and client checks are independent).
+Run each block from the repo root. 2b and 2c are independent and can run in parallel.
 
-### 2a. Server Unit Tests
+### 2a. Format (CI: `Format`)
 ```bash
-cd server && npm test
+npm run format:check
+```
+Expected: All matched files use Prettier code style
+
+### 2b. Client Checks (CI: `Client Checks`)
+```bash
+(cd client && npm run typecheck && npm run lint && npm run build && npm run test:coverage)
+```
+Expected: No type or lint errors (warnings OK), the build succeeds, all tests pass and the coverage thresholds hold
+
+### 2c. Server Checks (CI: `Server Checks`)
+```bash
+(cd server && npx prisma generate && npm run lint && npm run typecheck && npm run test:coverage)
+```
+Expected: No lint or type errors (warnings OK), all tests pass and the coverage thresholds hold. `npm run typecheck` is CI's two type checks in order: `tsc --noEmit` (source), then `npm run typecheck:tests` (`tests/` and `integration/`). Lint and the test type check need `server/integration/fixtures/testEntities.ts`; copy `testEntities.example.ts` if you have none.
+
+### 2d. Dependency Audit (CI: `Dependency Audit`)
+```bash
+(cd server && npm audit --omit=dev --audit-level=high)
+(cd client && npm audit --omit=dev --audit-level=high)
+(cd shared && npm audit --omit=dev --audit-level=high)
+npm audit --omit=dev --audit-level=high
+```
+Expected: Each exits 0 (no high or critical advisory in runtime dependencies)
+
+### 2e. E2E Tests (CI: `E2E Tests`)
+Covered by Step 0: CI ran the suite on this commit.
+
+### 2f. Integration Tests (CI: `Integration Tests`, skipped there: CI has no test Stash)
+```bash
+(cd server && npm run test:integration:fresh)
 ```
 Expected: All tests pass
+Note: Needs `STASH_TEST_URL` and `STASH_TEST_API_KEY` in the root `.env` and `server/integration/fixtures/testEntities.ts` configured for that Stash. `:fresh` (`FRESH_DB=true`) deletes `server/integration/test.db` first: the multi-instance tests add the main Stash (`STASH_URL`) to it read-only and keep it there, and a run on the kept database syncs it again at startup.
 
-### 2b. Server Linter + Type Check
+## Step 3: Docker image
+
+Covered by Step 0 (CI built and booted it on amd64 and arm64). `docker-build.yml` runs the same smoke test again on the tagged commit and tags only images that passed on both architectures. To debug an image locally:
+
 ```bash
-cd server && npm run lint
-cd server && npm run typecheck
+docker build -f Dockerfile.production -t peek:test . && node docker/smoke-test.mjs peek:test
 ```
-Expected: No errors (warnings OK)
 
-### 2c. Client Unit Tests
-```bash
-cd client && npm test
-```
-Expected: All tests pass
-
-### 2d. Client Linter
-```bash
-cd client && npm run lint
-```
-Expected: No errors (warnings OK)
-
-### 2e. Integration Tests
-```bash
-cd server && npm run test:integration
-```
-Expected: All tests pass
-Note: Requires testEntities.ts to be configured
-
-## Step 3: Build checks
-
-### 3a. Client Build
-```bash
-cd client && npm run build
-```
-Expected: Build succeeds without errors
-
-### 3b. Docker Build
-```bash
-docker build -f Dockerfile.production -t peek:test .
-```
-Expected: Image builds successfully
+`docker/smoke-test.mjs` publishes the container on `127.0.0.1:8080`; pass another port as a second argument if that one is taken. It removes its container and volume when it ends.
 
 ## Fixing Failures
 
@@ -89,13 +89,16 @@ When a check fails, find the root cause with `/fluffer:code-debug` before changi
 ## After All Checks Pass
 
 Report summary:
-- CI on main: Green
+- CI on HEAD: Green (run ID)
 - Shared types: Clean build
-- Unit tests: X passed (client) + X passed (server)
-- Integration tests: X passed
+- Format: Clean
+- Type check: server and client
 - Linter: Clean
-- Type check: Clean
 - Client build: Success
-- Docker: Success
+- Unit tests: X passed (client) + X passed (server), coverage thresholds met
+- Dependency audit: Clean
+- E2E: Passed in CI
+- Integration tests: X passed
+- Docker: smoke-tested in CI (amd64, arm64)
 
 Ready to proceed with release tagging.
