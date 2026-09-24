@@ -3,21 +3,10 @@ import prisma from "../../prisma/singleton.js";
 import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-    performerTag: { findMany: vi.fn().mockResolvedValue([]) },
-    scenePerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    galleryPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneGallery: { findMany: vi.fn().mockResolvedValue([]) },
-    stashScene: { findMany: vi.fn().mockResolvedValue([]) },
-    stashTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGallery: { findMany: vi.fn().mockResolvedValue([]) },
-    stashStudio: { findMany: vi.fn().mockResolvedValue([]) },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -48,11 +37,22 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   ),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("PerformerQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.performerTag.findMany.mockResolvedValue([]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.galleryPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
+    mockPrisma.stashScene.findMany.mockResolvedValue([]);
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
+    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
+    mockPrisma.stashStudio.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query

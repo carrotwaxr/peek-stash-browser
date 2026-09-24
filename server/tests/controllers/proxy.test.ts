@@ -20,13 +20,10 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 // Mocks (must be before imports)
 // =============================================================================
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    stashScene: { findFirst: vi.fn() },
-    stashClip: { findFirst: vi.fn() },
-    stashImage: { findFirst: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
@@ -61,7 +58,7 @@ vi.mock("https", () => {
   };
 });
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 const mockHttpGet = vi.mocked(http.get);

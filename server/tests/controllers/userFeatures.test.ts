@@ -55,34 +55,10 @@ import {
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    userContentRestriction: {
-      findMany: vi.fn(),
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    userGroupMembership: {
-      findMany: vi.fn(),
-    },
-    userStashInstance: {
-      findMany: vi.fn(),
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-    },
-    stashInstance: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-    // A batch transaction resolves its operations in order
-    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -158,7 +134,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockVisibleKeys = vi.mocked(getVisibleEntityKeys);
 const mockVisibleIds = vi.mocked(getIdsVisibleOnAnyInstance);
 const mockAlreadyHidden = vi.mocked(userHiddenEntityService.findAlreadyHidden);
@@ -353,8 +329,8 @@ describe("User Controller — Features", () => {
       await saveFilterPreset(req, res);
 
       // Check that defaultFilterPresets was updated in the prisma call
-      const updateCall = mockPrisma.user.update.mock.calls[0][0];
-      const defaults = updateCall.data.defaultFilterPresets as Record<
+      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
+      const defaults = updateCall?.data.defaultFilterPresets as Record<
         string,
         unknown
       >;
@@ -391,12 +367,12 @@ describe("User Controller — Features", () => {
       await deleteFilterPreset(req, res);
       expect(res._getBody().success).toBe(true);
 
-      const updateCall = mockPrisma.user.update.mock.calls[0][0];
-      const presets = updateCall.data.filterPresets as Record<
+      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
+      const presets = updateCall?.data.filterPresets as Record<
         string,
         unknown[]
       >;
-      const defaults = updateCall.data.defaultFilterPresets as Record<
+      const defaults = updateCall?.data.defaultFilterPresets as Record<
         string,
         unknown
       >;

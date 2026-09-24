@@ -19,17 +19,10 @@ const { mockGetAllConfigs } = vi.hoisted(() => ({
 }));
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    stashScene: { findMany: vi.fn() },
-    stashPerformer: { findMany: vi.fn() },
-    stashStudio: { findMany: vi.fn() },
-    stashTag: { findMany: vi.fn() },
-    stashGallery: { findMany: vi.fn() },
-    stashGroup: { findMany: vi.fn() },
-    stashImage: { findMany: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -49,7 +42,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 const INSTANCE_A = {
   id: "aaa-111",

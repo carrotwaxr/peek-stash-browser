@@ -6,21 +6,12 @@ import {
 } from "../../services/PermissionService.js";
 
 // Mock prisma before importing the service
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      findUnique: vi.fn(),
-    },
-    userGroup: {
-      findMany: vi.fn(),
-    },
-    userGroupMembership: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("PermissionService", () => {
   beforeEach(() => {

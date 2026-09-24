@@ -33,19 +33,10 @@ import {
 // Mocks — must precede imports of the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock("../../../prisma/singleton.js", () => ({
-  default: {
-    watchHistory: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneRating: { findMany: vi.fn().mockResolvedValue([]) },
-    performerRating: { findMany: vi.fn().mockResolvedValue([]) },
-    studioRating: { findMany: vi.fn().mockResolvedValue([]) },
-    tagRating: { findMany: vi.fn().mockResolvedValue([]) },
-    userEntityRanking: {
-      findMany: vi.fn().mockResolvedValue([]),
-      findFirst: vi.fn().mockResolvedValue(null),
-    },
-  },
-}));
+vi.mock(
+  "../../../prisma/singleton.js",
+  () => import("../../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
@@ -183,7 +174,7 @@ vi.mock("@peek/shared-types/instanceAwareId.js", () => ({
   coerceEntityRefs: vi.fn().mockImplementation((ids: string[]) => ids),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockIsSceneStreamable = vi.mocked(isSceneStreamable);
 const mockSceneQueryBuilder = vi.mocked(sceneQueryBuilder);
 const mockStashEntityService = vi.mocked(stashEntityService);
@@ -196,6 +187,13 @@ const mockCountUserCriteria = vi.mocked(countUserCriteria);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrisma.watchHistory.findMany.mockResolvedValue([]);
+  mockPrisma.sceneRating.findMany.mockResolvedValue([]);
+  mockPrisma.performerRating.findMany.mockResolvedValue([]);
+  mockPrisma.studioRating.findMany.mockResolvedValue([]);
+  mockPrisma.tagRating.findMany.mockResolvedValue([]);
+  mockPrisma.userEntityRanking.findMany.mockResolvedValue([]);
+  mockPrisma.userEntityRanking.findFirst.mockResolvedValue(null);
 });
 
 // ===== 1. addStreamabilityInfo =====

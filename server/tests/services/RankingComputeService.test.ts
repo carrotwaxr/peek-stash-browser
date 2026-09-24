@@ -9,16 +9,10 @@ import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 
 // Mock prisma before importing service
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRaw: vi.fn(),
-    $transaction: vi.fn(),
-    userEntityRanking: {
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger to suppress output
 vi.mock("../../utils/logger.js", () => ({
@@ -30,7 +24,7 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 /** Helper: set up mocks for a recomputeAllRankings call */
 function setupRankingMocks(opts: {

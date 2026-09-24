@@ -12,15 +12,12 @@ import {
 } from "../../services/PlaylistAccessService.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    playlist: { findUnique: vi.fn() },
-    playlistShare: { findMany: vi.fn() },
-    userGroupMembership: { findMany: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("PlaylistAccessService", () => {
   beforeEach(() => {

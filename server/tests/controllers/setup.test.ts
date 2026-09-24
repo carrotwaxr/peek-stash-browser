@@ -20,26 +20,13 @@ import {
 import prisma from "../../prisma/singleton.js";
 import { logger } from "../../utils/logger.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      count: vi.fn().mockResolvedValue(0),
-      create: vi.fn(),
-    },
-    stashInstance: {
-      count: vi.fn().mockResolvedValue(0),
-      findMany: vi.fn().mockResolvedValue([]),
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      aggregate: vi.fn().mockResolvedValue({ _max: { priority: null } }),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -85,11 +72,17 @@ vi.mock("bcryptjs", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("Setup Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.user.count.mockResolvedValue(0);
+    mockPrisma.stashInstance.count.mockResolvedValue(0);
+    mockPrisma.stashInstance.findMany.mockResolvedValue([]);
+    mockPrisma.stashInstance.aggregate.mockResolvedValue(
+      partialRow({ _max: partialRow({ priority: null }) })
+    );
   });
 
   describe("getSetupStatus", () => {

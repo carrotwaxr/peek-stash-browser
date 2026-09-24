@@ -3,15 +3,12 @@ import prisma from "../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 
 // Mock prisma before importing
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    userExcludedEntity: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("EntityExclusionHelper", () => {
   beforeEach(() => {

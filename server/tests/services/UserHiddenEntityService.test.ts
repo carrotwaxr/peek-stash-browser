@@ -10,15 +10,10 @@ import { userHiddenEntityService } from "../../services/UserHiddenEntityService.
 import type { EntityType } from "../../services/UserHiddenEntityService.js";
 
 // Mock prisma before importing service
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    userHiddenEntity: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // The access check is mocked; entityRefKey stays real
 vi.mock("../../services/EntityAccessService.js", async () => {
@@ -53,7 +48,7 @@ vi.mock("../../services/StashEntityService.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockExclusion = vi.mocked(exclusionComputationService);
 const mockEntity = vi.mocked(stashEntityService);
 const mockResolveVisible = vi.mocked(resolveVisibleApartFromOwnHides);

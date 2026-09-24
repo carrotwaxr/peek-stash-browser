@@ -21,18 +21,10 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: { findUnique: vi.fn() },
-    sceneRating: { upsert: vi.fn() },
-    performerRating: { upsert: vi.fn() },
-    studioRating: { upsert: vi.fn() },
-    tagRating: { upsert: vi.fn() },
-    galleryRating: { upsert: vi.fn() },
-    groupRating: { upsert: vi.fn() },
-    imageRating: { upsert: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -51,7 +43,7 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   resolveAccessibleInstanceId: vi.fn(),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 

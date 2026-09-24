@@ -25,13 +25,10 @@ vi.mock("../../services/RankingComputeService.js", () => ({
   },
 }));
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    userEntityRanking: {
-      findFirst: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -39,7 +36,7 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockStatsService = vi.mocked(userStatsAggregationService);
 const mockRankingService = vi.mocked(rankingComputeService);
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 const USER = { id: 1, username: "testuser", role: "USER" };
 

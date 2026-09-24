@@ -36,11 +36,10 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   canUserAccessEntity: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: { findUnique: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../utils/jwtSecret.js", () => ({
   getJwtSecret: vi.fn().mockReturnValue("test-secret"),
@@ -61,7 +60,7 @@ vi.mock("../../utils/streamProxy.js", () => ({
 
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
 
 /** Every logger call so far, at any level, as one string. */

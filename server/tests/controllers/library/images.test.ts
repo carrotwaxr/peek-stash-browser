@@ -15,12 +15,10 @@ import { mockReq, mockRes } from "../../helpers/controllerTestUtils.js";
 
 // --- Mocks (must come before module import) ---
 
-vi.mock("../../../prisma/singleton.js", () => ({
-  default: {
-    imageRating: { findMany: vi.fn() },
-    imageViewHistory: { findMany: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../../prisma/singleton.js",
+  () => import("../../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../../services/ImageQueryBuilder.js", () => ({
   imageQueryBuilder: { execute: vi.fn() },
@@ -42,7 +40,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockImageQueryBuilder = vi.mocked(imageQueryBuilder);
 
 const defaultUser = { id: 1, role: "USER" };

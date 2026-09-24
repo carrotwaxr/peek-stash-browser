@@ -11,17 +11,10 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { userStatsService } from "../../services/UserStatsService.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    dataMigration: {
-      findMany: vi.fn(),
-      create: vi.fn(),
-    },
-    user: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -49,7 +42,7 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockStatsService = vi.mocked(userStatsService);
 const mockExclusionService = vi.mocked(exclusionComputationService);
 

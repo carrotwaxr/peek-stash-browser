@@ -28,44 +28,14 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock Prisma - hoisted to top level. Interactive transactions run their
 // callback on this same mock client.
-vi.mock("../../prisma/singleton.js", () => {
-  const client = {
-    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
-    watchHistory: {
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    user: {
-      findUnique: vi.fn(),
-    },
-    stashScene: {
-      findFirst: vi.fn().mockResolvedValue({
-        duration: 600,
-        stashInstanceId: "test-instance",
-      }),
-    },
-    userPerformerStats: {
-      deleteMany: vi.fn(),
-    },
-    userStudioStats: {
-      deleteMany: vi.fn(),
-    },
-    userTagStats: {
-      deleteMany: vi.fn(),
-    },
-    userEntityRanking: {
-      deleteMany: vi.fn(),
-    },
-  };
-  return { default: client };
-});
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock StashInstanceManager
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -109,7 +79,7 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 // Get mocked functions
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockResolve = vi.mocked(resolveAccessibleInstanceId);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 
@@ -121,6 +91,9 @@ describe("Watch History Controller", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.stashScene.findFirst.mockResolvedValue(
+      partialRow({ duration: 600, stashInstanceId: "test-instance" })
+    );
     mockResolve.mockImplementation(
       async (_userId, _type, _id, requested) => requested ?? "test-instance"
     );

@@ -20,19 +20,11 @@ const mockStashClient = vi.hoisted(() => ({
   findGroups: vi.fn(),
 }));
 
-// Mock prisma — need all entity rating models plus watchHistory and $transaction
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    sceneRating: { findMany: vi.fn(), upsert: vi.fn() },
-    performerRating: { findMany: vi.fn(), upsert: vi.fn() },
-    studioRating: { findMany: vi.fn(), upsert: vi.fn() },
-    tagRating: { findMany: vi.fn(), upsert: vi.fn() },
-    galleryRating: { findMany: vi.fn(), upsert: vi.fn() },
-    groupRating: { findMany: vi.fn(), upsert: vi.fn() },
-    watchHistory: { findMany: vi.fn(), upsert: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}));
+// Mock prisma
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -75,7 +67,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
 
 const ADMIN = { id: 1, username: "admin", role: "ADMIN" };

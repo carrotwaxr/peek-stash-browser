@@ -23,31 +23,10 @@ import {
 import { mockReq, mockRes } from "../helpers/controllerTestUtils.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    playlist: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    playlistItem: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      delete: vi.fn(),
-      update: vi.fn(),
-    },
-    playlistShare: {
-      findMany: vi.fn(),
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    userGroupMembership: { findMany: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock PlaylistAccessService
 vi.mock("../../services/PlaylistAccessService.js", () => ({
@@ -85,7 +64,7 @@ vi.mock("../../utils/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockGetAccess = vi.mocked(getPlaylistAccess);
 const mockGetUserGroups = vi.mocked(getUserGroups);
 const mockResolvePermissions = vi.mocked(resolveUserPermissions);

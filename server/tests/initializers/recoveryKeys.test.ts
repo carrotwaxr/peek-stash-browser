@@ -7,20 +7,16 @@ import { hashLegacyRecoveryKeys } from "../../initializers/recoveryKeys.js";
 import prisma from "../../prisma/singleton.js";
 import { hashRecoveryKey } from "../../utils/recoveryKey.js";
 
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    user: {
-      findMany: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../utils/logger.js", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("hashLegacyRecoveryKeys", () => {
   beforeEach(() => {

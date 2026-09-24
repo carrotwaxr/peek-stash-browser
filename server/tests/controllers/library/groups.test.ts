@@ -21,11 +21,10 @@ import { createMockGroup } from "../../helpers/mockDataGenerators.js";
 
 // --- Mocks (must come before module import) ---
 
-vi.mock("../../../prisma/singleton.js", () => ({
-  default: {
-    groupRating: { findMany: vi.fn() },
-  },
-}));
+vi.mock(
+  "../../../prisma/singleton.js",
+  () => import("../../helpers/prismaSingletonMock.js")
+);
 
 vi.mock("../../../services/StashEntityService.js", () => ({
   stashEntityService: {
@@ -85,7 +84,7 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 const mockStashEntityService = vi.mocked(stashEntityService);
 const mockGroupQueryBuilder = vi.mocked(groupQueryBuilder);
 

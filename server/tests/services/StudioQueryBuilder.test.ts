@@ -3,19 +3,10 @@ import prisma from "../../prisma/singleton.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 
 // Mock prisma
-vi.mock("../../prisma/singleton.js", () => ({
-  default: {
-    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
-    studioTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashScene: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGallery: { findMany: vi.fn().mockResolvedValue([]) },
-    scenePerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    sceneGroup: { findMany: vi.fn().mockResolvedValue([]) },
-    stashTag: { findMany: vi.fn().mockResolvedValue([]) },
-    stashPerformer: { findMany: vi.fn().mockResolvedValue([]) },
-    stashGroup: { findMany: vi.fn().mockResolvedValue([]) },
-  },
-}));
+vi.mock(
+  "../../prisma/singleton.js",
+  () => import("../helpers/prismaSingletonMock.js")
+);
 
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
@@ -46,11 +37,20 @@ vi.mock("../../services/EntityAccessService.js", () => ({
   ),
 }));
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = vi.mocked(prisma, true);
 
 describe("StudioQueryBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashScene.findMany.mockResolvedValue([]);
+    mockPrisma.stashGallery.findMany.mockResolvedValue([]);
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.stashTag.findMany.mockResolvedValue([]);
+    mockPrisma.stashPerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashGroup.findMany.mockResolvedValue([]);
     // Default: main query returns empty, count query returns {total: 0}
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([]) // main query
