@@ -151,6 +151,10 @@ Common header names:
 - `Remote-User` (common with Nginx auth_request)
 - `X-Auth-Request-User` (oauth2-proxy)
 
+### External player links
+
+External players (VLC, Android video apps) cannot pass your single-sign-on login to the proxy. The external player button therefore gives each user a personal, signed link, and Peek checks the signature itself. Let requests to `GET /api/scene/*/proxy-stream/stream` that carry a `sig` query parameter through the proxy without authentication; everything else stays behind it. Peek still rejects an expired, tampered or foreign link with 401, and applies that user's hidden items and content restrictions.
+
 ### Security Requirements
 
 !!! danger "Critical Security Requirements"

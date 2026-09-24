@@ -62,6 +62,10 @@
       "types": "./dist/api/userStats.d.ts",
       "default": "./dist/api/userStats.js"
     },
+    "./api/video.js": {
+      "types": "./dist/api/video.d.ts",
+      "default": "./dist/api/video.js"
+    },
     "./api/watchHistory.js": {
       "types": "./dist/api/watchHistory.d.ts",
       "default": "./dist/api/watchHistory.js"

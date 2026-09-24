@@ -6,9 +6,13 @@ import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
 import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import videojs from "video.js";
-import { apiPost } from "../../api";
+import { apiPost, redirectToLogin } from "../../api";
 import { getSceneTitle } from "../../utils/format";
 import { buildPlayerSources } from "./playerSources";
+import {
+  SESSION_EXPIRED_PLAYBACK_MESSAGE,
+  isSessionExpired,
+} from "./sessionCheck";
 import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
@@ -442,15 +446,23 @@ export function useVideoPlayer({
     isAutoFallbackRef.current = false;
 
     const handleError = async () => {
+      const error = player.error();
+      if (!error) return;
+
+      // A <video> element cannot see its source's HTTP status, so ask the
+      // server once per error. This runs before the auto-fallback, which
+      // would otherwise take a 401 on direct play for a codec error.
+      if (await isSessionExpired()) {
+        redirectToLogin(SESSION_EXPIRED_PLAYBACK_MESSAGE);
+        return;
+      }
+
       if (hasFallbackTriggeredRef.current) {
         console.log(
           "[AUTO-FALLBACK] Already triggered for this scene, ignoring"
         );
         return;
       }
-
-      const error = player.error();
-      if (!error) return;
 
       // Only handle codec errors (3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED)
       if (error.code !== 3 && error.code !== 4) return;

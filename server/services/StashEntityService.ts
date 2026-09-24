@@ -2114,8 +2114,10 @@ class StashEntityService {
           scene.pathChaptersVtt,
           scene.stashInstanceId
         ),
-        stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
-        caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
+        // Always null: Peek serves streams and captions through its own
+        // routes, and the media proxy refuses both Stash routes
+        stream: null,
+        caption: null,
       },
 
       // Built from the stored stream choices, as keyless Peek proxy paths
@@ -2212,8 +2214,10 @@ class StashEntityService {
           scene.pathChaptersVtt,
           scene.stashInstanceId
         ),
-        stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
-        caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
+        // Always null: Peek serves streams and captions through its own
+        // routes, and the media proxy refuses both Stash routes
+        stream: null,
+        caption: null,
       },
 
       // Empty sceneStreams for browse - generated on demand for playback

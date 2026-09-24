@@ -6,10 +6,27 @@
 
 const API_BASE_URL = "/api";
 const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
+/** A one-time notice the login page shows (set by redirectToLogin). */
+export const LOGIN_MESSAGE_STORAGE_KEY = "peek_login_message";
 
 // Flag to prevent multiple simultaneous redirects to login.
 // Never reset because the page does a full navigation (window.location.href).
 let isRedirectingToLogin = false;
+
+/**
+ * Send the browser to the login page, remembering where it was so login can
+ * return there, with an optional message the login page shows once.
+ */
+export function redirectToLogin(message?: string): void {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  sessionStorage.setItem(
+    REDIRECT_STORAGE_KEY,
+    window.location.pathname + window.location.search
+  );
+  if (message) sessionStorage.setItem(LOGIN_MESSAGE_STORAGE_KEY, message);
+  window.location.href = "/login";
+}
 
 // Background/fire-and-forget endpoints where 401/403 should NOT trigger redirect.
 const AUTH_SILENT_ENDPOINTS = new Set([
@@ -102,10 +119,7 @@ export async function apiFetch<T = unknown>(
       }
 
       if (!isRedirectingToLogin) {
-        isRedirectingToLogin = true;
-        const fullUrl = window.location.pathname + window.location.search;
-        sessionStorage.setItem(REDIRECT_STORAGE_KEY, fullUrl);
-        window.location.href = "/login";
+        redirectToLogin();
         return new Promise<T>(() => {});
       }
     }

@@ -446,5 +446,67 @@ describe("SceneQueryBuilder", () => {
       expect(json).not.toContain("stash.test:9999/scene/1/stream");
       expect(result.scenes[0].sceneStreams).toEqual([]);
     });
+
+    it("returns null paths.stream and paths.caption", async () => {
+      // Peek serves streams and captions through its own routes; the media
+      // proxy's allowlist refuses both Stash routes, so neither is emitted.
+      const row = {
+        id: "1",
+        stashInstanceId: "inst-a",
+        title: "Scene 1",
+        code: null,
+        date: null,
+        studioId: null,
+        stashRating100: null,
+        duration: 60,
+        organized: 0,
+        details: null,
+        director: null,
+        urls: null,
+        filePath: "/v/scene1.mp4",
+        fileBitRate: null,
+        fileFrameRate: null,
+        fileWidth: 1280,
+        fileHeight: 720,
+        fileVideoCodec: "h264",
+        fileAudioCodec: "aac",
+        fileSize: null,
+        pathScreenshot: "/scene/1/screenshot?t=1",
+        pathPreview: null,
+        pathSprite: null,
+        pathVtt: null,
+        pathChaptersVtt: null,
+        pathStream: "/scene/1/stream",
+        pathCaption: "/scene/1/caption",
+        captions: null,
+        streams: null,
+        inheritedTagIds: null,
+        stashOCounter: 0,
+        stashPlayCount: 0,
+        stashPlayDuration: 0,
+        stashCreatedAt: null,
+        stashUpdatedAt: null,
+        userRating: null,
+        userFavorite: null,
+        userPlayCount: null,
+        userPlayDuration: null,
+        userLastPlayedAt: null,
+        userOCount: null,
+        userResumeTime: null,
+        userOHistory: null,
+        userPlayHistory: null,
+      };
+      mockPrisma.$queryRawUnsafe.mockReset();
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([row]) // main query
+        .mockResolvedValueOnce([{ total: 1 }]) // count query
+        .mockResolvedValue([]);
+
+      const result = await sceneQueryBuilder.execute(executeOptions);
+
+      expect(result.scenes[0].paths.stream).toBeNull();
+      expect(result.scenes[0].paths.caption).toBeNull();
+      expect(result.scenes[0].paths.screenshot).toContain("/api/proxy/stash");
+    });
   });
 });

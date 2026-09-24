@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { REDIRECT_STORAGE_KEY } from "../../api";
+import { LOGIN_MESSAGE_STORAGE_KEY, REDIRECT_STORAGE_KEY } from "../../api";
 import { getLandingPage } from "../../constants/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../themes/useTheme";
@@ -15,6 +15,13 @@ const Login = () => {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // A one-time notice left by redirectToLogin (a session that expired while
+  // a video was paused); read once and cleared
+  const [notice] = useState(() => {
+    const message = sessionStorage.getItem(LOGIN_MESSAGE_STORAGE_KEY);
+    if (message) sessionStorage.removeItem(LOGIN_MESSAGE_STORAGE_KEY);
+    return message ?? "";
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,6 +87,16 @@ const Login = () => {
             Sign in to your account
           </p>
         </div>
+
+        {notice && (
+          <div
+            role="status"
+            className="text-sm text-center"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {notice}
+          </div>
+        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">

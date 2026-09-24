@@ -14,6 +14,8 @@ export {
   apiDelete,
   ApiError,
   REDIRECT_STORAGE_KEY,
+  LOGIN_MESSAGE_STORAGE_KEY,
+  redirectToLogin,
 } from "./client";
 
 // Library (entity search)

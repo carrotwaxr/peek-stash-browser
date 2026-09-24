@@ -75,12 +75,12 @@ export const wallConfig = {
     getImageUrl: (item: any) => {
       // Use dedicated clip preview proxy endpoint - it handles the URL properly
       if (item.id) {
-        return getClipPreviewUrl(item.id);
+        return getClipPreviewUrl(item.id, item.instanceId);
       }
       return null;
     },
     getPreviewUrl: (item: any) =>
-      item.isGenerated ? getClipPreviewUrl(item.id) : null,
+      item.isGenerated ? getClipPreviewUrl(item.id, item.instanceId) : null,
     getAspectRatio: (item: any) => {
       // Use parent scene's video dimensions
       const file = item.scene?.files?.[0];

@@ -13,6 +13,7 @@ import {
   proxyStashMedia,
 } from "../../controllers/proxy.js";
 import prisma from "../../prisma/singleton.js";
+import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 
 // =============================================================================
@@ -32,7 +33,12 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     get: vi.fn().mockReturnValue({ id: "inst-a" }),
     getBaseUrl: vi.fn().mockReturnValue("http://stash:9999"),
     getApiKey: vi.fn().mockReturnValue("test-api-key"),
+    getDefaultConfig: vi.fn().mockReturnValue({ id: "inst-default" }),
   },
+}));
+
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -57,6 +63,7 @@ vi.mock("https", () => {
 
 const mockPrisma = vi.mocked(prisma);
 const mockInstanceManager = vi.mocked(stashInstanceManager);
+const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 const mockHttpGet = vi.mocked(http.get);
 const mockHttpsGet = vi.mocked(https.get);
 
@@ -64,8 +71,16 @@ const mockHttpsGet = vi.mocked(https.get);
 // Helpers
 // =============================================================================
 
+const USER = { id: 7, username: "u", role: "USER" };
+
 function createMockReq(overrides = {}) {
-  return { params: {}, query: {}, headers: {}, ...overrides } as any;
+  return {
+    params: {},
+    query: {},
+    headers: {},
+    user: USER,
+    ...overrides,
+  } as any;
 }
 
 function createMockRes() {
@@ -86,9 +101,13 @@ function createMockRes() {
  * concurrency slot is released, preventing timeouts from slot exhaustion.
  * Returns the mock proxyReq object for assertions.
  */
-function setupHttpGetSuccess() {
+function setupHttpGetSuccess(headers: Record<string, string> = {}) {
   const mockProxyRes: any = {
-    headers: { "content-type": "video/mp4", "content-length": "12345" },
+    headers: {
+      "content-type": "video/mp4",
+      "content-length": "12345",
+      ...headers,
+    },
     statusCode: 200,
     pipe: vi.fn(),
     on: vi.fn((event: string, cb: () => void) => {
@@ -120,6 +139,16 @@ function setupHttpGetSuccess() {
   return { mockProxyReq, mockProxyRes };
 }
 
+function restoreDefaults() {
+  mockInstanceManager.get.mockReturnValue({ id: "inst-a" } as any);
+  mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
+  mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
+  mockInstanceManager.getDefaultConfig.mockReturnValue({
+    id: "inst-default",
+  } as any);
+  mockCanUserAccessEntity.mockResolvedValue(true);
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -128,9 +157,7 @@ describe("Proxy Controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default mock return values after clearAllMocks
-    mockInstanceManager.get.mockReturnValue({ id: "inst-a" } as any);
-    mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
-    mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
+    restoreDefaults();
   });
 
   // ===========================================================================
@@ -190,6 +217,120 @@ describe("Proxy Controller", () => {
       });
     });
 
+    it("returns 400 for /graphql?query=... and never calls http.get", async () => {
+      setupHttpGetSuccess();
+      const req = createMockReq({
+        query: { path: "/graphql?query={version{version}}" },
+      });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Invalid path parameter",
+      });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for a hash-keyed sprite path", async () => {
+      setupHttpGetSuccess();
+      const req = createMockReq({
+        query: { path: "/scene/54d60970d229e3a3_sprite.jpg" },
+      });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for a malformed instanceId", async () => {
+      setupHttpGetSuccess();
+      const req = createMockReq({
+        query: { path: "/scene/1/screenshot", instanceId: "inst a" },
+      });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when the user cannot access the entity in the path", async () => {
+      setupHttpGetSuccess();
+      mockCanUserAccessEntity.mockResolvedValue(false);
+
+      const req = createMockReq({
+        query: { path: "/performer/5/image", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "performer",
+        "5",
+        "inst-a"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+
+      // Without an instance the default instance is checked
+      mockCanUserAccessEntity.mockClear();
+      const req2 = createMockReq({ query: { path: "/performer/5/image" } });
+      await proxyStashMedia(req2, createMockRes());
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "performer",
+        "5",
+        "inst-default"
+      );
+    });
+
+    it("checks both the scene and the clip for a scene_marker path", async () => {
+      setupHttpGetSuccess();
+
+      const req = createMockReq({
+        query: {
+          path: "/scene/2587/scene_marker/429/screenshot",
+          instanceId: "inst-a",
+        },
+      });
+      await proxyStashMedia(req, createMockRes());
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "2587",
+        "inst-a"
+      );
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "clip",
+        "429",
+        "inst-a"
+      );
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+
+      // Either entity hidden hides the clip media
+      for (const hidden of ["scene", "clip"]) {
+        mockHttpGet.mockClear();
+        mockCanUserAccessEntity.mockImplementation(
+          async (_u, entityType) => entityType !== hidden
+        );
+        const res = createMockRes();
+        await proxyStashMedia(req, res);
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(mockHttpGet).not.toHaveBeenCalled();
+      }
+    });
+
     it("returns 500 when instance credentials fail", async () => {
       mockInstanceManager.get.mockReturnValue(undefined as any);
       mockInstanceManager.getBaseUrl.mockImplementation(() => {
@@ -213,14 +354,14 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = createMockReq({
-        query: { path: "/scene/abc/sprite", instanceId: "inst-a" },
+        query: { path: "/scene/12/vtt/sprite", instanceId: "inst-a" },
       });
       const res = createMockRes();
 
       await proxyStashMedia(req, res);
 
       expect(mockHttpGet).toHaveBeenCalledWith(
-        "http://stash:9999/scene/abc/sprite?apikey=test-api-key",
+        "http://stash:9999/scene/12/vtt/sprite?apikey=test-api-key",
         expect.any(Object),
         expect.any(Function)
       );
@@ -230,16 +371,90 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = createMockReq({
-        query: { path: "/scene/abc/sprite?t=123" },
+        query: { path: "/scene/1/screenshot?t=5" },
       });
       const res = createMockRes();
 
       await proxyStashMedia(req, res);
 
       expect(mockHttpGet).toHaveBeenCalledWith(
-        "http://stash:9999/scene/abc/sprite?t=123&apikey=test-api-key",
+        "http://stash:9999/scene/1/screenshot?t=5&apikey=test-api-key",
         expect.any(Object),
         expect.any(Function)
+      );
+    });
+
+    it("forwards only t and default upstream", async () => {
+      setupHttpGetSuccess();
+
+      const req = createMockReq({
+        query: {
+          path: "/performer/6/image?t=5&apikey=evil&x=1&default=true&redirect=http://evil.test",
+        },
+      });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash:9999/performer/6/image?t=5&default=true&apikey=test-api-key",
+        expect.any(Object),
+        expect.any(Function)
+      );
+    });
+
+    it("sets private Cache-Control even when Stash sends public", async () => {
+      setupHttpGetSuccess({ "cache-control": "public, max-age=604800" });
+
+      const req = createMockReq({ query: { path: "/scene/1/screenshot" } });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Cache-Control",
+        "private, max-age=604800"
+      );
+    });
+
+    it("forwards nothing and holds no slot once the client has gone", async () => {
+      setupHttpGetSuccess();
+
+      // Seven requests whose browser moved on while they waited on the
+      // session and access checks: more than the six upstream slots. Each
+      // must be dropped without an upstream request, or the slot it takes
+      // starves every later request.
+      for (let i = 0; i < 7; i++) {
+        const res = createMockRes();
+        res.destroyed = true;
+        await proxyStashMedia(
+          createMockReq({ query: { path: `/scene/${i + 1}/screenshot` } }),
+          res
+        );
+      }
+      expect(mockHttpGet).not.toHaveBeenCalled();
+
+      // A live request still gets a slot afterwards (hangs here if leaked)
+      const live = createMockRes();
+      await proxyStashMedia(
+        createMockReq({ query: { path: "/scene/9/screenshot" } }),
+        live
+      );
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+      expect(live.status).toHaveBeenCalledWith(200);
+    });
+
+    it("uses a private, immutable default when Stash sends no Cache-Control", async () => {
+      setupHttpGetSuccess();
+
+      const req = createMockReq({ query: { path: "/scene/1/screenshot" } });
+      const res = createMockRes();
+
+      await proxyStashMedia(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Cache-Control",
+        "private, max-age=31536000, immutable"
       );
     });
   });
@@ -259,16 +474,63 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Missing scene ID" });
     });
 
+    it("returns 400 for a non-numeric id", async () => {
+      const req = createMockReq({ params: { id: "scene-1" } });
+      const res = createMockRes();
+
+      await proxyScenePreview(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.stashScene.findFirst).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when scene not found in DB", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
-      const req = createMockReq({ params: { id: "nonexistent" } });
+      const req = createMockReq({ params: { id: "999" } });
       const res = createMockRes();
 
       await proxyScenePreview(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
+    });
+
+    it("filters the lookup by instanceId when given", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+
+      const req = createMockReq({
+        params: { id: "1" },
+        query: { instanceId: "inst-b" },
+      });
+      await proxyScenePreview(req, createMockRes());
+
+      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "1", deletedAt: null, stashInstanceId: "inst-b" },
+        select: { stashInstanceId: true },
+      });
+    });
+
+    it("returns 404 when canUserAccessEntity is false", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
+        stashInstanceId: "inst-a",
+      } as any);
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      setupHttpGetSuccess();
+
+      const req = createMockReq({ params: { id: "42" } });
+      const res = createMockRes();
+
+      await proxyScenePreview(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "42",
+        "inst-a"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
     it("returns 500 when instance credentials fail", async () => {
@@ -281,7 +543,7 @@ describe("Proxy Controller", () => {
         return "http://stash:9999";
       });
 
-      const req = createMockReq({ params: { id: "scene-1" } });
+      const req = createMockReq({ params: { id: "1" } });
       const res = createMockRes();
 
       await proxyScenePreview(req, res);
@@ -298,13 +560,13 @@ describe("Proxy Controller", () => {
       } as any);
       setupHttpGetSuccess();
 
-      const req = createMockReq({ params: { id: "scene-42" } });
+      const req = createMockReq({ params: { id: "42" } });
       const res = createMockRes();
 
       await proxyScenePreview(req, res);
 
       expect(mockHttpGet).toHaveBeenCalledWith(
-        "http://stash:9999/scene/scene-42/preview?apikey=test-api-key",
+        "http://stash:9999/scene/42/preview?apikey=test-api-key",
         expect.any(Object),
         expect.any(Function)
       );
@@ -313,13 +575,13 @@ describe("Proxy Controller", () => {
     it("queries prisma with deletedAt: null filter", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
-      const req = createMockReq({ params: { id: "scene-1" } });
+      const req = createMockReq({ params: { id: "1" } });
       const res = createMockRes();
 
       await proxyScenePreview(req, res);
 
       expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
-        where: { id: "scene-1", deletedAt: null },
+        where: { id: "1", deletedAt: null },
         select: { stashInstanceId: true },
       });
     });
@@ -340,10 +602,20 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Missing scene ID" });
     });
 
+    it("returns 400 for a non-numeric id", async () => {
+      const req = createMockReq({ params: { id: "scene-7" } });
+      const res = createMockRes();
+
+      await proxySceneWebp(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.stashScene.findFirst).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when scene not found in DB", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue(null);
 
-      const req = createMockReq({ params: { id: "nonexistent" } });
+      const req = createMockReq({ params: { id: "999" } });
       const res = createMockRes();
 
       await proxySceneWebp(req, res);
@@ -352,19 +624,56 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Scene not found" });
     });
 
+    it("filters the lookup by instanceId when given", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue(null);
+
+      const req = createMockReq({
+        params: { id: "7" },
+        query: { instanceId: "inst-b" },
+      });
+      await proxySceneWebp(req, createMockRes());
+
+      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "7", deletedAt: null, stashInstanceId: "inst-b" },
+        select: { stashInstanceId: true },
+      });
+    });
+
+    it("returns 404 when canUserAccessEntity is false", async () => {
+      mockPrisma.stashScene.findFirst.mockResolvedValue({
+        stashInstanceId: "inst-a",
+      } as any);
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      setupHttpGetSuccess();
+
+      const req = createMockReq({ params: { id: "7" } });
+      const res = createMockRes();
+
+      await proxySceneWebp(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "7",
+        "inst-a"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
     it("constructs correct Stash URL with webp path", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue({
         stashInstanceId: "inst-a",
       } as any);
       setupHttpGetSuccess();
 
-      const req = createMockReq({ params: { id: "scene-7" } });
+      const req = createMockReq({ params: { id: "7" } });
       const res = createMockRes();
 
       await proxySceneWebp(req, res);
 
       expect(mockHttpGet).toHaveBeenCalledWith(
-        "http://stash:9999/scene/scene-7/webp?apikey=test-api-key",
+        "http://stash:9999/scene/7/webp?apikey=test-api-key",
         expect.any(Object),
         expect.any(Function)
       );
@@ -389,7 +698,7 @@ describe("Proxy Controller", () => {
     it("returns 404 when clip not found in DB", async () => {
       mockPrisma.stashClip.findFirst.mockResolvedValue(null);
 
-      const req = createMockReq({ params: { id: "clip-99" } });
+      const req = createMockReq({ params: { id: "99" } });
       const res = createMockRes();
 
       await proxyClipPreview(req, res);
@@ -400,6 +709,68 @@ describe("Proxy Controller", () => {
       });
     });
 
+    it("ignores soft-deleted clips", async () => {
+      mockPrisma.stashClip.findFirst.mockResolvedValue(null);
+
+      const req = createMockReq({ params: { id: "429" } });
+      await proxyClipPreview(req, createMockRes());
+
+      expect(mockPrisma.stashClip.findFirst).toHaveBeenCalledWith({
+        where: { id: "429", deletedAt: null },
+        select: {
+          streamPath: true,
+          screenshotPath: true,
+          stashInstanceId: true,
+        },
+      });
+    });
+
+    it("filters the lookup by instanceId when given", async () => {
+      mockPrisma.stashClip.findFirst.mockResolvedValue(null);
+
+      const req = createMockReq({
+        params: { id: "429" },
+        query: { instanceId: "inst-b" },
+      });
+      await proxyClipPreview(req, createMockRes());
+
+      expect(mockPrisma.stashClip.findFirst).toHaveBeenCalledWith({
+        where: { id: "429", deletedAt: null, stashInstanceId: "inst-b" },
+        select: {
+          streamPath: true,
+          screenshotPath: true,
+          stashInstanceId: true,
+        },
+      });
+    });
+
+    it("checks the clip with canUserAccessEntity(userId, 'clip', id, instanceId)", async () => {
+      mockPrisma.stashClip.findFirst.mockResolvedValue({
+        streamPath: "http://stash:9999/scene/1/scene_marker/429/stream",
+        screenshotPath: null,
+        stashInstanceId: "inst-a",
+      } as any);
+      setupHttpGetSuccess();
+
+      const req = createMockReq({ params: { id: "429" } });
+      await proxyClipPreview(req, createMockRes());
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "clip",
+        "429",
+        "inst-a"
+      );
+      expect(mockHttpGet).toHaveBeenCalledTimes(1);
+
+      mockHttpGet.mockClear();
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      const res = createMockRes();
+      await proxyClipPreview(req, res);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when clip has no media path (both streamPath and screenshotPath null)", async () => {
       mockPrisma.stashClip.findFirst.mockResolvedValue({
         streamPath: null,
@@ -407,7 +778,7 @@ describe("Proxy Controller", () => {
         stashInstanceId: "inst-a",
       } as any);
 
-      const req = createMockReq({ params: { id: "clip-1" } });
+      const req = createMockReq({ params: { id: "1" } });
       const res = createMockRes();
 
       await proxyClipPreview(req, res);
@@ -426,7 +797,7 @@ describe("Proxy Controller", () => {
       } as any);
       setupHttpGetSuccess();
 
-      const req = createMockReq({ params: { id: "clip-1" } });
+      const req = createMockReq({ params: { id: "1" } });
       const res = createMockRes();
 
       await proxyClipPreview(req, res);
@@ -447,7 +818,7 @@ describe("Proxy Controller", () => {
       } as any);
       setupHttpGetSuccess();
 
-      const req = createMockReq({ params: { id: "clip-2" } });
+      const req = createMockReq({ params: { id: "2" } });
       const res = createMockRes();
 
       await proxyClipPreview(req, res);
@@ -475,9 +846,21 @@ describe("Proxy Controller", () => {
       expect(res.json).toHaveBeenCalledWith({ error: "Missing image ID" });
     });
 
+    it("returns 400 for a non-numeric id", async () => {
+      const req = createMockReq({
+        params: { imageId: "img-1", type: "thumbnail" },
+      });
+      const res = createMockRes();
+
+      await proxyImage(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockPrisma.stashImage.findFirst).not.toHaveBeenCalled();
+    });
+
     it("returns 400 when type is invalid", async () => {
       const req = createMockReq({
-        params: { imageId: "img-1", type: "poster" },
+        params: { imageId: "1", type: "poster" },
       });
       const res = createMockRes();
 
@@ -490,7 +873,7 @@ describe("Proxy Controller", () => {
     });
 
     it("returns 400 when type is missing", async () => {
-      const req = createMockReq({ params: { imageId: "img-1" } });
+      const req = createMockReq({ params: { imageId: "1" } });
       const res = createMockRes();
 
       await proxyImage(req, res);
@@ -505,7 +888,7 @@ describe("Proxy Controller", () => {
       mockPrisma.stashImage.findFirst.mockResolvedValue(null);
 
       const req = createMockReq({
-        params: { imageId: "img-nonexistent", type: "thumbnail" },
+        params: { imageId: "999", type: "thumbnail" },
       });
       const res = createMockRes();
 
@@ -513,6 +896,53 @@ describe("Proxy Controller", () => {
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({ error: "Image not found" });
+    });
+
+    it("filters the lookup by instanceId when given", async () => {
+      mockPrisma.stashImage.findFirst.mockResolvedValue(null);
+
+      const req = createMockReq({
+        params: { imageId: "1", type: "thumbnail" },
+        query: { instanceId: "inst-b" },
+      });
+      await proxyImage(req, createMockRes());
+
+      expect(mockPrisma.stashImage.findFirst).toHaveBeenCalledWith({
+        where: { id: "1", deletedAt: null, stashInstanceId: "inst-b" },
+        select: {
+          pathThumbnail: true,
+          pathPreview: true,
+          pathImage: true,
+          stashInstanceId: true,
+        },
+      });
+    });
+
+    it("returns 404 when canUserAccessEntity is false", async () => {
+      mockPrisma.stashImage.findFirst.mockResolvedValue({
+        pathThumbnail: "/image/1/thumbnail",
+        pathPreview: null,
+        pathImage: null,
+        stashInstanceId: "inst-a",
+      } as any);
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      setupHttpGetSuccess();
+
+      const req = createMockReq({
+        params: { imageId: "1", type: "thumbnail" },
+      });
+      const res = createMockRes();
+
+      await proxyImage(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "image",
+        "1",
+        "inst-a"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
     it("returns 404 when image path for type is null", async () => {
@@ -524,7 +954,7 @@ describe("Proxy Controller", () => {
       } as any);
 
       const req = createMockReq({
-        params: { imageId: "img-1", type: "thumbnail" },
+        params: { imageId: "1", type: "thumbnail" },
       });
       const res = createMockRes();
 
@@ -546,7 +976,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = createMockReq({
-        params: { imageId: "img-1", type: "thumbnail" },
+        params: { imageId: "1", type: "thumbnail" },
       });
       const res = createMockRes();
 
@@ -570,7 +1000,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = createMockReq({
-        params: { imageId: "img-2", type: "preview" },
+        params: { imageId: "2", type: "preview" },
       });
       const res = createMockRes();
 
@@ -594,7 +1024,7 @@ describe("Proxy Controller", () => {
       setupHttpGetSuccess();
 
       const req = createMockReq({
-        params: { imageId: "img-3", type: "image" },
+        params: { imageId: "3", type: "image" },
       });
       const res = createMockRes();
 
@@ -612,14 +1042,14 @@ describe("Proxy Controller", () => {
       mockPrisma.stashImage.findFirst.mockResolvedValue(null);
 
       const req = createMockReq({
-        params: { imageId: "img-1", type: "thumbnail" },
+        params: { imageId: "1", type: "thumbnail" },
       });
       const res = createMockRes();
 
       await proxyImage(req, res);
 
       expect(mockPrisma.stashImage.findFirst).toHaveBeenCalledWith({
-        where: { id: "img-1", deletedAt: null },
+        where: { id: "1", deletedAt: null },
         select: {
           pathThumbnail: true,
           pathPreview: true,
@@ -645,14 +1075,12 @@ describe("Proxy Controller", () => {
 
       for (const { type, expectedPath } of typeMappings) {
         vi.clearAllMocks();
-        mockInstanceManager.get.mockReturnValue({ id: "inst-a" } as any);
-        mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
-        mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
+        restoreDefaults();
         mockPrisma.stashImage.findFirst.mockResolvedValue(pathData as any);
         setupHttpGetSuccess();
 
         const req = createMockReq({
-          params: { imageId: "img-1", type },
+          params: { imageId: "1", type },
         });
         const res = createMockRes();
 
@@ -679,7 +1107,7 @@ describe("Proxy Controller", () => {
       });
 
       const req = createMockReq({
-        params: { imageId: "img-1", type: "thumbnail" },
+        params: { imageId: "1", type: "thumbnail" },
       });
       const res = createMockRes();
 
@@ -702,11 +1130,11 @@ describe("Proxy Controller", () => {
         "/../../etc/passwd",
         "/scene/../../../secrets",
         "/a/b/c/../../..",
-        "/scene/..%2F..%2Fetc%2Fpasswd", // won't match because raw string has ..
+        "/scene/1/../../graphql",
+        "/performer/1/image/../../graphql",
       ];
 
       for (const path of traversalPaths) {
-        if (!path.includes("..")) continue;
         const req = createMockReq({ query: { path } });
         const res = createMockRes();
 
@@ -724,6 +1152,7 @@ describe("Proxy Controller", () => {
         "/redirect?target=http://evil.com",
         "/scene/1?redirect=https://attacker.org",
         "/ftp://internal-server/data",
+        "//evil.test/scene/1/screenshot",
       ];
 
       for (const path of injectionPaths) {
@@ -739,17 +1168,31 @@ describe("Proxy Controller", () => {
       }
     });
 
-    it("allows valid paths that look similar to attacks but are safe", async () => {
-      setupHttpGetSuccess();
+    it("proxies every allowlisted shape", async () => {
+      const allowedPaths = [
+        "/scene/12/screenshot?t=1780427975",
+        "/scene/12/preview",
+        "/scene/12/webp",
+        "/scene/12/vtt/thumbs",
+        "/scene/12/vtt/sprite",
+        "/scene/12/vtt/chapter",
+        "/scene/2587/scene_marker/429/screenshot",
+        "/scene/2587/scene_marker/429/preview",
+        "/scene/2587/scene_marker/429/stream",
+        "/performer/6225/image?t=1771565524&default=true",
+        "/studio/874/image?t=1",
+        "/tag/193/image",
+        "/group/131/frontimage?t=1&default=true",
+        "/group/32/backimage",
+        "/gallery/5/cover?t=1761756397",
+        "/image/1/thumbnail",
+        "/image/1/preview",
+        "/image/1/image?t=1",
+      ];
 
-      // Single dots are fine, colons without // are fine
-      const safePaths = ["/scene/file.name.mp4", "/image/path/to/file"];
-
-      for (const path of safePaths) {
+      for (const path of allowedPaths) {
         vi.clearAllMocks();
-        mockInstanceManager.get.mockReturnValue({ id: "inst-a" } as any);
-        mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
-        mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
+        restoreDefaults();
         setupHttpGetSuccess();
 
         const req = createMockReq({ query: { path } });
@@ -757,8 +1200,13 @@ describe("Proxy Controller", () => {
 
         await proxyStashMedia(req, res);
 
-        // Should NOT return 400 — http.get should have been called
-        expect(mockHttpGet).toHaveBeenCalled();
+        expect(res.status, path).not.toHaveBeenCalledWith(400);
+        expect(mockHttpGet, path).toHaveBeenCalledTimes(1);
+        const url: string = mockHttpGet.mock.calls[0][0] as string;
+        expect(url.startsWith(`http://stash:9999${path.split("?")[0]}?`)).toBe(
+          true
+        );
+        expect(url.endsWith("apikey=test-api-key")).toBe(true);
       }
     });
   });

@@ -1,14 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { getCaption, proxyStashStream } from "../../controllers/video.js";
+import {
+  createExternalPlayerLink,
+  getCaption,
+  proxyStashStream,
+} from "../../controllers/video.js";
+import prisma from "../../prisma/singleton.js";
+import { canUserAccessEntity } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { isAllowedStreamPath } from "../../utils/stashMediaPath.js";
+import {
+  deriveStreamLinkKey,
+  isStreamLinkSignatureValid,
+} from "../../utils/streamLink.js";
 import { pipeResponseToClient } from "../../utils/streamProxy.js";
 
 // ---------------------------------------------------------------------------
-// Mocks — must come before imports
+// Mocks (must come before imports)
 // ---------------------------------------------------------------------------
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -16,7 +27,22 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     get: vi.fn(),
     getBaseUrl: vi.fn().mockReturnValue("http://stash:9999"),
     getApiKey: vi.fn().mockReturnValue("test-api-key"),
+    getDefaultConfig: vi.fn().mockReturnValue({ id: "inst-default" }),
   },
+}));
+
+vi.mock("../../services/EntityAccessService.js", () => ({
+  canUserAccessEntity: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("../../prisma/singleton.js", () => ({
+  default: {
+    user: { findUnique: vi.fn() },
+  },
+}));
+
+vi.mock("../../utils/jwtSecret.js", () => ({
+  getJwtSecret: vi.fn().mockReturnValue("test-secret"),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -33,11 +59,15 @@ vi.mock("../../utils/streamProxy.js", () => ({
 }));
 
 const mockInstanceManager = vi.mocked(stashInstanceManager);
+const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
+const mockPrisma = vi.mocked(prisma);
 const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const USER = { id: 7, username: "u", role: "USER" };
 
 function createMockReq(overrides = {}) {
   return {
@@ -45,6 +75,8 @@ function createMockReq(overrides = {}) {
     query: { instanceId: "inst-a" },
     url: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=inst-a",
     headers: {},
+    user: USER,
+    body: {},
     ...overrides,
   } as any;
 }
@@ -63,21 +95,41 @@ function createMockRes() {
 
 function makeFetchResponse(
   body: string,
-  options: { ok?: boolean; status?: number; contentType?: string } = {}
+  options: {
+    ok?: boolean;
+    status?: number;
+    contentType?: string;
+    cacheControl?: string;
+  } = {}
 ) {
   const {
     ok = true,
     status = 200,
     contentType = "application/vnd.apple.mpegurl",
+    cacheControl,
   } = options;
+  const headers = new Headers({ "content-type": contentType });
+  if (cacheControl) headers.set("cache-control", cacheControl);
   return {
     ok,
     status,
     statusText: ok ? "OK" : "Error",
-    headers: new Headers({ "content-type": contentType }),
+    headers,
     text: vi.fn().mockResolvedValue(body),
     body: new ReadableStream(),
   };
+}
+
+/** Non-tag lines of a rewritten playlist, as [streamPath, subPath] pairs. */
+function proxiedPaths(playlist: string): Array<[string, string | undefined]> {
+  return playlist
+    .split("\n")
+    .filter((line) => line.trim() && !line.startsWith("#"))
+    .map((line) => {
+      const afterProxy = line.split("/proxy-stream/")[1] ?? "";
+      const [streamPath, subPath] = afterProxy.split("?")[0]!.split("/");
+      return [streamPath!, subPath];
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +144,10 @@ describe("Video Controller", () => {
     mockInstanceManager.get.mockReturnValue({} as any);
     mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
     mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
+    mockInstanceManager.getDefaultConfig.mockReturnValue({
+      id: "inst-default",
+    } as any);
+    mockCanUserAccessEntity.mockResolvedValue(true);
   });
 
   // =========================================================================
@@ -99,7 +155,8 @@ describe("Video Controller", () => {
   // =========================================================================
   describe("proxyStashStream", () => {
     // -----------------------------------------------------------------------
-    // HLS playlist rewriting
+    // HLS playlist rewriting. Stash 0.31 emits segments as
+    // /scene/{id}/stream.m3u8/{n}.ts?resolution=..., absolute or as a path.
     // -----------------------------------------------------------------------
     describe("HLS playlist rewriting", () => {
       it("rewrites absolute Stash URLs, stripping apikey and adding instanceId", async () => {
@@ -107,9 +164,9 @@ describe("Video Controller", () => {
           "#EXTM3U",
           "#EXT-X-VERSION:3",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/segment_0.ts?apikey=secret123&resolution=FULL_HD",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=secret123&resolution=LOW",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/segment_1.ts?ApiKey=secret123",
+          "http://stash:9999/scene/123/stream.m3u8/1.ts?ApiKey=secret123",
           "",
         ].join("\n");
 
@@ -127,10 +184,10 @@ describe("Video Controller", () => {
 
         // Absolute URL rewritten to proxy path, apikey stripped, instanceId added
         expect(lines[3]).toBe(
-          "/api/scene/123/proxy-stream/stream/segment_0.ts?resolution=FULL_HD&instanceId=inst-a"
+          "/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=inst-a"
         );
         expect(lines[5]).toBe(
-          "/api/scene/123/proxy-stream/stream/segment_1.ts?instanceId=inst-a"
+          "/api/scene/123/proxy-stream/stream.m3u8/1.ts?instanceId=inst-a"
         );
       });
 
@@ -138,7 +195,7 @@ describe("Video Controller", () => {
         const hlsContent = [
           "#EXTM3U",
           "#EXTINF:10.0,",
-          "/scene/123/stream/segment_0.ts?apikey=secret",
+          "/scene/123/stream.m3u8/0.ts?apikey=secret&resolution=LOW",
         ].join("\n");
 
         const req = createMockReq();
@@ -154,7 +211,7 @@ describe("Video Controller", () => {
         const lines = sentContent.split("\n");
 
         expect(lines[2]).toBe(
-          "/api/scene/123/proxy-stream/stream/segment_0.ts?instanceId=inst-a"
+          "/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=inst-a"
         );
       });
 
@@ -162,7 +219,7 @@ describe("Video Controller", () => {
         const hlsContent = [
           "#EXTM3U",
           "#EXTINF:10.0,",
-          "stream/segment_0.ts?apikey=secret",
+          "stream.m3u8/0.ts?apikey=secret",
         ].join("\n");
 
         const req = createMockReq();
@@ -178,7 +235,7 @@ describe("Video Controller", () => {
         const lines = sentContent.split("\n");
 
         expect(lines[2]).toBe(
-          "/api/scene/123/proxy-stream/stream/segment_0.ts?instanceId=inst-a"
+          "/api/scene/123/proxy-stream/stream.m3u8/0.ts?instanceId=inst-a"
         );
       });
 
@@ -189,7 +246,7 @@ describe("Video Controller", () => {
           "#EXT-X-TARGETDURATION:10",
           "#EXT-X-MEDIA-SEQUENCE:0",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/segment_0.ts?apikey=secret",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=secret",
           "#EXT-X-ENDLIST",
         ].join("\n");
 
@@ -217,7 +274,7 @@ describe("Video Controller", () => {
         const hlsContent = [
           "#EXTM3U",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/segment_0.ts?apikey=secret&resolution=FULL_HD",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=secret&resolution=FULL_HD",
         ].join("\n");
 
         const req = createMockReq();
@@ -253,28 +310,15 @@ describe("Video Controller", () => {
         );
       });
 
-      it("sets cache-control to no-cache for HLS playlists", async () => {
-        const req = createMockReq();
-        const res = createMockRes();
-
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-          makeFetchResponse("#EXTM3U\n")
-        );
-
-        await proxyStashStream(req, res);
-
-        expect(res.setHeader).toHaveBeenCalledWith("cache-control", "no-cache");
-      });
-
       it("strips all case variants of apikey (apikey, ApiKey, APIKEY)", async () => {
         const hlsContent = [
           "#EXTM3U",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/seg0.ts?apikey=a",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=a",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/seg1.ts?ApiKey=b",
+          "http://stash:9999/scene/123/stream.m3u8/1.ts?ApiKey=b",
           "#EXTINF:10.0,",
-          "http://stash:9999/scene/123/stream/seg2.ts?APIKEY=c",
+          "http://stash:9999/scene/123/stream.m3u8/2.ts?APIKEY=c",
         ].join("\n");
 
         const req = createMockReq();
@@ -290,6 +334,40 @@ describe("Video Controller", () => {
         expect(sentContent).not.toMatch(/apikey/i);
         // instanceId should still be present
         expect(sentContent).toContain("instanceId=inst-a");
+      });
+
+      it("every URL rewriteHlsPlaylist emits for a Stash manifest passes isAllowedStreamPath", async () => {
+        const hlsContent = [
+          "#EXTM3U",
+          "#EXT-X-VERSION:3",
+          "#EXT-X-TARGETDURATION:10",
+          "#EXTINF:10.0,",
+          "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=secret&resolution=LOW",
+          "#EXTINF:10.0,",
+          "/scene/123/stream.m3u8/1.ts?apikey=secret&resolution=LOW",
+          "#EXTINF:10.0,",
+          "stream.m3u8/2.ts?resolution=LOW",
+          "#EXTINF:10.0,",
+          "http://stash:9999/scene/123/stream.m3u8/123456.ts?resolution=LOW",
+          "#EXT-X-ENDLIST",
+        ].join("\n");
+
+        const req = createMockReq();
+        const res = createMockRes();
+
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse(hlsContent)
+        );
+
+        await proxyStashStream(req, res);
+
+        const pairs = proxiedPaths(res.send.mock.calls[0][0]);
+        expect(pairs).toHaveLength(4);
+        for (const [streamPath, subPath] of pairs) {
+          expect(isAllowedStreamPath(streamPath, subPath), streamPath).toBe(
+            true
+          );
+        }
       });
     });
 
@@ -311,6 +389,7 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
+        // cache-control is set by the controller, never copied from Stash
         expect(mockPipeResponseToClient).toHaveBeenCalledWith(
           fetchResp,
           res,
@@ -320,7 +399,6 @@ describe("Video Controller", () => {
             "content-length",
             "accept-ranges",
             "content-range",
-            "cache-control",
             "last-modified",
             "etag",
           ]
@@ -350,26 +428,178 @@ describe("Video Controller", () => {
     });
 
     // -----------------------------------------------------------------------
+    // Validation and access
+    // -----------------------------------------------------------------------
+    describe("validation and access", () => {
+      it("returns 400 for the ../../graphql traversal and never fetches", async () => {
+        const req = createMockReq({
+          params: {
+            sceneId: "1",
+            streamPath: "../../graphql?query={version{version}}",
+          },
+          url: "/api/scene/1/proxy-stream/..%2F..%2Fgraphql%3Fquery%3D%7Bversion%7Bversion%7D%7D",
+          query: {},
+        });
+        const res = createMockRes();
+
+        await proxyStashStream(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.send).toHaveBeenCalledWith("Invalid stream path");
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
+      });
+
+      it("returns 400 for a non-numeric sceneId", async () => {
+        const req = createMockReq({
+          params: { sceneId: "abc", streamPath: "stream.m3u8" },
+        });
+        const res = createMockRes();
+
+        await proxyStashStream(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it("returns 400 for subPath segment_0.ts under stream", async () => {
+        const req = createMockReq({
+          params: {
+            sceneId: "123",
+            streamPath: "stream",
+            subPath: "segment_0.ts",
+          },
+          url: "/api/scene/123/proxy-stream/stream/segment_0.ts?instanceId=inst-a",
+        });
+        const res = createMockRes();
+
+        await proxyStashStream(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it("returns 400 for a malformed instanceId", async () => {
+        const req = createMockReq({
+          query: { instanceId: "inst a" },
+          url: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=inst%20a",
+        });
+        const res = createMockRes();
+
+        await proxyStashStream(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it("returns 404 when canUserAccessEntity is false", async () => {
+        mockCanUserAccessEntity.mockResolvedValue(false);
+        const req = createMockReq();
+        const res = createMockRes();
+
+        await proxyStashStream(req, res);
+
+        expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+          7,
+          "scene",
+          "123",
+          "inst-a"
+        );
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it("checks the default instance when instanceId is absent", async () => {
+        const req = createMockReq({
+          query: {},
+          url: "/api/scene/123/proxy-stream/stream.m3u8",
+        });
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse("#EXTM3U\n")
+        );
+
+        await proxyStashStream(req, createMockRes());
+
+        expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+          7,
+          "scene",
+          "123",
+          "inst-default"
+        );
+      });
+
+      it("forwards only resolution and start to Stash", async () => {
+        const req = createMockReq({
+          params: { sceneId: "123", streamPath: "stream.mp4" },
+          url: "/api/scene/123/proxy-stream/stream.mp4?resolution=LOW&start=12.5&uid=1&sig=x&foo=bar&instanceId=inst-a",
+        });
+        const res = createMockRes();
+
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse("", { contentType: "video/mp4" })
+        );
+
+        await proxyStashStream(req, res);
+
+        const stashUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
+          .calls[0][0];
+        expect(stashUrl).toBe(
+          "http://stash:9999/scene/123/stream.mp4?resolution=LOW&start=12.5"
+        );
+      });
+
+      it("sets private Cache-Control on direct streams and on HLS playlists", async () => {
+        // HLS playlist
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse("#EXTM3U\n", { cacheControl: "public, max-age=60" })
+        );
+        const hlsRes = createMockRes();
+        await proxyStashStream(createMockReq(), hlsRes);
+        expect(hlsRes.setHeader).toHaveBeenCalledWith(
+          "cache-control",
+          "private, no-cache"
+        );
+
+        // Direct stream with an upstream public value
+        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+          makeFetchResponse("", {
+            contentType: "video/mp4",
+            cacheControl: "public, max-age=60",
+          })
+        );
+        const directRes = createMockRes();
+        await proxyStashStream(
+          createMockReq({
+            params: { sceneId: "123", streamPath: "stream" },
+            url: "/api/scene/123/proxy-stream/stream?instanceId=inst-a",
+          }),
+          directRes
+        );
+        expect(directRes.setHeader).toHaveBeenCalledWith(
+          "cache-control",
+          "private, max-age=60"
+        );
+        const forwarded = mockPipeResponseToClient.mock.calls[0]![3];
+        expect(forwarded).not.toContain("cache-control");
+      });
+    });
+
+    // -----------------------------------------------------------------------
     // Error handling
     // -----------------------------------------------------------------------
     describe("error handling", () => {
       it("returns 500 when instance not found", async () => {
         mockInstanceManager.get.mockReturnValue(undefined as any);
-        // Make getInstanceCredentials throw by simulating missing instance
         mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
           if (id === "bad-inst")
             throw new Error("Stash instance not found: bad-inst");
           return "http://stash:9999";
         });
 
-        // We need to trigger the error path — the controller calls
-        // getInstanceCredentials which calls stashInstanceManager.get() and
-        // throws if it returns falsy (for non-default instanceId).
-        // The actual throw happens inside getInstanceCredentials, so we need
-        // to mock .get() to return undefined for the specific instanceId.
-        mockInstanceManager.get.mockReturnValue(undefined as any);
-
-        const req = createMockReq({ query: { instanceId: "bad-inst" } });
+        const req = createMockReq({
+          query: { instanceId: "bad-inst" },
+          url: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=bad-inst",
+        });
         const res = createMockRes();
 
         await proxyStashStream(req, res);
@@ -453,10 +683,10 @@ describe("Video Controller", () => {
         const req = createMockReq({
           params: {
             sceneId: "123",
-            streamPath: "stream",
-            subPath: "segment_0.ts",
+            streamPath: "stream.m3u8",
+            subPath: "0.ts",
           },
-          url: "/api/scene/123/proxy-stream/stream/segment_0.ts?instanceId=inst-a",
+          url: "/api/scene/123/proxy-stream/stream.m3u8/0.ts?instanceId=inst-a",
         });
         const res = createMockRes();
 
@@ -468,9 +698,7 @@ describe("Video Controller", () => {
 
         const stashUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
           .calls[0][0];
-        expect(stashUrl).toBe(
-          "http://stash:9999/scene/123/stream/segment_0.ts"
-        );
+        expect(stashUrl).toBe("http://stash:9999/scene/123/stream.m3u8/0.ts");
       });
 
       it("registers an abort handler on res close", async () => {
@@ -495,6 +723,14 @@ describe("Video Controller", () => {
   // getCaption
   // =========================================================================
   describe("getCaption", () => {
+    function captionResponse(body = "WEBVTT\n\n") {
+      return {
+        ok: true,
+        text: vi.fn().mockResolvedValue(body),
+        headers: new Headers(),
+      };
+    }
+
     it("returns 400 when lang is missing", async () => {
       const req = createMockReq({
         params: { sceneId: "123" },
@@ -521,6 +757,65 @@ describe("Video Controller", () => {
       expect(res.send).toHaveBeenCalledWith("Missing lang or type parameter");
     });
 
+    it("returns 400 when type is not srt or vtt", async () => {
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: { lang: "en", type: "ass", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await getCaption(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for lang with & or =", async () => {
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: { lang: "en&admin=1", type: "srt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await getCaption(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for a non-numeric sceneId", async () => {
+      const req = createMockReq({
+        params: { sceneId: "abc" },
+        query: { lang: "en", type: "srt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await getCaption(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when canUserAccessEntity is false", async () => {
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      const req = createMockReq({
+        params: { sceneId: "456" },
+        query: { lang: "en", type: "srt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await getCaption(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "456",
+        "inst-a"
+      );
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it("proxies caption from Stash with correct URL", async () => {
       const req = createMockReq({
         params: { sceneId: "456" },
@@ -528,13 +823,9 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        text: vi
-          .fn()
-          .mockResolvedValue("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello"),
-        headers: new Headers(),
-      });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello")
+      );
 
       await getCaption(req, res);
 
@@ -545,6 +836,29 @@ describe("Video Controller", () => {
       );
     });
 
+    it("builds the upstream query with URLSearchParams", async () => {
+      const req = createMockReq({
+        params: { sceneId: "456" },
+        query: { lang: "pt-BR", type: "vtt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse()
+      );
+
+      await getCaption(req, res);
+
+      const fetchUrl: string = (global.fetch as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      const url = new URL(fetchUrl);
+      expect(url.pathname).toBe("/scene/456/caption");
+      expect([...url.searchParams.entries()]).toEqual([
+        ["lang", "pt-BR"],
+        ["type", "vtt"],
+      ]);
+    });
+
     it("sets Content-Type to text/vtt", async () => {
       const req = createMockReq({
         params: { sceneId: "123" },
@@ -552,17 +866,34 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        text: vi.fn().mockResolvedValue("WEBVTT\n\n"),
-        headers: new Headers(),
-      });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse()
+      );
 
       await getCaption(req, res);
 
       expect(res.setHeader).toHaveBeenCalledWith(
         "Content-Type",
         "text/vtt; charset=utf-8"
+      );
+    });
+
+    it("sets Cache-Control private, max-age=86400", async () => {
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: { lang: "en", type: "vtt", instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse()
+      );
+
+      await getCaption(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        "Cache-Control",
+        "private, max-age=86400"
       );
     });
 
@@ -592,11 +923,9 @@ describe("Video Controller", () => {
       });
       const res = createMockRes();
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: true,
-        text: vi.fn().mockResolvedValue("WEBVTT\n\n"),
-        headers: new Headers(),
-      });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        captionResponse()
+      );
 
       await getCaption(req, res);
 
@@ -627,6 +956,151 @@ describe("Video Controller", () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.send).toHaveBeenCalledWith("Stash configuration missing");
+    });
+  });
+
+  // =========================================================================
+  // createExternalPlayerLink
+  // =========================================================================
+  describe("createExternalPlayerLink", () => {
+    const NOW = new Date("2026-09-23T12:00:00Z");
+    const PASSWORD_CHANGED_AT = new Date("2026-09-01T00:00:00Z");
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        passwordChangedAt: PASSWORD_CHANGED_AT,
+      } as any);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("returns a direct-stream path carrying uid, exp 12 h ahead and a signature", async () => {
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: {},
+        body: { instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await createExternalPlayerLink(req, res);
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "123",
+        "inst-a"
+      );
+      expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+      expect(res.json).toHaveBeenCalledTimes(1);
+      const body = res.json.mock.calls[0][0] as {
+        url: string;
+        expiresAt: string;
+      };
+      expect(body.url).toMatch(
+        /^\/api\/scene\/123\/proxy-stream\/stream\?instanceId=inst-a&uid=7&exp=1790208000&sig=[A-Za-z0-9_-]{43}$/
+      );
+      expect(body.expiresAt).toBe("2026-09-24T00:00:00.000Z");
+
+      const sig = new URL(body.url, "http://peek.test").searchParams.get(
+        "sig"
+      )!;
+      expect(
+        isStreamLinkSignatureValid(
+          {
+            userId: 7,
+            sceneId: "123",
+            instanceId: "inst-a",
+            exp: 1790208000,
+            passwordChangedAtMs: PASSWORD_CHANGED_AT.getTime(),
+          },
+          sig,
+          deriveStreamLinkKey("test-secret")
+        )
+      ).toBe(true);
+    });
+
+    it("signs passwordChangedAt as 0 for a user who never changed it", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        passwordChangedAt: null,
+      } as any);
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: {},
+        body: { instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await createExternalPlayerLink(req, res);
+
+      const body = res.json.mock.calls[0][0] as { url: string };
+      const sig = new URL(body.url, "http://peek.test").searchParams.get(
+        "sig"
+      )!;
+      expect(
+        isStreamLinkSignatureValid(
+          {
+            userId: 7,
+            sceneId: "123",
+            instanceId: "inst-a",
+            exp: 1790208000,
+            passwordChangedAtMs: 0,
+          },
+          sig,
+          deriveStreamLinkKey("test-secret")
+        )
+      ).toBe(true);
+    });
+
+    it("returns 404 when the user cannot access the scene", async () => {
+      mockCanUserAccessEntity.mockResolvedValue(false);
+      const req = createMockReq({
+        params: { sceneId: "123" },
+        query: {},
+        body: { instanceId: "inst-a" },
+      });
+      const res = createMockRes();
+
+      await createExternalPlayerLink(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+    });
+
+    it("returns 400 for a non-numeric sceneId or a missing instanceId", async () => {
+      const badScene = createMockRes();
+      await createExternalPlayerLink(
+        createMockReq({
+          params: { sceneId: "abc" },
+          query: {},
+          body: { instanceId: "inst-a" },
+        }),
+        badScene
+      );
+      expect(badScene.status).toHaveBeenCalledWith(400);
+
+      const noInstance = createMockRes();
+      await createExternalPlayerLink(
+        createMockReq({ params: { sceneId: "123" }, query: {}, body: {} }),
+        noInstance
+      );
+      expect(noInstance.status).toHaveBeenCalledWith(400);
+
+      const badInstance = createMockRes();
+      await createExternalPlayerLink(
+        createMockReq({
+          params: { sceneId: "123" },
+          query: {},
+          body: { instanceId: "inst a" },
+        }),
+        badInstance
+      );
+      expect(badInstance.status).toHaveBeenCalledWith(400);
+
+      expect(mockCanUserAccessEntity).not.toHaveBeenCalled();
     });
   });
 
@@ -664,11 +1138,11 @@ describe("Video Controller", () => {
       const hlsContent = [
         "#EXTM3U",
         "#EXTINF:10.0,",
-        "http://stash:9999/scene/123/stream/seg0.ts?apikey=LEAK1&resolution=720",
+        "http://stash:9999/scene/123/stream.m3u8/0.ts?apikey=LEAK1&resolution=LOW",
         "#EXTINF:10.0,",
-        "/scene/123/stream/seg1.ts?ApiKey=LEAK2",
+        "/scene/123/stream.m3u8/1.ts?ApiKey=LEAK2",
         "#EXTINF:10.0,",
-        "stream/seg2.ts?APIKEY=LEAK3&foo=bar",
+        "stream.m3u8/2.ts?APIKEY=LEAK3&foo=bar",
       ].join("\n");
 
       const req = createMockReq();
@@ -689,7 +1163,7 @@ describe("Video Controller", () => {
       expect(sentContent).not.toContain("LEAK2");
       expect(sentContent).not.toContain("LEAK3");
       // But non-apikey params and instanceId are preserved
-      expect(sentContent).toContain("resolution=720");
+      expect(sentContent).toContain("resolution=LOW");
       expect(sentContent).toContain("foo=bar");
       expect(sentContent).toContain("instanceId=inst-a");
     });

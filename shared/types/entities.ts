@@ -77,7 +77,9 @@ export interface ScenePaths {
   sprite: string | null;
   vtt: string | null;
   chapters_vtt: string | null;
+  /** Always null: Peek serves streams and captions through its own routes. */
   stream: string | null;
+  /** Always null: Peek serves streams and captions through its own routes. */
   caption: string | null;
 }
 

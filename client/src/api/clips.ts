@@ -53,6 +53,13 @@ export async function getClipsForScene(
   );
 }
 
-export function getClipPreviewUrl(clipId: string): string {
-  return `/api/proxy/clip/${clipId}/preview`;
+/**
+ * The clip preview proxy URL. The instance lets the server check the row it
+ * will serve on a multi-instance setup.
+ */
+export function getClipPreviewUrl(clipId: string, instanceId?: string): string {
+  const base = `/api/proxy/clip/${clipId}/preview`;
+  return instanceId
+    ? `${base}?instanceId=${encodeURIComponent(instanceId)}`
+    : base;
 }
