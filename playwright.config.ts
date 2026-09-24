@@ -32,6 +32,9 @@ if (existsSync(envFile)) {
 }
 
 const isCI = !!process.env.CI;
+// CI starts the dev servers itself, unless E2E_BASE_URL points at a running
+// app (image-smoke.yml points it at the production image)
+const startServers = isCI && !process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -83,7 +86,7 @@ export default defineConfig({
 
   // In CI, start both the server and client dev server.
   // Locally, assume docker-compose is already running.
-  ...(isCI
+  ...(startServers
     ? {
         webServer: [
           {

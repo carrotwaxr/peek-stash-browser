@@ -3,8 +3,16 @@ name: Image Smoke Test
 # Builds Dockerfile.production natively on each architecture and boots it
 # against an empty data volume (item 80, TCI-10). Called by ci.yml on every
 # pull request and push to main, and by docker-build.yml before publishing.
+# ci.yml sets browser-checks, so amd64 also runs the production-image
+# Playwright specs against the image; publishing leaves it off and waits on
+# the deterministic checks only.
 on:
   workflow_call:
+    inputs:
+      browser-checks:
+        description: Also run the production-image Playwright specs (amd64)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -49,3 +57,48 @@ jobs:
         run: node docker/smoke-test.mjs peek:smoke
         env:
           EXPECT_BUILD_DATE: smoke-${{ github.sha }}
+
+      # The browser checks run on amd64 only: the CSP test needs installed
+      # Google Chrome (channel "chrome"), which has no Linux arm64 build
+      - name: Install root dependencies
+        if: inputs.browser-checks && matrix.arch == 'amd64'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        if: inputs.browser-checks && matrix.arch == 'amd64'
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: inputs.browser-checks && matrix.arch == 'amd64' && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS dependencies
+        if: inputs.browser-checks && matrix.arch == 'amd64' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # NODE_ENV=test only makes create-stash-instance skip its connection
+      # test (controllers/setup.ts), so global setup can add the dummy instance
+      - name: Start the image for the browser checks
+        if: inputs.browser-checks && matrix.arch == 'amd64'
+        run: |
+          docker run -d --name peek-browser -p 127.0.0.1:8080:80 -e NODE_ENV=test peek:smoke
+          timeout 180 sh -c 'until curl -fsS http://127.0.0.1:8080/api/health > /dev/null; do sleep 2; done'
+
+      - name: Browser checks against the image
+        if: inputs.browser-checks && matrix.arch == 'amd64'
+        run: npx playwright test e2e/privacy-and-headers.spec.ts
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8080
+          E2E_PROD_IMAGE: "1"
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() && inputs.browser-checks && matrix.arch == 'amd64' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-image
+          path: playwright-report/
+          retention-days: 14
