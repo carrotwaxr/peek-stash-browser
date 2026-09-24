@@ -4,7 +4,7 @@ Self-hosted web app for browsing and streaming media from one or more Stash serv
 
 ## Commands
 
-- Dev: `docker compose up --build -d` (client on :6969, server on :8000); `docker compose logs -f peek-server`
+- Dev: `docker compose up --build -d` (client on :6969, server on :8000); `docker compose logs -f peek-server`. Each container reinstalls `node_modules` when `package-lock.json` changed, and the server regenerates its Prisma client, so no `-V` is needed.
 - Shared types: `cd shared && npm run build`. Needed before server `tsc`, the server dev runtime and client `typecheck`; Vite and Vitest read `shared/types` directly.
 - Test: `npm run test:run` in `client/` and `server/` (`npm test` starts watch mode in a terminal)
 - Coverage gate: `npm run test:coverage` in both; CI enforces the thresholds in each `vitest.config`
