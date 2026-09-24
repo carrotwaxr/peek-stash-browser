@@ -3,8 +3,10 @@
  *
  * Tests the studio filters in controllers/library/studios.ts
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyStudioFilters } from "../../controllers/library/studios.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import {
   createMockStudio,
@@ -24,7 +26,10 @@ describe("Studio Filters", () => {
   describe("ID Filter", () => {
     it("should filter studios by single ID", () => {
       const filter: PeekStudioFilter = {
-        ids: { value: [mockStudios[0].id], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs([mockStudios[0].id]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -40,7 +45,7 @@ describe("Studio Filters", () => {
         mockStudios[10].id,
       ];
       const filter: PeekStudioFilter = {
-        ids: { value: targetIds, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -53,7 +58,10 @@ describe("Studio Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", () => {
       const filter: PeekStudioFilter = {
-        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs(["nonexistent-id"]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -114,7 +122,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         tags: {
           value: [tagId],
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -131,7 +139,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         tags: {
           value: tagIds,
-          modifier: "INCLUDES_ALL",
+          modifier: CriterionModifier.IncludesAll,
         },
       };
 
@@ -150,7 +158,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         tags: {
           value: [tagId],
-          modifier: "EXCLUDES",
+          modifier: CriterionModifier.Excludes,
         },
       };
 
@@ -166,7 +174,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         tags: {
           value: [],
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -180,7 +188,10 @@ describe("Studio Filters", () => {
     it("should filter by rating100 with GREATER_THAN modifier", () => {
       const threshold = 50;
       const filter: PeekStudioFilter = {
-        rating100: { value: threshold, modifier: "GREATER_THAN" },
+        rating100: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -194,7 +205,7 @@ describe("Studio Filters", () => {
     it("should filter by rating100 with EQUALS modifier", () => {
       const rating = 80;
       const filter: PeekStudioFilter = {
-        rating100: { value: rating, modifier: "EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.Equals },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -207,7 +218,7 @@ describe("Studio Filters", () => {
     it("should filter by rating100 with NOT_EQUALS modifier", () => {
       const rating = 0;
       const filter: PeekStudioFilter = {
-        rating100: { value: rating, modifier: "NOT_EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.NotEquals },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -221,7 +232,11 @@ describe("Studio Filters", () => {
       const min = 20;
       const max = 80;
       const filter: PeekStudioFilter = {
-        rating100: { value: min, value2: max, modifier: "BETWEEN" },
+        rating100: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -329,7 +344,10 @@ describe("Studio Filters", () => {
     it("should filter by scene_count with GREATER_THAN modifier", () => {
       const threshold = 50;
       const filter: PeekStudioFilter = {
-        scene_count: { value: threshold, modifier: "GREATER_THAN" },
+        scene_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -343,7 +361,7 @@ describe("Studio Filters", () => {
     it("should filter by scene_count with LESS_THAN modifier", () => {
       const threshold = 100;
       const filter: PeekStudioFilter = {
-        scene_count: { value: threshold, modifier: "LESS_THAN" },
+        scene_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -358,7 +376,11 @@ describe("Studio Filters", () => {
       const min = 30;
       const max = 150;
       const filter: PeekStudioFilter = {
-        scene_count: { value: min, value2: max, modifier: "BETWEEN" },
+        scene_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -377,7 +399,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         name: {
           value: searchTerm,
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -400,7 +422,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         details: {
           value: "special",
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -420,7 +442,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -440,7 +462,7 @@ describe("Studio Filters", () => {
         created_at: {
           value: min.toISOString(),
           value2: max.toISOString(),
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
         },
       };
 
@@ -459,7 +481,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         updated_at: {
           value: threshold.toISOString(),
-          modifier: "LESS_THAN",
+          modifier: CriterionModifier.LessThan,
         },
       };
 
@@ -477,8 +499,8 @@ describe("Studio Filters", () => {
     it("should apply multiple filters together (AND logic)", () => {
       const filter: PeekStudioFilter = {
         favorite: true,
-        rating100: { value: 60, modifier: "GREATER_THAN" },
-        scene_count: { value: 30, modifier: "GREATER_THAN" },
+        rating100: { value: 60, modifier: CriterionModifier.GreaterThan },
+        scene_count: { value: 30, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -514,7 +536,7 @@ describe("Studio Filters", () => {
       const filter: PeekStudioFilter = {
         created_at: {
           value: new Date(Date.now() - 30 * 86400000).toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -528,7 +550,7 @@ describe("Studio Filters", () => {
       const studiosWithNullRatings = mockStudios.filter((s) => !s.rating100);
 
       const filter: PeekStudioFilter = {
-        rating100: { value: 0, modifier: "GREATER_THAN" },
+        rating100: { value: 0, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = applyStudioFilters(studiosWithNullRatings, filter);

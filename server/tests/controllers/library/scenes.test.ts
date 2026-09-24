@@ -13,6 +13,7 @@ import {
   mergeScenesWithUserData,
   sortScenes,
 } from "../../../controllers/library/scenes.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import {
   countUserCriteria,
@@ -153,7 +154,12 @@ vi.mock("../../../utils/stashUrl.js", () => ({
     ),
 }));
 
-vi.mock("../../../graphql/generated/graphql.js", () => ({
+vi.mock("../../../graphql/generated/graphql.js", async (importOriginal) => ({
+  CriterionModifier: (
+    await importOriginal<
+      typeof import("../../../graphql/generated/graphql.js")
+    >()
+  ).CriterionModifier,
   OrientationEnum: {
     Landscape: "LANDSCAPE",
     Portrait: "PORTRAIT",
@@ -332,21 +338,30 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: returns scenes with any matching performer", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        performers: { value: ["p1"] as any, modifier: "INCLUDES" },
+        performers: {
+          value: ["p1"] as any,
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s1"]);
     });
 
     it("INCLUDES_ALL: returns only scenes containing all listed performers", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        performers: { value: ["p2", "p3"] as any, modifier: "INCLUDES_ALL" },
+        performers: {
+          value: ["p2", "p3"] as any,
+          modifier: CriterionModifier.IncludesAll,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
 
     it("EXCLUDES: returns scenes without any listed performers", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        performers: { value: ["p1", "p2"] as any, modifier: "EXCLUDES" },
+        performers: {
+          value: ["p1", "p2"] as any,
+          modifier: CriterionModifier.Excludes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s3"]);
     });
@@ -365,21 +380,27 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: returns scenes with any matching tag", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        tags: { value: ["t1"] as any, modifier: "INCLUDES" },
+        tags: { value: ["t1"] as any, modifier: CriterionModifier.Includes },
       });
       expect(result.map((s) => s.id)).toEqual(["s1"]);
     });
 
     it("INCLUDES_ALL: returns scenes with all matching tags", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        tags: { value: ["t2", "t3"] as any, modifier: "INCLUDES_ALL" },
+        tags: {
+          value: ["t2", "t3"] as any,
+          modifier: CriterionModifier.IncludesAll,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
 
     it("EXCLUDES: returns scenes without any listed tags", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        tags: { value: ["t1", "t2"] as any, modifier: "EXCLUDES" },
+        tags: {
+          value: ["t1", "t2"] as any,
+          modifier: CriterionModifier.Excludes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s3"]);
     });
@@ -397,14 +418,20 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: returns scenes with matching studio", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        studios: { value: ["st1"] as any, modifier: "INCLUDES" },
+        studios: {
+          value: ["st1"] as any,
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s1"]);
     });
 
     it("EXCLUDES: returns scenes without matching studio (null studio passes)", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        studios: { value: ["st1"] as any, modifier: "EXCLUDES" },
+        studios: {
+          value: ["st1"] as any,
+          modifier: CriterionModifier.Excludes,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s2", "s3"]);
     });
@@ -451,21 +478,24 @@ describe("applyQuickSceneFilters", () => {
 
     it("INCLUDES: returns scenes in any listed group", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        groups: { value: ["g2"] as any, modifier: "INCLUDES" },
+        groups: { value: ["g2"] as any, modifier: CriterionModifier.Includes },
       });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
 
     it("INCLUDES_ALL: returns scenes in all listed groups", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        groups: { value: ["g1", "g2"] as any, modifier: "INCLUDES_ALL" },
+        groups: {
+          value: ["g1", "g2"] as any,
+          modifier: CriterionModifier.IncludesAll,
+        },
       });
       expect(result.map((s) => s.id)).toEqual(["s2"]);
     });
 
     it("EXCLUDES: returns scenes not in any listed group", async () => {
       const result = await applyQuickSceneFilters(scenes, {
-        groups: { value: ["g1"] as any, modifier: "EXCLUDES" },
+        groups: { value: ["g1"] as any, modifier: CriterionModifier.Excludes },
       });
       expect(result.map((s) => s.id)).toEqual(["s3"]);
     });

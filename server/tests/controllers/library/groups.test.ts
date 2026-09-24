@@ -5,12 +5,14 @@
  * Note: mergeGroupsWithUserData is private and tested indirectly
  * through findGroupsMinimal.
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyGroupFilters,
   findGroups,
   findGroupsMinimal,
 } from "../../../controllers/library/groups.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 // --- Imports ---
 
 import prisma from "../../../prisma/singleton.js";
@@ -119,7 +121,7 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g3" }),
       ];
       const result = await applyGroupFilters(groups, {
-        ids: { value: ["g1", "g3"], modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(["g1", "g3"]), modifier: "INCLUDES" },
       });
       expect(result).toHaveLength(2);
       expect(result.map((g) => g.id)).toEqual(["g1", "g3"]);
@@ -147,7 +149,10 @@ describe("Groups Controller", () => {
         }),
       ];
       const result = await applyGroupFilters(groups, {
-        tags: { value: ["t1"], modifier: "INCLUDES" },
+        tags: {
+          value: coerceEntityRefs(["t1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -168,7 +173,10 @@ describe("Groups Controller", () => {
         }),
       ];
       const result = await applyGroupFilters(groups, {
-        tags: { value: ["t1", "t2"], modifier: "INCLUDES_ALL" },
+        tags: {
+          value: coerceEntityRefs(["t1", "t2"]),
+          modifier: CriterionModifier.IncludesAll,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -186,7 +194,10 @@ describe("Groups Controller", () => {
         }),
       ];
       const result = await applyGroupFilters(groups, {
-        tags: { value: ["t1"], modifier: "EXCLUDES" },
+        tags: {
+          value: coerceEntityRefs(["t1"]),
+          modifier: CriterionModifier.Excludes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g2");
@@ -202,7 +213,10 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g2" }),
       ];
       const result = await applyGroupFilters(groups, {
-        performers: { value: ["p1", "p2"], modifier: "INCLUDES" },
+        performers: {
+          value: ["p1", "p2"],
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -224,7 +238,10 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g3", studio: null }),
       ];
       const result = await applyGroupFilters(groups, {
-        studios: { value: ["s1"], modifier: "INCLUDES" },
+        studios: {
+          value: coerceEntityRefs(["s1"]),
+          modifier: CriterionModifier.Includes,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -236,7 +253,7 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g2", rating100: 30 }),
       ];
       const result = await applyGroupFilters(groups, {
-        rating100: { modifier: "GREATER_THAN", value: 50 },
+        rating100: { modifier: CriterionModifier.GreaterThan, value: 50 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -249,7 +266,11 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g3", rating100: 20 }),
       ];
       const result = await applyGroupFilters(groups, {
-        rating100: { modifier: "BETWEEN", value: 40, value2: 60 },
+        rating100: {
+          modifier: CriterionModifier.Between,
+          value: 40,
+          value2: 60,
+        },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g1");
@@ -261,7 +282,7 @@ describe("Groups Controller", () => {
         createMockGroup({ id: "g2", rating100: 80 }),
       ];
       const result = await applyGroupFilters(groups, {
-        rating100: { modifier: "EQUALS", value: 80 },
+        rating100: { modifier: CriterionModifier.Equals, value: 80 },
       });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("g2");

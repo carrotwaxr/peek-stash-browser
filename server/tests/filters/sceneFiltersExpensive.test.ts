@@ -6,6 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyExpensiveSceneFilters } from "../../controllers/library/scenes.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import {
   createMockGroups,
@@ -79,7 +80,10 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by rating100 with GREATER_THAN modifier", () => {
       const threshold = 50;
       const filter: PeekSceneFilter = {
-        rating100: { value: threshold, modifier: "GREATER_THAN" },
+        rating100: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -93,7 +97,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by rating100 with EQUALS modifier", () => {
       const rating = 80;
       const filter: PeekSceneFilter = {
-        rating100: { value: rating, modifier: "EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.Equals },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -106,7 +110,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by rating100 with NOT_EQUALS modifier", () => {
       const rating = 0;
       const filter: PeekSceneFilter = {
-        rating100: { value: rating, modifier: "NOT_EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.NotEquals },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -120,7 +124,11 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const min = 20;
       const max = 80;
       const filter: PeekSceneFilter = {
-        rating100: { value: min, value2: max, modifier: "BETWEEN" },
+        rating100: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -137,7 +145,10 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by o_counter with GREATER_THAN modifier", () => {
       const threshold = 5;
       const filter: PeekSceneFilter = {
-        o_counter: { value: threshold, modifier: "GREATER_THAN" },
+        o_counter: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -151,7 +162,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by o_counter with EQUALS modifier (find scenes with exact count)", () => {
       const count = 10;
       const filter: PeekSceneFilter = {
-        o_counter: { value: count, modifier: "EQUALS" },
+        o_counter: { value: count, modifier: CriterionModifier.Equals },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -164,7 +175,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by o_counter with NOT_EQUALS modifier (exclude specific count)", () => {
       const count = 0;
       const filter: PeekSceneFilter = {
-        o_counter: { value: count, modifier: "NOT_EQUALS" },
+        o_counter: { value: count, modifier: CriterionModifier.NotEquals },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -178,7 +189,11 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const min = 5;
       const max = 20;
       const filter: PeekSceneFilter = {
-        o_counter: { value: min, value2: max, modifier: "BETWEEN" },
+        o_counter: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -195,7 +210,10 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by play_count with GREATER_THAN modifier", () => {
       const threshold = 10;
       const filter: PeekSceneFilter = {
-        play_count: { value: threshold, modifier: "GREATER_THAN" },
+        play_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -209,7 +227,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by play_count with LESS_THAN modifier", () => {
       const threshold = 50;
       const filter: PeekSceneFilter = {
-        play_count: { value: threshold, modifier: "LESS_THAN" },
+        play_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -224,7 +242,11 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const min = 20;
       const max = 60;
       const filter: PeekSceneFilter = {
-        play_count: { value: min, value2: max, modifier: "BETWEEN" },
+        play_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -241,7 +263,10 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should filter by play_duration with GREATER_THAN modifier", () => {
       const threshold = 1000; // seconds
       const filter: PeekSceneFilter = {
-        play_duration: { value: threshold, modifier: "GREATER_THAN" },
+        play_duration: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -256,7 +281,11 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const min = 500;
       const max = 5000;
       const filter: PeekSceneFilter = {
-        play_duration: { value: min, value2: max, modifier: "BETWEEN" },
+        play_duration: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -275,7 +304,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const filter: PeekSceneFilter = {
         last_played_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -295,7 +324,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
         last_played_at: {
           value: min.toISOString(),
           value2: max.toISOString(),
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
         },
       };
 
@@ -314,7 +343,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const filter: PeekSceneFilter = {
         last_played_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -417,8 +446,8 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
     it("should apply multiple expensive filters together (AND logic)", () => {
       const filter: PeekSceneFilter = {
         favorite: true,
-        rating100: { value: 60, modifier: "GREATER_THAN" },
-        play_count: { value: 5, modifier: "GREATER_THAN" },
+        rating100: { value: 60, modifier: CriterionModifier.GreaterThan },
+        play_count: { value: 5, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = applyExpensiveSceneFilters(mockScenes, filter);
@@ -454,7 +483,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const scenesWithNullRatings = mockScenes.filter((s) => !s.rating100);
 
       const filter: PeekSceneFilter = {
-        rating100: { value: 0, modifier: "GREATER_THAN" },
+        rating100: { value: 0, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = applyExpensiveSceneFilters(scenesWithNullRatings, filter);
@@ -467,7 +496,7 @@ describe("Scene Filters - Expensive Filters (User-Specific Data)", () => {
       const scenesWithZeroPlays = mockScenes.filter((s) => s.play_count === 0);
 
       const filter: PeekSceneFilter = {
-        play_count: { value: 0, modifier: "EQUALS" },
+        play_count: { value: 0, modifier: CriterionModifier.Equals },
       };
 
       const result = applyExpensiveSceneFilters(scenesWithZeroPlays, filter);

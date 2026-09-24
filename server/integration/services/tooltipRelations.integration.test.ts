@@ -11,6 +11,7 @@
  * - u: the default hides, which include HIDDEN_A's performer and tag on A
  * - v: no hides
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
@@ -39,7 +40,7 @@ async function createUser(username: string): Promise<number> {
 function byIdOnA(userId: number, id: string) {
   return {
     userId,
-    filters: { ids: { value: [id], modifier: "INCLUDES" } },
+    filters: { ids: { value: coerceEntityRefs([id]), modifier: "INCLUDES" } },
     specificInstanceId: FX.A,
     sort: "name",
     sortDirection: "ASC" as const,

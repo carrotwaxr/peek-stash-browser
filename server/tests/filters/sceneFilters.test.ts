@@ -4,8 +4,14 @@
  * Tests the scene filtering implementation in controllers/library/scenes.ts
  * Uses mock data to validate filter behavior without database dependency
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { applyQuickSceneFilters } from "../../controllers/library/scenes.js";
+import {
+  OrientationEnum,
+  ResolutionEnum,
+} from "../../graphql/generated/graphql.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import {
   createMockGroups,
@@ -86,7 +92,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes with INCLUDES modifier (any performer)", async () => {
       const performerIds = [mockPerformers[0].id, mockPerformers[1].id];
       const filter: PeekSceneFilter = {
-        performers: { value: performerIds, modifier: "INCLUDES" },
+        performers: {
+          value: coerceEntityRefs(performerIds),
+          modifier: CriterionModifier.Includes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -104,7 +113,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes with INCLUDES_ALL modifier (all performers)", async () => {
       const performerIds = [mockPerformers[0].id];
       const filter: PeekSceneFilter = {
-        performers: { value: performerIds, modifier: "INCLUDES_ALL" },
+        performers: {
+          value: coerceEntityRefs(performerIds),
+          modifier: CriterionModifier.IncludesAll,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -122,7 +134,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes with EXCLUDES modifier", async () => {
       const performerIds = [mockPerformers[0].id];
       const filter: PeekSceneFilter = {
-        performers: { value: performerIds, modifier: "EXCLUDES" },
+        performers: {
+          value: coerceEntityRefs(performerIds),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -142,7 +157,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by scene tags with INCLUDES modifier", async () => {
       const tagIds = [mockTags[0].id];
       const filter: PeekSceneFilter = {
-        tags: { value: tagIds, modifier: "INCLUDES" },
+        tags: {
+          value: coerceEntityRefs(tagIds),
+          modifier: CriterionModifier.Includes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -164,7 +182,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by tags with INCLUDES_ALL modifier", async () => {
       const tagIds = [mockTags[0].id, mockTags[1].id];
       const filter: PeekSceneFilter = {
-        tags: { value: tagIds, modifier: "INCLUDES_ALL" },
+        tags: {
+          value: coerceEntityRefs(tagIds),
+          modifier: CriterionModifier.IncludesAll,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -186,7 +207,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by tags with EXCLUDES modifier", async () => {
       const tagIds = [mockTags[0].id];
       const filter: PeekSceneFilter = {
-        tags: { value: tagIds, modifier: "EXCLUDES" },
+        tags: {
+          value: coerceEntityRefs(tagIds),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -210,7 +234,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by studio with INCLUDES modifier", async () => {
       const studioIds = [mockStudios[0].id];
       const filter: PeekSceneFilter = {
-        studios: { value: studioIds, modifier: "INCLUDES" },
+        studios: {
+          value: coerceEntityRefs(studioIds),
+          modifier: CriterionModifier.Includes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -224,7 +251,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by studio with EXCLUDES modifier", async () => {
       const studioIds = [mockStudios[0].id];
       const filter: PeekSceneFilter = {
-        studios: { value: studioIds, modifier: "EXCLUDES" },
+        studios: {
+          value: coerceEntityRefs(studioIds),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -239,7 +269,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should include scenes without studio when EXCLUDES modifier is used", async () => {
       const studioIds = [mockStudios[0].id];
       const filter: PeekSceneFilter = {
-        studios: { value: studioIds, modifier: "EXCLUDES" },
+        studios: {
+          value: coerceEntityRefs(studioIds),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -260,7 +293,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by group with INCLUDES modifier", async () => {
       const groupIds = [mockGroups[0].id];
       const filter: PeekSceneFilter = {
-        groups: { value: groupIds, modifier: "INCLUDES" },
+        groups: {
+          value: coerceEntityRefs(groupIds),
+          modifier: CriterionModifier.Includes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -275,7 +311,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by group with INCLUDES_ALL modifier", async () => {
       const groupIds = [mockGroups[0].id];
       const filter: PeekSceneFilter = {
-        groups: { value: groupIds, modifier: "INCLUDES_ALL" },
+        groups: {
+          value: coerceEntityRefs(groupIds),
+          modifier: CriterionModifier.IncludesAll,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -290,7 +329,10 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter scenes by group with EXCLUDES modifier", async () => {
       const groupIds = [mockGroups[0].id];
       const filter: PeekSceneFilter = {
-        groups: { value: groupIds, modifier: "EXCLUDES" },
+        groups: {
+          value: coerceEntityRefs(groupIds),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -309,7 +351,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by bitrate with GREATER_THAN modifier", async () => {
       const threshold = 5000000; // 5 Mbps
       const filter: PeekSceneFilter = {
-        bitrate: { value: threshold, modifier: "GREATER_THAN" },
+        bitrate: { value: threshold, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -324,7 +366,11 @@ describe("Scene Filters - Quick Filters", () => {
       const min = 600; // 10 minutes
       const max = 3600; // 60 minutes
       const filter: PeekSceneFilter = {
-        duration: { value: min, value2: max, modifier: "BETWEEN" },
+        duration: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -339,7 +385,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by performer_count with EQUALS modifier", async () => {
       const count = 2;
       const filter: PeekSceneFilter = {
-        performer_count: { value: count, modifier: "EQUALS" },
+        performer_count: { value: count, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -352,7 +398,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by tag_count with LESS_THAN modifier", async () => {
       const threshold = 3;
       const filter: PeekSceneFilter = {
-        tag_count: { value: threshold, modifier: "LESS_THAN" },
+        tag_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -365,7 +411,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by framerate with EQUALS modifier", async () => {
       const framerate = 60;
       const filter: PeekSceneFilter = {
-        framerate: { value: framerate, modifier: "EQUALS" },
+        framerate: { value: framerate, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -382,7 +428,7 @@ describe("Scene Filters - Quick Filters", () => {
       const filter: PeekSceneFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -401,7 +447,7 @@ describe("Scene Filters - Quick Filters", () => {
         created_at: {
           value: min.toISOString(),
           value2: max.toISOString(),
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
         },
       };
 
@@ -419,7 +465,7 @@ describe("Scene Filters - Quick Filters", () => {
       const filter: PeekSceneFilter = {
         updated_at: {
           value: threshold.toISOString(),
-          modifier: "LESS_THAN",
+          modifier: CriterionModifier.LessThan,
         },
       };
 
@@ -495,7 +541,7 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [landscapeScene, portraitScene, squareScene];
 
       const filter: PeekSceneFilter = {
-        orientation: { value: ["LANDSCAPE"] },
+        orientation: { value: [OrientationEnum.Landscape] },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -571,7 +617,7 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [landscapeScene, portraitScene, squareScene];
 
       const filter: PeekSceneFilter = {
-        orientation: { value: ["PORTRAIT"] },
+        orientation: { value: [OrientationEnum.Portrait] },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -647,7 +693,7 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [landscapeScene, portraitScene, squareScene];
 
       const filter: PeekSceneFilter = {
-        orientation: { value: ["SQUARE"] },
+        orientation: { value: [OrientationEnum.Square] },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -723,7 +769,9 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [landscapeScene, portraitScene, squareScene];
 
       const filter: PeekSceneFilter = {
-        orientation: { value: ["PORTRAIT", "SQUARE"] },
+        orientation: {
+          value: [OrientationEnum.Portrait, OrientationEnum.Square],
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -820,7 +868,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by title with INCLUDES modifier", async () => {
       const searchTerm = "scene 1";
       const filter: PeekSceneFilter = {
-        title: { value: searchTerm, modifier: "INCLUDES" },
+        title: { value: searchTerm, modifier: CriterionModifier.Includes },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -833,7 +881,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by title with EXCLUDES modifier", async () => {
       const searchTerm = "scene 1";
       const filter: PeekSceneFilter = {
-        title: { value: searchTerm, modifier: "EXCLUDES" },
+        title: { value: searchTerm, modifier: CriterionModifier.Excludes },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -848,7 +896,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by title with EQUALS modifier (case insensitive)", async () => {
       const exactTitle = "Scene 5";
       const filter: PeekSceneFilter = {
-        title: { value: exactTitle, modifier: "EQUALS" },
+        title: { value: exactTitle, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -861,7 +909,7 @@ describe("Scene Filters - Quick Filters", () => {
     it("should filter by details with INCLUDES modifier", async () => {
       const searchTerm = "scene";
       const filter: PeekSceneFilter = {
-        details: { value: searchTerm, modifier: "INCLUDES" },
+        details: { value: searchTerm, modifier: CriterionModifier.Includes },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -918,7 +966,10 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [scene720p, scene1080p];
 
       const filter: PeekSceneFilter = {
-        resolution: { value: "STANDARD_HD", modifier: "EQUALS" },
+        resolution: {
+          value: ResolutionEnum.StandardHd,
+          modifier: CriterionModifier.Equals,
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -970,7 +1021,10 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [scene720p, scene1080p];
 
       const filter: PeekSceneFilter = {
-        resolution: { value: "STANDARD_HD", modifier: "NOT_EQUALS" },
+        resolution: {
+          value: ResolutionEnum.StandardHd,
+          modifier: CriterionModifier.NotEquals,
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -1041,7 +1095,10 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [scene480p, scene720p, scene1080p];
 
       const filter: PeekSceneFilter = {
-        resolution: { value: "STANDARD_HD", modifier: "GREATER_THAN" },
+        resolution: {
+          value: ResolutionEnum.StandardHd,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -1115,7 +1172,10 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [scene480p, scene720p, scene1080p];
 
       const filter: PeekSceneFilter = {
-        resolution: { value: "STANDARD_HD", modifier: "LESS_THAN" },
+        resolution: {
+          value: ResolutionEnum.StandardHd,
+          modifier: CriterionModifier.LessThan,
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -1190,7 +1250,10 @@ describe("Scene Filters - Quick Filters", () => {
 
       // Test R360P
       const filter360p: PeekSceneFilter = {
-        resolution: { value: "R360P", modifier: "EQUALS" },
+        resolution: {
+          value: ResolutionEnum.R360P,
+          modifier: CriterionModifier.Equals,
+        },
       };
       const result360p = await applyQuickSceneFilters(testScenes, filter360p);
       expect(result360p).toHaveLength(1);
@@ -1198,7 +1261,10 @@ describe("Scene Filters - Quick Filters", () => {
 
       // Test STANDARD (480p)
       const filter480p: PeekSceneFilter = {
-        resolution: { value: "STANDARD", modifier: "EQUALS" },
+        resolution: {
+          value: ResolutionEnum.Standard,
+          modifier: CriterionModifier.Equals,
+        },
       };
       const result480p = await applyQuickSceneFilters(testScenes, filter480p);
       expect(result480p).toHaveLength(1);
@@ -1206,7 +1272,10 @@ describe("Scene Filters - Quick Filters", () => {
 
       // Test FOUR_K (2160p)
       const filter4k: PeekSceneFilter = {
-        resolution: { value: "FOUR_K", modifier: "EQUALS" },
+        resolution: {
+          value: ResolutionEnum.FourK,
+          modifier: CriterionModifier.Equals,
+        },
       };
       const result4k = await applyQuickSceneFilters(testScenes, filter4k);
       expect(result4k).toHaveLength(1);
@@ -1255,7 +1324,10 @@ describe("Scene Filters - Quick Filters", () => {
       const testScenes = [sceneNoHeight, scene720p];
 
       const filter: PeekSceneFilter = {
-        resolution: { value: "STANDARD_HD", modifier: "EQUALS" },
+        resolution: {
+          value: ResolutionEnum.StandardHd,
+          modifier: CriterionModifier.Equals,
+        },
       };
 
       const result = await applyQuickSceneFilters(testScenes, filter);
@@ -1273,9 +1345,18 @@ describe("Scene Filters - Quick Filters", () => {
       const minDuration = 600;
 
       const filter: PeekSceneFilter = {
-        performers: { value: performerIds, modifier: "INCLUDES" },
-        studios: { value: studioIds, modifier: "INCLUDES" },
-        duration: { value: minDuration, modifier: "GREATER_THAN" },
+        performers: {
+          value: coerceEntityRefs(performerIds),
+          modifier: CriterionModifier.Includes,
+        },
+        studios: {
+          value: coerceEntityRefs(studioIds),
+          modifier: CriterionModifier.Includes,
+        },
+        duration: {
+          value: minDuration,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);
@@ -1317,7 +1398,10 @@ describe("Scene Filters - Quick Filters", () => {
       const scenesWithoutStudio = mockScenes.filter((s) => !s.studio);
 
       const filter: PeekSceneFilter = {
-        studios: { value: [mockStudios[0].id], modifier: "EXCLUDES" },
+        studios: {
+          value: coerceEntityRefs([mockStudios[0].id]),
+          modifier: CriterionModifier.Excludes,
+        },
       };
 
       const result = await applyQuickSceneFilters(scenesWithoutStudio, filter);
@@ -1328,7 +1412,7 @@ describe("Scene Filters - Quick Filters", () => {
 
     it("should handle empty arrays in filter values", async () => {
       const filter: PeekSceneFilter = {
-        performers: { value: [], modifier: "INCLUDES" },
+        performers: { value: [], modifier: CriterionModifier.Includes },
       };
 
       const result = await applyQuickSceneFilters(mockScenes, filter);

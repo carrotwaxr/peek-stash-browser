@@ -3,8 +3,10 @@
  *
  * Tests the gallery filters in controllers/library/galleries.ts
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyGalleryFilters } from "../../controllers/library/galleries.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type {
   NormalizedGallery,
   PeekGalleryFilter,
@@ -33,7 +35,10 @@ describe("Gallery Filters", () => {
   describe("ID Filter", () => {
     it("should filter galleries by single ID", async () => {
       const filter: PeekGalleryFilter = {
-        ids: { value: [mockGalleries[0].id], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs([mockGalleries[0].id]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -49,7 +54,7 @@ describe("Gallery Filters", () => {
         mockGalleries[10].id,
       ];
       const filter: PeekGalleryFilter = {
-        ids: { value: targetIds, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -62,7 +67,10 @@ describe("Gallery Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekGalleryFilter = {
-        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs(["nonexistent-id"]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -121,7 +129,10 @@ describe("Gallery Filters", () => {
     it("should filter by rating100 with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekGalleryFilter = {
-        rating100: { value: threshold, modifier: "GREATER_THAN" },
+        rating100: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -135,7 +146,7 @@ describe("Gallery Filters", () => {
     it("should filter by rating100 with EQUALS modifier", async () => {
       const rating = 80;
       const filter: PeekGalleryFilter = {
-        rating100: { value: rating, modifier: "EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.Equals },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -148,7 +159,7 @@ describe("Gallery Filters", () => {
     it("should filter by rating100 with NOT_EQUALS modifier", async () => {
       const rating = 0;
       const filter: PeekGalleryFilter = {
-        rating100: { value: rating, modifier: "NOT_EQUALS" },
+        rating100: { value: rating, modifier: CriterionModifier.NotEquals },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -162,7 +173,11 @@ describe("Gallery Filters", () => {
       const min = 20;
       const max = 80;
       const filter: PeekGalleryFilter = {
-        rating100: { value: min, value2: max, modifier: "BETWEEN" },
+        rating100: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -179,7 +194,10 @@ describe("Gallery Filters", () => {
     it("should filter by image_count with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekGalleryFilter = {
-        image_count: { value: threshold, modifier: "GREATER_THAN" },
+        image_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -193,7 +211,7 @@ describe("Gallery Filters", () => {
     it("should filter by image_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekGalleryFilter = {
-        image_count: { value: threshold, modifier: "LESS_THAN" },
+        image_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -208,7 +226,11 @@ describe("Gallery Filters", () => {
       const min = 30;
       const max = 150;
       const filter: PeekGalleryFilter = {
-        image_count: { value: min, value2: max, modifier: "BETWEEN" },
+        image_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -227,7 +249,7 @@ describe("Gallery Filters", () => {
       const filter: PeekGalleryFilter = {
         title: {
           value: searchTerm,
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -250,7 +272,7 @@ describe("Gallery Filters", () => {
       const filter: PeekGalleryFilter = {
         title: {
           value: "Special",
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -269,8 +291,8 @@ describe("Gallery Filters", () => {
       const studioId = mockStudios[0].id;
       const filter: PeekGalleryFilter = {
         studios: {
-          value: [studioId],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([studioId]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -292,8 +314,8 @@ describe("Gallery Filters", () => {
       const studioIds = [mockStudios[0].id, mockStudios[1].id];
       const filter: PeekGalleryFilter = {
         studios: {
-          value: studioIds,
-          modifier: "INCLUDES",
+          value: coerceEntityRefs(studioIds),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -320,8 +342,8 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         studios: {
-          value: [mockStudios[0].id],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([mockStudios[0].id]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -336,8 +358,8 @@ describe("Gallery Filters", () => {
       const performerId = mockPerformers[0].id;
       const filter: PeekGalleryFilter = {
         performers: {
-          value: [performerId],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([performerId]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -359,8 +381,8 @@ describe("Gallery Filters", () => {
       const performerIds = [mockPerformers[0].id, mockPerformers[1].id];
       const filter: PeekGalleryFilter = {
         performers: {
-          value: performerIds,
-          modifier: "INCLUDES",
+          value: coerceEntityRefs(performerIds),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -392,8 +414,8 @@ describe("Gallery Filters", () => {
       const tagId = mockTags[0].id;
       const filter: PeekGalleryFilter = {
         tags: {
-          value: [tagId],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([tagId]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -415,8 +437,8 @@ describe("Gallery Filters", () => {
       const tagIds = [mockTags[0].id, mockTags[1].id];
       const filter: PeekGalleryFilter = {
         tags: {
-          value: tagIds,
-          modifier: "INCLUDES",
+          value: coerceEntityRefs(tagIds),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -440,8 +462,8 @@ describe("Gallery Filters", () => {
     it("should apply multiple filters together (AND logic)", async () => {
       const filter: PeekGalleryFilter = {
         favorite: true,
-        rating100: { value: 60, modifier: "GREATER_THAN" },
-        image_count: { value: 30, modifier: "GREATER_THAN" },
+        rating100: { value: 60, modifier: CriterionModifier.GreaterThan },
+        image_count: { value: 30, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -473,7 +495,7 @@ describe("Gallery Filters", () => {
       );
 
       const filter: PeekGalleryFilter = {
-        rating100: { value: 0, modifier: "GREATER_THAN" },
+        rating100: { value: 0, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyGalleryFilters(
@@ -493,8 +515,8 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         tags: {
-          value: [mockTags[0].id],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([mockTags[0].id]),
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -511,8 +533,8 @@ describe("Gallery Filters", () => {
 
       const filter: PeekGalleryFilter = {
         performers: {
-          value: [mockPerformers[0].id],
-          modifier: "INCLUDES",
+          value: coerceEntityRefs([mockPerformers[0].id]),
+          modifier: CriterionModifier.Includes,
         },
       };
 

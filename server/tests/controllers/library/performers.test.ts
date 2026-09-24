@@ -1,3 +1,4 @@
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports AFTER mocks
@@ -10,6 +11,7 @@ import {
   mergePerformersWithUserData,
   parseCareerLength,
 } from "../../../controllers/library/performers.js";
+import { CriterionModifier } from "../../../graphql/types.js";
 import prisma from "../../../prisma/singleton.js";
 import { entityExclusionHelper } from "../../../services/EntityExclusionHelper.js";
 import { performerQueryBuilder } from "../../../services/PerformerQueryBuilder.js";
@@ -254,7 +256,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "c" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      ids: { value: ["a", "c"], modifier: "INCLUDES" },
+      ids: { value: coerceEntityRefs(["a", "c"]), modifier: "INCLUDES" },
     });
     expect(result.map((p) => p.id)).toEqual(["a", "c"]);
   });
@@ -277,7 +279,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "f", gender: "FEMALE" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      gender: { value: "FEMALE", modifier: "EQUALS" },
+      gender: { value: "FEMALE", modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("f");
@@ -289,7 +291,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "f", gender: "FEMALE" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      gender: { value: "MALE", modifier: "NOT_EQUALS" },
+      gender: { value: "MALE", modifier: CriterionModifier.NotEquals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("f");
@@ -308,7 +310,10 @@ describe("applyPerformerFilters", () => {
       }),
     ];
     const result = await applyPerformerFilters(performers, {
-      tags: { value: ["tag1"], modifier: "INCLUDES" },
+      tags: {
+        value: coerceEntityRefs(["tag1"]),
+        modifier: CriterionModifier.Includes,
+      },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("t1");
@@ -329,7 +334,10 @@ describe("applyPerformerFilters", () => {
       }),
     ];
     const result = await applyPerformerFilters(performers, {
-      tags: { value: ["tag1", "tag2"], modifier: "INCLUDES_ALL" },
+      tags: {
+        value: coerceEntityRefs(["tag1", "tag2"]),
+        modifier: CriterionModifier.IncludesAll,
+      },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("both");
@@ -344,7 +352,10 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "clean", tags: [] }),
     ];
     const result = await applyPerformerFilters(performers, {
-      tags: { value: ["tag1"], modifier: "EXCLUDES" },
+      tags: {
+        value: coerceEntityRefs(["tag1"]),
+        modifier: CriterionModifier.Excludes,
+      },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("clean");
@@ -360,7 +371,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "p2" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      studios: { value: ["studio1"], modifier: "INCLUDES" },
+      studios: { value: ["studio1"], modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("p1");
@@ -376,7 +387,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "p2" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      groups: { value: ["group1"], modifier: "INCLUDES" },
+      groups: { value: ["group1"], modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("p2");
@@ -389,7 +400,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "low", rating100: 40 }),
     ];
     const result = await applyPerformerFilters(performers, {
-      rating100: { value: 50, modifier: "GREATER_THAN" },
+      rating100: { value: 50, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("high");
@@ -401,7 +412,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "out", rating100: 90 }),
     ];
     const result = await applyPerformerFilters(performers, {
-      rating100: { value: 50, value2: 70, modifier: "BETWEEN" },
+      rating100: { value: 50, value2: 70, modifier: CriterionModifier.Between },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("in");
@@ -414,7 +425,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "no", scene_count: 5 }),
     ];
     const result = await applyPerformerFilters(performers, {
-      scene_count: { value: 10, modifier: "EQUALS" },
+      scene_count: { value: 10, modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("match");
@@ -427,7 +438,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "bob", name: "Bob", alias_list: ["Bobby"] }),
     ];
     const result = await applyPerformerFilters(performers, {
-      name: { value: "bob", modifier: "INCLUDES" },
+      name: { value: "bob", modifier: CriterionModifier.Includes },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("bob");
@@ -439,7 +450,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "alias", name: "Bob", alias_list: ["alice"] }),
     ];
     const result = await applyPerformerFilters(performers, {
-      name: { value: "alice", modifier: "EQUALS" },
+      name: { value: "alice", modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("exact");
@@ -452,7 +463,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "brown", eye_color: "Brown" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      eye_color: { value: "blue", modifier: "EQUALS" },
+      eye_color: { value: "blue", modifier: CriterionModifier.Equals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("blue");
@@ -464,7 +475,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "brown", eye_color: "Brown" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      eye_color: { value: "blue", modifier: "NOT_EQUALS" },
+      eye_color: { value: "blue", modifier: CriterionModifier.NotEquals },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("brown");
@@ -492,7 +503,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "old", birthdate: old }),
     ];
     const result = await applyPerformerFilters(performers, {
-      age: { value: 30, modifier: "GREATER_THAN" },
+      age: { value: 30, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("old");
@@ -505,7 +516,7 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "short", career_length: "2022-present" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      career_length: { value: 10, modifier: "GREATER_THAN" },
+      career_length: { value: 10, modifier: CriterionModifier.GreaterThan },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("long");
@@ -518,7 +529,11 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "out", birthdate: "1975-01-01" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      birth_year: { value: 1985, value2: 1995, modifier: "BETWEEN" },
+      birth_year: {
+        value: 1985,
+        value2: 1995,
+        modifier: CriterionModifier.Between,
+      },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("in");
@@ -531,7 +546,10 @@ describe("applyPerformerFilters", () => {
       createMockPerformer({ id: "old", created_at: "2024-01-01T00:00:00Z" }),
     ];
     const result = await applyPerformerFilters(performers, {
-      created_at: { value: "2025-01-01T00:00:00Z", modifier: "GREATER_THAN" },
+      created_at: {
+        value: "2025-01-01T00:00:00Z",
+        modifier: CriterionModifier.GreaterThan,
+      },
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("new");

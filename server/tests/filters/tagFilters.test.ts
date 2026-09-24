@@ -3,8 +3,10 @@
  *
  * Tests the tag filters in controllers/library/tags.ts
  */
+import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyTagFilters } from "../../controllers/library/tags.js";
+import { CriterionModifier } from "../../graphql/types.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import {
   createMockTag,
@@ -21,7 +23,10 @@ describe("Tag Filters", () => {
   describe("ID Filter", () => {
     it("should filter tags by single ID", async () => {
       const filter: PeekTagFilter = {
-        ids: { value: [mockTags[0].id], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs([mockTags[0].id]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -33,7 +38,7 @@ describe("Tag Filters", () => {
     it("should filter tags by multiple IDs", async () => {
       const targetIds = [mockTags[0].id, mockTags[5].id, mockTags[10].id];
       const filter: PeekTagFilter = {
-        ids: { value: targetIds, modifier: "INCLUDES" },
+        ids: { value: coerceEntityRefs(targetIds), modifier: "INCLUDES" },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -46,7 +51,10 @@ describe("Tag Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekTagFilter = {
-        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
+        ids: {
+          value: coerceEntityRefs(["nonexistent-id"]),
+          modifier: "INCLUDES",
+        },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -254,7 +262,10 @@ describe("Tag Filters", () => {
     it("should filter by scene_count with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekTagFilter = {
-        scene_count: { value: threshold, modifier: "GREATER_THAN" },
+        scene_count: {
+          value: threshold,
+          modifier: CriterionModifier.GreaterThan,
+        },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -268,7 +279,7 @@ describe("Tag Filters", () => {
     it("should filter by scene_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekTagFilter = {
-        scene_count: { value: threshold, modifier: "LESS_THAN" },
+        scene_count: { value: threshold, modifier: CriterionModifier.LessThan },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -283,7 +294,11 @@ describe("Tag Filters", () => {
       const min = 30;
       const max = 150;
       const filter: PeekTagFilter = {
-        scene_count: { value: min, value2: max, modifier: "BETWEEN" },
+        scene_count: {
+          value: min,
+          value2: max,
+          modifier: CriterionModifier.Between,
+        },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -302,7 +317,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         name: {
           value: searchTerm,
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -325,7 +340,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         description: {
           value: "special",
-          modifier: "INCLUDES",
+          modifier: CriterionModifier.Includes,
         },
       };
 
@@ -345,7 +360,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         created_at: {
           value: threshold.toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
@@ -365,7 +380,7 @@ describe("Tag Filters", () => {
         created_at: {
           value: min.toISOString(),
           value2: max.toISOString(),
-          modifier: "BETWEEN",
+          modifier: CriterionModifier.Between,
         },
       };
 
@@ -384,7 +399,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         updated_at: {
           value: threshold.toISOString(),
-          modifier: "LESS_THAN",
+          modifier: CriterionModifier.LessThan,
         },
       };
 
@@ -403,7 +418,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         favorite: true,
         rating100: { value: 60, modifier: "GREATER_THAN" },
-        scene_count: { value: 30, modifier: "GREATER_THAN" },
+        scene_count: { value: 30, modifier: CriterionModifier.GreaterThan },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -439,7 +454,7 @@ describe("Tag Filters", () => {
       const filter: PeekTagFilter = {
         created_at: {
           value: new Date(Date.now() - 30 * 86400000).toISOString(),
-          modifier: "GREATER_THAN",
+          modifier: CriterionModifier.GreaterThan,
         },
       };
 
