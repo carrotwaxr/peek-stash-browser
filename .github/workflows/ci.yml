@@ -44,13 +44,19 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: |
+            client/package-lock.json
+            shared/package-lock.json
 
       - run: npm ci
 
       - name: Build shared types
         working-directory: shared
         run: npm ci && npm run build
+
+      - name: Lint shared
+        working-directory: shared
+        run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck

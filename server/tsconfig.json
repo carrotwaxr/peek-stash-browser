@@ -11,6 +11,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "paths": {
       "@peek/shared-types": ["../shared/dist/index.d.ts"],
       "@peek/shared-types/*": ["../shared/dist/*"]
