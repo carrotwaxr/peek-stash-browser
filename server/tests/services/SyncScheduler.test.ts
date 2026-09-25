@@ -4,8 +4,8 @@
  * sync fetches it whole; the other types sync incrementally.
  *
  * Once a day the startup sync or the scheduled tick is a full sync instead:
- * when some type of an enabled instance has had no full sync in 24 hours
- * (`lastFullSyncActual`).
+ * when an enabled instance has had no full pass in 24 hours (the newest
+ * `lastFullSyncActual` of its types).
  *
  * The scheduler starts once an instance exists (the setup wizard starts it),
  * and a new sync interval only re-arms the timer: it never starts a sync.
@@ -29,16 +29,6 @@ vi.mock("../../initializers/database.js", () => ({
 }));
 
 vi.mock("../../services/StashSyncService.js", () => ({
-  SYNC_ORDER: [
-    "tag",
-    "studio",
-    "performer",
-    "group",
-    "gallery",
-    "scene",
-    "clip",
-    "image",
-  ],
   stashSyncService: {
     fullSync: vi.fn(),
     smartIncrementalSync: vi.fn(),
@@ -451,10 +441,26 @@ describe("the daily full pass", () => {
       full: false,
     },
     {
-      name: "the second instance's clip type had its last 24 hours and a minute ago",
+      name: "every type of the second instance had its last 24 hours and a minute ago",
+      rows: () => [
+        ...syncStates([], "default", TYPES, hoursAgo(23)),
+        ...syncStates(
+          [],
+          "second",
+          TYPES,
+          new Date(Date.now() - 24 * HOUR - MINUTE)
+        ),
+      ],
+      full: true,
+    },
+    {
+      name: "the second instance's newest full sync is 24 hours and a minute old, its others older",
       rows: () =>
         withFullPassAt(
-          everyInstanceSynced(23),
+          [
+            ...syncStates([], "default", TYPES, hoursAgo(23)),
+            ...syncStates([], "second", TYPES, hoursAgo(30)),
+          ],
           "second",
           "clip",
           new Date(Date.now() - 24 * HOUR - MINUTE)
@@ -462,10 +468,23 @@ describe("the daily full pass", () => {
       full: true,
     },
     {
-      name: "the second instance's clip type never recorded one",
-      rows: () =>
-        withFullPassAt(everyInstanceSynced(23), "second", "clip", null),
+      name: "no type of the second instance recorded one",
+      rows: () => [
+        ...syncStates([], "default", TYPES, hoursAgo(23)),
+        ...syncStates([], "second", TYPES, null),
+      ],
       full: true,
+    },
+    {
+      name: "the second instance has no rows",
+      rows: () => syncStates([], "default", TYPES, hoursAgo(23)),
+      full: true,
+    },
+    {
+      name: "one type of the second instance had its last 30 hours ago, the others 23",
+      rows: () =>
+        withFullPassAt(everyInstanceSynced(23), "second", "clip", hoursAgo(30)),
+      full: false,
     },
     {
       name: "the default instance has no image row",
@@ -474,7 +493,7 @@ describe("the daily full pass", () => {
           (row) =>
             !(row.stashInstanceId === "default" && row.entityType === "image")
         ),
-      full: true,
+      full: false,
     },
     {
       name: "only an instance that is not enabled had its last three days ago",
@@ -497,7 +516,7 @@ describe("the daily full pass", () => {
   });
 
   it.each(cases)(
-    "a scheduled tick runs a full sync when any enabled instance's oldest lastFullSyncActual is older than 24 hours, else an incremental one: $name",
+    "a scheduled tick runs a full sync when an enabled instance's newest lastFullSyncActual is older than 24 hours or missing, else an incremental one: $name",
     async ({ rows, full }) => {
       vi.useFakeTimers();
       syncScheduler["startPollingInterval"](60);
@@ -529,6 +548,27 @@ describe("the daily full pass", () => {
       expect(mockSync.smartIncrementalSync).toHaveBeenCalledTimes(full ? 0 : 1);
     }
   );
+
+  it("an instance whose studio type fails every pass still runs incremental syncs between daily passes", async () => {
+    vi.useFakeTimers();
+    // The last pass fetched every other type an hour ago; studios failed
+    // there and on every pass before, so they never recorded one
+    storeSyncStates(
+      withFullPassAt(everyInstanceSynced(1), "default", "studio", null)
+    );
+    syncScheduler["startPollingInterval"](60);
+
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+
+    await vi.waitFor(() => {
+      expect(
+        mockSync.fullSync.mock.calls.length +
+          mockSync.incrementalSync.mock.calls.length
+      ).toBe(1);
+    });
+    expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
+    expect(mockSync.fullSync).not.toHaveBeenCalled();
+  });
 
   it("a tick while a sync runs starts nothing", async () => {
     vi.useFakeTimers();

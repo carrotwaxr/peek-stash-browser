@@ -5,7 +5,7 @@
  * - Startup sync (full if first run, incremental otherwise)
  * - Polling interval (configurable, default 60 min)
  * - The daily full pass: the startup sync or a scheduled one is a full sync
- *   when some type of an enabled instance has had none in 24 hours
+ *   when an enabled instance has had none in 24 hours
  * - Manual trigger support
  *
  * Note: Stash scan completion subscription is a future enhancement
@@ -16,7 +16,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { SYNC_ORDER, stashSyncService } from "./StashSyncService.js";
+import { stashSyncService } from "./StashSyncService.js";
 
 /** The types the startup check reports as never synced when a row is absent */
 const STARTUP_TYPES = [
@@ -46,43 +46,43 @@ type FullPassState = Pick<
   "stashInstanceId" | "entityType" | "lastFullSyncActual"
 >;
 
-/** The type that makes the full pass due, and when it last had one. */
+/** The instance that makes the full pass due, and its last full pass. */
 type FullPassDue = {
   instanceId: string;
-  entityType: string;
-  lastFullSyncActual: string | null;
+  lastFullPass: string | null;
 };
 
 /**
- * The oldest full sync among the types of `instanceIds` in `states` when it
- * is null, missing or older than FULL_PASS_INTERVAL_MS before `now` (the
- * pass is due), else null.
+ * The first of `instanceIds` whose last full pass is older than
+ * FULL_PASS_INTERVAL_MS before `now`, or that has none (the pass is due),
+ * else null. An instance's last full pass is the newest `lastFullSyncActual`
+ * among its types: a pass that fetched some types counts, so a type that
+ * fails on every pass (it keeps its `lastError` and its old watermark, and
+ * each incremental sync tries it again) does not make every scheduled sync
+ * a full one.
  */
 function fullPassDue(
   instanceIds: readonly string[],
   states: readonly FullPassState[],
   now: number
 ): FullPassDue | null {
-  let oldest: FullPassDue | null = null;
-  let oldestAt = Infinity;
   for (const instanceId of instanceIds) {
-    for (const entityType of SYNC_ORDER) {
-      const at =
-        states.find(
-          (s) => s.stashInstanceId === instanceId && s.entityType === entityType
-        )?.lastFullSyncActual ?? null;
-      const time = at?.getTime() ?? -Infinity;
-      if (time < oldestAt) {
-        oldestAt = time;
-        oldest = {
-          instanceId,
-          entityType,
-          lastFullSyncActual: at?.toISOString() ?? null,
-        };
+    let newest: Date | null = null;
+    for (const state of states) {
+      const at = state.lastFullSyncActual;
+      if (
+        state.stashInstanceId === instanceId &&
+        at &&
+        (!newest || at > newest)
+      ) {
+        newest = at;
       }
     }
+    if (!newest || newest.getTime() < now - FULL_PASS_INTERVAL_MS) {
+      return { instanceId, lastFullPass: newest?.toISOString() ?? null };
+    }
   }
-  return oldestAt < now - FULL_PASS_INTERVAL_MS ? oldest : null;
+  return null;
 }
 
 class SyncScheduler {
@@ -288,11 +288,11 @@ class SyncScheduler {
   }
 
   /**
-   * Whether the daily full pass is due: some type of an enabled instance
-   * has had no full sync (`lastFullSyncActual` null, or no row) or none in
-   * FULL_PASS_INTERVAL_MS. The time is stored per type, so it survives
-   * restarts; a manual Full Sync resets it. Returns the type that makes it
-   * due, else null.
+   * Whether the daily full pass is due: an enabled instance has had no full
+   * pass (no type with a `lastFullSyncActual`) or none in
+   * FULL_PASS_INTERVAL_MS (`fullPassDue`). The time is stored per type, so
+   * it survives restarts; a manual Full Sync resets it. Returns the instance
+   * that makes it due, else null.
    */
   private async isFullPassDue(): Promise<FullPassDue | null> {
     const instanceIds = stashInstanceManager.getAllEnabled().map((i) => i.id);
