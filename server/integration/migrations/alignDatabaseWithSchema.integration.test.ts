@@ -428,6 +428,13 @@ describe("align database with schema migration", () => {
     expect(
       await client.$queryRawUnsafe<Row[]>("PRAGMA integrity_check")
     ).toEqual([{ integrity_check: "ok" }]);
+
+    // With the migrations after this one, it matches schema.prisma
+    await client.$disconnect();
+    await runPrismaCli(["migrate", "deploy"], {
+      prismaDir: PRISMA_DIR,
+      databaseUrl: db.url,
+    });
     expect(await schemaDriftExitCode(db.url)).toBe(0);
   });
 

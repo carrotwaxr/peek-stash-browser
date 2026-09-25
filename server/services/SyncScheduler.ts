@@ -17,7 +17,6 @@ import { type SyncProgress, stashSyncService } from "./StashSyncService.js";
 interface SyncSchedulerSettings {
   syncIntervalMinutes: number;
   enableScanSubscription: boolean;
-  enablePluginWebhook: boolean;
 }
 
 class SyncScheduler {
@@ -61,7 +60,6 @@ class SyncScheduler {
     logger.info("SyncScheduler started", {
       intervalMinutes: settings.syncIntervalMinutes,
       scanSubscription: settings.enableScanSubscription,
-      webhookEnabled: settings.enablePluginWebhook,
     });
   }
 
@@ -112,7 +110,6 @@ class SyncScheduler {
         id: 1,
         syncIntervalMinutes: settings.syncIntervalMinutes ?? 60,
         enableScanSubscription: settings.enableScanSubscription ?? true,
-        enablePluginWebhook: settings.enablePluginWebhook ?? false,
       },
     });
 
@@ -188,7 +185,6 @@ class SyncScheduler {
     return {
       syncIntervalMinutes: settings?.syncIntervalMinutes ?? 60,
       enableScanSubscription: settings?.enableScanSubscription ?? true,
-      enablePluginWebhook: settings?.enablePluginWebhook ?? false,
     };
   }
 

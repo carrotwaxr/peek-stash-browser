@@ -4,7 +4,8 @@
  * Handles sync-related API endpoints:
  * - GET /api/sync/status - Get current sync status and settings (admin only)
  * - POST /api/sync/trigger - Trigger manual sync (admin only)
- * - POST /api/sync/notify - Webhook for Stash plugin (admin only)
+ * - POST /api/sync/abort - Abort the current sync (admin only)
+ * - POST /api/sync/reprobe-clips - Re-probe clips without previews (admin only)
  * - PUT /api/sync/settings - Update sync settings (admin only)
  */
 import express from "express";
@@ -51,7 +52,7 @@ router.post(
   requireAdmin,
   authenticated((req, res) => {
     try {
-      const { type = "incremental" } = (req.body || {}) as { type?: string };
+      const { type = "incremental" } = (req.body ?? {}) as { type?: string };
 
       if (stashSyncService.isSyncing()) {
         res.status(409).json({
@@ -118,87 +119,6 @@ router.post(
 );
 
 /**
- * POST /api/sync/notify
- * Webhook endpoint for Stash plugin to notify of entity changes
- * (admin only, requires enablePluginWebhook setting)
- *
- * Body: { entity: string, id: string, action: 'create' | 'update' | 'delete' }
- */
-router.post(
-  "/notify",
-  requireAdmin,
-  authenticated(async (req, res) => {
-    try {
-      const status = await stashSyncService.getSyncStatus();
-
-      if (!status.settings.enablePluginWebhook) {
-        res.status(403).json({
-          error: "Webhook disabled",
-          message: "Plugin webhook is not enabled in sync settings",
-        });
-        return;
-      }
-
-      const { entity, id, action } = (req.body || {}) as {
-        entity?: string;
-        id?: string;
-        action?: string;
-      };
-
-      if (!entity || !id || !action) {
-        res.status(400).json({
-          error: "Missing required fields",
-          message: "Request must include entity, id, and action",
-        });
-        return;
-      }
-
-      const validEntities = [
-        "scene",
-        "performer",
-        "studio",
-        "tag",
-        "group",
-        "gallery",
-        "image",
-      ] as const;
-      type SyncEntityType = (typeof validEntities)[number];
-      if (!validEntities.includes(entity as SyncEntityType)) {
-        res.status(400).json({
-          error: "Invalid entity type",
-          message: `Entity must be one of: ${validEntities.join(", ")}`,
-        });
-        return;
-      }
-
-      const validActions = ["create", "update", "delete"] as const;
-      type SyncAction = (typeof validActions)[number];
-      if (!validActions.includes(action as SyncAction)) {
-        res.status(400).json({
-          error: "Invalid action",
-          message: `Action must be one of: ${validActions.join(", ")}`,
-        });
-        return;
-      }
-
-      // Queue single entity sync (don't wait for completion)
-      stashSyncService
-        .syncSingleEntity(entity as SyncEntityType, id, action as SyncAction)
-        .catch(() => {
-          // Error is logged by the service
-        });
-
-      res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to process webhook",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  })
-);
-
-/**
  * POST /api/sync/reprobe-clips
  * Re-probe clips that were synced before previews were generated (admin only)
  *
@@ -218,7 +138,7 @@ router.post(
         return;
       }
 
-      const { instanceId } = (req.body || {}) as { instanceId?: string };
+      const { instanceId } = (req.body ?? {}) as { instanceId?: string };
 
       // If no instance specified, get the first enabled instance
       const { stashInstanceManager } =
@@ -267,8 +187,7 @@ router.post(
  *
  * Body: {
  *   syncIntervalMinutes?: number,
- *   enableScanSubscription?: boolean,
- *   enablePluginWebhook?: boolean
+ *   enableScanSubscription?: boolean
  * }
  */
 router.put(
@@ -276,14 +195,9 @@ router.put(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      const {
-        syncIntervalMinutes,
-        enableScanSubscription,
-        enablePluginWebhook,
-      } = req.body as {
+      const { syncIntervalMinutes, enableScanSubscription } = req.body as {
         syncIntervalMinutes?: number;
         enableScanSubscription?: boolean;
-        enablePluginWebhook?: boolean;
       };
 
       // Validate syncIntervalMinutes
@@ -305,7 +219,6 @@ router.put(
       const updates: {
         syncIntervalMinutes?: number;
         enableScanSubscription?: boolean;
-        enablePluginWebhook?: boolean;
       } = {};
 
       if (syncIntervalMinutes !== undefined) {
@@ -313,9 +226,6 @@ router.put(
       }
       if (enableScanSubscription !== undefined) {
         updates.enableScanSubscription = enableScanSubscription;
-      }
-      if (enablePluginWebhook !== undefined) {
-        updates.enablePluginWebhook = enablePluginWebhook;
       }
 
       await syncScheduler.updateSettings(updates);
