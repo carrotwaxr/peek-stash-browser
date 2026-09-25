@@ -261,7 +261,7 @@ This test will fail if gallery inheritance doesn't run.
 
 **2. Behavioral parity checks:**
 
-When adding post-sync processing to one sync method, verify all three methods have equivalent processing. The three sync methods should have the same set of post-processing steps:
+The three sync modes run through one per-instance path (`syncInstance`) and one set of post-sync steps (`runInstancePostSteps`), so a step added there runs in every mode. When changing a step's condition, keep the modes equivalent:
 
 - Gallery inheritance (conditional on images/galleries synced)
 - Scene tag inheritance (conditional on scenes synced)
@@ -275,7 +275,11 @@ When adding post-sync processing to one sync method, verify all three methods ha
 
 The sync logic is implemented in:
 
-- `server/services/StashSyncService.ts` - Main sync orchestration
+- `server/services/StashSyncService.ts` - Main sync orchestration:
+  - `runSync(mode, instanceId?)`: one sync run, of one instance or every enabled instance in turn, for `fullSync`, `incrementalSync` and `smartIncrementalSync`
+  - `syncInstance(instanceId, mode, run)`: one instance's types in `SYNC_ORDER`, then the cleanups and the post-sync steps
+  - `paginate(type, instanceId, { since, ids }, run)`: the one page loop for every type (500 a page): abort checks between pages, progress events, and the newest `updated_at` seen as the next sync's watermark
+  - `ENTITY_SYNC`: each type's spec, `fetchPage` (the Stash query that lists it, narrowed by `updated_at` or by ids, carrying the run's abort signal) and `processBatch` (the writer of one page)
 - `server/services/ImageGalleryInheritanceService.ts` - Gallery-to-image inheritance
 - `server/services/SceneTagInheritanceService.ts` - Scene tag inheritance
 - `server/services/EntityImageCountService.ts` - Image count denormalization

@@ -13,7 +13,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  ENTITY_SYNC,
+  type SyncEntityOf,
+  type SyncRunContext,
+} from "../../services/StashSyncService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { defaultRestrictEmpty } from "../../services/exclusionPolicy.js";
 import { must } from "../../tests/helpers/must.js";
@@ -25,12 +29,8 @@ import { TestClient, adminClient } from "../helpers/testClient.js";
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 /** Galleries and images as Stash's sync queries return them */
-type SyncGallery = Parameters<
-  (typeof stashSyncService)["processGalleriesBatch"]
->[0][number];
-type SyncImage = Parameters<
-  (typeof stashSyncService)["processImagesBatch"]
->[0][number];
+type SyncGallery = SyncEntityOf<"gallery">;
+type SyncImage = SyncEntityOf<"image">;
 
 const A = "restr-it-a";
 const B = "restr-it-b";
@@ -692,8 +692,9 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     });
     try {
       for (const instanceId of INSTANCES) {
-        await stashSyncService["processGalleriesBatch"]([gallery], instanceId);
-        await stashSyncService["processImagesBatch"]([image], instanceId);
+        const run: SyncRunContext = { signal: new AbortController().signal };
+        await ENTITY_SYNC.gallery.processBatch([gallery], instanceId, run);
+        await ENTITY_SYNC.image.processBatch([image], instanceId, run);
       }
 
       await setRules(userId, [

@@ -14,7 +14,11 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  ENTITY_SYNC,
+  type SyncEntityOf,
+  type SyncRunContext,
+} from "../../services/StashSyncService.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 
@@ -27,12 +31,8 @@ const INSTANCES = [A, B];
 const STUDIO_ID = "1";
 
 /** Galleries and images as Stash's sync queries return them */
-type SyncGallery = Parameters<
-  (typeof stashSyncService)["processGalleriesBatch"]
->[0][number];
-type SyncImage = Parameters<
-  (typeof stashSyncService)["processImagesBatch"]
->[0][number];
+type SyncGallery = SyncEntityOf<"gallery">;
+type SyncImage = SyncEntityOf<"image">;
 
 function stashGallery(id: string, studioId: string | null): SyncGallery {
   return partialRow<SyncGallery>({
@@ -80,8 +80,9 @@ async function syncOnto(
   galleries: SyncGallery[],
   images: SyncImage[]
 ): Promise<void> {
-  await stashSyncService["processGalleriesBatch"](galleries, instanceId);
-  await stashSyncService["processImagesBatch"](images, instanceId);
+  const run: SyncRunContext = { signal: new AbortController().signal };
+  await ENTITY_SYNC.gallery.processBatch(galleries, instanceId, run);
+  await ENTITY_SYNC.image.processBatch(images, instanceId, run);
 }
 
 /** `<id>@<instance>` to its `studioId@studioInstanceId` */

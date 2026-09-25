@@ -5,12 +5,16 @@
  * decisions (Direct, MKV, the resolution tiers) in three small columns.
  *
  * Rows are seeded under an isolated stashInstanceId that real sync never
- * touches, and processScenesBatch is called directly with a Stash-shaped
- * scene, so no Stash server is involved.
+ * touches, and the scene spec's batch writer (ENTITY_SYNC.scene.processBatch)
+ * is called directly with a Stash-shaped scene, so no Stash server is
+ * involved.
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  ENTITY_SYNC,
+  type SyncEntityOf,
+} from "../../services/StashSyncService.js";
 import { must } from "../../tests/helpers/must.js";
 import { untrusted } from "../../tests/helpers/untrusted.js";
 
@@ -21,9 +25,7 @@ const TEST_INSTANCE = "streams-it-instance";
 const SCENE_ID = "9001";
 
 /** A scene as Stash's compact scene query returns it */
-type SyncScene = Parameters<
-  (typeof stashSyncService)["processScenesBatch"]
->[0][number];
+type SyncScene = SyncEntityOf<"scene">;
 
 const scene: SyncScene = {
   id: SCENE_ID,
@@ -91,7 +93,9 @@ const scene: SyncScene = {
 };
 
 async function syncScene(): Promise<void> {
-  await stashSyncService["processScenesBatch"]([scene], TEST_INSTANCE, 0, 1);
+  await ENTITY_SYNC.scene.processBatch([scene], TEST_INSTANCE, {
+    signal: new AbortController().signal,
+  });
 }
 
 async function readRow(): Promise<Record<string, unknown>> {

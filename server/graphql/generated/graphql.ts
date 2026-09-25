@@ -5438,6 +5438,7 @@ export type FindSceneIDsQuery = { findScenes: { count: number, scenes: Array<{ i
 
 export type FindSceneMarkersQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']> | Scalars['ID']['input']>;
   scene_marker_filter?: InputMaybe<SceneMarkerFilterType>;
 }>;
 
@@ -6100,8 +6101,12 @@ export const FindSceneIDsDocument = gql`
 }
     `;
 export const FindSceneMarkersDocument = gql`
-    query FindSceneMarkers($filter: FindFilterType, $scene_marker_filter: SceneMarkerFilterType) {
-  findSceneMarkers(filter: $filter, scene_marker_filter: $scene_marker_filter) {
+    query FindSceneMarkers($filter: FindFilterType, $ids: [ID!], $scene_marker_filter: SceneMarkerFilterType) {
+  findSceneMarkers(
+    filter: $filter
+    ids: $ids
+    scene_marker_filter: $scene_marker_filter
+  ) {
     count
     scene_markers {
       id
