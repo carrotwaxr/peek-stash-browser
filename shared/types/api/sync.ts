@@ -12,6 +12,17 @@
  */
 export type SyncJob = "sync" | "instance-delete";
 
+/** A synced entity type, as `SyncState` rows and the cleanup route name it. */
+export type SyncEntityType =
+  | "tag"
+  | "studio"
+  | "performer"
+  | "group"
+  | "gallery"
+  | "scene"
+  | "clip"
+  | "image";
+
 /** One entity type's sync state on one instance (a `SyncState` row). */
 export interface SyncEntityState {
   /** `tag`, `studio`, `performer`, `group`, `gallery`, `scene`, `clip` or `image` */
@@ -58,4 +69,21 @@ export interface SyncStatusResponse {
   };
   /** Every configured instance, enabled or not, in priority order. */
   instances: SyncInstanceStatus[];
+}
+
+/**
+ * POST /api/sync/cleanup: the sync status's "Apply deletions". Runs one
+ * type's cleanup on one instance without the ratio guard, after a cleanup
+ * refused to soft-delete more than half of the type ("Cleanup refused: ..."
+ * in its `lastError`). The partial and empty list guards still apply.
+ */
+export interface ApplyDeletionsRequest {
+  instanceId: string;
+  entityType: SyncEntityType;
+}
+
+/** 202: the cleanup runs in the background; its outcome goes to `lastError`. */
+export interface ApplyDeletionsResponse {
+  ok: true;
+  message: string;
 }

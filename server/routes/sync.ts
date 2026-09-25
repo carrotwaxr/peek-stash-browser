@@ -5,17 +5,40 @@
  * - GET /api/sync/status - Sync status, settings and each instance's entity states (admin only)
  * - POST /api/sync/trigger - Trigger manual sync (admin only)
  * - POST /api/sync/abort - Abort the current sync (admin only)
+ * - POST /api/sync/cleanup - Apply the deletions a cleanup refused (admin only)
  * - POST /api/sync/reprobe-clips - Re-probe clips without previews (admin only)
  * - PUT /api/sync/settings - Update sync settings (admin only)
  */
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
-import { stashSyncService } from "../services/StashSyncService.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  SYNC_ORDER,
+  SyncBusyError,
+  stashSyncService,
+} from "../services/StashSyncService.js";
 import { syncScheduler } from "../services/SyncScheduler.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
-import type { TypedResponse } from "../types/api/express.js";
-import type { SyncStatusResponse } from "../types/api/sync.js";
+import type { TypedRequest, TypedResponse } from "../types/api/express.js";
+import type {
+  ApplyDeletionsRequest,
+  ApplyDeletionsResponse,
+  SyncStatusResponse,
+} from "../types/api/sync.js";
 import { authenticated } from "../utils/routeHelpers.js";
+import { logSyncFailure } from "../utils/syncLog.js";
+
+/** How the cleanup route names each type in its answer. */
+const PLURALS: Record<(typeof SYNC_ORDER)[number], string> = {
+  tag: "tags",
+  studio: "studios",
+  performer: "performers",
+  group: "collections",
+  gallery: "galleries",
+  scene: "scenes",
+  clip: "clips",
+  image: "images",
+};
 
 const router = express.Router();
 
@@ -121,6 +144,71 @@ router.post(
       });
     }
   })
+);
+
+/**
+ * POST /api/sync/cleanup
+ * The sync status's "Apply deletions" (admin only): one type's cleanup on
+ * one enabled instance, without the ratio guard, after a cleanup refused to
+ * soft-delete more than half of the type. It runs in the background under
+ * the sync lock, so it answers 409 while a sync or an instance deletion
+ * runs; its outcome goes to the type's `lastError`.
+ *
+ * Body: { instanceId: string, entityType: "tag" | "studio" | ... }
+ */
+router.post(
+  "/cleanup",
+  requireAdmin,
+  authenticated(
+    (
+      req: TypedRequest<Partial<ApplyDeletionsRequest> | undefined>,
+      res: TypedResponse<ApplyDeletionsResponse | ApiErrorResponse>
+    ) => {
+      const { instanceId, entityType } = req.body ?? {};
+      const type = SYNC_ORDER.find((known) => known === entityType);
+      if (typeof instanceId !== "string" || instanceId === "" || !type) {
+        res.status(400).json({
+          error: "Name an instance and one of the synced entity types",
+        });
+        return;
+      }
+      if (!stashInstanceManager.get(instanceId)) {
+        res.status(404).json({
+          error: "No enabled Stash instance with that id",
+        });
+        return;
+      }
+
+      let cleanup: Promise<unknown>;
+      try {
+        cleanup = stashSyncService.runCleanup(type, instanceId, {
+          ignoreRatioGuard: true,
+        });
+      } catch (error) {
+        if (error instanceof SyncBusyError) {
+          res.status(409).json({
+            error:
+              error.job === "sync"
+                ? "A sync is already running"
+                : "Peek is removing a deleted instance's cached library. Try again once it has finished.",
+          });
+          return;
+        }
+        throw error;
+      }
+      cleanup.catch((error: unknown) => {
+        logSyncFailure("Applying deletions failed", error, {
+          instanceId,
+          entityType: type,
+        });
+      });
+
+      res.status(202).json({
+        ok: true,
+        message: `Applying the deletions of ${PLURALS[type]}`,
+      });
+    }
+  )
 );
 
 /**

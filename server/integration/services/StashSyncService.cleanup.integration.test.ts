@@ -25,6 +25,8 @@ import type {
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { stringContaining } from "../../tests/helpers/matchers.js";
+import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -111,6 +113,38 @@ async function clearSeeds(): Promise<void> {
       INSTANCE_B
     );
   }
+  await prisma.syncState.deleteMany({
+    where: { stashInstanceId: { in: [INSTANCE_A, INSTANCE_B] } },
+  });
+}
+
+/** A and B each have a SyncState row for `type` with `lastError`. */
+async function seedSyncStates(
+  type: CleanupType,
+  lastError: string
+): Promise<void> {
+  await prisma.syncState.createMany({
+    data: [INSTANCE_A, INSTANCE_B].map((stashInstanceId) => ({
+      stashInstanceId,
+      entityType: type,
+      lastError,
+    })),
+  });
+}
+
+/** `lastError` of `type` on A and on B. */
+async function lastErrors(
+  type: CleanupType
+): Promise<Record<string, string | null>> {
+  const rows = await prisma.syncState.findMany({
+    where: {
+      stashInstanceId: { in: [INSTANCE_A, INSTANCE_B] },
+      entityType: type,
+    },
+  });
+  return Object.fromEntries(
+    rows.map((row) => [row.stashInstanceId, row.lastError])
+  );
 }
 
 /** Which rows of `table` under `instanceId` are alive and soft-deleted. */
@@ -243,6 +277,9 @@ function stubClient(type: CleanupType, answer: StashAnswer): StashClient {
 function stubStash(type: CleanupType, answer: StashAnswer): void {
   const realGet = stashInstanceManager.get.bind(stashInstanceManager);
   const client = stubClient(type, answer);
+  // Under the lock (runCleanup) the client is scoped to the job's abort
+  // signal; the stub stays itself
+  Object.assign(client, { withSignal: () => client });
   vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
     id === INSTANCE_A ? client : realGet(id)
   );
@@ -289,6 +326,57 @@ describeWithDb.each(TYPES)(
       expect(await snapshot(table, INSTANCE_A)).toEqual({
         alive: ROWS,
         deleted: [],
+      });
+    });
+
+    it("applies a refused deletion when an admin forces it, only on A", async () => {
+      // 80 of 120 missing: refused by the sync's own cleanup
+      stubStash(type, { keepSet: ids(1, 40) });
+      const refused = await stashSyncService["cleanupDeletedEntities"](
+        type,
+        INSTANCE_A
+      );
+      expect(refused.skipped).toMatch(
+        /^Cleanup refused: Stash no longer lists 80 of 120 /
+      );
+      await seedSyncStates(type, must(refused.skipped, "the refusal"));
+
+      // Apply deletions (POST /api/sync/cleanup)
+      await stashSyncService.runCleanup(type, INSTANCE_A, {
+        ignoreRatioGuard: true,
+      });
+
+      expect(await snapshot(table, INSTANCE_A)).toEqual({
+        alive: ids(1, 40),
+        deleted: ids(41, 120),
+      });
+      expect(await snapshot(table, INSTANCE_B)).toEqual({
+        alive: ROWS,
+        deleted: [],
+      });
+      expect(await lastErrors(type)).toEqual({
+        [INSTANCE_A]: null,
+        [INSTANCE_B]: refused.skipped,
+      });
+    });
+
+    it("keeps skipping a partial list when an admin forces the cleanup", async () => {
+      stubStash(type, { keepSet: ids(1, 40), count: 120 });
+      await seedSyncStates(type, "Cleanup refused: an earlier run");
+
+      await stashSyncService.runCleanup(type, INSTANCE_A, {
+        ignoreRatioGuard: true,
+      });
+
+      expect(await snapshot(table, INSTANCE_A)).toEqual({
+        alive: ROWS,
+        deleted: [],
+      });
+      expect(await lastErrors(type)).toEqual({
+        [INSTANCE_A]: stringContaining(
+          "Cleanup skipped: Stash returned 40 of 120"
+        ),
+        [INSTANCE_B]: "Cleanup refused: an earlier run",
       });
     });
 

@@ -41,6 +41,7 @@ import type {
 import prisma from "../prisma/singleton.js";
 import type {
   SyncEntityState,
+  SyncEntityType,
   SyncJob,
   SyncStatusResponse,
 } from "../types/api/sync.js";
@@ -94,15 +95,7 @@ export interface SyncResult {
   maxUpdatedAt?: string;
 }
 
-type EntityType =
-  | "scene"
-  | "performer"
-  | "studio"
-  | "tag"
-  | "group"
-  | "gallery"
-  | "image"
-  | "clip";
+type EntityType = SyncEntityType;
 
 /**
  * The order every sync path takes, and its cleanups: a type before the ones
@@ -111,7 +104,7 @@ type EntityType =
  * not suppress; a gallery's or image's studio and a clip's scene and primary
  * tag are foreign keys too.
  */
-const SYNC_ORDER: readonly EntityType[] = [
+export const SYNC_ORDER: readonly EntityType[] = [
   "tag",
   "studio",
   "performer",
@@ -287,6 +280,15 @@ interface CleanupOutcome {
   stashIds?: string[];
   skipped?: string;
   error?: string;
+}
+
+/** How one cleanup runs. */
+interface CleanupOptions {
+  /**
+   * Skip the ratio guard: an admin's "Apply deletions" after a cleanup
+   * refused a mass deletion. The partial and empty list guards still apply.
+   */
+  ignoreRatioGuard?: boolean;
 }
 
 /** What a cleanup outcome adds to its type's `lastError`, if anything. */
@@ -1714,6 +1716,8 @@ class StashSyncService extends EventEmitter {
    *    parameter, so there is no TEMP table (which lives on one pooled
    *    connection, #526), no transaction and no bound-variable ceiling.
    * 4. The ratio guard (exceedsCleanupDeleteThreshold); a refusal is a skip.
+   *    `ignoreRatioGuard` (an admin's "Apply deletions") passes it by; the
+   *    guards of steps 1 and 2 stay.
    * 5. softDeleteMissing, 500 rows per writer-queue unit.
    * 6. Scenes: user data moves from merged scenes to their survivors
    *    (MergeReconciliationService.reconcileDeletedScenes). Scenes that left
@@ -1726,7 +1730,8 @@ class StashSyncService extends EventEmitter {
    */
   private async cleanupDeletedEntities(
     entityType: EntityType,
-    stashInstanceId: string
+    stashInstanceId: string,
+    { ignoreRatioGuard = false }: CleanupOptions = {}
   ): Promise<CleanupOutcome> {
     const { table, plural } = ENTITY_TABLES[entityType];
     logger.info(`Checking for deleted ${plural}...`);
@@ -1805,8 +1810,13 @@ class StashSyncService extends EventEmitter {
         return { deleted: 0, deletedIds: [], stashIds };
       }
 
-      // 4. The ratio guard
-      if (
+      // 4. The ratio guard, unless an admin applies the deletions
+      if (ignoreRatioGuard) {
+        logger.warn(
+          `Cleanup: soft-deleting ${missing.length}/${liveCount} ${plural} without the ratio guard (applied by an admin)`,
+          { stashInstanceId }
+        );
+      } else if (
         this.exceedsCleanupDeleteThreshold(
           plural,
           stashIds.length,
@@ -3440,6 +3450,53 @@ class StashSyncService extends EventEmitter {
       this.abortController?.signal.aborted === true ||
       (error instanceof Error && error.message === "Sync aborted")
     );
+  }
+
+  /**
+   * One type's cleanup on one instance, outside a sync: the sync status's
+   * "Apply deletions" (POST /api/sync/cleanup) runs it with
+   * `ignoreRatioGuard` after a cleanup refused a mass deletion.
+   *
+   * Takes the lock as a sync at once, and throws SyncBusyError when a sync
+   * or an instance deletion holds it. The returned promise is the cleanup:
+   * its outcome replaces the type's `lastError` (null when it ran clean, the
+   * skip or failure otherwise), then the lock is released. Abort stops it
+   * like a sync, rejecting with "Sync aborted" and recording nothing.
+   */
+  runCleanup(
+    entityType: EntityType,
+    stashInstanceId: string,
+    options: CleanupOptions = {}
+  ): Promise<CleanupOutcome> {
+    this.acquire("sync");
+    return this.cleanupAndRecord(entityType, stashInstanceId, options).finally(
+      () => this.release()
+    );
+  }
+
+  /** runCleanup's work; the caller holds the lock. */
+  private async cleanupAndRecord(
+    entityType: EntityType,
+    stashInstanceId: string,
+    options: CleanupOptions
+  ): Promise<CleanupOutcome> {
+    const outcome = await this.cleanupDeletedEntities(
+      entityType,
+      stashInstanceId,
+      options
+    );
+    await this.recordEntityError(
+      stashInstanceId,
+      entityType,
+      cleanupProblem(outcome) ?? null
+    );
+    logger.info("Cleanup run by an admin finished", {
+      stashInstanceId,
+      entityType,
+      deleted: outcome.deleted,
+      problem: cleanupProblem(outcome) ?? null,
+    });
+    return outcome;
   }
 
   /**

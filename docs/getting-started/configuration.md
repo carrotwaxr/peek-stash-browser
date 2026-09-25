@@ -41,6 +41,12 @@ Each instance can be:
 - **Enabled/Disabled**: Temporarily hide an instance without deleting it
 - **Deleted**: Permanently remove it, with its cached library and every user's ratings, favorites, watch and O history, image views, playlist entries, hidden items and downloads for it. Peek refuses while a sync is running, and the last enabled instance cannot be deleted. To keep all of that, disable the instance instead.
 
+### Sync Status
+
+**Location:** Settings → Server Configuration → Sync status
+
+Each instance has a table of its entity types: when each last had a full sync, the newest change Peek has from Stash, the last run's count and duration, and any problem the last run had with that type (a Stash error, a timeout, or a cleanup that was skipped or held back). While a sync runs, the status refreshes every 10 seconds and an **Abort sync** button stops it. **Full Sync** under Server Statistics asks before it starts. See [Sync Problems](troubleshooting.md#sync-problems) for what each problem means.
+
 ### Per-User Instance Selection
 
 When multiple instances are configured, each user can choose which instances they see content from:

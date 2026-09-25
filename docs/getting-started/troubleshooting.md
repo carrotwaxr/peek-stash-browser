@@ -56,6 +56,17 @@ docker exec peek-stash-browser curl -X POST http://your-stash-ip:9999/graphql \
 - [ ] Stash is reachable from Peek container (check Docker networking)
 - [ ] No firewall blocking the connection
 
+## Sync Problems
+
+**Where to look:** Settings → Server Configuration → Sync status. Each Stash instance has a table with one row per type (tags, studios, performers, collections, galleries, scenes, clips, images): when it last had a full sync, the newest change Peek has from Stash, how many items the last run synced and how long it took, and the problem the last run had with that type, if any. A type that fails does not stop the others: the next sync retries it from where it left off, and its problem clears once it syncs cleanly.
+
+- **A Stash error on one type**, such as `FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.image_path) (HTTP 200)`: Stash failed to answer for that type. The part in brackets names the field that broke (a studio's `image_path` here).
+- **`Stash request FindStudios timed out after 120 s`**: every request to Stash gives up after two minutes, so a Stash that hangs cannot hold the sync forever. Check that Stash is running and answers in its own web UI, then let the next sync try again.
+- **A running sync takes too long**: the **Abort sync** button next to Sync status stops it at its next step, including a request to Stash that is still waiting. The types that finished keep their progress; the next sync picks up the rest.
+- **`Cleanup refused: Stash no longer lists 812 of 1,200 scenes (more than half); ...`**: after each sync Peek removes what Stash no longer lists, but it holds back when more than half of a type would go (and more than 50 items), because an incomplete list from Stash would otherwise empty your library. If you did delete that many in Stash, press **Apply deletions** on that row and confirm: Peek asks Stash for the list again and removes only what Stash still does not list. It stops again if the list comes back incomplete. A Full Sync brings back anything Stash lists again later.
+- **`Cleanup skipped: ...`**: Stash's list came back incomplete or empty, so Peek removed nothing. The next sync checks again.
+- **A Stash on a blocked port**: Peek reaches Stash with `fetch`, which refuses the ports browsers block (6665-6669, 10080 and the others in the Fetch standard's "bad ports" list), so a Stash listening on one of them cannot be reached. Move Stash to another port, such as its default 9999.
+
 ## Starting Setup Over
 
 If setup stops before it is finished (for example, you forgot the admin password before connecting Stash), start it over:
