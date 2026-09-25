@@ -48,6 +48,9 @@ vi.mock("../../services/UserStatsService.js", () => ({
 vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {
     rebuildAllImageCounts: vi.fn().mockResolvedValue(undefined),
+    countedThrough: vi
+      .fn()
+      .mockResolvedValue({ performers: [], studios: [], tags: [] }),
   },
 }));
 vi.mock("../../services/ExclusionComputationService.js", () => ({

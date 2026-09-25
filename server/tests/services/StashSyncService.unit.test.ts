@@ -207,6 +207,9 @@ vi.mock("../../services/UserStatsService.js", () => ({
 vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {
     rebuildAllImageCounts: vi.fn().mockResolvedValue(undefined),
+    countedThrough: vi
+      .fn()
+      .mockResolvedValue({ performers: [], studios: [], tags: [] }),
   },
 }));
 
@@ -242,6 +245,7 @@ vi.mock("../../services/SceneTagInheritanceService.js", () => ({
 vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({
   imageGalleryInheritanceService: {
     applyGalleryInheritance: vi.fn().mockResolvedValue(undefined),
+    imagesInGalleries: vi.fn().mockResolvedValue([]),
   },
 }));
 

@@ -137,6 +137,21 @@ class RefList {
   }
 }
 
+/** Refs without duplicates, in first-seen order. */
+export function distinctRefs(refs: Iterable<EntityRef>): EntityRef[] {
+  const list = new RefList();
+  list.addAll(refs);
+  return list.refs();
+}
+
+/**
+ * Refs as one JSON parameter of [id, instanceId] pairs, which a statement
+ * reads with `json_each(?)` and `json_extract(j.value, '$[0]')`/`'$[1]'`.
+ */
+export function pairsJson(refs: readonly EntityRef[]): string {
+  return JSON.stringify(refs.map((ref) => [ref.id, ref.instanceId]));
+}
+
 /** The junction rows a batch deleted, grouped by their near id. */
 export function linksByNearId(
   rows: ReadonlyArray<{ nearId: string; farId: string; farInstanceId: string }>

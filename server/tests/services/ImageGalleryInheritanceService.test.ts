@@ -465,4 +465,135 @@ describe("ImageGalleryInheritanceService", () => {
       expect(image?.studioId).toBeNull();
     });
   });
+
+  describe("scoped", () => {
+    const OTHER_INSTANCE = "test-instance-igi-other";
+
+    /**
+     * On each instance: a gallery with a studio, a date, a performer and a
+     * tag, and images 1 and 2 in it with none of their own.
+     */
+    async function seedGalleryWithTwoImages(): Promise<void> {
+      for (const instance of [INSTANCE_ID, OTHER_INSTANCE]) {
+        await prisma.stashStudio.create({
+          data: {
+            id: `${PREFIX}studio-1`,
+            stashInstanceId: instance,
+            name: "Scoped Studio",
+          },
+        });
+        await prisma.stashPerformer.create({
+          data: {
+            id: `${PREFIX}performer-1`,
+            stashInstanceId: instance,
+            name: "Scoped Performer",
+          },
+        });
+        await prisma.stashTag.create({
+          data: {
+            id: `${PREFIX}tag-1`,
+            stashInstanceId: instance,
+            name: "Scoped Tag",
+          },
+        });
+        await prisma.stashGallery.create({
+          data: {
+            id: `${PREFIX}gallery-1`,
+            stashInstanceId: instance,
+            studioId: `${PREFIX}studio-1`,
+            studioInstanceId: instance,
+            date: "2026-01-01",
+          },
+        });
+        await prisma.galleryPerformer.create({
+          data: {
+            galleryId: `${PREFIX}gallery-1`,
+            galleryInstanceId: instance,
+            performerId: `${PREFIX}performer-1`,
+            performerInstanceId: instance,
+          },
+        });
+        await prisma.galleryTag.create({
+          data: {
+            galleryId: `${PREFIX}gallery-1`,
+            galleryInstanceId: instance,
+            tagId: `${PREFIX}tag-1`,
+            tagInstanceId: instance,
+          },
+        });
+        for (const image of ["image-1", "image-2"]) {
+          await prisma.stashImage.create({
+            data: { id: `${PREFIX}${image}`, stashInstanceId: instance },
+          });
+          await prisma.imageGallery.create({
+            data: {
+              imageId: `${PREFIX}${image}`,
+              imageInstanceId: instance,
+              galleryId: `${PREFIX}gallery-1`,
+              galleryInstanceId: instance,
+            },
+          });
+        }
+      }
+    }
+
+    /** Whether an image has each inherited value. */
+    async function inherited(image: string, instance: string) {
+      const where = { imageId: `${PREFIX}${image}`, imageInstanceId: instance };
+      const row = must(
+        await prisma.stashImage.findUnique({
+          where: {
+            id_stashInstanceId: {
+              id: `${PREFIX}${image}`,
+              stashInstanceId: instance,
+            },
+          },
+        }),
+        image
+      );
+      return {
+        studio: row.studioId !== null,
+        date: row.date !== null,
+        performers: await prisma.imagePerformer.count({ where }),
+        tags: await prisma.imageTag.count({ where }),
+      };
+    }
+
+    const all = { studio: true, date: true, performers: 1, tags: 1 };
+    const none = { studio: false, date: false, performers: 0, tags: 0 };
+
+    it("applies inheritance to the images in scope only", async () => {
+      await seedGalleryWithTwoImages();
+
+      await imageGalleryInheritanceService.applyGalleryInheritance([
+        { id: `${PREFIX}image-1`, instanceId: INSTANCE_ID },
+      ]);
+
+      expect(await inherited("image-1", INSTANCE_ID)).toEqual(all);
+      expect(await inherited("image-2", INSTANCE_ID)).toEqual(none);
+      // The same ids on another instance are other images
+      expect(await inherited("image-1", OTHER_INSTANCE)).toEqual(none);
+    });
+
+    it("an empty scope changes nothing", async () => {
+      await seedGalleryWithTwoImages();
+
+      await imageGalleryInheritanceService.applyGalleryInheritance([]);
+
+      expect(await inherited("image-1", INSTANCE_ID)).toEqual(none);
+    });
+
+    it("imagesInGalleries lists a gallery's images on its own instance", async () => {
+      await seedGalleryWithTwoImages();
+
+      const images = await imageGalleryInheritanceService.imagesInGalleries([
+        { id: `${PREFIX}gallery-1`, instanceId: INSTANCE_ID },
+      ]);
+
+      expect(images.map((i) => `${i.id}@${i.instanceId}`).sort()).toEqual([
+        `${PREFIX}image-1@${INSTANCE_ID}`,
+        `${PREFIX}image-2@${INSTANCE_ID}`,
+      ]);
+    });
+  });
 });
