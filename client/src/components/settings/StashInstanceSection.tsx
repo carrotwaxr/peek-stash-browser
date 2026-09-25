@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import type { DeleteStashInstanceResponse } from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
+import { showError, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
 interface StashInstance {
@@ -221,17 +223,24 @@ const StashInstanceSection = () => {
   const handleDelete = async (instance: { id: string; name: string }) => {
     if (
       !confirm(
-        `Are you sure you want to delete "${instance.name}"? This cannot be undone.`
+        `Delete "${instance.name}"? Peek removes its cached library and every ` +
+          "user's ratings, favorites, watch history, playlist entries and " +
+          "hidden items for it. To keep them, disable the instance instead."
       )
     ) {
       return;
     }
 
     try {
-      await apiDelete(`/setup/stash-instance/${instance.id}`);
+      const result = await apiDelete<DeleteStashInstanceResponse>(
+        `/setup/stash-instance/${instance.id}`
+      );
+      showSuccess(result.message);
       await loadInstances();
     } catch (err) {
-      setError((err as Error).message || "Failed to delete instance");
+      // A toast, so the list stays: a 409 (a sync is running) asks the admin
+      // to delete again once it has finished
+      showError((err as Error).message || "Failed to delete instance");
     }
   };
 

@@ -1,7 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../../src/api/client";
 import StashInstanceSection from "../../../src/components/settings/StashInstanceSection";
 import { useAuth } from "../../../src/hooks/useAuth";
+import { showError, showSuccess } from "../../../src/utils/toast";
+
+vi.mock("../../../src/utils/toast", () => ({
+  showError: vi.fn(),
+  showSuccess: vi.fn(),
+}));
 
 // Mock useAuth hook
 vi.mock("../../../src/hooks/useAuth", () => ({
@@ -174,6 +182,62 @@ describe("StashInstanceSection", () => {
       await waitFor(() => {
         expect(screen.getAllByText("Delete")).toHaveLength(2);
       });
+    });
+
+    it("the delete confirmation names what is removed and offers Disable instead", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          mockInstance,
+          { ...mockInstance, id: "test-instance-2", name: "Second Instance" },
+        ],
+      });
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getAllByText("Delete")).toHaveLength(2);
+      });
+      fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
+
+      expect(confirmSpy).toHaveBeenCalledWith(
+        'Delete "Second Instance"? Peek removes its cached library and every ' +
+          "user's ratings, favorites, watch history, playlist entries and " +
+          "hidden items for it. To keep them, disable the instance instead."
+      );
+      expect(mockApiDelete).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it("a 409 shows the server's message", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          mockInstance,
+          { ...mockInstance, id: "test-instance-2", name: "Second Instance" },
+        ],
+      });
+      const message =
+        "A sync is running. Wait for it to finish or abort it under Server Configuration → Sync status, then delete again.";
+      mockApiDelete.mockRejectedValue(
+        new ApiError(message, 409, { error: message })
+      );
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getAllByText("Delete")).toHaveLength(2);
+      });
+      fireEvent.click(must(screen.getAllByText("Delete")[1], "second Delete"));
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith(message);
+      });
+      expect(mockApiDelete).toHaveBeenCalledWith(
+        "/setup/stash-instance/test-instance-2"
+      );
+      // The list stays, so the admin can delete again once the sync is done
+      expect(screen.getAllByText("Delete")).toHaveLength(2);
+      expect(showSuccess).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
     });
 
     it("shows Primary badge on first instance when multiple exist", async () => {

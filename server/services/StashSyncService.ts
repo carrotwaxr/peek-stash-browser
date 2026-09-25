@@ -36,7 +36,7 @@ import type {
   TagFilterType,
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
-import { dbWrite, dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
@@ -116,6 +116,50 @@ const BATCH_SIZE = 500; // Number of entities to fetch per page
 // landing on a different pooled connection) would otherwise mass-delete real
 // scenes. Soft-deletes are recoverable, but the guard stops it before it happens.
 const MAX_CLEANUP_DELETE_RATIO = 0.5;
+
+/**
+ * What holds the service's one lock: a sync, or an instance deletion (the
+ * instance-row batch, then the purge of its cached library). Neither runs
+ * while the other does.
+ */
+type SyncJob = "sync" | "instance-delete";
+
+/** The lock is held: a sync or an instance deletion is running. */
+export class SyncBusyError extends Error {
+  constructor(readonly job: SyncJob) {
+    super(
+      job === "sync"
+        ? "Sync already in progress"
+        : "An instance's cached library is being removed"
+    );
+    this.name = "SyncBusyError";
+  }
+}
+
+/**
+ * The cached tables of an instance, in purge order: an entity before the
+ * ones it references (a clip's scene and primary tag, an image's or
+ * gallery's studio), so no foreign key action has to touch a row the purge
+ * removes later anyway. Junction rows go by their ON DELETE CASCADE keys.
+ */
+const INSTANCE_CACHE_TABLES = [
+  "StashClip",
+  "StashImage",
+  "StashGallery",
+  "StashScene",
+  "StashGroup",
+  "StashPerformer",
+  "StashStudio",
+  "StashTag",
+] as const;
+
+/**
+ * Rows per purge statement. One transaction for the whole prod library
+ * (27k scenes, 261k images) held the write lock for 9.1 s; in 1,000-row
+ * chunks the worst took 0.63 s and most under 0.17 s (about 9.5 s in all),
+ * so user writes interleave with the purge (the writer rule's 1 s bound).
+ */
+const PURGE_CHUNK_ROWS = 1000;
 
 /**
  * Format a timestamp for Stash GraphQL queries.
@@ -236,7 +280,8 @@ function extractPhashes(
 }
 
 class StashSyncService extends EventEmitter {
-  private syncInProgress = false;
+  /** The lock: which job runs, if any. Read it through isSyncing(). */
+  private activeJob: SyncJob | null = null;
   private readonly PAGE_SIZE = BATCH_SIZE;
   private abortController: AbortController | null = null;
   private batchItemCount = 0; // Track items within current batch for progress logging
@@ -273,20 +318,36 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Check if a sync is currently in progress
+   * Whether the service is busy: a sync or an instance deletion holds the
+   * lock, so a new sync or deletion would be refused or skipped.
    */
   isSyncing(): boolean {
-    return this.syncInProgress;
+    return this.activeJob !== null;
   }
 
   /**
-   * Abort current sync if running
+   * Abort the running job: a sync stops at its next check, an instance purge
+   * between two chunks (the startup sweep removes the rest).
    */
   abort(): void {
     if (this.abortController) {
       this.abortController.abort();
-      logger.info("Sync abort requested");
+      logger.info("Sync abort requested", { job: this.activeJob });
     }
+  }
+
+  /** Takes the lock for `job`, or throws SyncBusyError when it is held. */
+  private acquire(job: SyncJob): void {
+    if (this.activeJob !== null) {
+      throw new SyncBusyError(this.activeJob);
+    }
+    this.activeJob = job;
+    this.abortController = new AbortController();
+  }
+
+  private release(): void {
+    this.activeJob = null;
+    this.abortController = null;
   }
 
   /**
@@ -297,12 +358,7 @@ class StashSyncService extends EventEmitter {
    * If not provided, syncs ALL enabled instances.
    */
   async fullSync(stashInstanceId?: string): Promise<SyncResult[]> {
-    if (this.syncInProgress) {
-      throw new Error("Sync already in progress");
-    }
-
-    this.syncInProgress = true;
-    this.abortController = new AbortController();
+    this.acquire("sync");
 
     try {
       // If no instance specified, sync all enabled instances
@@ -311,14 +367,13 @@ class StashSyncService extends EventEmitter {
       }
       return await this.fullSyncInstance(stashInstanceId);
     } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
+      this.release();
     }
   }
 
   /**
    * Full sync all enabled instances
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async fullSyncAllInstances(): Promise<SyncResult[]> {
     const enabledInstances = stashInstanceManager.getAllEnabled();
@@ -352,7 +407,7 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Full sync a single instance
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async fullSyncInstance(
     stashInstanceId: string
@@ -497,13 +552,14 @@ class StashSyncService extends EventEmitter {
    * - Uses per-entity-type timestamps for incremental updates
    */
   async smartIncrementalSync(stashInstanceId?: string): Promise<SyncResult[]> {
-    if (this.syncInProgress) {
-      logger.warn("Sync already in progress, skipping");
+    if (this.activeJob !== null) {
+      logger.warn("Sync already in progress, skipping", {
+        job: this.activeJob,
+      });
       return [];
     }
 
-    this.syncInProgress = true;
-    this.abortController = new AbortController();
+    this.acquire("sync");
 
     try {
       // If no instance specified, sync all enabled instances
@@ -512,14 +568,13 @@ class StashSyncService extends EventEmitter {
       }
       return await this.smartIncrementalSyncInstance(stashInstanceId);
     } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
+      this.release();
     }
   }
 
   /**
    * Smart incremental sync all enabled instances
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async smartIncrementalSyncAllInstances(): Promise<SyncResult[]> {
     const enabledInstances = stashInstanceManager.getAllEnabled();
@@ -553,7 +608,7 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Smart incremental sync a single instance
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async smartIncrementalSyncInstance(
     stashInstanceId: string
@@ -880,13 +935,14 @@ class StashSyncService extends EventEmitter {
    * Uses per-entity-type timestamps so each entity type syncs from its own last sync time
    */
   async incrementalSync(stashInstanceId?: string): Promise<SyncResult[]> {
-    if (this.syncInProgress) {
-      logger.warn("Sync already in progress, skipping");
+    if (this.activeJob !== null) {
+      logger.warn("Sync already in progress, skipping", {
+        job: this.activeJob,
+      });
       return [];
     }
 
-    this.syncInProgress = true;
-    this.abortController = new AbortController();
+    this.acquire("sync");
 
     try {
       // If no instance specified, sync all enabled instances
@@ -895,14 +951,13 @@ class StashSyncService extends EventEmitter {
       }
       return await this.incrementalSyncInstance(stashInstanceId);
     } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
+      this.release();
     }
   }
 
   /**
    * Incremental sync all enabled instances
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async incrementalSyncAllInstances(): Promise<SyncResult[]> {
     const enabledInstances = stashInstanceManager.getAllEnabled();
@@ -938,7 +993,7 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Incremental sync a single instance
-   * Note: Assumes syncInProgress is already set by caller
+   * Note: the caller holds the lock (activeJob)
    */
   private async incrementalSyncInstance(
     stashInstanceId: string
@@ -3605,7 +3660,7 @@ class StashSyncService extends EventEmitter {
         syncIntervalMinutes: 60,
         enableScanSubscription: true,
       },
-      inProgress: this.syncInProgress,
+      inProgress: this.activeJob === "sync",
     };
   }
 
@@ -3728,65 +3783,207 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Clear all cached entities for a specific Stash instance.
-   * Used when an instance is deleted to clean up its cached data.
+   * Deletes a Stash instance and everything Peek keeps for it (item 18).
    *
-   * Hard-deletes all entities with the given stashInstanceId.
+   * Refused with SyncBusyError while a sync or another deletion holds the
+   * lock. Then, in one batch: the instance row (its `UserStashInstance` rows
+   * cascade), its `SyncState`, every user's own rows for it (history,
+   * ratings and favorites, image views, playlist entries, hides, entity
+   * downloads, merge records) and the derived per-user rows (stats and
+   * rankings). Rows for every instance (`instanceId = ''`) stay. The
+   * instance manager then reloads, so no later sync can reach it.
+   *
+   * It answers once that is done. The cached library goes afterwards,
+   * still under the lock, in `purged` (which never rejects): its rows carry
+   * an instance id that no longer exists, so a failure or an abort midway
+   * leaves them to the startup sweep (`purgeUnknownInstanceCaches`).
    */
-  async clearInstanceData(instanceId: string): Promise<void> {
-    logger.info(`Clearing all cached data for instance ${instanceId}...`);
-    const startTime = Date.now();
+  async deleteInstance(instanceId: string): Promise<{ purged: Promise<void> }> {
+    this.acquire("instance-delete");
 
     try {
-      // Delete in order to respect foreign key constraints
-      // Junction tables first, then entities
-      // Uses interactive transaction for extended timeout support
-      await dbWriteTransaction(
-        "sync.clearInstance",
-        async (tx) => {
-          // Junction tables (depend on entity primary keys)
-          await tx.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM ScenePerformer WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM SceneGroup WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM SceneGallery WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM GalleryTag WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM GalleryPerformer WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM ImageTag WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM ImagePerformer WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM ImageGallery WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM PerformerTag WHERE performerId IN (SELECT id FROM StashPerformer WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM GroupTag WHERE groupId IN (SELECT id FROM StashGroup WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM StudioTag WHERE studioId IN (SELECT id FROM StashStudio WHERE stashInstanceId = ${instanceId})`;
-          await tx.$executeRaw`DELETE FROM ClipTag WHERE clipId IN (SELECT id FROM StashClip WHERE stashInstanceId = ${instanceId})`;
-
-          // Entity tables
-          await tx.$executeRaw`DELETE FROM StashClip WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashImage WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashGallery WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashScene WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashGroup WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashPerformer WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashStudio WHERE stashInstanceId = ${instanceId}`;
-          await tx.$executeRaw`DELETE FROM StashTag WHERE stashInstanceId = ${instanceId}`;
-
-          // Sync state for this instance
-          await tx.syncState.deleteMany({
-            where: { stashInstanceId: instanceId },
-          });
-        },
-        { timeout: 120000 } // 120 second timeout for clearing large instances
-      );
-
-      const duration = Date.now() - startTime;
-      logger.info(
-        `Cleared cached data for instance ${instanceId} in ${duration}ms`
-      );
+      const own = { instanceId };
+      await dbWriteBatch("instance.delete", [
+        prisma.stashInstance.delete({ where: { id: instanceId } }),
+        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } }),
+        // Every user's own rows for the instance (owner, 2026-09-24)
+        prisma.watchHistory.deleteMany({ where: own }),
+        prisma.sceneRating.deleteMany({ where: own }),
+        prisma.performerRating.deleteMany({ where: own }),
+        prisma.studioRating.deleteMany({ where: own }),
+        prisma.tagRating.deleteMany({ where: own }),
+        prisma.galleryRating.deleteMany({ where: own }),
+        prisma.groupRating.deleteMany({ where: own }),
+        prisma.imageRating.deleteMany({ where: own }),
+        prisma.imageViewHistory.deleteMany({ where: own }),
+        prisma.playlistItem.deleteMany({ where: own }),
+        prisma.userHiddenEntity.deleteMany({ where: own }),
+        prisma.download.deleteMany({ where: own }),
+        prisma.mergeRecord.deleteMany({
+          where: {
+            OR: [
+              { sourceInstanceId: instanceId },
+              { targetInstanceId: instanceId },
+            ],
+          },
+        }),
+        // Derived rows; UserExcludedEntity has no instanceId index, so the
+        // purge removes its rows in chunks instead
+        prisma.userEntityStats.deleteMany({ where: own }),
+        prisma.userPerformerStats.deleteMany({ where: own }),
+        prisma.userStudioStats.deleteMany({ where: own }),
+        prisma.userTagStats.deleteMany({ where: own }),
+        prisma.userEntityRanking.deleteMany({ where: own }),
+      ]);
+      await stashInstanceManager.reload();
     } catch (error) {
-      logger.error(`Failed to clear cached data for instance ${instanceId}`, {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      this.release();
       throw error;
     }
+
+    logger.info("Deleted Stash instance; removing its cached library", {
+      instanceId,
+    });
+    const purged = this.purgeInstanceCache(instanceId)
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        logger.error(
+          "Removing a deleted instance's cached library failed; the next start finishes it",
+          {
+            instanceId,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      })
+      .finally(() => {
+        this.release();
+      });
+    return { purged };
+  }
+
+  /**
+   * Removes every cached row of an instance id: its exclusion rows, the
+   * eight entity tables (junction rows cascade) and its `SyncState`, each in
+   * chunks of PURGE_CHUNK_ROWS, one writer unit per chunk. Checks the abort
+   * flag before every chunk and stops there; the rows left carry an unknown
+   * instance id, which the startup sweep finds. The caller holds the lock.
+   *
+   * @returns the rows removed and whether it stopped early
+   */
+  private async purgeInstanceCache(
+    instanceId: string
+  ): Promise<{ rows: number; aborted: boolean }> {
+    const startTime = Date.now();
+    let rows = 0;
+    const aborted = () => this.abortController?.signal.aborted === true;
+    const stop = () => {
+      logger.info(
+        "Stopped removing an instance's cached library; the next start finishes it",
+        { instanceId, rows }
+      );
+      return { rows, aborted: true };
+    };
+
+    // UserExcludedEntity first: no index on instanceId, so it walks the
+    // table once by id instead of rescanning it for every chunk. Done
+    // before the entity tables, a stop midway leaves entity rows for the
+    // startup sweep to find.
+    let afterId = 0;
+    for (;;) {
+      if (aborted()) return stop();
+      const deleted = await dbWrite(
+        "instance.purge.UserExcludedEntity",
+        () =>
+          prisma.$queryRaw<Array<{ id: number | bigint }>>`
+          DELETE FROM "UserExcludedEntity"
+          WHERE "id" IN (
+            SELECT "id" FROM "UserExcludedEntity"
+            WHERE "instanceId" = ${instanceId} AND "id" > ${afterId}
+            ORDER BY "id" LIMIT ${PURGE_CHUNK_ROWS}
+          )
+          RETURNING "id"`
+      );
+      if (deleted.length === 0) break;
+      rows += deleted.length;
+      afterId = Math.max(...deleted.map((row) => Number(row.id)));
+    }
+
+    for (const table of INSTANCE_CACHE_TABLES) {
+      // The table name comes from the closed list above; the id is bound
+      const sql = `DELETE FROM "${table}" WHERE rowid IN (SELECT rowid FROM "${table}" WHERE "stashInstanceId" = ? LIMIT ${PURGE_CHUNK_ROWS})`;
+      for (;;) {
+        if (aborted()) return stop();
+        const deleted = await dbWrite(`instance.purge.${table}`, () =>
+          prisma.$executeRawUnsafe(sql, instanceId)
+        );
+        if (deleted === 0) break;
+        rows += deleted;
+      }
+    }
+
+    if (aborted()) return stop();
+    rows += (
+      await dbWrite("instance.purge.SyncState", () =>
+        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } })
+      )
+    ).count;
+
+    logger.info("Removed an instance's cached library", {
+      instanceId,
+      rows,
+      durationMs: Date.now() - startTime,
+    });
+    return { rows, aborted: false };
+  }
+
+  /**
+   * The startup sweep: purges the cached rows of every instance id that has
+   * no `StashInstance` row, left by a deletion that failed or was aborted
+   * midway (or by an older version's). Called before the scheduler starts;
+   * skipped, never guessing, when no instance exists at all or the lock is
+   * held.
+   *
+   * @returns the instance ids it purged
+   */
+  async purgeUnknownInstanceCaches(): Promise<string[]> {
+    if ((await prisma.stashInstance.count()) === 0) {
+      logger.warn("No Stash instance exists; not sweeping the cache");
+      return [];
+    }
+    if (this.activeJob !== null) {
+      logger.warn("Busy; the cache sweep waits for the next start", {
+        job: this.activeJob,
+      });
+      return [];
+    }
+
+    const purged: string[] = [];
+    this.acquire("instance-delete");
+    try {
+      const unknown = new Set<string>();
+      for (const table of [...INSTANCE_CACHE_TABLES, "SyncState"]) {
+        // Served by each table's stashInstanceId index
+        const found = await prisma.$queryRawUnsafe<
+          Array<{ stashInstanceId: string }>
+        >(
+          `SELECT DISTINCT "stashInstanceId" FROM "${table}"
+           WHERE "stashInstanceId" NOT IN (SELECT "id" FROM "StashInstance")`
+        );
+        for (const row of found) unknown.add(row.stashInstanceId);
+      }
+
+      for (const instanceId of unknown) {
+        logger.info("Removing the cached library of a deleted instance", {
+          instanceId,
+        });
+        const { aborted } = await this.purgeInstanceCache(instanceId);
+        if (aborted) break;
+        purged.push(instanceId);
+      }
+    } finally {
+      this.release();
+    }
+    return purged;
   }
 }
 

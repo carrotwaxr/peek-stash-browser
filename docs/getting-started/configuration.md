@@ -37,9 +37,9 @@ Peek automatically triggers a full sync for new instances in the background.
 
 Each instance can be:
 
-- **Edited** — Update URL, API key, name, or priority
-- **Enabled/Disabled** — Temporarily hide an instance without deleting it
-- **Deleted** — Permanently remove (cannot delete the last enabled instance)
+- **Edited**: Update URL, API key, name, or priority
+- **Enabled/Disabled**: Temporarily hide an instance without deleting it
+- **Deleted**: Permanently remove it, with its cached library and every user's ratings, favorites, watch and O history, image views, playlist entries, hidden items and downloads for it. Peek refuses while a sync is running, and the last enabled instance cannot be deleted. To keep all of that, disable the instance instead.
 
 ### Per-User Instance Selection
 
