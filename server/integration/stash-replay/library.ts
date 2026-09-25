@@ -8,8 +8,9 @@
  * rewrites per request to the origin the client used.
  *
  * Query evaluation is deliberately narrow: what Peek's sync sends (Stash's
- * pagination, id lists, the updated_at filter of incremental sync, sort on
- * an entity field) and nothing else. Anything else throws ReplayUnsupported,
+ * pagination, id lists, the updated_at filter of incremental sync, the
+ * galleries filter of its gallery members refetch, sort on an entity field)
+ * and nothing else. Anything else throws ReplayUnsupported,
  * so a new filter in Peek fails the run instead of being silently ignored.
  */
 
@@ -277,6 +278,78 @@ function narrowByIds(
   return entities.filter((entity) => wanted.has(entity.id));
 }
 
+/** The filters whose `galleries` criterion the replay evaluates. */
+const GALLERY_CRITERION_ARGUMENTS = new Set(["image_filter", "scene_filter"]);
+
+/** A criterion's `modifier` and `value`; any other part is refused. */
+function criterionParts(
+  criterion: Record<string, unknown>,
+  path: string,
+  unsupported: (what: string) => ReplayUnsupported
+): { modifier: unknown; value: unknown } {
+  for (const [part, partValue] of Object.entries(criterion)) {
+    if (partValue === undefined || partValue === null) continue;
+    if (part !== "modifier" && part !== "value") {
+      throw unsupported(`${path}.${part}`);
+    }
+  }
+  return { modifier: criterion.modifier, value: criterion.value };
+}
+
+/** `updated_at` GREATER_THAN, as incremental sync sends it. */
+function updatedAfter(
+  entities: Entity[],
+  criterion: Record<string, unknown>,
+  path: string,
+  unsupported: (what: string) => ReplayUnsupported
+): Entity[] {
+  const { modifier, value } = criterionParts(criterion, path, unsupported);
+  if (modifier !== "GREATER_THAN") {
+    throw unsupported(`${path}.modifier: ${describeValue(modifier)}`);
+  }
+  const since = typeof value === "string" ? wallClock(value) : NaN;
+  if (Number.isNaN(since)) {
+    throw unsupported(`${path}.value: ${describeValue(value)}`);
+  }
+  return entities.filter(
+    (entity) =>
+      typeof entity.updated_at === "string" &&
+      wallClock(entity.updated_at) > since
+  );
+}
+
+/**
+ * `galleries` INCLUDES on images and scenes, as sync asks for the members of
+ * the galleries that changed: the entities in any of the listed galleries.
+ */
+function inGalleries(
+  entities: Entity[],
+  criterion: Record<string, unknown>,
+  path: string,
+  unsupported: (what: string) => ReplayUnsupported
+): Entity[] {
+  const { modifier, value } = criterionParts(criterion, path, unsupported);
+  if (modifier !== "INCLUDES") {
+    throw unsupported(`${path}.modifier: ${describeValue(modifier)}`);
+  }
+  // Stash reads an empty list as no criterion; sync never sends one
+  if (!Array.isArray(value) || value.length === 0) {
+    throw unsupported(`${path}.value: ${describeValue(value)}`);
+  }
+  if (!entities.every((entity) => Array.isArray(entity.galleries))) {
+    throw unsupported(path);
+  }
+  const wanted = new Set(value.map((id: unknown) => String(id)));
+  return entities.filter(
+    (entity) =>
+      Array.isArray(entity.galleries) &&
+      entity.galleries.some(
+        (gallery: unknown) =>
+          isRecord(gallery) && wanted.has(String(gallery.id))
+      )
+  );
+}
+
 function applyCriteria(
   entities: Entity[],
   value: unknown,
@@ -290,30 +363,19 @@ function applyCriteria(
   for (const [key, criterion] of Object.entries(value)) {
     if (criterion === undefined || criterion === null) continue;
     const path = `${argument}.${key}`;
-    if (key !== "updated_at" || !isRecord(criterion)) {
+    if (!isRecord(criterion)) {
       throw unsupported(path);
     }
-    for (const [part, partValue] of Object.entries(criterion)) {
-      if (partValue === undefined || partValue === null) continue;
-      if (part !== "modifier" && part !== "value") {
-        throw unsupported(`${path}.${part}`);
-      }
+    if (key === "updated_at") {
+      matched = updatedAfter(matched, criterion, path, unsupported);
+    } else if (
+      key === "galleries" &&
+      GALLERY_CRITERION_ARGUMENTS.has(argument)
+    ) {
+      matched = inGalleries(matched, criterion, path, unsupported);
+    } else {
+      throw unsupported(path);
     }
-    if (criterion.modifier !== "GREATER_THAN") {
-      throw unsupported(
-        `${path}.modifier: ${describeValue(criterion.modifier)}`
-      );
-    }
-    const since =
-      typeof criterion.value === "string" ? wallClock(criterion.value) : NaN;
-    if (Number.isNaN(since)) {
-      throw unsupported(`${path}.value: ${describeValue(criterion.value)}`);
-    }
-    matched = matched.filter(
-      (entity) =>
-        typeof entity.updated_at === "string" &&
-        wallClock(entity.updated_at) > since
-    );
   }
   return matched;
 }

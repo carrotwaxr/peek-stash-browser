@@ -32,6 +32,7 @@ import type {
   FindScenesCompactQuery,
   FindStudiosQuery,
   FindTagsQuery,
+  MultiCriterionInput,
 } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
@@ -124,7 +125,9 @@ interface Library {
 /**
  * What a stub Stash answers: `all` to a page without an updated_at filter
  * (a full sync) and to the id lists cleanup fetches; `updated` to a page or
- * count with one (an incremental sync), nothing by default.
+ * count with one (an incremental sync), nothing by default. A page of scene
+ * or image ids (a refetch) and a gallery's members get each row's `updated`
+ * version when it has one, as Stash holds only that.
  */
 interface StashAnswer {
   all: Library;
@@ -259,6 +262,45 @@ function rowsFor<K extends keyof Library>(
     : answer.all[type];
 }
 
+/** Each row as Stash holds it now: its `updated` version, else its `all` one. */
+function current<T extends { id: string }>(
+  all: readonly T[],
+  updated: readonly T[] | undefined
+): T[] {
+  const byId = new Map(all.map((row) => [row.id, row]));
+  for (const row of updated ?? []) byId.set(row.id, row);
+  return Array.from(byId.values());
+}
+
+/** A page of ids (a refetch): those rows, as Stash holds them now. */
+function byIds<T extends { id: string }>(
+  all: readonly T[],
+  updated: readonly T[] | undefined,
+  ids: ReadonlyArray<string | number>
+): T[] {
+  const wanted = new Set(ids.map(String));
+  return current(all, updated).filter((row) => wanted.has(row.id));
+}
+
+/**
+ * An id list: every row of `all` (cleanup's), or with a `galleries`
+ * INCLUDES criterion the rows in any of those galleries now (the refetch of
+ * a changed gallery's members).
+ */
+function listed<
+  T extends { id: string; galleries: ReadonlyArray<{ id: string }> },
+>(
+  all: T[],
+  updated: readonly T[] | undefined,
+  galleries: MultiCriterionInput | null | undefined
+): T[] {
+  if (!galleries) return all;
+  const wanted = new Set(galleries.value ?? []);
+  return current(all, updated).filter((row) =>
+    row.galleries.some((g) => wanted.has(g.id))
+  );
+}
+
 /** A Stash client answering `answer` for every sync and cleanup request. */
 function stubClient(answer: StashAnswer): StashClient {
   const ids = (rows: Array<{ id: string }>) => rows.map(({ id }) => ({ id }));
@@ -302,7 +344,9 @@ function stubClient(answer: StashAnswer): StashClient {
     },
     findScenesCompact: (vars) => {
       const { count, items } = page(
-        rowsFor(answer, "scene", vars?.scene_filter),
+        vars?.ids == null
+          ? rowsFor(answer, "scene", vars?.scene_filter)
+          : byIds(answer.all.scene, answer.updated?.scene, [vars.ids].flat()),
         vars?.filter
       );
       return Promise.resolve({
@@ -321,12 +365,19 @@ function stubClient(answer: StashAnswer): StashClient {
     },
     findImages: (vars) => {
       const { count, items } = page(
-        rowsFor(answer, "image", vars?.image_filter),
+        vars?.image_ids == null
+          ? rowsFor(answer, "image", vars?.image_filter)
+          : byIds(
+              answer.all.image,
+              answer.updated?.image,
+              [vars.image_ids].flat()
+            ),
         vars?.filter
       );
       return Promise.resolve({ findImages: { count, images: items } });
     },
-    // Cleanup's id lists: everything Stash holds
+    // Cleanup's id lists: everything Stash holds; scenes and images also
+    // list a changed gallery's members
     findTagIDs: (vars) => {
       const { count, items } = page(ids(answer.all.tag), vars?.filter);
       return Promise.resolve({ findTags: { count, tags: items } });
@@ -350,11 +401,29 @@ function stubClient(answer: StashAnswer): StashClient {
       return Promise.resolve({ findGalleries: { count, galleries: items } });
     },
     findSceneIDs: (vars) => {
-      const { count, items } = page(ids(answer.all.scene), vars?.filter);
+      const { count, items } = page(
+        ids(
+          listed(
+            answer.all.scene,
+            answer.updated?.scene,
+            vars?.scene_filter?.galleries
+          )
+        ),
+        vars?.filter
+      );
       return Promise.resolve({ findScenes: { count, scenes: items } });
     },
     findImageIDs: (vars) => {
-      const { count, items } = page(ids(answer.all.image), vars?.filter);
+      const { count, items } = page(
+        ids(
+          listed(
+            answer.all.image,
+            answer.updated?.image,
+            vars?.image_filter?.galleries
+          )
+        ),
+        vars?.filter
+      );
       return Promise.resolve({ findImages: { count, images: items } });
     },
     // The sync scopes its client to its abort signal
