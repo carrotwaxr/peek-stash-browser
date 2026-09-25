@@ -33,7 +33,7 @@
  * source) it throws "dbWrite re-entered: <outer> -> <inner>"; in production
  * it runs inline with logger.error, so a missed case costs a log line and
  * not a deadlock. Inside a `dbWriteTransaction` callback, write through `tx`.
- * Never take the compute connection (`withComputeSnapshot`) inside a unit:
+ * Never take the compute connection (`withComputeConnection`) inside a unit:
  * the order is always compute connection first, then the writer queue.
  *
  * Retries: a busy failure (an outside holder such as the sqlite3 CLI, or a

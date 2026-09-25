@@ -352,9 +352,42 @@ const INCLUDE_PLUS_EXCLUDE: RuleInput[] = [
   { entityType: "tags", mode: "EXCLUDE", entityIds: [`2:${A}`] },
 ];
 
+/** A stored exclusion row minus `id` and `computedAt`, as one sortable key. */
+function storedKey(r: {
+  userId: number;
+  entityType: string;
+  entityId: string;
+  instanceId: string;
+  reason: string;
+}): string {
+  return `${r.userId}|${r.entityType}|${r.entityId}|${r.instanceId}|${r.reason}`;
+}
+
+/**
+ * Every stored exclusion row of the given users, outside this file's seeded
+ * instances, sorted.
+ */
+async function storedRows(userIds: number[]): Promise<string[]> {
+  const found = await prisma.userExcludedEntity.findMany({
+    where: { userId: { in: userIds }, instanceId: { notIn: INSTANCES } },
+    select: {
+      userId: true,
+      entityType: true,
+      entityId: true,
+      instanceId: true,
+      reason: true,
+    },
+  });
+  return found.map(storedKey).sort();
+}
+
 describeWithDb("ExclusionComputationService restrictions (integration)", () => {
   let userId: number;
   let adminId: number;
+  // The fixture users (every user before this file adds its own) and the
+  // rows the startup sync's recompute stored for them
+  let fixtureUserIds: number[] = [];
+  let fixtureRows: string[] = [];
 
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
@@ -364,6 +397,10 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       where: { username: { in: [USER_NAME, ADMIN_NAME] } },
     });
     await clearSeed();
+    fixtureUserIds = (await prisma.user.findMany({ select: { id: true } })).map(
+      (u) => u.id
+    );
+    fixtureRows = await storedRows(fixtureUserIds);
     await seed();
 
     userId = await createUser(USER_NAME, "USER");
@@ -392,6 +429,18 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
       where: { username: { in: [USER_NAME, ADMIN_NAME] } },
     });
     await clearSeed();
+  }, 120000);
+
+  it("a recompute stores exactly the rows it stored before this change", async () => {
+    // The rows at the start of the file came from the startup recompute;
+    // recomputing every user must store the same set again (minus id and
+    // computedAt), whatever the write phase's shape.
+    expect(fixtureUserIds.length).toBeGreaterThan(0);
+
+    const result = await exclusionComputationService.recomputeAllUsers();
+
+    expect(result.failed).toBe(0);
+    expect(await storedRows(fixtureUserIds)).toEqual(fixtureRows);
   }, 120000);
 
   it("INCLUDE tags [Cartoons@A], restrictEmpty on: descendants admitted, not inverted", async () => {

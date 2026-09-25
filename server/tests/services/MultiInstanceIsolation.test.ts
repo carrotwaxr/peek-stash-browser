@@ -21,6 +21,13 @@ vi.mock(
   () => import("../helpers/prismaSingletonMock.js")
 );
 
+// The compute client (hides compute and merge their rows on it) is the same
+// mocked prisma
+vi.mock(
+  "../../prisma/computeClient.js",
+  () => import("../helpers/computeClientMock.js")
+);
+
 // Mock UserInstanceService: the exclusion compute resolves hides on the
 // user's allowed instances
 vi.mock("../../services/UserInstanceService.js", () => ({
@@ -278,20 +285,25 @@ describe("Multi-Instance Isolation", () => {
       return call ? String(call[1]) : undefined;
     }
 
-    function upsertKeys(): string[] {
-      return mockPrisma.userExcludedEntity.upsert.mock.calls.map(([args]) => {
-        const w = must(args.where.userId_entityType_entityId_instanceId);
-        return `${w.entityType}:${w.entityId}@${w.instanceId}:${args.create.reason}`;
-      });
+    /** A row as the _peek_result fill binds it. */
+    interface FillRow {
+      t: string;
+      id: string;
+      iid: string;
+      r: string;
+    }
+
+    /** The rows addHiddenEntity merges (the _peek_result fills), as keys. */
+    function mergedKeys(): string[] {
+      return mockPrisma.$executeRawUnsafe.mock.calls
+        .filter((c) => /INSERT OR IGNORE INTO _peek_result/.test(c[0]))
+        .flatMap((c) => JSON.parse(String(c[1])) as FillRow[])
+        .map((r) => `${r.t}:${r.id}@${r.iid}:${r.r}`);
     }
 
     beforeEach(() => {
       mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
       mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
-      mockPrisma.userExcludedEntity.upsert.mockResolvedValue(partialRow({}));
-      mockPrisma.$transaction.mockImplementation(
-        prismaImpl((callback) => callback(mockPrisma))
-      );
     });
 
     it("hiding performer from instance A cascades only to instance A scenes", async () => {
@@ -330,15 +342,15 @@ describe("Multi-Instance Isolation", () => {
       // The cascade source is the A-scoped ref only
       expect(refsFill()).toBe(JSON.stringify([{ id: "perf1", iid: INST_A }]));
 
-      // Direct hidden row and the two cascades carry instance A; 3 upserts
-      expect(new Set(upsertKeys())).toEqual(
+      // Direct hidden row and the two cascades carry instance A; 3 rows
+      expect(new Set(mergedKeys())).toEqual(
         new Set([
           `performer:perf1@${INST_A}:hidden`,
           `scene:scene1@${INST_A}:cascade`,
           `scene:scene2@${INST_A}:cascade`,
         ])
       );
-      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(3);
+      expect(mergedKeys()).toHaveLength(3);
     });
 
     it("hiding performer without instanceId cascades on every allowed instance", async () => {
@@ -373,7 +385,7 @@ describe("Multi-Instance Isolation", () => {
       expect(must(resolve).slice(1)).toContain(JSON.stringify(["perf1"]));
 
       // The stored "" row, a hidden row per instance, and scoped cascades
-      expect(new Set(upsertKeys())).toEqual(
+      expect(new Set(mergedKeys())).toEqual(
         new Set([
           "performer:perf1@:hidden",
           `performer:perf1@${INST_A}:hidden`,
@@ -382,7 +394,7 @@ describe("Multi-Instance Isolation", () => {
           `scene:scene3@${INST_B}:cascade`,
         ])
       );
-      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(5);
+      expect(mergedKeys()).toHaveLength(5);
     });
 
     it("hiding studio from instance A cascades only to instance A scenes", async () => {
@@ -416,8 +428,8 @@ describe("Multi-Instance Isolation", () => {
       expect(must(edge).slice(1)).toEqual([INST_A, INST_B]);
       expect(refsFill()).toBe(JSON.stringify([{ id: "studio1", iid: INST_A }]));
 
-      expect(upsertKeys()).toContain(`scene:scene1@${INST_A}:cascade`);
-      expect(upsertKeys().some((k) => k.includes(`@${INST_B}:`))).toBe(false);
+      expect(mergedKeys()).toContain(`scene:scene1@${INST_A}:cascade`);
+      expect(mergedKeys().some((k) => k.includes(`@${INST_B}:`))).toBe(false);
     });
 
     it("hiding tag from instance A cascades only within that instance", async () => {
@@ -451,8 +463,8 @@ describe("Multi-Instance Isolation", () => {
       expect(must(inherited)[0]).not.toContain("tag1");
       expect(must(inherited).slice(1)).toEqual([INST_A, INST_B]);
 
-      // 1 hidden tag + 1 direct scene + 1 inherited scene + 1 performer = 4 upserts
-      expect(new Set(upsertKeys())).toEqual(
+      // 1 hidden tag + 1 direct scene + 1 inherited scene + 1 performer = 4 rows
+      expect(new Set(mergedKeys())).toEqual(
         new Set([
           `tag:tag1@${INST_A}:hidden`,
           `scene:scene1@${INST_A}:cascade`,
@@ -460,7 +472,7 @@ describe("Multi-Instance Isolation", () => {
           `performer:perf1@${INST_A}:cascade`,
         ])
       );
-      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(4);
+      expect(mergedKeys()).toHaveLength(4);
     });
   });
 
