@@ -17,27 +17,37 @@ const scopedImageRowids = `SELECT x.rowid FROM json_each(?) j
           CROSS JOIN StashImage x ON x.id = json_extract(j.value, '$[0]') AND x.stashInstanceId = json_extract(j.value, '$[1]')`;
 
 /**
- * A gallery's performers or tags for every live image in a live gallery
- * that has none of its own, for every image or only the scoped ones. "Has
- * none" is a correlated NOT EXISTS, which looks up each image's rows in the
- * junction's (imageId, imageInstanceId) index; a row-value NOT IN over the
- * junction scanned it whole as a list, and the two inserts held the write
- * lock for 50 to 90 s each on a 260k-image library.
+ * A gallery's live performers or tags for every live image in a live
+ * gallery that has none of its own, for every image or only the scoped
+ * ones. A soft-deleted performer or tag (Stash deleted or merged it) is not
+ * handed down; the gallery's link to it goes when the gallery is fetched
+ * again. "Has none" is a correlated NOT EXISTS, which looks up each image's
+ * rows in the junction's (imageId, imageInstanceId) index; a row-value NOT
+ * IN over the junction scanned it whole as a list, and the two inserts held
+ * the write lock for 50 to 90 s each on a 260k-image library.
  */
 function inheritLinksSql(
-  link: { junction: string; source: string; id: string; instance: string },
+  link: {
+    junction: string;
+    source: string;
+    far: string;
+    id: string;
+    instance: string;
+  },
   scoped: boolean
 ): string {
-  const { junction, source, id, instance } = link;
+  const { junction, source, far, id, instance } = link;
   return `
   INSERT OR IGNORE INTO ${junction} (imageId, imageInstanceId, ${id}, ${instance})
   SELECT DISTINCT ig.imageId, ig.imageInstanceId, gl.${id}, gl.${instance}
   FROM ${scoped ? scopedImageGalleries : "ImageGallery ig"}
   JOIN ${source} gl ON gl.galleryId = ig.galleryId AND gl.galleryInstanceId = ig.galleryInstanceId
+  JOIN ${far} f ON f.id = gl.${id} AND f.stashInstanceId = gl.${instance}
   JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
   JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
   WHERE i.deletedAt IS NULL
     AND g.deletedAt IS NULL
+    AND f.deletedAt IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM ${junction} x
       WHERE x.imageId = ig.imageId AND x.imageInstanceId = ig.imageInstanceId
@@ -48,12 +58,14 @@ function inheritLinksSql(
 const PERFORMERS = {
   junction: "ImagePerformer",
   source: "GalleryPerformer",
+  far: "StashPerformer",
   id: "performerId",
   instance: "performerInstanceId",
 };
 const TAGS = {
   junction: "ImageTag",
   source: "GalleryTag",
+  far: "StashTag",
   id: "tagId",
   instance: "tagInstanceId",
 };

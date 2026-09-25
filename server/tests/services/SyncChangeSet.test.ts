@@ -159,6 +159,36 @@ describe("detectChanges", () => {
     expect(changes.farSides.ImageTag ?? []).toEqual([]);
   });
 
+  it("markChanged counts every row changed, with its old and new far sides and studios, even an image (a refetch for a known link change)", () => {
+    const changes = detectChanges({
+      instanceId: INSTANCE,
+      stored: stored({
+        "1": { updatedAt: UPDATED, deleted: false, studioId: "s1" },
+      }),
+      // Same updated_at: a merge in Stash moved the image's tag, not its time
+      incoming: [
+        {
+          id: "1",
+          updatedAt: UPDATED,
+          studioId: null,
+          links: { ImageTag: ["t2"] },
+        },
+      ],
+      oldLinks: { ImageTag: old({ "1": ["t1"] }) },
+      compareLinks: false,
+      compareStudio: false,
+      markChanged: true,
+    });
+
+    expect(refs(changes.changed)).toEqual(["1@cs-a"]);
+    expect(refs(changes.farSides.ImageTag ?? [])).toEqual([
+      "t1@cs-a",
+      "t2@cs-a",
+    ]);
+    expect(refs(changes.studioIds)).toEqual(["s1@cs-a"]);
+    expect(refs(changes.written)).toEqual(["1@cs-a"]);
+  });
+
   it("a scene whose studio changed is changed, and both studios are recorded", () => {
     const changes = detectChanges({
       instanceId: INSTANCE,

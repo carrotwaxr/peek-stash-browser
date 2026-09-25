@@ -36,6 +36,27 @@ FROM json_each(?) j
 CROSS JOIN SceneGroup sg ON sg.groupId = json_extract(j.value, '$[0]') AND sg.groupInstanceId = json_extract(j.value, '$[1]')`,
 };
 
+/** What a batch passes on: the sources, and the tags they carry. */
+const SOURCE_TABLES = {
+  performer: "StashPerformer",
+  studio: "StashStudio",
+  group: "StashGroup",
+  tag: "StashTag",
+} as const;
+
+type SourceType = keyof typeof SOURCE_TABLES;
+
+const SOURCE_TYPES: readonly SourceType[] = [
+  "performer",
+  "studio",
+  "group",
+  "tag",
+];
+
+/** In-memory key of one source of a type. */
+const sourceKey = (type: SourceType, id: string, instanceId: string) =>
+  `${type}\0${id}\0${instanceId}`;
+
 /**
  * SceneTagInheritanceService
  *
@@ -52,6 +73,9 @@ CROSS JOIN SceneGroup sg ON sg.groupId = json_extract(j.value, '$[0]') AND sg.gr
  * - Tags are deduplicated across all sources
  * - Stored as JSON array for efficient querying
  * - Multi-instance aware: uses composite keys (id:instanceId) to prevent cross-instance contamination
+ * - A soft-deleted performer, studio, group or tag passes nothing on: Stash
+ *   deleted or merged it, and the scenes still linking to it are fetched
+ *   again by the sync that soft-deleted it
  * - Scoped: a sync recomputes only the scenes its change set reaches (see
  *   `scenesInheritingFrom`); a full sync, or a scope past the change set's
  *   limit, recomputes every live scene
@@ -119,6 +143,32 @@ class SceneTagInheritanceService {
     );
   }
 
+  /**
+   * The soft-deleted ones among a batch's sources, as `sourceKey`s: one
+   * statement, each type's (id, instance) pairs bound as one JSON list and
+   * looked up by primary key. Usually none.
+   */
+  private async softDeletedSources(
+    sources: Record<SourceType, readonly EntityRef[]>
+  ): Promise<Set<string>> {
+    const arms: string[] = [];
+    const params: string[] = [];
+    for (const type of SOURCE_TYPES) {
+      const refs = distinctRefs(sources[type]);
+      if (refs.length === 0) continue;
+      arms.push(`SELECT '${type}' AS type, x.id AS id, x.stashInstanceId AS instanceId
+FROM json_each(?) j
+CROSS JOIN ${SOURCE_TABLES[type]} x ON x.id = json_extract(j.value, '$[0]') AND x.stashInstanceId = json_extract(j.value, '$[1]')
+WHERE x.deletedAt IS NOT NULL`);
+      params.push(pairsJson(refs));
+    }
+    if (arms.length === 0) return new Set();
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ type: SourceType; id: string; instanceId: string }>
+    >(arms.join("\nUNION ALL\n"), ...params);
+    return new Set(rows.map((r) => sourceKey(r.type, r.id, r.instanceId)));
+  }
+
   /** The live scenes among `refs`, each looked up by its primary key. */
   private async liveScenes(refs: readonly EntityRef[]): Promise<SceneRow[]> {
     return prisma.$queryRawUnsafe<SceneRow[]>(
@@ -180,16 +230,13 @@ WHERE s.deletedAt IS NULL`,
         performerId: { in: performerIds },
         performerInstanceId: { in: performerInstanceIds },
       },
-      select: { performerId: true, performerInstanceId: true, tagId: true },
+      select: {
+        performerId: true,
+        performerInstanceId: true,
+        tagId: true,
+        tagInstanceId: true,
+      },
     });
-    const tagsByPerformer = new Map<string, string[]>();
-    for (const pt of performerTags) {
-      const key = compositeKey(pt.performerId, pt.performerInstanceId);
-      if (!tagsByPerformer.has(key)) {
-        tagsByPerformer.set(key, []);
-      }
-      tagsByPerformer.get(key)?.push(pt.tagId);
-    }
 
     // Get studio tags (scoped by instance)
     const studioIds = [
@@ -202,16 +249,13 @@ WHERE s.deletedAt IS NULL`,
         studioId: { in: studioIds },
         studioInstanceId: { in: sceneInstanceIds },
       },
-      select: { studioId: true, studioInstanceId: true, tagId: true },
+      select: {
+        studioId: true,
+        studioInstanceId: true,
+        tagId: true,
+        tagInstanceId: true,
+      },
     });
-    const tagsByStudio = new Map<string, string[]>();
-    for (const st of studioTags) {
-      const key = compositeKey(st.studioId, st.studioInstanceId);
-      if (!tagsByStudio.has(key)) {
-        tagsByStudio.set(key, []);
-      }
-      tagsByStudio.get(key)?.push(st.tagId);
-    }
 
     // Get group tags for all scenes in batch (scoped by instance)
     const sceneGroups = await prisma.sceneGroup.findMany({
@@ -235,10 +279,60 @@ WHERE s.deletedAt IS NULL`,
         groupId: { in: groupIds },
         groupInstanceId: { in: groupInstanceIds },
       },
-      select: { groupId: true, groupInstanceId: true, tagId: true },
+      select: {
+        groupId: true,
+        groupInstanceId: true,
+        tagId: true,
+        tagInstanceId: true,
+      },
     });
+
+    // A soft-deleted performer, studio, group or tag (Stash deleted or
+    // merged it) passes nothing on, though the rows linking to it stay until
+    // the entities that link to it are fetched again
+    const deleted = await this.softDeletedSources({
+      performer: scenePerformers.map((sp) => ({
+        id: sp.performerId,
+        instanceId: sp.performerInstanceId,
+      })),
+      studio: scenes.flatMap((s) =>
+        s.studioId ? [{ id: s.studioId, instanceId: s.stashInstanceId }] : []
+      ),
+      group: sceneGroups.map((sg) => ({
+        id: sg.groupId,
+        instanceId: sg.groupInstanceId,
+      })),
+      tag: [...performerTags, ...studioTags, ...groupTags].map((t) => ({
+        id: t.tagId,
+        instanceId: t.tagInstanceId,
+      })),
+    });
+    const isLive = (type: SourceType, id: string, instanceId: string) =>
+      !deleted.has(sourceKey(type, id, instanceId));
+
+    const tagsByPerformer = new Map<string, string[]>();
+    for (const pt of performerTags) {
+      if (!isLive("tag", pt.tagId, pt.tagInstanceId)) continue;
+      const key = compositeKey(pt.performerId, pt.performerInstanceId);
+      if (!tagsByPerformer.has(key)) {
+        tagsByPerformer.set(key, []);
+      }
+      tagsByPerformer.get(key)?.push(pt.tagId);
+    }
+
+    const tagsByStudio = new Map<string, string[]>();
+    for (const st of studioTags) {
+      if (!isLive("tag", st.tagId, st.tagInstanceId)) continue;
+      const key = compositeKey(st.studioId, st.studioInstanceId);
+      if (!tagsByStudio.has(key)) {
+        tagsByStudio.set(key, []);
+      }
+      tagsByStudio.get(key)?.push(st.tagId);
+    }
+
     const tagsByGroup = new Map<string, string[]>();
     for (const gt of groupTags) {
+      if (!isLive("tag", gt.tagId, gt.tagInstanceId)) continue;
       const key = compositeKey(gt.groupId, gt.groupInstanceId);
       if (!tagsByGroup.has(key)) {
         tagsByGroup.set(key, []);
@@ -246,9 +340,12 @@ WHERE s.deletedAt IS NULL`,
       tagsByGroup.get(key)?.push(gt.tagId);
     }
 
-    // Build scene -> performer mapping (using composite keys)
+    // Build scene -> performer mapping (using composite keys), live ones
     const performersByScene = new Map<string, string[]>();
     for (const sp of scenePerformers) {
+      if (!isLive("performer", sp.performerId, sp.performerInstanceId)) {
+        continue;
+      }
       const sceneKey = compositeKey(sp.sceneId, sp.sceneInstanceId);
       const perfKey = compositeKey(sp.performerId, sp.performerInstanceId);
       if (!performersByScene.has(sceneKey)) {
@@ -257,9 +354,10 @@ WHERE s.deletedAt IS NULL`,
       performersByScene.get(sceneKey)?.push(perfKey);
     }
 
-    // Build scene -> group mapping (using composite keys)
+    // Build scene -> group mapping (using composite keys), live ones
     const groupsByScene = new Map<string, string[]>();
     for (const sg of sceneGroups) {
+      if (!isLive("group", sg.groupId, sg.groupInstanceId)) continue;
       const sceneKey = compositeKey(sg.sceneId, sg.sceneInstanceId);
       const grpKey = compositeKey(sg.groupId, sg.groupInstanceId);
       if (!groupsByScene.has(sceneKey)) {
@@ -292,7 +390,10 @@ WHERE s.deletedAt IS NULL`,
       }
 
       // Collect studio tags (studio is on the same instance as the scene)
-      if (scene.studioId) {
+      if (
+        scene.studioId &&
+        isLive("studio", scene.studioId, scene.stashInstanceId)
+      ) {
         const studioKey = compositeKey(scene.studioId, scene.stashInstanceId);
         const tags = tagsByStudio.get(studioKey) ?? [];
         for (const tagId of tags) {
