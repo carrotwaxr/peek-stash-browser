@@ -409,6 +409,23 @@ try {
     );
   });
 
+  // Docker's default stop timeout is 10 s, then SIGKILL (exit code 137)
+  await check(
+    "docker stop ends the container within 5 s with exit code 0 and 'Shutdown complete' in the log",
+    () => {
+      const started = performance.now();
+      docker("stop", name);
+      const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      const exitCode = docker("inspect", "-f", "{{.State.ExitCode}}", name);
+      const stopped = `stopped in ${seconds} s with exit code ${exitCode}`;
+      console.log(`     ${stopped}`);
+      if (Number(seconds) > 5 || exitCode !== "0") throw new Error(stopped);
+      if (!logsOf(name).includes("Shutdown complete")) {
+        throw new Error("no 'Shutdown complete' in the log");
+      }
+    }
+  );
+
   await check(
     "a restart applies no migration and turns healthy again",
     async () => {

@@ -28,9 +28,12 @@ You can also back up the database yourself, for example before a major upgrade. 
 
 === "unRAID"
 
-    1. Navigate to your Peek appdata folder (typically `/mnt/user/appdata/peek-stash-browser/`)
-    2. Copy `peek-stash-browser.db` to a safe location
-    3. Also copy `peek-stash-browser.db-wal` and `peek-stash-browser.db-shm` if they exist
+    1. Stop the Peek container. As it stops, Peek writes everything into `peek-stash-browser.db`.
+    2. Navigate to your Peek appdata folder (typically `/mnt/user/appdata/peek-stash-browser/`)
+    3. Copy `peek-stash-browser.db` to a safe location
+    4. Start the container again
+
+    To back up without stopping Peek, click **Create Backup** in Settings → Server Settings → Backup (see [Database Backup](../user-guide/user-management.md#database-backup)). Do not copy the files of a running Peek: the database and its `-wal` and `-shm` files change while you copy them, and the copies may not match.
 
 === "Docker (Named Volume)"
 
@@ -72,9 +75,9 @@ You can also back up the database yourself, for example before a major upgrade. 
 # Stop Peek
 docker stop peek-stash-browser
 
-# Delete the old database's WAL files, which belong to it and not to the backup,
-# then replace the database with the backup
-# (adjust paths for your setup)
+# Delete the old database's WAL files first: they belong to it, not to the
+# backup, and SQLite would replay a stale WAL onto the restored file.
+# Then replace the database with the backup (adjust paths for your setup)
 rm -f /path/to/data/peek-stash-browser.db-wal /path/to/data/peek-stash-browser.db-shm
 cp ./peek-stash-browser.db.backup /path/to/data/peek-stash-browser.db
 
