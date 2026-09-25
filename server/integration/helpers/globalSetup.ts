@@ -135,7 +135,7 @@ export async function setup() {
     stdio: "inherit",
   });
 
-  // Configure SQLite PRAGMAs (WAL mode, busy_timeout, etc.)
+  // WAL mode and the performance PRAGMAs, as the server does at startup
   // Must happen after migrations but before any application queries
   console.log("[Integration Tests] Configuring SQLite PRAGMAs...");
   const { default: prisma, configureSQLite } =

@@ -46,9 +46,8 @@ const main = async () => {
   // Run database migrations and seeding
   await initializeDatabase();
 
-  // Configure SQLite for production performance (WAL mode, busy_timeout, etc.)
+  // WAL mode and the performance PRAGMAs; logs what SQLite reports
   await configureSQLite();
-  logger.info("SQLite PRAGMAs configured (WAL mode, busy_timeout, etc.)");
 
   // Recovery keys from before 3.3.7 were stored in plaintext
   await hashLegacyRecoveryKeys();
