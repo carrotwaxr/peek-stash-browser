@@ -12,6 +12,7 @@ vi.mock("../../services/DatabaseBackupService.js", () => ({
     listBackups: vi.fn(),
     createBackup: vi.fn(),
     deleteBackup: vi.fn(),
+    getBackupDir: vi.fn(() => "/app/data"),
   },
 }));
 
@@ -46,15 +47,28 @@ describe("Database Backup Routes", () => {
   });
 
   describe("GET /api/admin/database/backups", () => {
-    it("should return list of backups", async () => {
-      const mockBackups = [
+    it("lists every backup with its kind, path and the backup directory", async () => {
+      const preMigration =
+        "peek-stash-browser.db.backup-20260924-101112-pre-3.5.0";
+      mockService.getBackupDir.mockReturnValue("/app/data");
+      mockService.listBackups.mockResolvedValue([
+        {
+          filename: preMigration,
+          kind: "preMigration",
+          version: "3.5.0",
+          path: `/app/data/${preMigration}`,
+          size: 4096,
+          createdAt: new Date("2026-09-24T10:11:12.000Z"),
+        },
         {
           filename: "peek-stash-browser.db.backup-20260118-104532",
+          kind: "manual",
+          version: null,
+          path: "/app/data/peek-stash-browser.db.backup-20260118-104532",
           size: 246747136,
           createdAt: new Date("2026-01-18T10:45:32.000Z"),
         },
-      ];
-      mockService.listBackups.mockResolvedValue(mockBackups);
+      ]);
 
       const { default: router } =
         await import("../../routes/databaseBackup.js");
@@ -69,7 +83,27 @@ describe("Database Backup Routes", () => {
       await handler(req, res, () => {});
 
       expect(mockService.listBackups).toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalledWith({ backups: mockBackups });
+      expect(res.json).toHaveBeenCalledWith({
+        backups: [
+          {
+            filename: preMigration,
+            kind: "preMigration",
+            version: "3.5.0",
+            path: `/app/data/${preMigration}`,
+            size: 4096,
+            createdAt: "2026-09-24T10:11:12.000Z",
+          },
+          {
+            filename: "peek-stash-browser.db.backup-20260118-104532",
+            kind: "manual",
+            version: null,
+            path: "/app/data/peek-stash-browser.db.backup-20260118-104532",
+            size: 246747136,
+            createdAt: "2026-01-18T10:45:32.000Z",
+          },
+        ],
+        directory: "/app/data",
+      });
     });
 
     it("should return 500 on service error", async () => {
@@ -96,12 +130,15 @@ describe("Database Backup Routes", () => {
 
   describe("POST /api/admin/database/backup", () => {
     it("should create a backup and return info", async () => {
-      const mockBackup = {
-        filename: "peek-stash-browser.db.backup-20260118-104532",
+      const filename = "peek-stash-browser.db.backup-20260118-104532-2";
+      mockService.createBackup.mockResolvedValue({
+        filename,
+        kind: "manual",
+        version: null,
+        path: `/app/data/${filename}`,
         size: 246747136,
         createdAt: new Date("2026-01-18T10:45:32.000Z"),
-      };
-      mockService.createBackup.mockResolvedValue(mockBackup);
+      });
 
       const { default: router } =
         await import("../../routes/databaseBackup.js");
@@ -115,7 +152,16 @@ describe("Database Backup Routes", () => {
       await handler(req, res, () => {});
 
       expect(mockService.createBackup).toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalledWith({ backup: mockBackup });
+      expect(res.json).toHaveBeenCalledWith({
+        backup: {
+          filename,
+          kind: "manual",
+          version: null,
+          path: `/app/data/${filename}`,
+          size: 246747136,
+          createdAt: "2026-01-18T10:45:32.000Z",
+        },
+      });
     });
   });
 

@@ -371,34 +371,55 @@ The reset signs the user out everywhere. The user should change their password a
 
 Admins can create and manage backups of the Peek database from the settings UI.
 
-**Location:** Settings → Server Configuration → Backup
+**Location:** Settings → Server Settings → Backup
 
 ### Creating a Backup
 
 1. Click **Create Backup**
 2. Peek creates an atomic snapshot of the entire SQLite database
-3. The backup appears in the list with its creation date and file size
+3. The backup appears in the list with its creation date, size and file path
+
+Two backups made in the same second are both kept: the second gets `-2` at the end of its name.
 
 ### What's Included
 
 Backups contain all Peek data:
 
-- User accounts, preferences, and permissions
+- User accounts (with their password hashes), preferences, and permissions
 - Ratings, favorites, and watch history
 - Playlists and playlist shares
+- The Stash instances you connected, with their API keys
 - Cached entity data from Stash
 - Custom themes and carousels
 
-Backups do **not** include Stash media files or Stash server configuration.
+Backups do **not** include Stash media files or Stash's own database.
+
+### Kinds of Backup
+
+The list shows every backup of the database in the data directory, labeled with what made it:
+
+| Label | Made by | File name |
+|---|---|---|
+| Created in Peek | **Create Backup** in this tab | `peek-stash-browser.db.backup-20260924-101112` |
+| Before upgrading to 3.5.0 | Peek itself, before it applied that version's database migrations | `peek-stash-browser.db.backup-20260924-101112-pre-3.5.0` |
+| Before an upgrade (older Peek) | Versions before 3.4.0, when they upgraded a database from before 2.0.1 | `peek-stash-browser.db.backup.20260924_101112` |
+
+Times in the names are UTC. Peek keeps the 3 newest "Before upgrading" backups and deletes older ones when it takes a new one; it never deletes the other kinds. See [Upgrading](../getting-started/upgrading.md#automatic-backup-before-migrations) for when the automatic backup is taken and how to restore one.
 
 ### Managing Backups
 
-- Backups are listed newest-first with creation date and file size
-- Click the trash icon to delete a backup (with confirmation)
-- Backups are stored in the Peek data directory alongside the database
+- Backups are listed newest-first with their label, date, size and full path
+- Click the trash icon to delete a backup of any kind (with confirmation)
+- Backups are stored in the Peek data directory alongside the database: `/app/data` in the container (or `CONFIG_DIR` if you set it), which is the folder or volume you mount there on the host
+
+### Getting a Backup Off the Server
+
+There is no download in the browser. A backup holds every user's password hash and history and your Stash API keys, and Peek never sends those to a browser.
+
+To keep a copy elsewhere, copy the backup's file from the data directory on the host (on unRAID, the appdata folder you mapped to `/app/data`). A finished backup, including an automatic "Before upgrading" one, is a complete database file and is safe to copy while Peek runs. To copy the live database (`peek-stash-browser.db`) instead, stop the container first.
 
 !!! tip "Before Upgrading"
-    Create a backup before upgrading Peek to a new version. If something goes wrong, you can restore the backup by replacing the database file.
+    Peek backs up the database by itself before any upgrade that changes it. You can still create a backup first and copy it off the server. If something goes wrong, restore a backup by replacing the database file: see [Restore from Backup](../getting-started/upgrading.md#restore-from-backup).
 
 ---
 

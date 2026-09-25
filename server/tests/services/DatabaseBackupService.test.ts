@@ -64,6 +64,63 @@ function fileHandle(): FileHandle {
   });
 }
 
+/**
+ * The backup directory `/app/data` on a fake disk, holding `existing` (names
+ * to mtimes), 4096 bytes each. `open(name, "wx")` claims a name, failing
+ * with EEXIST when it exists; `VACUUM INTO` fails as SQLite does when its
+ * target exists and is not empty, and otherwise writes 4096 bytes.
+ */
+function fakeBackupDir(existing: Record<string, Date> = {}): void {
+  const files = new Map(
+    Object.entries(existing).map(([name, mtime]) => [
+      `/app/data/${name}`,
+      { size: 4096, mtime },
+    ])
+  );
+  vi.mocked(fs.open).mockImplementation((file, flags) => {
+    const name = String(file);
+    if (flags === "wx" && files.has(name)) {
+      return Promise.reject(
+        Object.assign(
+          new Error(`EEXIST: file already exists, open '${name}'`),
+          {
+            code: "EEXIST",
+          }
+        )
+      );
+    }
+    if (!files.has(name)) files.set(name, { size: 0, mtime: new Date() });
+    return Promise.resolve(fileHandle());
+  });
+  mockPrisma.$executeRaw.mockImplementation(
+    prismaImpl<typeof prisma.$executeRaw>((_query, ...values: unknown[]) => {
+      const target = String(values[0]);
+      if ((files.get(target)?.size ?? 0) > 0) {
+        throw new Error(
+          "Raw query failed. Code: `1`. Message: `output file already exists`"
+        );
+      }
+      files.set(target, { size: 4096, mtime: new Date() });
+      return 0;
+    })
+  );
+  mockStat.mockImplementation((file) => {
+    const entry = files.get(String(file));
+    return entry
+      ? Promise.resolve(partialRow(entry))
+      : Promise.reject(
+          new Error(`ENOENT: no such file, stat '${String(file)}'`)
+        );
+  });
+  mockReaddir.mockImplementation(() =>
+    Promise.resolve([...files.keys()].map((name) => path.basename(name)))
+  );
+  vi.mocked(fs.unlink).mockImplementation((file) => {
+    files.delete(String(file));
+    return Promise.resolve();
+  });
+}
+
 // Mock environment
 const originalEnv = process.env;
 
@@ -71,6 +128,7 @@ describe("DatabaseBackupService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv, CONFIG_DIR: "/app/data" };
+    databaseOf("/app/data/peek-stash-browser.db", MIB);
   });
 
   afterEach(() => {
@@ -213,6 +271,50 @@ describe("DatabaseBackupService", () => {
         "peek-stash-browser.db.backup-20260116-080000"
       );
     });
+
+    it("lists pre-migration and legacy backups with their kind", async () => {
+      const manual = "peek-stash-browser.db.backup-20260118-104532";
+      const sameSecond = "peek-stash-browser.db.backup-20260118-104532-2";
+      const preMigration =
+        "peek-stash-browser.db.backup-20260924-101112-pre-3.5.0";
+      const legacy = "peek-stash-browser.db.backup.20251201_083000";
+      const mtimes: Record<string, Date> = {
+        [manual]: new Date("2026-01-18T10:45:32.100Z"),
+        [sameSecond]: new Date("2026-01-18T10:45:32.900Z"),
+        [preMigration]: new Date("2026-09-24T10:11:12.000Z"),
+        [legacy]: new Date("2025-12-01T08:30:00.000Z"),
+        // Not backups of this database
+        "peek-stash-browser.db": new Date("2026-09-24T11:00:00.000Z"),
+        "peek-stash-browser.db-wal": new Date("2026-09-24T11:00:00.000Z"),
+        [`${preMigration}-wal`]: new Date("2026-09-24T10:11:12.000Z"),
+        "peek-stash-browser.db.failed-migration": new Date("2026-01-26"),
+        "other.db.backup-20260118-104532": new Date("2026-01-18"),
+      };
+      fakeBackupDir(mtimes);
+
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
+      const backups = await databaseBackupService.listBackups();
+
+      const entry = (
+        filename: string,
+        kind: string,
+        version: string | null
+      ) => ({
+        filename,
+        kind,
+        version,
+        path: `/app/data/${filename}`,
+        size: 4096,
+        createdAt: must(mtimes[filename]),
+      });
+      expect(backups).toEqual([
+        entry(preMigration, "preMigration", "3.5.0"),
+        entry(sameSecond, "manual", null),
+        entry(manual, "manual", null),
+        entry(legacy, "legacy", null),
+      ]);
+    });
   });
 
   describe("createBackup", () => {
@@ -221,14 +323,7 @@ describe("DatabaseBackupService", () => {
       vi.useFakeTimers();
       const mockDate = new Date("2026-01-18T10:45:32.000Z");
       vi.setSystemTime(mockDate);
-
-      mockPrisma.$executeRaw.mockResolvedValue(0);
-      vi.mocked(fs.stat).mockResolvedValue(
-        partialRow({
-          size: 246747136,
-          mtime: new Date("2026-01-18T10:45:32.000Z"),
-        })
-      );
+      fakeBackupDir();
 
       const { databaseBackupService } =
         await import("../../services/DatabaseBackupService.js");
@@ -238,7 +333,7 @@ describe("DatabaseBackupService", () => {
       expect(backup.filename).toBe(
         "peek-stash-browser.db.backup-20260118-104532"
       );
-      expect(backup.size).toBe(246747136);
+      expect(backup.size).toBe(4096);
       // The path is a bound parameter, not spliced into the SQL
       const [sql, ...values] = must(mockPrisma.$executeRaw.mock.calls[0]);
       expect([...(sql as TemplateStringsArray)]).toEqual(["VACUUM INTO ", ""]);
@@ -251,6 +346,7 @@ describe("DatabaseBackupService", () => {
     });
 
     it("should throw error if VACUUM INTO fails", async () => {
+      fakeBackupDir();
       mockPrisma.$executeRaw.mockRejectedValue(new Error("Database locked"));
 
       const { databaseBackupService } =
@@ -259,6 +355,67 @@ describe("DatabaseBackupService", () => {
       await expect(databaseBackupService.createBackup()).rejects.toThrow(
         "Database locked"
       );
+      // Nothing is left behind under the name
+      expect(await databaseBackupService.listBackups()).toEqual([]);
+    });
+
+    it("two backups in the same second both succeed", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-01-18T10:45:32.000Z"));
+      fakeBackupDir();
+
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
+
+      const made = await Promise.all([
+        databaseBackupService.createBackup(),
+        databaseBackupService.createBackup(),
+      ]);
+
+      expect(made.map((backup) => backup.filename)).toEqual([
+        "peek-stash-browser.db.backup-20260118-104532",
+        "peek-stash-browser.db.backup-20260118-104532-2",
+      ]);
+      expect(made.map((backup) => backup.kind)).toEqual(["manual", "manual"]);
+      const listed = await databaseBackupService.listBackups();
+      expect(listed.map((backup) => backup.filename).sort()).toEqual([
+        "peek-stash-browser.db.backup-20260118-104532",
+        "peek-stash-browser.db.backup-20260118-104532-2",
+      ]);
+
+      vi.useRealTimers();
+    });
+
+    it("names backups after the database file", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-01-18T10:45:32.000Z"));
+      databaseOf("/data/peek-db.db", MIB);
+      fakeBackupDir({
+        "peek-db.db.backup-20260117-093045": new Date("2026-01-17T09:30:45Z"),
+        "peek-stash-browser.db.backup-20260117-093045": new Date(
+          "2026-01-17T09:30:45Z"
+        ),
+      });
+
+      const { databaseBackupService } =
+        await import("../../services/DatabaseBackupService.js");
+
+      const backup = await databaseBackupService.createBackup();
+      expect(backup.filename).toBe("peek-db.db.backup-20260118-104532");
+      expect(backup.path).toBe("/app/data/peek-db.db.backup-20260118-104532");
+      const listed = await databaseBackupService.listBackups();
+      expect(listed.map((b) => b.filename)).toEqual([
+        "peek-db.db.backup-20260118-104532",
+        "peek-db.db.backup-20260117-093045",
+      ]);
+      // Another database's backups are not this one's to delete
+      await expect(
+        databaseBackupService.deleteBackup(
+          "peek-stash-browser.db.backup-20260117-093045"
+        )
+      ).rejects.toThrow("Invalid backup filename");
+
+      vi.useRealTimers();
     });
   });
 
@@ -344,6 +501,8 @@ describe("DatabaseBackupService", () => {
       ]);
       expect(must(all[0])).toEqual({
         filename: "peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
+        kind: "preMigration",
+        version: "3.3.8",
         path: "/app/data/peek-stash-browser.db.backup-20260101-000000-pre-3.3.8",
         size: 4096,
         createdAt: mtime,

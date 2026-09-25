@@ -18,6 +18,8 @@ peek-stash-browser.db.backup-20260924-101112-pre-3.4.0
 
 Peek keeps the 3 newest of these and deletes older ones. It never deletes a backup you made yourself. A new install, and an upgrade with no migrations, take no backup. This backup is the way back to the version you ran before: see [Downgrading](#downgrading).
 
+Settings → Server Settings → Backup lists these backups as "Before upgrading to 3.4.0", beside the ones made there, with each file's path (see [Database Backup](../user-guide/user-management.md#database-backup)).
+
 Before copying, Peek checks that the data directory has room for the copy and the migrations: about 2.2 times the space the database uses, plus 64 MB. If it has less, Peek stops and changes nothing (see [Migration failed](#migration-failed)).
 
 ### Manual backup
