@@ -839,6 +839,94 @@ async function missingReferences(
   return missing;
 }
 
+// ==================== Entities linked to deleted ones ====================
+
+/**
+ * One way an entity of type `linked` points at one of type `source`:
+ * through a junction whose near side it is, or through a column of its own
+ * row, which names an entity on the row's instance.
+ */
+type LinkPath = { linked: EntityType; source: EntityType } & (
+  | { junction: JunctionName }
+  | { column: "studioId" | "primaryTagId" }
+);
+
+/**
+ * The links Stash rewrites without moving the linking entity's updated_at
+ * (item 42, SYNC-17): merging tags moves every link to the merged tag onto
+ * the one kept (`TagStore.Merge` rewrites the join tables), a performer
+ * merge the same, and deleting a studio clears it from its galleries,
+ * scenes and images. An incremental page never returns those entities, so
+ * after a cleanup soft-deletes the merged or deleted one, what linked to it
+ * is fetched again (`refetchLinkedToDeleted`).
+ */
+const LINK_PATHS: readonly LinkPath[] = [
+  { linked: "studio", source: "tag", junction: "StudioTag" },
+  { linked: "performer", source: "tag", junction: "PerformerTag" },
+  { linked: "group", source: "tag", junction: "GroupTag" },
+  { linked: "gallery", source: "tag", junction: "GalleryTag" },
+  { linked: "gallery", source: "performer", junction: "GalleryPerformer" },
+  { linked: "gallery", source: "studio", column: "studioId" },
+  { linked: "scene", source: "tag", junction: "SceneTag" },
+  { linked: "scene", source: "performer", junction: "ScenePerformer" },
+  { linked: "scene", source: "studio", column: "studioId" },
+  { linked: "scene", source: "group", junction: "SceneGroup" },
+  { linked: "clip", source: "tag", junction: "ClipTag" },
+  { linked: "clip", source: "tag", column: "primaryTagId" },
+  { linked: "image", source: "tag", junction: "ImageTag" },
+  { linked: "image", source: "performer", junction: "ImagePerformer" },
+  { linked: "image", source: "studio", column: "studioId" },
+];
+
+/**
+ * The live entities on `instanceId` that link to the given ones (by type,
+ * soft-deleted by a cleanup) along `LINK_PATHS`, by type in SYNC_ORDER. One
+ * statement per linked type: each source's ids are bound as one JSON list
+ * that drives the junction's reverse index (or the column's index), and
+ * each linked id is then looked up by primary key.
+ */
+async function linkedTo(
+  instanceId: string,
+  deleted: ReadonlyMap<EntityType, readonly string[]>
+): Promise<Map<EntityType, string[]>> {
+  const linked = new Map<EntityType, string[]>();
+  for (const type of SYNC_ORDER) {
+    const { table } = ENTITY_TABLES[type];
+    const arms: string[] = [];
+    const params: string[] = [];
+    for (const path of LINK_PATHS) {
+      const ids = deleted.get(path.source) ?? [];
+      if (path.linked !== type || ids.length === 0) continue;
+      if ("junction" in path) {
+        const { near, far, farInstance } = JUNCTION_COLUMNS[path.junction];
+        arms.push(
+          `SELECT x."${near}" AS id FROM json_each(?) j
+           CROSS JOIN "${path.junction}" x ON x."${far}" = j.value AND x."${farInstance}" = ?`
+        );
+      } else {
+        // The + keeps the planner on the column's index: the instance's
+        // matches every row of the instance
+        arms.push(
+          `SELECT x."id" AS id FROM json_each(?) j
+           CROSS JOIN "${table}" x ON x."${path.column}" = j.value AND +x."stashInstanceId" = ?`
+        );
+      }
+      params.push(JSON.stringify(ids), instanceId);
+    }
+    if (arms.length === 0) continue;
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT l.id AS id FROM (${arms.join("\nUNION\n")}) l
+       CROSS JOIN "${table}" e ON e."id" = l.id AND e."stashInstanceId" = ?
+       WHERE e."deletedAt" IS NULL`,
+      ...params,
+      instanceId
+    );
+    const linkedIds = rows.map((row) => row.id);
+    if (linkedIds.length > 0) linked.set(type, linkedIds);
+  }
+  return linked;
+}
+
 // ==================== Entity sync specs ====================
 
 /** One page request of a type's sync. */
@@ -860,6 +948,12 @@ export interface SyncRunContext {
   signal: AbortSignal;
   /** What the run has changed so far, across its instances (SyncChangeSet) */
   changes: SyncChangeSet;
+  /**
+   * Every row a batch writes counts as changed (`detectChanges`'
+   * `markChanged`): set on a refetch for a known link change, whose rows
+   * come back with the same updated_at (`refetchLinkedToDeleted`)
+   */
+  markChanged?: boolean;
 }
 
 /**
@@ -1114,7 +1208,8 @@ export const ENTITY_SYNC: {
 
 async function processScenesBatch(
   scenes: SyncScene[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (scenes.length === 0) return noChanges();
@@ -1306,6 +1401,7 @@ async function processScenesBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming,
     oldLinks,
     compareStudio: true,
@@ -1316,7 +1412,8 @@ async function processScenesBatch(
 
 async function processPerformersBatch(
   performers: SyncPerformer[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (performers.length === 0) return noChanges();
@@ -1461,6 +1558,7 @@ async function processPerformersBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming,
     oldLinks,
     tagJunction: "PerformerTag",
@@ -1471,7 +1569,8 @@ async function processPerformersBatch(
 
 async function processStudiosBatch(
   studios: SyncStudio[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (studios.length === 0) return noChanges();
@@ -1578,6 +1677,7 @@ async function processStudiosBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming,
     oldLinks,
     tagJunction: "StudioTag",
@@ -1588,7 +1688,8 @@ async function processStudiosBatch(
 
 async function processTagsBatch(
   tags: SyncTag[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (tags.length === 0) return noChanges();
@@ -1687,6 +1788,7 @@ async function processTagsBatch(
   return detectChanges({
     instanceId: stashInstanceId,
     stored,
+    markChanged,
     incoming: validTags.map((tag) => ({
       id: tag.id,
       updatedAt: tag.updated_at,
@@ -1698,7 +1800,8 @@ async function processTagsBatch(
 
 async function processGroupsBatch(
   groups: SyncGroup[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (groups.length === 0) return noChanges();
@@ -1792,6 +1895,7 @@ async function processGroupsBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming,
     oldLinks,
     tagJunction: "GroupTag",
@@ -1802,7 +1906,8 @@ async function processGroupsBatch(
 
 async function processGalleriesBatch(
   galleries: SyncGallery[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (galleries.length === 0) return noChanges();
@@ -1921,6 +2026,7 @@ async function processGalleriesBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming: validGalleries.map((gallery) => ({
       id: gallery.id,
       updatedAt: gallery.updated_at,
@@ -1936,7 +2042,8 @@ async function processGalleriesBatch(
 
 async function processImagesBatch(
   images: SyncImage[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   // Skip empty batches
   if (images.length === 0) return noChanges();
@@ -2071,6 +2178,7 @@ async function processImagesBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming,
     oldLinks,
     compareLinks: false,
@@ -2092,7 +2200,8 @@ async function processImagesBatch(
  */
 async function processClipsBatch(
   markers: SyncClip[],
-  stashInstanceId: string
+  stashInstanceId: string,
+  { markChanged }: SyncRunContext
 ): Promise<BatchChanges> {
   if (markers.length === 0) return noChanges();
 
@@ -2208,6 +2317,7 @@ async function processClipsBatch(
   return detectChanges({
     instanceId,
     stored,
+    markChanged,
     incoming: markers.map((marker) => ({
       id: marker.id,
       updatedAt: epochMs(marker.updated_at),
@@ -2513,11 +2623,15 @@ class StashSyncService extends EventEmitter {
    * Syncs one instance in `mode`: every type in SYNC_ORDER, then the
    * cleanups (on the full path each type's runs right after it). A type
    * fetched whole is then completed from Stash's id list, which its cleanup
-   * reads: what no page returned is fetched by id (`fetchMissedIds`). Each
-   * type's state is saved at once, so a restart does not sync completed
-   * types again; a type that fails is recorded and the next one runs. What
-   * changed goes into the run's change set; the post-sync steps run once
-   * per run, after every instance (runSync). The caller holds the lock.
+   * reads: what no page returned is fetched by id (`fetchMissedIds`). On
+   * the incremental paths, what linked to the entities the cleanups
+   * soft-deleted is then fetched again (`refetchLinkedToDeleted`): a merge
+   * or deletion in Stash rewrites those links without moving updated_at.
+   * Each type's state is saved at once, so a restart does not sync
+   * completed types again; a type that fails is recorded and the next one
+   * runs. What changed goes into the run's change set; the post-sync steps
+   * run once per run, after every instance (runSync). The caller holds the
+   * lock.
    */
   private async syncInstance(
     stashInstanceId: string,
@@ -2547,9 +2661,22 @@ class StashSyncService extends EventEmitter {
         );
       }
 
-      // Cleanup deleted entities (detect deletions/merges in Stash)
+      // Cleanup deleted entities (detect deletions/merges in Stash), then
+      // what linked to them. The full path fetched every type after a
+      // cleaned-up one whole, so it needs no refetch
       if (mode !== "full") {
-        await this.cleanupEveryType(stashInstanceId, results, run, seenIds);
+        const deleted = await this.cleanupEveryType(
+          stashInstanceId,
+          results,
+          run,
+          seenIds
+        );
+        await this.refetchLinkedToDeleted(
+          stashInstanceId,
+          deleted,
+          results,
+          run
+        );
       }
 
       const duration = Date.now() - startTime;
@@ -3252,16 +3379,18 @@ class StashSyncService extends EventEmitter {
    * added to the type's `lastError`. A type fetched whole this run (never
    * synced before, its page ids in `seenIds`) that synced cleanly then gets
    * what no page returned (`fetchMissedIds`), a failure of which is added
-   * too.
+   * too. Returns the ids each type's cleanup soft-deleted (all it tried,
+   * after a failure midway), for `refetchLinkedToDeleted`.
    */
   private async cleanupEveryType(
     stashInstanceId: string,
     results: SyncResult[],
     run: SyncRunContext,
     seenIds: ReadonlyMap<EntityType, ReadonlySet<string>>
-  ): Promise<void> {
+  ): Promise<Map<EntityType, string[]>> {
     logger.info("Checking for deleted entities...");
     let totalDeleted = 0;
+    const deleted = new Map<EntityType, string[]>();
     for (const entityType of SYNC_ORDER) {
       this.checkAbort();
       const outcome = await this.cleanupDeletedEntities(
@@ -3269,6 +3398,9 @@ class StashSyncService extends EventEmitter {
         stashInstanceId
       );
       run.changes.addDeleted(entityType, stashInstanceId, outcome.deletedIds);
+      if (outcome.deletedIds.length > 0) {
+        deleted.set(entityType, outcome.deletedIds);
+      }
       totalDeleted += outcome.deleted;
       const result = results.find((r) => r.entityType === entityType);
       if (result) result.deleted = outcome.deleted;
@@ -3295,6 +3427,64 @@ class StashSyncService extends EventEmitter {
       logger.info(
         `Cleanup complete: ${totalDeleted} entities marked as deleted`
       );
+    }
+    return deleted;
+  }
+
+  /**
+   * What linked to the entities a cleanup soft-deleted (`deleted`, ids by
+   * type) is fetched again by id (item 42, SYNC-17). Stash's tag and
+   * performer merges move every link to the merged entity onto the one kept,
+   * and deleting a studio clears it from its entities, without moving the
+   * linking entities' updated_at, so no incremental page returns them. Along
+   * `LINK_PATHS`: a tag leads to the studios, performers, groups, galleries,
+   * scenes, clips (their tags and primary tag) and images carrying it; a
+   * performer to its galleries, scenes and images; a studio to its
+   * galleries, scenes and images; a group to its scenes. Each type's live
+   * linked ids are paged in by id (`paginate`, 500 a request) in SYNC_ORDER,
+   * into the change set as changed (`markChanged`: they come back with the
+   * same updated_at, and an image's links are not diffed), so the post-sync
+   * steps and the exclusion recompute cover them. A type whose refetch fails
+   * keeps its old links until the daily full pass: the failure is added to
+   * its result's error and its `lastError`. An abort throws.
+   */
+  private async refetchLinkedToDeleted(
+    stashInstanceId: string,
+    deleted: ReadonlyMap<EntityType, readonly string[]>,
+    results: SyncResult[],
+    run: SyncRunContext
+  ): Promise<void> {
+    if (deleted.size === 0) return;
+    const linked = await linkedTo(stashInstanceId, deleted);
+    const refetch: SyncRunContext = { ...run, markChanged: true };
+    for (const [entityType, ids] of linked) {
+      this.checkAbort();
+      const { plural } = ENTITY_TABLES[entityType];
+      const result = results.find((r) => r.entityType === entityType);
+      logger.info(
+        `Fetching ${ids.length} ${plural} that linked to what Stash deleted or merged`,
+        { instanceId: stashInstanceId, ids: ids.slice(0, LOGGED_IDS) }
+      );
+      try {
+        const { synced } = await this.paginate(
+          entityType,
+          stashInstanceId,
+          { ids },
+          refetch
+        );
+        if (result) result.synced += synced;
+      } catch (error) {
+        if (this.isAbort(error)) throw new Error("Sync aborted");
+        const message = describeStashError(error);
+        logger.error(
+          `Failed to refetch the ${plural} that linked to what Stash deleted or merged`,
+          { stashInstanceId, entityType, error: message }
+        );
+        const problem = `Could not refetch ${ids.length.toLocaleString("en-US")} ${plural} that linked to what Stash deleted or merged: ${message}`;
+        const lastError = joinProblems(result?.error, problem) ?? problem;
+        if (result) result.error = lastError;
+        await this.recordEntityError(stashInstanceId, entityType, lastError);
+      }
     }
   }
 
@@ -3575,13 +3765,17 @@ class StashSyncService extends EventEmitter {
     );
   }
 
-  /** runCleanup's work; the caller holds the lock. */
+  /**
+   * runCleanup's work; the caller holds the lock. What linked to the rows it
+   * soft-deleted is fetched again, as after a sync's cleanups.
+   */
   private async cleanupAndRecord(
     entityType: EntityType,
     stashInstanceId: string,
     options: CleanupOptions
   ): Promise<CleanupOutcome> {
-    const changes = this.takeChanges();
+    const run = this.runContext();
+    const { changes } = run;
     try {
       const outcome = await this.cleanupDeletedEntities(
         entityType,
@@ -3593,6 +3787,12 @@ class StashSyncService extends EventEmitter {
         stashInstanceId,
         entityType,
         cleanupProblem(outcome) ?? null
+      );
+      await this.refetchLinkedToDeleted(
+        stashInstanceId,
+        new Map([[entityType, outcome.deletedIds]]),
+        [],
+        run
       );
       logger.info("Cleanup run by an admin finished", {
         stashInstanceId,
@@ -3845,6 +4045,8 @@ class StashSyncService extends EventEmitter {
    * Compute sceneCountViaPerformers for all tags using SQL.
    * This counts scenes where a performer in the scene has this tag.
    * Called after sync completes to pre-compute the value for fast retrieval.
+   * A soft-deleted performer counts for nothing: Stash deleted or merged it,
+   * and its links go when the scenes are fetched again.
    */
   async computeTagSceneCountsViaPerformers(): Promise<void> {
     const startTime = Date.now();
@@ -3864,6 +4066,7 @@ class StashSyncService extends EventEmitter {
         SET sceneCountViaPerformers = COALESCE((
           SELECT COUNT(DISTINCT sp.sceneId)
           FROM PerformerTag pt
+          JOIN StashPerformer p ON p.id = pt.performerId AND p.stashInstanceId = pt.performerInstanceId AND p.deletedAt IS NULL
           JOIN ScenePerformer sp ON sp.performerId = pt.performerId AND sp.performerInstanceId = pt.performerInstanceId
           JOIN StashScene s ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId AND s.deletedAt IS NULL
           WHERE pt.tagId = StashTag.id AND pt.tagInstanceId = StashTag.stashInstanceId

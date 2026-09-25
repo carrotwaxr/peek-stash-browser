@@ -34,7 +34,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 2. Then, once for the whole sync: compute scene tag inheritance, apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images), rebuild inherited image counts, rebuild user stats, recompute the exclusions of every user
 
 **Characteristics:**
-- **Always runs every post-sync step**, whole library, whatever changed: it is the catch-all for links Stash edits without moving `updated_at` (tag and performer merges, images added to a gallery)
+- **Always runs every post-sync step**, whole library, whatever changed: it is the catch-all for links Stash edits without moving `updated_at` (images added to a gallery, a refetch that failed; see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at))
 - Slowest option but guarantees complete data consistency
 - Safe recovery mechanism for any sync issues
 
@@ -47,7 +47,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 
 **Process:**
 1. Sync all entity types, but only fetch entities with `updated_at > since`
-2. Clean up deleted entities (detect deletions/merges in Stash)
+2. Clean up deleted entities (detect deletions/merges in Stash), then fetch again what linked to them (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at))
 3. After every instance, the [post-sync steps](#post-sync-processing) once, only for what changed; nothing changed means none of them runs
 
 **Characteristics:**
@@ -69,7 +69,7 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
    - Query Stash for change count since that timestamp
    - If changes: sync that entity type
    - If no changes: skip entirely
-2. Clean up deleted entities
+2. Clean up deleted entities, then fetch again what linked to them
 3. After every instance, the [post-sync steps](#post-sync-processing) once, only for what changed; a sync in which Stash reports no change runs none of them
 
 **Characteristics:**
@@ -116,6 +116,19 @@ The ratio guard has a floor of 50 rows, so a small library can still lose most o
 
 How the delete set is computed: one SQL statement compares the cached rows with Stash's whole id list, bound as one JSON parameter (`"id" NOT IN (SELECT value FROM json_each(?))`), so there is no limit on library size and no transaction: 178 ms for 260,599 image ids on a production copy. The rows then go in batches of 500, each a short write-queue unit. Scenes then move user data from merged scenes to their survivors (see [Merge Detection](../user-guide/merge-detection.md)).
 
+### Edits Stash makes without updated_at
+
+Some edits in Stash change links without moving the `updated_at` of the entities that carry them, so no incremental page returns those entities:
+
+- Merging tags moves every link to the merged tag (on scenes, images, galleries, performers, studios, collections and clips, a clip's primary tag included) onto the tag kept, and deletes the merged one. Merging performers does the same for scenes, images and galleries.
+- Deleting a studio clears it from its scenes, galleries and images; deleting a tag or a performer removes its links.
+
+The cleanup notices the merged or deleted entity (Stash no longer lists it) and soft-deletes it. On an incremental or smart sync, and after **Apply deletions**, Peek then looks up what still links to it (a tag's scenes, images, galleries, performers, studios, collections and clips; a performer's scenes, images and galleries; a studio's scenes, galleries and images; a collection's scenes) and fetches those entities again by id, 500 a request. They count as changed for the post-sync steps, so their inherited tags, image counts and every affected user's exclusions are recomputed in the same sync. The cost is proportional to what the deleted entity linked to: a merged tag on 5,000 scenes is 10 requests. A full sync needs none of it, since it fetches every entity of the types after each cleanup anyway. A refetch that fails is recorded in the type's `lastError`, and those entities keep their old links until the next full sync.
+
+Until then, and whatever an entity still links to, a soft-deleted performer, studio, collection or tag hands nothing down: scene tag inheritance, the tag counts via performers and gallery inheritance read only live ones.
+
+Adding images to a gallery, or removing them, moves only the gallery's `updated_at`; a full sync catches it.
+
 ---
 
 ## Post-Sync Processing
@@ -145,6 +158,7 @@ Images can inherit metadata from their parent galleries:
 - Only copies metadata if the image field is NULL/empty
 - Never overwrites existing image metadata
 - Uses first gallery if image is in multiple galleries
+- Hands down only live performers and tags (a soft-deleted one was deleted or merged in Stash)
 
 **Trigger conditions:**
 - Full sync: Always runs, for every image
@@ -157,6 +171,7 @@ Scenes inherit tags from their performers, studio and groups:
 - Performer tags propagate to scenes featuring that performer
 - Studio tags propagate to scenes from that studio
 - Group tags propagate to the scenes in that group
+- A soft-deleted performer, studio, group or tag passes nothing on
 - A scene's own tags are left out; the rest are stored as a JSON array in `StashScene.inheritedTagIds`, which the tag filters and content restrictions read
 
 **Trigger conditions:**
@@ -222,9 +237,9 @@ An `updated_at` more than 5 minutes ahead of Peek's clock (clock skew allowance)
 
 **Symptom:** Changes made in Stash don't appear in Peek.
 
-**Cause:** Smart incremental sync may have missed changes if Stash's `updated_at` timestamps weren't updated.
+**Cause:** Incremental and smart syncs fetch what Stash marks updated. Merging or deleting tags and performers, and deleting a studio, reach Peek on the next sync anyway: the entities that linked to them are fetched again (see [Edits Stash makes without updated_at](#edits-stash-makes-without-updated_at)). Other edits that leave `updated_at` alone, such as images added to a gallery from the gallery, wait for a full sync, and so do the entities of a refetch that failed (its error is in the type's sync status).
 
-**Solution:** Run a full sync, or incremental sync with an earlier timestamp.
+**Solution:** Run a full sync.
 
 ### Sync appears stuck
 
@@ -283,7 +298,7 @@ The sync logic is implemented in:
 
 - `server/services/StashSyncService.ts` - Main sync orchestration:
   - `runSync(mode, instanceId?)`: one sync run, of one instance or every enabled instance in turn, for `fullSync`, `incrementalSync` and `smartIncrementalSync`
-  - `syncInstance(instanceId, mode, run)`: one instance's types in `SYNC_ORDER`, then the cleanups and the post-sync steps
+  - `syncInstance(instanceId, mode, run)`: one instance's types in `SYNC_ORDER`, then the cleanups and, on the incremental paths, `refetchLinkedToDeleted` (what linked to the entities they soft-deleted, along `LINK_PATHS`)
   - `paginate(type, instanceId, { since, ids }, run)`: the one page loop for every type (500 a page): abort checks between pages, progress events, the page's missing references fetched first (`ensureReferenced`), and the newest `updated_at` seen as the next sync's watermark
   - `ENTITY_SYNC`: each type's spec, `fetchPage` (the Stash query that lists it, narrowed by `updated_at` or by ids, carrying the run's abort signal), `references` (what a page points at) and `processBatch` (the writer of one page, in one transaction through `writeBatch`)
 - `server/services/ImageGalleryInheritanceService.ts` - Gallery-to-image inheritance

@@ -1,6 +1,10 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { entityImageCountService } from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
+import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
+import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
+import { stashSyncService } from "./StashSyncService.js";
 import { userStatsService } from "./UserStatsService.js";
 
 /**
@@ -150,6 +154,42 @@ const migrations: Migration[] = [
     "Recompute every user's exclusions once galleries and images record their studio's instance, so a studio restriction covers them on every instance",
     "galleries and images recorded their studio's instance"
   ),
+  // Sync now recomputes these only for what a sync changed, and a
+  // soft-deleted performer, studio, group or tag no longer passes anything
+  // on: what was computed under the old rules is rebuilt once, whole
+  // library, instead of whenever each entity is next rescoped
+  {
+    name: "006_rebuild_derived_after_sync_semantics",
+    description:
+      "Rebuild scene tag inheritance, gallery inheritance, inherited image counts and tag scene counts for the whole library, then every user's exclusions, under the sync's new rules (soft-deleted performers, studios, groups and tags pass nothing on)",
+    run: async () => {
+      const label = "[Migration 006]";
+      const startTime = Date.now();
+      logger.info(
+        `${label} Rebuilding inherited tags, gallery inheritance, image counts and tag scene counts, then every user's exclusions`
+      );
+      try {
+        // In the post-sync steps' order: the counts count what the
+        // inheritance hands down, and the recompute reads all of it
+        await sceneTagInheritanceService.computeInheritedTags("all");
+        await imageGalleryInheritanceService.applyGalleryInheritance("all");
+        await entityImageCountService.rebuildAllImageCounts("all");
+        await stashSyncService.computeTagSceneCountsViaPerformers();
+        const result = await exclusionComputationService.recomputeAllUsers();
+        logger.info(`${label} Rebuild completed`, {
+          durationMs: Date.now() - startTime,
+          success: result.success,
+          failed: result.failed,
+        });
+      } catch (error) {
+        logger.error(`${label} Rebuild failed - will retry on next startup`, {
+          durationMs: Date.now() - startTime,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
+    },
+  },
 ];
 
 class DataMigrationService {

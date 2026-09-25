@@ -20,6 +20,15 @@
  * (read by its cleanup) that no page returned are fetched by id: paging by
  * offset skips an entity when another is edited mid-sync.
  *
+ * Item 42 (SYNC-17): Stash's tag and performer merges rewrite the links of
+ * every entity that carried the merged one without moving its updated_at,
+ * and deleting a studio clears its entities' studio the same way. After an
+ * incremental sync's cleanup soft-deletes the merged or deleted entity, what
+ * linked to it is fetched again by id, into the change set as changed. The
+ * derived values (inherited tags, tag counts via performers, gallery
+ * inheritance) pass on nothing from a soft-deleted performer, studio, group
+ * or tag.
+ *
  * Rows are seeded under two made-up instances, jn-a and jn-b, with the same
  * ids, which real sync never touches; the batch writers are called directly
  * with Stash-shaped rows, and the page loop with a stub Stash.
@@ -36,9 +45,18 @@ import {
 import type { StashClient } from "../../graphql/StashClient.js";
 import type { FindFilterType } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
+import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
+import {
+  type ImageCountScope,
+  entityImageCountService,
+} from "../../services/EntityImageCountService.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   ENTITY_SYNC,
+  SYNC_ORDER,
   type SyncEntityOf,
   type SyncRunContext,
   stashSyncService,
@@ -47,6 +65,12 @@ import {
   type BatchChanges,
   SyncChangeSet,
 } from "../../services/SyncChangeSet.js";
+import { userStatsService } from "../../services/UserStatsService.js";
+import {
+  arrayContaining,
+  objectContaining,
+} from "../../tests/helpers/matchers.js";
+import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 import { recordStatements } from "../helpers/statementRecorder.js";
 
@@ -70,6 +94,9 @@ type SyncGroup = SyncEntityOf<"group">;
 type SyncScene = SyncEntityOf<"scene">;
 type SyncTag = SyncEntityOf<"tag">;
 type SyncGallery = SyncEntityOf<"gallery">;
+type SyncPerformer = SyncEntityOf<"performer">;
+type SyncClip = SyncEntityOf<"clip">;
+type SyncImage = SyncEntityOf<"image">;
 
 /** A studio as Stash's sync query returns it */
 function studioRow(
@@ -114,6 +141,7 @@ function sceneRow(
     tags?: string[];
     groups?: string[];
     galleries?: string[];
+    studio?: string | null;
   },
   updatedAt = UPDATED_AT
 ): SyncScene {
@@ -123,7 +151,7 @@ function sceneRow(
     urls: [],
     files: [],
     captions: [],
-    studio: null,
+    studio: links.studio ? partialRow({ id: links.studio }) : null,
     performers: (links.performers ?? []).map((p) => partialRow({ id: p })),
     tags: (links.tags ?? []).map((t) => partialRow({ id: t })),
     groups: (links.groups ?? []).map((g, i) =>
@@ -149,19 +177,85 @@ function tagRow(id: string): SyncTag {
 }
 
 /** A gallery as Stash's sync query returns it */
-function galleryRow(id: string, studioId: string | null): SyncGallery {
+function galleryRow(
+  id: string,
+  studioId: string | null,
+  links: { performers?: string[]; tags?: string[] } = {}
+): SyncGallery {
   return partialRow<SyncGallery>({
     id,
     title: `Junctions IT gallery ${id}`,
     urls: [],
     files: [],
-    performers: [],
-    tags: [],
+    performers: (links.performers ?? []).map((p) => partialRow({ id: p })),
+    tags: (links.tags ?? []).map((t) => partialRow({ id: t })),
     scenes: [],
     studio: studioId === null ? null : partialRow({ id: studioId }),
     folder: null,
     cover: null,
     image_count: 0,
+    created_at: CREATED_AT,
+    updated_at: UPDATED_AT,
+  });
+}
+
+/** A performer as Stash's sync query returns it */
+function performerRow(id: string, tagIds: string[]): SyncPerformer {
+  return partialRow<SyncPerformer>({
+    id,
+    name: `Junctions IT performer ${id}`,
+    stash_ids: [],
+    alias_list: [],
+    tags: tagIds.map((tagId) => partialRow({ id: tagId })),
+    created_at: CREATED_AT,
+    updated_at: UPDATED_AT,
+  });
+}
+
+/** A clip (scene marker) as Stash's sync query returns it */
+function clipRow(
+  id: string,
+  sceneId: string,
+  primaryTagId: string,
+  tagIds: string[]
+): SyncClip {
+  const path = `http://stash.invalid/scene/${sceneId}/scene_marker/${id}`;
+  return partialRow<SyncClip>({
+    id,
+    title: `Junctions IT clip ${id}`,
+    seconds: 10,
+    end_seconds: null,
+    scene: partialRow({ id: sceneId }),
+    primary_tag: partialRow({ id: primaryTagId }),
+    tags: tagIds.map((tagId) => partialRow({ id: tagId })),
+    preview: `${path}/preview`,
+    screenshot: `${path}/screenshot`,
+    stream: `${path}/stream`,
+    created_at: CREATED_AT,
+    updated_at: UPDATED_AT,
+  });
+}
+
+/** An image as Stash's sync query returns it, with its links */
+function imageRow(
+  id: string,
+  links: {
+    performers?: string[];
+    tags?: string[];
+    galleries?: string[];
+    studio?: string | null;
+  }
+): SyncImage {
+  return partialRow<SyncImage>({
+    id,
+    title: `Junctions IT image ${id}`,
+    urls: [],
+    files: [],
+    paths: {},
+    performers: (links.performers ?? []).map((p) => partialRow({ id: p })),
+    tags: (links.tags ?? []).map((t) => partialRow({ id: t })),
+    galleries: (links.galleries ?? []).map((g) => partialRow({ id: g })),
+    studio: links.studio ? partialRow({ id: links.studio }) : null,
     created_at: CREATED_AT,
     updated_at: UPDATED_AT,
   });
@@ -280,6 +374,21 @@ function refs(list: ReadonlyArray<{ id: string; instanceId: string }>) {
 
 async function clearSeed(): Promise<void> {
   const inSeed = { in: INSTANCES };
+  await prisma.clipTag.deleteMany({ where: { clipInstanceId: inSeed } });
+  await prisma.stashClip.deleteMany({ where: { stashInstanceId: inSeed } });
+  await prisma.imagePerformer.deleteMany({
+    where: { imageInstanceId: inSeed },
+  });
+  await prisma.imageTag.deleteMany({ where: { imageInstanceId: inSeed } });
+  await prisma.imageGallery.deleteMany({ where: { imageInstanceId: inSeed } });
+  await prisma.stashImage.deleteMany({ where: { stashInstanceId: inSeed } });
+  await prisma.galleryPerformer.deleteMany({
+    where: { galleryInstanceId: inSeed },
+  });
+  await prisma.galleryTag.deleteMany({ where: { galleryInstanceId: inSeed } });
+  await prisma.performerTag.deleteMany({
+    where: { performerInstanceId: inSeed },
+  });
   await prisma.scenePerformer.deleteMany({
     where: { sceneInstanceId: inSeed },
   });
@@ -312,7 +421,7 @@ const idList = (ids: IdsVariable) => (ids == null ? undefined : [ids].flat());
 
 /** One page of `rows` as `filter` asks for it, narrowed to `ids` when given */
 function page<T extends { id: string }>(
-  rows: T[],
+  rows: readonly T[],
   filter: FindFilterType | null | undefined,
   ids: IdsVariable
 ): { count: number; items: T[] } {
@@ -656,6 +765,650 @@ describeWithDb(
       ]);
       expect(await sceneLinks("SceneGroup")).toEqual(["1:1"]);
       expect(await sceneLinks("ScenePerformer")).toEqual(["1:1", "1:2", "2:2"]);
+    });
+  }
+);
+
+/** What a stub Stash holds, as each type's sync query returns it */
+interface Library {
+  tag: SyncTag[];
+  studio: SyncStudio[];
+  performer: SyncPerformer[];
+  group: SyncGroup[];
+  gallery: SyncGallery[];
+  scene: SyncScene[];
+  clip: SyncClip[];
+  image: SyncImage[];
+}
+
+/** A library holding `rows`, and nothing of the other types */
+function library(rows: Partial<Library>): Library {
+  return {
+    tag: [],
+    studio: [],
+    performer: [],
+    group: [],
+    gallery: [],
+    scene: [],
+    clip: [],
+    image: [],
+    ...rows,
+  };
+}
+
+/** Writes `lib` on `instanceId` as a sync does, through each batch writer */
+async function writeLibrary(instanceId: string, lib: Library): Promise<void> {
+  const run = newRun();
+  await ENTITY_SYNC.tag.processBatch(lib.tag, instanceId, run);
+  await ENTITY_SYNC.studio.processBatch(lib.studio, instanceId, run);
+  await ENTITY_SYNC.performer.processBatch(lib.performer, instanceId, run);
+  await ENTITY_SYNC.group.processBatch(lib.group, instanceId, run);
+  await ENTITY_SYNC.gallery.processBatch(lib.gallery, instanceId, run);
+  await ENTITY_SYNC.scene.processBatch(lib.scene, instanceId, run);
+  await ENTITY_SYNC.clip.processBatch(lib.clip, instanceId, run);
+  await ENTITY_SYNC.image.processBatch(lib.image, instanceId, run);
+}
+
+/** Every type of `instanceId` synced up to UPDATED_AT: the next sync is incremental */
+async function markSynced(instanceId: string): Promise<void> {
+  await prisma.syncState.createMany({
+    data: SYNC_ORDER.map((entityType) => ({
+      stashInstanceId: instanceId,
+      entityType,
+      lastIncrementalSyncTimestamp: UPDATED_AT,
+      lastIncrementalSyncActual: new Date(),
+    })),
+  });
+}
+
+/** A request the stub answered by ids */
+interface IdRequest {
+  op: string;
+  ids: string[];
+}
+
+/**
+ * Routes `instanceId`'s Stash client to a stub holding `lib` after an edit
+ * that moved no entity's updated_at (a merge, a deletion): a page asking
+ * for what changed since the last sync gets nothing, a page of ids gets
+ * those rows, and the cleanup's id lists hold every row. Returns the
+ * requests made by ids; one by ids for an operation in `failing` fails.
+ */
+function stubUnchangedStash(
+  instanceId: string,
+  lib: Library,
+  failing: readonly string[] = []
+): IdRequest[] {
+  const requests: IdRequest[] = [];
+  function answer<T extends { id: string }>(
+    op: string,
+    rows: T[],
+    filter: FindFilterType | null | undefined,
+    ids: IdsVariable,
+    changedSince: unknown
+  ): Promise<{ count: number; items: T[] }> {
+    const wanted = idList(ids);
+    if (wanted) {
+      requests.push({ op, ids: wanted });
+      if (failing.includes(op)) {
+        return Promise.reject(new Error(`${op} failed: Stash is down`));
+      }
+    }
+    return Promise.resolve(
+      changedSince ? { count: 0, items: [] } : page(rows, filter, ids)
+    );
+  }
+  const idsOf = (
+    rows: ReadonlyArray<{ id: string }>,
+    filter: FindFilterType | null | undefined
+  ) => {
+    const { count, items } = page(rows, filter, undefined);
+    return { count, ids: items.map(({ id }) => ({ id })) };
+  };
+
+  const client: StashClient = partialRow<StashClient>({
+    findTags: (vars) =>
+      answer(
+        "findTags",
+        lib.tag,
+        vars?.filter,
+        vars?.ids,
+        vars?.tag_filter?.updated_at
+      ).then(({ count, items }) => ({ findTags: { count, tags: items } })),
+    findStudios: (vars) =>
+      answer(
+        "findStudios",
+        lib.studio,
+        vars?.filter,
+        vars?.ids,
+        vars?.studio_filter?.updated_at
+      ).then(({ count, items }) => ({
+        findStudios: { count, studios: items },
+      })),
+    findPerformers: (vars) =>
+      answer(
+        "findPerformers",
+        lib.performer,
+        vars?.filter,
+        vars?.ids,
+        vars?.performer_filter?.updated_at
+      ).then(({ count, items }) => ({
+        findPerformers: { count, performers: items },
+      })),
+    findGroups: (vars) =>
+      answer(
+        "findGroups",
+        lib.group,
+        vars?.filter,
+        vars?.ids,
+        vars?.group_filter?.updated_at
+      ).then(({ count, items }) => ({ findGroups: { count, groups: items } })),
+    findGalleries: (vars) =>
+      answer(
+        "findGalleries",
+        lib.gallery,
+        vars?.filter,
+        vars?.ids,
+        vars?.gallery_filter?.updated_at
+      ).then(({ count, items }) => ({
+        findGalleries: { count, galleries: items },
+      })),
+    findScenesCompact: (vars) =>
+      answer(
+        "findScenes",
+        lib.scene,
+        vars?.filter,
+        vars?.ids,
+        vars?.scene_filter?.updated_at
+      ).then(({ count, items }) => ({
+        findScenes: { count, duration: 0, filesize: 0, scenes: items },
+      })),
+    // Clips page and list their ids for cleanup through the same operation
+    findSceneMarkers: (vars) =>
+      answer(
+        "findSceneMarkers",
+        lib.clip,
+        vars?.filter,
+        vars?.ids,
+        vars?.scene_marker_filter?.updated_at
+      ).then(({ count, items }) => ({
+        findSceneMarkers: { count, scene_markers: items },
+      })),
+    // Images narrow by Stash's integer ids
+    findImages: (vars) =>
+      answer(
+        "findImages",
+        lib.image,
+        vars?.filter,
+        vars?.image_ids == null
+          ? undefined
+          : [vars.image_ids].flat().map(String),
+        vars?.image_filter?.updated_at
+      ).then(({ count, items }) => ({ findImages: { count, images: items } })),
+    findTagIDs: (vars) => {
+      const { count, ids } = idsOf(lib.tag, vars?.filter);
+      return Promise.resolve({ findTags: { count, tags: ids } });
+    },
+    findStudioIDs: (vars) => {
+      const { count, ids } = idsOf(lib.studio, vars?.filter);
+      return Promise.resolve({ findStudios: { count, studios: ids } });
+    },
+    findPerformerIDs: (vars) => {
+      const { count, ids } = idsOf(lib.performer, vars?.filter);
+      return Promise.resolve({ findPerformers: { count, performers: ids } });
+    },
+    findGroupIDs: (vars) => {
+      const { count, ids } = idsOf(lib.group, vars?.filter);
+      return Promise.resolve({ findGroups: { count, groups: ids } });
+    },
+    findGalleryIDs: (vars) => {
+      const { count, ids } = idsOf(lib.gallery, vars?.filter);
+      return Promise.resolve({ findGalleries: { count, galleries: ids } });
+    },
+    findSceneIDs: (vars) => {
+      const { count, ids } = idsOf(lib.scene, vars?.filter);
+      return Promise.resolve({ findScenes: { count, scenes: ids } });
+    },
+    findImageIDs: (vars) => {
+      const { count, ids } = idsOf(lib.image, vars?.filter);
+      return Promise.resolve({ findImages: { count, images: ids } });
+    },
+    withSignal: () => client,
+  });
+  const realGet = stashInstanceManager.get.bind(stashInstanceManager);
+  vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
+    id === instanceId ? client : realGet(id)
+  );
+  return requests;
+}
+
+/**
+ * jn's library with one entity of every type linked to tag `tagId`, and
+ * the tags `tagIds`: before tag 1 was merged into tag 2 in Stash (tag 1
+ * everywhere, tags 1 and 2), and after (tag 2 everywhere, tag 2 alone),
+ * the merge having moved no linked entity's updated_at. Scene 2 carries
+ * tag 2 all along.
+ */
+function taggedLibrary(tagId: string, tagIds: string[]): Library {
+  return library({
+    tag: tagIds.map((id) => tagRow(id)),
+    studio: [studioRow("1", [tagId])],
+    performer: [performerRow("1", [tagId])],
+    group: [groupRow("1", [tagId])],
+    gallery: [galleryRow("1", null, { tags: [tagId] })],
+    scene: [sceneRow("1", { tags: [tagId] }), sceneRow("2", { tags: ["2"] })],
+    clip: [clipRow("1", "1", tagId, [tagId])],
+    image: [imageRow("1", { tags: [tagId] })],
+  });
+}
+
+/** The same for performer `performerId` of `performerIds` (a performer merge) */
+function performerLibrary(
+  performerId: string,
+  performerIds: string[]
+): Library {
+  return library({
+    performer: performerIds.map((id) => performerRow(id, [])),
+    gallery: [galleryRow("1", null, { performers: [performerId] })],
+    scene: [sceneRow("1", { performers: [performerId] })],
+    image: [imageRow("1", { performers: [performerId] })],
+  });
+}
+
+/** The same for studio `studioId` of `studioIds` (none: it was deleted) */
+function studioLibrary(studioId: string | null, studioIds: string[]): Library {
+  return library({
+    studio: studioIds.map((id) => studioRow(id, [])),
+    gallery: [galleryRow("1", studioId)],
+    scene: [sceneRow("1", { studio: studioId })],
+    image: [imageRow("1", { studio: studioId })],
+  });
+}
+
+/** `instanceId`'s links to tags, per junction as `<near>:<tag>`, and its clips' primary tags */
+async function tagLinksOn(
+  instanceId: string
+): Promise<Record<string, string[]>> {
+  const junctions = [
+    ["StudioTag", "studioId", "studioInstanceId"],
+    ["PerformerTag", "performerId", "performerInstanceId"],
+    ["GroupTag", "groupId", "groupInstanceId"],
+    ["GalleryTag", "galleryId", "galleryInstanceId"],
+    ["SceneTag", "sceneId", "sceneInstanceId"],
+    ["ClipTag", "clipId", "clipInstanceId"],
+    ["ImageTag", "imageId", "imageInstanceId"],
+  ] as const;
+  const links: Record<string, string[]> = {};
+  for (const [table, near, nearInstance] of junctions) {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ nearId: string; tagId: string }>
+    >(
+      `SELECT "${near}" AS nearId, "tagId" AS tagId FROM "${table}" WHERE "${nearInstance}" = ?`,
+      instanceId
+    );
+    links[table] = rows.map((r) => `${r.nearId}:${r.tagId}`).sort();
+  }
+  const clips = await prisma.stashClip.findMany({
+    where: { stashInstanceId: instanceId },
+    select: { id: true, primaryTagId: true },
+    orderBy: { id: "asc" },
+  });
+  links.clipPrimaryTag = clips.map((c) => `${c.id}:${c.primaryTagId}`);
+  return links;
+}
+
+/** `instanceId`'s links to performers, per junction as `<near>:<performer>` */
+async function performerLinksOn(
+  instanceId: string
+): Promise<Record<string, string[]>> {
+  const junctions = [
+    ["GalleryPerformer", "galleryId", "galleryInstanceId"],
+    ["ScenePerformer", "sceneId", "sceneInstanceId"],
+    ["ImagePerformer", "imageId", "imageInstanceId"],
+  ] as const;
+  const links: Record<string, string[]> = {};
+  for (const [table, near, nearInstance] of junctions) {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ nearId: string; performerId: string }>
+    >(
+      `SELECT "${near}" AS nearId, "performerId" AS performerId FROM "${table}" WHERE "${nearInstance}" = ?`,
+      instanceId
+    );
+    links[table] = rows.map((r) => `${r.nearId}:${r.performerId}`).sort();
+  }
+  return links;
+}
+
+/** The studio of `instanceId`'s galleries, scenes and images, as `<id>:<studio>` */
+async function studiosOn(
+  instanceId: string
+): Promise<Record<string, string[]>> {
+  const studios: Record<string, string[]> = {};
+  for (const table of ["StashGallery", "StashScene", "StashImage"] as const) {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; studioId: string | null }>
+    >(
+      `SELECT "id", "studioId" FROM "${table}" WHERE "stashInstanceId" = ? ORDER BY "id"`,
+      instanceId
+    );
+    studios[table] = rows.map((r) => `${r.id}:${r.studioId ?? "none"}`);
+  }
+  return studios;
+}
+
+/** The ids of `table`'s live rows on `instanceId` */
+async function liveIds(
+  table: "StashTag" | "StashPerformer" | "StashStudio",
+  instanceId: string
+): Promise<string[]> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    `SELECT "id" FROM "${table}" WHERE "stashInstanceId" = ? AND "deletedAt" IS NULL ORDER BY "id"`,
+    instanceId
+  );
+  return rows.map((r) => r.id);
+}
+
+/** A scene's inheritedTagIds as stored, sorted */
+async function inheritedTagsOf(
+  instanceId: string,
+  sceneId: string
+): Promise<string[]> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ tagId: string }>>(
+    `SELECT je.value AS tagId
+     FROM "StashScene" s, json_each(COALESCE(s."inheritedTagIds", '[]')) je
+     WHERE s."id" = ? AND s."stashInstanceId" = ?
+     ORDER BY je.value`,
+    sceneId,
+    instanceId
+  );
+  return rows.map((r) => r.tagId);
+}
+
+/**
+ * Scene 1 of jn-a inherits from performers 1 (tags 1 and 3) and 2 (tag 2),
+ * studio 1 and group 1 (tag 2 each); image 1 is in gallery 1, which has
+ * performers 1 and 2 and tags 1 and 3 to hand down. Tag 3, performer 2,
+ * studio 1 and group 1 are then soft-deleted, as a cleanup leaves what
+ * Stash deleted or merged until what linked to it is fetched again.
+ */
+async function seedSoftDeletedSources(): Promise<void> {
+  await writeLibrary(
+    JN_A,
+    library({
+      tag: ["1", "2", "3"].map((id) => tagRow(id)),
+      studio: [studioRow("1", ["2"])],
+      performer: [performerRow("1", ["1", "3"]), performerRow("2", ["2"])],
+      group: [groupRow("1", ["2"])],
+      gallery: [
+        galleryRow("1", null, { performers: ["1", "2"], tags: ["1", "3"] }),
+      ],
+      scene: [
+        sceneRow("1", { performers: ["1", "2"], studio: "1", groups: ["1"] }),
+      ],
+      image: [imageRow("1", { galleries: ["1"] })],
+    })
+  );
+  for (const [table, id] of [
+    ["StashTag", "3"],
+    ["StashPerformer", "2"],
+    ["StashStudio", "1"],
+    ["StashGroup", "1"],
+  ] as const) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}" SET "deletedAt" = ? WHERE "id" = ? AND "stashInstanceId" = ?`,
+      Date.now(),
+      id,
+      JN_A
+    );
+  }
+}
+
+describeWithDb(
+  "StashSyncService: what linked to entities Stash deleted or merged (integration)",
+  () => {
+    beforeEach(async () => {
+      await clearSeed();
+      // The clips' previews are on no real Stash
+      vi.spyOn(clipPreviewProber, "probeBatch").mockResolvedValue(new Map());
+      const realCredentials =
+        stashInstanceManager.getCredentials.bind(stashInstanceManager);
+      vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation(
+        (id) =>
+          id !== undefined && INSTANCES.includes(id)
+            ? { baseUrl: "http://stash.invalid", apiKey: "junctions-it-key" }
+            : realCredentials(id)
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    afterAll(async () => {
+      await clearSeed();
+    });
+
+    it("tags A and B merged into B in Stash: after the next incremental sync the scenes, performers, images and clips that carried A carry B", async () => {
+      await writeLibrary(JN_A, taggedLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      const requests = stubUnchangedStash(JN_A, taggedLibrary("2", ["2"]));
+      const run = newRun();
+
+      await stashSyncService["syncInstance"](JN_A, "incremental", run);
+
+      expect(await tagLinksOn(JN_A)).toEqual({
+        StudioTag: ["1:2"],
+        PerformerTag: ["1:2"],
+        GroupTag: ["1:2"],
+        GalleryTag: ["1:2"],
+        SceneTag: ["1:2", "2:2"],
+        ClipTag: ["1:2"],
+        ImageTag: ["1:2"],
+        clipPrimaryTag: ["1:2"],
+      });
+      // The cleanup soft-deleted tag 1; what linked to it was fetched by
+      // id, in sync order, and nothing else (scene 2 never carried it)
+      expect(await liveIds("StashTag", JN_A)).toEqual(["2"]);
+      expect(requests).toEqual([
+        { op: "findStudios", ids: ["1"] },
+        { op: "findPerformers", ids: ["1"] },
+        { op: "findGroups", ids: ["1"] },
+        { op: "findGalleries", ids: ["1"] },
+        { op: "findScenes", ids: ["1"] },
+        { op: "findSceneMarkers", ids: ["1"] },
+        { op: "findImages", ids: ["1"] },
+      ]);
+      // Each refetched entity reaches the post-sync steps as changed, though
+      // its updated_at did not move: images too, whose links the diff does
+      // not compare, with the tags they lost and gained for the counts
+      const changed = Object.fromEntries(
+        SYNC_ORDER.map((type) => [type, refs(run.changes.changed(type).refs)])
+      );
+      expect(changed).toEqual({
+        tag: [],
+        studio: [`1@${JN_A}`],
+        performer: [`1@${JN_A}`],
+        group: [`1@${JN_A}`],
+        gallery: [`1@${JN_A}`],
+        scene: [`1@${JN_A}`],
+        clip: [`1@${JN_A}`],
+        image: [`1@${JN_A}`],
+      });
+      expect(refs(run.changes.farSides("ImageTag").refs)).toEqual([
+        `1@${JN_A}`,
+        `2@${JN_A}`,
+      ]);
+      expect(refs(run.changes.tagSetChanged("performer").refs)).toEqual([
+        `1@${JN_A}`,
+      ]);
+      expect(refs(run.changes.deleted("tag").refs)).toEqual([`1@${JN_A}`]);
+    });
+
+    it("a full sync fetches every type after the tag cleanup whole, so it refetches nothing by id", async () => {
+      await writeLibrary(JN_A, taggedLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      const requests = stubUnchangedStash(JN_A, taggedLibrary("2", ["2"]));
+
+      await stashSyncService["syncInstance"](JN_A, "full", newRun());
+
+      expect((await tagLinksOn(JN_A)).SceneTag).toEqual(["1:2", "2:2"]);
+      expect((await tagLinksOn(JN_A)).clipPrimaryTag).toEqual(["1:2"]);
+      expect(requests).toEqual([]);
+    });
+
+    it("the same for a performer merge", async () => {
+      await writeLibrary(JN_A, performerLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      const requests = stubUnchangedStash(JN_A, performerLibrary("2", ["2"]));
+      const run = newRun();
+
+      await stashSyncService["syncInstance"](JN_A, "incremental", run);
+
+      expect(await performerLinksOn(JN_A)).toEqual({
+        GalleryPerformer: ["1:2"],
+        ScenePerformer: ["1:2"],
+        ImagePerformer: ["1:2"],
+      });
+      expect(await liveIds("StashPerformer", JN_A)).toEqual(["2"]);
+      expect(requests).toEqual([
+        { op: "findGalleries", ids: ["1"] },
+        { op: "findScenes", ids: ["1"] },
+        { op: "findImages", ids: ["1"] },
+      ]);
+      expect(refs(run.changes.changed("image").refs)).toEqual([`1@${JN_A}`]);
+      expect(refs(run.changes.farSides("ImagePerformer").refs)).toEqual([
+        `1@${JN_A}`,
+        `2@${JN_A}`,
+      ]);
+    });
+
+    it("a scene whose studio was deleted in Stash loses the studio on the next sync", async () => {
+      await writeLibrary(JN_A, studioLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      const requests = stubUnchangedStash(JN_A, studioLibrary(null, ["2"]));
+      const run = newRun();
+
+      await stashSyncService["syncInstance"](JN_A, "incremental", run);
+
+      // Galleries and images lose it too
+      expect(await studiosOn(JN_A)).toEqual({
+        StashGallery: ["1:none"],
+        StashScene: ["1:none"],
+        StashImage: ["1:none"],
+      });
+      expect(await liveIds("StashStudio", JN_A)).toEqual(["2"]);
+      expect(requests).toEqual([
+        { op: "findGalleries", ids: ["1"] },
+        { op: "findScenes", ids: ["1"] },
+        { op: "findImages", ids: ["1"] },
+      ]);
+      // The studio they lost is recounted
+      expect(refs(run.changes.studios().refs)).toEqual([`1@${JN_A}`]);
+    });
+
+    it("inherited tags and sceneCountViaPerformers ignore soft-deleted performers and tags", async () => {
+      await seedSoftDeletedSources();
+
+      await sceneTagInheritanceService.computeInheritedTags([
+        { id: "1", instanceId: JN_A },
+      ]);
+      await stashSyncService.computeTagSceneCountsViaPerformers();
+
+      // Performer 1's live tag only: nothing from performer 2, studio 1 or
+      // group 1, and not tag 3
+      expect(await inheritedTagsOf(JN_A, "1")).toEqual(["1"]);
+      // Tag 2 reaches scene 1 only through performer 2
+      const counts = await prisma.stashTag.findMany({
+        where: { stashInstanceId: JN_A, id: { in: ["1", "2"] } },
+        select: { id: true, sceneCountViaPerformers: true },
+        orderBy: { id: "asc" },
+      });
+      expect(counts).toEqual([
+        { id: "1", sceneCountViaPerformers: 1 },
+        { id: "2", sceneCountViaPerformers: 0 },
+      ]);
+    });
+
+    it("gallery inheritance hands down no soft-deleted performer or tag", async () => {
+      await seedSoftDeletedSources();
+
+      await imageGalleryInheritanceService.applyGalleryInheritance([
+        { id: "1", instanceId: JN_A },
+      ]);
+
+      expect((await performerLinksOn(JN_A)).ImagePerformer).toEqual(["1:1"]);
+      expect((await tagLinksOn(JN_A)).ImageTag).toEqual(["1:1"]);
+    });
+
+    it("jn-b's same-id rows are untouched", async () => {
+      await writeLibrary(JN_A, taggedLibrary("1", ["1", "2"]));
+      await writeLibrary(JN_B, taggedLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      const before = await tagLinksOn(JN_B);
+      stubUnchangedStash(JN_A, taggedLibrary("2", ["2"]));
+
+      await stashSyncService["syncInstance"](JN_A, "incremental", newRun());
+
+      expect((await tagLinksOn(JN_A)).SceneTag).toEqual(["1:2", "2:2"]);
+      expect(await tagLinksOn(JN_B)).toEqual(before);
+      expect(before.SceneTag).toEqual(["1:1", "2:2"]);
+      expect(await liveIds("StashTag", JN_B)).toEqual(["1", "2"]);
+    });
+
+    it("a refetch that fails is recorded in its type's lastError, and the other types are still refetched", async () => {
+      await writeLibrary(JN_A, taggedLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      stubUnchangedStash(JN_A, taggedLibrary("2", ["2"]), ["findScenes"]);
+
+      const results = await stashSyncService["syncInstance"](
+        JN_A,
+        "incremental",
+        newRun()
+      );
+
+      const links = await tagLinksOn(JN_A);
+      expect(links.SceneTag).toEqual(["1:1", "2:2"]);
+      expect(links.ImageTag).toEqual(["1:2"]);
+      const scene = must(
+        results.find((r) => r.entityType === "scene"),
+        "the scene result"
+      );
+      expect(scene.error).toBe(
+        "Could not refetch 1 scenes that linked to what Stash deleted or merged: findScenes failed: Stash is down"
+      );
+      const state = await prisma.syncState.findFirst({
+        where: { stashInstanceId: JN_A, entityType: "scene" },
+        select: { lastError: true },
+      });
+      expect(state).toEqual({ lastError: scene.error });
+    });
+
+    it("Apply deletions refetches what linked to the entities it soft-deleted", async () => {
+      await writeLibrary(JN_A, taggedLibrary("1", ["1", "2"]));
+      await markSynced(JN_A);
+      stubUnchangedStash(JN_A, taggedLibrary("2", ["2"]));
+      // The whole-library steps are not this test's
+      vi.spyOn(userStatsService, "rebuildAllStats").mockResolvedValue(
+        undefined
+      );
+      vi.spyOn(
+        exclusionComputationService,
+        "recomputeUsersForInstances"
+      ).mockResolvedValue({ success: 0, failed: 0, errors: [] });
+      const counts = vi.spyOn(entityImageCountService, "rebuildAllImageCounts");
+
+      await stashSyncService.runCleanup("tag", JN_A, {
+        ignoreRatioGuard: true,
+      });
+
+      expect((await tagLinksOn(JN_A)).SceneTag).toEqual(["1:2", "2:2"]);
+      expect((await tagLinksOn(JN_A)).ImageTag).toEqual(["1:2"]);
+      // The steps saw the refetched image's new tag
+      expect(counts).toHaveBeenCalledWith(
+        objectContaining<ImageCountScope>({
+          tags: arrayContaining([{ id: "2", instanceId: JN_A }]),
+        })
+      );
     });
   }
 );

@@ -8,7 +8,8 @@
  * post-sync steps read it once at the end: nothing changed means no step
  * runs, and the exclusion recompute covers only the users who can see a
  * changed instance. C4 and C5 scope the inheritance and count steps to the
- * refs it holds; C14 and C15 add what they refetch; C17 and C18 read it too.
+ * refs it holds; C14 and C15 add what they refetch, as changed
+ * (`markChanged`); C17 and C18 read it too.
  *
  * What counts as changed (lead decision, 2026-09-24): an entity is changed
  * when it is new, its `stashUpdatedAt` differs (clips compare epoch
@@ -108,6 +109,14 @@ export interface DetectChangesOptions {
   compareStudio?: boolean;
   /** The junction whose difference lists the entity in `tagSetChanged` */
   tagJunction?: JunctionName;
+  /**
+   * Every entity counts as changed, its old and new far sides and studios
+   * recorded, whatever the diff finds: a refetch for a known link change
+   * (what linked to an entity Stash merged or deleted), which moved no
+   * updated_at and may sit where the diff does not look (an image's links
+   * and studio, a clip's primary tag)
+   */
+  markChanged?: boolean;
 }
 
 /** In-memory key of a ref (`${id}\0${instanceId}`, as the other maps use). */
@@ -186,6 +195,7 @@ export function detectChanges({
   compareLinks = true,
   compareStudio = false,
   tagJunction,
+  markChanged = false,
 }: DetectChangesOptions): BatchChanges {
   const written: EntityRef[] = [];
   const changed: EntityRef[] = [];
@@ -208,6 +218,7 @@ export function detectChanges({
     const before = stored.get(entity.id);
 
     let isChanged =
+      markChanged ||
       before === undefined ||
       before.deleted ||
       before.updatedAt !== entity.updatedAt;
