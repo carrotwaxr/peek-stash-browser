@@ -13,7 +13,10 @@
  */
 import type { SyncSettings, SyncState } from "@prisma/client";
 import { EventEmitter } from "events";
-import type { StashClient } from "../graphql/StashClient.js";
+import {
+  type StashClient,
+  describeStashError,
+} from "../graphql/StashClient.js";
 import {
   CriterionModifier,
   SortDirectionEnum,
@@ -95,6 +98,33 @@ type EntityType =
   | "gallery"
   | "image"
   | "clip";
+
+/**
+ * The order every sync path takes, and its cleanups: a type before the ones
+ * that reference it. Tags come first because junction rows such as
+ * `StudioTag` have foreign keys to `StashTag`, which `INSERT OR IGNORE` does
+ * not suppress; a gallery's or image's studio and a clip's scene and primary
+ * tag are foreign keys too.
+ */
+const SYNC_ORDER: readonly EntityType[] = [
+  "tag",
+  "studio",
+  "performer",
+  "group",
+  "gallery",
+  "scene",
+  "clip",
+  "image",
+];
+
+/** What one type's sync reads besides the sync's own mode. */
+interface RunEntityTypeOptions {
+  /** A "full" type fetches everything; "incremental" what changed since. */
+  syncType: "full" | "incremental";
+  since?: string;
+  /** Run the type's cleanup right after it (the full sync path). */
+  withCleanup: boolean;
+}
 
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
@@ -241,9 +271,11 @@ const CLEANUP_MIN_GUARDED_DELETES = 50;
 
 /**
  * What one type's cleanup did. `deleted` rows were soft-deleted, their ids in
- * `deletedIds`. `skipped` says why a guard refused and `error` what failed;
- * either way nothing was soft-deleted. `stashIds` is the whole id list Stash
- * returned, present when the cleanup ran to the end.
+ * `deletedIds`. `skipped` says why a guard refused, as the type's `lastError`
+ * shows it: "Cleanup skipped: ..." when Stash's list is partial or empty,
+ * "Cleanup refused: ..." when the ratio guard held back a mass deletion.
+ * `error` is what failed. Either way nothing was soft-deleted. `stashIds` is
+ * the whole id list Stash returned, present when the cleanup ran to the end.
  */
 interface CleanupOutcome {
   deleted: number;
@@ -251,6 +283,23 @@ interface CleanupOutcome {
   stashIds?: string[];
   skipped?: string;
   error?: string;
+}
+
+/** What a cleanup outcome adds to its type's `lastError`, if anything. */
+function cleanupProblem(outcome: CleanupOutcome): string | undefined {
+  if (outcome.skipped !== undefined) return outcome.skipped;
+  if (outcome.error !== undefined) return `Cleanup failed: ${outcome.error}`;
+  return undefined;
+}
+
+/** A type's problems this run, in the order they happened, as one text. */
+function joinProblems(
+  ...problems: Array<string | undefined>
+): string | undefined {
+  const present = problems.filter(
+    (problem): problem is string => problem !== undefined && problem !== ""
+  );
+  return present.length > 0 ? present.join("; ") : undefined;
 }
 
 /**
@@ -493,6 +542,8 @@ class StashSyncService extends EventEmitter {
         const results = await this.fullSyncInstance(instance.id);
         allResults.push(...results);
       } catch (error) {
+        // An abort ends the whole run, not just this instance
+        if (this.isAbort(error)) throw new Error("Sync aborted");
         logger.error(`Failed to sync instance ${instance.name}`, {
           instanceId: instance.id,
           error: error instanceof Error ? error.message : String(error),
@@ -517,73 +568,18 @@ class StashSyncService extends EventEmitter {
     try {
       logger.info("Starting full sync...", { stashInstanceId });
 
-      // Sync each entity type in order (dependencies first)
-      // Tags must be synced first since other entities reference them via junction tables
-      // Save state after each entity so restarts don't re-sync completed types
-      let result: SyncResult;
-
-      result = await this.syncTags(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("tag", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncStudios(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("studio", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncPerformers(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("performer", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncGroups(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("group", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncGalleries(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("gallery", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncScenes(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("scene", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncClips(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("clip", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
-      this.checkAbort();
-
-      result = await this.syncImages(stashInstanceId, true);
-      result.deleted = (
-        await this.cleanupDeletedEntities("image", stashInstanceId)
-      ).deleted;
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "full", result);
+      // Each type, then its cleanup; its state is saved at once, so a
+      // restart does not sync completed types again. A type that fails is
+      // recorded and the next one runs.
+      for (const entityType of SYNC_ORDER) {
+        this.checkAbort();
+        results.push(
+          await this.runEntityType(entityType, stashInstanceId, {
+            syncType: "full",
+            withCleanup: true,
+          })
+        );
+      }
 
       // Compute inherited tags for scenes (must happen after scenes, performers, studios, groups are synced)
       logger.info("Computing inherited tags for scenes...");
@@ -686,6 +682,8 @@ class StashSyncService extends EventEmitter {
         const results = await this.smartIncrementalSyncInstance(instance.id);
         allResults.push(...results);
       } catch (error) {
+        // An abort ends the whole run, not just this instance
+        if (this.isAbort(error)) throw new Error("Sync aborted");
         logger.error(`Failed to smart sync instance ${instance.name}`, {
           instanceId: instance.id,
           error: error instanceof Error ? error.message : String(error),
@@ -710,19 +708,7 @@ class StashSyncService extends EventEmitter {
     try {
       logger.info("Starting smart incremental sync...", { stashInstanceId });
 
-      // Entity types in dependency order
-      const entityTypes: EntityType[] = [
-        "studio",
-        "tag",
-        "performer",
-        "group",
-        "gallery",
-        "scene",
-        "clip",
-        "image",
-      ];
-
-      for (const entityType of entityTypes) {
+      for (const entityType of SYNC_ORDER) {
         this.checkAbort();
 
         // Get sync state for this specific entity type
@@ -735,69 +721,49 @@ class StashSyncService extends EventEmitter {
         if (!lastSync) {
           // Never synced - do full sync for this entity type only
           logger.info(`${entityType}: No previous sync, syncing all`);
-          const result = await this.syncEntityType(
-            entityType,
-            stashInstanceId,
-            true
+          results.push(
+            await this.runEntityType(entityType, stashInstanceId, {
+              syncType: "full",
+              withCleanup: false,
+            })
           );
-          results.push(result);
-          await this.saveSyncState(stashInstanceId, "full", result);
-        } else {
-          // Check how many entities changed since last sync
-          const changeCount = await this.getChangeCount(
-            entityType,
-            lastSync,
-            stashInstanceId
-          );
+          continue;
+        }
 
-          if (changeCount === 0) {
-            // lastSync is now a raw RFC3339 string
-            logger.info(
-              `${entityType}: No changes since ${lastSync}, skipping`
-            );
-            results.push({
-              entityType,
-              synced: 0,
-              deleted: 0,
-              durationMs: 0,
-            });
-          } else {
-            logger.info(
-              `${entityType}: ${changeCount} changes since ${lastSync}, syncing`
-            );
-            const result = await this.syncEntityType(
-              entityType,
-              stashInstanceId,
-              false,
-              lastSync
-            );
-            results.push(result);
-            await this.saveSyncState(stashInstanceId, "incremental", result);
-          }
+        // Check how many entities changed since last sync
+        const changeCount = await this.getChangeCount(
+          entityType,
+          lastSync,
+          stashInstanceId
+        );
+
+        if (changeCount === 0) {
+          // lastSync is now a raw RFC3339 string
+          logger.info(`${entityType}: No changes since ${lastSync}, skipping`);
+          results.push({
+            entityType,
+            synced: 0,
+            deleted: 0,
+            durationMs: 0,
+          });
+          // Nothing failed this run: clear an earlier run's error
+          await this.recordEntityError(stashInstanceId, entityType, null);
+        } else {
+          logger.info(
+            `${entityType}: ${changeCount} changes since ${lastSync}, syncing`
+          );
+          results.push(
+            await this.runEntityType(entityType, stashInstanceId, {
+              syncType: "incremental",
+              since: lastSync,
+              withCleanup: false,
+            })
+          );
         }
       }
 
       // Cleanup deleted entities (detect deletions/merges in Stash)
-      logger.info("Checking for deleted entities...");
-      let totalDeleted = 0;
-      for (const entityType of entityTypes) {
-        this.checkAbort();
-        const { deleted } = await this.cleanupDeletedEntities(
-          entityType,
-          stashInstanceId
-        );
-        totalDeleted += deleted;
-        // Update the result for this entity type with deleted count
-        const result = results.find((r) => r.entityType === entityType);
-        if (result) {
-          result.deleted = deleted;
-        }
-      }
-      if (totalDeleted > 0) {
-        logger.info(
-          `Cleanup complete: ${totalDeleted} entities marked as deleted`
-        );
-      }
+      await this.cleanupEveryType(stashInstanceId, results);
 
       // Apply gallery inheritance if images or galleries were synced
       // (galleries may have new performers/tags that need to propagate to images)
@@ -982,8 +948,10 @@ class StashSyncService extends EventEmitter {
           return 0;
       }
     } catch (error) {
+      // An abort ends the sync; anything else is not this probe's to decide
+      if (this.isAbort(error)) throw new Error("Sync aborted");
       logger.warn(`Failed to get change count for ${entityType}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error: describeStashError(error),
       });
       // If we can't determine, assume there are changes
       return 1;
@@ -1018,6 +986,95 @@ class StashSyncService extends EventEmitter {
         return this.syncImages(stashInstanceId, isFullSync, lastSyncTime);
       default:
         throw new Error(`Unknown entity type: ${entityType as string}`);
+    }
+  }
+
+  /**
+   * Syncs one type and saves its SyncState, the cleanup in between when
+   * `withCleanup` (the full sync path). A failure of the type, a Stash error
+   * or a database one, becomes the result's `error` and the type's
+   * `lastError`, and returns: the caller goes on to the next type. The
+   * type's timestamps stay where they were (saveSyncState moves them only
+   * with a `maxUpdatedAt`), so the next sync retries it from its old
+   * "since". A cleanup that skips, refuses or fails adds its text after the
+   * type's own error. An abort throws Error("Sync aborted") and saves
+   * nothing.
+   */
+  private async runEntityType(
+    entityType: EntityType,
+    stashInstanceId: string,
+    { syncType, since, withCleanup }: RunEntityTypeOptions
+  ): Promise<SyncResult> {
+    const startTime = Date.now();
+    let result: SyncResult;
+    try {
+      result = await this.syncEntityType(
+        entityType,
+        stashInstanceId,
+        syncType === "full",
+        since
+      );
+    } catch (error) {
+      if (this.isAbort(error)) throw new Error("Sync aborted");
+      const message = describeStashError(error);
+      logger.error(`Failed to sync ${ENTITY_TABLES[entityType].plural}`, {
+        stashInstanceId,
+        entityType,
+        error: message,
+      });
+      result = {
+        entityType,
+        synced: 0,
+        deleted: 0,
+        durationMs: Date.now() - startTime,
+        error: message,
+      };
+    }
+
+    if (withCleanup) {
+      const outcome = await this.cleanupDeletedEntities(
+        entityType,
+        stashInstanceId
+      );
+      result.deleted = outcome.deleted;
+      result.error = joinProblems(result.error, cleanupProblem(outcome));
+    }
+
+    await this.saveSyncState(stashInstanceId, syncType, result);
+    return result;
+  }
+
+  /**
+   * The incremental paths' cleanup, every type after all of them synced.
+   * Each type's soft-deleted count goes into its result, and a cleanup that
+   * skips, refuses or fails is added to the type's `lastError`.
+   */
+  private async cleanupEveryType(
+    stashInstanceId: string,
+    results: SyncResult[]
+  ): Promise<void> {
+    logger.info("Checking for deleted entities...");
+    let totalDeleted = 0;
+    for (const entityType of SYNC_ORDER) {
+      this.checkAbort();
+      const outcome = await this.cleanupDeletedEntities(
+        entityType,
+        stashInstanceId
+      );
+      totalDeleted += outcome.deleted;
+      const result = results.find((r) => r.entityType === entityType);
+      if (result) result.deleted = outcome.deleted;
+      const problem = cleanupProblem(outcome);
+      if (problem !== undefined) {
+        const lastError = joinProblems(result?.error, problem) ?? problem;
+        if (result) result.error = lastError;
+        await this.recordEntityError(stashInstanceId, entityType, lastError);
+      }
+    }
+    if (totalDeleted > 0) {
+      logger.info(
+        `Cleanup complete: ${totalDeleted} entities marked as deleted`
+      );
     }
   }
 
@@ -1071,6 +1128,8 @@ class StashSyncService extends EventEmitter {
         const results = await this.incrementalSyncInstance(instance.id);
         allResults.push(...results);
       } catch (error) {
+        // An abort ends the whole run, not just this instance
+        if (this.isAbort(error)) throw new Error("Sync aborted");
         logger.error(`Failed to incremental sync instance ${instance.name}`, {
           instanceId: instance.id,
           error: error instanceof Error ? error.message : String(error),
@@ -1097,19 +1156,7 @@ class StashSyncService extends EventEmitter {
         stashInstanceId,
       });
 
-      // Entity types in dependency order (tags first since others reference them)
-      const entityTypes: EntityType[] = [
-        "tag",
-        "studio",
-        "performer",
-        "group",
-        "gallery",
-        "scene",
-        "clip",
-        "image",
-      ];
-
-      for (const entityType of entityTypes) {
+      for (const entityType of SYNC_ORDER) {
         this.checkAbort();
 
         // Get THIS entity type's last sync timestamp
@@ -1122,49 +1169,24 @@ class StashSyncService extends EventEmitter {
         if (!lastSync) {
           // Never synced - do full sync for this entity type only
           logger.info(`${entityType}: No previous sync, syncing all`);
-          const result = await this.syncEntityType(
-            entityType,
-            stashInstanceId,
-            true
-          );
-          results.push(result);
-          await this.saveSyncState(stashInstanceId, "full", result);
         } else {
           // Incremental sync using this entity's own timestamp
           // lastSync is now a raw RFC3339 string from Stash
           logger.info(`${entityType}: syncing changes since ${lastSync}`);
-          const result = await this.syncEntityType(
+        }
+        results.push(
+          await this.runEntityType(
             entityType,
             stashInstanceId,
-            false,
             lastSync
-          );
-          results.push(result);
-          await this.saveSyncState(stashInstanceId, "incremental", result);
-        }
+              ? { syncType: "incremental", since: lastSync, withCleanup: false }
+              : { syncType: "full", withCleanup: false }
+          )
+        );
       }
 
       // Cleanup deleted entities (detect deletions/merges in Stash)
-      logger.info("Checking for deleted entities...");
-      let totalDeleted = 0;
-      for (const entityType of entityTypes) {
-        this.checkAbort();
-        const { deleted } = await this.cleanupDeletedEntities(
-          entityType,
-          stashInstanceId
-        );
-        totalDeleted += deleted;
-        // Update the result for this entity type with deleted count
-        const result = results.find((r) => r.entityType === entityType);
-        if (result) {
-          result.deleted = deleted;
-        }
-      }
-      if (totalDeleted > 0) {
-        logger.info(
-          `Cleanup complete: ${totalDeleted} entities marked as deleted`
-        );
-      }
+      await this.cleanupEveryType(stashInstanceId, results);
 
       // Apply gallery inheritance if images or galleries were synced
       // (galleries may have new performers/tags that need to propagate to images)
@@ -1632,7 +1654,11 @@ class StashSyncService extends EventEmitter {
       logger.warn(
         `Cleanup safety: ${reason}. Skipping ${plural} cleanup to prevent false deletions.`
       );
-      return { deleted: 0, deletedIds: [], skipped: reason };
+      return {
+        deleted: 0,
+        deletedIds: [],
+        skipped: `Cleanup skipped: ${reason}`,
+      };
     };
 
     try {
@@ -1711,8 +1737,9 @@ class StashSyncService extends EventEmitter {
           deleted: 0,
           deletedIds: [],
           skipped:
-            `Refused to soft-delete ${missing.length} of ${liveCount} ${plural}: ` +
-            `Stash returned ${stashIds.length} IDs, and more than half would go`,
+            `Cleanup refused: Stash no longer lists ${missing.length.toLocaleString("en-US")} ` +
+            `of ${liveCount.toLocaleString("en-US")} ${plural} (more than half); ` +
+            `apply the deletions from the sync status if this is intended`,
         };
       }
       this.checkAbort();
@@ -1743,7 +1770,8 @@ class StashSyncService extends EventEmitter {
       if (error instanceof Error && error.message === "Sync aborted") {
         throw error;
       }
-      const message = error instanceof Error ? error.message : String(error);
+      // Kept in the type's lastError: never the query a Stash error embeds
+      const message = describeStashError(error);
       logger.error(`Failed to cleanup deleted ${plural}`, { error: message });
       return { deleted: 0, deletedIds: [], error: message };
     }
@@ -3323,6 +3351,34 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * Whether `error` ends the running job: its abort was requested, or the
+   * error is the abort (checkAbort's, or a scoped Stash request's).
+   */
+  private isAbort(error: unknown): boolean {
+    return (
+      this.abortController?.signal.aborted === true ||
+      (error instanceof Error && error.message === "Sync aborted")
+    );
+  }
+
+  /**
+   * Sets one type's `lastError` on its SyncState row: a cleanup's problem
+   * after the type's own state was saved, or null when a smart sync skips an
+   * unchanged type, so an earlier run's error does not linger. A type with
+   * no row yet has nothing to update.
+   */
+  private async recordEntityError(
+    stashInstanceId: string,
+    entityType: EntityType,
+    message: string | null
+  ): Promise<void> {
+    await prisma.syncState.updateMany({
+      where: { stashInstanceId, entityType },
+      data: { lastError: message },
+    });
+  }
+
+  /**
    * Save sync state for a single entity type immediately after sync completes.
    *
    * Uses the maxUpdatedAt from synced entities (if available) instead of the current time.
@@ -3333,6 +3389,10 @@ class StashSyncService extends EventEmitter {
    *
    * When no entities are synced (result.synced === 0), we do NOT update the sync timestamp.
    * Without maxUpdatedAt from synced entities, we have no reliable timestamp to store.
+   * A type that failed has none either, so the next sync retries it from its old time.
+   *
+   * `lastError` is this run's problem with the type (runEntityType), or null when it
+   * synced cleanly, so a type that recovers clears its earlier error.
    */
   private async saveSyncState(
     stashInstanceId: string,
