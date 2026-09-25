@@ -1,5 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import prisma from "../../prisma/singleton.js";
+import { must } from "../../tests/helpers/must.js";
 import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
+import { createApiUser, hideFor } from "../helpers/accessFixture.js";
+import type { TestClient } from "../helpers/testClient.js";
 import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 
 /**
@@ -11,6 +15,7 @@ import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
  * - Last page handling
  * - Beyond-range page numbers
  * - Page navigation consistency
+ * - Totals for a user with overlapping exclusion rows
  */
 
 interface FindScenesResponse {
@@ -43,11 +48,37 @@ interface FindTagsResponse {
   };
 }
 
+interface FindImagesResponse {
+  findImages: {
+    images: Array<{
+      id: string;
+    }>;
+    count: number;
+  };
+}
+
+/** Every page's ids at per_page 5, and the total each page reported. */
+async function pageThrough(
+  fetchPage: (page: number) => Promise<{ count: number; ids: string[] }>
+): Promise<{ counts: Set<number>; ids: string[] }> {
+  const counts = new Set<number>();
+  const ids: string[] = [];
+  for (let page = 1; page <= 1000; page++) {
+    const result = await fetchPage(page);
+    counts.add(result.count);
+    if (result.ids.length === 0) break;
+    ids.push(...result.ids);
+  }
+  return { counts, ids };
+}
+
 describe("Pagination Edge Cases", () => {
+  let testInstanceId: string;
+
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
     // Select only test instance for consistent pagination counts
-    await selectTestInstanceOnly();
+    testInstanceId = await selectTestInstanceOnly();
   });
 
   describe("per_page variations", () => {
@@ -548,6 +579,111 @@ describe("Pagination Edge Cases", () => {
       const firstIds = first.data.findScenes.scenes.map((s) => s.id);
       const secondIds = second.data.findScenes.scenes.map((s) => s.id);
       expect(firstIds).toEqual(secondIds);
+    });
+  });
+
+  describe("totals with overlapping exclusion rows", () => {
+    // A USER whose hidden scene and image each have a global ("") and an
+    // instance-specific exclusion row, and whose visible scene and image
+    // have a rating and a history row: the count query joins all of them,
+    // and must still count each visible entity once.
+    let viewer: { id: number; client: TestClient } | undefined;
+    let hiddenScene: string;
+    let hiddenImage: string;
+
+    beforeAll(async () => {
+      viewer = await createApiUser(
+        "pagination_it_viewer",
+        "pagination_it_pass_1"
+      );
+      const userId = viewer.id;
+      await prisma.userStashInstance.deleteMany({ where: { userId } });
+      await prisma.userStashInstance.create({
+        data: { userId, instanceId: testInstanceId },
+      });
+
+      const live = { stashInstanceId: testInstanceId, deletedAt: null };
+      const scenes = await prisma.stashScene.findMany({
+        where: live,
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: 2,
+      });
+      const images = await prisma.stashImage.findMany({
+        where: live,
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: 2,
+      });
+      hiddenScene = must(scenes[0], "a live scene").id;
+      hiddenImage = must(images[0], "a live image").id;
+      const ratedScene = must(scenes[1], "a second live scene").id;
+      const ratedImage = must(images[1], "a second live image").id;
+
+      for (const instanceId of ["", testInstanceId]) {
+        await hideFor(userId, "scene", hiddenScene, instanceId);
+        await hideFor(userId, "image", hiddenImage, instanceId);
+      }
+      const mine = { userId, instanceId: testInstanceId };
+      await prisma.sceneRating.create({
+        data: { ...mine, sceneId: ratedScene, rating: 80 },
+      });
+      await prisma.watchHistory.create({
+        data: { ...mine, sceneId: ratedScene, playCount: 1 },
+      });
+      await prisma.imageRating.create({
+        data: { ...mine, imageId: ratedImage, rating: 80 },
+      });
+      await prisma.imageViewHistory.create({
+        data: { ...mine, imageId: ratedImage, viewCount: 1 },
+      });
+    }, 60000);
+
+    afterAll(async () => {
+      // Deleting the user deletes their hides, exclusions, ratings and history
+      if (viewer) {
+        await adminClient.delete(`/api/user/${viewer.id}`);
+      }
+    });
+
+    it("the total equals the number of items across every page for a user whose scene has both a global and an instance-specific exclusion row", async () => {
+      const { client } = must(viewer, "the viewer");
+      const { counts, ids } = await pageThrough(async (page) => {
+        const response = await client.post<FindScenesResponse>(
+          "/api/library/scenes",
+          { filter: { per_page: 5, page, sort: "id", direction: "ASC" } }
+        );
+        expect(response.status).toBe(200);
+        return {
+          count: response.data.findScenes.count,
+          ids: response.data.findScenes.scenes.map((s) => s.id),
+        };
+      });
+
+      expect([...counts]).toEqual([ids.length]);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).not.toContain(hiddenScene);
+      expect(ids.length).toBeGreaterThan(5);
+    });
+
+    it("the total equals the number of items across every page for a user whose image has both a global and an instance-specific exclusion row", async () => {
+      const { client } = must(viewer, "the viewer");
+      const { counts, ids } = await pageThrough(async (page) => {
+        const response = await client.post<FindImagesResponse>(
+          "/api/library/images",
+          { filter: { per_page: 5, page, sort: "title", direction: "ASC" } }
+        );
+        expect(response.status).toBe(200);
+        return {
+          count: response.data.findImages.count,
+          ids: response.data.findImages.images.map((i) => i.id),
+        };
+      });
+
+      expect([...counts]).toEqual([ids.length]);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).not.toContain(hiddenImage);
+      expect(ids.length).toBeGreaterThan(5);
     });
   });
 });

@@ -631,9 +631,12 @@ class ImageQueryBuilder {
     // Hydrate with related entities
     const hydratedImages = await this.hydrateImages(transformedRows);
 
-    // Count query
+    // Count query. COUNT(*) counts each image once: the other LEFT JOINs in
+    // buildFromClause match at most one row each (a unique key), and the
+    // exclusion join, which can match two (global and per-instance), keeps an
+    // image only when it matched none (e.id IS NULL).
     const countSql = `
-      SELECT COUNT(DISTINCT i.id || ':' || i.stashInstanceId) as total
+      SELECT COUNT(*) as total
       ${fromClause.sql}
       WHERE ${whereSQL}
     `;
@@ -642,7 +645,7 @@ class ImageQueryBuilder {
       countSql,
       ...countParams
     );
-    const total = Number(countResult[0]?.total || 0);
+    const total = Number(countResult[0]?.total ?? 0n);
 
     const duration = Date.now() - startTime;
     logger.debug("ImageQueryBuilder.execute completed", {

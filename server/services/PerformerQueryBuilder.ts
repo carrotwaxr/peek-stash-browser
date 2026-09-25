@@ -1048,8 +1048,12 @@ class PerformerQueryBuilder {
       filters?.o_counter !== undefined;
 
     if (hasUserDataFilters || applyExclusions) {
+      // COUNT(*) counts each performer once: the other LEFT JOINs in
+      // buildFromClause match at most one row each (a unique key), and the
+      // exclusion join, which can match two (global and per-instance), keeps a
+      // performer only when it matched none (e.id IS NULL).
       const countSql = `
-        SELECT COUNT(DISTINCT p.id || ':' || p.stashInstanceId) as total
+        SELECT COUNT(*) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;
@@ -1058,7 +1062,7 @@ class PerformerQueryBuilder {
         countSql,
         ...countParams
       );
-      total = Number(countResult[0]?.total || 0);
+      total = Number(countResult[0]?.total ?? 0n);
     } else {
       // Fast path: count without JOINs
       const baseWhereClauses = whereClauses.filter(

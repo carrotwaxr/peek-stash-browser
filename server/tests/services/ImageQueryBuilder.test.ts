@@ -469,6 +469,70 @@ describe("ImageQueryBuilder", () => {
       expect(result.total).toBe(3);
       expect(result.images.map((i) => i.id)).toContain("999002");
     });
+
+    it("the count query with exclusions applied counts rows, not distinct composite ids", async () => {
+      // 999002 also has an instance-specific row beside the global one, and
+      // 999001 a rating and a view row: none of them may count an image twice
+      await prisma.userExcludedEntity.create({
+        data: {
+          userId: testUserId,
+          entityType: "image",
+          entityId: "999002",
+          instanceId: testInstanceId,
+          reason: "cascade",
+        },
+      });
+      await prisma.imageRating.create({
+        data: {
+          userId: testUserId,
+          instanceId: testInstanceId,
+          imageId: "999001",
+          rating: 60,
+        },
+      });
+      await prisma.imageViewHistory.create({
+        data: {
+          userId: testUserId,
+          instanceId: testInstanceId,
+          imageId: "999001",
+          viewCount: 1,
+        },
+      });
+
+      // vi.spyOn cannot wrap the Prisma client's methods (it installs a stub
+      // that swallows the query), so the recorder goes in by hand
+      const original = prisma.$queryRawUnsafe.bind(prisma);
+      const statements: string[] = [];
+      prisma.$queryRawUnsafe = <T = unknown>(
+        query: string,
+        ...values: unknown[]
+      ) => {
+        statements.push(query);
+        return original<T>(query, ...values);
+      };
+      let result;
+      try {
+        result = await imageQueryBuilder.execute({
+          userId: testUserId,
+          sort: "created_at",
+          sortDirection: "DESC",
+          page: 1,
+          perPage: 10,
+        });
+      } finally {
+        prisma.$queryRawUnsafe = original;
+      }
+
+      // The count statement runs last, after the page and its hydration
+      const countQuerySql = must(statements[statements.length - 1]);
+      expect(countQuerySql).toMatch(/SELECT COUNT\(\*\) as total/);
+      expect(countQuerySql).not.toMatch(/COUNT\(DISTINCT/);
+      expect(result.total).toBe(2);
+      expect(result.images.map((i) => i.id).sort()).toEqual([
+        "999001",
+        "999003",
+      ]);
+    });
   });
 
   describe("getByIds", () => {

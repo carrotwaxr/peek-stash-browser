@@ -130,4 +130,25 @@ describe("StudioQueryBuilder", () => {
       expect(mainQuerySql).not.toContain("s.stashInstanceId = ?");
     });
   });
+
+  describe("count query", () => {
+    it("the count query with exclusions applied counts rows, not distinct composite ids", async () => {
+      await studioQueryBuilder.execute({
+        userId: 1,
+        sort: "name",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+      });
+
+      // Second call is the count query. The other LEFT JOINs are on unique
+      // keys and e.id IS NULL drops every excluded studio, so each row left
+      // is one studio.
+      const countQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[1])[0];
+
+      expect(countQuerySql).toMatch(/SELECT COUNT\(\*\) as total/);
+      expect(countQuerySql).not.toMatch(/COUNT\(DISTINCT/);
+      expect(countQuerySql).toContain("LEFT JOIN UserExcludedEntity e");
+    });
+  });
 });

@@ -635,8 +635,12 @@ class GroupQueryBuilder {
       filters?.favorite !== undefined || filters?.rating100 !== undefined;
 
     if (hasUserDataFilters || applyExclusions) {
+      // COUNT(*) counts each group once: the rating LEFT JOIN in
+      // buildFromClause matches at most one row (a unique key), and the
+      // exclusion join, which can match two (global and per-instance), keeps a
+      // group only when it matched none (e.id IS NULL).
       const countSql = `
-        SELECT COUNT(DISTINCT g.id || ':' || g.stashInstanceId) as total
+        SELECT COUNT(*) as total
         ${fromClause.sql}
         WHERE ${whereSQL}
       `;
@@ -645,7 +649,7 @@ class GroupQueryBuilder {
         countSql,
         ...countParams
       );
-      total = Number(countResult[0]?.total || 0);
+      total = Number(countResult[0]?.total ?? 0n);
     } else {
       // Fast path: count without JOINs
       const baseWhereClauses = whereClauses.filter(
