@@ -336,6 +336,29 @@ describe("processHandlers", () => {
       expect(exit).toHaveBeenCalledExactlyOnceWith(0);
     });
 
+    it("the WAL checkpoint runs inside a writer-queue unit, as the sync's does", async () => {
+      const m = await load();
+      const { dbWrite } = await import("../../utils/dbWrite.js");
+      let unit = "";
+      m.prisma.$queryRaw.mockImplementation(
+        prismaImpl<typeof m.prisma.$queryRaw>(async () => {
+          // A dbWrite from inside a unit fails, naming the unit it ran in
+          unit = await dbWrite("probe", () =>
+            Promise.resolve("outside every unit")
+          ).catch((error: unknown) => String(error));
+          return [{ busy: 0, log: 0, checkpointed: 0 }];
+        })
+      );
+      const exit = vi.fn();
+
+      await m.gracefulShutdown("SIGTERM", exit);
+
+      expect(unit).toBe(
+        "Error: dbWrite re-entered: shutdown.checkpoint -> probe"
+      );
+      expect(exit).toHaveBeenCalledExactlyOnceWith(0);
+    });
+
     it("a failing PRAGMA optimize is logged and the checkpoint still runs", async () => {
       const m = await load();
       m.prisma.$queryRawUnsafe.mockRejectedValue(new Error("disk I/O error"));

@@ -7,6 +7,7 @@ import {
   checkpointWal,
   refreshPlannerStatistics,
 } from "../utils/databaseMaintenance.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { whenMigrationsSettled } from "./database.js";
 
@@ -134,8 +135,11 @@ export async function gracefulShutdown(
   // so before the checkpoint)
   await refreshPlannerStatistics("shutdown.optimize");
 
-  // 5. Everything in the database file, the WAL emptied
-  await checkpointWal();
+  // 5. Everything in the database file, the WAL emptied. A writer-queue
+  // unit, as after a sync: a write still queued (a request that answered
+  // before the grace ended) runs first, and none starts while it holds the
+  // lock. checkpointWal never throws; the deadline bounds the wait
+  await dbWrite("shutdown.checkpoint", checkpointWal);
 
   // 6. Both Prisma clients
   await closeResources();
