@@ -23,6 +23,14 @@
  * interactive transaction (BEGIN IMMEDIATE) would hold the database write lock
  * for the whole compute.
  *
+ * The write phase is set-based on the same connection: the deduplicated rows
+ * go into the TEMP table _peek_result (bound as JSON, 20,000 rows per
+ * statement, no main-database lock), then one short BEGIN IMMEDIATE deletes
+ * the user's rows and inserts the new ones with INSERT ... SELECT (the
+ * `exclusions.swap` writer unit), and the stats follow in one batch on the
+ * main client. On a 180k-row user the lock is held for well under a second,
+ * where a createMany of the same rows held it for over three.
+ *
  * Who exclusions apply to lives in exclusionPolicy.ts: an admin's rows hold
  * only their own hides and cascades, so no read path needs a role check.
  *
@@ -47,10 +55,11 @@ import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
 import type { PrismaClient } from "@prisma/client";
 import {
   disconnectComputeClient,
-  getComputeClient,
+  readSnapshot,
+  withComputeConnection,
 } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
-import { dbWriteTransaction } from "../utils/dbWrite.js";
+import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import {
   buildInstanceFilterClause,
@@ -148,7 +157,8 @@ function isRestrictableType(
 /**
  * TEMP tables (per connection, dropped at the end of each compute).
  * _peek_refs holds the closure the current queries join against; the
- * _peek_ex_* tables hold the exclusions the empty phase probes.
+ * _peek_ex_* tables hold the exclusions the empty phase probes; _peek_result
+ * holds the rows the write phase swaps or merges into UserExcludedEntity.
  */
 const REFS_TABLE = "_peek_refs";
 const EXCLUSION_SET_TABLES = {
@@ -160,7 +170,42 @@ const EXCLUSION_SET_TABLES = {
   gallery: "_peek_ex_gallery",
 } as const;
 type ExclusionSetType = keyof typeof EXCLUSION_SET_TABLES;
-const TEMP_TABLES = [REFS_TABLE, ...Object.values(EXCLUSION_SET_TABLES)];
+const RESULT_TABLE = "_peek_result";
+const TEMP_TABLES = [
+  REFS_TABLE,
+  ...Object.values(EXCLUSION_SET_TABLES),
+  RESULT_TABLE,
+];
+
+/** Rows per _peek_result fill statement (about 1.5 MB of JSON each). */
+const RESULT_CHUNK = 20_000;
+
+/**
+ * Copy _peek_result into the user's rows. OR IGNORE: a row already stored
+ * for a key keeps its reason (a `pending` hold the swap kept, or, for a hide,
+ * whatever the last recompute stored). computedAt is bound as Prisma stores
+ * DateTime in SQLite, epoch milliseconds.
+ */
+const INSERT_FROM_RESULT_SQL = `INSERT OR IGNORE INTO UserExcludedEntity (userId, entityType, entityId, instanceId, reason, computedAt) SELECT ?, entityType, entityId, instanceId, reason, ? FROM ${RESULT_TABLE}`;
+
+/**
+ * Remove the user's rows before the swap, except `pending` holds written
+ * since the snapshot began: a sync batch wrote them for changes this
+ * snapshot may not have seen, and the end-of-sync recompute, whose snapshot
+ * starts after every batch, is the one that clears them.
+ */
+const DELETE_BEFORE_SWAP_SQL = `DELETE FROM UserExcludedEntity WHERE userId = ? AND NOT (reason = 'pending' AND computedAt >= ?)`;
+
+const STATS_ENTITY_TYPES = [
+  "scene",
+  "performer",
+  "studio",
+  "tag",
+  "group",
+  "gallery",
+  "image",
+  "clip",
+] as const;
 
 /**
  * Cascade edges (Rule 3), first order only: a performer excluded through a
@@ -377,15 +422,12 @@ class ExclusionComputationService {
   private pendingRecomputes = new Map<number, Promise<void>>();
   // Track whether another recompute is needed after the current one finishes
   private recomputeQueued = new Set<number>();
-  // Tail of the compute queue: TEMP table names are shared on the one compute
-  // connection, so computes for different users must never interleave
-  private computeTail: Promise<void> = Promise.resolve();
 
   /**
    * Full recompute for a user.
    * Computation runs on the single-connection compute client in a read
-   * snapshot that takes no write lock; only the final DELETE+INSERT swap is
-   * a write transaction.
+   * snapshot that takes no write lock; only the final DELETE+INSERT swap
+   * holds it, briefly.
    * If the write phase fails, previous exclusions are preserved.
    * Prevents concurrent recomputes for the same user.
    *
@@ -440,11 +482,15 @@ class ExclusionComputationService {
    * Internal recompute implementation.
    *
    * Structured to minimize SQLite write lock time:
-   * - Phases 1-4 (resolve, direct, cascade, content rules, empty) run through
-   *   withComputeSnapshot: they only read the main database and write TEMP
-   *   tables, so they take no main-database write lock.
-   * - Only the final atomic swap (DELETE + INSERT + stats) runs in a short
-   *   write transaction.
+   * - Phases 1-4 (resolve, direct, cascade, content rules, empty) run in a
+   *   readSnapshot on the compute connection: they only read the main
+   *   database and write TEMP tables, so they take no main-database write
+   *   lock.
+   * - The deduplicated rows are filled into _peek_result on the same
+   *   connection (fillResult), still without the lock.
+   * - Only the swap (swapResult: DELETE + INSERT ... SELECT) holds the write
+   *   lock, as the `exclusions.swap` unit of the writer queue, and the stats
+   *   batch follows outside it.
    */
   private async doRecomputeForUser(userId: number): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", {
@@ -471,81 +517,100 @@ class ExclusionComputationService {
     // Fetch allowed instance IDs for this user, scopes all phases
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    // === COMPUTATION PHASE (compute connection, read snapshot, no write lock) ===
-    const computed = await this.withComputeSnapshot(async (tx) => {
-      const rules = applyRestrictions
-        ? await this.loadRules(userId, tx, allowedInstanceIds)
-        : [];
-      const hidden = await this.loadHidden(userId, tx);
+    const written = await withComputeConnection(async (db) => {
+      // The swap keeps `pending` holds written from here on. Taken before the
+      // BEGIN, so no hold for a change the snapshot cannot see slips in
+      // between.
+      const snapshotStartedAt = Date.now();
 
-      // Phase 1: direct exclusions (EXCLUDE closures, INCLUDE inversion, hides)
-      const direct = await this.computeDirectExclusions(
-        userId,
-        tx,
-        allowedInstanceIds,
-        rules,
-        hidden
-      );
-      const t1 = Date.now();
+      // === COMPUTATION PHASE (read snapshot, no write lock) ===
+      const computed = await readSnapshot(db, async () => {
+        const rules = applyRestrictions
+          ? await this.loadRules(userId, db, allowedInstanceIds)
+          : [];
+        const hidden = await this.loadHidden(userId, db);
 
-      // Phase 2: cascades from EXCLUDE closures and hides only, each source
-      // apart so the stored reason says where a row came from
-      const restrictionCascade = await this.computeCascadeExclusions(
-        userId,
-        direct.restrictionSources,
-        tx,
-        allowedInstanceIds
-      );
-      const hideCascade = await this.computeCascadeExclusions(
-        userId,
-        direct.hideSources,
-        tx,
-        allowedInstanceIds
-      );
-      const t2 = Date.now();
-
-      // Phase 3: content rules (INCLUDE admission, restrictEmpty)
-      const content = await this.computeContentRuleExclusions(
-        userId,
-        rules,
-        tx,
-        allowedInstanceIds
-      );
-      const t3 = Date.now();
-
-      // Phase 4: empty organizational entities (skipped for admins, Q2).
-      // First under the restrictions alone, only for the entities the hides
-      // cover; then under every exclusion, as the lists apply it.
-      let emptyUnderRestrictions: ExclusionRecord[] = [];
-      let empty: ExclusionRecord[] = [];
-      if (applyRestrictions) {
-        await this.loadExclusionSets(
-          tx,
-          [...direct.restricted, ...restrictionCascade, ...content],
-          allowedInstanceIds,
-          { append: false }
-        );
-        emptyUnderRestrictions = await this.computeEmptyExclusions(
+        // Phase 1: direct exclusions (EXCLUDE closures, INCLUDE inversion, hides)
+        const direct = await this.computeDirectExclusions(
           userId,
-          tx,
+          db,
           allowedInstanceIds,
-          direct.hideSources
+          rules,
+          hidden
         );
-        await this.loadExclusionSets(
-          tx,
-          [...direct.hidden, ...hideCascade],
-          allowedInstanceIds,
-          { append: true }
-        );
-        empty = await this.computeEmptyExclusions(
+        const t1 = Date.now();
+
+        // Phase 2: cascades from EXCLUDE closures and hides only, each source
+        // apart so the stored reason says where a row came from
+        const restrictionCascade = await this.computeCascadeExclusions(
           userId,
-          tx,
+          direct.restrictionSources,
+          db,
           allowedInstanceIds
         );
-      }
-      const t4 = Date.now();
+        const hideCascade = await this.computeCascadeExclusions(
+          userId,
+          direct.hideSources,
+          db,
+          allowedInstanceIds
+        );
+        const t2 = Date.now();
 
-      return {
+        // Phase 3: content rules (INCLUDE admission, restrictEmpty)
+        const content = await this.computeContentRuleExclusions(
+          userId,
+          rules,
+          db,
+          allowedInstanceIds
+        );
+        const t3 = Date.now();
+
+        // Phase 4: empty organizational entities (skipped for admins, Q2).
+        // First under the restrictions alone, only for the entities the hides
+        // cover; then under every exclusion, as the lists apply it.
+        let emptyUnderRestrictions: ExclusionRecord[] = [];
+        let empty: ExclusionRecord[] = [];
+        if (applyRestrictions) {
+          await this.loadExclusionSets(
+            db,
+            [...direct.restricted, ...restrictionCascade, ...content],
+            allowedInstanceIds,
+            { append: false }
+          );
+          emptyUnderRestrictions = await this.computeEmptyExclusions(
+            userId,
+            db,
+            allowedInstanceIds,
+            direct.hideSources
+          );
+          await this.loadExclusionSets(
+            db,
+            [...direct.hidden, ...hideCascade],
+            allowedInstanceIds,
+            { append: true }
+          );
+          empty = await this.computeEmptyExclusions(
+            userId,
+            db,
+            allowedInstanceIds
+          );
+        }
+        const t4 = Date.now();
+
+        return {
+          direct,
+          restrictionCascade,
+          hideCascade,
+          content,
+          emptyUnderRestrictions,
+          empty,
+          t1,
+          t2,
+          t3,
+          t4,
+        };
+      });
+      const {
         direct,
         restrictionCascade,
         hideCascade,
@@ -556,90 +621,84 @@ class ExclusionComputationService {
         t2,
         t3,
         t4,
+      } = computed;
+
+      // Combine all exclusions and deduplicate. An entity can qualify through
+      // several paths; the first reason in the order of "Reason precedence"
+      // (file header) is the one stored. The key includes the instance.
+      const allExclusionsRaw = [
+        ...direct.restricted,
+        ...restrictionCascade,
+        ...content,
+        ...emptyUnderRestrictions,
+        ...direct.hidden,
+        ...hideCascade,
+        ...empty,
+      ];
+      const seen = new Set<string>();
+      const allExclusions: ExclusionRecord[] = [];
+      for (const excl of allExclusionsRaw) {
+        const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          allExclusions.push(excl);
+        }
+      }
+
+      // === WRITE PHASE (fill without the lock, then one short swap) ===
+      let swapMs = 0;
+      let t5 = t4;
+      try {
+        await this.fillResult(db, allExclusions);
+        t5 = Date.now();
+        await dbWrite("exclusions.swap", async () => {
+          const started = Date.now();
+          await this.swapResult(db, userId, snapshotStartedAt);
+          swapMs = Date.now() - started;
+        });
+      } finally {
+        await this.cleanupTempTables(db);
+      }
+      const t6 = Date.now();
+
+      return {
+        totalExclusions: allExclusions.length,
+        phaseCounts: {
+          restricted: direct.restricted.length,
+          hidden: direct.hidden.length,
+          restrictionCascade: restrictionCascade.length,
+          hideCascade: hideCascade.length,
+          content: content.length,
+          emptyUnderRestrictions: emptyUnderRestrictions.length,
+          empty: empty.length,
+        },
+        timing: {
+          directMs: t1 - t0,
+          cascadeMs: t2 - t1,
+          contentMs: t3 - t2,
+          emptyMs: t4 - t3,
+          fillMs: t5 - t4,
+          swapMs,
+          swapQueuedMs: t6 - t5 - swapMs,
+        },
       };
     });
-    const {
-      direct,
-      restrictionCascade,
-      hideCascade,
-      content,
-      emptyUnderRestrictions,
-      empty,
-      t1,
-      t2,
-      t3,
-      t4,
-    } = computed;
 
-    // Combine all exclusions and deduplicate. An entity can qualify through
-    // several paths; the first reason in the order of "Reason precedence"
-    // (file header) is the one stored. The key includes the instance.
-    const allExclusionsRaw = [
-      ...direct.restricted,
-      ...restrictionCascade,
-      ...content,
-      ...emptyUnderRestrictions,
-      ...direct.hidden,
-      ...hideCascade,
-      ...empty,
-    ];
-    const seen = new Set<string>();
-    const allExclusions: ExclusionRecord[] = [];
-    for (const excl of allExclusionsRaw) {
-      const key = `${excl.entityType}:${excl.entityId}:${excl.instanceId || ""}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        allExclusions.push(excl);
-      }
-    }
-
-    // === WRITE PHASE (short transaction, only the atomic swap) ===
-
-    await dbWriteTransaction(
-      "exclusions.write",
-      async (tx) => {
-        // Delete existing exclusions for this user
-        await tx.userExcludedEntity.deleteMany({
-          where: { userId },
-        });
-
-        // Insert new exclusions if any exist
-        if (allExclusions.length > 0) {
-          await tx.userExcludedEntity.createMany({
-            data: allExclusions,
-          });
-        }
-
-        // Phase 5: Update entity stats
-        await this.updateEntityStats(userId, tx, allowedInstanceIds);
-      },
-      {
-        timeout: 30000,
-      }
-    );
-    const t5 = Date.now();
+    // Phase 5: entity stats, outside the swap
+    const t7 = Date.now();
+    await this.updateEntityStats(userId, allowedInstanceIds);
+    const t8 = Date.now();
 
     logger.info("ExclusionComputationService.recomputeForUser completed", {
       userId,
       applyRestrictions,
-      totalExclusions: allExclusions.length,
+      totalExclusions: written.totalExclusions,
       instanceCount: allowedInstanceIds.length,
-      phaseCounts: {
-        restricted: direct.restricted.length,
-        hidden: direct.hidden.length,
-        restrictionCascade: restrictionCascade.length,
-        hideCascade: hideCascade.length,
-        content: content.length,
-        emptyUnderRestrictions: emptyUnderRestrictions.length,
-        empty: empty.length,
-      },
+      phaseCounts: written.phaseCounts,
       timing: {
-        directMs: t1 - t0,
-        cascadeMs: t2 - t1,
-        contentMs: t3 - t2,
-        emptyMs: t4 - t3,
-        writeMs: t5 - t4,
-        totalMs: t5 - t0,
+        ...written.timing,
+        statsMs: t8 - t7,
+        totalMs: t8 - t0,
       },
     });
   }
@@ -688,57 +747,109 @@ class ExclusionComputationService {
     return result;
   }
 
-  // ─── Compute connection and TEMP tables ───
+  // ─── Compute connection, TEMP tables and the write phase ───
 
   /**
-   * Run fn on the single-connection compute client, one caller at a time,
-   * inside a deferred BEGIN. Under WAL a deferred transaction that only reads
-   * the main database and writes TEMP tables takes no write lock: other
-   * connections keep writing, and fn reads one consistent snapshot. (Prisma's
-   * interactive $transaction opens with BEGIN IMMEDIATE, which would hold the
-   * write lock for the whole compute.) The TEMP tables are dropped and the
-   * snapshot ended before the next caller starts.
+   * Fill _peek_result with the rows to store, bound as JSON in chunks of
+   * RESULT_CHUNK, on the compute connection outside any transaction (each
+   * statement is its own, and touches only the TEMP database). The table's
+   * primary key with OR IGNORE keeps the first row per key, the same
+   * first-reason-wins the callers' dedup applies.
    */
-  private async withComputeSnapshot<T>(
-    fn: (db: TransactionClient) => Promise<T>
-  ): Promise<T> {
-    const previous = this.computeTail;
-    let release!: () => void;
-    this.computeTail = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await previous; // never rejects: release() is the only way it settles
-    try {
-      const db = await getComputeClient();
-      try {
-        await db.$executeRawUnsafe("BEGIN");
-        return await fn(db);
-      } finally {
-        await this.endComputeSnapshot(db);
-      }
-    } finally {
-      release();
+  private async fillResult(
+    db: TransactionClient,
+    records: ExclusionRecord[]
+  ): Promise<void> {
+    await db.$executeRawUnsafe(
+      `CREATE TEMP TABLE IF NOT EXISTS ${RESULT_TABLE} (entityType TEXT NOT NULL, entityId TEXT NOT NULL, instanceId TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY (entityType, entityId, instanceId)) WITHOUT ROWID`
+    );
+    await db.$executeRawUnsafe(`DELETE FROM ${RESULT_TABLE}`);
+    for (let i = 0; i < records.length; i += RESULT_CHUNK) {
+      const chunk = records.slice(i, i + RESULT_CHUNK).map((r) => ({
+        t: r.entityType,
+        id: r.entityId,
+        iid: r.instanceId,
+        r: r.reason,
+      }));
+      await db.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ${RESULT_TABLE} (entityType, entityId, instanceId, reason) SELECT json_extract(value, '$.t'), json_extract(value, '$.id'), json_extract(value, '$.iid'), json_extract(value, '$.r') FROM json_each(?)`,
+        JSON.stringify(chunk)
+      );
     }
   }
 
   /**
-   * Drop the TEMP tables and end the snapshot. The snapshot wrote nothing to
-   * the main database, so ROLLBACK ends it (and discards any TEMP table left
-   * behind). If that fails, the connection could still be inside the
-   * snapshot, pinning stale data and failing the next BEGIN: disconnect it so
-   * the next compute opens a fresh one. Never throws, so the compute's own
-   * error is the one reported.
+   * The swap: replace the user's rows with _peek_result inside one short
+   * BEGIN IMMEDIATE on the compute connection (the TEMP table lives there).
+   * `pending` holds written since `snapshotStartedAt` survive the DELETE and
+   * win the INSERT OR IGNORE. On any failure after the BEGIN the transaction
+   * is rolled back, so the user's old rows stay, and the error rethrown: a
+   * busy failure is retried by dbWrite with _peek_result still filled. A
+   * BEGIN that fails (busy) throws with nothing to roll back.
    */
-  private async endComputeSnapshot(db: TransactionClient): Promise<void> {
+  private async swapResult(
+    db: TransactionClient,
+    userId: number,
+    snapshotStartedAt: number
+  ): Promise<void> {
+    await db.$executeRawUnsafe("BEGIN IMMEDIATE");
     try {
-      await this.dropTempTables(db);
+      await db.$executeRawUnsafe(
+        DELETE_BEFORE_SWAP_SQL,
+        userId,
+        snapshotStartedAt
+      );
+      await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
+      await db.$executeRawUnsafe("COMMIT");
+    } catch (error) {
+      await this.rollbackSwap(db);
+      throw error;
+    }
+  }
+
+  /**
+   * The merge (hides): add the rows of _peek_result the user lacks, one
+   * statement, autocommit. An existing row keeps its reason.
+   */
+  private async mergeResult(
+    db: TransactionClient,
+    userId: number
+  ): Promise<void> {
+    await db.$executeRawUnsafe(INSERT_FROM_RESULT_SQL, userId, Date.now());
+  }
+
+  /**
+   * End a failed swap. If the ROLLBACK itself fails the connection may still
+   * hold the write transaction: disconnect it so the next compute opens a
+   * fresh one. Never throws, so the swap's own error is the one reported.
+   */
+  private async rollbackSwap(db: TransactionClient): Promise<void> {
+    try {
       await db.$executeRawUnsafe("ROLLBACK");
     } catch (error) {
       logger.warn(
-        "ExclusionComputationService: could not end the compute snapshot, reconnecting",
+        "ExclusionComputationService: could not roll back the swap, reconnecting the compute client",
         { error: error instanceof Error ? error.message : String(error) }
       );
       await disconnectComputeClient();
+    }
+  }
+
+  /**
+   * Drop the TEMP tables at the end of a compute. Never throws: a table left
+   * behind is emptied by the next compute's CREATE IF NOT EXISTS + DELETE,
+   * and the compute's own error is the one reported.
+   */
+  private async cleanupTempTables(db: TransactionClient): Promise<void> {
+    try {
+      await this.dropTempTables(db);
+    } catch (error) {
+      logger.warn(
+        "ExclusionComputationService: could not drop the TEMP tables",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
   }
 
@@ -1690,48 +1801,39 @@ class ExclusionComputationService {
   }
 
   /**
-   * Update visible entity counts for the user.
-   * Called at the end of recomputeForUser after all exclusions are computed.
+   * Update visible entity counts for the user, after the swap has committed:
+   * the 8 entity counts and 8 excluded counts are read on the main client
+   * outside any unit, then the 8 upserts go in as one batch.
    */
   private async updateEntityStats(
     userId: number,
-    tx: TransactionClient,
     allowedInstanceIds: string[]
   ): Promise<void> {
-    const entityTypes = [
-      "scene",
-      "performer",
-      "studio",
-      "tag",
-      "group",
-      "gallery",
-      "image",
-      "clip",
-    ];
-
-    for (const entityType of entityTypes) {
-      const total = await this.getEntityCount(
-        entityType,
-        tx,
-        allowedInstanceIds
-      );
-      const excluded = await tx.userExcludedEntity.count({
+    const visible: Array<{ entityType: string; visibleCount: number }> = [];
+    for (const entityType of STATS_ENTITY_TYPES) {
+      const total = await this.getEntityCount(entityType, allowedInstanceIds);
+      const excluded = await prisma.userExcludedEntity.count({
         where: { userId, entityType },
       });
-
-      await tx.userEntityStats.upsert({
-        where: {
-          userId_entityType_instanceId: { userId, entityType, instanceId: "" },
-        },
-        create: {
-          userId,
-          entityType,
-          instanceId: "",
-          visibleCount: total - excluded,
-        },
-        update: { visibleCount: total - excluded },
-      });
+      visible.push({ entityType, visibleCount: total - excluded });
     }
+
+    await dbWriteBatch(
+      "exclusions.stats",
+      visible.map(({ entityType, visibleCount }) =>
+        prisma.userEntityStats.upsert({
+          where: {
+            userId_entityType_instanceId: {
+              userId,
+              entityType,
+              instanceId: "",
+            },
+          },
+          create: { userId, entityType, instanceId: "", visibleCount },
+          update: { visibleCount },
+        })
+      )
+    );
 
     logger.debug("updateEntityStats complete", { userId });
   }
@@ -1740,8 +1842,7 @@ class ExclusionComputationService {
    * Get total count of entities of a given type.
    */
   private async getEntityCount(
-    entityType: string,
-    tx: TransactionClient,
+    entityType: (typeof STATS_ENTITY_TYPES)[number],
     allowedInstanceIds: string[]
   ): Promise<number> {
     const where = {
@@ -1750,23 +1851,21 @@ class ExclusionComputationService {
     };
     switch (entityType) {
       case "scene":
-        return tx.stashScene.count({ where });
+        return prisma.stashScene.count({ where });
       case "performer":
-        return tx.stashPerformer.count({ where });
+        return prisma.stashPerformer.count({ where });
       case "studio":
-        return tx.stashStudio.count({ where });
+        return prisma.stashStudio.count({ where });
       case "tag":
-        return tx.stashTag.count({ where });
+        return prisma.stashTag.count({ where });
       case "group":
-        return tx.stashGroup.count({ where });
+        return prisma.stashGroup.count({ where });
       case "gallery":
-        return tx.stashGallery.count({ where });
+        return prisma.stashGallery.count({ where });
       case "image":
-        return tx.stashImage.count({ where });
+        return prisma.stashImage.count({ where });
       case "clip":
-        return tx.stashClip.count({ where });
-      default:
-        return 0;
+        return prisma.stashClip.count({ where });
     }
   }
 
@@ -1775,12 +1874,16 @@ class ExclusionComputationService {
    * Synchronous - user waits for completion.
    * Writes the stored `hidden` row, the rows the hide expands to
    * (descendants, per-instance copies) and the cascades, through the same
-   * expandHides and computeCascadeExclusions the full recompute uses.
-   * Skips the empty phase and the stats update.
+   * expandHides and computeCascadeExclusions the full recompute uses, on the
+   * same path: a read snapshot on the compute connection, the rows filled
+   * into _peek_result, then one INSERT OR IGNORE ... SELECT as the
+   * `exclusions.hide` unit. Skips the empty phase and the stats update.
    *
-   * Every write only fills a missing row: an existing row keeps its reason,
-   * so a restriction already stored for a key is never rewritten as
-   * `hidden` (Reason precedence, file header).
+   * The merge only fills missing rows: an existing row keeps its reason, so
+   * a restriction already stored for a key is never rewritten as `hidden`
+   * (Reason precedence, file header). A hide that arrives during a recompute
+   * waits for the compute connection and merges after the swap, so it is
+   * never lost under it.
    */
   async addHiddenEntity(
     userId: number,
@@ -1798,97 +1901,32 @@ class ExclusionComputationService {
 
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    await dbWriteTransaction(
-      "exclusions.hide",
-      async (tx) => {
-        try {
-          // Add the direct exclusion
-          await tx.userExcludedEntity.upsert({
-            where: {
-              userId_entityType_entityId_instanceId: {
-                userId,
-                entityType,
-                entityId,
-                instanceId,
-              },
-            },
-            create: {
-              userId,
-              entityType,
-              entityId,
-              instanceId,
-              reason: "hidden",
-            },
-            update: {},
-          });
-
+    await withComputeConnection(async (db) => {
+      try {
+        // The stored row, its descendants and per-instance copies, and the
+        // cascades of every resolved ref
+        const records = await readSnapshot(db, async () => {
           const { records: hiddenRecords, refs } = await this.expandHides(
             userId,
             entityType,
             [{ id: entityId, instanceId }],
-            tx,
+            db,
             allowedInstanceIds
           );
-          const rows = await this.computeCascadeExclusions(
+          const cascades = await this.computeCascadeExclusions(
             userId,
             [{ entityType, refs }],
-            tx,
+            db,
             allowedInstanceIds
           );
-
-          // Descendants and per-instance copies (the stored row is above)
-          for (const record of hiddenRecords) {
-            if (
-              record.entityId === entityId &&
-              record.instanceId === instanceId
-            ) {
-              continue;
-            }
-            await tx.userExcludedEntity.upsert({
-              where: {
-                userId_entityType_entityId_instanceId: {
-                  userId,
-                  entityType: record.entityType,
-                  entityId: record.entityId,
-                  instanceId: record.instanceId,
-                },
-              },
-              create: record,
-              update: {},
-            });
-          }
-
-          // Insert cascade exclusions if any
-          // SQLite doesn't support skipDuplicates, so we use individual upserts
-          if (rows.length > 0) {
-            await Promise.all(
-              rows.map((exclusion) =>
-                tx.userExcludedEntity.upsert({
-                  where: {
-                    userId_entityType_entityId_instanceId: {
-                      userId: exclusion.userId,
-                      entityType: exclusion.entityType,
-                      entityId: exclusion.entityId,
-                      instanceId: exclusion.instanceId || "",
-                    },
-                  },
-                  create: {
-                    ...exclusion,
-                    instanceId: exclusion.instanceId || "",
-                  },
-                  update: {}, // No update needed - just ensure it exists
-                })
-              )
-            );
-          }
-        } finally {
-          await this.dropTempTables(tx);
-        }
-      },
-      {
-        timeout: 30000, // 30 seconds for hide operation
+          return [...hiddenRecords, ...cascades];
+        });
+        await this.fillResult(db, records);
+        await dbWrite("exclusions.hide", () => this.mergeResult(db, userId));
+      } finally {
+        await this.cleanupTempTables(db);
       }
-    );
+    });
 
     logger.info("ExclusionComputationService.addHiddenEntity complete", {
       userId,
