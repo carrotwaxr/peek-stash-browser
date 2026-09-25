@@ -221,6 +221,47 @@ describe("detectChanges", () => {
     expect(refs(changes.tagSetChanged)).toEqual(["1@cs-a"]);
   });
 
+  it("a differing tag set marks the entity changed even when other links are not compared, so every tagSetChanged entity is also changed", () => {
+    const changes = detectChanges({
+      instanceId: INSTANCE,
+      stored: stored({
+        "1": { updatedAt: UPDATED, deleted: false },
+        "2": { updatedAt: UPDATED, deleted: false },
+      }),
+      incoming: [
+        // Same updated_at, another tag set, another performer set
+        {
+          id: "1",
+          updatedAt: UPDATED,
+          links: { ImageTag: ["t1"], ImagePerformer: ["p2"] },
+        },
+        // Same updated_at and tags, another performer set: not compared
+        {
+          id: "2",
+          updatedAt: UPDATED,
+          links: { ImageTag: ["t1"], ImagePerformer: ["p2"] },
+        },
+      ],
+      oldLinks: {
+        ImageTag: old({ "1": ["t2"], "2": ["t1"] }),
+        ImagePerformer: old({ "1": ["p1"], "2": ["p1"] }),
+      },
+      compareLinks: false,
+      tagJunction: "ImageTag",
+    });
+    expect(refs(changes.tagSetChanged)).toEqual(["1@cs-a"]);
+    expect(refs(changes.changed)).toEqual(["1@cs-a"]);
+    // Its old and new far sides, as for any changed entity
+    expect(refs(changes.farSides.ImageTag ?? [])).toEqual([
+      "t1@cs-a",
+      "t2@cs-a",
+    ]);
+    expect(refs(changes.farSides.ImagePerformer ?? [])).toEqual([
+      "p1@cs-a",
+      "p2@cs-a",
+    ]);
+  });
+
   it("a junction left out of an entity's links is not compared", () => {
     // No StudioTag in the links: the batch did not rewrite it for this entity
     const changes = detectChanges({

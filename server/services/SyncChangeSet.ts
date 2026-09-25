@@ -17,7 +17,9 @@
  * images, its old and new far-side sets differ, or its studio does (scenes
  * and galleries). An image's junction rows and studio are never compared:
  * gallery inheritance writes into them, so a far-side diff would mark nearly
- * every image changed on every full pass.
+ * every image changed on every full pass. A differing tag set of a
+ * performer, studio or group (`tagJunction`) always marks it changed, so
+ * every entity in `tagSetChanged` is also in `changed`.
  *
  * Memory bound: past SCOPE_LIMIT refs, a type switches to "whole library"
  * and stores no more refs (a full sync of a large instance lands there); the
@@ -103,11 +105,17 @@ export interface DetectChangesOptions {
   oldLinks?: Partial<
     Record<JunctionName, ReadonlyMap<string, readonly EntityRef[]>>
   >;
-  /** Whether a differing far-side set marks the entity changed (not for images) */
+  /**
+   * Whether a differing far-side set marks the entity changed (not for
+   * images). A differing `tagJunction` set marks it changed regardless.
+   */
   compareLinks?: boolean;
   /** Whether a differing studio marks the entity changed (scenes, galleries) */
   compareStudio?: boolean;
-  /** The junction whose difference lists the entity in `tagSetChanged` */
+  /**
+   * The junction whose difference lists the entity in `tagSetChanged`, and
+   * marks it changed
+   */
   tagJunction?: JunctionName;
   /**
    * Every entity counts as changed, its old and new far sides and studios
@@ -246,8 +254,15 @@ export function detectChanges({
         new Set(next.map(refKey))
       );
       linkDiffs.push({ junction, old, next, differs });
-      if (differs && compareLinks) isChanged = true;
-      if (differs && junction === tagJunction) tagSetChanged.push(ref);
+      if (!differs) continue;
+      // A differing tag set always marks the entity changed, so every
+      // entity in tagSetChanged is also in changed with its far sides
+      if (junction === tagJunction) {
+        tagSetChanged.push(ref);
+        isChanged = true;
+      } else if (compareLinks) {
+        isChanged = true;
+      }
     }
 
     if (!isChanged) continue;
