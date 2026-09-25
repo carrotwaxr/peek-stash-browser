@@ -437,6 +437,8 @@ class StashSyncService extends EventEmitter {
    * starts them one at a time; abort() drops them.
    */
   private readonly queuedFullSyncs = new Set<string>();
+  /** whenIdle() callers, resolved when a release leaves the lock free. */
+  private readonly idleWaiters: Array<() => void> = [];
   private readonly PAGE_SIZE = BATCH_SIZE;
   private abortController: AbortController | null = null;
   private batchItemCount = 0; // Track items within current batch for progress logging
@@ -490,11 +492,12 @@ class StashSyncService extends EventEmitter {
   /**
    * Abort the running job: a sync stops at its next check, an instance purge
    * between two chunks (the startup sweep removes the rest). Queued full
-   * syncs are dropped, so nothing starts after it.
+   * syncs are dropped, so nothing starts after it. Calling it again while
+   * the job winds down only drops the queue again.
    */
   abort(): void {
     this.queuedFullSyncs.clear();
-    if (this.abortController) {
+    if (this.abortController && !this.abortController.signal.aborted) {
       this.abortController.abort();
       logger.info("Sync abort requested", { job: this.activeJob });
     }
@@ -509,11 +512,29 @@ class StashSyncService extends EventEmitter {
     this.abortController = new AbortController();
   }
 
-  /** Frees the lock, then starts the next queued full sync, if any. */
+  /**
+   * Frees the lock, then starts the next queued full sync, if any. When
+   * none starts, the service is idle and whenIdle() resolves.
+   */
   private release(): void {
     this.activeJob = null;
     this.abortController = null;
     this.drainQueuedFullSyncs();
+    if (!this.isSyncing()) {
+      for (const resolve of this.idleWaiters.splice(0)) resolve();
+    }
+  }
+
+  /**
+   * Resolves once no job holds the lock: at once when none does, otherwise
+   * when a job's release starts no queued sync. The shutdown calls abort()
+   * first, which drops the queue, so it waits only for the running job.
+   */
+  whenIdle(): Promise<void> {
+    if (this.activeJob === null) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.idleWaiters.push(resolve);
+    });
   }
 
   /**

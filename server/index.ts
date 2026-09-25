@@ -4,16 +4,19 @@ import { fileURLToPath } from "url";
 import { setupAPI, startServer } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
-import { installProcessHandlers } from "./initializers/processHandlers.js";
+import {
+  closeResources,
+  installProcessHandlers,
+  isShuttingDown,
+  registerHttpServer,
+} from "./initializers/processHandlers.js";
 import { hashLegacyRecoveryKeys } from "./initializers/recoveryKeys.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
-import { disconnectComputeClient } from "./prisma/computeClient.js";
-import prisma, { configureSQLite } from "./prisma/singleton.js";
+import { configureSQLite } from "./prisma/singleton.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
-import { stashSyncService } from "./services/StashSyncService.js";
 import { getJwtSecret } from "./utils/jwtSecret.js";
 import { logger } from "./utils/logger.js";
 
@@ -31,7 +34,8 @@ const envPath =
 
 dotenv.config({ path: envPath });
 
-// Log (and, for an uncaught exception, exit on) errors nothing else caught
+// Shut down cleanly on SIGTERM and SIGINT; log (and, for an uncaught
+// exception, exit on) errors nothing else caught
 installProcessHandlers();
 
 const main = async () => {
@@ -45,6 +49,8 @@ const main = async () => {
 
   // Run database migrations and seeding
   await initializeDatabase();
+  // A stop signal during the migrations: the shutdown takes it from here
+  if (isShuttingDown()) return;
 
   // WAL mode and the performance PRAGMAs; logs what SQLite reports
   await configureSQLite();
@@ -62,7 +68,9 @@ const main = async () => {
   const app = setupAPI();
   // PEEK_SERVER_PORT is for development and tests (E2E runs beside the dev
   // stack); the Docker image's nginx forwards to 8000
-  startServer(app, Number(process.env.PEEK_SERVER_PORT) || 8000);
+  registerHttpServer(
+    startServer(app, Number(process.env.PEEK_SERVER_PORT) || 8000)
+  );
 
   // Schedule background jobs
   scheduleDownloadCleanup();
@@ -76,6 +84,8 @@ const main = async () => {
   } else {
     // Initialize cache FIRST (needed for data migrations that access scene data)
     await initializeCache();
+    // A stop signal during the startup sync: no data migration starts
+    if (isShuttingDown()) return;
 
     // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
     await dataMigrationService.runPendingMigrations();
@@ -86,19 +96,6 @@ main().catch(async (e: unknown) => {
   // The message as it is, not escaped into JSON: a refusal such as
   // LegacyDatabaseError's tells the admin what to do
   logger.error(`Fatal error: ${e instanceof Error ? e.message : String(e)}`);
-  await Promise.all([prisma.$disconnect(), disconnectComputeClient()]);
+  await closeResources();
   process.exit(1);
-});
-
-// Cleanup on exit
-process.on("SIGTERM", () => {
-  stashSyncService.abort();
-  void prisma.$disconnect();
-  void disconnectComputeClient();
-});
-
-process.on("SIGINT", () => {
-  stashSyncService.abort();
-  void prisma.$disconnect();
-  void disconnectComputeClient();
 });

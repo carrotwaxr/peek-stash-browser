@@ -1016,6 +1016,11 @@ describe("StashSyncService queued full syncs", () => {
     mockStashClient.findTags.mockReturnValueOnce(tags.promise);
     const done = stashSyncService.incrementalSync(RUNNING);
     expect(stashSyncService.isSyncing()).toBe(true);
+    // The page is out, so a test's abort() lands mid-request and no held
+    // answer is left queued for the next test
+    await vi.waitFor(() => {
+      expect(mockStashClient.findTags).toHaveBeenCalled();
+    });
     return { done, release: tags.release };
   }
 
@@ -1093,6 +1098,67 @@ describe("StashSyncService queued full syncs", () => {
 
     await expect(running.done).rejects.toThrow("Sync aborted");
     expect(fullSync).not.toHaveBeenCalled();
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("`whenIdle` resolves at once when no sync runs", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+    let idle = false;
+
+    void stashSyncService.whenIdle().then(() => {
+      idle = true;
+    });
+    await Promise.resolve();
+
+    expect(idle).toBe(true);
+    expect(stashSyncService.isSyncing()).toBe(false);
+    expect(fullSync).not.toHaveBeenCalled();
+  });
+
+  it("`whenIdle` resolves after an aborted sync's finally", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const running = await runningSync();
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+    let idle = false;
+    const whenIdle = stashSyncService.whenIdle().then(() => {
+      idle = true;
+    });
+    stashSyncService.queueFullSync("instance-b");
+
+    // The shutdown: abort, then wait while the sync's request is still out
+    stashSyncService.abort();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(idle).toBe(false);
+    running.release();
+    await whenIdle;
+
+    await expect(running.done).rejects.toThrow("Sync aborted");
+    expect(stashSyncService.isSyncing()).toBe(false);
+    // abort() dropped the queued sync, so the release started nothing
+    expect(fullSync).not.toHaveBeenCalled();
+  });
+
+  it("`whenIdle` waits for the queued full sync that the release starts", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const running = await runningSync();
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+    let idle = false;
+    const whenIdle = stashSyncService.whenIdle().then(() => {
+      idle = true;
+    });
+    stashSyncService.queueFullSync("instance-b");
+
+    running.release();
+    await running.done;
+
+    expect(fullSync).toHaveBeenCalledExactlyOnceWith("instance-b");
+    expect(idle).toBe(false);
+    await must(fullSync.mock.results[0], "the queued sync").value;
+    await whenIdle;
     expect(stashSyncService.isSyncing()).toBe(false);
   });
 
