@@ -366,11 +366,19 @@ function stubClient(answer: StashAnswer): StashClient {
 /** Route `stashInstanceManager.get` to a stub per made-up instance. */
 function stubInstances(answers: Record<string, StashAnswer>): void {
   const realGet = stashInstanceManager.get.bind(stashInstanceManager);
+  const realCredentials =
+    stashInstanceManager.getCredentials.bind(stashInstanceManager);
   const clients = new Map(
     Object.entries(answers).map(([id, answer]) => [id, stubClient(answer)])
   );
   vi.spyOn(stashInstanceManager, "get").mockImplementation(
     (id) => clients.get(id) ?? realGet(id)
+  );
+  // Clip sync probes previews with its instance's own key
+  vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation((id) =>
+    id !== undefined && clients.has(id)
+      ? { baseUrl: "http://stash.invalid", apiKey: "postsync-it-key" }
+      : realCredentials(id)
   );
 }
 
@@ -975,8 +983,7 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
     );
 
   beforeAll(async () => {
-    // The instances the server knows (the test Stash), as in production:
-    // clip sync reads the default one's key
+    // The instances the server knows (the test Stash), as in production
     await stashInstanceManager.reload();
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
   });

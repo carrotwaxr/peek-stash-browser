@@ -503,8 +503,8 @@ function escapeSqlNullable(value: string | null | undefined): string {
  * stores `stashUpdatedAt` as the text Stash sent, in a column declared
  * DateTime, which Prisma's raw reads would parse into a Date; the CAST
  * returns the text, so it compares equal to what Stash sends again. Not for
- * clips, whose `stashUpdatedAt` Prisma writes (processClipsBatch reads them
- * through Prisma).
+ * clips, whose `stashUpdatedAt` is stored as epoch milliseconds, as Prisma
+ * stores a DateTime (processClipsBatch reads them through Prisma).
  */
 async function readStored(
   table: Exclude<(typeof INSTANCE_CACHE_TABLES)[number], "StashClip">,
@@ -2063,8 +2063,13 @@ async function processImagesBatch(
 // ==================== Clip Sync ====================
 
 /**
- * Writes one page of clips (scene markers) and their tags. Each preview is
- * probed first, to record whether Stash has generated it.
+ * Writes one page of clips (scene markers) and their tags, in three
+ * statements whatever the page's size (item 42), each bound as one JSON
+ * parameter: the old ClipTag rows go (`DELETE ... RETURNING`, for the change
+ * diff), the clips are upserted, and their tags inserted. Each preview is
+ * probed first, with the page's own instance's API key, to record whether
+ * Stash has generated it. Timestamps are stored as epoch milliseconds, as
+ * Prisma stores a DateTime.
  */
 async function processClipsBatch(
   markers: SyncClip[],
@@ -2072,15 +2077,15 @@ async function processClipsBatch(
 ): Promise<BatchChanges> {
   if (markers.length === 0) return noChanges();
 
-  // Build preview URLs for probing
-  // Note: m.preview is already a full URL from Stash, just append API key
-  const apiKey = stashInstanceManager.getApiKey();
-  const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
+  const instanceId = stashInstanceId;
 
-  // Probe previews in batch
+  // m.preview is already a full URL from Stash; the probe authenticates with
+  // this instance's key (another instance's key is refused, and the clip
+  // would be stored as not generated)
+  const { apiKey } = stashInstanceManager.getCredentials(instanceId);
+  const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
   const probeResults = await clipPreviewProber.probeBatch(previewUrls);
 
-  const instanceId = stashInstanceId;
   const markerIds = markers.map((m) => m.id);
 
   // What the batch's clips looked like before the write, for the change
@@ -2101,57 +2106,93 @@ async function processClipsBatch(
 
   // Delete the batch's clip tags, keeping the rows for the change diff
   const oldLinks = {
-    ClipTag: await deleteJunctionRows(prisma, "ClipTag", markerIds, instanceId),
+    ClipTag: await dbWrite("sync.clips.tags.delete", () =>
+      deleteJunctionRows(prisma, "ClipTag", markerIds, instanceId)
+    ),
   };
 
-  // Upsert clips
-  for (let i = 0; i < markers.length; i++) {
-    const marker = markers[i] as (typeof markers)[number];
-    const previewUrl = previewUrls[i] as string;
+  const epochMs = (timestamp: string | null | undefined): number | null =>
+    timestamp ? new Date(timestamp).getTime() : null;
+  const now = Date.now();
+  const clips = markers.map((marker, i) => ({
+    id: marker.id,
+    sceneId: marker.scene.id,
+    title: marker.title || null,
+    seconds: marker.seconds,
+    // Stash sends null for an unset end; 0 is a real one
+    endSeconds: marker.end_seconds ?? null,
+    primaryTagId: marker.primary_tag.id,
+    previewPath: marker.preview,
+    screenshotPath: marker.screenshot,
+    streamPath: marker.stream,
+    isGenerated: probeResults.get(previewUrls[i] as string) ? 1 : 0,
+    stashCreatedAt: epochMs(marker.created_at),
+    stashUpdatedAt: epochMs(marker.updated_at),
+  }));
 
-    const clipData = {
-      sceneId: marker.scene.id,
-      sceneInstanceId: instanceId,
-      title: marker.title || null,
-      seconds: marker.seconds,
-      endSeconds: marker.end_seconds || null,
-      primaryTagId: marker.primary_tag.id,
-      primaryTagInstanceId: instanceId,
-      previewPath: marker.preview,
-      screenshotPath: marker.screenshot,
-      streamPath: marker.stream,
-      isGenerated: probeResults.get(previewUrl) ?? false,
-      generationCheckedAt: new Date(),
-      stashCreatedAt: marker.created_at ? new Date(marker.created_at) : null,
-      stashUpdatedAt: marker.updated_at ? new Date(marker.updated_at) : null,
-      syncedAt: new Date(),
-      deletedAt: null,
-    };
+  await dbWrite("sync.clips", () =>
+    prisma.$executeRawUnsafe(
+      `INSERT INTO "StashClip" (
+         "id", "stashInstanceId", "sceneId", "sceneInstanceId", "title",
+         "seconds", "endSeconds", "primaryTagId", "primaryTagInstanceId",
+         "previewPath", "screenshotPath", "streamPath", "isGenerated",
+         "generationCheckedAt", "stashCreatedAt", "stashUpdatedAt",
+         "syncedAt", "deletedAt"
+       )
+       SELECT
+         json_extract(j.value, '$.id'), ?, json_extract(j.value, '$.sceneId'), ?,
+         json_extract(j.value, '$.title'), json_extract(j.value, '$.seconds'),
+         json_extract(j.value, '$.endSeconds'),
+         json_extract(j.value, '$.primaryTagId'), ?,
+         json_extract(j.value, '$.previewPath'),
+         json_extract(j.value, '$.screenshotPath'),
+         json_extract(j.value, '$.streamPath'),
+         json_extract(j.value, '$.isGenerated'), ?,
+         json_extract(j.value, '$.stashCreatedAt'),
+         json_extract(j.value, '$.stashUpdatedAt'), ?, NULL
+       FROM json_each(?) j
+       WHERE true
+       ON CONFLICT("id", "stashInstanceId") DO UPDATE SET
+         "sceneId" = excluded."sceneId",
+         "sceneInstanceId" = excluded."sceneInstanceId",
+         "title" = excluded."title",
+         "seconds" = excluded."seconds",
+         "endSeconds" = excluded."endSeconds",
+         "primaryTagId" = excluded."primaryTagId",
+         "primaryTagInstanceId" = excluded."primaryTagInstanceId",
+         "previewPath" = excluded."previewPath",
+         "screenshotPath" = excluded."screenshotPath",
+         "streamPath" = excluded."streamPath",
+         "isGenerated" = excluded."isGenerated",
+         "generationCheckedAt" = excluded."generationCheckedAt",
+         "stashCreatedAt" = excluded."stashCreatedAt",
+         "stashUpdatedAt" = excluded."stashUpdatedAt",
+         "syncedAt" = excluded."syncedAt",
+         "deletedAt" = NULL`,
+      instanceId,
+      instanceId,
+      instanceId,
+      now,
+      now,
+      JSON.stringify(clips)
+    )
+  );
 
-    await prisma.stashClip.upsert({
-      where: {
-        id_stashInstanceId: {
-          id: marker.id,
-          stashInstanceId: instanceId,
-        },
-      },
-      create: { id: marker.id, stashInstanceId: instanceId, ...clipData },
-      update: clipData,
-    });
-
-    // Sync clip tags (junction table); the old rows went above
-    const tagIds = marker.tags.map((t) => t.id);
-    if (tagIds.length > 0) {
-      const tagValues = tagIds
-        .map(
-          (tagId) =>
-            `('${escapeSql(marker.id)}', '${escapeSql(instanceId)}', '${escapeSql(tagId)}', '${escapeSql(instanceId)}')`
-        )
-        .join(", ");
-      await prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ClipTag (clipId, clipInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-      );
-    }
+  // The clips' tags, as [clipId, tagId] pairs; the old rows went above
+  const clipTags = markers.flatMap((marker) =>
+    marker.tags.map((tag) => [marker.id, tag.id])
+  );
+  if (clipTags.length > 0) {
+    await dbWrite("sync.clips.tags", () =>
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO "ClipTag" ("clipId", "clipInstanceId", "tagId", "tagInstanceId")
+         SELECT json_extract(j.value, '$[0]'), ?, json_extract(j.value, '$[1]'), ?
+         FROM json_each(?) j`,
+        instanceId,
+        instanceId,
+        JSON.stringify(clipTags)
+      )
+    );
   }
 
   return detectChanges({
@@ -2159,9 +2200,7 @@ async function processClipsBatch(
     stored,
     incoming: markers.map((marker) => ({
       id: marker.id,
-      updatedAt: marker.updated_at
-        ? new Date(marker.updated_at).getTime()
-        : null,
+      updatedAt: epochMs(marker.updated_at),
       links: { ClipTag: marker.tags.map((t) => t.id) },
     })),
     oldLinks,
