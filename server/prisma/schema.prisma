@@ -943,6 +943,9 @@ model StashGroup {
   // === Relations ===
   scenes SceneGroup[]
   tags   GroupTag[]
+  // The collection hierarchy: this group's sub-groups, and the groups it is in
+  subGroupLinks        GroupRelation[] @relation("GroupSubGroups")
+  containingGroupLinks GroupRelation[] @relation("GroupContainingGroups")
 
   @@index([name])
   @@index([date])
@@ -1268,6 +1271,25 @@ model GroupTag {
 
   @@id([groupId, groupInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+}
+
+// Stash's collection hierarchy: one row per edge from a containing group to
+// one of its sub-groups (Stash's groups_relations). containing_groups and
+// sub_groups are the same edges read from either end. Both instance columns
+// hold the same value, since relations stay within one Stash server.
+model GroupRelation {
+  containingId         String
+  containingInstanceId String
+  subId                String
+  subInstanceId        String
+  orderIndex           Int // the sub-group's place in the containing group's list
+  description          String? // Stash's description of the link, e.g. "Part 2"
+
+  containing StashGroup @relation("GroupSubGroups", fields: [containingId, containingInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  sub        StashGroup @relation("GroupContainingGroups", fields: [subId, subInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+
+  @@id([containingId, containingInstanceId, subId, subInstanceId])
+  @@index([subId, subInstanceId])
 }
 
 // Sync state tracking per entity type
