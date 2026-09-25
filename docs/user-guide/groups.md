@@ -27,6 +27,7 @@ Groups support two view modes:
 | **Scene Count** | Range filter for number of scenes |
 | **Duration** | Range filter for total duration in minutes |
 | **Favorites** | Show only favorited groups |
+| **Parent collection** | The sub-collections of the collections you pick (direct children only) |
 | **Release Date** | Date range filter |
 | **Created Date** | Date range filter |
 | **Updated Date** | Date range filter |
@@ -77,11 +78,15 @@ Shows all performers appearing in any scene within the group, with full performe
 
 ## Group Hierarchy
 
-Groups can have parent-child relationships:
+Peek syncs Stash's collection hierarchy, so groups keep the parent-child relationships you set up in Stash:
 
-- A group can belong to one or more parent collections (shown in "Part Of")
-- A group can contain sub-collections (shown in "Sub-Collections")
+- A group can belong to one or more parent collections, shown in "Part Of" by name
+- A group can contain sub-collections, shown in "Sub-Collections" in Stash's order
+- Each link shows its description from Stash, such as "Part 2"
 - Click any parent or child link to navigate the hierarchy
+- A collection card's collections count is its number of sub-collections; click it to open the Collections page filtered to them (the **Parent collection** filter)
+
+Collections you cannot see (hidden, or excluded by your content restrictions) are left out of these lists and counts. Hiding or restricting a collection covers that collection only, not its sub-collections.
 
 ## Rating and Favorites
 

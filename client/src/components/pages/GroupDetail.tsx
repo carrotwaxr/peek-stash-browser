@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { TagRef } from "@peek/shared-types";
+import type { GroupRelationRef, TagRef } from "@peek/shared-types";
 import { ArrowLeft } from "lucide-react";
 import { libraryApi } from "../../api";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext";
@@ -30,11 +30,6 @@ interface EntityRef {
   instanceId?: string;
   image_path?: string;
   [key: string]: unknown;
-}
-
-interface GroupRelation {
-  group: EntityRef;
-  description?: string;
 }
 
 const GroupDetail = () => {
@@ -534,10 +529,11 @@ interface GroupDetailsProps {
 
 const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
   const studio = group?.studio as EntityRef | undefined;
+  // Each link's group carries its instance, so the links keep it
   const containingGroups = group?.containing_groups as
-    | GroupRelation[]
+    | GroupRelationRef[]
     | undefined;
-  const subGroups = group?.sub_groups as GroupRelation[] | undefined;
+  const subGroups = group?.sub_groups as GroupRelationRef[] | undefined;
   const tags = group?.tags as TagRef[] | undefined;
   const urls = group?.urls as string[] | undefined;
 
@@ -577,7 +573,7 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
       {containingGroups && containingGroups.length > 0 && (
         <Card title="Part Of">
           <div className="space-y-2">
-            {containingGroups.map((cg: GroupRelation) => (
+            {containingGroups.map((cg) => (
               <Link
                 key={cg.group.id}
                 to={getEntityPath("group", cg.group, hasMultipleInstances)}
@@ -608,7 +604,7 @@ const GroupDetails = ({ group, hasMultipleInstances }: GroupDetailsProps) => {
       {subGroups && subGroups.length > 0 && (
         <Card title="Sub-Collections">
           <div className="space-y-2">
-            {subGroups.map((sg: GroupRelation) => (
+            {subGroups.map((sg) => (
               <Link
                 key={sg.group.id}
                 to={getEntityPath("group", sg.group, hasMultipleInstances)}

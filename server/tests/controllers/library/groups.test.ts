@@ -38,7 +38,12 @@ vi.mock("../../../services/StashEntityService.js", () => ({
 }));
 
 vi.mock("../../../services/GroupQueryBuilder.js", () => ({
-  groupQueryBuilder: { execute: vi.fn() },
+  groupQueryBuilder: {
+    execute: vi.fn(),
+    getHierarchy: vi
+      .fn()
+      .mockResolvedValue({ containing_groups: [], sub_groups: [] }),
+  },
 }));
 
 vi.mock("../../../services/StashInstanceManager.js", () => ({
@@ -384,6 +389,57 @@ describe("Groups Controller", () => {
         "g1",
         "default"
       );
+    });
+
+    it("attaches the user's view of the hierarchy to a single-ID lookup", async () => {
+      const group = createMockGroup({ id: "g1", instanceId: "inst-a" });
+      mockGroupQueryBuilder.execute.mockResolvedValue({
+        groups: [group],
+        total: 1,
+      });
+      mockStashEntityService.getGroup.mockResolvedValue(group);
+      const hierarchy = {
+        containing_groups: [
+          {
+            group: { id: "p", name: "Box", instanceId: "inst-a" },
+            description: "Box set",
+          },
+        ],
+        sub_groups: [],
+      };
+      mockGroupQueryBuilder.getHierarchy.mockResolvedValueOnce(hierarchy);
+
+      const req = reqFor(findGroups, {
+        body: { ids: ["g1"], group_filter: { instance_id: "inst-a" } },
+        user: defaultUser,
+      });
+      const res = resFor(findGroups);
+
+      await findGroups(req, res);
+
+      expect(mockGroupQueryBuilder.getHierarchy).toHaveBeenCalledWith(
+        "g1",
+        "inst-a",
+        defaultUser.id
+      );
+      expect(must(res._getOkBody().findGroups.groups[0])).toMatchObject(
+        hierarchy
+      );
+    });
+
+    it("does not look up the hierarchy for a list", async () => {
+      mockGroupQueryBuilder.execute.mockResolvedValue({
+        groups: [createMockGroup({ id: "g1" })],
+        total: 1,
+      });
+
+      const req = reqFor(findGroups, {
+        body: { filter: {}, group_filter: {} },
+        user: defaultUser,
+      });
+      await findGroups(req, resFor(findGroups));
+
+      expect(mockGroupQueryBuilder.getHierarchy).not.toHaveBeenCalled();
     });
 
     it("adds stashUrl to each group for an admin", async () => {

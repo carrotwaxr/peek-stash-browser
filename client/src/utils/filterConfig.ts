@@ -1153,6 +1153,17 @@ export const GROUP_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Select scene...",
   },
+  {
+    // The direct sub-collections of these collections; a collection card's
+    // sub-collection count opens the list with it (?groupId=)
+    key: "groupIds",
+    label: "Parent collection",
+    type: "searchable-select",
+    entityType: "groups",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select collections...",
+  },
 ];
 
 export const GALLERY_FILTER_OPTIONS = [
@@ -2973,6 +2984,15 @@ export const buildGroupFilter = (
         value: [filters.sceneId],
         modifier: "INCLUDES",
       },
+    };
+  }
+
+  // Parent collection: "id:instanceId" values, kept whole for the server
+  const parentIds: unknown = filters.groupIds;
+  if (Array.isArray(parentIds) && parentIds.length > 0) {
+    groupFilter.containing_groups = {
+      value: parentIds.map(String),
+      modifier: "INCLUDES",
     };
   }
 

@@ -8,13 +8,17 @@ import { coerceEntityRefs } from "@peek/shared-types/instanceAwareId.js";
 import prisma from "../prisma/singleton.js";
 import type {
   GalleryRef,
+  GroupRelationRef,
   NormalizedGroup,
   PeekGroupFilter,
   PerformerRef,
   StudioRef,
   TagRef,
 } from "../types/index.js";
-import type { GroupQueryRow } from "../types/internal/queryRows.js";
+import type {
+  GroupQueryRow,
+  GroupRelationQueryRow,
+} from "../types/internal/queryRows.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -51,6 +55,12 @@ export interface GroupQueryResult {
   total: number;
 }
 
+/** A group's place in the collection hierarchy, as its detail page shows it */
+export interface GroupHierarchy {
+  containing_groups: GroupRelationRef[];
+  sub_groups: GroupRelationRef[];
+}
+
 /**
  * Builds and executes SQL queries for group filtering
  */
@@ -64,6 +74,29 @@ class GroupQueryBuilder {
     g.stashCreatedAt, g.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite
   `.trim();
+
+  /**
+   * The sub-group count column: the group's direct sub-groups that are live
+   * and, with exclusions applied, not excluded for the user. A sub-group is on
+   * the group's own instance, which the list already allows. Each row probes
+   * GroupRelation's primary key prefix (containingId, containingInstanceId),
+   * so a page of 40 groups is 40 lookups.
+   */
+  private buildSubGroupCountColumn(
+    userId: number,
+    applyExclusions: boolean
+  ): { sql: string; params: number[] } {
+    const exclusion = applyExclusions
+      ? `LEFT JOIN UserExcludedEntity se ON se.userId = ? AND se.entityType = 'group' AND se.entityId = sub.id AND (se.instanceId = '' OR se.instanceId = sub.stashInstanceId)`
+      : "";
+    return {
+      sql: `(SELECT COUNT(*) FROM GroupRelation gr
+        JOIN StashGroup sub ON sub.id = gr.subId AND sub.stashInstanceId = gr.subInstanceId AND sub.deletedAt IS NULL
+        ${exclusion}
+        WHERE gr.containingId = g.id AND gr.containingInstanceId = g.stashInstanceId AND gr.subInstanceId = g.stashInstanceId${applyExclusions ? " AND se.id IS NULL" : ""}) AS subGroupCount`,
+      params: applyExclusions ? [userId] : [],
+    };
+  }
 
   // Base FROM clause with user data JOINs
   private buildFromClause(
@@ -375,6 +408,29 @@ class GroupQueryBuilder {
   }
 
   /**
+   * Parent collection filter: the direct sub-groups (depth 0, as the card
+   * counts them) of the groups named. An "id:instance" value matches that
+   * group on its instance; a bare id matches that id on every instance.
+   */
+  private buildContainingGroupsFilter(
+    filter: PeekGroupFilter["containing_groups"]
+  ): FilterClause {
+    if (!filter?.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+    return buildJunctionFilter(
+      coerceEntityRefs(filter.value),
+      "GroupRelation",
+      "subId",
+      "subInstanceId",
+      "containingId",
+      "containingInstanceId",
+      "g",
+      filter.modifier ?? "INCLUDES"
+    );
+  }
+
+  /**
    * Build search query filter (searches name and synopsis)
    */
   private buildSearchFilter(searchQuery: string | undefined): FilterClause {
@@ -518,6 +574,14 @@ class GroupQueryBuilder {
       }
     }
 
+    // Parent collection filter
+    const containingFilter = this.buildContainingGroupsFilter(
+      filters?.containing_groups
+    );
+    if (containingFilter.sql) {
+      whereClauses.push(containingFilter);
+    }
+
     // Rating filter
     if (filters?.rating100) {
       const ratingFilter = buildNumericFilter(
@@ -602,16 +666,27 @@ class GroupQueryBuilder {
     );
 
     // Build full query
+    const subGroupCount = this.buildSubGroupCountColumn(
+      userId,
+      applyExclusions
+    );
     const offset = (page - 1) * perPage;
     const sql = `
-      SELECT ${this.SELECT_COLUMNS}
+      SELECT ${this.SELECT_COLUMNS},
+        ${subGroupCount.sql}
       ${fromClause.sql}
       WHERE ${whereSQL}
       ORDER BY ${sortClause}
       LIMIT ? OFFSET ?
     `;
 
-    const params = [...fromClause.params, ...whereParams, perPage, offset];
+    const params = [
+      ...subGroupCount.params,
+      ...fromClause.params,
+      ...whereParams,
+      perPage,
+      offset,
+    ];
 
     logger.info("GroupQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
@@ -709,6 +784,7 @@ class GroupQueryBuilder {
       // Counts
       scene_count: row.sceneCount || 0,
       performer_count: row.performerCount || 0,
+      sub_group_count: Number(row.subGroupCount),
       duration: row.duration || 0,
 
       // Image paths - transform to proxy URLs with instanceId for multi-instance routing
@@ -740,6 +816,59 @@ class GroupQueryBuilder {
     };
 
     return group as NormalizedGroup;
+  }
+
+  /**
+   * A group's place in the collection hierarchy: the groups containing it, by
+   * name, and its sub-groups, in Stash's order (`orderIndex`), each with the
+   * link's description. The first query drives from GroupRelation's reverse
+   * index (subId, subInstanceId), the second from its primary key prefix.
+   * Both leave out deleted groups and those excluded for the user (hidden,
+   * restricted, empty), as the list's sub-group count does. The other end is
+   * held to the group's own instance, which the caller already allows.
+   */
+  async getHierarchy(
+    groupId: string,
+    instanceId: string,
+    userId: number
+  ): Promise<GroupHierarchy> {
+    const visible = `LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'group' AND e.entityId = other.id AND (e.instanceId = '' OR e.instanceId = other.stashInstanceId)`;
+
+    const [containing, sub] = await Promise.all([
+      prisma.$queryRawUnsafe<GroupRelationQueryRow[]>(
+        `SELECT other.id, other.stashInstanceId, other.name, gr.description
+        FROM GroupRelation gr
+        JOIN StashGroup other ON other.id = gr.containingId AND other.stashInstanceId = gr.containingInstanceId AND other.deletedAt IS NULL
+        ${visible}
+        WHERE gr.subId = ? AND gr.subInstanceId = ? AND gr.containingInstanceId = ? AND e.id IS NULL
+        ORDER BY other.name COLLATE NOCASE ASC, other.id ASC`,
+        userId,
+        groupId,
+        instanceId,
+        instanceId
+      ),
+      prisma.$queryRawUnsafe<GroupRelationQueryRow[]>(
+        `SELECT other.id, other.stashInstanceId, other.name, gr.description
+        FROM GroupRelation gr
+        JOIN StashGroup other ON other.id = gr.subId AND other.stashInstanceId = gr.subInstanceId AND other.deletedAt IS NULL
+        ${visible}
+        WHERE gr.containingId = ? AND gr.containingInstanceId = ? AND gr.subInstanceId = ? AND e.id IS NULL
+        ORDER BY gr.orderIndex ASC, other.id ASC`,
+        userId,
+        groupId,
+        instanceId,
+        instanceId
+      ),
+    ]);
+
+    const toRef = (row: GroupRelationQueryRow): GroupRelationRef => ({
+      group: { id: row.id, name: row.name, instanceId: row.stashInstanceId },
+      description: row.description,
+    });
+    return {
+      containing_groups: containing.map(toRef),
+      sub_groups: sub.map(toRef),
+    };
   }
 
   /**

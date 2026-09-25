@@ -134,7 +134,7 @@ export type PeekGalleryFilter = BaseGalleryFilterType & {
  * Peek Group Filter
  * Adds custom Peek filter fields to base Stash group filters.
  */
-export type PeekGroupFilter = BaseGroupFilterType & {
+export type PeekGroupFilter = Omit<BaseGroupFilterType, "containing_groups"> & {
   ids?: EntityRefFilter;
   tags?: EntityRefFilter;
   studios?: EntityRefFilter;
@@ -142,4 +142,9 @@ export type PeekGroupFilter = BaseGroupFilterType & {
   instance_id?: string;
   scenes?: EntityRefFilter;
   scene_count?: { value?: number; value2?: number; modifier?: string };
+  /**
+   * Direct sub-groups of these groups (depth 0, as the card counts them); it
+   * replaces Stash's hierarchical form, which takes a depth
+   */
+  containing_groups?: EntityRefFilter;
 };

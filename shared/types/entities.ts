@@ -57,6 +57,16 @@ export interface GalleryRef {
   cover: string | null;
 }
 
+/**
+ * One link of the collection hierarchy, seen from a group: the group at the
+ * other end (always on the same instance) and Stash's description of the
+ * link, e.g. "Part 2".
+ */
+export interface GroupRelationRef {
+  group: { id: string; name: string; instanceId: string };
+  description: string | null;
+}
+
 // ─── Scene File & Stream Types ───────────────────────────────────────────────
 
 export interface SceneFile {
@@ -287,6 +297,8 @@ export interface NormalizedGroup {
   duration: number | null;
   scene_count: number;
   performer_count: number;
+  /** Direct sub-groups the requesting user can see */
+  sub_group_count: number;
   director: string | null;
   synopsis: string | null;
   urls: string[];
@@ -295,6 +307,12 @@ export interface NormalizedGroup {
   back_image_path: string | null;
   created_at: string | null;
   updated_at: string | null;
+
+  // The collection hierarchy, on the detail request only: the groups
+  // containing this one, by name, and its sub-groups, in Stash's order. Each
+  // leaves out the groups the requesting user cannot see.
+  containing_groups?: GroupRelationRef[];
+  sub_groups?: GroupRelationRef[];
 
   // Transient field: set by QueryBuilder transformRow() but not part of the GraphQL type.
   // Used internally by populateRelations to look up studios without re-parsing.

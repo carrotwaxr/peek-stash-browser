@@ -119,8 +119,11 @@ const Groups = () => {
 
         {initMessage && <SyncProgressBanner message={initMessage} />}
 
-        {/* Controls Section */}
+        {/* Controls Section. SearchControls reads the URL once, on mount: a
+            collection card's sub-collection count links here with another
+            ?groupId=, so a new one mounts it afresh */}
         <SearchControls
+          key={searchParams.get("groupId") ?? ""}
           artifactType="group"
           isRefreshing={isPlaceholderData}
           initialSort="name"
@@ -244,7 +247,6 @@ const Groups = () => {
                           key={group.id as string}
                           group={
                             group as unknown as NormalizedGroup & {
-                              sub_group_count?: number;
                               description?: string | null;
                             }
                           }

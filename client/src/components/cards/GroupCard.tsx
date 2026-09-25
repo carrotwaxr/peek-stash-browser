@@ -10,7 +10,6 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid";
 
 interface Props {
   group: NormalizedGroup & {
-    sub_group_count?: number;
     description?: string | null;
   };
   fromPageTitle?: string;
@@ -94,14 +93,16 @@ const GroupCard = forwardRef<HTMLDivElement, Props>(
               : undefined,
         },
         {
+          // Sub-collections: the singular groupId, with the instance param,
+          // becomes the "Parent collection" filter's "id:instance" value
           type: "GROUPS",
           count: group.sub_group_count,
           onClick:
-            (group.sub_group_count ?? 0) > 0
+            group.sub_group_count > 0
               ? () =>
                   navigate(
                     appendInstanceParam(
-                      `/collections?groupIds=${group.id}`,
+                      `/collections?groupId=${group.id}`,
                       group,
                       hasMultipleInstances
                     )

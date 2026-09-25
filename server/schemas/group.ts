@@ -8,6 +8,19 @@ import { ProxyUrlSchema, TimestampSchema } from "./base.js";
 import { StudioRefSchema, TagRefSchema } from "./refs.js";
 
 /**
+ * One link of the collection hierarchy: the group at the other end, on the
+ * same instance, and Stash's description of the link
+ */
+const GroupRelationRefSchema = z.object({
+  group: z.object({
+    id: z.string(),
+    name: z.string(),
+    instanceId: z.string(),
+  }),
+  description: z.string().nullable(),
+});
+
+/**
  * Full group response
  */
 export const GroupSchema = z.object({
@@ -28,26 +41,14 @@ export const GroupSchema = z.object({
   studio: StudioRefSchema.nullable(),
   tags: z.array(TagRefSchema),
 
-  // Containing group (if sub-group)
-  containing_groups: z.array(
-    z.object({
-      group: z.object({
-        id: z.string(),
-        name: z.string(),
-      }),
-    })
-  ),
-  sub_groups: z.array(
-    z.object({
-      group: z.object({
-        id: z.string(),
-        name: z.string(),
-      }),
-    })
-  ),
+  // The collection hierarchy, on the detail request only: the groups this
+  // one is in and its sub-groups, each with the link's description
+  containing_groups: z.array(GroupRelationRefSchema).optional(),
+  sub_groups: z.array(GroupRelationRefSchema).optional(),
 
   // Counts
   scene_count: z.number().nullable(),
+  sub_group_count: z.number(),
 
   // Stash ratings
   rating100: z.number().nullable(),

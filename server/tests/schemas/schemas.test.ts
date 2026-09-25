@@ -645,6 +645,7 @@ describe("Entity Schemas", () => {
       containing_groups: [],
       sub_groups: [],
       scene_count: 10,
+      sub_group_count: 0,
       rating100: 85,
       created_at: "2024-01-01T00:00:00Z",
       updated_at: "2024-01-15T00:00:00Z",
@@ -679,13 +680,66 @@ describe("Entity Schemas", () => {
     it("validates group with containing and sub groups", () => {
       const groupWithHierarchy = {
         ...validGroup,
-        containing_groups: [{ group: { id: "cg1", name: "Containing Group" } }],
-        sub_groups: [
-          { group: { id: "sg1", name: "Sub Group 1" } },
-          { group: { id: "sg2", name: "Sub Group 2" } },
+        containing_groups: [
+          {
+            group: { id: "cg1", name: "Containing Group", instanceId: "i" },
+            description: null,
+          },
         ],
+        sub_groups: [
+          {
+            group: { id: "sg1", name: "Sub Group 1", instanceId: "i" },
+            description: "Part 1",
+          },
+          {
+            group: { id: "sg2", name: "Sub Group 2", instanceId: "i" },
+            description: null,
+          },
+        ],
+        sub_group_count: 2,
       };
       expect(() => GroupSchema.parse(groupWithHierarchy)).not.toThrow();
+    });
+
+    it("accepts the hierarchy's descriptions and instances and sub_group_count", () => {
+      const group = {
+        ...validGroup,
+        sub_group_count: 1,
+        containing_groups: [
+          {
+            group: { id: "cg1", name: "Box", instanceId: "inst-a" },
+            description: "Box set",
+          },
+        ],
+        sub_groups: [
+          {
+            group: { id: "sg1", name: "Part", instanceId: "inst-a" },
+            description: null,
+          },
+        ],
+      };
+
+      // Unknown keys are stripped, so a missing field would drop out here
+      expect(GroupSchema.parse(group)).toMatchObject({
+        sub_group_count: 1,
+        containing_groups: [
+          {
+            group: { id: "cg1", name: "Box", instanceId: "inst-a" },
+            description: "Box set",
+          },
+        ],
+        sub_groups: [
+          {
+            group: { id: "sg1", name: "Part", instanceId: "inst-a" },
+            description: null,
+          },
+        ],
+      });
+    });
+
+    it("accepts a list row, which has no hierarchy lists", () => {
+      const { containing_groups: _c, sub_groups: _s, ...row } = validGroup;
+      expect(() => GroupSchema.parse(row)).not.toThrow();
     });
 
     it("validates group with tags", () => {
