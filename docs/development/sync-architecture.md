@@ -30,7 +30,7 @@ Peek provides three sync strategies, each optimized for different use cases:
 An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
 **Process:**
-1. Sync all entity types in dependency order: studios, tags, performers, groups, galleries, scenes, images, each followed by its [cleanup](#cleanup-safety)
+1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety)
 2. Apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images)
 3. Compute scene tag inheritance
 4. Rebuild inherited image counts
@@ -94,19 +94,22 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 
 ## Entity Sync Order
 
-All sync types process entities in dependency order:
+Every sync type processes entities in the same dependency order, and runs its cleanups in it too:
 
 ```
-1. studios     (no dependencies)
-2. tags        (no dependencies)
-3. performers  (no dependencies)
+1. tags        (no dependencies)
+2. studios     (depends on tags)
+3. performers  (depends on tags)
 4. groups      (depends on studios, tags)
 5. galleries   (depends on studios, performers, tags)
 6. scenes      (depends on studios, performers, tags, groups, galleries)
-7. images      (depends on studios, performers, tags, galleries)
+7. clips       (depends on scenes, tags)
+8. images      (depends on studios, performers, tags, galleries)
 ```
 
-This order ensures foreign key relationships are satisfied.
+This order ensures foreign key relationships are satisfied: a junction row such as a studio's tag has a foreign key to the tag, which must already be stored.
+
+**One failing type does not stop the rest.** When Stash (or the database) fails on one type, Peek records the error in that type's sync state, leaves its timestamps where they were so the next sync retries it, and goes on with the next type. The post-sync steps still run. Aborting a sync is different: it stops the whole run, every instance, and records nothing.
 
 ---
 
@@ -120,7 +123,7 @@ After syncing, each entity type runs a cleanup: Peek asks Stash for every id of 
 | Empty list | Stash returns no ids while Peek has live rows of that type | Skipped |
 | Ratio | More than half of the live rows would go, and more than 50 of them | Refused |
 
-The ratio guard has a floor of 50 rows, so a small library can still lose most of a type when Stash really did (8 of 10 tags, say). A skip or refusal soft-deletes nothing, and the next sync checks again. The server log names each skip (a warning) and refusal (an error) with its counts, and any Stash or database error in a cleanup; either way the sync moves on to the next type.
+The ratio guard has a floor of 50 rows, so a small library can still lose most of a type when Stash really did (8 of 10 tags, say). A skip or refusal soft-deletes nothing, and the next sync checks again. The server log names each skip (a warning) and refusal (an error) with its counts, and any Stash or database error in a cleanup; either way the sync moves on to the next type. Each is also kept in the type's `lastError` (see [Sync State Tracking](#sync-state-tracking)): `Cleanup skipped: Stash returned 100 of 120 scenes (page 2 was empty)`, `Cleanup refused: Stash no longer lists 812 of 1,200 scenes (more than half); ...`, or `Cleanup failed: ...`.
 
 How the delete set is computed: one SQL statement compares the cached rows with Stash's whole id list, bound as one JSON parameter (`"id" NOT IN (SELECT value FROM json_each(?))`), so there is no limit on library size and no transaction: 178 ms for 260,599 image ids on a production copy. The rows then go in batches of 500, each a short write-queue unit. Scenes then move user data from merged scenes to their survivors (see [Merge Detection](../user-guide/merge-detection.md)).
 
@@ -182,15 +185,18 @@ Each entity type maintains its own sync state:
 
 ```sql
 CREATE TABLE SyncState (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY,
   stashInstanceId TEXT,
   entityType TEXT,              -- 'scene', 'performer', 'studio', etc.
   lastFullSyncTimestamp TEXT,   -- RFC3339 timestamp from Stash
-  lastIncrementalSyncTimestamp TEXT
+  lastIncrementalSyncTimestamp TEXT,
+  lastError TEXT                -- what went wrong with this type in the last sync, or NULL
 );
 ```
 
 Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastIncrementalSyncTimestamp` for each entity type independently. A type with neither is fetched whole, by every sync mode; that is how a migration asks for a refetch.
+
+`lastError` holds the last sync's problem with the type: Stash's error when fetching it failed (its GraphQL message and HTTP status, a timeout, or "Could not reach Stash", never the query), then any cleanup skip, refusal or failure, joined with "; ". A type that syncs cleanly, or that a smart sync skips because nothing changed, clears it. A failed type keeps its timestamps, so the next sync fetches it again from the same point.
 
 ---
 

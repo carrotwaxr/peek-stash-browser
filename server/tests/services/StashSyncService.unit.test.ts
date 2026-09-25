@@ -5,10 +5,23 @@
  */
 import { type Server, createServer } from "http";
 import type { AddressInfo } from "net";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { StashClient } from "../../graphql/StashClient.js";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  StashClient,
+  StashRequestTimeoutError,
+} from "../../graphql/StashClient.js";
 import prisma from "../../prisma/singleton.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { logger } from "../../utils/logger.js";
+import { stringContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
@@ -117,6 +130,59 @@ const mockStashClient = {
 };
 mockStashClient.withSignal.mockReturnValue(mockStashClient);
 
+/** Stash lists nothing and reports no change for any type (the defaults). */
+function stashAnswersNothing(): void {
+  mockStashClient.findTags.mockResolvedValue({
+    findTags: { tags: [], count: 0 },
+  });
+  mockStashClient.findStudios.mockResolvedValue({
+    findStudios: { studios: [], count: 0 },
+  });
+  mockStashClient.findPerformers.mockResolvedValue({
+    findPerformers: { performers: [], count: 0 },
+  });
+  mockStashClient.findGroups.mockResolvedValue({
+    findGroups: { groups: [], count: 0 },
+  });
+  mockStashClient.findGalleries.mockResolvedValue({
+    findGalleries: { galleries: [], count: 0 },
+  });
+  mockStashClient.findScenesCompact.mockResolvedValue({
+    findScenes: { scenes: [], count: 0 },
+  });
+  mockStashClient.findImages.mockResolvedValue({
+    findImages: { images: [], count: 0 },
+  });
+}
+
+/**
+ * Stash reports one change for every type but lists none, so each type
+ * syncs (the smart path's change count is 1) without writing a row.
+ */
+function everyTypeChanged(): void {
+  mockStashClient.findTags.mockResolvedValue({
+    findTags: { tags: [], count: 1 },
+  });
+  mockStashClient.findStudios.mockResolvedValue({
+    findStudios: { studios: [], count: 1 },
+  });
+  mockStashClient.findPerformers.mockResolvedValue({
+    findPerformers: { performers: [], count: 1 },
+  });
+  mockStashClient.findGroups.mockResolvedValue({
+    findGroups: { groups: [], count: 1 },
+  });
+  mockStashClient.findGalleries.mockResolvedValue({
+    findGalleries: { galleries: [], count: 1 },
+  });
+  mockStashClient.findScenesCompact.mockResolvedValue({
+    findScenes: { scenes: [], count: 1 },
+  });
+  mockStashClient.findImages.mockResolvedValue({
+    findImages: { images: [], count: 1 },
+  });
+}
+
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefault: vi.fn(() => mockStashClient),
@@ -158,6 +224,18 @@ vi.mock("../../services/ClipPreviewProber.js", () => ({
   },
 }));
 
+// Full sync's inheritance steps
+vi.mock("../../services/SceneTagInheritanceService.js", () => ({
+  sceneTagInheritanceService: {
+    computeInheritedTags: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({
+  imageGalleryInheritanceService: {
+    applyGalleryInheritance: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Scene cleanup's merge steps
 vi.mock("../../services/MergeReconciliationService.js", () => ({
   mergeReconciliationService: {
@@ -173,6 +251,7 @@ vi.mock("../../services/MergeReconciliationService.js", () => ({
 describe("StashSyncService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stashAnswersNothing();
     // Cleanup's live counts and delete sets: nothing cached
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
@@ -446,7 +525,335 @@ describe("StashSyncService", () => {
       ]);
     });
   });
+
+  describe("order and per-type errors", () => {
+    const INSTANCE = "test-instance-uuid";
+    const SINCE = "2025-12-27T16:00:00-08:00";
+    const TYPES = [
+      "tag",
+      "studio",
+      "performer",
+      "group",
+      "gallery",
+      "scene",
+      "clip",
+      "image",
+    ];
+    /** SyncState row ids by type, so a write by id names its type */
+    const STATE_IDS = new Map(TYPES.map((type, i) => [type, i + 1]));
+
+    /** Every type has synced before, at SINCE, and holds `lastError`. */
+    function everyTypeSynced(lastError: string | null = null): void {
+      mockPrisma.syncState.findFirst.mockImplementation(
+        prismaImpl((args) => {
+          const entityType = args?.where?.entityType;
+          if (typeof entityType !== "string") return null;
+          return partialRow({
+            id: STATE_IDS.get(entityType),
+            entityType,
+            lastFullSyncTimestamp: null,
+            lastIncrementalSyncTimestamp: SINCE,
+            lastError,
+          });
+        })
+      );
+    }
+
+    /**
+     * The `lastError` values written to each type's SyncState row, in
+     * order: saveSyncState's update or create, and recordEntityError's
+     * updateMany.
+     */
+    function lastErrorsWritten(): Record<string, unknown[]> {
+      const typeById = new Map([...STATE_IDS].map(([type, id]) => [id, type]));
+      const writes: Array<{ order: number; type: string; lastError: unknown }> =
+        [];
+      const { calls: updates, invocationCallOrder: updateOrder } =
+        mockPrisma.syncState.update.mock;
+      updates.forEach(([args], i) => {
+        writes.push({
+          order: must(updateOrder[i]),
+          type: String(typeById.get(Number(args.where.id))),
+          lastError: args.data.lastError,
+        });
+      });
+      const { calls: creates, invocationCallOrder: createOrder } =
+        mockPrisma.syncState.create.mock;
+      creates.forEach(([args], i) => {
+        writes.push({
+          order: must(createOrder[i]),
+          type: args.data.entityType,
+          lastError: args.data.lastError,
+        });
+      });
+      const { calls: recorded, invocationCallOrder: recordedOrder } =
+        mockPrisma.syncState.updateMany.mock;
+      recorded.forEach(([args], i) => {
+        const entityType = args.where?.entityType;
+        writes.push({
+          order: must(recordedOrder[i]),
+          type: typeof entityType === "string" ? entityType : "(no type)",
+          lastError: args.data.lastError,
+        });
+      });
+      const byType: Record<string, unknown[]> = {};
+      for (const write of writes.sort((a, b) => a.order - b.order)) {
+        (byType[write.type] ??= []).push(write.lastError);
+      }
+      return byType;
+    }
+
+    /** Whether any call to `fn` fetched a page (the sync), not a count. */
+    function fetchedPage(fn: { mock: { calls: unknown[][] } }): boolean {
+      return fn.mock.calls.some(([vars]) => {
+        const perPage = (vars as { filter?: { per_page?: number } } | undefined)
+          ?.filter?.per_page;
+        return typeof perPage === "number" && perPage > 0;
+      });
+    }
+
+    afterEach(() => {
+      stashAnswersNothing();
+    });
+
+    it("smartIncrementalSync syncs tags before studios", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      everyTypeSynced();
+      everyTypeChanged();
+
+      await stashSyncService.smartIncrementalSync(INSTANCE);
+
+      const firstTagCall = must(
+        mockStashClient.findTags.mock.invocationCallOrder[0],
+        "a FindTags request"
+      );
+      const firstStudioCall = must(
+        mockStashClient.findStudios.mock.invocationCallOrder[0],
+        "a FindStudios request"
+      );
+      expect(firstTagCall).toBeLessThan(firstStudioCall);
+    });
+
+    it.each(["smartIncrementalSync", "incrementalSync", "fullSync"] as const)(
+      "%s: a failing studio sync is stored in SyncState.lastError and the later types still sync",
+      async (method) => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        everyTypeSynced("an error from an earlier sync");
+        everyTypeChanged();
+        mockStashClient.findStudios.mockRejectedValue(
+          new StashRequestTimeoutError("FindStudios", 120_000)
+        );
+
+        const results = await stashSyncService[method](INSTANCE);
+
+        expect(fetchedPage(mockStashClient.findPerformers)).toBe(true);
+        expect(fetchedPage(mockStashClient.findScenesCompact)).toBe(true);
+        expect(fetchedPage(mockStashClient.findImages)).toBe(true);
+        const written = lastErrorsWritten();
+        expect(written.studio).toEqual([
+          "Stash request FindStudios timed out after 120 s",
+        ]);
+        expect(written.tag).toEqual([null]);
+        expect(written.image).toEqual([null]);
+        expect(must(results.find((r) => r.entityType === "studio")).error).toBe(
+          "Stash request FindStudios timed out after 120 s"
+        );
+      }
+    );
+
+    it("an abort during a type ends the sync and records no lastError", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      everyTypeSynced();
+      everyTypeChanged();
+      // The tag page request is cut short, as a scoped client's is by abort()
+      mockStashClient.findTags.mockImplementation(
+        (vars: { filter?: { per_page?: number } } | undefined) => {
+          if (vars?.filter?.per_page === 0) {
+            return Promise.resolve({ findTags: { tags: [], count: 1 } });
+          }
+          stashSyncService.abort();
+          return Promise.reject(new Error("Sync aborted"));
+        }
+      );
+
+      await expect(
+        stashSyncService.smartIncrementalSync(INSTANCE)
+      ).rejects.toThrow("Sync aborted");
+
+      expect(lastErrorsWritten()).toEqual({});
+      expect(mockStashClient.findStudios).not.toHaveBeenCalled();
+      expect(stashSyncService.isSyncing()).toBe(false);
+    });
+
+    it.each(["smartIncrementalSync", "incrementalSync", "fullSync"] as const)(
+      "%s: an abort ends the run for every instance, not just the one syncing",
+      async (method) => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        vi.mocked(stashInstanceManager.getAllEnabled).mockReturnValueOnce([
+          { id: "instance-a", name: "A" },
+          { id: "instance-b", name: "B" },
+        ]);
+        everyTypeSynced();
+        everyTypeChanged();
+        // A's first request (the smart path's change count, else the tag
+        // page) is cut short by abort()
+        mockStashClient.findTags.mockImplementationOnce(() => {
+          stashSyncService.abort();
+          return Promise.reject(new Error("Sync aborted"));
+        });
+        const warn = vi.spyOn(logger, "warn");
+
+        try {
+          await expect(stashSyncService[method]()).rejects.toThrow(
+            "Sync aborted"
+          );
+
+          expect(stashInstanceManager.get).not.toHaveBeenCalledWith(
+            "instance-b"
+          );
+          const warnings = warn.mock.calls.map(([message]) => message);
+          expect(warnings).not.toContainEqual(
+            stringContaining("Failed to get change count")
+          );
+          expect(lastErrorsWritten()).toEqual({});
+        } finally {
+          warn.mockRestore();
+        }
+      }
+    );
+
+    it("a type with no changes clears an earlier lastError", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      everyTypeSynced("an error from an earlier sync");
+
+      await stashSyncService.smartIncrementalSync(INSTANCE);
+
+      expect(mockPrisma.syncState.updateMany).toHaveBeenCalledWith({
+        where: { stashInstanceId: INSTANCE, entityType: "studio" },
+        data: { lastError: null },
+      });
+      expect(lastErrorsWritten()).toEqual(
+        Object.fromEntries(TYPES.map((type) => [type, [null]]))
+      );
+    });
+
+    it.each([
+      {
+        kind: "a ratio-guard refusal",
+        // Stash lists 40 of the 120 cached scenes
+        stashPages: [{ ids: ids(1, 40), count: 40 }],
+        cached: 120,
+        missing: ids(41, 120),
+        stored:
+          "Cleanup refused: Stash no longer lists 80 of 120 scenes (more than half); " +
+          "apply the deletions from the sync status if this is intended",
+      },
+      {
+        kind: "a partial list",
+        // Stash counts 120 scenes, but page 2 comes back empty
+        stashPages: [
+          { ids: ids(1, 100), count: 120 },
+          { ids: [], count: 120 },
+        ],
+        cached: 120,
+        missing: [],
+        stored:
+          "Cleanup skipped: Stash returned 100 of 120 scenes (page 2 was empty)",
+      },
+    ])(
+      "a cleanup refusal is stored in that type's lastError: $kind",
+      async ({ stashPages, cached, missing, stored }) => {
+        const { stashSyncService } =
+          await import("../../services/StashSyncService.js");
+        everyTypeSynced("an error from an earlier sync");
+        for (const page of stashPages) {
+          mockStashClient.findSceneIDs.mockResolvedValueOnce({
+            findScenes: {
+              scenes: page.ids.map((id) => ({ id })),
+              count: page.count,
+            },
+          });
+        }
+        cacheHoldsScenes(cached, missing);
+
+        await stashSyncService.smartIncrementalSync(INSTANCE);
+
+        // Cleared by the skipped scene sync, then the cleanup's text
+        expect(lastErrorsWritten().scene).toEqual([null, stored]);
+        const statements = mockPrisma.$executeRawUnsafe.mock.calls.map(
+          ([sql]) => sql
+        );
+        expect(statements).not.toContainEqual(
+          stringContaining('UPDATE "StashScene" SET "deletedAt"')
+        );
+      }
+    );
+
+    it("a full sync stores a cleanup refusal with the type's state", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      everyTypeSynced();
+      mockStashClient.findSceneIDs.mockResolvedValueOnce({
+        findScenes: { scenes: ids(1, 40).map((id) => ({ id })), count: 40 },
+      });
+      cacheHoldsScenes(120, ids(41, 120));
+
+      await stashSyncService.fullSync(INSTANCE);
+
+      expect(lastErrorsWritten().scene).toEqual([
+        stringContaining("Cleanup refused: Stash no longer lists 80 of 120"),
+      ]);
+    });
+
+    it("a cleanup that fails is stored after the type's own error", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      everyTypeSynced();
+      everyTypeChanged();
+      mockStashClient.findStudios.mockRejectedValue(
+        new StashRequestTimeoutError("FindStudios", 120_000)
+      );
+      mockStashClient.findStudioIDs.mockRejectedValueOnce(
+        new StashRequestTimeoutError("FindStudioIDs", 120_000)
+      );
+
+      await stashSyncService.incrementalSync(INSTANCE);
+
+      expect(lastErrorsWritten().studio).toEqual([
+        "Stash request FindStudios timed out after 120 s",
+        "Stash request FindStudios timed out after 120 s; " +
+          "Cleanup failed: Stash request FindStudioIDs timed out after 120 s",
+      ]);
+    });
+  });
 });
+
+/** `from` to `to` as string ids */
+function ids(from: number, to: number): string[] {
+  return Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
+}
+
+/**
+ * The cache holds `live` scenes of the instance, of which `missing` are not
+ * in Stash's list (cleanup's live count and delete set).
+ */
+function cacheHoldsScenes(live: number, missing: string[]): void {
+  mockPrisma.$queryRawUnsafe.mockImplementation(
+    prismaImpl((sql: string) => {
+      if (!sql.includes('"StashScene"')) return [];
+      if (sql.includes("COUNT(*)")) return [{ n: BigInt(live) }];
+      if (sql.includes("NOT IN")) {
+        return missing.map((id) => ({ id, phash: null }));
+      }
+      return [];
+    })
+  );
+}
 
 describe("StashSyncService abort", () => {
   let hanging: Server;
