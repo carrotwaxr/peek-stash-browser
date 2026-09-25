@@ -9,6 +9,7 @@ import {
   SyncBusyError,
   stashSyncService,
 } from "../services/StashSyncService.js";
+import { syncScheduler } from "../services/SyncScheduler.js";
 import { getUsersSelecting } from "../services/UserInstanceService.js";
 import type {
   ApiErrorResponse,
@@ -404,14 +405,21 @@ export const createFirstStashInstance = async (
     // Reload the StashInstanceManager to pick up the new instance
     await stashInstanceManager.reload();
 
-    // Initialize the Stash cache now that we have an instance
-    // This runs in the background - we don't want to block the response
-    logger.info("Triggering Stash cache initialization...");
-    stashSyncService.fullSync().catch((err: unknown) => {
-      logger.error("Failed to initialize Stash cache after instance creation", {
-        error: err instanceof Error ? err.message : String(err),
+    // Start the scheduler, which the boot left stopped with no instance: its
+    // startup sync is a full sync (nothing has synced yet), and it then keeps
+    // syncing on the interval. In the background: the answer does not wait.
+    // One still running for an earlier instance (disabled, then deleted)
+    // syncs the new one through the queue instead.
+    if (syncScheduler.isRunning()) {
+      stashSyncService.queueFullSync(instance.id);
+    } else {
+      logger.info("Starting the sync scheduler for the first instance");
+      syncScheduler.start().catch((err: unknown) => {
+        logger.error("Failed to start the sync scheduler after setup", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
+    }
 
     res.status(201).json({
       success: true,

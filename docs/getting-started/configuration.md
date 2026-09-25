@@ -47,6 +47,8 @@ Each instance can be:
 
 Each instance has a table of its entity types: when each last had a full sync, the newest change Peek has from Stash, the last run's count and duration, and any problem the last run had with that type (a Stash error, a timeout, or a cleanup that was skipped or held back). While a sync runs, the status refreshes every 10 seconds and an **Abort sync** button stops it. **Full Sync** under Server Statistics asks before it starts. See [Sync Problems](troubleshooting.md#sync-problems) for what each problem means.
 
+**Sync Interval**, above the status, sets how often Peek checks Stash for changes (every hour by default). A new interval takes effect at once: the next scheduled sync comes one new interval after you save it. Saving it does not start a sync. Scheduled syncs begin as soon as the setup wizard has saved the first instance, with no restart.
+
 ### Per-User Instance Selection
 
 When multiple instances are configured, each user can choose which instances they see content from:

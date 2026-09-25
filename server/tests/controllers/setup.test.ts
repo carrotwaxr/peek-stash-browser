@@ -22,6 +22,7 @@ import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { syncScheduler } from "../../services/SyncScheduler.js";
 import { getUsersSelecting } from "../../services/UserInstanceService.js";
 import { logger } from "../../utils/logger.js";
 import {
@@ -87,6 +88,15 @@ vi.mock("../../services/StashSyncService.js", () => ({
   },
 }));
 
+// The wizard's first instance starts the scheduler, which runs its first
+// sync and then keeps syncing on the interval
+vi.mock("../../services/SyncScheduler.js", () => ({
+  syncScheduler: {
+    isRunning: vi.fn(() => false),
+    start: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Mock bcryptjs
 vi.mock("bcryptjs", () => ({
   default: {
@@ -108,6 +118,8 @@ vi.mock("../../services/UserInstanceService.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockSync = vi.mocked(stashSyncService, true);
+const mockScheduler = vi.mocked(syncScheduler, true);
+const mockManager = vi.mocked(stashInstanceManager, true);
 const mockExclusions = vi.mocked(exclusionComputationService, true);
 const mockUsersSelecting = vi.mocked(getUsersSelecting);
 
@@ -426,6 +438,70 @@ describe("Setup Controller", () => {
           }),
         })
       );
+    });
+
+    it("createFirstStashInstance starts the scheduler", async () => {
+      mockPrisma.stashInstance.count.mockResolvedValue(0);
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        partialRow({
+          id: "inst-1",
+          name: "Default",
+          url: "http://stash:9999/graphql",
+          uiUrl: null,
+          enabled: true,
+          createdAt: new Date(),
+        })
+      );
+      // The startup sync runs in the background: the answer does not wait
+      mockScheduler.start.mockReturnValueOnce(new Promise(() => undefined));
+
+      const res = resFor(createFirstStashInstance);
+      await createFirstStashInstance(
+        reqFor(createFirstStashInstance, {
+          body: { url: "http://stash:9999/graphql", apiKey: "test-key" },
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(mockScheduler.start).toHaveBeenCalledOnce();
+      // After the manager has loaded the new instance
+      expect(
+        must(mockManager.reload.mock.invocationCallOrder[0], "reload")
+      ).toBeLessThan(
+        must(mockScheduler.start.mock.invocationCallOrder[0], "start")
+      );
+      // The scheduler's startup sync is the first sync, not one of its own
+      expect(mockSync.fullSync).not.toHaveBeenCalled();
+      expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+    });
+
+    it("a scheduler still running for a deleted instance syncs the first new one through the queue", async () => {
+      // The only instance was disabled, then deleted: the wizard runs again
+      mockScheduler.isRunning.mockReturnValueOnce(true);
+      mockPrisma.stashInstance.count.mockResolvedValue(0);
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        partialRow({
+          id: "inst-2",
+          name: "Default",
+          url: "http://stash:9999/graphql",
+          uiUrl: null,
+          enabled: true,
+          createdAt: new Date(),
+        })
+      );
+
+      const res = resFor(createFirstStashInstance);
+      await createFirstStashInstance(
+        reqFor(createFirstStashInstance, {
+          body: { url: "http://stash:9999/graphql", apiKey: "test-key" },
+        }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(mockSync.queueFullSync).toHaveBeenCalledWith("inst-2");
+      expect(mockScheduler.start).not.toHaveBeenCalled();
     });
 
     it("returns 403 when instances already exist", async () => {
