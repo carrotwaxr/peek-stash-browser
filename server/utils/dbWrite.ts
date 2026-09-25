@@ -144,7 +144,7 @@ async function runWithRetry<T>(
 /**
  * Runs `fn` as one write unit: after every unit enqueued before it, and
  * before every unit enqueued after. `label` names the unit in the logs
- * ("rating.scene", "sync.scenes.junctions"): keep it short and stable.
+ * ("rating.scene", "sync.scenes"): keep it short and stable.
  */
 export async function dbWrite<T>(
   label: string,
@@ -186,9 +186,10 @@ export async function dbWrite<T>(
 
 /**
  * An interactive transaction as one unit: `dbWrite(label, () =>
- * prisma.$transaction(fn, DB_WRITE_TX))`. `options` override DB_WRITE_TX for
- * the sync junction transactions still to be shortened; new code passes
- * none. Write through `tx` inside `fn`, never through `dbWrite`.
+ * prisma.$transaction(fn, DB_WRITE_TX))`. `options` override DB_WRITE_TX;
+ * no caller passes any (a sync batch holds the lock about 0.1 s on a
+ * 200k-scene library), and new code passes none. Write through `tx` inside
+ * `fn`, never through `dbWrite`.
  */
 export function dbWriteTransaction<T>(
   label: string,

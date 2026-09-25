@@ -14,7 +14,7 @@
  * - Progress events for UI feedback
  * - Soft delete for removed entities
  */
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { EventEmitter } from "events";
 import {
   type StashClient,
@@ -507,12 +507,13 @@ function escapeSqlNullable(value: string | null | undefined): string {
  * stores a DateTime (processClipsBatch reads them through Prisma).
  */
 async function readStored(
+  db: Pick<PrismaClient, "$queryRawUnsafe">,
   table: Exclude<(typeof INSTANCE_CACHE_TABLES)[number], "StashClip">,
   stashInstanceId: string,
   ids: readonly string[],
   withStudio: boolean
 ): Promise<Map<string, StoredEntity>> {
-  const rows = await prisma.$queryRawUnsafe<
+  const rows = await db.$queryRawUnsafe<
     Array<{
       id: string;
       stashUpdatedAt: string | null;
@@ -539,10 +540,19 @@ async function readStored(
   );
 }
 
-/** Each junction's near (the synced entity) and far columns. */
+/**
+ * Each junction's near (the synced entity) and far columns, and a column of
+ * its own when it has one (a scene's place in a group).
+ */
 const JUNCTION_COLUMNS: Record<
   JunctionName,
-  { near: string; nearInstance: string; far: string; farInstance: string }
+  {
+    near: string;
+    nearInstance: string;
+    far: string;
+    farInstance: string;
+    extra?: string;
+  }
 > = {
   ScenePerformer: {
     near: "sceneId",
@@ -561,6 +571,7 @@ const JUNCTION_COLUMNS: Record<
     nearInstance: "sceneInstanceId",
     far: "groupId",
     farInstance: "groupInstanceId",
+    extra: "sceneIndex",
   },
   SceneGallery: {
     near: "sceneId",
@@ -649,6 +660,141 @@ async function deleteJunctionRows(
   return linksByNearId(rows);
 }
 
+/**
+ * One junction row to insert: the synced entity's id and the far side's,
+ * both on the batch's instance, and the junction's own column if it has one
+ * (a scene's place in a group, null when Stash has none).
+ */
+type JunctionRow = readonly [nearId: string, farId: string, extra?: unknown];
+
+/**
+ * Inserts a batch's junction rows on its transaction, bound as one JSON
+ * parameter: one statement whatever the batch's size, and no string built
+ * from the ids.
+ */
+async function insertJunctionRows(
+  db: Pick<PrismaClient, "$executeRawUnsafe">,
+  junction: JunctionName,
+  rows: readonly JunctionRow[],
+  instanceId: string
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { near, nearInstance, far, farInstance, extra } =
+    JUNCTION_COLUMNS[junction];
+  await db.$executeRawUnsafe(
+    `INSERT OR IGNORE INTO "${junction}" ("${near}", "${nearInstance}", "${far}", "${farInstance}"${extra ? `, "${extra}"` : ""})
+     SELECT json_extract(j.value, '$[0]'), ?, json_extract(j.value, '$[1]'), ?${extra ? `, json_extract(j.value, '$[2]')` : ""}
+     FROM json_each(?) j`,
+    instanceId,
+    instanceId,
+    JSON.stringify(rows)
+  );
+}
+
+/** One batch's writes, built before its transaction opens. */
+interface BatchWrite {
+  /** The unit's name in the writer queue's logs, "sync.<plural>" */
+  label: string;
+  instanceId: string;
+  /** The batch's entity ids: their junction rows are replaced */
+  ids: readonly string[];
+  /** Reads the batch's rows as stored before the write, for the change diff */
+  readStored(tx: Prisma.TransactionClient): Promise<Map<string, StoredEntity>>;
+  /** Writes the batch's rows */
+  upsert(tx: Prisma.TransactionClient): Promise<unknown>;
+  /** Each junction the batch rewrites, with its new rows */
+  junctions: ReadonlyArray<readonly [JunctionName, readonly JunctionRow[]]>;
+}
+
+/** What a batch's rows and links were before its write. */
+interface StoredBatch {
+  stored: Map<string, StoredEntity>;
+  oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>>;
+}
+
+/**
+ * Writes one batch in one transaction, one statement after another on its
+ * connection (item 42, SYNC-11): the rows' stored state, the old junction
+ * rows (deleted and returned, for the change diff), the rows, then the new
+ * junction rows. A failure rolls the whole batch back, so no row keeps a new
+ * updated_at with its links gone: the type records the error, its watermark
+ * stays, and the next sync writes the batch again. Everything is built
+ * before the transaction opens, and no Stash request runs inside it (a
+ * page's missing references are fetched first, `ensureReferenced`).
+ */
+function writeBatch(batch: BatchWrite): Promise<StoredBatch> {
+  return dbWriteTransaction(batch.label, async (tx) => {
+    const stored = await batch.readStored(tx);
+    const oldLinks: StoredBatch["oldLinks"] = {};
+    for (const [junction] of batch.junctions) {
+      oldLinks[junction] = await deleteJunctionRows(
+        tx,
+        junction,
+        batch.ids,
+        batch.instanceId
+      );
+    }
+    await batch.upsert(tx);
+    for (const [junction, rows] of batch.junctions) {
+      await insertJunctionRows(tx, junction, rows, batch.instanceId);
+    }
+    return { stored, oldLinks };
+  });
+}
+
+// ==================== Referenced entities ====================
+
+/**
+ * The entities a page's rows point at, by type, on the page's instance: a
+ * junction's far sides, a studio, a clip's scene and tags.
+ */
+export type BatchReferences = Partial<Record<EntityType, string[]>>;
+
+/** The distinct safe ids among `refs` (a missing one is no reference). */
+function idsOf(
+  refs: ReadonlyArray<{ id: string } | null | undefined>
+): string[] {
+  const ids = new Set<string>();
+  for (const ref of refs) {
+    if (ref && validateEntityId(ref.id)) ids.add(ref.id);
+  }
+  return [...ids];
+}
+
+/**
+ * Which of `refs` Peek holds no row for on `instanceId` (a soft-deleted row
+ * is held): one statement over every type, each id list bound as one JSON
+ * parameter and looked up by primary key.
+ */
+async function missingReferences(
+  instanceId: string,
+  refs: BatchReferences
+): Promise<Map<EntityType, string[]>> {
+  const selects: string[] = [];
+  const params: string[] = [];
+  for (const type of SYNC_ORDER) {
+    const ids = refs[type] ?? [];
+    if (ids.length === 0) continue;
+    selects.push(
+      `SELECT '${type}' AS type, j.value AS id FROM json_each(?) j
+       WHERE NOT EXISTS (SELECT 1 FROM "${ENTITY_TABLES[type].table}" x
+                         WHERE x."id" = j.value AND x."stashInstanceId" = ?)`
+    );
+    params.push(JSON.stringify(ids), instanceId);
+  }
+  const missing = new Map<EntityType, string[]>();
+  if (selects.length === 0) return missing;
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ type: EntityType; id: string }>
+  >(selects.join("\nUNION ALL\n"), ...params);
+  for (const { type, id } of rows) {
+    const ids = missing.get(type) ?? [];
+    ids.push(id);
+    missing.set(type, ids);
+  }
+  return missing;
+}
+
 // ==================== Entity sync specs ====================
 
 /** One page request of a type's sync. */
@@ -674,8 +820,8 @@ export interface SyncRunContext {
 
 /**
  * How one entity type syncs: the Stash query that lists it a page at a time
- * (narrowed by `since` or `ids`), and the writer of one page. `paginate` runs
- * the page loop for every type.
+ * (narrowed by `since` or `ids`), what a page references, and the writer of
+ * one page. `paginate` runs the page loop for every type.
  */
 export interface EntitySyncSpec<
   T extends { id: string; updated_at?: string | null },
@@ -685,6 +831,14 @@ export interface EntitySyncSpec<
     client: StashClient,
     q: SyncPageQuery
   ): Promise<{ items: T[]; count: number }>;
+  /**
+   * The entities a page's rows point at, of the types before this one in
+   * SYNC_ORDER. A junction row, a gallery's or image's studio and a clip's
+   * scene and primary tag have foreign keys, so `paginate` fetches the ones
+   * Peek lacks before it writes the page (`ensureReferenced`).
+   */
+  references(items: T[]): BatchReferences;
+  /** Writes one page in one transaction (`writeBatch`). */
   processBatch(
     items: T[],
     instanceId: string,
@@ -750,6 +904,7 @@ export const ENTITY_SYNC: {
       );
       return { items: findTags.tags, count: findTags.count };
     },
+    references: () => ({}),
     processBatch: processTagsBatch,
   },
   studio: {
@@ -766,6 +921,9 @@ export const ENTITY_SYNC: {
       );
       return { items: findStudios.studios, count: findStudios.count };
     },
+    references: (studios) => ({
+      tag: idsOf(studios.flatMap((s) => s.tags)),
+    }),
     processBatch: processStudiosBatch,
   },
   performer: {
@@ -782,6 +940,9 @@ export const ENTITY_SYNC: {
       );
       return { items: findPerformers.performers, count: findPerformers.count };
     },
+    references: (performers) => ({
+      tag: idsOf(performers.flatMap((p) => p.tags)),
+    }),
     processBatch: processPerformersBatch,
   },
   group: {
@@ -798,6 +959,10 @@ export const ENTITY_SYNC: {
       );
       return { items: findGroups.groups, count: findGroups.count };
     },
+    references: (groups) => ({
+      tag: idsOf(groups.flatMap((g) => g.tags)),
+      studio: idsOf(groups.map((g) => g.studio)),
+    }),
     processBatch: processGroupsBatch,
   },
   gallery: {
@@ -814,6 +979,11 @@ export const ENTITY_SYNC: {
       );
       return { items: findGalleries.galleries, count: findGalleries.count };
     },
+    references: (galleries) => ({
+      tag: idsOf(galleries.flatMap((g) => g.tags)),
+      studio: idsOf(galleries.map((g) => g.studio)),
+      performer: idsOf(galleries.flatMap((g) => g.performers)),
+    }),
     processBatch: processGalleriesBatch,
   },
   scene: {
@@ -830,6 +1000,13 @@ export const ENTITY_SYNC: {
       );
       return { items: findScenes.scenes, count: findScenes.count };
     },
+    references: (scenes) => ({
+      tag: idsOf(scenes.flatMap((s) => s.tags)),
+      studio: idsOf(scenes.map((s) => s.studio)),
+      performer: idsOf(scenes.flatMap((s) => s.performers)),
+      group: idsOf(scenes.flatMap((s) => s.groups.map((g) => g.group))),
+      gallery: idsOf(scenes.flatMap((s) => s.galleries)),
+    }),
     processBatch: processScenesBatch,
   },
   clip: {
@@ -853,6 +1030,10 @@ export const ENTITY_SYNC: {
         count: findSceneMarkers.count,
       };
     },
+    references: (markers) => ({
+      tag: idsOf(markers.flatMap((m) => [m.primary_tag, ...m.tags])),
+      scene: idsOf(markers.map((m) => m.scene)),
+    }),
     processBatch: processClipsBatch,
   },
   image: {
@@ -869,6 +1050,12 @@ export const ENTITY_SYNC: {
       );
       return { items: findImages.images, count: findImages.count };
     },
+    references: (images) => ({
+      tag: idsOf(images.flatMap((i) => i.tags)),
+      studio: idsOf(images.map((i) => i.studio)),
+      performer: idsOf(images.flatMap((i) => i.performers)),
+      gallery: idsOf(images.flatMap((i) => i.galleries)),
+    }),
     processBatch: processImagesBatch,
   },
 };
@@ -892,33 +1079,6 @@ async function processScenesBatch(
 
   const sceneIds = validScenes.map((s) => s.id);
   const instanceId = stashInstanceId;
-
-  // What the batch's scenes looked like before the write, for the change diff
-  const stored = await readStored("StashScene", instanceId, sceneIds, true);
-
-  // Bulk delete all junction records for this batch, keeping the rows for
-  // the change diff. Uses sequential raw SQL in a transaction to avoid
-  // SQLite lock contention and includes extended timeout for large libraries
-  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
-  await dbWriteTransaction(
-    "sync.scenes.junctions",
-    async (tx) => {
-      for (const junction of [
-        "ScenePerformer",
-        "SceneTag",
-        "SceneGroup",
-        "SceneGallery",
-      ] as const) {
-        oldLinks[junction] = await deleteJunctionRows(
-          tx,
-          junction,
-          sceneIds,
-          instanceId
-        );
-      }
-    },
-    { timeout: 60000 } // 60 second timeout for large batches
-  );
 
   // Build bulk scene upsert using raw SQL
   const sceneValues = validScenes
@@ -980,7 +1140,7 @@ async function processScenesBatch(
     })
     .join(",\n");
 
-  await prisma.$executeRawUnsafe(`
+  const upsertScenes = `
   INSERT INTO StashScene (
     id, stashInstanceId, title, code, date, studioId, rating100, duration,
     organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
@@ -1029,14 +1189,14 @@ async function processScenesBatch(
     deletedAt = NULL,
     phash = excluded.phash,
     phashes = excluded.phashes
-`);
+`;
 
   // Collect all junction records (validate related entity IDs too), and
   // each scene's new far sides for the change diff
-  const performerRecords: string[] = [];
-  const tagRecords: string[] = [];
-  const groupRecords: string[] = [];
-  const galleryRecords: string[] = [];
+  const performerRows: JunctionRow[] = [];
+  const tagRows: JunctionRow[] = [];
+  const groupRows: JunctionRow[] = [];
+  const galleryRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
 
   for (const scene of validScenes) {
@@ -1049,34 +1209,25 @@ async function processScenesBatch(
     for (const p of scene.performers || []) {
       if (validateEntityId(p.id)) {
         links.ScenePerformer.push(p.id);
-        performerRecords.push(
-          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
-        );
+        performerRows.push([scene.id, p.id]);
       }
     }
     for (const t of scene.tags || []) {
       if (validateEntityId(t.id)) {
         links.SceneTag.push(t.id);
-        tagRecords.push(
-          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
-        );
+        tagRows.push([scene.id, t.id]);
       }
     }
     for (const g of scene.groups || []) {
       if (validateEntityId(g.group.id)) {
         links.SceneGroup.push(g.group.id);
-        const index = g.scene_index ?? "NULL";
-        groupRecords.push(
-          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.group.id)}', '${escapeSql(instanceId)}', ${index})`
-        );
+        groupRows.push([scene.id, g.group.id, g.scene_index ?? null]);
       }
     }
     for (const g of scene.galleries || []) {
       if (validateEntityId(g.id)) {
         links.SceneGallery.push(g.id);
-        galleryRecords.push(
-          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
-        );
+        galleryRows.push([scene.id, g.id]);
       }
     }
     incoming.push({
@@ -1087,39 +1238,20 @@ async function processScenesBatch(
     });
   }
 
-  // Batch insert junction records
-  const inserts = [];
-
-  if (performerRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ScenePerformer (sceneId, sceneInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
-      )
-    );
-  }
-  if (tagRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO SceneTag (sceneId, sceneInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
-      )
-    );
-  }
-  if (groupRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO SceneGroup (sceneId, sceneInstanceId, groupId, groupInstanceId, sceneIndex) VALUES ${groupRecords.join(",")}`
-      )
-    );
-  }
-  if (galleryRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO SceneGallery (sceneId, sceneInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
-      )
-    );
-  }
-
-  await Promise.all(inserts);
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.scenes",
+    instanceId,
+    ids: sceneIds,
+    readStored: (tx) =>
+      readStored(tx, "StashScene", instanceId, sceneIds, true),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertScenes),
+    junctions: [
+      ["ScenePerformer", performerRows],
+      ["SceneTag", tagRows],
+      ["SceneGroup", groupRows],
+      ["SceneGallery", galleryRows],
+    ],
+  });
 
   return detectChanges({
     instanceId,
@@ -1142,14 +1274,6 @@ async function processPerformersBatch(
   // Validate IDs
   const validPerformers = performers.filter((p) => validateEntityId(p.id));
   if (validPerformers.length === 0) return noChanges();
-
-  // What the batch's performers looked like before the write
-  const stored = await readStored(
-    "StashPerformer",
-    stashInstanceId,
-    validPerformers.map((p) => p.id),
-    false
-  );
 
   const values = validPerformers
     .map((performer) => {
@@ -1205,7 +1329,7 @@ async function processPerformersBatch(
   // imageCount is set on insert only: it holds the count with gallery
   // inheritance (EntityImageCountService), which the post-sync steps rebuild
   // for what changed, and an update keeps it over Stash's direct count
-  await prisma.$executeRawUnsafe(`
+  const upsertPerformers = `
   INSERT INTO StashPerformer (
     id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
     rating100, details, aliasList,
@@ -1245,14 +1369,15 @@ async function processPerformersBatch(
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
     deletedAt = NULL
-`);
+`;
 
   // Sync performer tags to PerformerTag junction table (batched for performance)
   const instanceId = stashInstanceId;
+  const performerIds = validPerformers.map((p) => p.id);
 
   // Collect all tag relationships for batch insert, and each performer's
   // new tag set for the change diff
-  const tagInserts: { performerId: string; tagId: string }[] = [];
+  const tagRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
   for (const performer of validPerformers) {
     const tagIds: string[] = [];
@@ -1260,10 +1385,7 @@ async function processPerformersBatch(
       for (const tag of performer.tags) {
         if (tag?.id && validateEntityId(tag.id)) {
           tagIds.push(tag.id);
-          tagInserts.push({
-            performerId: performer.id,
-            tagId: tag.id,
-          });
+          tagRows.push([performer.id, tag.id]);
         }
       }
     }
@@ -1274,30 +1396,17 @@ async function processPerformersBatch(
     });
   }
 
-  // Bulk delete existing tags for all performers in this batch, keeping
-  // the rows for the change diff
-  const oldLinks = {
-    PerformerTag: await deleteJunctionRows(
-      prisma,
-      "PerformerTag",
-      validPerformers.map((p) => p.id),
-      instanceId
-    ),
-  };
-
-  // Bulk insert all new tags
-  if (tagInserts.length > 0) {
-    const tagValues = tagInserts
-      .map(
-        (t) =>
-          `('${escapeSql(t.performerId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
-      )
-      .join(", ");
-
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-    );
-  }
+  // Every performer of the batch loses its old tag rows (kept for the
+  // change diff) and gets Stash's
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.performers",
+    instanceId,
+    ids: performerIds,
+    readStored: (tx) =>
+      readStored(tx, "StashPerformer", instanceId, performerIds, false),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertPerformers),
+    junctions: [["PerformerTag", tagRows]],
+  });
 
   return detectChanges({
     instanceId,
@@ -1320,14 +1429,6 @@ async function processStudiosBatch(
   // Validate IDs
   const validStudios = studios.filter((s) => validateEntityId(s.id));
   if (validStudios.length === 0) return noChanges();
-
-  // What the batch's studios looked like before the write
-  const stored = await readStored(
-    "StashStudio",
-    stashInstanceId,
-    validStudios.map((s) => s.id),
-    false
-  );
 
   const values = validStudios
     .map((studio) => {
@@ -1369,7 +1470,7 @@ async function processStudiosBatch(
   // imageCount is set on insert only: it holds the count with gallery
   // inheritance (EntityImageCountService), which the post-sync steps rebuild
   // for what changed, and an update keeps it over Stash's direct count
-  await prisma.$executeRawUnsafe(`
+  const upsertStudios = `
   INSERT INTO StashStudio (
     id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
     sceneCount, imageCount, galleryCount, performerCount, groupCount,
@@ -1393,19 +1494,20 @@ async function processStudiosBatch(
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
     deletedAt = NULL
-`);
+`;
 
   // Sync studio tags to the StudioTag junction table: every studio of the
   // batch is rewritten, so one whose tags were all removed in Stash loses
   // its rows
   const instanceId = stashInstanceId;
-  const tagInserts: { studioId: string; tagId: string }[] = [];
+  const studioIds = validStudios.map((s) => s.id);
+  const tagRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
   for (const studio of validStudios) {
     const tagIds = (studio.tags ?? [])
       .filter((t: TagRef) => t?.id && validateEntityId(t.id))
       .map((t: TagRef) => t.id);
-    for (const tagId of tagIds) tagInserts.push({ studioId: studio.id, tagId });
+    for (const tagId of tagIds) tagRows.push([studio.id, tagId]);
     incoming.push({
       id: studio.id,
       updatedAt: studio.updated_at,
@@ -1413,30 +1515,15 @@ async function processStudiosBatch(
     });
   }
 
-  // Bulk delete existing tags for all studios in this batch, keeping the
-  // rows for the change diff
-  const oldLinks = {
-    StudioTag: await deleteJunctionRows(
-      prisma,
-      "StudioTag",
-      validStudios.map((s) => s.id),
-      instanceId
-    ),
-  };
-
-  // Bulk insert all new tags
-  if (tagInserts.length > 0) {
-    const tagValues = tagInserts
-      .map(
-        (t) =>
-          `('${escapeSql(t.studioId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
-      )
-      .join(", ");
-
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-    );
-  }
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.studios",
+    instanceId,
+    ids: studioIds,
+    readStored: (tx) =>
+      readStored(tx, "StashStudio", instanceId, studioIds, false),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertStudios),
+    junctions: [["StudioTag", tagRows]],
+  });
 
   return detectChanges({
     instanceId,
@@ -1459,15 +1546,6 @@ async function processTagsBatch(
   // Validate IDs
   const validTags = tags.filter((t) => validateEntityId(t.id));
   if (validTags.length === 0) return noChanges();
-
-  // What the batch's tags looked like before the write (tags have no
-  // junction of their own: a parent change moves the tag's updated_at)
-  const stored = await readStored(
-    "StashTag",
-    stashInstanceId,
-    validTags.map((t) => t.id),
-    false
-  );
 
   const values = validTags
     .map((tag) => {
@@ -1516,7 +1594,7 @@ async function processTagsBatch(
   // imageCount is set on insert only: it holds the count with gallery
   // inheritance (EntityImageCountService), which the post-sync steps rebuild
   // for what changed, and an update keeps it over Stash's direct count
-  await prisma.$executeRawUnsafe(`
+  const upsertTags = `
   INSERT INTO StashTag (
     id, stashInstanceId, stashIds, name, favorite,
     sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
@@ -1541,7 +1619,20 @@ async function processTagsBatch(
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
     deletedAt = NULL
-`);
+`;
+
+  // Tags have no junction of their own: a parent change moves the tag's
+  // updated_at
+  const tagIds = validTags.map((t) => t.id);
+  const { stored } = await writeBatch({
+    label: "sync.tags",
+    instanceId: stashInstanceId,
+    ids: tagIds,
+    readStored: (tx) =>
+      readStored(tx, "StashTag", stashInstanceId, tagIds, false),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertTags),
+    junctions: [],
+  });
 
   return detectChanges({
     instanceId: stashInstanceId,
@@ -1566,17 +1657,10 @@ async function processGroupsBatch(
   const validGroups = groups.filter((g) => validateEntityId(g.id));
   if (validGroups.length === 0) return noChanges();
 
-  // What the batch's groups looked like before the write
-  const stored = await readStored(
-    "StashGroup",
-    stashInstanceId,
-    validGroups.map((g) => g.id),
-    false
-  );
-
   const values = validGroups
     .map((group) => {
-      const duration = group.duration || null;
+      // 0 is written as NULL below, as no duration
+      const duration = group.duration ?? null;
       const urls = group.urls || [];
       return `(
     '${escapeSql(group.id)}',
@@ -1601,7 +1685,7 @@ async function processGroupsBatch(
     })
     .join(",\n");
 
-  await prisma.$executeRawUnsafe(`
+  const upsertGroups = `
   INSERT INTO StashGroup (
     id, stashInstanceId, name, date, studioId, rating100, duration,
     sceneCount, performerCount,
@@ -1625,18 +1709,19 @@ async function processGroupsBatch(
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
     deletedAt = NULL
-`);
+`;
 
   // Sync group tags to the GroupTag junction table: every group of the batch
   // is rewritten, so one whose tags were all removed in Stash loses its rows
   const instanceId = stashInstanceId;
-  const tagInserts: { groupId: string; tagId: string }[] = [];
+  const groupIds = validGroups.map((g) => g.id);
+  const tagRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
   for (const group of validGroups) {
     const tagIds = (group.tags ?? [])
       .filter((t: TagRef) => t?.id && validateEntityId(t.id))
       .map((t: TagRef) => t.id);
-    for (const tagId of tagIds) tagInserts.push({ groupId: group.id, tagId });
+    for (const tagId of tagIds) tagRows.push([group.id, tagId]);
     incoming.push({
       id: group.id,
       updatedAt: group.updated_at,
@@ -1644,30 +1729,15 @@ async function processGroupsBatch(
     });
   }
 
-  // Bulk delete existing tags for all groups in this batch, keeping the rows
-  // for the change diff
-  const oldLinks = {
-    GroupTag: await deleteJunctionRows(
-      prisma,
-      "GroupTag",
-      validGroups.map((g) => g.id),
-      instanceId
-    ),
-  };
-
-  // Bulk insert all new tags
-  if (tagInserts.length > 0) {
-    const tagValues = tagInserts
-      .map(
-        (t) =>
-          `('${escapeSql(t.groupId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
-      )
-      .join(", ");
-
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-    );
-  }
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.groups",
+    instanceId,
+    ids: groupIds,
+    readStored: (tx) =>
+      readStored(tx, "StashGroup", instanceId, groupIds, false),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertGroups),
+    junctions: [["GroupTag", tagRows]],
+  });
 
   return detectChanges({
     instanceId,
@@ -1691,21 +1761,13 @@ async function processGalleriesBatch(
   const validGalleries = galleries.filter((g) => validateEntityId(g.id));
   if (validGalleries.length === 0) return noChanges();
 
-  // What the batch's galleries looked like before the write
-  const stored = await readStored(
-    "StashGallery",
-    stashInstanceId,
-    validGalleries.map((g) => g.id),
-    true
-  );
-
   const values = validGalleries
     .map((gallery) => {
       const folder = gallery.folder;
       // Get first file's basename for zip gallery title fallback
-      const fileBasename = gallery.files?.[0]?.basename || null;
+      const fileBasename = gallery.files?.[0]?.basename ?? null;
       // Cover image ID for dimension lookup
-      const coverImageId = gallery.cover?.id || null;
+      const coverImageId = gallery.cover?.id ?? null;
       // A gallery's studio is on the gallery's own Stash, so it takes the
       // gallery's instance (as does an image's, below)
       return `(
@@ -1734,7 +1796,7 @@ async function processGalleriesBatch(
     })
     .join(",\n");
 
-  await prisma.$executeRawUnsafe(`
+  const upsertGalleries = `
   INSERT INTO StashGallery (
     id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
     details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
@@ -1760,10 +1822,10 @@ async function processGalleriesBatch(
     stashUpdatedAt = excluded.stashUpdatedAt,
     syncedAt = excluded.syncedAt,
     deletedAt = NULL
-`);
+`;
 
-  // Sync gallery performers (junction table), keeping each gallery's new
-  // far sides for the change diff
+  // The gallery performers and tags (junction tables), keeping each
+  // gallery's new far sides for the change diff
   const instanceId = stashInstanceId;
   const galleryIds = validGalleries.map((g) => g.id);
   const linksOf = new Map(
@@ -1772,85 +1834,39 @@ async function processGalleriesBatch(
       { GalleryPerformer: [] as string[], GalleryTag: [] as string[] },
     ])
   );
-  const performerInserts: { galleryId: string; performerId: string }[] = [];
+  const performerRows: JunctionRow[] = [];
+  const tagRows: JunctionRow[] = [];
   for (const gallery of validGalleries) {
     if (gallery.performers && gallery.performers.length > 0) {
       for (const performer of gallery.performers) {
         if (validateEntityId(performer.id)) {
           linksOf.get(gallery.id)?.GalleryPerformer.push(performer.id);
-          performerInserts.push({
-            galleryId: gallery.id,
-            performerId: performer.id,
-          });
+          performerRows.push([gallery.id, performer.id]);
         }
       }
     }
-  }
-
-  // Delete existing gallery-performer relationships for these galleries,
-  // keeping the rows for the change diff
-  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
-  oldLinks.GalleryPerformer = await deleteJunctionRows(
-    prisma,
-    "GalleryPerformer",
-    galleryIds,
-    instanceId
-  );
-
-  // Insert new gallery-performer relationships
-  if (performerInserts.length > 0) {
-    const performerValues = performerInserts
-      .map(
-        (p) =>
-          `('${escapeSql(p.galleryId)}', '${escapeSql(instanceId)}', '${escapeSql(p.performerId)}', '${escapeSql(instanceId)}')`
-      )
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-      INSERT OR IGNORE INTO GalleryPerformer (galleryId, galleryInstanceId, performerId, performerInstanceId)
-      VALUES ${performerValues}
-    `);
-  }
-
-  // Sync gallery tags to GalleryTag junction table
-  const tagInserts: { galleryId: string; tagId: string }[] = [];
-  for (const gallery of validGalleries) {
     if (gallery.tags && gallery.tags.length > 0) {
       for (const tag of gallery.tags) {
         if (tag?.id && validateEntityId(tag.id)) {
           linksOf.get(gallery.id)?.GalleryTag.push(tag.id);
-          tagInserts.push({
-            galleryId: gallery.id,
-            tagId: tag.id,
-          });
+          tagRows.push([gallery.id, tag.id]);
         }
       }
     }
   }
 
-  // Delete existing gallery-tag relationships for these galleries, keeping
-  // the rows for the change diff
-  oldLinks.GalleryTag = await deleteJunctionRows(
-    prisma,
-    "GalleryTag",
-    galleryIds,
-    instanceId
-  );
-
-  // Insert new gallery-tag relationships
-  if (tagInserts.length > 0) {
-    const tagValues = tagInserts
-      .map(
-        (t) =>
-          `('${escapeSql(t.galleryId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
-      )
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-      INSERT OR IGNORE INTO GalleryTag (galleryId, galleryInstanceId, tagId, tagInstanceId)
-      VALUES ${tagValues}
-    `);
-  }
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.galleries",
+    instanceId,
+    ids: galleryIds,
+    readStored: (tx) =>
+      readStored(tx, "StashGallery", instanceId, galleryIds, true),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertGalleries),
+    junctions: [
+      ["GalleryPerformer", performerRows],
+      ["GalleryTag", tagRows],
+    ],
+  });
 
   return detectChanges({
     instanceId,
@@ -1881,32 +1897,6 @@ async function processImagesBatch(
 
   const imageIds = validImages.map((i) => i.id);
   const instanceId = stashInstanceId;
-
-  // What the batch's images looked like before the write
-  const stored = await readStored("StashImage", instanceId, imageIds, true);
-
-  // Bulk delete junction records, keeping the rows for the change diff.
-  // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
-  // and includes extended timeout for large libraries
-  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
-  await dbWriteTransaction(
-    "sync.images.junctions",
-    async (tx) => {
-      for (const junction of [
-        "ImagePerformer",
-        "ImageTag",
-        "ImageGallery",
-      ] as const) {
-        oldLinks[junction] = await deleteJunctionRows(
-          tx,
-          junction,
-          imageIds,
-          instanceId
-        );
-      }
-    },
-    { timeout: 60000 } // 60 second timeout for large batches
-  );
 
   // Build bulk image upsert
   const values = validImages
@@ -1942,7 +1932,7 @@ async function processImagesBatch(
     })
     .join(",\n");
 
-  await prisma.$executeRawUnsafe(`
+  const upsertImages = `
     INSERT INTO StashImage (
       id, stashInstanceId, title, code, details, photographer, urls, date, studioId, studioInstanceId, rating100, oCounter, organized,
       filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
@@ -1971,13 +1961,13 @@ async function processImagesBatch(
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
       deletedAt = NULL
-  `);
+  `;
 
   // Collect junction records (validate related entity IDs too), and each
   // image's new far sides for the change diff
-  const performerRecords: string[] = [];
-  const tagRecords: string[] = [];
-  const galleryRecords: string[] = [];
+  const performerRows: JunctionRow[] = [];
+  const tagRows: JunctionRow[] = [];
+  const galleryRows: JunctionRow[] = [];
   const incoming: IncomingEntity[] = [];
 
   for (const image of validImages) {
@@ -1989,25 +1979,19 @@ async function processImagesBatch(
     for (const p of image.performers || []) {
       if (validateEntityId(p.id)) {
         links.ImagePerformer.push(p.id);
-        performerRecords.push(
-          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
-        );
+        performerRows.push([image.id, p.id]);
       }
     }
     for (const t of image.tags || []) {
       if (validateEntityId(t.id)) {
         links.ImageTag.push(t.id);
-        tagRecords.push(
-          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
-        );
+        tagRows.push([image.id, t.id]);
       }
     }
     for (const g of image.galleries || []) {
       if (validateEntityId(g.id)) {
         links.ImageGallery.push(g.id);
-        galleryRecords.push(
-          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
-        );
+        galleryRows.push([image.id, g.id]);
       }
     }
     incoming.push({
@@ -2018,32 +2002,19 @@ async function processImagesBatch(
     });
   }
 
-  // Batch insert junction records
-  const inserts = [];
-
-  if (performerRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
-      )
-    );
-  }
-  if (tagRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
-      )
-    );
-  }
-  if (galleryRecords.length > 0) {
-    inserts.push(
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImageGallery (imageId, imageInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
-      )
-    );
-  }
-
-  await Promise.all(inserts);
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.images",
+    instanceId,
+    ids: imageIds,
+    readStored: (tx) =>
+      readStored(tx, "StashImage", instanceId, imageIds, true),
+    upsert: (tx) => tx.$executeRawUnsafe(upsertImages),
+    junctions: [
+      ["ImagePerformer", performerRows],
+      ["ImageTag", tagRows],
+      ["ImageGallery", galleryRows],
+    ],
+  });
 
   // An image's junction rows and studio are not compared: gallery
   // inheritance writes into them (lead decision, 2026-09-24)
@@ -2060,13 +2031,14 @@ async function processImagesBatch(
 // ==================== Clip Sync ====================
 
 /**
- * Writes one page of clips (scene markers) and their tags, in three
- * statements whatever the page's size (item 42), each bound as one JSON
- * parameter: the old ClipTag rows go (`DELETE ... RETURNING`, for the change
- * diff), the clips are upserted, and their tags inserted. Each preview is
- * probed first, with the page's own instance's API key, to record whether
- * Stash has generated it. Timestamps are stored as epoch milliseconds, as
- * Prisma stores a DateTime.
+ * Writes one page of clips (scene markers) and their tags in one
+ * transaction of four statements whatever the page's size (item 42), each
+ * bound as one JSON parameter: the stored clips are read, the old ClipTag
+ * rows go (`DELETE ... RETURNING`, for the change diff), the clips are
+ * upserted, and their tags inserted. Each preview is probed first, with the
+ * page's own instance's API key, to record whether Stash has generated it:
+ * a request, so before the transaction opens. Timestamps are stored as
+ * epoch milliseconds, as Prisma stores a DateTime.
  */
 async function processClipsBatch(
   markers: SyncClip[],
@@ -2084,29 +2056,6 @@ async function processClipsBatch(
   const probeResults = await clipPreviewProber.probeBatch(previewUrls);
 
   const markerIds = markers.map((m) => m.id);
-
-  // What the batch's clips looked like before the write, for the change
-  // diff: stashUpdatedAt is a DateTime here, compared as epoch milliseconds
-  const storedRows = await prisma.stashClip.findMany({
-    where: { stashInstanceId: instanceId, id: { in: markerIds } },
-    select: { id: true, stashUpdatedAt: true, deletedAt: true },
-  });
-  const stored = new Map<string, StoredEntity>(
-    storedRows.map((row) => [
-      row.id,
-      {
-        updatedAt: row.stashUpdatedAt?.getTime() ?? null,
-        deleted: row.deletedAt !== null,
-      },
-    ])
-  );
-
-  // Delete the batch's clip tags, keeping the rows for the change diff
-  const oldLinks = {
-    ClipTag: await dbWrite("sync.clips.tags.delete", () =>
-      deleteJunctionRows(prisma, "ClipTag", markerIds, instanceId)
-    ),
-  };
 
   const epochMs = (timestamp: string | null | undefined): number | null =>
     timestamp ? new Date(timestamp).getTime() : null;
@@ -2127,8 +2076,8 @@ async function processClipsBatch(
     stashUpdatedAt: epochMs(marker.updated_at),
   }));
 
-  await dbWrite("sync.clips", () =>
-    prisma.$executeRawUnsafe(
+  const upsertClips = (tx: Prisma.TransactionClient) =>
+    tx.$executeRawUnsafe(
       `INSERT INTO "StashClip" (
          "id", "stashInstanceId", "sceneId", "sceneInstanceId", "title",
          "seconds", "endSeconds", "primaryTagId", "primaryTagInstanceId",
@@ -2172,25 +2121,39 @@ async function processClipsBatch(
       now,
       now,
       JSON.stringify(clips)
-    )
+    );
+
+  // What the batch's clips looked like before the write, for the change
+  // diff: stashUpdatedAt is a DateTime here, compared as epoch milliseconds
+  const readStoredClips = async (tx: Prisma.TransactionClient) => {
+    const rows = await tx.stashClip.findMany({
+      where: { stashInstanceId: instanceId, id: { in: markerIds } },
+      select: { id: true, stashUpdatedAt: true, deletedAt: true },
+    });
+    return new Map<string, StoredEntity>(
+      rows.map((row) => [
+        row.id,
+        {
+          updatedAt: row.stashUpdatedAt?.getTime() ?? null,
+          deleted: row.deletedAt !== null,
+        },
+      ])
+    );
+  };
+
+  // The clips' tags, as [clipId, tagId] pairs, replacing their old rows
+  const clipTags: JunctionRow[] = markers.flatMap((marker) =>
+    marker.tags.map((tag) => [marker.id, tag.id] as const)
   );
 
-  // The clips' tags, as [clipId, tagId] pairs; the old rows went above
-  const clipTags = markers.flatMap((marker) =>
-    marker.tags.map((tag) => [marker.id, tag.id])
-  );
-  if (clipTags.length > 0) {
-    await dbWrite("sync.clips.tags", () =>
-      prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO "ClipTag" ("clipId", "clipInstanceId", "tagId", "tagInstanceId")
-         SELECT json_extract(j.value, '$[0]'), ?, json_extract(j.value, '$[1]'), ?
-         FROM json_each(?) j`,
-        instanceId,
-        instanceId,
-        JSON.stringify(clipTags)
-      )
-    );
-  }
+  const { stored, oldLinks } = await writeBatch({
+    label: "sync.clips",
+    instanceId,
+    ids: markerIds,
+    readStored: readStoredClips,
+    upsert: upsertClips,
+    junctions: [["ClipTag", clipTags]],
+  });
 
   return detectChanges({
     instanceId,
@@ -2985,6 +2948,14 @@ class StashSyncService extends EventEmitter {
           // Track max updated_at for sync state
           maxUpdatedAt = newestUpdatedAt(maxUpdatedAt, items);
 
+          // What the page points at and Peek lacks goes first, while no
+          // transaction is open; then the page, in one transaction
+          await this.ensureReferenced(
+            entityType,
+            stashInstanceId,
+            spec.references(items),
+            run
+          );
           run.changes.addBatch(
             entityType,
             await spec.processBatch(items, stashInstanceId, run)
@@ -3034,6 +3005,37 @@ class StashSyncService extends EventEmitter {
         message: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * Fetches by id, and writes in their own batches, the entities a page of
+   * `entityType` references that Peek holds no row for: created in Stash
+   * after their own type's pages ran, or of a type whose sync failed. A
+   * junction row, a gallery's or image's studio and a clip's scene and
+   * primary tag have foreign keys, so without them the page's batch would
+   * fail and roll back. It runs before the page's transaction opens, so no
+   * Stash request waits inside one; the fetched entities' own references
+   * are ensured the same way (references point only at earlier types in
+   * SYNC_ORDER), and they join the run's change set as new. An id Stash no
+   * longer has is not fetched, and the page's batch then fails on it, to be
+   * written again by the next sync.
+   */
+  private async ensureReferenced(
+    entityType: EntityType,
+    stashInstanceId: string,
+    refs: BatchReferences,
+    run: SyncRunContext
+  ): Promise<void> {
+    const missing = await missingReferences(stashInstanceId, refs);
+    for (const type of SYNC_ORDER) {
+      const ids = missing.get(type);
+      if (!ids) continue;
+      logger.info(
+        `Fetching ${ids.length} ${ENTITY_TABLES[type].plural} that ${ENTITY_TABLES[entityType].plural} reference and Peek has not synced yet`,
+        { instanceId: stashInstanceId, ids: ids.slice(0, 20) }
+      );
+      await this.paginate(type, stashInstanceId, { ids }, run);
     }
   }
 
