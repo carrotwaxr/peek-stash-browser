@@ -88,6 +88,7 @@ import type {
   UpdateUserSettingsResponse,
   UpdateUserStashInstancesBody,
 } from "../types/api/user.js";
+import { dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { validatePassword } from "../utils/passwordValidation.js";
 import {
@@ -1660,7 +1661,7 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (ratingUpserts.length > 0 || watchUpserts.length > 0) {
-              await prisma.$transaction([
+              await dbWriteBatch("syncFromStash.scenes", [
                 ...ratingUpserts.map((u) => prisma.sceneRating.upsert(u)),
                 ...watchUpserts.map((u) => prisma.watchHistory.upsert(u)),
               ]);
@@ -1796,7 +1797,8 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (upserts.length > 0) {
-              await prisma.$transaction(
+              await dbWriteBatch(
+                "syncFromStash.performers",
                 upserts.map((u) => prisma.performerRating.upsert(u))
               );
             }
@@ -1925,7 +1927,8 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (upserts.length > 0) {
-              await prisma.$transaction(
+              await dbWriteBatch(
+                "syncFromStash.studios",
                 upserts.map((u) => prisma.studioRating.upsert(u))
               );
             }
@@ -1999,7 +2002,8 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (upserts.length > 0) {
-              await prisma.$transaction(
+              await dbWriteBatch(
+                "syncFromStash.tags",
                 upserts.map((u) => prisma.tagRating.upsert(u))
               );
             }
@@ -2081,7 +2085,8 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (upserts.length > 0) {
-              await prisma.$transaction(
+              await dbWriteBatch(
+                "syncFromStash.galleries",
                 upserts.map((u) => prisma.galleryRating.upsert(u))
               );
             }
@@ -2163,7 +2168,8 @@ export const syncFromStash = async (
 
             // Execute upserts in transaction
             if (upserts.length > 0) {
-              await prisma.$transaction(
+              await dbWriteBatch(
+                "syncFromStash.groups",
                 upserts.map((u) => prisma.groupRating.upsert(u))
               );
             }
@@ -2365,7 +2371,7 @@ export const updateUserRestrictions = async (
     // Replace the stored rows in one batch transaction, so a failed insert
     // rolls the delete back and the user keeps their old restrictions. A batch
     // holds SQLite's write lock for just these two statements.
-    await prisma.$transaction([
+    await dbWriteBatch("restrictions.save", [
       prisma.userContentRestriction.deleteMany({
         where: { userId: targetUserId },
       }),

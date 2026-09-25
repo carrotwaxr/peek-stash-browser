@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -57,7 +58,10 @@ class ImageGalleryInheritanceService {
 
     // StudioId inheritance. The gallery is on the image's instance, and so is
     // its studio.
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.studio",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashImage
       SET studioId = (
         SELECT g.studioId
@@ -78,10 +82,14 @@ class ImageGalleryInheritanceService {
           JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.studioId IS NOT NULL AND g.deletedAt IS NULL
         )
-    `;
+    `
+    );
 
     // Date inheritance
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.date",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashImage
       SET date = (
         SELECT g.date
@@ -101,10 +109,14 @@ class ImageGalleryInheritanceService {
           JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.date IS NOT NULL AND g.deletedAt IS NULL
         )
-    `;
+    `
+    );
 
     // Photographer inheritance
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.photographer",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashImage
       SET photographer = (
         SELECT g.photographer
@@ -124,10 +136,14 @@ class ImageGalleryInheritanceService {
           JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.photographer IS NOT NULL AND g.deletedAt IS NULL
         )
-    `;
+    `
+    );
 
     // Details inheritance
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.details",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashImage
       SET details = (
         SELECT g.details
@@ -147,7 +163,8 @@ class ImageGalleryInheritanceService {
           JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.details IS NOT NULL AND g.deletedAt IS NULL
         )
-    `;
+    `
+    );
   }
 
   /**
@@ -157,7 +174,10 @@ class ImageGalleryInheritanceService {
   private async inheritPerformers(): Promise<void> {
     // Insert gallery performers for images that have no performers
     // Junction tables now have composite keys: (imageId, imageInstanceId, performerId, performerInstanceId)
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.performers",
+      () =>
+        prisma.$executeRaw`
       INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId)
       SELECT DISTINCT ig.imageId, ig.imageInstanceId, gp.performerId, gp.performerInstanceId
       FROM ImageGallery ig
@@ -169,7 +189,8 @@ class ImageGalleryInheritanceService {
         AND (ig.imageId, ig.imageInstanceId) NOT IN (
           SELECT DISTINCT imageId, imageInstanceId FROM ImagePerformer
         )
-    `;
+    `
+    );
   }
 
   /**
@@ -179,7 +200,10 @@ class ImageGalleryInheritanceService {
   private async inheritTags(): Promise<void> {
     // Insert gallery tags for images that have no tags
     // Junction tables now have composite keys: (imageId, imageInstanceId, tagId, tagInstanceId)
-    await prisma.$executeRaw`
+    await dbWrite(
+      "galleryInheritance.tags",
+      () =>
+        prisma.$executeRaw`
       INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId)
       SELECT DISTINCT ig.imageId, ig.imageInstanceId, gt.tagId, gt.tagInstanceId
       FROM ImageGallery ig
@@ -191,7 +215,8 @@ class ImageGalleryInheritanceService {
         AND (ig.imageId, ig.imageInstanceId) NOT IN (
           SELECT DISTINCT imageId, imageInstanceId FROM ImageTag
         )
-    `;
+    `
+    );
   }
 }
 

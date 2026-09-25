@@ -11,9 +11,9 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../types/api/index.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { readHistory } from "../utils/historyJson.js";
-import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -69,32 +69,35 @@ export async function incrementImageOCounter(
 
     // Read, then create or update, in one transaction: a view or another O
     // press on this image waits for it to commit, then sees its row.
-    const viewHistory = await historyTransaction(async (tx) => {
-      const existing = await tx.imageViewHistory.findUnique({
-        where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
-      });
-      if (!existing) {
-        return tx.imageViewHistory.create({
+    const viewHistory = await dbWriteTransaction(
+      "imageHistory.o",
+      async (tx) => {
+        const existing = await tx.imageViewHistory.findUnique({
+          where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
+        });
+        if (!existing) {
+          return tx.imageViewHistory.create({
+            data: {
+              userId,
+              instanceId,
+              imageId,
+              viewCount: 0,
+              viewHistory: [],
+              oCount: 1,
+              oHistory: [now.toISOString()],
+              lastViewedAt: now,
+            },
+          });
+        }
+        return tx.imageViewHistory.update({
+          where: { id: existing.id },
           data: {
-            userId,
-            instanceId,
-            imageId,
-            viewCount: 0,
-            viewHistory: [],
-            oCount: 1,
-            oHistory: [now.toISOString()],
-            lastViewedAt: now,
+            oCount: { increment: 1 },
+            oHistory: [...readHistory(existing.oHistory), now.toISOString()],
           },
         });
       }
-      return tx.imageViewHistory.update({
-        where: { id: existing.id },
-        data: {
-          oCount: { increment: 1 },
-          oHistory: [...readHistory(existing.oHistory), now.toISOString()],
-        },
-      });
-    });
+    );
 
     // Sync to Stash if user has sync enabled
     // Note: imageIncrementO is not yet in stashapp-api, so we log a warning for now
@@ -163,36 +166,39 @@ export async function recordImageView(
 
     // Read, then create or update, in one transaction: an O press or another
     // view of this image waits for it to commit, then sees its row.
-    const viewHistory = await historyTransaction(async (tx) => {
-      const existing = await tx.imageViewHistory.findUnique({
-        where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
-      });
-      if (!existing) {
-        return tx.imageViewHistory.create({
+    const viewHistory = await dbWriteTransaction(
+      "imageHistory.view",
+      async (tx) => {
+        const existing = await tx.imageViewHistory.findUnique({
+          where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
+        });
+        if (!existing) {
+          return tx.imageViewHistory.create({
+            data: {
+              userId,
+              instanceId,
+              imageId,
+              viewCount: 1,
+              viewHistory: [now.toISOString()],
+              oCount: 0,
+              oHistory: [],
+              lastViewedAt: now,
+            },
+          });
+        }
+        return tx.imageViewHistory.update({
+          where: { id: existing.id },
           data: {
-            userId,
-            instanceId,
-            imageId,
-            viewCount: 1,
-            viewHistory: [now.toISOString()],
-            oCount: 0,
-            oHistory: [],
+            viewCount: { increment: 1 },
+            viewHistory: [
+              ...readHistory(existing.viewHistory),
+              now.toISOString(),
+            ],
             lastViewedAt: now,
           },
         });
       }
-      return tx.imageViewHistory.update({
-        where: { id: existing.id },
-        data: {
-          viewCount: { increment: 1 },
-          viewHistory: [
-            ...readHistory(existing.viewHistory),
-            now.toISOString(),
-          ],
-          lastViewedAt: now,
-        },
-      });
-    });
+    );
 
     res.json({
       success: true,

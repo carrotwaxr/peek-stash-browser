@@ -21,9 +21,9 @@ import type {
   TypedAuthRequest,
   TypedResponse,
 } from "../types/api/index.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 import { readHistory } from "../utils/historyJson.js";
-import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
@@ -117,7 +117,7 @@ export async function pingWatchHistory(
     // an O press, a play count, an activity save or another ping on this
     // scene waits for it to commit, then sees its row.
     const { updated, playbackDelta, playCountIncremented, resumeTime } =
-      await historyTransaction(async (tx) => {
+      await dbWriteTransaction("history.ping", async (tx) => {
         // An earlier attempt of this ping found the database busy and
         // committed nothing: take back the flag it set
         if (countedPlay) {
@@ -410,7 +410,7 @@ export async function incrementOCounter(
 
     // Read, then create or update, in one transaction: another write to this
     // scene's history waits for it to commit, then sees its row.
-    const watchHistory = await historyTransaction(async (tx) => {
+    const watchHistory = await dbWriteTransaction("history.o", async (tx) => {
       const existing = await tx.watchHistory.findUnique({
         where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
       });
@@ -839,38 +839,41 @@ export async function incrementPlayCount(
     // Read, then create or update, in one transaction: the play history
     // append needs the row as it is when the write lands, and another write
     // to this scene's history waits for it to commit.
-    const watchHistory = await historyTransaction(async (tx) => {
-      const existing = await tx.watchHistory.findUnique({
-        where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
-      });
-      if (!existing) {
-        return tx.watchHistory.create({
+    const watchHistory = await dbWriteTransaction(
+      "history.play",
+      async (tx) => {
+        const existing = await tx.watchHistory.findUnique({
+          where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
+        });
+        if (!existing) {
+          return tx.watchHistory.create({
+            data: {
+              userId,
+              instanceId,
+              sceneId,
+              playCount: 1,
+              playDuration: 0,
+              resumeTime: 0,
+              lastPlayedAt: now,
+              oCount: 0,
+              oHistory: [],
+              playHistory: [now.toISOString()],
+            },
+          });
+        }
+        return tx.watchHistory.update({
+          where: { id: existing.id },
           data: {
-            userId,
-            instanceId,
-            sceneId,
-            playCount: 1,
-            playDuration: 0,
-            resumeTime: 0,
+            playCount: { increment: 1 },
+            playHistory: [
+              ...readHistory(existing.playHistory),
+              now.toISOString(),
+            ],
             lastPlayedAt: now,
-            oCount: 0,
-            oHistory: [],
-            playHistory: [now.toISOString()],
           },
         });
       }
-      return tx.watchHistory.update({
-        where: { id: existing.id },
-        data: {
-          playCount: { increment: 1 },
-          playHistory: [
-            ...readHistory(existing.playHistory),
-            now.toISOString(),
-          ],
-          lastPlayedAt: now,
-        },
-      });
-    });
+    );
 
     // Update pre-computed stats
     await userStatsService.updateStatsForScene(

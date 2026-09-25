@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
+import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { readHistory } from "../utils/historyJson.js";
 import { groupIdsByInstance } from "../utils/instanceUtils.js";
 import { logger } from "../utils/logger.js";
@@ -256,7 +257,21 @@ class UserStatsService {
         })),
       ];
 
-      const results = await Promise.allSettled(writes.map((w) => w.run()));
+      // One write unit for the scene, its upserts one after another: each
+      // stands on its own (an autocommit upsert), so a failed one is logged
+      // with its context and the others still land
+      const results = await dbWrite("stats.scene", async () => {
+        const settled: PromiseSettledResult<void>[] = [];
+        for (const write of writes) {
+          settled.push(
+            await write.run().then(
+              (value) => ({ status: "fulfilled", value }),
+              (reason: unknown) => ({ status: "rejected", reason })
+            )
+          );
+        }
+        return settled;
+      });
       writes.forEach(({ entityType, entityId }, i) => {
         const result = results[i];
         if (result?.status === "rejected") {
@@ -411,13 +426,6 @@ class UserStatsService {
     try {
       logger.info("Rebuilding stats for user", { userId });
 
-      // Clear existing stats
-      await Promise.all([
-        prisma.userPerformerStats.deleteMany({ where: { userId } }),
-        prisma.userStudioStats.deleteMany({ where: { userId } }),
-        prisma.userTagStats.deleteMany({ where: { userId } }),
-      ]);
-
       // Get all watch history for user
       const watchHistory = await prisma.watchHistory.findMany({
         where: { userId },
@@ -541,9 +549,12 @@ class UserStatsService {
         }
       }
 
-      // Bulk insert aggregated stats
-      // Note: We already deleted all existing stats above, so no duplicates possible
-      await Promise.all([
+      // Replace the user's stats in one batch: the old rows go and the
+      // aggregated ones land together, with nothing computed under the lock
+      await dbWriteBatch("stats.rebuild", [
+        prisma.userPerformerStats.deleteMany({ where: { userId } }),
+        prisma.userStudioStats.deleteMany({ where: { userId } }),
+        prisma.userTagStats.deleteMany({ where: { userId } }),
         // Performers
         prisma.userPerformerStats.createMany({
           data: Array.from(performerStatsMap.entries()).map(([key, stats]) => {

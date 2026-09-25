@@ -11,6 +11,7 @@ paths:
   - "server/services/RankingComputeService.ts"
   - "server/utils/entityInstanceId.ts"
   - "server/utils/instanceUtils.ts"
+  - "server/utils/dbWrite.ts"
   - "server/controllers/library/**"
 ---
 

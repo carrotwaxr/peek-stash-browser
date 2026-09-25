@@ -11,6 +11,7 @@
  * 5. Store results in UserEntityRanking table
  */
 import prisma from "../prisma/singleton.js";
+import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 const RANKING_WEIGHTS = {
@@ -183,20 +184,21 @@ class RankingComputeService {
   ): Promise<void> {
     if (rankings.length === 0) {
       // Clear any existing rankings for this entity type
-      await prisma.userEntityRanking.deleteMany({
-        where: { userId, entityType },
-      });
+      await dbWrite("rankings", () =>
+        prisma.userEntityRanking.deleteMany({
+          where: { userId, entityType },
+        })
+      );
       return;
     }
 
-    // Delete existing rankings for this user/type and insert new ones
-    // Using transaction to ensure atomicity
-    await prisma.$transaction(async (tx) => {
-      await tx.userEntityRanking.deleteMany({
+    // Replace this user's rankings of the type in one batch: both statements
+    // are built first, so the unit makes no Node round trip under the lock
+    await dbWriteBatch("rankings", [
+      prisma.userEntityRanking.deleteMany({
         where: { userId, entityType },
-      });
-
-      await tx.userEntityRanking.createMany({
+      }),
+      prisma.userEntityRanking.createMany({
         data: rankings.map((r) => ({
           userId,
           instanceId: r.instanceId || "",
@@ -210,8 +212,8 @@ class RankingComputeService {
           engagementRate: r.engagementRate,
           percentileRank: r.percentileRank,
         })),
-      });
-    });
+      }),
+    ]);
   }
 
   /**

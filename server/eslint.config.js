@@ -81,6 +81,24 @@ export default tseslint.config(
       // already rejects a comparison with a non-member; the other is style.
       "@typescript-eslint/no-unsafe-enum-comparison": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
+
+      // The writer rule: every transaction is a dbWrite unit, so writers
+      // queue in Node instead of starving each other inside the engine
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'MemberExpression[property.name="$transaction"]',
+          message:
+            "use dbWriteTransaction / dbWriteBatch (server-sql.md, Writes)",
+        },
+      ],
+    },
+  },
+  // The one place that calls $transaction, and the tests that mock it
+  {
+    files: ["utils/dbWrite.ts", ...testFiles],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   // Tests: the source rules above, plus vitest's. tsconfig.json excludes

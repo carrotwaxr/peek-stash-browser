@@ -50,6 +50,7 @@ import {
   getComputeClient,
 } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import {
   buildInstanceFilterClause,
@@ -594,7 +595,8 @@ class ExclusionComputationService {
 
     // === WRITE PHASE (short transaction, only the atomic swap) ===
 
-    await prisma.$transaction(
+    await dbWriteTransaction(
+      "exclusions.write",
       async (tx) => {
         // Delete existing exclusions for this user
         await tx.userExcludedEntity.deleteMany({
@@ -1796,7 +1798,8 @@ class ExclusionComputationService {
 
     const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
 
-    await prisma.$transaction(
+    await dbWriteTransaction(
+      "exclusions.hide",
       async (tx) => {
         try {
           // Add the direct exclusion

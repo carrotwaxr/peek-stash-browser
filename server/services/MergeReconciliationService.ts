@@ -6,8 +6,8 @@
  */
 import type { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
+import { dbWriteTransaction } from "../utils/dbWrite.js";
 import { getEntityInstanceId } from "../utils/entityInstanceId.js";
-import { historyTransaction } from "../utils/historyTransaction.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -259,7 +259,7 @@ class MergeReconciliationService {
           sceneId: targetSceneId,
         },
       };
-      await historyTransaction(async (tx) => {
+      await dbWriteTransaction("history.merge", async (tx) => {
         const targetHistory = await tx.watchHistory.findUnique({
           where: targetKey,
         });

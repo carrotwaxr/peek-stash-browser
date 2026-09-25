@@ -5,11 +5,10 @@
  * tie handling, edge cases, and BigInt/float rounding from SQLite.
  */
 import type { Prisma } from "@prisma/client";
-import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { rankingComputeService } from "../../services/RankingComputeService.js";
 import { must } from "../helpers/must.js";
-import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock prisma before importing service
 vi.mock(
@@ -29,36 +28,19 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 
-/** A transaction client with only the ranking table, whose writes a test reads back. */
-interface RankingTx {
-  userEntityRanking: {
-    deleteMany: Mock<Prisma.UserEntityRankingDelegate["deleteMany"]>;
-    createMany: Mock<Prisma.UserEntityRankingDelegate["createMany"]>;
-  };
+/**
+ * The ranking table's writes, resolving as Prisma would. The service builds
+ * its delete and insert on the client and runs them as one batch
+ * (`dbWriteBatch`), which the mock's `$transaction` resolves in order.
+ */
+function rankingTx() {
+  const table = mockPrisma.userEntityRanking;
+  table.deleteMany.mockResolvedValue({ count: 0 });
+  table.createMany.mockResolvedValue({ count: 1 });
+  return { userEntityRanking: table };
 }
 
-/** A ranking table whose writes resolve as Prisma would. */
-function rankingTx(): RankingTx {
-  return {
-    userEntityRanking: {
-      deleteMany: vi
-        .fn<Prisma.UserEntityRankingDelegate["deleteMany"]>()
-        .mockResolvedValue({ count: 0 }),
-      createMany: vi
-        .fn<Prisma.UserEntityRankingDelegate["createMany"]>()
-        .mockResolvedValue({ count: 1 }),
-    },
-  };
-}
-
-/** Run every transaction callback against `tx` instead of the client. */
-function runTransactionsOn(tx: RankingTx) {
-  mockPrisma.$transaction.mockImplementation(async (fn) => {
-    await fn(
-      partialRow({ userEntityRanking: partialRow(tx.userEntityRanking) })
-    );
-  });
-}
+type RankingTx = ReturnType<typeof rankingTx>;
 
 /** Helper: set up mocks for a recomputeAllRankings call */
 function setupRankingMocks(opts: {
@@ -76,7 +58,6 @@ function setupRankingMocks(opts: {
     .mockResolvedValueOnce(opts.sceneStats ?? []);
 
   const txMock = rankingTx();
-  runTransactionsOn(txMock);
 
   return txMock;
 }
@@ -332,7 +313,7 @@ describe("RankingComputeService", () => {
 
       await rankingComputeService.recomputeAllRankings(1);
 
-      // When empty, upsertRankings calls deleteMany directly (not via transaction)
+      // When empty, upsertRankings runs the delete alone, as its own unit
       expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalled();
       expect(txMock.userEntityRanking.createMany).not.toHaveBeenCalled();
     });
@@ -460,7 +441,6 @@ describe("RankingComputeService", () => {
         .mockResolvedValueOnce([]);
 
       const txMock = rankingTx();
-      runTransactionsOn(txMock);
 
       await rankingComputeService.recomputeAllRankings(1);
 

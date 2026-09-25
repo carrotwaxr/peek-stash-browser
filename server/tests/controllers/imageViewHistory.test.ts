@@ -15,6 +15,7 @@ import {
 } from "../../controllers/imageViewHistory.js";
 import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
+import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { malformed, reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { anyOf, objectContaining } from "../helpers/matchers.js";
@@ -227,7 +228,7 @@ describe("Image View History Controller", () => {
 
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
         expect.any(Function),
-        { maxWait: 10_000, timeout: 10_000 }
+        DB_WRITE_TX
       );
       expect(mockPrisma.imageViewHistory.update).toHaveBeenCalledWith({
         where: { id: 1 },

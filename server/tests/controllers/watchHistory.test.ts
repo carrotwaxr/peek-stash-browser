@@ -29,6 +29,7 @@ import prisma from "../../prisma/singleton.js";
 import { resolveAccessibleInstanceId } from "../../services/EntityAccessService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import {
   malformed,
   reqFor,
@@ -1389,7 +1390,7 @@ describe("Watch History Controller", () => {
       // which an upsert can't give it
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
         expect.any(Function),
-        { maxWait: 10_000, timeout: 10_000 }
+        DB_WRITE_TX
       );
       expect(mockPrisma.watchHistory.create).toHaveBeenCalled();
       expect(mockPrisma.watchHistory.upsert).not.toHaveBeenCalled();
