@@ -12,6 +12,7 @@ paths:
   - "server/utils/entityInstanceId.ts"
   - "server/utils/instanceUtils.ts"
   - "server/utils/dbWrite.ts"
+  - "server/utils/serialQueue.ts"
   - "server/controllers/library/**"
 ---
 
@@ -50,7 +51,7 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 - Why a queue in Node: Prisma's SQLite driver waits for the write lock on the query engine's worker threads (one per CPU). A few waiting writers occupy them all, the lock holder cannot run its next statement, and they time out together (P1008: 32 of 40 simultaneous hides failed on a 16-CPU box). A unit waiting in the queue holds no connection and no engine thread.
 - No unit holds the lock longer than 1 s on a 200k-scene library (`DB_WRITE_HOLD_WARN_MS`): longer work is chunked (one unit per sync page, per user's exclusion swap, per 500 to 5,000 rows), so user writes interleave with it. Build every statement before the unit starts, and make no Stash request inside one. A unit over the bound logs `Database write held the lock {label, ms}`; one that waited in the queue longer than 10 s logs `Database write waited for the queue {label, ms, behind}`, naming the unit ahead of it.
 - A busy failure (the lock held from outside the queue: the sqlite3 CLI, another process) reruns the unit from the start for up to 30 s, logging `Database write waiting for the lock`, so `fn` keeps no state between attempts. Any other error, a transaction's own timeout (P2028) included, is thrown at once.
-- Nesting: inside a `dbWriteTransaction` callback write through `tx`, never through `dbWrite`; a nested unit throws `dbWrite re-entered: <outer> -> <inner>` in tests and development and logs it and runs inline in production. Never take the compute connection (`withComputeConnection`) inside a unit: the order is the compute connection first, then the queue.
+- Nesting: inside a `dbWriteTransaction` callback write through `tx`, never through `dbWrite`; a nested unit throws `dbWrite re-entered: <outer> -> <inner>` in tests and development and logs it and runs inline in production. Never take the compute connection (`withComputeConnection`) inside a unit: the order is the compute connection first, then the queue. The queue is a `createSerialQueue` (`utils/serialQueue.ts`), as are the compute connection and manual backups: one at a time in arrival order, a rejected unit releases the next, and a nested `withComputeConnection` fails the same way (`withComputeConnection re-entered: <outer> -> <inner>`).
 - Reads never queue: under WAL a read waits only for a pool connection and an engine worker, never for the writer. The one write that waits on readers is `wal_checkpoint(TRUNCATE)` (`checkpointWal` in `utils/databaseMaintenance.ts`, after the post-sync steps and at shutdown): it holds the lock while readers of older pages finish, up to `busy_timeout`, and the queue waits behind it.
 - Lint: `prisma.$transaction` outside `utils/dbWrite.ts` is an error (`no-restricted-syntax`; tests may mock it).
 - `configureSQLite`'s performance PRAGMAs (`synchronous = NORMAL`, cache, mmap) reach only the pooled connection that ran them; the compute connection sets its own `cache_size` and `synchronous`. A timing taken through the pool may run on a connection with SQLite's defaults (2 MB cache, `synchronous = FULL`).

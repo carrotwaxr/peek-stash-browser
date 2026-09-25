@@ -27,12 +27,14 @@
  * engine thread; on the probe (40 hides at once on a 16-CPU box) that turns
  * 32 failures into 40 commits.
  *
- * Nesting: a unit runs inside an AsyncLocalStorage context, and a `dbWrite`
- * called from within one would wait for itself. In tests and development
- * (NODE_ENV test or development, or the server running from TypeScript
- * source) it throws "dbWrite re-entered: <outer> -> <inner>"; in production
- * it runs inline with logger.error, so a missed case costs a log line and
- * not a deadlock. Inside a `dbWriteTransaction` callback, write through `tx`.
+ * Nesting: the queue is a `createSerialQueue` (utils/serialQueue.ts), whose
+ * units run inside an AsyncLocalStorage context, and a `dbWrite` called from
+ * within one would wait for itself. In tests and development (NODE_ENV test
+ * or development, or the server running from TypeScript source) it throws
+ * "dbWrite re-entered: <outer> -> <inner>"; in production it runs inline
+ * with logger.error, as given (no retry: inside an outer transaction that
+ * would outlive it), so a missed case costs a log line and not a deadlock.
+ * Inside a `dbWriteTransaction` callback, write through `tx`.
  * Never take the compute connection (`withComputeConnection`) inside a unit:
  * the order is always compute connection first, then the writer queue.
  *
@@ -46,9 +48,9 @@
  * the compute client too (D3 swaps a user's exclusions that way).
  */
 import { Prisma } from "@prisma/client";
-import { AsyncLocalStorage } from "node:async_hooks";
 import prisma from "../prisma/singleton.js";
 import { logger } from "./logger.js";
+import { createSerialQueue } from "./serialQueue.js";
 
 /**
  * Options for every interactive transaction: up to 10 s to get a pool
@@ -94,20 +96,6 @@ export function isDatabaseBusy(error: unknown): boolean {
   );
 }
 
-const env = process.env.NODE_ENV;
-/** Throw on a nested unit (tests, development) rather than log and run inline. */
-const STRICT_NESTING =
-  env !== "production" &&
-  (env === "test" || env === "development" || import.meta.url.endsWith(".ts"));
-
-/** The label of the unit the current async context runs inside, if any. */
-const runningUnit = new AsyncLocalStorage<string>();
-
-// The queue: `tail` settles when the last enqueued unit has released, and
-// `queued` holds the labels from the running unit to the newest.
-let tail: Promise<void> = Promise.resolve();
-const queued: string[] = [];
-
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -141,47 +129,21 @@ async function runWithRetry<T>(
   }
 }
 
+/** The writer queue: busy retries and the hold warning around each unit. */
+const writer = createSerialQueue({
+  name: "dbWrite",
+  waitWarnMs: DB_WRITE_QUEUE_WARN_MS,
+  waitWarning: "Database write waited for the queue",
+  wrap: runWithRetry,
+});
+
 /**
  * Runs `fn` as one write unit: after every unit enqueued before it, and
  * before every unit enqueued after. `label` names the unit in the logs
  * ("rating.scene", "sync.scenes"): keep it short and stable.
  */
-export async function dbWrite<T>(
-  label: string,
-  fn: () => Promise<T>
-): Promise<T> {
-  const outer = runningUnit.getStore();
-  if (outer !== undefined) {
-    const message = `dbWrite re-entered: ${outer} -> ${label}`;
-    if (STRICT_NESTING) throw new Error(message);
-    // The outer unit holds the queue: run inside it rather than wait forever
-    logger.error(message);
-    return fn();
-  }
-
-  const queuedAt = Date.now();
-  const behind = queued[0];
-  queued.push(label);
-  const previous = tail;
-  let release!: () => void;
-  tail = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await previous; // never rejects: release() is the only way it settles
-  try {
-    const ms = Date.now() - queuedAt;
-    if (ms > DB_WRITE_QUEUE_WARN_MS) {
-      logger.warn("Database write waited for the queue", {
-        label,
-        ms,
-        behind,
-      });
-    }
-    return await runningUnit.run(label, () => runWithRetry(label, fn));
-  } finally {
-    queued.shift();
-    release();
-  }
+export function dbWrite<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  return writer.run(label, fn);
 }
 
 /**

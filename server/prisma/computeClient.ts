@@ -16,6 +16,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { logger } from "../utils/logger.js";
+import { createSerialQueue } from "../utils/serialQueue.js";
 
 let clientPromise: Promise<PrismaClient> | null = null;
 
@@ -81,32 +82,24 @@ export async function disconnectComputeClient(): Promise<void> {
   }
 }
 
-// The connection's callers, one at a time: `tail` settles when the last
-// caller enqueued has released.
-let tail: Promise<void> = Promise.resolve();
+/** The connection's callers, one at a time. */
+const computeQueue = createSerialQueue({ name: "withComputeConnection" });
 
 /**
  * Run `fn` on the single-connection client, after every caller enqueued
  * before it and before every caller after: the TEMP tables are shared, so
- * two computes must never interleave. Take the connection before entering a
+ * two computes must never interleave. `label` names the caller in the
+ * nesting error: a `withComputeConnection` inside another would wait for
+ * itself, so it throws in tests and development and runs inline, logged, in
+ * production (utils/serialQueue.ts). Take the connection before entering a
  * `dbWrite` unit, never inside one: a unit waiting here would hold the
  * writer queue for as long as the caller ahead of it computes.
  */
-export async function withComputeConnection<T>(
-  fn: (db: PrismaClient) => Promise<T>
+export function withComputeConnection<T>(
+  fn: (db: PrismaClient) => Promise<T>,
+  label = "compute"
 ): Promise<T> {
-  const previous = tail;
-  let release!: () => void;
-  tail = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await previous; // never rejects: release() is the only way it settles
-  try {
-    const db = await getComputeClient();
-    return await fn(db);
-  } finally {
-    release();
-  }
+  return computeQueue.run(label, async () => fn(await getComputeClient()));
 }
 
 /**
