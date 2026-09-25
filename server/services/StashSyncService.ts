@@ -758,6 +758,11 @@ interface BatchWrite {
   upsert(tx: Prisma.TransactionClient): Promise<unknown>;
   /** Each junction the batch rewrites, with its new rows */
   junctions: ReadonlyArray<readonly [JunctionName, readonly JunctionRow[]]>;
+  /**
+   * Recomputes the columns the rows derive from themselves and their new
+   * junction rows, after the inserts (scenes: `refreshSceneDerivedColumns`)
+   */
+  refreshDerived?(tx: Prisma.TransactionClient): Promise<unknown>;
   /** The change diff, from the rows and links as they were before the write */
   detect(
     stored: Map<string, StoredEntity>,
@@ -771,7 +776,8 @@ interface BatchWrite {
  * Writes one batch in one transaction, one statement after another on its
  * connection (item 42, SYNC-11): the rows' stored state, the old junction
  * rows (deleted and returned, for the change diff), the rows, the new
- * junction rows, then the holds: once the diff says what changed, a
+ * junction rows, the columns derived from them (`refreshDerived`, scenes'
+ * sort columns), then the holds: once the diff says what changed, a
  * `pending` exclusion row per user of `holdFrom` for each changed entity and
  * what it links to (`holdForRecompute`), so a user with restrictions or
  * hidden items never sees a change before their recompute at the end of
@@ -799,6 +805,7 @@ function writeBatch(batch: BatchWrite): Promise<BatchChanges> {
     for (const [junction, rows] of batch.junctions) {
       await insertJunctionRows(tx, junction, rows, batch.instanceId);
     }
+    await batch.refreshDerived?.(tx);
     const changes = batch.detect(stored, oldLinks);
     if (batch.holdFrom.length > 0) {
       await exclusionComputationService.holdForRecompute(
@@ -1373,6 +1380,62 @@ export const ENTITY_SYNC: {
 
 // ==================== Scene Sync ====================
 
+/**
+ * The scene columns derived from a scene's row and its junction rows, as the
+ * SET list of an UPDATE of "StashScene" (item 67 (c), DB-07). The list sorts
+ * and filters on them through its `(deletedAt, <column>, id)` indexes instead
+ * of computing them for every scene on every request.
+ *
+ * - `titleSort`: the title the scene's card shows, `title ||
+ *   getSceneFallbackTitle(filePath)` (`utils/titleUtils.ts`): its title, else
+ *   its file name after the last `/` or `\`, the last extension stripped
+ *   (the whole path when it ends in a separator; NULL without a path).
+ *   lower() folds ASCII only (Prisma's SQLite has no ICU), exactly what
+ *   COLLATE NOCASE compared, so a BINARY order on the stored value is the
+ *   case-insensitive order of the displayed title, and the index needs no
+ *   collation `schema.prisma` cannot declare. The file name part runs only
+ *   for an untitled scene: COALESCE stops at the title. Read inside out:
+ *   `path`; `name`, what follows the last separator (`rtrim` by every
+ *   character but the separators leaves the directory part); `dot`, `name`
+ *   up to its last `.`; `ext`, what follows it, stripped when non-empty and
+ *   free of `/` (the regex `\.[^/.]+$`).
+ * - `performerCount`, `tagCount`: the scene's `ScenePerformer` and `SceneTag`
+ *   rows, as the count filters and sorts counted them (deleted far sides
+ *   included).
+ *
+ * Migration `20260925001100_scene_sort_columns` backfills with a copy of
+ * this text: change both together.
+ */
+export const SCENE_DERIVED_COLUMNS_SQL = `"titleSort" = lower(COALESCE(NULLIF("title", ''), (
+    SELECT CASE WHEN dot <> '' AND ext <> '' AND instr(ext, '/') = 0
+      THEN substr(name, 1, length(dot) - 1) ELSE name END
+    FROM (SELECT name, dot, substr(name, length(dot) + 1) AS ext
+      FROM (SELECT name, rtrim(name, replace(name, '.', '')) AS dot
+        FROM (SELECT COALESCE(NULLIF(substr(path, length(rtrim(path, replace(replace(path, '/', ''), '\\', ''))) + 1), ''), path) AS name
+          FROM (SELECT NULLIF("filePath", '') AS path))))))),
+  "performerCount" = (SELECT COUNT(*) FROM "ScenePerformer" sp WHERE sp."sceneId" = "StashScene"."id" AND sp."sceneInstanceId" = "StashScene"."stashInstanceId"),
+  "tagCount" = (SELECT COUNT(*) FROM "SceneTag" st WHERE st."sceneId" = "StashScene"."id" AND st."sceneInstanceId" = "StashScene"."stashInstanceId")`;
+
+/**
+ * Recomputes the derived columns (`SCENE_DERIVED_COLUMNS_SQL`) of a batch's
+ * scenes on `instanceId`, on its transaction after its junction inserts, so
+ * the counts are the junction rows as stored, whatever the inserts kept.
+ * One bound statement; the primary key finds each scene.
+ */
+export async function refreshSceneDerivedColumns(
+  db: Pick<PrismaClient, "$executeRawUnsafe">,
+  sceneIds: readonly string[],
+  instanceId: string
+): Promise<void> {
+  if (sceneIds.length === 0) return;
+  await db.$executeRawUnsafe(
+    `UPDATE "StashScene" SET ${SCENE_DERIVED_COLUMNS_SQL}
+     WHERE "id" IN (SELECT value FROM json_each(?)) AND "stashInstanceId" = ?`,
+    JSON.stringify(sceneIds),
+    instanceId
+  );
+}
+
 async function processScenesBatch(
   scenes: SyncScene[],
   stashInstanceId: string,
@@ -1564,6 +1627,8 @@ async function processScenesBatch(
       ["SceneGroup", groupRows],
       ["SceneGallery", galleryRows],
     ],
+    refreshDerived: (tx) =>
+      refreshSceneDerivedColumns(tx, sceneIds, instanceId),
     holdFrom: await usersToHold(run, instanceId),
     detect: (stored, oldLinks) =>
       detectChanges({
