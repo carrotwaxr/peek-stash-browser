@@ -6,6 +6,8 @@ import Tooltip from "./Tooltip";
 interface IndicatorItem {
   type: string;
   count: number;
+  /** The tooltip text for the count, in place of the type's own label */
+  countLabel?: (count: number) => string;
   tooltipContent?: ReactNode;
   onClick?: (e: React.MouseEvent) => void;
 }
@@ -116,7 +118,7 @@ export const CardCountIndicators = ({
             iconColor={knownIndicatorProps.iconColor}
             iconSize={size}
             tooltipContent={indicator.tooltipContent}
-            label={knownIndicatorProps.label}
+            label={indicator.countLabel ?? knownIndicatorProps.label}
             onClick={indicator.onClick}
           />
         );

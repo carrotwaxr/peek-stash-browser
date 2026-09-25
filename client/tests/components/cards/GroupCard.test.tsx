@@ -1,14 +1,17 @@
 import { createElement } from "react";
 import type * as routerModule from "react-router-dom";
 import type { NormalizedGroup } from "@peek/shared-types";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { must } from "@tests/testUtils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GroupCard from "../../../src/components/cards/GroupCard";
 import type { BaseCardProps } from "../../../src/components/ui/BaseCard";
+import { CardCountIndicators } from "../../../src/components/ui/CardCountIndicators";
+import { SCENE_FILTER_OPTIONS } from "../../../src/utils/filterConfig";
+import { parseSearchParams } from "../../../src/utils/urlParams";
 
 const { navigate, baseCardProps, config } = vi.hoisted(() => ({
-  navigate: vi.fn(),
+  navigate: vi.fn<(to: string) => void>(),
   baseCardProps: vi.fn<(props: BaseCardProps) => void>(),
   config: { hasMultipleInstances: true },
 }));
@@ -176,5 +179,67 @@ describe("GroupCard collections indicator", () => {
     );
 
     expect(indicator("GROUPS").onClick).toBeUndefined();
+  });
+});
+
+describe("GroupCard indicators", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const renderCard = (fields: Partial<NormalizedGroup>) => {
+    render(
+      <GroupCard
+        group={partialGroup({
+          id: "7",
+          instanceId: "inst-a",
+          name: "Box set",
+          scene_count: 0,
+          sub_group_count: 0,
+          tags: [],
+          ...fields,
+        })}
+      />
+    );
+    const props = must(baseCardProps.mock.lastCall, "BaseCard's props")[0];
+    return (type: string) =>
+      must(
+        props.indicators?.find((each) => each.type === type),
+        `the ${type} indicator`
+      );
+  };
+
+  it.each([
+    [1, "1 sub-collection"],
+    [3, "3 sub-collections"],
+  ])(
+    "the sub-collection count's tooltip names %i sub-collection(s)",
+    (count, text) => {
+      const groups = renderCard({ sub_group_count: count })("GROUPS");
+      render(
+        <CardCountIndicators
+          indicators={[{ ...groups, count: must(groups.count, "the count") }]}
+        />
+      );
+
+      fireEvent.mouseEnter(screen.getByText(String(count)));
+
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+  );
+
+  it("the scenes link carries the collection's instance into the Scenes filter", () => {
+    const scenes = renderCard({ scene_count: 4 })("SCENES");
+    must(scenes.onClick, "the scenes link")();
+
+    const url = new URL(
+      must(navigate.mock.lastCall, "a navigation")[0],
+      "http://peek.test"
+    );
+    expect(url.pathname).toBe("/scenes");
+    const { filters } = parseSearchParams(url.searchParams, [
+      ...SCENE_FILTER_OPTIONS,
+    ]);
+    expect(filters.groupIds).toEqual(["7:inst-a"]);
   });
 });
