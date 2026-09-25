@@ -42,18 +42,6 @@ import {
   getSceneFallbackTitle,
 } from "../utils/titleUtils.js";
 
-/**
- * Row shape returned by FTS search queries (raw SQL returning StashScene columns).
- * Uses Record<string, unknown> base since raw SQL results don't have Prisma's
- * typed Date objects - timestamps come back as strings or numbers.
- */
-type FtsSceneRow = Record<string, unknown> & StashScene;
-
-/**
- * Row shape returned by FTS performer search queries.
- */
-type FtsPerformerRow = Record<string, unknown> & StashPerformer;
-
 /** Junction table entry for scene-performer with included performer */
 interface ScenePerformerWithPerformer {
   performer: StashPerformer;
@@ -947,48 +935,6 @@ class StashEntityService {
     return cached.map((c) => c.id);
   }
 
-  /**
-   * Search scenes using FTS5
-   */
-  async searchScenes(query: string, limit = 100): Promise<NormalizedScene[]> {
-    try {
-      // Use raw SQL for FTS5 search - select all scene columns
-      const results = await prisma.$queryRaw<FtsSceneRow[]>`
-        SELECT s.*
-        FROM scene_fts
-        INNER JOIN StashScene s ON scene_fts.id = s.id
-        WHERE scene_fts MATCH ${query}
-          AND s.deletedAt IS NULL
-        ORDER BY rank
-        LIMIT ${limit}
-      `;
-
-      return results.map((r) => this.transformScene(r));
-    } catch (error) {
-      // FTS might fail with special characters, fall back to LIKE search
-      logger.warn("FTS5 search failed, falling back to LIKE", { error });
-      return this.searchScenesLike(query, limit);
-    }
-  }
-
-  /**
-   * Fallback LIKE search for scenes
-   */
-  private async searchScenesLike(
-    query: string,
-    limit: number
-  ): Promise<NormalizedScene[]> {
-    const cached = await prisma.stashScene.findMany({
-      where: {
-        deletedAt: null,
-        OR: [{ title: { contains: query } }, { code: { contains: query } }],
-      },
-      take: limit,
-    });
-
-    return cached.map((c) => this.transformScene(c));
-  }
-
   // ==================== Performer Queries ====================
 
   /**
@@ -1103,40 +1049,6 @@ class StashEntityService {
     return prisma.stashPerformer.count({
       where: { deletedAt: null },
     });
-  }
-
-  /**
-   * Search performers using FTS5
-   */
-  async searchPerformers(
-    query: string,
-    limit = 100
-  ): Promise<NormalizedPerformer[]> {
-    try {
-      const results = await prisma.$queryRaw<FtsPerformerRow[]>`
-        SELECT p.*
-        FROM performer_fts
-        INNER JOIN StashPerformer p ON performer_fts.id = p.id
-        WHERE performer_fts MATCH ${query}
-          AND p.deletedAt IS NULL
-        ORDER BY rank
-        LIMIT ${limit}
-      `;
-
-      return results.map((r) => this.transformPerformer(r));
-    } catch (error) {
-      logger.warn("FTS5 performer search failed, falling back to LIKE", {
-        error,
-      });
-      const cached = await prisma.stashPerformer.findMany({
-        where: {
-          deletedAt: null,
-          name: { contains: query },
-        },
-        take: limit,
-      });
-      return cached.map((c) => this.transformPerformer(c));
-    }
   }
 
   // ==================== Studio Queries ====================
