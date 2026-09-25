@@ -187,8 +187,8 @@ export async function dbWrite<T>(
 /**
  * An interactive transaction as one unit: `dbWrite(label, () =>
  * prisma.$transaction(fn, DB_WRITE_TX))`. `options` override DB_WRITE_TX for
- * the units B2 and B5 have yet to shorten; new code passes none. Write
- * through `tx` inside `fn`, never through `dbWrite`.
+ * the sync junction transactions still to be shortened; new code passes
+ * none. Write through `tx` inside `fn`, never through `dbWrite`.
  */
 export function dbWriteTransaction<T>(
   label: string,

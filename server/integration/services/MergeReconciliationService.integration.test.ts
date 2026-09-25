@@ -128,7 +128,9 @@ describeWithDb("MergeReconciliationService (integration)", () => {
   let u = 0;
   let v = 0;
 
-  const cleanupA = () => stashSyncService["cleanupDeletedEntities"]("scene", A);
+  /** Runs A's scene cleanup; resolves with how many scenes it soft-deleted. */
+  const cleanupA = async () =>
+    (await stashSyncService["cleanupDeletedEntities"]("scene", A)).deleted;
 
   const mergeRecords = () =>
     prisma.mergeRecord.findMany({

@@ -30,13 +30,13 @@ paths:
 
 ## Cleanup
 
-`cleanupDeletedEntities` sets `deletedAt` on rows Stash no longer returns. A truncated ID list from Stash would soft-delete the library, so it:
+`cleanupDeletedEntities` sets `deletedAt` on rows Stash no longer returns, for all eight types through one routine (`ENTITY_TABLES`, `CLEANUP_ID_FETCHERS`). A truncated id list from Stash would soft-delete the library, so it:
 
-- skips when Stash returns no IDs but the cache has rows, or page 1 is empty while the count is not;
-- for scenes, aborts when more than `MAX_CLEANUP_DELETE_RATIO` (0.5) of the live rows would go;
-- for scenes, runs the TEMP table create, insert, `NOT IN` select and drop in one interactive `$transaction`. A TEMP table lives on one connection, and nothing pins Prisma's pool to one connection (comments claiming `connection_limit=1` are wrong) (#526).
+- skips when a page comes back empty before Stash's own count is reached (a partial list), and when Stash returns no ids while the cache has live rows;
+- refuses, for every type, when more than `MAX_CLEANUP_DELETE_RATIO` (0.5) of the live rows would go and more than `CLEANUP_MIN_GUARDED_DELETES` (50), so a small library can still lose most of its rows;
+- computes the delete set in one statement, `"id" NOT IN (SELECT value FROM json_each(?))` with Stash's whole list as one JSON parameter: no TEMP table (a TEMP table lives on one pooled connection, #526), no transaction, no bound-variable ceiling (Prisma's `notIn` binds one variable per id, and SQLite stops at 250,000). 178 ms for 260k image ids on the prod copy.
 
-Keep all three when changing cleanup. The other entity types lack the ratio guard so far.
+Keep all three when changing cleanup. `softDeleteMissing` writes 500 rows per `dbWrite` unit, binding `deletedAt` as epoch milliseconds, as Prisma stores a `DateTime`. The routine returns a `CleanupOutcome`: `deleted` and `deletedIds`, `stashIds` when it ran to the end, `skipped` for a guard's refusal, `error` for a failure. An abort rethrows.
 
 Merges (`MergeReconciliationService`): the scene branch soft-deletes first and then calls `reconcileDeletedScenes(instanceId, deleted)`, so scenes that leave Stash together are never each other's target. A scene merges only into the one live scene of its own instance sharing its phash; with several it waits in Merge Recovery. Each scene cleanup starts with `reconcileRecentDeletions`, the catch-up for scenes soft-deleted in the last 24 hours with activity and no `MergeRecord` as source.
 
@@ -54,5 +54,5 @@ Several junction writes build SQL with `this.escape()` and string interpolation.
 
 ## Tests
 
-- `server/tests/services/StashSyncService.cleanup.test.ts` mocks `$transaction` as `cb => cb(mockPrisma)`. Its `afterEach` runs `vi.restoreAllMocks()`, which wipes that implementation, so `beforeEach` sets it again.
-- Real-SQLite coverage is in `server/integration/services/StashSyncService.cleanup.integration.test.ts`. It seeds rows under a made-up `stashInstanceId` that real sync never touches, and spies on `getStashClient` to control what Stash returns.
+- `server/tests/services/StashSyncService.cleanup.test.ts` mocks Prisma with `tests/helpers/prismaMock.ts`, routes `$queryRawUnsafe` by statement shape and spies on `dbWrite`.
+- Real-SQLite coverage is in `server/integration/services/StashSyncService.cleanup.integration.test.ts`, every type: it seeds rows under two made-up instances with the same ids, which real sync never touches, and spies on `stashInstanceManager.get` to page what Stash returns.
