@@ -4,7 +4,11 @@ import https from "https";
 import { URL } from "url";
 import prisma from "../prisma/singleton.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  type StashCredentials,
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import type { ProxyOptions } from "../types/api/proxy.js";
@@ -90,43 +94,40 @@ function isClientGone(res: Response): boolean {
 }
 
 /**
- * Get credentials for a specific Stash instance
- * @param instanceId - Optional instance ID. If not provided, uses default instance.
- * @returns Object with baseUrl and apiKey
+ * The address and key of the instance to serve from (the one named, or the
+ * highest-priority enabled instance), or null once the response is sent:
+ * 404 for an instance that is not enabled (disabled or deleted; invariant
+ * 11), 500 when none is named and none is configured.
  */
-function getInstanceCredentials(instanceId?: string): {
-  baseUrl: string;
-  apiKey: string;
-} {
-  // Treat "default" the same as undefined - use the default instance
-  if (instanceId && instanceId !== "default") {
-    const instance = stashInstanceManager.get(instanceId);
-    if (!instance) {
-      throw new Error(`Stash instance not found: ${instanceId}`);
+function credentialsOrRespond(
+  instanceId: string | undefined,
+  res: TypedResponse<ApiErrorResponse>
+): StashCredentials | null {
+  try {
+    return stashInstanceManager.getCredentials(instanceId);
+  } catch (error) {
+    if (error instanceof UnknownInstanceError) {
+      res.status(404).json({ error: "Not found" });
+      return null;
     }
-    return {
-      baseUrl: stashInstanceManager.getBaseUrl(instanceId),
-      apiKey: stashInstanceManager.getApiKey(instanceId),
-    };
+    logger.error("Failed to get Stash instance credentials", {
+      error,
+      instanceId,
+    });
+    res.status(500).json({ error: "Stash configuration missing" });
+    return null;
   }
-  // Default instance
-  return {
-    baseUrl: stashInstanceManager.getBaseUrl(),
-    apiKey: stashInstanceManager.getApiKey(),
-  };
 }
 
 /**
  * The optional `?instanceId=` on the by-id routes narrows the row lookup, so
- * a multi-instance setup checks the row it will serve. Absent (or the legacy
- * "default"), the bare id picks the first row.
+ * a multi-instance setup checks the row it will serve. Every id is an
+ * ordinary id, "default" included; absent, the bare id picks the first row.
  */
 function rowInstanceFilter(
   instanceId: string | undefined
 ): { stashInstanceId: string } | Record<never, never> {
-  return instanceId && instanceId !== "default"
-    ? { stashInstanceId: instanceId }
-    : {};
+  return instanceId === undefined ? {} : { stashInstanceId: instanceId };
 }
 
 // =============================================================================
@@ -279,21 +280,9 @@ export const proxyScenePreview = async (
     return;
   }
 
-  let stashUrl: string;
-  let apiKey: string;
-
-  try {
-    const creds = getInstanceCredentials(scene.stashInstanceId ?? undefined);
-    stashUrl = creds.baseUrl;
-    apiKey = creds.apiKey;
-  } catch (error) {
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId: scene.stashInstanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
-    return;
-  }
+  const creds = credentialsOrRespond(scene.stashInstanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
@@ -366,21 +355,9 @@ export const proxySceneWebp = async (
     return;
   }
 
-  let stashUrl: string;
-  let apiKey: string;
-
-  try {
-    const creds = getInstanceCredentials(scene.stashInstanceId ?? undefined);
-    stashUrl = creds.baseUrl;
-    apiKey = creds.apiKey;
-  } catch (error) {
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId: scene.stashInstanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
-    return;
-  }
+  const creds = credentialsOrRespond(scene.stashInstanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
@@ -453,21 +430,9 @@ export const proxyStashMedia = async (
     return;
   }
 
-  let stashUrl: string;
-  let apiKey: string;
-
-  try {
-    const creds = getInstanceCredentials(instanceId);
-    stashUrl = creds.baseUrl;
-    apiKey = creds.apiKey;
-  } catch (error) {
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
-    return;
-  }
+  const creds = credentialsOrRespond(instanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
@@ -547,19 +512,9 @@ export const proxyClipPreview = async (
     return;
   }
 
-  let apiKey: string;
-
-  try {
-    const creds = getInstanceCredentials(clip.stashInstanceId ?? undefined);
-    apiKey = creds.apiKey;
-  } catch (error) {
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId: clip.stashInstanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
-    return;
-  }
+  const creds = credentialsOrRespond(clip.stashInstanceId, res);
+  if (!creds) return;
+  const { apiKey } = creds;
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;
@@ -663,21 +618,9 @@ export const proxyImage = async (
     return;
   }
 
-  let stashUrl: string;
-  let apiKey: string;
-
-  try {
-    const creds = getInstanceCredentials(image.stashInstanceId ?? undefined);
-    stashUrl = creds.baseUrl;
-    apiKey = creds.apiKey;
-  } catch (error) {
-    logger.error("Failed to get Stash instance credentials", {
-      error,
-      instanceId: image.stashInstanceId,
-    });
-    res.status(500).json({ error: "Stash configuration missing" });
-    return;
-  }
+  const creds = credentialsOrRespond(image.stashInstanceId, res);
+  if (!creds) return;
+  const { baseUrl: stashUrl, apiKey } = creds;
 
   // Nothing to send to a browser that has moved on; skip the queue entirely
   if (isClientGone(res)) return;

@@ -1,3 +1,4 @@
+import type { StashInstance } from "@prisma/client";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 // =============================================================================
 // Imports (after mocks)
@@ -26,15 +27,6 @@ vi.mock(
   "../../prisma/singleton.js",
   () => import("../helpers/prismaSingletonMock.js")
 );
-
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn().mockReturnValue({ id: "inst-a" }),
-    getBaseUrl: vi.fn().mockReturnValue("http://stash:9999"),
-    getApiKey: vi.fn().mockReturnValue("test-api-key"),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "inst-default" }),
-  },
-}));
 
 vi.mock("../../services/EntityAccessService.js", () => ({
   canUserAccessEntity: vi.fn().mockResolvedValue(true),
@@ -83,7 +75,6 @@ vi.mock("https", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
-const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 
 // =============================================================================
@@ -136,25 +127,57 @@ function setupHttpGetSuccess(headers: Record<string, string> = {}) {
   return { mockProxyReq, mockProxyRes };
 }
 
-function restoreDefaults() {
-  mockInstanceManager.get.mockReturnValue(partialRow({}));
-  mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
-  mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
-  mockInstanceManager.getDefaultConfig.mockReturnValue(
-    stashInstanceRow({ id: "inst-default" })
+/**
+ * Load `rows` into the real instance manager, as its database query returns
+ * them (enabled instances, in priority order).
+ */
+async function loadInstances(...rows: StashInstance[]): Promise<void> {
+  mockPrisma.stashInstance.findMany.mockResolvedValue(rows);
+  await stashInstanceManager.reload();
+}
+
+/** Three enabled instances on one Stash address; inst-default comes first. */
+async function restoreDefaults() {
+  await loadInstances(
+    ...["inst-default", "inst-a", "inst-b"].map((id, priority) =>
+      stashInstanceRow({
+        id,
+        priority,
+        url: "http://stash:9999/graphql",
+        apiKey: "test-api-key",
+      })
+    )
   );
   mockCanUserAccessEntity.mockResolvedValue(true);
 }
+
+/**
+ * The owner's instance id is literally "default". Here another instance has
+ * the top priority, so "the default instance" and the instance named
+ * "default" differ.
+ */
+const TOP_PRIORITY = stashInstanceRow({
+  id: "b",
+  priority: 0,
+  url: "http://stash-b:9999/graphql",
+  apiKey: "key-b",
+});
+const NAMED_DEFAULT = stashInstanceRow({
+  id: "default",
+  priority: 5,
+  url: "http://stash-default:9999/graphql",
+  apiKey: "key-default",
+});
 
 // =============================================================================
 // Tests
 // =============================================================================
 
 describe("Proxy Controller", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     // Restore default mock return values after clearAllMocks
-    restoreDefaults();
+    await restoreDefaults();
   });
 
   // ===========================================================================
@@ -341,12 +364,8 @@ describe("Proxy Controller", () => {
       }
     });
 
-    it("returns 500 when instance credentials fail", async () => {
-      mockInstanceManager.get.mockReturnValue(undefined);
-      mockInstanceManager.getBaseUrl.mockImplementation(() => {
-        throw new Error("Stash instance not found: bad-id");
-      });
-
+    it("returns 404 for an instance that is not enabled (disabled or deleted)", async () => {
+      setupHttpGetSuccess();
       const req = reqFor(proxyStashMedia, {
         query: { path: "/scene/1/preview", instanceId: "bad-id" },
         user: USER,
@@ -355,10 +374,32 @@ describe("Proxy Controller", () => {
 
       await proxyStashMedia(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Stash configuration missing",
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("with instanceId=default fetches from the `default` instance when another has higher priority", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      setupHttpGetSuccess();
+
+      const req = reqFor(proxyStashMedia, {
+        query: { path: "/performer/5/image", instanceId: "default" },
+        user: USER,
       });
+      await proxyStashMedia(req, resFor(proxyStashMedia));
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "performer",
+        "5",
+        "default"
+      );
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash-default:9999/performer/5/image?apikey=key-default",
+        expect.any(Object),
+        expect.any(Function)
+      );
     });
 
     it("constructs correct URL and calls proxyHttpRequest for valid path", async () => {
@@ -574,17 +615,13 @@ describe("Proxy Controller", () => {
       expect(mockHttpGet).not.toHaveBeenCalled();
     });
 
-    it("returns 500 when instance credentials fail", async () => {
+    it("returns 404 when the row's instance is not enabled (disabled or deleted)", async () => {
       mockPrisma.stashScene.findFirst.mockResolvedValue(
         partialRow({
           stashInstanceId: "bad-instance",
         })
       );
-      mockInstanceManager.get.mockReturnValue(undefined);
-      mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
-        if (id === "bad-instance") throw new Error("Stash instance not found");
-        return "http://stash:9999";
-      });
+      setupHttpGetSuccess();
 
       const req = reqFor(proxyScenePreview, {
         params: { id: "1" },
@@ -594,10 +631,34 @@ describe("Proxy Controller", () => {
 
       await proxyScenePreview(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Stash configuration missing",
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+
+    it("with instanceId=default looks the row up on `default`", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({ stashInstanceId: "default" })
+      );
+      setupHttpGetSuccess();
+
+      const req = reqFor(proxyScenePreview, {
+        params: { id: "42" },
+        query: { instanceId: "default" },
+        user: USER,
       });
+      await proxyScenePreview(req, resFor(proxyScenePreview));
+
+      expect(mockPrisma.stashScene.findFirst).toHaveBeenCalledWith({
+        where: { id: "42", deletedAt: null, stashInstanceId: "default" },
+        select: { stashInstanceId: true },
+      });
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        "http://stash-default:9999/scene/42/preview?apikey=key-default",
+        expect.any(Object),
+        expect.any(Function)
+      );
     });
 
     it("constructs correct Stash URL with preview path", async () => {
@@ -1184,7 +1245,7 @@ describe("Proxy Controller", () => {
 
       for (const { type, expectedPath } of typeMappings) {
         vi.clearAllMocks();
-        restoreDefaults();
+        await restoreDefaults();
         mockPrisma.stashImage.findFirst.mockResolvedValue(partialRow(pathData));
         setupHttpGetSuccess();
 
@@ -1204,7 +1265,7 @@ describe("Proxy Controller", () => {
       }
     });
 
-    it("returns 500 when instance credentials fail", async () => {
+    it("returns 404 when the row's instance is not enabled (disabled or deleted)", async () => {
       mockPrisma.stashImage.findFirst.mockResolvedValue(
         partialRow({
           pathThumbnail: "/thumb",
@@ -1213,10 +1274,7 @@ describe("Proxy Controller", () => {
           stashInstanceId: "bad-instance",
         })
       );
-      mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
-        if (id === "bad-instance") throw new Error("Stash instance not found");
-        return "http://stash:9999";
-      });
+      setupHttpGetSuccess();
 
       const req = reqFor(proxyImage, {
         params: { imageId: "1", type: "thumbnail" },
@@ -1226,10 +1284,107 @@ describe("Proxy Controller", () => {
 
       await proxyImage(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: "Stash configuration missing",
-      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: "Not found" });
+      expect(mockHttpGet).not.toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================================================
+  // An instance whose id is "default" (the owner's)
+  // ===========================================================================
+
+  describe("an instance whose id is `default`", () => {
+    it("a row on `default` is served from `default` when another instance has the top priority", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      setupHttpGetSuccess();
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({ stashInstanceId: "default" })
+      );
+      mockPrisma.stashClip.findFirst.mockResolvedValue(
+        partialRow({
+          streamPath: "http://stash-default:9999/scene/1/scene_marker/9/stream",
+          screenshotPath: null,
+          stashInstanceId: "default",
+        })
+      );
+      mockPrisma.stashImage.findFirst.mockResolvedValue(
+        partialRow({
+          pathThumbnail: "/image/3/thumbnail",
+          pathPreview: null,
+          pathImage: null,
+          stashInstanceId: "default",
+        })
+      );
+
+      await proxyScenePreview(
+        reqFor(proxyScenePreview, { params: { id: "1" }, user: USER }),
+        resFor(proxyScenePreview)
+      );
+      await proxySceneWebp(
+        reqFor(proxySceneWebp, { params: { id: "1" }, user: USER }),
+        resFor(proxySceneWebp)
+      );
+      await proxyClipPreview(
+        reqFor(proxyClipPreview, { params: { id: "9" }, user: USER }),
+        resFor(proxyClipPreview)
+      );
+      await proxyImage(
+        reqFor(proxyImage, {
+          params: { imageId: "3", type: "thumbnail" },
+          user: USER,
+        }),
+        resFor(proxyImage)
+      );
+
+      expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
+        "http://stash-default:9999/scene/1/preview?apikey=key-default",
+        "http://stash-default:9999/scene/1/webp?apikey=key-default",
+        "http://stash-default:9999/scene/1/scene_marker/9/stream?apikey=key-default",
+        "http://stash-default:9999/image/3/thumbnail?apikey=key-default",
+      ]);
+    });
+
+    it("the owner's setup, `default` alone at priority 0, serves it whether a request names it or not", async () => {
+      await loadInstances({ ...NAMED_DEFAULT, priority: 0 });
+      setupHttpGetSuccess();
+      mockPrisma.stashScene.findFirst.mockResolvedValue(
+        partialRow({ stashInstanceId: "default" })
+      );
+
+      for (const query of [{ instanceId: "default" }, {}]) {
+        await proxyStashMedia(
+          reqFor(proxyStashMedia, {
+            query: { path: "/performer/5/image", ...query },
+            user: USER,
+          }),
+          resFor(proxyStashMedia)
+        );
+        await proxyScenePreview(
+          reqFor(proxyScenePreview, {
+            params: { id: "42" },
+            query,
+            user: USER,
+          }),
+          resFor(proxyScenePreview)
+        );
+      }
+
+      const media =
+        "http://stash-default:9999/performer/5/image?apikey=key-default";
+      const preview =
+        "http://stash-default:9999/scene/42/preview?apikey=key-default";
+      expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
+        media,
+        preview,
+        media,
+        preview,
+      ]);
+      expect(
+        mockCanUserAccessEntity.mock.calls.map(
+          ([, , , instanceId]) => instanceId
+        )
+      ).toEqual(["default", "default", "default", "default"]);
     });
   });
 
@@ -1305,7 +1460,7 @@ describe("Proxy Controller", () => {
 
       for (const path of allowedPaths) {
         vi.clearAllMocks();
-        restoreDefaults();
+        await restoreDefaults();
         setupHttpGetSuccess();
 
         const req = reqFor(proxyStashMedia, { query: { path }, user: USER });

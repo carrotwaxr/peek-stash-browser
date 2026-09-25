@@ -1,3 +1,4 @@
+import type { StashInstance } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
@@ -33,15 +34,6 @@ import { partialRow } from "../helpers/prismaMock.js";
 // Mocks (must come before imports)
 // ---------------------------------------------------------------------------
 
-vi.mock("../../services/StashInstanceManager.js", () => ({
-  stashInstanceManager: {
-    get: vi.fn(),
-    getBaseUrl: vi.fn().mockReturnValue("http://stash:9999"),
-    getApiKey: vi.fn().mockReturnValue("test-api-key"),
-    getDefaultConfig: vi.fn().mockReturnValue({ id: "inst-default" }),
-  },
-}));
-
 vi.mock("../../services/EntityAccessService.js", () => ({
   canUserAccessEntity: vi.fn().mockResolvedValue(true),
 }));
@@ -68,7 +60,6 @@ vi.mock("../../utils/streamProxy.js", () => ({
   pipeResponseToClient: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockInstanceManager = vi.mocked(stashInstanceManager);
 const mockCanUserAccessEntity = vi.mocked(canUserAccessEntity);
 const mockPrisma = vi.mocked(prisma, true);
 const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
@@ -86,6 +77,33 @@ const allLogged = () =>
 // ---------------------------------------------------------------------------
 
 const USER = { id: 7, username: "u", role: "USER" };
+
+/**
+ * Load `rows` into the real instance manager, as its database query returns
+ * them (enabled instances, in priority order).
+ */
+async function loadInstances(...rows: StashInstance[]): Promise<void> {
+  mockPrisma.stashInstance.findMany.mockResolvedValue(rows);
+  await stashInstanceManager.reload();
+}
+
+/**
+ * The owner's instance id is literally "default". Here another instance has
+ * the top priority, so "the default instance" and the instance named
+ * "default" differ.
+ */
+const TOP_PRIORITY = stashInstanceRow({
+  id: "b",
+  priority: 0,
+  url: "http://stash-b:9999/graphql",
+  apiKey: "key-b",
+});
+const NAMED_DEFAULT = stashInstanceRow({
+  id: "default",
+  priority: 5,
+  url: "http://stash-default:9999/graphql",
+  apiKey: "key-default",
+});
 
 /** A request for the scene's HLS playlist; `parts` replace the defaults. */
 function createMockReq(parts: ReqParts<typeof proxyStashStream> = {}) {
@@ -167,16 +185,21 @@ function createMpdReq(overrides: ReqParts<typeof proxyStashStream> = {}) {
 // ---------------------------------------------------------------------------
 
 describe("Video Controller", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  beforeEach(async () => {
     global.fetch = vi.fn();
-    // Default: instance exists
-    mockInstanceManager.get.mockReturnValue(partialRow({}));
-    mockInstanceManager.getBaseUrl.mockReturnValue("http://stash:9999");
-    mockInstanceManager.getApiKey.mockReturnValue("test-api-key");
-    mockInstanceManager.getDefaultConfig.mockReturnValue(
-      stashInstanceRow({ id: "inst-default" })
+    // Two enabled instances on one Stash address; inst-default comes first
+    await loadInstances(
+      ...["inst-default", "inst-a"].map((id, priority) =>
+        stashInstanceRow({
+          id,
+          priority,
+          url: "http://stash:9999/graphql",
+          apiKey: "test-api-key",
+        })
+      )
     );
+    // After the load, whose log lines are not the handler's
+    vi.clearAllMocks();
     mockCanUserAccessEntity.mockResolvedValue(true);
   });
 
@@ -846,14 +869,7 @@ describe("Video Controller", () => {
     // Error handling
     // -----------------------------------------------------------------------
     describe("error handling", () => {
-      it("returns 500 when instance not found", async () => {
-        mockInstanceManager.get.mockReturnValue(undefined);
-        mockInstanceManager.getBaseUrl.mockImplementation((id?: string) => {
-          if (id === "bad-inst")
-            throw new Error("Stash instance not found: bad-inst");
-          return "http://stash:9999";
-        });
-
+      it("returns 404 for an instance that is not enabled (disabled or deleted)", async () => {
         const req = createMockReq({
           query: { instanceId: "bad-inst" },
           url: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=bad-inst",
@@ -862,8 +878,9 @@ describe("Video Controller", () => {
 
         await proxyStashStream(req, res);
 
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.send).toHaveBeenCalledWith("Stash not configured");
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.send).toHaveBeenCalledWith("Not found");
+        expect(global.fetch).not.toHaveBeenCalled();
       });
 
       it("returns Stash error status when Stash returns non-ok", async () => {
@@ -984,6 +1001,95 @@ describe("Video Controller", () => {
         await proxyStashStream(req, res);
 
         expect(res.on).toHaveBeenCalledWith("close", expect.any(Function));
+      });
+    });
+    // -----------------------------------------------------------------------
+    // An instance whose id is "default" (the owner's)
+    // -----------------------------------------------------------------------
+    describe("an instance whose id is `default`", () => {
+      it("with instanceId=default fetches from the `default` instance when another has higher priority", async () => {
+        await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+        vi.mocked(global.fetch).mockResolvedValue(
+          makeFetchResponse("", { contentType: "video/mp4" })
+        );
+
+        await proxyStashStream(
+          createMockReq({
+            params: { sceneId: "123", streamPath: "stream.mp4" },
+            query: { instanceId: "default" },
+            url: "/api/scene/123/proxy-stream/stream.mp4?instanceId=default&resolution=STANDARD",
+          }),
+          resFor(proxyStashStream)
+        );
+
+        expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+          7,
+          "scene",
+          "123",
+          "default"
+        );
+        expect(fetchedUrl()).toBe(
+          "http://stash-default:9999/scene/123/stream.mp4?resolution=STANDARD"
+        );
+        expect(fetchedHeaders()).toEqual({ ApiKey: "key-default" });
+      });
+
+      it("an HLS playlist from `default` keeps instanceId=default on every segment", async () => {
+        await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+        vi.mocked(global.fetch).mockResolvedValue(
+          makeFetchResponse(
+            "#EXTM3U\n#EXTINF:10,\n/scene/123/stream.m3u8/0.ts?apikey=key-default&resolution=LOW\n"
+          )
+        );
+        const res = resFor(proxyStashStream);
+
+        await proxyStashStream(
+          createMockReq({
+            query: { instanceId: "default" },
+            url: "/api/scene/123/proxy-stream/stream.m3u8?instanceId=default",
+          }),
+          res
+        );
+
+        expect(fetchedUrl()).toBe(
+          "http://stash-default:9999/scene/123/stream.m3u8"
+        );
+        expect(sentText(res)).toContain(
+          "/api/scene/123/proxy-stream/stream.m3u8/0.ts?resolution=LOW&instanceId=default"
+        );
+      });
+
+      it("the owner's setup, `default` alone at priority 0, serves it whether a request names it or not", async () => {
+        await loadInstances({ ...NAMED_DEFAULT, priority: 0 });
+        vi.mocked(global.fetch).mockImplementation(() =>
+          Promise.resolve(makeFetchResponse("", { contentType: "video/mp4" }))
+        );
+
+        for (const query of [{ instanceId: "default" }, {}]) {
+          await proxyStashStream(
+            createMockReq({
+              params: { sceneId: "123", streamPath: "stream" },
+              query,
+              url: "/api/scene/123/proxy-stream/stream",
+            }),
+            resFor(proxyStashStream)
+          );
+        }
+
+        const calls = vi.mocked(global.fetch).mock.calls;
+        expect(calls.map(([url]) => url)).toEqual([
+          "http://stash-default:9999/scene/123/stream",
+          "http://stash-default:9999/scene/123/stream",
+        ]);
+        expect(calls.map(([, init]) => init?.headers)).toEqual([
+          { ApiKey: "key-default" },
+          { ApiKey: "key-default" },
+        ]);
+        expect(
+          mockCanUserAccessEntity.mock.calls.map(
+            ([, , , instanceId]) => instanceId
+          )
+        ).toEqual(["default", "default"]);
       });
     });
   });
@@ -1230,9 +1336,7 @@ describe("Video Controller", () => {
       expect(fetchUrl).not.toMatch(/apikey/i);
     });
 
-    it("returns 500 when instance not found", async () => {
-      mockInstanceManager.get.mockReturnValue(undefined);
-
+    it("returns 404 for an instance that is not enabled (disabled or deleted)", async () => {
       const req = reqFor(getCaption, {
         params: { sceneId: "123" },
         query: { lang: "en", type: "srt", instanceId: "bad-inst" },
@@ -1242,8 +1346,34 @@ describe("Video Controller", () => {
 
       await getCaption(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.send).toHaveBeenCalledWith("Stash configuration missing");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.send).toHaveBeenCalledWith("Not found");
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("with instanceId=default fetches from the `default` instance when another has higher priority", async () => {
+      await loadInstances(TOP_PRIORITY, NAMED_DEFAULT);
+      vi.mocked(global.fetch).mockResolvedValue(captionResponse());
+
+      await getCaption(
+        reqFor(getCaption, {
+          params: { sceneId: "123" },
+          query: { lang: "en", type: "srt", instanceId: "default" },
+          user: USER,
+        }),
+        resFor(getCaption)
+      );
+
+      expect(mockCanUserAccessEntity).toHaveBeenCalledWith(
+        7,
+        "scene",
+        "123",
+        "default"
+      );
+      expect(fetchedUrl()).toBe(
+        "http://stash-default:9999/scene/123/caption?lang=en&type=srt"
+      );
+      expect(fetchedHeaders()).toEqual({ ApiKey: "key-default" });
     });
   });
 

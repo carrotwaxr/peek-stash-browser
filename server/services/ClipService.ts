@@ -81,8 +81,8 @@ export class ClipService {
       proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    // Add instanceId for multi-instance routing (skip "default" - proxy handles that automatically)
-    if (instanceId && instanceId !== "default") {
+    // The instance the proxy serves it from; every id is an ordinary id
+    if (instanceId) {
       proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
     }
 
