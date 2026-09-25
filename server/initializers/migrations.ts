@@ -13,10 +13,16 @@
  * Databases from before Peek kept migration history (`prisma db push`, up to
  * v2.0.0) upgrade only from v2.0.0, whose tables are `0_baseline`'s; older
  * ones stop at startup with an error naming the release to run first.
+ *
+ * Migrations from 20260925000000 on run in one transaction
+ * (`isAtomicMigration`), so one that fails changes nothing. When a start finds
+ * such a migration unfinished, it marks it rolled back and deploys once more;
+ * any other unfinished migration stops startup with `MigrationFailedError`,
+ * which names the ways out.
  */
 import type { PrismaClient } from "@prisma/client";
 import { execFile } from "child_process";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import prisma from "../prisma/singleton.js";
@@ -107,6 +113,356 @@ export class LegacyDatabaseError extends Error {
     this.name = "LegacyDatabaseError";
     this.runFirst = runFirst;
     this.missingTables = missingTables;
+  }
+}
+
+/** A statement of a migration file, without its comments or final `;`. */
+interface SqlStatement {
+  text: string;
+  /**
+   * The statement in upper case, whitespace collapsed, with every string
+   * literal and quoted identifier emptied: a keyword inside one is not a
+   * keyword.
+   */
+  keywords: string;
+}
+
+const TRIGGER_START = /^\s*CREATE\s+(?:TEMP\s+|TEMPORARY\s+)?TRIGGER\b/i;
+
+/**
+ * Whether a `;` at this point of a statement is inside a trigger's
+ * `BEGIN` ... `END` body: from the body's `BEGIN` until the `END` that is not
+ * a `CASE`'s.
+ */
+function insideTriggerBody(statement: string): boolean {
+  if (!TRIGGER_START.test(statement)) return false;
+  let begins = 0;
+  let open = 0;
+  for (const [word] of statement.matchAll(/\b(?:BEGIN|CASE|END)\b/gi)) {
+    const keyword = word.toUpperCase();
+    if (keyword === "BEGIN") begins++;
+    if (keyword === "END") open--;
+    else open++;
+  }
+  return begins === 0 || open > 0;
+}
+
+/** Splits SQL into statements, as SQLite reads them. */
+function splitSqlStatements(sql: string): SqlStatement[] {
+  const statements: SqlStatement[] = [];
+  let text = "";
+  let masked = "";
+  const flush = (): void => {
+    const keywords = masked.replace(/\s+/g, " ").trim().toUpperCase();
+    if (keywords !== "") statements.push({ text: text.trim(), keywords });
+    text = "";
+    masked = "";
+  };
+
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql.charAt(i);
+    const pair = sql.slice(i, i + 2);
+    if (pair === "--" || pair === "/*") {
+      const close = pair === "--" ? "\n" : "*/";
+      const end = sql.indexOf(close, i + 2);
+      i = end === -1 ? sql.length : end + close.length;
+      text += " ";
+      masked += " ";
+    } else if (ch === "'" || ch === '"' || ch === "`" || ch === "[") {
+      // A string literal or quoted identifier; a doubled quote is escaped
+      const close = ch === "[" ? "]" : ch;
+      let end = i + 1;
+      while (end < sql.length) {
+        if (sql.charAt(end) !== close) end++;
+        else if (close !== "]" && sql.charAt(end + 1) === close) end += 2;
+        else break;
+      }
+      text += sql.slice(i, end + 1);
+      masked += ch === "'" ? "''" : '""';
+      i = end + 1;
+    } else if (ch === ";" && !insideTriggerBody(masked)) {
+      flush();
+      i++;
+    } else {
+      text += ch;
+      masked += ch;
+      i++;
+    }
+  }
+  flush();
+  return statements;
+}
+
+const TRANSACTION_CONTROL =
+  /^(?:BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b/;
+const FOREIGN_KEY_PRAGMA =
+  /^PRAGMA (?:\w+ ?\. ?)?(?:FOREIGN_KEYS|DEFER_FOREIGN_KEYS)\b/;
+
+/**
+ * Whether a migration runs in one transaction, in the form every migration
+ * from 20260925000000 on takes:
+ *
+ * ```sql
+ * PRAGMA foreign_keys=OFF;
+ * BEGIN;
+ * ...
+ * COMMIT;
+ * PRAGMA foreign_keys=ON;
+ * ```
+ *
+ * with no other transaction statement and no other `foreign_keys` or
+ * `defer_foreign_keys` pragma. Prisma applies a migration statement by
+ * statement, so without the wrapper a failure leaves the statements before it
+ * applied. Foreign keys go off before `BEGIN` because inside a transaction the
+ * pragma does nothing, and a rebuild's `DROP TABLE` would cascade.
+ */
+export function isAtomicMigration(sql: string): boolean {
+  const statements = splitSqlStatements(sql).map((statement) =>
+    statement.keywords.replace(/ ?= ?/g, "=")
+  );
+  if (statements.length < 4) return false;
+  if (
+    statements[0] !== "PRAGMA FOREIGN_KEYS=OFF" ||
+    statements[1] !== "BEGIN" ||
+    statements[statements.length - 2] !== "COMMIT" ||
+    statements[statements.length - 1] !== "PRAGMA FOREIGN_KEYS=ON"
+  ) {
+    return false;
+  }
+  return statements
+    .slice(2, -2)
+    .every(
+      (statement) =>
+        !TRANSACTION_CONTROL.test(statement) &&
+        !FOREIGN_KEY_PRAGMA.test(statement)
+    );
+}
+
+// An identifier as SQL spells it: quoted, or a bare word
+const NAME = String.raw`(?:"(?:[^"]|"")+"|\`[^\`]+\`|\[[^\]]+\]|[\w$]+)`;
+// A name that may be schema-qualified, the name itself captured
+const QUALIFIED = String.raw`(?:${NAME}\s*\.\s*)?(${NAME})`;
+
+/** An identifier without its quotes or schema. */
+function unquotedName(name: string): string {
+  const parts = name.trim().split(".");
+  const last = parts[parts.length - 1] ?? "";
+  return last.replace(/^["`[]|["`\]]$/g, "").replace(/""/g, '"');
+}
+
+/** An identifier as SQLite compares it: unquoted, any case. */
+function bareName(name: string): string {
+  return unquotedName(name).toLowerCase();
+}
+
+/** The objects and columns a migration creates, drops or renames. */
+interface MigrationObjects {
+  /** Tables, indexes, triggers and views it creates, or renames a table to. */
+  created: Set<string>;
+  /** Tables, indexes, triggers and views it drops, or renames a table from. */
+  dropped: Set<string>;
+  addedColumns: Set<string>;
+  /** Columns it drops, or renames. */
+  droppedColumns: Set<string>;
+}
+
+const CREATE_OBJECT = new RegExp(
+  String.raw`^CREATE\s+(?:UNIQUE\s+)?(?:TEMP(?:ORARY)?\s+)?(?:TABLE|INDEX|TRIGGER|VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?${QUALIFIED}`,
+  "i"
+);
+const DROP_OBJECT = new RegExp(
+  String.raw`^DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)\s+(?:IF\s+EXISTS\s+)?${QUALIFIED}`,
+  "i"
+);
+const RENAME_TABLE = new RegExp(
+  String.raw`^ALTER\s+TABLE\s+${QUALIFIED}\s+RENAME\s+TO\s+(${NAME})`,
+  "i"
+);
+const ADD_COLUMN = new RegExp(
+  String.raw`^ALTER\s+TABLE\s+${QUALIFIED}\s+ADD\s+(?:COLUMN\s+)?(${NAME})`,
+  "i"
+);
+const DROP_COLUMN = new RegExp(
+  String.raw`^ALTER\s+TABLE\s+${QUALIFIED}\s+(?:DROP\s+(?:COLUMN\s+)?|RENAME\s+(?:COLUMN\s+)?(?!TO\b))(${NAME})`,
+  "i"
+);
+
+function migrationObjects(sql: string): MigrationObjects {
+  const objects: MigrationObjects = {
+    created: new Set(),
+    dropped: new Set(),
+    addedColumns: new Set(),
+    droppedColumns: new Set(),
+  };
+  for (const { text } of splitSqlStatements(sql)) {
+    const created = CREATE_OBJECT.exec(text)?.[1];
+    if (created !== undefined) objects.created.add(bareName(created));
+    const dropped = DROP_OBJECT.exec(text)?.[1];
+    if (dropped !== undefined) objects.dropped.add(bareName(dropped));
+    const renamed = RENAME_TABLE.exec(text);
+    if (renamed?.[1] !== undefined && renamed[2] !== undefined) {
+      objects.dropped.add(bareName(renamed[1]));
+      objects.created.add(bareName(renamed[2]));
+    }
+    const added = ADD_COLUMN.exec(text)?.[2];
+    if (added !== undefined) objects.addedColumns.add(bareName(added));
+    const droppedColumn = DROP_COLUMN.exec(text)?.[2];
+    if (droppedColumn !== undefined) {
+      objects.droppedColumns.add(bareName(droppedColumn));
+    }
+  }
+  return objects;
+}
+
+/**
+ * The database's own error in Prisma's output for a failed migration (its
+ * stderr, or the `logs` it records), such as `no such table: X`, and its
+ * SQLite code; null when the output has none.
+ */
+function databaseError(
+  output: string
+): { message: string; code: string | undefined } | null {
+  const line = /Database error:\s*\n\s*(.+)/.exec(output)?.[1];
+  if (line === undefined) return null;
+  return {
+    // SQLite's message goes on with " in <the rest of the migration>"
+    message: line.replace(/\s+in\s*$/, "").trim(),
+    code: /Database error code:\s*(\d+)/.exec(output)?.[1],
+  };
+}
+
+/** Prisma's error for a failed migration, as one sentence. */
+function describeFailure(output: string | null): string {
+  const trimmed = output?.trim() ?? "";
+  if (trimmed === "") return "Prisma recorded no error.";
+  const error = databaseError(trimmed);
+  if (error === null) {
+    const short =
+      trimmed.length > 500 ? `${trimmed.slice(0, 500)}...` : trimmed;
+    return `Prisma said: ${short}`;
+  }
+  const code = error.code === undefined ? "" : ` (SQLite error ${error.code})`;
+  return `The database said: ${error.message}${code}.`;
+}
+
+/**
+ * The object a failed retry stumbled on when the migration itself creates or
+ * drops it, which means the migration had committed at an earlier start:
+ * `already exists` for what it creates, `no such` for what it drops. Null for
+ * any other error.
+ */
+export function objectMigrationAlreadyChanged(
+  sql: string,
+  output: string
+): string | null {
+  const error = databaseError(output)?.message ?? output;
+  const objects = migrationObjects(sql);
+  const checks: [RegExp, Set<string>][] = [
+    [/\b(?:table|index|trigger|view) (.+?) already exists/i, objects.created],
+    [/\bno such (?:table|index|trigger|view): (\S+)/i, objects.dropped],
+    [/\bduplicate column name: (\S+)/i, objects.addedColumns],
+    [/\bno such column: (\S+)/i, objects.droppedColumns],
+  ];
+  for (const [pattern, names] of checks) {
+    const name = pattern.exec(error)?.[1];
+    if (name !== undefined && names.has(bareName(name))) {
+      return unquotedName(name);
+    }
+  }
+  return null;
+}
+
+/**
+ * Why a migration stopped startup:
+ * - `partial`: it did not finish at an earlier start and is not atomic, so
+ *   some of its statements may have been applied. Nothing was run.
+ * - `retryFailed`: it is atomic and failed again when retried, changing
+ *   nothing. The next start retries it again.
+ * - `alreadyApplied`: the retry failed on an object the migration itself
+ *   creates or drops: it had committed at an earlier start that stopped before
+ *   Prisma recorded it.
+ */
+export type MigrationFailure = "partial" | "retryFailed" | "alreadyApplied";
+
+export interface MigrationFailedDetails {
+  migration: string;
+  failure: MigrationFailure;
+  /** Prisma's output: the retry's stderr, or the unfinished row's `logs`. */
+  output: string | null;
+  /** The newest pre-migration backup's path; null when there is none. */
+  backup: string | null;
+  /** Where the pre-migration backups are kept. */
+  backupDir: string;
+  /** For `alreadyApplied`: the object the retry stumbled on. */
+  object?: string | null;
+}
+
+/**
+ * The command that records a migration's state with the image's own Prisma
+ * CLI, on the data directory, while Peek is stopped. `docker exec` cannot do
+ * it: the container stops at startup, and exec runs as root.
+ */
+function resolveCommand(
+  flag: "--rolled-back" | "--applied",
+  migration: string
+): string {
+  return `docker run --rm --user 99:100 -v <data dir>:/app/data --entrypoint node carrotwaxr/peek-stash-browser:${getServerVersion()} /app/node_modules/prisma/build/index.js migrate resolve ${flag} ${migration} --schema /app/prisma/schema.prisma`;
+}
+
+/** How to fill in `resolveCommand`'s placeholders. */
+const RESOLVE_COMMAND_HELP =
+  "with Peek stopped, and with your PUID:PGID in place of 99:100 if you set them and the host directory you mount at /app/data in place of <data dir>";
+
+function migrationFailedMessage(details: MigrationFailedDetails): string {
+  const { migration, backup, backupDir } = details;
+  const error = describeFailure(details.output);
+  const more = "See Upgrading → Migration failed.";
+  switch (details.failure) {
+    case "partial": {
+      const fix = `fix the cause, undo what the migration applied, and mark it rolled back with the command below (${RESOLVE_COMMAND_HELP}); then start Peek again.`;
+      const ways =
+        backup === null
+          ? `There is no pre-migration backup in ${backupDir}, so the way out is to ${fix}`
+          : `Either restore the pre-migration backup ${backup}, the database as it was before this upgrade (see Upgrading → Restore from Backup), or ${fix}`;
+      return `Migration ${migration} did not finish at an earlier start. ${error} It does not run in one transaction, so some of its changes may be in the database, and Peek will not run it again by itself. ${ways} ${more}\n${resolveCommand("--rolled-back", migration)}`;
+    }
+    case "retryFailed": {
+      const back =
+        backup === null
+          ? ""
+          : ` To go back to the version you ran before instead, restore the pre-migration backup ${backup} (see Upgrading → Downgrading).`;
+      return `Migration ${migration} failed again when Peek retried it. ${error} It runs in one transaction, so it changed nothing, and Peek retries it at every start: fix the cause (a full disk is the usual one) and start Peek again.${back} ${more}`;
+    }
+    case "alreadyApplied": {
+      const unsure =
+        backup === null
+          ? ""
+          : ` If you are not sure, restore the pre-migration backup ${backup} instead, the database as it was before this upgrade (see Upgrading → Restore from Backup).`;
+      return `Migration ${migration} failed when Peek retried it. ${error} The migration itself creates or drops ${details.object ?? "that object"}, so it most likely finished at an earlier start that stopped before Prisma recorded it. Mark it applied with the command below (${RESOLVE_COMMAND_HELP}), then start Peek again.${unsure} ${more}\n${resolveCommand("--applied", migration)}`;
+    }
+  }
+}
+
+/**
+ * Thrown when a migration that failed cannot be retried by itself: one that
+ * is not atomic and did not finish at an earlier start (before anything runs),
+ * or an atomic one whose retry failed. The message names the migration,
+ * Prisma's error, the newest pre-migration backup and the ways out.
+ */
+export class MigrationFailedError extends Error {
+  readonly migration: string;
+  readonly failure: MigrationFailure;
+  readonly output: string | null;
+  readonly backup: string | null;
+
+  constructor(details: MigrationFailedDetails) {
+    super(migrationFailedMessage(details));
+    this.name = "MigrationFailedError";
+    this.migration = details.migration;
+    this.failure = details.failure;
+    this.output = details.output;
+    this.backup = details.backup;
   }
 }
 
@@ -304,11 +660,63 @@ function migrationCount(count: number): string {
   return `${count} migration${count === 1 ? "" : "s"}`;
 }
 
+/** A migration folder's SQL, or null when this version has no such folder. */
+function readMigrationSql(prismaDir: string, name: string): string | null {
+  try {
+    return readFileSync(
+      path.join(prismaDir, "migrations", name, "migration.sql"),
+      "utf8"
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** The migration Prisma's output for a failed deploy names, if it names one. */
+function failedMigrationName(output: string): string | undefined {
+  return /Migration name:\s*(\S+)/.exec(output)?.[1];
+}
+
+/**
+ * What stops startup after the retried deploy failed: a failure of one of the
+ * retried migrations, told apart by whether it stumbled on an object the
+ * migration itself creates or drops. A later migration's first failure is
+ * rethrown as it is, to be retried at the next start when it is atomic.
+ */
+function retryFailure(
+  error: unknown,
+  retried: readonly string[],
+  prismaDir: string,
+  backup: string | null,
+  backupDir: string
+): unknown {
+  const output = error instanceof Error ? error.message : String(error);
+  const named = failedMigrationName(output);
+  if (named !== undefined && !retried.includes(named)) return error;
+  const migration = named ?? retried.join(", ");
+  const object = objectMigrationAlreadyChanged(
+    readMigrationSql(prismaDir, migration) ?? "",
+    output
+  );
+  return new MigrationFailedError({
+    migration,
+    failure: object === null ? "retryFailed" : "alreadyApplied",
+    output,
+    backup,
+    backupDir,
+    object,
+  });
+}
+
 /**
  * Brings the database up to this version's migrations with at most one
  * `prisma migrate deploy`, and none when nothing is pending. A v2.0.0 `db push`
  * database is first marked at the baseline; one this version cannot upgrade
  * throws `LegacyDatabaseError` before anything is written.
+ *
+ * A migration an earlier start left unfinished is marked rolled back and
+ * deployed again when it is atomic: it changed nothing. Otherwise, or when
+ * that retry fails, it throws `MigrationFailedError`.
  */
 export async function migrateDatabase(
   opts: MigrateOptions = {}
@@ -316,6 +724,9 @@ export async function migrateDatabase(
   const client = opts.client ?? prisma;
   const prismaDir = opts.prismaDir ?? defaultPrismaDir();
   const cli = { prismaDir, databaseUrl: opts.databaseUrl };
+  const backupDir = opts.configDir ?? getConfigDir();
+  const backups = { client, dir: opts.configDir };
+  const version = getServerVersion();
   const plan = await readMigrationPlan(client, prismaDir);
 
   const legacy = legacyDatabaseError(plan);
@@ -323,8 +734,45 @@ export async function migrateDatabase(
 
   if (plan.unknownApplied.length > 0) {
     logger.warn(
-      `A newer Peek migrated this database (migrations this version does not have: ${plan.unknownApplied.join(", ")}). Starting anyway; to go back, restore its pre-migration backup from ${opts.configDir ?? getConfigDir()}`
+      `A newer Peek migrated this database (migrations this version does not have: ${plan.unknownApplied.join(", ")}). Starting anyway; to go back, restore its pre-migration backup from ${backupDir}`
     );
+  }
+
+  // A migration an earlier start began and never finished. An atomic one
+  // rolled back whole, so it runs again; any other may have applied part of
+  // itself, and nothing is touched
+  const retry = [...new Set(plan.unfinished.map((row) => row.name))];
+  let newestBackup: string | null = null;
+  let haveBackupForVersion = false;
+  if (retry.length > 0) {
+    const taken = await databaseBackupService.listPreMigrationBackups(backups);
+    newestBackup = taken[taken.length - 1]?.path ?? null;
+    const partial = plan.unfinished.find(
+      (row) => !isAtomicMigration(readMigrationSql(prismaDir, row.name) ?? "")
+    );
+    if (partial) {
+      throw new MigrationFailedError({
+        migration: partial.name,
+        failure: "partial",
+        output: partial.logs,
+        backup: newestBackup,
+        backupDir,
+      });
+    }
+    for (const name of retry) {
+      logger.warn(
+        `Migration ${name} was interrupted and rolled back; retrying`
+      );
+    }
+    // The start that failed took it, and the server has not served since:
+    // it is still the database before this version's migrations
+    haveBackupForVersion =
+      (
+        await databaseBackupService.listPreMigrationBackups({
+          ...backups,
+          version,
+        })
+      ).length > 0;
   }
 
   // A new database has nothing to lose. Any other gets a copy before the
@@ -332,12 +780,21 @@ export async function migrateDatabase(
   // refusal for lack of space stops here with nothing changed
   if (
     plan.shape !== "empty" &&
-    (plan.pending.length > 0 || plan.shape === "dbPush")
+    (plan.pending.length > 0 || plan.shape === "dbPush") &&
+    !haveBackupForVersion
   ) {
-    await databaseBackupService.createPreMigrationBackup(getServerVersion(), {
-      client,
-      dir: opts.configDir,
-    });
+    const backup = await databaseBackupService.createPreMigrationBackup(
+      version,
+      backups
+    );
+    if (retry.length > 0) newestBackup = backup.path;
+  }
+
+  if (retry.length > 0) {
+    await client.$disconnect();
+    for (const name of retry) {
+      await runPrismaCli(["migrate", "resolve", "--rolled-back", name], cli);
+    }
   }
 
   let pending = plan.pending;
@@ -372,7 +829,8 @@ export async function migrateDatabase(
     await runPrismaCli(["migrate", "deploy"], cli);
   } catch (error) {
     await truncateWal(client);
-    throw error;
+    if (retry.length === 0) throw error;
+    throw retryFailure(error, retry, prismaDir, newestBackup, backupDir);
   }
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   logger.info(`Applied ${migrationCount(pending.length)} in ${seconds} s`);

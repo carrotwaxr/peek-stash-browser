@@ -195,8 +195,33 @@ Common causes:
     ```
 
     Free at least the amount it names on the volume holding the data directory, then start Peek again. Old backups in the data directory (`*.backup-*`, including older pre-migration backups) are usually the easiest to move off the server or delete. The upgrade needs about 2.2 times the space the database uses, plus 64 MB.
-- **Disk full** during the migration itself: free up space and restart.
+- **Disk full, or Peek stopped, during a migration**: Peek's migrations since 3.4.0 run in one transaction, so one that fails or is interrupted changes nothing. At the next start Peek logs `Migration <name> was interrupted and rolled back; retrying` and runs it again. If the retry fails too, Peek stops and says why:
+
+    ```
+    Fatal error: Migration 20260925000100_drop_scene_fts failed again when Peek retried it. The database said: database or disk is full (SQLite error 13). It runs in one transaction, so it changed nothing, and Peek retries it at every start: fix the cause (a full disk is the usual one) and start Peek again. ...
+    ```
+
+    Fix the cause, for example by freeing disk space, and start Peek again. To go back to the version you ran before instead, restore the pre-migration backup the message names (see [Downgrading](#downgrading)).
 - **Permission denied**: Check volume mount permissions
+
+#### A migration Peek does not retry by itself
+
+Two messages ask you to act before Peek can start. Both name the migration, the database's error and the newest pre-migration backup, and end with the command to run. Run it with Peek stopped, with the host directory you mount at `/app/data` in place of `<data dir>`, and with your `PUID:PGID` in place of `99:100` if you set them. `docker exec` cannot do it: the container stops at startup, and `exec` runs as root.
+
+- **`Migration <name> did not finish at an earlier start`**: a migration from before 3.4.0, which does not run in one transaction, stopped partway, so some of its changes may be in the database. Either:
+    1. Restore the pre-migration backup the message names (see [Restore from Backup](#restore-from-backup)): the database as it was before the upgrade. Then start the version you ran before, or this version again once the cause is fixed.
+    2. Or fix the cause, undo what the migration applied, and mark the migration rolled back, so that the next start runs it again:
+
+        ```bash
+        docker stop peek-stash-browser
+        docker run --rm --user 99:100 -v /path/to/data:/app/data --entrypoint node \
+          carrotwaxr/peek-stash-browser:<version> \
+          /app/node_modules/prisma/build/index.js migrate resolve --rolled-back <name> \
+          --schema /app/prisma/schema.prisma
+        docker start peek-stash-browser
+        ```
+
+- **`Migration <name> failed when Peek retried it`** and **`The migration itself creates or drops ...`**: the retry stumbled on something the migration makes or removes itself, so the migration most likely finished at the earlier start, which stopped in the instant before recording it. Mark it applied instead: the same command with `--applied <name>` in place of `--rolled-back <name>`. If you are not sure, restore the pre-migration backup.
 
 ### Sync is slow
 

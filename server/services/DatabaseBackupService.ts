@@ -5,7 +5,8 @@
  * - List existing backups
  * - Create new backups using VACUUM INTO
  * - Delete backup files
- * - Back up the database before the server applies pending migrations
+ * - Back up the database before the server applies pending migrations, and
+ *   list those backups
  */
 import type { PrismaClient } from "@prisma/client";
 import fs from "fs/promises";
@@ -57,6 +58,11 @@ export interface PreMigrationBackupOptions {
   dir?: string;
 }
 
+export interface PreMigrationBackupListOptions extends PreMigrationBackupOptions {
+  /** Only the backups taken before migrating to this version. */
+  version?: string;
+}
+
 /** Bytes as MB or GB, for messages. */
 function formatSize(bytes: number): string {
   return bytes >= 1e9
@@ -104,6 +110,18 @@ function preMigrationPattern(base: string): RegExp {
   return new RegExp(
     `^${escapeRegExp(base)}\\.backup-\\d{8}-\\d{6}-pre-[0-9A-Za-z.+_-]+(?<!-wal|-shm|-journal)$`
   );
+}
+
+/**
+ * The names of the pre-migration backups of `base` in `dir`, oldest first:
+ * their names sort by their timestamps.
+ */
+async function preMigrationBackupNames(
+  dir: string,
+  base: string
+): Promise<string[]> {
+  const pattern = preMigrationPattern(base);
+  return (await fs.readdir(dir)).filter((name) => pattern.test(name)).sort();
 }
 
 /**
@@ -288,17 +306,46 @@ class DatabaseBackupService {
   }
 
   /**
+   * The pre-migration backups of the database `client` is connected to,
+   * oldest first; with `version`, only those taken before migrating to it.
+   */
+  async listPreMigrationBackups(
+    opts: PreMigrationBackupListOptions = {}
+  ): Promise<PreMigrationBackup[]> {
+    const dir = opts.dir ?? this.getBackupDir();
+    const base = await getDatabaseBaseName(opts.client ?? prisma);
+    const suffix =
+      opts.version === undefined ? "" : `-pre-${fileNamePart(opts.version)}`;
+    const names = (await preMigrationBackupNames(dir, base)).filter((name) =>
+      name.endsWith(suffix)
+    );
+    const backups: PreMigrationBackup[] = [];
+    for (const filename of names) {
+      const backupPath = path.join(dir, filename);
+      try {
+        const stat = await fs.stat(backupPath);
+        backups.push({
+          filename,
+          path: backupPath,
+          size: stat.size,
+          createdAt: stat.mtime,
+        });
+      } catch {
+        // Deleted between readdir and stat
+      }
+    }
+    return backups;
+  }
+
+  /**
    * Deletes all but the newest `PRE_MIGRATION_BACKUPS_KEPT` pre-migration
-   * backups of `base` in `dir`. Their names sort by their timestamps.
+   * backups of `base` in `dir`.
    */
   private async prunePreMigrationBackups(
     dir: string,
     base: string
   ): Promise<void> {
-    const pattern = preMigrationPattern(base);
-    const backups = (await fs.readdir(dir))
-      .filter((name) => pattern.test(name))
-      .sort();
+    const backups = await preMigrationBackupNames(dir, base);
     for (const name of backups.slice(0, -PRE_MIGRATION_BACKUPS_KEPT)) {
       try {
         await fs.unlink(path.join(dir, name));
