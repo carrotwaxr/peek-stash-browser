@@ -30,7 +30,7 @@ Peek provides three sync strategies, each optimized for different use cases:
 An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
 **Process:**
-1. Sync all entity types in dependency order: studios, tags, performers, groups, galleries, scenes, images
+1. Sync all entity types in dependency order: studios, tags, performers, groups, galleries, scenes, images, each followed by its [cleanup](#cleanup-safety)
 2. Apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images)
 3. Compute scene tag inheritance
 4. Rebuild inherited image counts
@@ -107,6 +107,22 @@ All sync types process entities in dependency order:
 ```
 
 This order ensures foreign key relationships are satisfied.
+
+---
+
+## Cleanup Safety
+
+After syncing, each entity type runs a cleanup: Peek asks Stash for every id of that type (5,000 a page) and soft-deletes the cached rows Stash no longer lists, because they were deleted or merged there. All eight types (scenes, performers, studios, tags, collections, galleries, images and clips) use the same routine and the same guards, because a truncated list from Stash would otherwise hide most of the library:
+
+| Guard | When | Result |
+|-------|------|--------|
+| Partial list | A page comes back empty before Stash's own count is reached ("Stash returned 100 of 120 scenes") | Skipped |
+| Empty list | Stash returns no ids while Peek has live rows of that type | Skipped |
+| Ratio | More than half of the live rows would go, and more than 50 of them | Refused |
+
+The ratio guard has a floor of 50 rows, so a small library can still lose most of a type when Stash really did (8 of 10 tags, say). A skip or refusal soft-deletes nothing, and the next sync checks again. The server log names each skip (a warning) and refusal (an error) with its counts, and any Stash or database error in a cleanup; either way the sync moves on to the next type.
+
+How the delete set is computed: one SQL statement compares the cached rows with Stash's whole id list, bound as one JSON parameter (`"id" NOT IN (SELECT value FROM json_each(?))`), so there is no limit on library size and no transaction: 178 ms for 260,599 image ids on a production copy. The rows then go in batches of 500, each a short write-queue unit. Scenes then move user data from merged scenes to their survivors (see [Merge Detection](../user-guide/merge-detection.md)).
 
 ---
 

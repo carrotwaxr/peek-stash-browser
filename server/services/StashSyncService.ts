@@ -13,6 +13,7 @@
  */
 import type { SyncSettings, SyncState } from "@prisma/client";
 import { EventEmitter } from "events";
+import type { StashClient } from "../graphql/StashClient.js";
 import {
   CriterionModifier,
   SortDirectionEnum,
@@ -95,27 +96,8 @@ type EntityType =
   | "image"
   | "clip";
 
-// Plural forms for entity types (for logging)
-const ENTITY_PLURALS: Record<EntityType, string> = {
-  scene: "scenes",
-  performer: "performers",
-  studio: "studios",
-  tag: "tags",
-  group: "groups",
-  gallery: "galleries",
-  image: "images",
-  clip: "clips",
-};
-
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
-
-// Cleanup safety: refuse to soft-delete more than this fraction of the live
-// (non-deleted) local entities in a single cleanup pass. A truncated or partial
-// ID list from Stash (e.g. a broken paginated fetch, or - per #526 - a temp table
-// landing on a different pooled connection) would otherwise mass-delete real
-// scenes. Soft-deletes are recoverable, but the guard stops it before it happens.
-const MAX_CLEANUP_DELETE_RATIO = 0.5;
 
 /**
  * What holds the service's one lock: a sync, or an instance deletion (the
@@ -160,6 +142,116 @@ const INSTANCE_CACHE_TABLES = [
  * so user writes interleave with the purge (the writer rule's 1 s bound).
  */
 const PURGE_CHUNK_ROWS = 1000;
+
+/** The cached table of each entity type, and its plural for the logs. */
+const ENTITY_TABLES: Record<
+  EntityType,
+  { table: (typeof INSTANCE_CACHE_TABLES)[number]; plural: string }
+> = {
+  scene: { table: "StashScene", plural: "scenes" },
+  performer: { table: "StashPerformer", plural: "performers" },
+  studio: { table: "StashStudio", plural: "studios" },
+  tag: { table: "StashTag", plural: "tags" },
+  group: { table: "StashGroup", plural: "groups" },
+  gallery: { table: "StashGallery", plural: "galleries" },
+  image: { table: "StashImage", plural: "images" },
+  clip: { table: "StashClip", plural: "clips" },
+};
+
+/** One page of a type's ids from Stash, and Stash's own total. */
+interface StashIdPage {
+  ids: string[];
+  count: number;
+}
+
+/**
+ * The Stash query that lists each type's ids for cleanup: the ID-only
+ * operations, and for clips the marker query, which has no ID-only form.
+ */
+const CLEANUP_ID_FETCHERS: Record<
+  EntityType,
+  (stash: StashClient, filter: FindFilterType) => Promise<StashIdPage>
+> = {
+  scene: async (stash, filter) => {
+    const { findScenes } = await stash.findSceneIDs({ filter });
+    return { ids: findScenes.scenes.map((s) => s.id), count: findScenes.count };
+  },
+  performer: async (stash, filter) => {
+    const { findPerformers } = await stash.findPerformerIDs({ filter });
+    return {
+      ids: findPerformers.performers.map((p) => p.id),
+      count: findPerformers.count,
+    };
+  },
+  studio: async (stash, filter) => {
+    const { findStudios } = await stash.findStudioIDs({ filter });
+    return {
+      ids: findStudios.studios.map((s) => s.id),
+      count: findStudios.count,
+    };
+  },
+  tag: async (stash, filter) => {
+    const { findTags } = await stash.findTagIDs({ filter });
+    return { ids: findTags.tags.map((t) => t.id), count: findTags.count };
+  },
+  group: async (stash, filter) => {
+    const { findGroups } = await stash.findGroupIDs({ filter });
+    return { ids: findGroups.groups.map((g) => g.id), count: findGroups.count };
+  },
+  gallery: async (stash, filter) => {
+    const { findGalleries } = await stash.findGalleryIDs({ filter });
+    return {
+      ids: findGalleries.galleries.map((g) => g.id),
+      count: findGalleries.count,
+    };
+  },
+  image: async (stash, filter) => {
+    const { findImages } = await stash.findImageIDs({ filter });
+    return { ids: findImages.images.map((i) => i.id), count: findImages.count };
+  },
+  clip: async (stash, filter) => {
+    const { findSceneMarkers } = await stash.findSceneMarkers({ filter });
+    return {
+      ids: findSceneMarkers.scene_markers.map((m) => m.id),
+      count: findSceneMarkers.count,
+    };
+  },
+};
+
+/** Ids per cleanup page from Stash (ids are small, so more than a sync page). */
+const CLEANUP_PAGE_SIZE = 5000;
+
+/** Rows per soft-delete statement, each its own writer-queue unit. */
+const CLEANUP_SOFT_DELETE_BATCH = 500;
+
+/**
+ * Cleanup safety: a cleanup that would soft-delete more than this share of a
+ * type's live cached rows, and more than CLEANUP_MIN_GUARDED_DELETES of them,
+ * is refused. A truncated or partial id list from Stash would otherwise hide
+ * much of the library; soft-deletes are recoverable, but the guard stops it
+ * before it happens.
+ */
+const MAX_CLEANUP_DELETE_RATIO = 0.5;
+
+/**
+ * Up to this many rows go without the ratio guard, so a small library (or a
+ * type with few rows) can still lose most of them when Stash really did.
+ */
+const CLEANUP_MIN_GUARDED_DELETES = 50;
+
+/**
+ * What one type's cleanup did. `deleted` rows were soft-deleted, their ids in
+ * `deletedIds`. `skipped` says why a guard refused and `error` what failed;
+ * either way nothing was soft-deleted. `stashIds` is the whole id list Stash
+ * returned, present when the cleanup ran to the end.
+ */
+interface CleanupOutcome {
+  deleted: number;
+  deletedIds: string[];
+  stashIds?: string[];
+  skipped?: string;
+  error?: string;
+}
 
 /**
  * Format a timestamp for Stash GraphQL queries.
@@ -424,73 +516,65 @@ class StashSyncService extends EventEmitter {
       let result: SyncResult;
 
       result = await this.syncTags(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "tag",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("tag", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncStudios(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "studio",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("studio", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncPerformers(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "performer",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("performer", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGroups(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "group",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("group", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGalleries(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "gallery",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("gallery", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncScenes(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "scene",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("scene", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncClips(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "clip",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("clip", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncImages(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities(
-        "image",
-        stashInstanceId
-      );
+      result.deleted = (
+        await this.cleanupDeletedEntities("image", stashInstanceId)
+      ).deleted;
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
 
@@ -691,7 +775,7 @@ class StashSyncService extends EventEmitter {
       let totalDeleted = 0;
       for (const entityType of entityTypes) {
         this.checkAbort();
-        const deleted = await this.cleanupDeletedEntities(
+        const { deleted } = await this.cleanupDeletedEntities(
           entityType,
           stashInstanceId
         );
@@ -1058,7 +1142,7 @@ class StashSyncService extends EventEmitter {
       let totalDeleted = 0;
       for (const entityType of entityTypes) {
         this.checkAbort();
-        const deleted = await this.cleanupDeletedEntities(
+        const { deleted } = await this.cleanupDeletedEntities(
           entityType,
           stashInstanceId
         );
@@ -1482,48 +1566,14 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Count non-deleted local entities of a given type for a specific Stash instance.
-   * Used by cleanup safety checks to detect when Stash returns suspicious empty results.
-   */
-  private async getLocalEntityCount(
-    entityType: EntityType,
-    stashInstanceId?: string
-  ): Promise<number> {
-    const where = {
-      deletedAt: null,
-      ...(stashInstanceId ? { stashInstanceId } : {}),
-    };
-    switch (entityType) {
-      case "scene":
-        return prisma.stashScene.count({ where });
-      case "performer":
-        return prisma.stashPerformer.count({ where });
-      case "studio":
-        return prisma.stashStudio.count({ where });
-      case "tag":
-        return prisma.stashTag.count({ where });
-      case "group":
-        return prisma.stashGroup.count({ where });
-      case "gallery":
-        return prisma.stashGallery.count({ where });
-      case "image":
-        return prisma.stashImage.count({ where });
-      case "clip":
-        return prisma.stashClip.count({ where });
-      default:
-        return 0;
-    }
-  }
-
-  /**
-   * Safety guard against a bad/truncated keep-set wiping a large share of the
-   * library. Returns true (and logs loudly) when the proposed soft-delete count
-   * exceeds MAX_CLEANUP_DELETE_RATIO of the live (non-deleted) local entities.
+   * Safety guard against a bad or truncated keep-set hiding much of the
+   * library. Returns true, and logs loudly, when more than
+   * MAX_CLEANUP_DELETE_RATIO of the live cached rows would go and more than
+   * CLEANUP_MIN_GUARDED_DELETES of them.
    *
-   * This protects against ANY cause of a bad keep-set - a partial paginated
-   * fetch, a transient Stash error, or the connection-pool race described in
-   * #526 - not just one specific failure mode. The keep-set size is surfaced in
-   * the log so a truncated fetch is easy to spot.
+   * This protects against any cause of a bad keep-set (a partial paginated
+   * fetch, a transient Stash error), not one specific failure mode. The
+   * keep-set size is in the log so a truncated fetch is easy to spot.
    */
   private exceedsCleanupDeleteThreshold(
     plural: string,
@@ -1531,47 +1581,56 @@ class StashSyncService extends EventEmitter {
     liveCount: number,
     toDeleteCount: number
   ): boolean {
-    // Nothing to protect (empty/new library) or nothing to delete - let it run.
-    if (liveCount === 0 || toDeleteCount === 0) {
-      return false;
-    }
-    const ratio = toDeleteCount / liveCount;
-    if (ratio > MAX_CLEANUP_DELETE_RATIO) {
-      logger.error(
-        `Cleanup safety: refusing to soft-delete ${toDeleteCount}/${liveCount} ${plural} ` +
-          `(${(ratio * 100).toFixed(1)}% > ${(MAX_CLEANUP_DELETE_RATIO * 100).toFixed(0)}% limit). ` +
-          `Stash returned only ${keepSetSize} ${plural} ID(s) - the list looks truncated or partial, ` +
-          `so cleanup is being skipped to prevent mass deletion. Run a full sync if this is expected.`
-      );
-      return true;
-    }
-    return false;
+    if (toDeleteCount <= CLEANUP_MIN_GUARDED_DELETES) return false;
+    if (toDeleteCount <= MAX_CLEANUP_DELETE_RATIO * liveCount) return false;
+    logger.error(
+      `Cleanup safety: refusing to soft-delete ${toDeleteCount}/${liveCount} ${plural} ` +
+        `(more than ${(MAX_CLEANUP_DELETE_RATIO * 100).toFixed(0)}% and more than ${CLEANUP_MIN_GUARDED_DELETES}). ` +
+        `Stash returned only ${keepSetSize} ${plural} ID(s) - the list looks truncated or partial, ` +
+        `so nothing was soft-deleted. The next sync checks again.`
+    );
+    return true;
   }
 
   /**
-   * Cleanup entities that no longer exist in Stash.
-   * Called during full sync after each entity type has been synced.
+   * Soft-deletes cached rows of a type that Stash no longer returns (deleted
+   * or merged there). Runs after each type's sync, in every sync mode.
    *
-   * Fetches all entity IDs from Stash using pagination and soft-deletes any
-   * entities in Peek that are not present in Stash (due to deletion or merge).
-   * For scenes it then moves user data from merged scenes to their survivors
-   * (MergeReconciliationService.reconcileDeletedScenes), after first
-   * catching up on scenes an earlier cleanup soft-deleted but did not
-   * reconcile.
+   * 1. Stash's whole id list, 5,000 a page. A page that comes back empty
+   *    before Stash's own count is reached is a skip: the list is partial.
+   * 2. The live cached rows of the instance. Zero ids from Stash while rows
+   *    are cached is a skip.
+   * 3. The delete set: one statement binding the whole list as one JSON
+   *    parameter, so there is no TEMP table (which lives on one pooled
+   *    connection, #526), no transaction and no bound-variable ceiling.
+   * 4. The ratio guard (exceedsCleanupDeleteThreshold); a refusal is a skip.
+   * 5. softDeleteMissing, 500 rows per writer-queue unit.
+   * 6. Scenes: user data moves from merged scenes to their survivors
+   *    (MergeReconciliationService.reconcileDeletedScenes). Scenes that left
+   *    Stash together are soft-deleted by then, so none becomes another's
+   *    target; each scene cleanup first catches up on scenes an earlier one
+   *    soft-deleted but did not reconcile.
+   *
+   * An abort rethrows; any other failure returns `{ deleted: 0, error }`,
+   * and a failure before step 5 soft-deletes nothing.
    */
   private async cleanupDeletedEntities(
     entityType: EntityType,
     stashInstanceId: string
-  ): Promise<number> {
-    const plural = ENTITY_PLURALS[entityType];
+  ): Promise<CleanupOutcome> {
+    const { table, plural } = ENTITY_TABLES[entityType];
     logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-
-    // Larger page size for ID-only fetches (IDs are small strings)
-    const CLEANUP_PAGE_SIZE = 5000;
+    const skip = (reason: string): CleanupOutcome => {
+      logger.warn(
+        `Cleanup safety: ${reason}. Skipping ${plural} cleanup to prevent false deletions.`
+      );
+      return { deleted: 0, deletedIds: [], skipped: reason };
+    };
 
     try {
+      const stash = this.getStashClient(stashInstanceId);
+
       // Merges a cleanup soft-deleted but stopped before reconciling
       if (entityType === "scene") {
         await mergeReconciliationService.reconcileRecentDeletions(
@@ -1579,362 +1638,140 @@ class StashSyncService extends EventEmitter {
         );
       }
 
-      // Fetch all IDs from Stash using pagination
+      // 1. Stash's whole id list
+      const fetchIds = CLEANUP_ID_FETCHERS[entityType];
       const stashIds: string[] = [];
-      let page = 1;
-      let totalCount = 0;
-      let fetchedCount = 0;
-
-      while (true) {
+      let count = 0;
+      for (let page = 1; ; page++) {
         this.checkAbort();
-
-        let pageIds: string[];
-        let count: number;
-
-        switch (entityType) {
-          case "scene": {
-            const result = await stash.findSceneIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findScenes.scenes.map((s) => s.id);
-            count = result.findScenes.count;
-            break;
-          }
-          case "performer": {
-            const result = await stash.findPerformerIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findPerformers.performers.map((p) => p.id);
-            count = result.findPerformers.count;
-            break;
-          }
-          case "studio": {
-            const result = await stash.findStudioIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findStudios.studios.map((s) => s.id);
-            count = result.findStudios.count;
-            break;
-          }
-          case "tag": {
-            const result = await stash.findTagIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findTags.tags.map((t) => t.id);
-            count = result.findTags.count;
-            break;
-          }
-          case "group": {
-            const result = await stash.findGroupIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findGroups.groups.map((g) => g.id);
-            count = result.findGroups.count;
-            break;
-          }
-          case "gallery": {
-            const result = await stash.findGalleryIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findGalleries.galleries.map((g) => g.id);
-            count = result.findGalleries.count;
-            break;
-          }
-          case "image": {
-            const result = await stash.findImageIDs({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findImages.images.map((i) => i.id);
-            count = result.findImages.count;
-            break;
-          }
-          case "clip": {
-            const result = await stash.findSceneMarkers({
-              filter: { per_page: CLEANUP_PAGE_SIZE, page },
-            });
-            pageIds = result.findSceneMarkers.scene_markers.map((m) => m.id);
-            count = result.findSceneMarkers.count;
-            break;
-          }
-          default:
-            logger.warn(
-              `Unknown entity type for cleanup: ${entityType as string}`
-            );
-            return 0;
+        const result = await fetchIds(stash, {
+          per_page: CLEANUP_PAGE_SIZE,
+          page,
+        });
+        // A missing count would page forever
+        if (!Number.isFinite(result.count)) {
+          throw new Error(`Stash's ${plural} ID list came without a count`);
         }
-
-        // Guard against missing count field (would cause infinite loop)
-        if (typeof count !== "number") {
-          throw new Error(
-            `API response missing count field for ${entityType} cleanup`
+        count = result.count;
+        for (const id of result.ids) stashIds.push(id);
+        if (stashIds.length >= count) break;
+        if (result.ids.length === 0) {
+          return skip(
+            `Stash returned ${stashIds.length} of ${count} ${plural} (page ${page} was empty)`
           );
         }
-
-        totalCount = count;
-        stashIds.push(...pageIds);
-        fetchedCount += pageIds.length;
-
-        if (fetchedCount >= totalCount) {
-          break;
-        }
-
-        // Safety: if a page returns empty results, only continue if we haven't fetched anything yet
-        // and the count says there should be data (possible Stash inconsistency)
-        if (pageIds.length === 0) {
-          if (fetchedCount === 0 && totalCount > 0) {
-            logger.warn(
-              `Stash returned 0 ${plural} on page ${page} but claims count=${totalCount}. ` +
-                `Skipping ${plural} cleanup to avoid false deletions.`
-            );
-            return 0;
-          }
-          break;
-        }
-        page++;
       }
-
       logger.info(
-        `Cleanup: found ${stashIds.length} ${plural} in Stash (total: ${totalCount}, fetched in ${page} pages)`
+        `Cleanup: found ${stashIds.length} ${plural} in Stash (total: ${count})`
       );
-
-      // Check for abort before proceeding with database updates
       this.checkAbort();
 
-      // Safety check: if Stash returned zero entity IDs but we have local entities,
-      // something is likely wrong (Stash temporarily unavailable, DB locked, network issue).
-      // Skip cleanup to prevent false mass-deletion.
-      if (stashIds.length === 0) {
-        const localCount = await this.getLocalEntityCount(
-          entityType,
-          stashInstanceId
-        );
-        if (localCount > 0) {
-          logger.warn(
-            `Cleanup safety: Stash returned 0 ${plural} but ${localCount} exist locally. ` +
-              `Skipping ${plural} cleanup to prevent false deletions. Run a full sync if this is expected.`
-          );
-          return 0;
-        }
+      // 2. Live cached rows
+      const [live] = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+        `SELECT COUNT(*) AS n FROM "${table}" WHERE "stashInstanceId" = ? AND "deletedAt" IS NULL`,
+        stashInstanceId
+      );
+      const liveCount = Number(live?.n ?? 0);
+      if (stashIds.length === 0 && liveCount > 0) {
+        return skip(`Stash returned 0 ${plural} but ${liveCount} are cached`);
       }
 
-      // Soft delete all entities that exist in Peek but not in Stash
-      const now = new Date();
-      let deletedCount = 0;
-
-      switch (entityType) {
-        case "scene": {
-          // For large libraries (100k+ scenes), we use a temp table approach to avoid:
-          // 1. Loading all scene IDs into memory
-          // 2. Exceeding SQLite's parameter limit (~32k)
-          //
-          // The CREATE TEMP TABLE -> INSERT -> SELECT (NOT IN) -> DROP sequence MUST run on a
-          // single connection: a TEMP table is connection-scoped, and Prisma pools several
-          // connections, so a SELECT on another one would see an empty table and mark the entire
-          // library for deletion (#526). The TEMP table lives on one connection inside this
-          // interactive transaction, which holds that connection from CREATE to DROP. The
-          // transaction is kept short - it only computes the delete-set; reconciliation and the
-          // soft-delete writes happen outside, after the safety threshold check below.
-          const sceneBatchSize = 500;
-          const scenesToDelete = await dbWriteTransaction(
-            "sync.cleanup.scenes",
-            async (tx) => {
-              await tx.$executeRawUnsafe(
-                `CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`
-              );
-              await tx.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
-
-              // Stash ids and the instance id are bound, never spliced into SQL text.
-              for (let i = 0; i < stashIds.length; i += sceneBatchSize) {
-                const batch = stashIds.slice(i, i + sceneBatchSize);
-                if (batch.length > 0) {
-                  await tx.$executeRawUnsafe(
-                    `INSERT OR IGNORE INTO _stash_scene_ids (id) SELECT value FROM json_each(?)`,
-                    JSON.stringify(batch)
-                  );
-                }
-              }
-
-              // Find scenes to delete (in local DB but not in Stash) - only fetch what we need
-              const rows = await tx.$queryRawUnsafe<
-                Array<{ id: string; phash: string | null }>
-              >(
-                `SELECT id, phash FROM StashScene
-                 WHERE deletedAt IS NULL
-                 AND stashInstanceId = ?
-                 AND id NOT IN (SELECT id FROM _stash_scene_ids)`,
-                stashInstanceId
-              );
-
-              await tx.$executeRawUnsafe(
-                `DROP TABLE IF EXISTS _stash_scene_ids`
-              );
-              return rows;
-            },
-            // Generous timeout: the insert loop can run many batches for very large libraries.
-            // Cleanup is a serial maintenance step, so a long-lived txn is fine.
-            { maxWait: 10000, timeout: 120000 }
-          );
-
-          if (scenesToDelete.length > 0) {
-            // Safety threshold (#526): abort before mutating anything if this would soft-delete
-            // an implausibly large share of the library, which indicates a truncated/partial
-            // keep-set rather than genuine deletions in Stash.
-            const liveCount = await this.getLocalEntityCount(
-              "scene",
-              stashInstanceId
-            );
-            if (
-              this.exceedsCleanupDeleteThreshold(
-                plural,
-                stashIds.length,
-                liveCount,
-                scenesToDelete.length
-              )
-            ) {
-              return 0;
-            }
-
-            // Soft-delete in batches, then look for merges: scenes that
-            // left Stash together are deleted by then, so none becomes
-            // another's merge target
-            const deleteIds = scenesToDelete.map((s) => s.id);
-            const instanceId = stashInstanceId;
-            for (let i = 0; i < deleteIds.length; i += sceneBatchSize) {
-              const batch = deleteIds.slice(i, i + sceneBatchSize);
-              await prisma.stashScene.updateMany({
-                where: { id: { in: batch }, stashInstanceId: instanceId },
-                data: { deletedAt: now },
-              });
-            }
-            deletedCount = deleteIds.length;
-
-            await mergeReconciliationService.reconcileDeletedScenes(
-              stashInstanceId,
-              scenesToDelete
-            );
-          }
-          // Note: the _stash_scene_ids temp table is created and dropped inside the
-          // transaction above, so there is nothing to clean up here.
-          break;
-        }
-        case "performer": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashPerformer.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "studio": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashStudio.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "tag": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashTag.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "group": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashGroup.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "gallery": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashGallery.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "image": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashImage.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-        case "clip": {
-          const cleanupInstanceId = stashInstanceId;
-          deletedCount = (
-            await prisma.stashClip.updateMany({
-              where: {
-                deletedAt: null,
-                stashInstanceId: cleanupInstanceId,
-                id: { notIn: stashIds },
-              },
-              data: { deletedAt: now },
-            })
-          ).count;
-          break;
-        }
-      }
-
-      if (deletedCount === 0) {
+      // 3. The delete set, over the whole keep-set at once
+      const missing = await prisma.$queryRawUnsafe<
+        Array<{ id: string; phash?: string | null }>
+      >(
+        `SELECT "id"${entityType === "scene" ? `, "phash"` : ""} FROM "${table}"
+         WHERE "stashInstanceId" = ? AND "deletedAt" IS NULL
+           AND "id" NOT IN (SELECT value FROM json_each(?))`,
+        stashInstanceId,
+        JSON.stringify(stashIds)
+      );
+      if (missing.length === 0) {
         logger.info(`No deleted ${plural} found`);
-        return 0;
+        return { deleted: 0, deletedIds: [], stashIds };
+      }
+
+      // 4. The ratio guard
+      if (
+        this.exceedsCleanupDeleteThreshold(
+          plural,
+          stashIds.length,
+          liveCount,
+          missing.length
+        )
+      ) {
+        return {
+          deleted: 0,
+          deletedIds: [],
+          skipped:
+            `Refused to soft-delete ${missing.length} of ${liveCount} ${plural}: ` +
+            `Stash returned ${stashIds.length} IDs, and more than half would go`,
+        };
+      }
+      this.checkAbort();
+
+      // 5. Soft-delete
+      const deletedIds = missing.map((row) => row.id);
+      const deleted = await this.softDeleteMissing(
+        entityType,
+        stashInstanceId,
+        deletedIds,
+        new Date()
+      );
+
+      // 6. Merges, once every scene that left Stash is soft-deleted
+      if (entityType === "scene") {
+        await mergeReconciliationService.reconcileDeletedScenes(
+          stashInstanceId,
+          missing.map((row) => ({ id: row.id, phash: row.phash ?? null }))
+        );
       }
 
       const durationMs = Date.now() - startTime;
       logger.info(
-        `Marked ${deletedCount} ${plural} as deleted in ${(durationMs / 1000).toFixed(1)}s`
+        `Marked ${deleted} ${plural} as deleted in ${(durationMs / 1000).toFixed(1)}s`
       );
-
-      return deletedCount;
+      return { deleted, deletedIds, stashIds };
     } catch (error) {
-      logger.error(`Failed to cleanup deleted ${plural}`, {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Don't throw - cleanup is a best-effort operation
-      return 0;
+      if (error instanceof Error && error.message === "Sync aborted") {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to cleanup deleted ${plural}`, { error: message });
+      return { deleted: 0, deletedIds: [], error: message };
     }
+  }
+
+  /**
+   * Soft-deletes `ids` of one type and instance, CLEANUP_SOFT_DELETE_BATCH
+   * rows per writer-queue unit, and returns how many rows changed.
+   * `deletedAt` is bound as epoch milliseconds, which is how Prisma stores a
+   * DateTime in SQLite, so Prisma reads it back as `now`. A failure midway
+   * leaves the batches already written soft-deleted, and the next cleanup
+   * finds the rest again.
+   */
+  private async softDeleteMissing(
+    entityType: EntityType,
+    stashInstanceId: string,
+    ids: string[],
+    now: Date
+  ): Promise<number> {
+    const { table, plural } = ENTITY_TABLES[entityType];
+    let changed = 0;
+    for (let i = 0; i < ids.length; i += CLEANUP_SOFT_DELETE_BATCH) {
+      const batch = JSON.stringify(ids.slice(i, i + CLEANUP_SOFT_DELETE_BATCH));
+      changed += await dbWrite(`sync.cleanup.${plural}`, () =>
+        prisma.$executeRawUnsafe(
+          `UPDATE "${table}" SET "deletedAt" = ?
+           WHERE "stashInstanceId" = ? AND "deletedAt" IS NULL
+             AND "id" IN (SELECT value FROM json_each(?))`,
+          now.getTime(),
+          stashInstanceId,
+          batch
+        )
+      );
+    }
+    return changed;
   }
 
   // ==================== Performer Sync ====================

@@ -4,7 +4,9 @@
  * Tests the incremental sync logic without requiring a real Stash instance.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { StashClient } from "../../graphql/StashClient.js";
 import prisma from "../../prisma/singleton.js";
+import { must } from "../helpers/must.js";
 import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 
 // Test the formatTimestampForStash logic directly (re-implemented here for testing)
@@ -85,6 +87,28 @@ const mockStashClient = {
   findImages: vi
     .fn()
     .mockResolvedValue({ findImages: { images: [], count: 0 } }),
+  // Cleanup's id lists (clips list theirs through findSceneMarkers)
+  findSceneIDs: vi
+    .fn<StashClient["findSceneIDs"]>()
+    .mockResolvedValue({ findScenes: { scenes: [], count: 0 } }),
+  findPerformerIDs: vi
+    .fn<StashClient["findPerformerIDs"]>()
+    .mockResolvedValue({ findPerformers: { performers: [], count: 0 } }),
+  findStudioIDs: vi
+    .fn<StashClient["findStudioIDs"]>()
+    .mockResolvedValue({ findStudios: { studios: [], count: 0 } }),
+  findTagIDs: vi
+    .fn<StashClient["findTagIDs"]>()
+    .mockResolvedValue({ findTags: { tags: [], count: 0 } }),
+  findGroupIDs: vi
+    .fn<StashClient["findGroupIDs"]>()
+    .mockResolvedValue({ findGroups: { groups: [], count: 0 } }),
+  findGalleryIDs: vi
+    .fn<StashClient["findGalleryIDs"]>()
+    .mockResolvedValue({ findGalleries: { galleries: [], count: 0 } }),
+  findImageIDs: vi
+    .fn<StashClient["findImageIDs"]>()
+    .mockResolvedValue({ findImages: { images: [], count: 0 } }),
 };
 
 vi.mock("../../services/StashInstanceManager.js", () => ({
@@ -128,9 +152,23 @@ vi.mock("../../services/ClipPreviewProber.js", () => ({
   },
 }));
 
+// Scene cleanup's merge steps
+vi.mock("../../services/MergeReconciliationService.js", () => ({
+  mergeReconciliationService: {
+    reconcileRecentDeletions: vi
+      .fn()
+      .mockResolvedValue({ merged: 0, ambiguous: 0 }),
+    reconcileDeletedScenes: vi
+      .fn()
+      .mockResolvedValue({ merged: 0, ambiguous: 0 }),
+  },
+}));
+
 describe("StashSyncService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Cleanup's live counts and delete sets: nothing cached
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
   });
 
   describe("incrementalSync", () => {
@@ -346,6 +384,60 @@ describe("StashSyncService", () => {
       // The logs will show "syncing changes since 2025-12-27T16:00:00"
       // proving it uses the newer fullSync timestamp
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
+    });
+  });
+
+  describe("cleanup during a sync", () => {
+    it("records each type's soft-deleted rows in that type's result", async () => {
+      const { stashSyncService } =
+        await import("../../services/StashSyncService.js");
+      mockPrisma.syncState.findFirst.mockResolvedValue(
+        partialRow({
+          lastFullSyncTimestamp: null,
+          lastIncrementalSyncTimestamp: "2025-12-27T16:00:00-08:00",
+        })
+      );
+      // Stash lists scenes 1-9; the cache also holds scene 10
+      mockStashClient.findSceneIDs.mockResolvedValueOnce({
+        findScenes: {
+          scenes: ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((id) => ({
+            id,
+          })),
+          count: 9,
+        },
+      });
+      mockPrisma.$queryRawUnsafe.mockImplementation(
+        prismaImpl((sql: string) => {
+          if (!sql.includes('"StashScene"')) return [];
+          if (sql.includes("COUNT(*)")) return [{ n: 10n }];
+          if (sql.includes("NOT IN")) return [{ id: "10", phash: null }];
+          return [];
+        })
+      );
+      mockPrisma.$executeRawUnsafe.mockResolvedValue(1);
+
+      const results = await stashSyncService.incrementalSync();
+
+      const deletedByType = Object.fromEntries(
+        results.map((r) => [r.entityType, r.deleted])
+      );
+      expect(deletedByType).toEqual({
+        tag: 0,
+        studio: 0,
+        performer: 0,
+        group: 0,
+        gallery: 0,
+        scene: 1,
+        clip: 0,
+        image: 0,
+      });
+      const softDelete = mockPrisma.$executeRawUnsafe.mock.calls.find(([sql]) =>
+        sql.startsWith('UPDATE "StashScene" SET "deletedAt"')
+      );
+      expect(must(softDelete).slice(2)).toEqual([
+        "test-instance-uuid",
+        JSON.stringify(["10"]),
+      ]);
     });
   });
 });

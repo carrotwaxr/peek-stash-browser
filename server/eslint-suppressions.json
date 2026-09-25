@@ -364,7 +364,7 @@
   },
   "services/StashSyncService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 67
+      "count": 66
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 7
