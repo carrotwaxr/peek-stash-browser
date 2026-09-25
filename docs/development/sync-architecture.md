@@ -30,7 +30,7 @@ Peek provides three sync strategies, each optimized for different use cases:
 An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
 **Process:**
-1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety), on every instance
+1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety) and a fetch by id of what Stash lists and no page returned (see [Sync State Tracking](#sync-state-tracking)), on every instance
 2. Then, once for the whole sync: compute scene tag inheritance, apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images), rebuild inherited image counts, rebuild user stats, recompute the exclusions of every user
 
 **Characteristics:**
@@ -197,6 +197,10 @@ CREATE TABLE SyncState (
 ```
 
 Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastIncrementalSyncTimestamp` for each entity type independently. A type with neither is fetched whole, by every sync mode; that is how a migration asks for a refetch.
+
+Every type is paged in `updated_at` order, oldest first, and the timestamp saved is the newest `updated_at` the pages returned. An entity edited in Stash while a sync pages moves to the end of that order, so a later page fetches it again with its edit. Its move shifts the entities after it up one place, so paging by offset skips one of them. When a type was fetched whole (a full sync, or a type with no timestamp yet), its cleanup reads Stash's whole id list anyway, and the ids no page returned are fetched by id afterwards: the ones a shift skipped, and ones created after the last page. An incremental sync that pages over more than 500 changes can still skip one entity per edit made meanwhile; the next full sync fetches it.
+
+An `updated_at` more than 5 minutes ahead of Peek's clock (clock skew allowance) is left out of the timestamp and logged as a warning: the entity is synced, but the saved timestamp is the newest one that is not in the future. A Stash import with future dates would otherwise make every later incremental sync ask for changes after that date and find none. Such entities are fetched again by each sync until their date passes.
 
 `lastError` holds the last sync's problem with the type: Stash's error when fetching it failed (the operation, each GraphQL message with the field it broke on, and the HTTP status, as in `FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.parent_studio) (HTTP 200)`; a timeout; or "Could not reach Stash"; never the query or its variables), then any cleanup skip, refusal or failure, joined with "; ". A type that syncs cleanly, or that a smart sync skips because nothing changed, clears it. A failed type keeps its timestamps, so the next sync fetches it again from the same point.
 
