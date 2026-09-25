@@ -145,8 +145,8 @@ Images can inherit metadata from their parent galleries:
 - Uses first gallery if image is in multiple galleries
 
 **Trigger conditions:**
-- Full sync: Always runs
-- Incremental and smart sync: Runs if any image was written (even one Stash returned unchanged: its junction rows were rewritten from Stash, and inheritance puts the gallery's back) or any gallery changed
+- Full sync: Always runs, for every image
+- Incremental and smart sync: Runs for the images the sync wrote, even ones Stash returned unchanged (writing an image rewrites its junction rows and studio from Stash, dropping what it had inherited, and inheritance puts the gallery's back), and for the images of every changed gallery. Other images are left as they are. Past the change set's limit (20,000 of a kind) it runs for every image
 
 ### Scene Tag Inheritance
 
@@ -163,14 +163,19 @@ Scenes inherit tags from their performers, studio and groups:
 
 ### Image Count Rebuild
 
-Maintains denormalized image counts on entities:
+Maintains denormalized image counts on entities, counting an image that has the entity itself or is in a gallery that has it:
 
 - Performers: Count of images featuring them
 - Tags: Count of images with that tag
 - Studios: Count of images from that studio
-- Galleries: Count of images in that gallery
 
-Runs after every full sync and after any sync that changed or soft-deleted something, followed by the user stats rebuild and the tag counts via performers.
+A gallery's own image count is Stash's, stored as synced. Sync writes a new performer, studio or tag with Stash's count (its direct images only) and never overwrites the stored count when it updates one; the rebuild sets it.
+
+**Trigger conditions:**
+- Full sync: Always runs, for every performer, studio and tag
+- Incremental and smart sync: Runs after any sync that changed or soft-deleted something, for the performers, studios and tags the change set reaches: the old and new performers, tags and studios of changed images and galleries; the performers, tags and studio of every gallery a changed image joined or left; those of soft-deleted images (with their galleries') and galleries; and every changed performer, studio and tag. Past the change set's limit it runs for every one
+
+The user stats rebuild and the tag counts via performers follow it.
 
 ---
 
@@ -258,9 +263,9 @@ This test will fail if gallery inheritance doesn't run.
 
 The three sync modes run through one per-instance path (`syncInstance`) and one set of post-sync steps (`runPostSyncSteps`), so a step added there runs in every mode. When changing a step's condition, keep the modes equivalent:
 
-- Gallery inheritance (conditional on images/galleries synced)
+- Gallery inheritance (scoped to the images written and the changed galleries' images)
 - Scene tag inheritance (scoped to the scenes the change set reaches)
-- Image count rebuild
+- Image count rebuild (scoped to the performers, studios and tags the change set reaches)
 - User stats rebuild
 - Exclusion recomputation
 

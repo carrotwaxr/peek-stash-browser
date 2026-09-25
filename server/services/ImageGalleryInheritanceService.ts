@@ -1,48 +1,146 @@
 import prisma from "../prisma/singleton.js";
 import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
+import { type EntityRef, distinctRefs, pairsJson } from "./SyncChangeSet.js";
+
+/** Images per scoped pass: one dbWrite unit per statement. */
+const SCOPE_CHUNK = 5000;
 
 /**
- * Gallery performers for every live image in a live gallery that has no
- * performers of its own. "Has none" is a correlated NOT EXISTS, which looks
- * up each image's rows in the junction's (imageId, imageInstanceId) index;
- * a row-value NOT IN over the junction scanned it whole as a list, and the
- * two inserts held the write lock for 50 to 90 s each on a 260k-image
- * library.
+ * The images a scoped statement covers, bound as one JSON parameter of
+ * [id, instanceId] pairs: `CROSS JOIN` keeps `json_each` as the outer loop,
+ * so each pair searches the table's primary key.
  */
-export const INHERIT_PERFORMERS_SQL = `
-  INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId)
-  SELECT DISTINCT ig.imageId, ig.imageInstanceId, gp.performerId, gp.performerInstanceId
-  FROM ImageGallery ig
-  JOIN GalleryPerformer gp ON gp.galleryId = ig.galleryId AND gp.galleryInstanceId = ig.galleryInstanceId
+const scopedImageGalleries = `json_each(?) j
+  CROSS JOIN ImageGallery ig ON ig.imageId = json_extract(j.value, '$[0]') AND ig.imageInstanceId = json_extract(j.value, '$[1]')`;
+const scopedImageRowids = `SELECT x.rowid FROM json_each(?) j
+          CROSS JOIN StashImage x ON x.id = json_extract(j.value, '$[0]') AND x.stashInstanceId = json_extract(j.value, '$[1]')`;
+
+/**
+ * A gallery's performers or tags for every live image in a live gallery
+ * that has none of its own, for every image or only the scoped ones. "Has
+ * none" is a correlated NOT EXISTS, which looks up each image's rows in the
+ * junction's (imageId, imageInstanceId) index; a row-value NOT IN over the
+ * junction scanned it whole as a list, and the two inserts held the write
+ * lock for 50 to 90 s each on a 260k-image library.
+ */
+function inheritLinksSql(
+  link: { junction: string; source: string; id: string; instance: string },
+  scoped: boolean
+): string {
+  const { junction, source, id, instance } = link;
+  return `
+  INSERT OR IGNORE INTO ${junction} (imageId, imageInstanceId, ${id}, ${instance})
+  SELECT DISTINCT ig.imageId, ig.imageInstanceId, gl.${id}, gl.${instance}
+  FROM ${scoped ? scopedImageGalleries : "ImageGallery ig"}
+  JOIN ${source} gl ON gl.galleryId = ig.galleryId AND gl.galleryInstanceId = ig.galleryInstanceId
   JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
   JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
   WHERE i.deletedAt IS NULL
     AND g.deletedAt IS NULL
     AND NOT EXISTS (
-      SELECT 1 FROM ImagePerformer x
+      SELECT 1 FROM ${junction} x
       WHERE x.imageId = ig.imageId AND x.imageInstanceId = ig.imageInstanceId
     )
 `;
+}
+
+const PERFORMERS = {
+  junction: "ImagePerformer",
+  source: "GalleryPerformer",
+  id: "performerId",
+  instance: "performerInstanceId",
+};
+const TAGS = {
+  junction: "ImageTag",
+  source: "GalleryTag",
+  id: "tagId",
+  instance: "tagInstanceId",
+};
+
+/** Gallery performers for every image that has none (whole library). */
+export const INHERIT_PERFORMERS_SQL = inheritLinksSql(PERFORMERS, false);
+/** Gallery tags for every image that has none (whole library). */
+export const INHERIT_TAGS_SQL = inheritLinksSql(TAGS, false);
+/** The same for the scoped images only. */
+export const INHERIT_PERFORMERS_SCOPED_SQL = inheritLinksSql(PERFORMERS, true);
+export const INHERIT_TAGS_SCOPED_SQL = inheritLinksSql(TAGS, true);
+
+/** The scalar fields an image takes from its first gallery that has one. */
+const SCALAR_FIELDS = [
+  { column: "studioId", label: "galleryInheritance.studio" },
+  { column: "date", label: "galleryInheritance.date" },
+  { column: "photographer", label: "galleryInheritance.photographer" },
+  { column: "details", label: "galleryInheritance.details" },
+] as const;
+
+type ScalarColumn = (typeof SCALAR_FIELDS)[number]["column"];
 
 /**
- * Gallery tags for every live image in a live gallery that has no tags of
- * its own, probed by index as in INHERIT_PERFORMERS_SQL.
+ * One scalar field for every live image that has none and is in a live
+ * gallery that has one, from its first such gallery; for every image or
+ * only the scoped ones. The whole-library form finds those images with one
+ * list of the galleries' images; the scoped form probes the scoped images
+ * by rowid and checks each one's galleries through the junction's index.
+ * An inherited studio takes the image's own instance, as the gallery's
+ * studio is on the gallery's (and so the image's) Stash.
  */
-export const INHERIT_TAGS_SQL = `
-  INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId)
-  SELECT DISTINCT ig.imageId, ig.imageInstanceId, gt.tagId, gt.tagInstanceId
-  FROM ImageGallery ig
-  JOIN GalleryTag gt ON gt.galleryId = ig.galleryId AND gt.galleryInstanceId = ig.galleryInstanceId
-  JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
-  JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-  WHERE i.deletedAt IS NULL
-    AND g.deletedAt IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM ImageTag x
-      WHERE x.imageId = ig.imageId AND x.imageInstanceId = ig.imageInstanceId
-    )
-`;
+export function inheritScalarSql(
+  column: ScalarColumn,
+  scoped: boolean
+): string {
+  const galleryWithValue = `FROM ImageGallery ig
+        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId`;
+  const filter = scoped
+    ? `rowid IN (
+          ${scopedImageRowids}
+        )
+        AND EXISTS (
+          SELECT 1
+          ${galleryWithValue}
+          WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
+            AND g.${column} IS NOT NULL AND g.deletedAt IS NULL
+        )`
+    : `(id, stashInstanceId) IN (
+          SELECT ig.imageId, ig.imageInstanceId
+          ${galleryWithValue}
+          WHERE g.${column} IS NOT NULL AND g.deletedAt IS NULL
+        )`;
+  return `
+      UPDATE StashImage
+      SET ${column} = (
+        SELECT g.${column}
+        ${galleryWithValue}
+        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
+          AND g.${column} IS NOT NULL
+          AND g.deletedAt IS NULL
+        ORDER BY ig.galleryId
+        LIMIT 1
+      )${column === "studioId" ? ",\n      studioInstanceId = StashImage.stashInstanceId" : ""}
+      WHERE ${column} IS NULL
+        AND deletedAt IS NULL
+        AND ${filter}
+    `;
+}
+
+const STATEMENTS = {
+  all: {
+    scalars: SCALAR_FIELDS.map(({ column, label }) => ({
+      label,
+      sql: inheritScalarSql(column, false),
+    })),
+    performers: INHERIT_PERFORMERS_SQL,
+    tags: INHERIT_TAGS_SQL,
+  },
+  scoped: {
+    scalars: SCALAR_FIELDS.map(({ column, label }) => ({
+      label,
+      sql: inheritScalarSql(column, true),
+    })),
+    performers: INHERIT_PERFORMERS_SCOPED_SQL,
+    tags: INHERIT_TAGS_SCOPED_SQL,
+  },
+};
 
 /**
  * ImageGalleryInheritanceService
@@ -59,25 +157,37 @@ export const INHERIT_TAGS_SQL = `
  * - studioId, date, photographer, details (scalar fields)
  * - performers (via ImagePerformer junction)
  * - tags (via ImageTag junction)
+ *
+ * A full sync applies it to every image; an incremental sync to the images
+ * it wrote (their rows were rewritten from Stash, dropping what they had
+ * inherited) and those of the galleries that changed.
  */
 class ImageGalleryInheritanceService {
   /**
-   * Apply gallery inheritance to all images.
-   * Uses SQL for efficient bulk operations.
+   * Apply gallery inheritance to every image ("all") or to the images in
+   * `scope` (unknown and soft-deleted ones are skipped), 5,000 at a time.
    */
-  async applyGalleryInheritance(): Promise<void> {
+  async applyGalleryInheritance(
+    scope: readonly EntityRef[] | "all" = "all"
+  ): Promise<void> {
     const startTime = Date.now();
-    logger.info("Applying gallery inheritance to images...");
+    const images = scope === "all" ? "all" : distinctRefs(scope);
+    logger.info(
+      images === "all"
+        ? "Applying gallery inheritance to images..."
+        : `Applying gallery inheritance to ${images.length} images...`
+    );
 
     try {
-      // Step 1: Inherit scalar fields (studioId, date, photographer, details)
-      await this.inheritScalarFields();
-
-      // Step 2: Inherit performers
-      await this.inheritPerformers();
-
-      // Step 3: Inherit tags
-      await this.inheritTags();
+      if (images === "all") {
+        await this.apply(STATEMENTS.all, []);
+      } else {
+        for (let i = 0; i < images.length; i += SCOPE_CHUNK) {
+          await this.apply(STATEMENTS.scoped, [
+            pairsJson(images.slice(i, i + SCOPE_CHUNK)),
+          ]);
+        }
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`Gallery inheritance applied in ${duration}ms`);
@@ -89,147 +199,35 @@ class ImageGalleryInheritanceService {
     }
   }
 
-  /**
-   * Inherit scalar fields from gallery to image where image has none.
-   * Uses a single UPDATE with subquery for efficiency.
-   */
-  private async inheritScalarFields(): Promise<void> {
-    // For each scalar field, update images that:
-    // 1. Have no value for that field
-    // 2. Are in a gallery that has a value
-
-    // StudioId inheritance. The gallery is on the image's instance, and so is
-    // its studio.
-    await dbWrite(
-      "galleryInheritance.studio",
-      () =>
-        prisma.$executeRaw`
-      UPDATE StashImage
-      SET studioId = (
-        SELECT g.studioId
-        FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
-          AND g.studioId IS NOT NULL
-          AND g.deletedAt IS NULL
-        ORDER BY ig.galleryId
-        LIMIT 1
-      ),
-      studioInstanceId = StashImage.stashInstanceId
-      WHERE studioId IS NULL
-        AND deletedAt IS NULL
-        AND (id, stashInstanceId) IN (
-          SELECT ig.imageId, ig.imageInstanceId
-          FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-          WHERE g.studioId IS NOT NULL AND g.deletedAt IS NULL
-        )
-    `
-    );
-
-    // Date inheritance
-    await dbWrite(
-      "galleryInheritance.date",
-      () =>
-        prisma.$executeRaw`
-      UPDATE StashImage
-      SET date = (
-        SELECT g.date
-        FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
-          AND g.date IS NOT NULL
-          AND g.deletedAt IS NULL
-        ORDER BY ig.galleryId
-        LIMIT 1
-      )
-      WHERE date IS NULL
-        AND deletedAt IS NULL
-        AND (id, stashInstanceId) IN (
-          SELECT ig.imageId, ig.imageInstanceId
-          FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-          WHERE g.date IS NOT NULL AND g.deletedAt IS NULL
-        )
-    `
-    );
-
-    // Photographer inheritance
-    await dbWrite(
-      "galleryInheritance.photographer",
-      () =>
-        prisma.$executeRaw`
-      UPDATE StashImage
-      SET photographer = (
-        SELECT g.photographer
-        FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
-          AND g.photographer IS NOT NULL
-          AND g.deletedAt IS NULL
-        ORDER BY ig.galleryId
-        LIMIT 1
-      )
-      WHERE photographer IS NULL
-        AND deletedAt IS NULL
-        AND (id, stashInstanceId) IN (
-          SELECT ig.imageId, ig.imageInstanceId
-          FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-          WHERE g.photographer IS NOT NULL AND g.deletedAt IS NULL
-        )
-    `
-    );
-
-    // Details inheritance
-    await dbWrite(
-      "galleryInheritance.details",
-      () =>
-        prisma.$executeRaw`
-      UPDATE StashImage
-      SET details = (
-        SELECT g.details
-        FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
-          AND g.details IS NOT NULL
-          AND g.deletedAt IS NULL
-        ORDER BY ig.galleryId
-        LIMIT 1
-      )
-      WHERE details IS NULL
-        AND deletedAt IS NULL
-        AND (id, stashInstanceId) IN (
-          SELECT ig.imageId, ig.imageInstanceId
-          FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-          WHERE g.details IS NOT NULL AND g.deletedAt IS NULL
-        )
-    `
+  /** The images of these galleries, live or not. */
+  async imagesInGalleries(
+    galleries: readonly EntityRef[]
+  ): Promise<EntityRef[]> {
+    if (galleries.length === 0) return [];
+    return prisma.$queryRawUnsafe<EntityRef[]>(
+      `SELECT DISTINCT ig.imageId AS id, ig.imageInstanceId AS instanceId
+FROM json_each(?) j
+CROSS JOIN ImageGallery ig ON ig.galleryId = json_extract(j.value, '$[0]') AND ig.galleryInstanceId = json_extract(j.value, '$[1]')`,
+      pairsJson(distinctRefs(galleries))
     );
   }
 
   /**
-   * Inherit performers from gallery to image where image has none.
-   * Uses INSERT OR IGNORE to handle duplicates.
+   * The scalar fields (studioId, date, photographer, details), then the
+   * performers and tags, each statement one dbWrite unit.
    */
-  private async inheritPerformers(): Promise<void> {
-    // Insert gallery performers for images that have no performers
-    // Junction tables now have composite keys: (imageId, imageInstanceId, performerId, performerInstanceId)
+  private async apply(
+    statements: (typeof STATEMENTS)["all"],
+    params: string[]
+  ): Promise<void> {
+    for (const { label, sql } of statements.scalars) {
+      await dbWrite(label, () => prisma.$executeRawUnsafe(sql, ...params));
+    }
     await dbWrite("galleryInheritance.performers", () =>
-      prisma.$executeRawUnsafe(INHERIT_PERFORMERS_SQL)
+      prisma.$executeRawUnsafe(statements.performers, ...params)
     );
-  }
-
-  /**
-   * Inherit tags from gallery to image where image has none.
-   * Uses INSERT OR IGNORE to handle duplicates.
-   */
-  private async inheritTags(): Promise<void> {
-    // Insert gallery tags for images that have no tags
-    // Junction tables now have composite keys: (imageId, imageInstanceId, tagId, tagInstanceId)
     await dbWrite("galleryInheritance.tags", () =>
-      prisma.$executeRawUnsafe(INHERIT_TAGS_SQL)
+      prisma.$executeRawUnsafe(statements.tags, ...params)
     );
   }
 }

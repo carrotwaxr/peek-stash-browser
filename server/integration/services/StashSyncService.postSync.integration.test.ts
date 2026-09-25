@@ -744,6 +744,200 @@ function inheritanceLibrary(): Library {
   };
 }
 
+/** An image as Stash returns it, by default as seedImageCountSources stored it. */
+function imageRow(
+  id: string,
+  {
+    performers = [],
+    tags = [],
+    studio = null,
+    galleries = [],
+  }: {
+    performers?: string[];
+    tags?: string[];
+    studio?: string | null;
+    galleries?: string[];
+  },
+  updatedAt = UPDATED_AT
+): SyncImage {
+  return {
+    ...must(library().image[0]),
+    id,
+    title: `PostSync IT image ${id}`,
+    performers: performers.map((p) => partialRow({ id: p })),
+    tags: tags.map((t) => partialRow({ id: t })),
+    studio: studio ? partialRow({ id: studio }) : null,
+    galleries: galleries.map((g) => partialRow({ id: g })),
+    updated_at: updatedAt,
+  };
+}
+
+/** Image 2 as stored: no gallery, performer 2, tag 2 and studio 1 of its own. */
+const image2 = (updatedAt = UPDATED_AT): SyncImage =>
+  imageRow("2", { performers: ["2"], tags: ["2"], studio: ID }, updatedAt);
+
+/** The gallery as Stash returns it, with these performers. */
+function galleryRow(performerIds: string[], updatedAt = LATER_AT): SyncGallery {
+  return {
+    ...must(library().gallery[0]),
+    performers: performerIds.map((id) => partialRow({ id })),
+    updated_at: updatedAt,
+  };
+}
+
+/** The image counts seedImageCountSources stores: what a whole rebuild gives. */
+const SEEDED_COUNTS = {
+  performer: { "1": 2, "2": 1 },
+  studio: { "1": 1 },
+  tag: { "1": 2, "2": 1 },
+};
+
+/**
+ * Image count sources on one instance, beside the library's image 1 in the
+ * gallery: performer 2, tag 2 and studio 1 on image 2 (no gallery, all its
+ * own), and image 3, a second gallery image with inherited rows. The counts
+ * hold what a whole rebuild gives (SEEDED_COUNTS).
+ */
+async function seedImageCountSources(instanceId: string): Promise<void> {
+  const base = { stashInstanceId: instanceId, stashUpdatedAt: UPDATED_AT };
+  await prisma.stashTag.create({
+    data: { id: "2", ...base, name: "PostSync IT tag 2" },
+  });
+  await prisma.stashPerformer.create({
+    data: { id: "2", ...base, name: "PostSync IT performer 2" },
+  });
+  await prisma.stashStudio.create({
+    data: { id: ID, ...base, name: "PostSync IT studio" },
+  });
+  await prisma.stashImage.createMany({
+    data: [
+      {
+        id: "2",
+        ...base,
+        title: "PostSync IT image 2",
+        studioId: ID,
+        studioInstanceId: instanceId,
+      },
+      { id: "3", ...base, title: "PostSync IT image 3" },
+    ],
+  });
+  for (const table of TABLES) {
+    if (table === "StashClip") continue;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
+      UPDATED_AT,
+      instanceId
+    );
+  }
+
+  const links: Array<[string, string, string, string, string, string]> = [
+    ["ImagePerformer", "imageId", "imageInstanceId", "2", "performerId", "2"],
+    ["ImageTag", "imageId", "imageInstanceId", "2", "tagId", "2"],
+    ["ImageGallery", "imageId", "imageInstanceId", "3", "galleryId", ID],
+    // Gallery-inherited, as for image 1
+    ["ImagePerformer", "imageId", "imageInstanceId", "3", "performerId", ID],
+    ["ImageTag", "imageId", "imageInstanceId", "3", "tagId", ID],
+  ];
+  for (const [table, nearId, nearInstance, near, farId, far] of links) {
+    const farInstance = farId.replace(/Id$/, "InstanceId");
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${table}" ("${nearId}", "${nearInstance}", "${farId}", "${farInstance}")
+       VALUES (?, ?, ?, ?)`,
+      near,
+      instanceId,
+      far,
+      instanceId
+    );
+  }
+
+  await setImageCounts(instanceId, SEEDED_COUNTS);
+}
+
+type ImageCounts = Record<
+  "performer" | "studio" | "tag",
+  Record<string, number>
+>;
+
+const COUNT_TABLES = {
+  performer: "StashPerformer",
+  studio: "StashStudio",
+  tag: "StashTag",
+} as const;
+
+async function setImageCounts(
+  instanceId: string,
+  counts: ImageCounts
+): Promise<void> {
+  for (const [type, table] of Object.entries(COUNT_TABLES)) {
+    for (const [id, n] of Object.entries(counts[type as keyof ImageCounts])) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "${table}" SET "imageCount" = ? WHERE "id" = ? AND "stashInstanceId" = ?`,
+        n,
+        id,
+        instanceId
+      );
+    }
+  }
+}
+
+/** Every performer's, studio's and tag's stored imageCount on `instanceId`. */
+async function imageCountsOf(instanceId: string): Promise<ImageCounts> {
+  const counts: ImageCounts = { performer: {}, studio: {}, tag: {} };
+  for (const [type, table] of Object.entries(COUNT_TABLES)) {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{ id: string; imageCount: bigint | number }>
+    >(
+      `SELECT "id", "imageCount" FROM "${table}" WHERE "stashInstanceId" = ? ORDER BY "id"`,
+      instanceId
+    );
+    counts[type as keyof ImageCounts] = Object.fromEntries(
+      rows.map((r) => [r.id, Number(r.imageCount)])
+    );
+  }
+  return counts;
+}
+
+/** The library with the image count sources, as seedImageCountSources stored it. */
+function imageCountLibrary(): Library {
+  const lib = library();
+  return {
+    ...lib,
+    tag: [
+      ...lib.tag,
+      { ...must(lib.tag[0]), id: "2", name: "PostSync IT tag 2" },
+    ],
+    studio: [studioRow([], UPDATED_AT)],
+    performer: [...lib.performer, performerRow("2", [], UPDATED_AT)],
+    image: [...lib.image, image2(), imageRow("3", { galleries: [ID] })],
+  };
+}
+
+/** An image's performer and tag rows and its date, as stored. */
+async function imageState(
+  instanceId: string,
+  imageId: string
+): Promise<{ performers: string[]; tags: string[]; date: string | null }> {
+  const performers = await prisma.imagePerformer.findMany({
+    where: { imageId, imageInstanceId: instanceId },
+    select: { performerId: true },
+    orderBy: { performerId: "asc" },
+  });
+  const tags = await prisma.imageTag.findMany({
+    where: { imageId, imageInstanceId: instanceId },
+    select: { tagId: true },
+    orderBy: { tagId: "asc" },
+  });
+  const image = await prisma.stashImage.findUnique({
+    where: { id_stashInstanceId: { id: imageId, stashInstanceId: instanceId } },
+    select: { date: true },
+  });
+  return {
+    performers: performers.map((p) => p.performerId),
+    tags: tags.map((t) => t.tagId),
+    date: image?.date ?? null,
+  };
+}
+
 type Step = MockInstance<() => Promise<void>>;
 
 /** The message texts logged at info level. */
@@ -1168,6 +1362,244 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
         "3": ["3"],
         "4": ["3"],
       });
+    }, 60_000);
+  });
+
+  describe("image counts and gallery inheritance", () => {
+    beforeEach(async () => {
+      for (const id of INSTANCES) await seedImageCountSources(id);
+      // Real here: the stored counts are what these tests check
+      steps.imageCounts.mockRestore();
+      steps.imageCounts = vi.spyOn(
+        entityImageCountService,
+        "rebuildAllImageCounts"
+      );
+    });
+
+    it("removing a performer from an image lowers that performer's imageCount on an incremental sync", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: imageCountLibrary(),
+          updated: {
+            image: [imageRow("2", { tags: ["2"], studio: ID }, LATER_AT)],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageCountsOf(PC_A)).toEqual({
+        ...SEEDED_COUNTS,
+        performer: { "1": 2, "2": 0 },
+      });
+    }, 60_000);
+
+    it("a gallery gaining a performer raises the count by the gallery's images", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: imageCountLibrary(),
+          updated: { gallery: [galleryRow([ID, "2"])] },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      // Image 2 of its own, images 1 and 3 through the gallery
+      expect(await imageCountsOf(PC_A)).toEqual({
+        ...SEEDED_COUNTS,
+        performer: { "1": 2, "2": 3 },
+      });
+    }, 60_000);
+
+    it("an incremental performer update keeps the inherited imageCount instead of Stash's direct count", async () => {
+      // Stash lists performer 1, studio 1 and tag 1 as updated but returns
+      // them as stored, with its own direct image count (no image of its own)
+      const lib = imageCountLibrary();
+      stubInstances({
+        [PC_A]: {
+          all: lib,
+          updated: {
+            performer: [{ ...must(lib.performer[0]), image_count: 0 }],
+            studio: [{ ...must(lib.studio[0]), image_count: 0 }],
+            tag: [{ ...must(lib.tag[0]), image_count: 0 }],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageCountsOf(PC_A)).toEqual(SEEDED_COUNTS);
+    }, 60_000);
+
+    it("images written by the sync get gallery inheritance again; images not written keep theirs untouched", async () => {
+      // The gallery has a date; image 5 is in it and was never given its
+      // performer, tag or date, so a pass over it would show
+      await prisma.$executeRawUnsafe(
+        `UPDATE "StashGallery" SET "date" = '2026-01-01' WHERE "stashInstanceId" = ?`,
+        PC_A
+      );
+      await prisma.stashImage.create({
+        data: { id: "5", stashInstanceId: PC_A, title: "PostSync IT image 5" },
+      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "StashImage" SET "stashUpdatedAt" = ? WHERE "id" = '5' AND "stashInstanceId" = ?`,
+        UPDATED_AT,
+        PC_A
+      );
+      await prisma.imageGallery.create({
+        data: {
+          imageId: "5",
+          imageInstanceId: PC_A,
+          galleryId: ID,
+          galleryInstanceId: PC_A,
+        },
+      });
+      const lib = imageCountLibrary();
+      lib.image.push(imageRow("5", { galleries: [ID] }));
+      // Stash lists image 1 as updated but returns it as stored
+      stubInstances({
+        [PC_A]: { all: lib, updated: { image: library().image } },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageState(PC_A, ID)).toEqual({
+        performers: [ID],
+        tags: [ID],
+        date: "2026-01-01",
+      });
+      expect(await imageState(PC_A, "3")).toEqual({
+        performers: [ID],
+        tags: [ID],
+        date: null,
+      });
+      expect(await imageState(PC_A, "5")).toEqual({
+        performers: [],
+        tags: [],
+        date: null,
+      });
+    }, 60_000);
+
+    it("pc-b's counts do not move on a pc-a change", async () => {
+      const untouched = {
+        performer: { "1": 99, "2": 99 },
+        studio: { "1": 99 },
+        tag: { "1": 99, "2": 99 },
+      };
+      await setImageCounts(PC_B, untouched);
+      stubInstances({
+        [PC_A]: {
+          all: imageCountLibrary(),
+          updated: {
+            gallery: [galleryRow([ID, "2"])],
+            image: [imageRow("2", { tags: ["2"], studio: ID }, LATER_AT)],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageCountsOf(PC_A)).toEqual({
+        ...SEEDED_COUNTS,
+        performer: { "1": 2, "2": 2 },
+      });
+      expect(await imageCountsOf(PC_B)).toEqual(untouched);
+    }, 60_000);
+
+    it("an image joining a gallery raises the counts of the gallery's performer and tag", async () => {
+      // Image 2 keeps its own performer and tag, so it inherits none
+      stubInstances({
+        [PC_A]: {
+          all: imageCountLibrary(),
+          updated: {
+            image: [
+              imageRow(
+                "2",
+                { performers: ["2"], tags: ["2"], studio: ID, galleries: [ID] },
+                LATER_AT
+              ),
+            ],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageCountsOf(PC_A)).toEqual({
+        ...SEEDED_COUNTS,
+        performer: { "1": 3, "2": 1 },
+        tag: { "1": 3, "2": 1 },
+      });
+    }, 60_000);
+
+    it("an image Stash no longer has lowers the counts of its performer, tag and studio", async () => {
+      const lib = imageCountLibrary();
+      lib.image = lib.image.filter((image) => image.id !== "2");
+      stubInstances({ [PC_A]: { all: lib } });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await imageCountsOf(PC_A)).toEqual({
+        performer: { "1": 2, "2": 0 },
+        studio: { "1": 0 },
+        tag: { "1": 2, "2": 0 },
+      });
+    }, 60_000);
+
+    it("a performer new to Peek gets the inherited count, not Stash's", async () => {
+      const lib = imageCountLibrary();
+      const newcomer = { ...performerRow("3", [], LATER_AT), image_count: 7 };
+      lib.performer.push(newcomer);
+      stubInstances({
+        [PC_A]: { all: lib, updated: { performer: [newcomer] } },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect((await imageCountsOf(PC_A)).performer).toEqual({
+        "1": 2,
+        "2": 1,
+        "3": 0,
+      });
+    }, 60_000);
+
+    it("past SCOPE_LIMIT the counts are rebuilt for the whole library", async () => {
+      await setImageCounts(PC_B, {
+        performer: { "1": 99, "2": 99 },
+        studio: { "1": 99 },
+        tag: { "1": 99, "2": 99 },
+      });
+      stubInstances({
+        [PC_A]: {
+          all: imageCountLibrary(),
+          updated: {
+            image: [imageRow("2", { tags: ["2"], studio: ID }, LATER_AT)],
+          },
+        },
+      });
+      // The batch reports more far sides than the change set keeps
+      const imageSpec = ENTITY_SYNC.image;
+      const processImages = imageSpec.processBatch.bind(imageSpec);
+      vi.spyOn(ENTITY_SYNC.image, "processBatch").mockImplementation(
+        async (items, instanceId, run) => {
+          const changes = await processImages(items, instanceId, run);
+          const far = changes.farSides.ImagePerformer ?? [];
+          for (let i = 0; i <= SCOPE_LIMIT; i++) {
+            far.push({ id: `c5-${i}`, instanceId });
+          }
+          changes.farSides.ImagePerformer = far;
+          return changes;
+        }
+      );
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect((await imageCountsOf(PC_A)).performer).toEqual({
+        "1": 2,
+        "2": 0,
+      });
+      // pc-b had no change, and its counts were rebuilt all the same
+      expect(await imageCountsOf(PC_B)).toEqual(SEEDED_COUNTS);
     }, 60_000);
   });
 });

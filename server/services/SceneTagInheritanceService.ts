@@ -1,7 +1,7 @@
 import prisma from "../prisma/singleton.js";
 import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
-import type { EntityRef } from "./SyncChangeSet.js";
+import { type EntityRef, distinctRefs, pairsJson } from "./SyncChangeSet.js";
 
 /** Scenes per batch: one read of their sources and one UPDATE (a dbWrite unit). */
 const BATCH_SIZE = 500;
@@ -35,17 +35,6 @@ WHERE s.deletedAt IS NULL`,
 FROM json_each(?) j
 CROSS JOIN SceneGroup sg ON sg.groupId = json_extract(j.value, '$[0]') AND sg.groupInstanceId = json_extract(j.value, '$[1]')`,
 };
-
-/** Refs as one JSON parameter of [id, instanceId] pairs. */
-const pairsJson = (refs: readonly EntityRef[]): string =>
-  JSON.stringify(refs.map((ref) => [ref.id, ref.instanceId]));
-
-/** Refs without duplicates, keyed as the in-memory maps are. */
-function distinctRefs(refs: readonly EntityRef[]): EntityRef[] {
-  const byKey = new Map<string, EntityRef>();
-  for (const ref of refs) byKey.set(`${ref.id}\0${ref.instanceId}`, ref);
-  return Array.from(byKey.values());
-}
 
 /**
  * SceneTagInheritanceService

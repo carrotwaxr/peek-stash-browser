@@ -12,8 +12,10 @@ import {
   type StoredEntity,
   SyncChangeSet,
   detectChanges,
+  distinctRefs,
   linksByNearId,
   noChanges,
+  pairsJson,
 } from "../../services/SyncChangeSet.js";
 
 const INSTANCE = "cs-a";
@@ -300,5 +302,19 @@ describe("SyncChangeSet", () => {
     expect(changes.instances()).toEqual([INSTANCE]);
     // Other types are unaffected
     expect(changes.changed("scene").whole).toBe(false);
+  });
+});
+
+describe("ref helpers", () => {
+  it("distinctRefs keeps each id once per instance, in first-seen order", () => {
+    expect(
+      distinctRefs([ref("2"), ref("1"), ref("2"), ref("2", "cs-b")])
+    ).toEqual([ref("2"), ref("1"), ref("2", "cs-b")]);
+  });
+
+  it("pairsJson binds refs as [id, instanceId] pairs", () => {
+    expect(pairsJson([ref("1"), ref("1", "cs-b")])).toBe(
+      '[["1","cs-a"],["1","cs-b"]]'
+    );
   });
 });

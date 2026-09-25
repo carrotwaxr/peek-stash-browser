@@ -49,7 +49,10 @@ import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
 // Transform functions no longer needed - URLs transformed at read time
-import { entityImageCountService } from "./EntityImageCountService.js";
+import {
+  type ImageCountScope,
+  entityImageCountService,
+} from "./EntityImageCountService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
@@ -60,9 +63,11 @@ import {
   type EntityRef,
   type IncomingEntity,
   type JunctionName,
+  type RefScope,
   type StoredEntity,
   SyncChangeSet,
   detectChanges,
+  distinctRefs,
   linksByNearId,
   noChanges,
 } from "./SyncChangeSet.js";
@@ -1197,6 +1202,9 @@ async function processPerformersBatch(
     })
     .join(",\n");
 
+  // imageCount is set on insert only: it holds the count with gallery
+  // inheritance (EntityImageCountService), which the post-sync steps rebuild
+  // for what changed, and an update keeps it over Stash's direct count
   await prisma.$executeRawUnsafe(`
   INSERT INTO StashPerformer (
     id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
@@ -1231,7 +1239,6 @@ async function processPerformersBatch(
     url = excluded.url,
     imagePath = excluded.imagePath,
     sceneCount = excluded.sceneCount,
-    imageCount = excluded.imageCount,
     galleryCount = excluded.galleryCount,
     groupCount = excluded.groupCount,
     stashCreatedAt = excluded.stashCreatedAt,
@@ -1359,6 +1366,9 @@ async function processStudiosBatch(
     })
     .join(",\n");
 
+  // imageCount is set on insert only: it holds the count with gallery
+  // inheritance (EntityImageCountService), which the post-sync steps rebuild
+  // for what changed, and an update keeps it over Stash's direct count
   await prisma.$executeRawUnsafe(`
   INSERT INTO StashStudio (
     id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
@@ -1373,7 +1383,6 @@ async function processStudiosBatch(
     favorite = excluded.favorite,
     rating100 = excluded.rating100,
     sceneCount = excluded.sceneCount,
-    imageCount = excluded.imageCount,
     galleryCount = excluded.galleryCount,
     performerCount = excluded.performerCount,
     groupCount = excluded.groupCount,
@@ -1505,6 +1514,9 @@ async function processTagsBatch(
     })
     .join(",\n");
 
+  // imageCount is set on insert only: it holds the count with gallery
+  // inheritance (EntityImageCountService), which the post-sync steps rebuild
+  // for what changed, and an update keeps it over Stash's direct count
   await prisma.$executeRawUnsafe(`
   INSERT INTO StashTag (
     id, stashInstanceId, stashIds, name, favorite,
@@ -1516,7 +1528,6 @@ async function processTagsBatch(
     name = excluded.name,
     favorite = excluded.favorite,
     sceneCount = excluded.sceneCount,
-    imageCount = excluded.imageCount,
     galleryCount = excluded.galleryCount,
     performerCount = excluded.performerCount,
     studioCount = excluded.studioCount,
@@ -2581,17 +2592,19 @@ class StashSyncService extends EventEmitter {
    * links Stash edits without moving updated_at. Otherwise the change set
    * decides:
    * - images written, even unchanged (their junction rows were rewritten
-   *   from Stash), re-apply gallery inheritance, as do changed galleries;
+   *   from Stash), re-apply gallery inheritance, as do changed galleries,
+   *   for those images and the changed galleries' images
+   *   (`galleryInheritanceScope`);
    * - nothing changed and no user holds `pending` rows: no other step runs;
    * - scene tag inheritance for the scenes the changes reach
    *   (`sceneTagInheritanceScope`), when there are any;
-   * - any change: the image counts, user stats and tag counts, then the
-   *   exclusion recompute of the users who can see a changed instance,
+   * - any change: the image counts of the performers, studios and tags the
+   *   changes reach (`imageCountScope`), user stats and tag counts, then
+   *   the exclusion recompute of the users who can see a changed instance,
    *   plus those with pending holds.
-   * Gallery inheritance and the image counts are whole library still (C5
-   * scopes them to the change set); user stats and tag counts stay whole
-   * library (1.3 s and 0.04 s on the prod copy, and the stats depend on
-   * watch history as well as the library).
+   * User stats and tag counts stay whole library (1.3 s and 0.04 s on the
+   * prod copy, and the stats depend on watch history as well as the
+   * library).
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
@@ -2600,19 +2613,18 @@ class StashSyncService extends EventEmitter {
     if (full) {
       logger.info("Full sync: running every post-sync step");
       await this.computeSceneTagInheritance();
-      await this.applyGalleryInheritance();
-      await this.rebuildCounts();
+      await this.applyGalleryInheritance("all");
+      await this.rebuildCounts("all");
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
       logger.info("User exclusions recomputed");
     } else {
       const wroteImages = !changes.written("image").isEmpty();
-      if (
-        wroteImages ||
-        !changes.changed("gallery").isEmpty() ||
-        !changes.changed("image").isEmpty()
-      ) {
-        await this.applyGalleryInheritance();
+      if (wroteImages || !changes.changed("gallery").isEmpty()) {
+        const images = await this.galleryInheritanceScope(changes);
+        if (images === "all" || images.length > 0) {
+          await this.applyGalleryInheritance(images);
+        }
       }
 
       if (changes.isEmpty()) {
@@ -2638,7 +2650,7 @@ class StashSyncService extends EventEmitter {
         if (scope === "all" || scope.length > 0) {
           await this.computeSceneTagInheritance(scope);
         }
-        await this.rebuildCounts();
+        await this.rebuildCounts(await this.imageCountScope(changes));
         const instances = changes.instances();
         logger.info(
           "Sync complete, recomputing the exclusions of the users on the changed instances...",
@@ -2707,17 +2719,103 @@ class StashSyncService extends EventEmitter {
     return Array.from(byKey.values());
   }
 
-  /** Gallery inheritance, whole library (after images and galleries). */
-  private async applyGalleryInheritance(): Promise<void> {
-    logger.info("Applying gallery inheritance to images...");
-    await imageGalleryInheritanceService.applyGalleryInheritance();
+  /**
+   * The images gallery inheritance re-applies to: every image written this
+   * run, changed or not (the upsert and the junction rewrite dropped what
+   * it had inherited), and the images of every changed gallery (it may
+   * have gained a performer, tag, studio or field to hand down). "all"
+   * when either kind is past the change set's limit.
+   */
+  private async galleryInheritanceScope(
+    changes: SyncChangeSet
+  ): Promise<EntityRef[] | "all"> {
+    const written = changes.written("image");
+    const galleries = changes.changed("gallery");
+    if (written.whole || galleries.whole) return "all";
+    return distinctRefs([
+      ...written.refs,
+      ...(await imageGalleryInheritanceService.imagesInGalleries(
+        galleries.refs
+      )),
+    ]);
+  }
+
+  /**
+   * The performers, studios and tags whose inherited image counts a run's
+   * changes reach:
+   * - performers: the old and new far sides of changed images'
+   *   `ImagePerformer` and changed galleries' `GalleryPerformer` rows;
+   * - studios: the old and new studios of changed images and galleries;
+   * - tags: the same through `ImageTag` and `GalleryTag`;
+   * - the performers, tags and studio of every gallery a changed image
+   *   joined or left (`ImageGallery`'s far sides), and of every image and
+   *   gallery the run soft-deleted, with the soft-deleted images' galleries
+   *   (read from their stored rows, `countedThrough`);
+   * - every changed performer, studio and tag itself: a new or returning
+   *   row holds Stash's direct count, or the count it had when deleted.
+   * "all" when one of those kinds is past the change set's limit.
+   */
+  private async imageCountScope(
+    changes: SyncChangeSet
+  ): Promise<ImageCountScope | "all"> {
+    const direct = {
+      performers: [
+        changes.farSides("ImagePerformer"),
+        changes.farSides("GalleryPerformer"),
+        changes.changed("performer"),
+      ],
+      studios: [changes.studios(), changes.changed("studio")],
+      tags: [
+        changes.farSides("ImageTag"),
+        changes.farSides("GalleryTag"),
+        changes.changed("tag"),
+      ],
+    };
+    const images = changes.deleted("image");
+    const galleries = [
+      changes.farSides("ImageGallery"),
+      changes.deleted("gallery"),
+    ];
+    if (
+      images.whole ||
+      galleries.some((scope) => scope.whole) ||
+      Object.values(direct).some((scopes) => scopes.some((s) => s.whole))
+    ) {
+      return "all";
+    }
+
+    const through = await entityImageCountService.countedThrough({
+      images: images.refs,
+      galleries: galleries.flatMap((scope) => scope.refs),
+    });
+    const refsOf = (scopes: RefScope[], more: readonly EntityRef[]) =>
+      distinctRefs([...scopes.flatMap((scope) => scope.refs), ...more]);
+    return {
+      performers: refsOf(direct.performers, through.performers),
+      studios: refsOf(direct.studios, through.studios),
+      tags: refsOf(direct.tags, through.tags),
+    };
+  }
+
+  /**
+   * Gallery inheritance for every image or the given ones (after images
+   * and galleries). The service logs how many.
+   */
+  private async applyGalleryInheritance(
+    images: EntityRef[] | "all"
+  ): Promise<void> {
+    await imageGalleryInheritanceService.applyGalleryInheritance(images);
     logger.info("Gallery inheritance complete");
   }
 
-  /** The image counts (after gallery inheritance), user stats and tag counts. */
-  private async rebuildCounts(): Promise<void> {
-    logger.info("Rebuilding inherited image counts...");
-    await entityImageCountService.rebuildAllImageCounts();
+  /**
+   * The image counts for `imageCounts` (after gallery inheritance), user
+   * stats and tag counts.
+   */
+  private async rebuildCounts(
+    imageCounts: ImageCountScope | "all"
+  ): Promise<void> {
+    await entityImageCountService.rebuildAllImageCounts(imageCounts);
     logger.info("Inherited image counts rebuild complete");
 
     logger.info("Rebuilding user stats after sync...");
