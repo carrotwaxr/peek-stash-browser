@@ -14,6 +14,7 @@
     "format:check": "cd .. && prettier --check server",
     "typecheck": "tsc --noEmit && npm run typecheck:tests",
     "typecheck:tests": "tsc -p tsconfig.tests.json",
+    "db:drift": "f=\"${TMPDIR:-/tmp}/peek-drift-$$.db\"; prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url \"file:$f\" --script --exit-code; s=$?; rm -f \"$f\"; exit $s",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
