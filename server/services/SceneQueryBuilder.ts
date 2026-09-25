@@ -678,26 +678,26 @@ class SceneQueryBuilder {
     }
 
     const { value, value2, modifier = "EQUALS" } = filter;
-    const subquery =
-      "(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId)";
+    // Stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's ScenePerformer rows
+    const column = "s.performerCount";
 
     switch (modifier) {
       case "EQUALS":
-        return { sql: `${subquery} = ?`, params: [value] };
+        return { sql: `${column} = ?`, params: [value] };
       case "NOT_EQUALS":
-        return { sql: `${subquery} != ?`, params: [value] };
+        return { sql: `${column} != ?`, params: [value] };
       case "GREATER_THAN":
-        return { sql: `${subquery} > ?`, params: [value] };
+        return { sql: `${column} > ?`, params: [value] };
       case "LESS_THAN":
-        return { sql: `${subquery} < ?`, params: [value] };
+        return { sql: `${column} < ?`, params: [value] };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
           return {
-            sql: `${subquery} BETWEEN ? AND ?`,
+            sql: `${column} BETWEEN ? AND ?`,
             params: [value, value2],
           };
         }
-        return { sql: `${subquery} >= ?`, params: [value] };
+        return { sql: `${column} >= ?`, params: [value] };
       case null:
       default:
         return { sql: "", params: [] };
@@ -722,26 +722,26 @@ class SceneQueryBuilder {
     }
 
     const { value, value2, modifier = "EQUALS" } = filter;
-    const subquery =
-      "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
+    // Stored by sync (SCENE_DERIVED_COLUMNS_SQL): the scene's SceneTag rows
+    const column = "s.tagCount";
 
     switch (modifier) {
       case "EQUALS":
-        return { sql: `${subquery} = ?`, params: [value] };
+        return { sql: `${column} = ?`, params: [value] };
       case "NOT_EQUALS":
-        return { sql: `${subquery} != ?`, params: [value] };
+        return { sql: `${column} != ?`, params: [value] };
       case "GREATER_THAN":
-        return { sql: `${subquery} > ?`, params: [value] };
+        return { sql: `${column} > ?`, params: [value] };
       case "LESS_THAN":
-        return { sql: `${subquery} < ?`, params: [value] };
+        return { sql: `${column} < ?`, params: [value] };
       case "BETWEEN":
         if (value2 !== undefined && value2 !== null) {
           return {
-            sql: `${subquery} BETWEEN ? AND ?`,
+            sql: `${column} BETWEEN ? AND ?`,
             params: [value, value2],
           };
         }
-        return { sql: `${subquery} >= ?`, params: [value] };
+        return { sql: `${column} >= ?`, params: [value] };
       case null:
       default:
         return { sql: "", params: [] };
@@ -984,25 +984,25 @@ class SceneQueryBuilder {
   ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
 
-    // Extract filename from path: '/videos/My Scene.mp4' -> 'My Scene.mp4'
-    // This matches the display logic in getSceneFallbackTitle which uses basename
-    // Note: handles forward slashes; backslashes are uncommon in Stash paths
-    const filenameExpr = `REPLACE(s.filePath, RTRIM(s.filePath, REPLACE(s.filePath, '/', '')), '')`;
-
-    // Map sort field names to SQL expressions
+    // Map sort field names to SQL expressions. title, performer_count and
+    // tag_count read the columns sync stores (SCENE_DERIVED_COLUMNS_SQL in
+    // StashSyncService): titleSort is the displayed title with ASCII
+    // lower-cased, so its BINARY order is the case-insensitive title order.
+    // Each has a (deletedAt, column, id) index, which serves the order with
+    // its id tiebreak as is.
     const sortMap: Record<string, string> = {
       // Scene metadata
       created_at: `s.stashCreatedAt ${dir}`,
       updated_at: `s.stashUpdatedAt ${dir}`,
       date: `s.date ${dir}`,
-      title: `COALESCE(NULLIF(s.title, ''), ${filenameExpr}) COLLATE NOCASE ${dir}`,
+      title: `s.titleSort ${dir}`,
       duration: `s.duration ${dir}`,
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
       framerate: `s.fileFrameRate ${dir}`,
       path: `s.filePath ${dir}`,
-      performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId) ${dir}`,
-      tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId) ${dir}`,
+      performer_count: `s.performerCount ${dir}`,
+      tag_count: `s.tagCount ${dir}`,
 
       // User ratings (from SceneRating table)
       rating: `COALESCE(r.rating, 0) ${dir}`,
@@ -1413,7 +1413,7 @@ class SceneQueryBuilder {
         countSql,
         ...baseWhereParams
       );
-      total = Number(countResult[0]?.total || 0);
+      total = Number(countResult[0]?.total ?? 0n);
     }
     const countMs = Date.now() - countStart;
 

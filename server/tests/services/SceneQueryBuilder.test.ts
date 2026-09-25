@@ -6,6 +6,7 @@
  * and allowedInstanceIds filtering by inspecting generated SQL.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CriterionModifier } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { must } from "../helpers/must.js";
@@ -291,7 +292,7 @@ describe("SceneQueryBuilder", () => {
       expect(mainQuerySql).toContain("s.stashCreatedAt DESC");
     });
 
-    it("applies COLLATE NOCASE for title sort", async () => {
+    it("sorts by title through the stored titleSort column with id as the tiebreak", async () => {
       await sceneQueryBuilder.execute({
         userId: 1,
         sort: "title",
@@ -302,7 +303,58 @@ describe("SceneQueryBuilder", () => {
 
       const mainQuerySql = must(mockPrisma.$queryRawUnsafe.mock.calls[0])[0];
 
-      expect(mainQuerySql).toContain("COLLATE NOCASE ASC");
+      // The (deletedAt, titleSort, id) index serves this order as is
+      expect(mainQuerySql).toContain("ORDER BY s.titleSort ASC, s.id ASC");
+      expect(mainQuerySql).not.toContain("COLLATE NOCASE");
+    });
+
+    it("sorts and filters by performer_count and tag_count through the stored columns", async () => {
+      await sceneQueryBuilder.execute({
+        userId: 1,
+        sort: "performer_count",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+        filters: {
+          tag_count: {
+            value: 1,
+            value2: 3,
+            modifier: CriterionModifier.Between,
+          },
+        },
+      });
+      await sceneQueryBuilder.execute({
+        userId: 1,
+        sort: "tag_count",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        filters: {
+          performer_count: {
+            value: 2,
+            modifier: CriterionModifier.GreaterThan,
+          },
+        },
+      });
+
+      const statements = mockPrisma.$queryRawUnsafe.mock.calls.map(
+        ([sql]) => sql
+      );
+      const [byPerformers, byTags] = statements.filter((sql) =>
+        sql.includes("ORDER BY")
+      );
+      expect(byPerformers).toContain(
+        "ORDER BY s.performerCount DESC, s.id DESC"
+      );
+      expect(byPerformers).toContain("s.tagCount BETWEEN ? AND ?");
+      expect(byTags).toContain("ORDER BY s.tagCount ASC, s.id ASC");
+      expect(byTags).toContain("s.performerCount > ?");
+      // No correlated count of the junction rows, in the lists or the counts
+      expect(
+        statements.filter((sql) =>
+          /COUNT\(\*\)\s+FROM\s+(ScenePerformer|SceneTag)\b/.test(sql)
+        )
+      ).toEqual([]);
     });
 
     it("includes secondary sort by id for stable ordering", async () => {

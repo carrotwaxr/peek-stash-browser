@@ -714,6 +714,11 @@ model StashScene {
   // === Inherited tags (denormalized for filtering) ===
   inheritedTagIds String? // JSON array of tag IDs from performers, studio, groups
 
+  // === Sort keys, written by sync (SCENE_DERIVED_COLUMNS_SQL in StashSyncService) ===
+  titleSort      String? // the displayed title (title, else file name without extension), ASCII lower-cased
+  performerCount Int     @default(0) // ScenePerformer rows
+  tagCount       Int     @default(0) // SceneTag rows
+
   // === Fingerprint data (for merge detection) ===
   phash   String? // Primary perceptual hash (from first file)
   phashes String? // JSON array of all phashes if scene has multiple files
@@ -731,7 +736,6 @@ model StashScene {
   @@index([stashUpdatedAt])
   @@index([rating100])
   @@index([duration])
-  @@index([deletedAt])
   @@index([oCounter])
   @@index([playCount])
   @@index([phash])
@@ -739,7 +743,9 @@ model StashScene {
   @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashScene_browse_idx")
   @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "StashScene_browse_updated_idx")
   @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
-  @@index([deletedAt, title], map: "StashScene_browse_title_idx")
+  @@index([deletedAt, titleSort, id], map: "StashScene_browse_titleSort_idx")
+  @@index([deletedAt, performerCount, id], map: "StashScene_browse_performerCount_idx")
+  @@index([deletedAt, tagCount, id], map: "StashScene_browse_tagCount_idx")
   @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
   @@index([stashInstanceId])
   @@id([id, stashInstanceId])

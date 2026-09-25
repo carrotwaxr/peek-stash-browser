@@ -84,10 +84,12 @@ describe("drop downgrade columns migration", () => {
     await db.client.$executeRaw`
       UPDATE "User" SET "recoveryKey" = '' WHERE id = ${other.id}
     `;
-    // A scene row an older version stored with its stream list
-    await db.client.stashScene.create({
-      data: { id: "1", stashInstanceId: "inst-a", title: "Kept" },
-    });
+    // A scene row an older version stored with its stream list. Raw SQL: the
+    // current client's create names columns later migrations add
+    await db.client.$executeRaw`
+      INSERT INTO "StashScene" ("id", "stashInstanceId", "title")
+      VALUES ('1', 'inst-a', 'Kept')
+    `;
     await db.client.$executeRaw`
       UPDATE "StashScene" SET "streams" = '[{"url":"x?apikey=OLD"}]'
     `;

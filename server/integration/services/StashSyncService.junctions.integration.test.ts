@@ -758,10 +758,11 @@ describeWithDb(
       expect(recorder.transactions()).toBe(1);
       expect(recorder.statements.filter((s) => !s.inTransaction)).toEqual([]);
       expect(recorder.maxInFlight()).toBe(1);
-      // In order: the stored state, the old links, the rows, the new links
+      // In order: the stored state, the old links, the rows, the new links,
+      // the sort columns derived from them
       const kind = (sql: string) =>
         (
-          /^\s*(SELECT|DELETE FROM|INSERT OR IGNORE INTO|INSERT INTO)\s+"?(\w+)/.exec(
+          /^\s*(SELECT|DELETE FROM|INSERT OR IGNORE INTO|INSERT INTO|UPDATE)\s+"?(\w+)/.exec(
             sql
           ) ?? []
         )
@@ -778,6 +779,7 @@ describeWithDb(
         "INSERT OR IGNORE INTO SceneTag",
         "INSERT OR IGNORE INTO SceneGroup",
         "INSERT OR IGNORE INTO SceneGallery",
+        "UPDATE StashScene",
       ]);
       expect(await sceneLinks("SceneGroup")).toEqual(["1:1"]);
       expect(await sceneLinks("ScenePerformer")).toEqual(["1:1", "1:2", "2:2"]);
