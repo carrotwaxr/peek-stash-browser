@@ -66,7 +66,6 @@ export function userRow(overrides: Partial<User> = {}): User {
     canDownloadFilesOverride: null,
     canDownloadPlaylistsOverride: null,
     recoveryKeyHash: null,
-    recoveryKey: null,
     passwordChangedAt: null,
     ...overrides,
   };

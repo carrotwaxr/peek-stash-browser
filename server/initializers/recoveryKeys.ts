@@ -1,48 +1,38 @@
+import type { PrismaClient } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { hashRecoveryKey, isRecoveryKeyHash } from "../utils/recoveryKey.js";
 
 /**
- * Hash recovery keys that versions before 3.3.7 stored in plaintext.
+ * Hash recovery keys stored in plaintext in `recoveryKeyHash`.
  *
- * Two sources:
- * - `recoveryKeyHash` holding a plaintext key: the migration that renamed
- *   `recoveryKey` to `recoveryKeyHash` kept the values.
- * - `recoveryKey` holding a plaintext key: 3.3.6, run again after a downgrade,
- *   writes a new key there at sign-in. That key is newer than any stored hash,
- *   so it replaces the hash and the column is cleared.
+ * Two migrations leave them there:
+ * - the one that renamed `recoveryKey` to `recoveryKeyHash` for 3.3.7 kept
+ *   the values;
+ * - `20260925000200_drop_scene_streams_and_recovery_key` moved in any key
+ *   3.3.6 wrote to `recoveryKey` after a downgrade, since that key is newer
+ *   than the stored hash.
  *
  * Existing keys keep working. Idempotent: hashes are left alone.
  */
-export async function hashLegacyRecoveryKeys(): Promise<number> {
-  const users = await prisma.user.findMany({
-    where: {
-      OR: [{ recoveryKey: { not: null } }, { recoveryKeyHash: { not: null } }],
-    },
-    select: { id: true, recoveryKey: true, recoveryKeyHash: true },
+export async function hashLegacyRecoveryKeys(
+  client: PrismaClient = prisma
+): Promise<number> {
+  const users = await client.user.findMany({
+    where: { recoveryKeyHash: { not: null } },
+    select: { id: true, recoveryKeyHash: true },
   });
 
-  let moved = 0;
-  let hashed = 0;
-  for (const { id, recoveryKey, recoveryKeyHash } of users) {
-    if (recoveryKey) {
-      await prisma.user.update({
-        where: { id },
-        data: {
-          recoveryKeyHash: hashRecoveryKey(recoveryKey),
-          recoveryKey: null,
-        },
-      });
-      moved++;
-    } else if (recoveryKeyHash && !isRecoveryKeyHash(recoveryKeyHash)) {
-      await prisma.user.update({
-        where: { id },
-        data: { recoveryKeyHash: hashRecoveryKey(recoveryKeyHash) },
-      });
-      hashed++;
-    }
+  let count = 0;
+  for (const { id, recoveryKeyHash } of users) {
+    if (!recoveryKeyHash || isRecoveryKeyHash(recoveryKeyHash)) continue;
+    await client.user.update({
+      where: { id },
+      data: { recoveryKeyHash: hashRecoveryKey(recoveryKeyHash) },
+    });
+    count++;
   }
 
-  logger.info("Hashed legacy recovery keys", { hashed, moved });
-  return hashed + moved;
+  logger.info("Hashed legacy recovery keys", { count });
+  return count;
 }

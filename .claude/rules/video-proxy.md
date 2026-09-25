@@ -25,7 +25,7 @@ The one exception is `stashUrl`, the View in Stash link on library entities, whi
 
 - Raw Stash paths from the database become proxy URLs before any response. The query builders' `transformUrl` copies append `&instanceId=`. `convertToProxyUrl` in `server/utils/stashUrlProxy.ts` does not, so its URLs are served by the default instance.
 - The server builds player stream paths in `StashEntityService.generateSceneStreams` from Stash's recorded choices (`streamDirect`, `streamMkv`, `streamResolutions`), only for single-scene lookups; the client uses them unchanged (`playerSources.ts`). The client still builds the HLS auto-fallback URL in `useVideoPlayer.ts` and caption URLs in `videoPlayerUtils.ts`; `ExternalPlayerButton.tsx` takes its signed direct link from `POST /api/scene/:id/external-player-link` (`useExternalPlayerLink`) and prefixes `window.location.origin`.
-- `StashScene.streams` is always NULL until PR 3 drops it. Sync reads Stash's choices from its labels into those three columns and never stores its URLs, which carry the Stash API key.
+- Sync reads Stash's choices from its labels into those three columns and never stores its URLs, which carry the Stash API key. The old `streams` column that held them is gone (`20260925000200_drop_scene_streams_and_recovery_key`).
 - Sprite and VTT use Stash's id-keyed routes, `/scene/:id/vtt/{sprite,thumbs}`, not the hash-keyed paths Stash reports.
 
 ## Two proxies
