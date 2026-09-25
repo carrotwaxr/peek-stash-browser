@@ -47,6 +47,7 @@ import type {
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
+import { logSyncFailure } from "../utils/syncLog.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
 // Transform functions no longer needed - URLs transformed at read time
 import { entityImageCountService } from "./EntityImageCountService.js";
@@ -132,6 +133,12 @@ interface RunEntityTypeOptions {
 
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
+
+/**
+ * A queued full sync of every enabled instance (`fullSync()` with no id, as
+ * an empty id also means)
+ */
+const ALL_INSTANCES = "";
 
 /** The lock is held: a sync or an instance deletion is running. */
 export class SyncBusyError extends Error {
@@ -424,6 +431,12 @@ class StashSyncService extends EventEmitter {
    * while the other does. Read it through isSyncing().
    */
   private activeJob: SyncJob | null = null;
+  /**
+   * Full syncs asked for while the lock was held (an instance added or
+   * re-pointed during a sync): instance ids, or ALL_INSTANCES. release()
+   * starts them one at a time; abort() drops them.
+   */
+  private readonly queuedFullSyncs = new Set<string>();
   private readonly PAGE_SIZE = BATCH_SIZE;
   private abortController: AbortController | null = null;
   private batchItemCount = 0; // Track items within current batch for progress logging
@@ -476,9 +489,11 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Abort the running job: a sync stops at its next check, an instance purge
-   * between two chunks (the startup sweep removes the rest).
+   * between two chunks (the startup sweep removes the rest). Queued full
+   * syncs are dropped, so nothing starts after it.
    */
   abort(): void {
+    this.queuedFullSyncs.clear();
     if (this.abortController) {
       this.abortController.abort();
       logger.info("Sync abort requested", { job: this.activeJob });
@@ -494,9 +509,58 @@ class StashSyncService extends EventEmitter {
     this.abortController = new AbortController();
   }
 
+  /** Frees the lock, then starts the next queued full sync, if any. */
   private release(): void {
     this.activeJob = null;
     this.abortController = null;
+    this.drainQueuedFullSyncs();
+  }
+
+  /**
+   * A full sync of one instance, or of every enabled instance without an id,
+   * as soon as the lock is free: now when nothing runs ("started"), otherwise
+   * once the running job ends ("queued"). For a change that has already been
+   * saved (an instance added or re-pointed), where refusing would lose the
+   * sync. Runs in the background; a failure is logged.
+   */
+  queueFullSync(stashInstanceId?: string): "started" | "queued" {
+    if (this.activeJob !== null) {
+      this.queuedFullSyncs.add(stashInstanceId ?? ALL_INSTANCES);
+      logger.info("Busy; the full sync starts when the running job ends", {
+        job: this.activeJob,
+        instanceId: stashInstanceId ?? "all",
+      });
+      return "queued";
+    }
+    this.startFullSync(stashInstanceId);
+    return "started";
+  }
+
+  /**
+   * Starts one queued full sync once the lock is free: every instance first,
+   * which covers the instances queued one by one, so they are dropped;
+   * otherwise the one queued earliest. The rest wait for its release.
+   */
+  private drainQueuedFullSyncs(): void {
+    if (this.activeJob !== null) return;
+    if (this.queuedFullSyncs.has(ALL_INSTANCES)) {
+      this.queuedFullSyncs.clear();
+      this.startFullSync();
+      return;
+    }
+    const [next] = this.queuedFullSyncs;
+    if (next === undefined) return;
+    this.queuedFullSyncs.delete(next);
+    this.startFullSync(next);
+  }
+
+  /** fullSync in the background; the caller has checked the lock is free. */
+  private startFullSync(stashInstanceId?: string): void {
+    this.fullSync(stashInstanceId).catch((error: unknown) => {
+      logSyncFailure("Background full sync failed", error, {
+        instanceId: stashInstanceId ?? "all",
+      });
+    });
   }
 
   /**
@@ -3776,6 +3840,8 @@ class StashSyncService extends EventEmitter {
         );
       })
       .finally(() => {
+        // A sync queued for the instance before it went has nothing to fetch
+        this.queuedFullSyncs.delete(instanceId);
         this.release();
       });
     return { purged };

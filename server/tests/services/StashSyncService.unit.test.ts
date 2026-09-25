@@ -193,6 +193,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
     hasInstances: vi.fn(() => true),
     getBaseUrl: vi.fn(() => "http://localhost:9999"),
     getApiKey: vi.fn(() => "test-api-key"),
+    reload: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -985,6 +986,140 @@ describe("StashSyncService abort", () => {
         ),
       ])
     ).rejects.toThrow("Sync aborted");
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+});
+
+describe("StashSyncService queued full syncs", () => {
+  const RUNNING = "test-instance-uuid";
+
+  /** A value held back until `release()`. */
+  function held<T>(value: T): { promise: Promise<T>; release: () => void } {
+    let release = () => {};
+    const promise = new Promise<T>((resolve) => {
+      release = () => resolve(value);
+    });
+    return { promise, release };
+  }
+
+  /**
+   * An incremental sync of RUNNING that holds the lock until `release()`:
+   * its first Stash request (the tags page) answers only then.
+   */
+  async function runningSync(): Promise<{
+    done: Promise<unknown>;
+    release: () => void;
+  }> {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const tags = held({ findTags: { tags: [], count: 0 } });
+    mockStashClient.findTags.mockReturnValueOnce(tags.promise);
+    const done = stashSyncService.incrementalSync(RUNNING);
+    expect(stashSyncService.isSyncing()).toBe(true);
+    return { done, release: tags.release };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stashAnswersNothing();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+  });
+
+  afterEach(async () => {
+    // Every test here spies on fullSync; restoreAllMocks would also drop the
+    // stub client's withSignal answer
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    vi.mocked(stashSyncService.fullSync).mockRestore();
+  });
+
+  it("starts at once when nothing runs", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+
+    expect(stashSyncService.queueFullSync("instance-b")).toBe("started");
+
+    expect(fullSync).toHaveBeenCalledExactlyOnceWith("instance-b");
+    expect(stashSyncService.isSyncing()).toBe(true);
+    await must(fullSync.mock.results[0], "the full sync").value;
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("a queued full sync starts when the running sync ends", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const running = await runningSync();
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+
+    expect(stashSyncService.queueFullSync("instance-b")).toBe("queued");
+    expect(fullSync).not.toHaveBeenCalled();
+
+    running.release();
+    await running.done;
+
+    expect(fullSync).toHaveBeenCalledExactlyOnceWith("instance-b");
+    expect(stashSyncService.isSyncing()).toBe(true);
+    await must(fullSync.mock.results[0], "the queued sync").value;
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("a queued sync of every instance goes first and covers the instances queued one by one", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const running = await runningSync();
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+
+    expect(stashSyncService.queueFullSync("instance-b")).toBe("queued");
+    expect(stashSyncService.queueFullSync()).toBe("queued");
+    running.release();
+    await running.done;
+    await must(fullSync.mock.results[0], "the queued sync").value;
+
+    expect(fullSync).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("abort() drops queued syncs", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    const running = await runningSync();
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+
+    stashSyncService.queueFullSync("instance-b");
+    stashSyncService.queueFullSync();
+    stashSyncService.abort();
+    running.release();
+
+    await expect(running.done).rejects.toThrow("Sync aborted");
+    expect(fullSync).not.toHaveBeenCalled();
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("deleting an instance drops its queued sync and starts the others once its library is removed", async () => {
+    const { stashSyncService } =
+      await import("../../services/StashSyncService.js");
+    // The deletion holds the lock until the instance manager has reloaded
+    const reloaded = held(undefined);
+    vi.mocked(stashInstanceManager.reload).mockReturnValueOnce(
+      reloaded.promise
+    );
+    mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.$executeRawUnsafe.mockResolvedValue(0);
+    mockPrisma.syncState.deleteMany.mockResolvedValue({ count: 0 });
+    const fullSync = vi.spyOn(stashSyncService, "fullSync");
+
+    const deletion = stashSyncService.deleteInstance("instance-gone");
+    // An edit of the instance that landed just before its deletion
+    expect(stashSyncService.queueFullSync("instance-gone")).toBe("queued");
+    expect(stashSyncService.queueFullSync("instance-b")).toBe("queued");
+    reloaded.release();
+    await (
+      await deletion
+    ).purged;
+
+    expect(fullSync).toHaveBeenCalledExactlyOnceWith("instance-b");
+    await must(fullSync.mock.results[0], "the queued sync").value;
     expect(stashSyncService.isSyncing()).toBe(false);
   });
 });

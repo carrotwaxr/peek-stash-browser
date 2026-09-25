@@ -3,7 +3,7 @@
  * Peek to refetch a type clears that type's `SyncState` timestamps, and the
  * sync fetches it whole; the other types sync incrementally.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { syncScheduler } from "../../services/SyncScheduler.js";
@@ -24,6 +24,8 @@ vi.mock("../../services/StashSyncService.js", () => ({
   stashSyncService: {
     fullSync: vi.fn(),
     smartIncrementalSync: vi.fn(),
+    incrementalSync: vi.fn(),
+    isSyncing: vi.fn(() => false),
   },
 }));
 
@@ -146,5 +148,90 @@ describe("performStartupSync", () => {
     });
     expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
     expect(mockSync.fullSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("an admin's abort is not a failure", () => {
+  const aborted = () => Promise.reject(new Error("Sync aborted"));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    syncScheduler.stop();
+    vi.useRealTimers();
+  });
+
+  it.each([
+    {
+      caller: "the startup full sync",
+      run: async () => {
+        storeSyncStates(syncStates(TYPES));
+        mockSync.fullSync.mockImplementationOnce(aborted);
+        await syncScheduler["performStartupSync"]();
+      },
+    },
+    {
+      caller: "the startup smart sync",
+      run: async () => {
+        storeSyncStates(syncStates([]));
+        mockSync.smartIncrementalSync.mockImplementationOnce(aborted);
+        await syncScheduler["performStartupSync"]();
+      },
+    },
+    {
+      caller: "a manual full sync",
+      run: async () => {
+        mockSync.fullSync.mockImplementationOnce(aborted);
+        await syncScheduler.triggerFullSync();
+      },
+    },
+    {
+      caller: "a manual incremental sync",
+      run: async () => {
+        mockSync.incrementalSync.mockImplementationOnce(aborted);
+        await syncScheduler.triggerIncrementalSync();
+      },
+    },
+    {
+      caller: "a scheduled sync",
+      run: async () => {
+        vi.useFakeTimers();
+        mockSync.incrementalSync.mockImplementationOnce(aborted);
+        syncScheduler["startPollingInterval"](1);
+        await vi.advanceTimersByTimeAsync(60_000);
+      },
+    },
+  ])("$caller logs Sync aborted at info", async ({ run }) => {
+    // A manual sync rethrows the abort to the route, which ignores it
+    await run().catch(() => undefined);
+
+    await vi.waitFor(() => {
+      expect(mockLogger.info).toHaveBeenCalledWith("Sync aborted", {});
+    });
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("a manual full sync still rethrows the abort to its caller", async () => {
+    mockSync.fullSync.mockImplementationOnce(aborted);
+
+    await expect(syncScheduler.triggerFullSync()).rejects.toThrow(
+      "Sync aborted"
+    );
+  });
+
+  it("a sync that fails is still logged at error level", async () => {
+    storeSyncStates(syncStates([]));
+    mockSync.smartIncrementalSync.mockRejectedValueOnce(
+      new Error("Stash is down")
+    );
+
+    await syncScheduler["performStartupSync"]();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      "Startup smart incremental sync failed",
+      { error: "Stash is down" }
+    );
   });
 });
