@@ -3,18 +3,26 @@
  *
  * Handles admin endpoints for managing orphaned scene data:
  * - GET /api/admin/orphaned-scenes - List orphaned scenes with user activity
- * - GET /api/admin/orphaned-scenes/:id/matches - Get phash matches for an orphan
- * - POST /api/admin/orphaned-scenes/:id/reconcile - Transfer data to target scene
- * - POST /api/admin/orphaned-scenes/:id/discard - Delete orphaned user data
- * - POST /api/admin/reconcile-all - Auto-reconcile all with exact phash matches
+ * - GET /api/admin/orphaned-scenes/:ref/matches - Phash matches for an orphan
+ * - POST /api/admin/orphaned-scenes/:ref/reconcile - Transfer data to target scene
+ * - POST /api/admin/orphaned-scenes/:ref/discard - Delete orphaned user data
+ * - POST /api/admin/reconcile-all - Reconcile every orphan with exactly one match
+ *
+ * `:ref` is the orphan as "id:instanceId"; a bare id answers 400. A target
+ * is a scene id on the orphan's instance: a merge never crosses instances.
  */
-import express from "express";
+import { parseEntityRef } from "@peek/shared-types/instanceAwareId.js";
+import express, { type Response } from "express";
 import {
   type AuthenticatedRequest,
   authenticate,
   requireAdmin,
 } from "../middleware/auth.js";
-import { mergeReconciliationService } from "../services/MergeReconciliationService.js";
+import {
+  MergeTargetError,
+  type SceneRef,
+  mergeReconciliationService,
+} from "../services/MergeReconciliationService.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -22,6 +30,19 @@ const router = express.Router();
 // All routes require authentication and admin role
 router.use(authenticate);
 router.use(requireAdmin);
+
+/**
+ * The orphan named by `:ref`, or null after answering 400 when the ref
+ * carries no instance.
+ */
+function orphanRef(ref: unknown, res: Response): SceneRef | null {
+  const { id, instanceId } = parseEntityRef(typeof ref === "string" ? ref : "");
+  if (!id || !instanceId) {
+    res.status(400).json({ error: 'Scene reference must be "id:instanceId"' });
+    return null;
+  }
+  return { id, instanceId };
+}
 
 /**
  * GET /api/admin/orphaned-scenes
@@ -47,17 +68,16 @@ router.get(
 );
 
 /**
- * GET /api/admin/orphaned-scenes/:id/matches
- * Get potential phash matches for an orphaned scene
+ * GET /api/admin/orphaned-scenes/:ref/matches
+ * Live scenes of the orphan's instance with a matching phash
  */
 router.get(
-  "/orphaned-scenes/:id/matches",
+  "/orphaned-scenes/:ref/matches",
   authenticated(async (req, res) => {
+    const orphan = orphanRef(req.params.ref, res);
+    if (!orphan) return;
     try {
-      const { id } = req.params;
-      const matches = await mergeReconciliationService.findPhashMatches(
-        id as string
-      );
+      const matches = await mergeReconciliationService.findPhashMatches(orphan);
       res.json({ matches });
     } catch (error) {
       res.status(500).json({
@@ -69,25 +89,27 @@ router.get(
 );
 
 /**
- * POST /api/admin/orphaned-scenes/:id/reconcile
- * Transfer user data from orphan to target scene
+ * POST /api/admin/orphaned-scenes/:ref/reconcile
+ * Transfer user data from the orphan to `targetSceneId`, a scene id on the
+ * orphan's instance. A target that is not a live scene there answers 400.
  */
 router.post(
-  "/orphaned-scenes/:id/reconcile",
+  "/orphaned-scenes/:ref/reconcile",
   authenticated(async (req: AuthenticatedRequest, res) => {
+    const orphan = orphanRef(req.params.ref, res);
+    if (!orphan) return;
+    const { targetSceneId } = (req.body ?? {}) as { targetSceneId?: unknown };
+
+    if (typeof targetSceneId !== "string" || !targetSceneId) {
+      res.status(400).json({ error: "targetSceneId is required" });
+      return;
+    }
+
     try {
-      const { id } = req.params;
-      const { targetSceneId } = req.body as { targetSceneId: string };
-
-      if (!targetSceneId) {
-        res.status(400).json({ error: "targetSceneId is required" });
-        return;
-      }
-
       const result = await mergeReconciliationService.reconcileScene(
-        id as string,
-        targetSceneId,
-        null, // Will be looked up if available
+        orphan,
+        { id: targetSceneId, instanceId: orphan.instanceId },
+        null, // Chosen by the admin, not matched by phash
         req.user.id // Admin who initiated
       );
 
@@ -96,6 +118,10 @@ router.post(
         ...result,
       });
     } catch (error) {
+      if (error instanceof MergeTargetError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
       res.status(500).json({
         error: "Failed to reconcile scene",
         message: error instanceof Error ? error.message : String(error),
@@ -105,17 +131,17 @@ router.post(
 );
 
 /**
- * POST /api/admin/orphaned-scenes/:id/discard
- * Delete orphaned user data for a scene
+ * POST /api/admin/orphaned-scenes/:ref/discard
+ * Delete the orphan's user data (on its instance only)
  */
 router.post(
-  "/orphaned-scenes/:id/discard",
+  "/orphaned-scenes/:ref/discard",
   authenticated(async (req, res) => {
+    const orphan = orphanRef(req.params.ref, res);
+    if (!orphan) return;
     try {
-      const { id } = req.params;
-      const result = await mergeReconciliationService.discardOrphanedData(
-        id as string
-      );
+      const result =
+        await mergeReconciliationService.discardOrphanedData(orphan);
 
       res.json({
         ok: true,
@@ -132,7 +158,8 @@ router.post(
 
 /**
  * POST /api/admin/reconcile-all
- * Auto-reconcile all orphans with exact phash matches
+ * Reconcile every orphan with exactly one phash match on its instance, as
+ * sync does; orphans with several matches are left for the admin to pick.
  */
 router.post(
   "/reconcile-all",
@@ -149,15 +176,15 @@ router.post(
           continue;
         }
 
-        const matches = await mergeReconciliationService.findPhashMatches(
-          orphan.id
-        );
-        const exactMatch = matches.find((m) => m.similarity === "exact");
+        const source = { id: orphan.id, instanceId: orphan.instanceId };
+        const matches =
+          await mergeReconciliationService.findPhashMatches(source);
+        const [only] = matches;
 
-        if (exactMatch) {
+        if (matches.length === 1 && only) {
           await mergeReconciliationService.reconcileScene(
-            orphan.id,
-            exactMatch.sceneId,
+            source,
+            { id: only.sceneId, instanceId: orphan.instanceId },
             orphan.phash,
             req.user.id
           );

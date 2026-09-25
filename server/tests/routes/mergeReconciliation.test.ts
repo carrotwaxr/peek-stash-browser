@@ -3,10 +3,12 @@
  *
  * Tests the admin endpoints for managing orphaned scene data:
  * - GET /api/admin/orphaned-scenes - List orphaned scenes
- * - GET /api/admin/orphaned-scenes/:id/matches - Get phash matches
- * - POST /api/admin/orphaned-scenes/:id/reconcile - Transfer data to target
- * - POST /api/admin/orphaned-scenes/:id/discard - Delete orphaned data
- * - POST /api/admin/reconcile-all - Auto-reconcile all with exact matches
+ * - GET /api/admin/orphaned-scenes/:ref/matches - Get phash matches
+ * - POST /api/admin/orphaned-scenes/:ref/reconcile - Transfer data to target
+ * - POST /api/admin/orphaned-scenes/:ref/discard - Delete orphaned data
+ * - POST /api/admin/reconcile-all - Auto-reconcile every orphan with one match
+ *
+ * `:ref` is the orphan as "id:instanceId".
  *
  * The handler tests call each route's real handler from the router, with the
  * service and the auth middleware mocked.
@@ -16,7 +18,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticate, requireAdmin } from "../../middleware/auth.js";
 // Import after mocks are set up
 import {
+  MergeTargetError,
   type OrphanedSceneInfo,
+  type PhashMatch,
   mergeReconciliationService,
 } from "../../services/MergeReconciliationService.js";
 import { findHandler, reqFor, resFor } from "../helpers/controllerTestUtils.js";
@@ -24,6 +28,7 @@ import { partialRow } from "../helpers/prismaMock.js";
 
 // Mock MergeReconciliationService - hoisted to top level
 vi.mock("../../services/MergeReconciliationService.js", () => ({
+  MergeTargetError: class MergeTargetError extends Error {},
   mergeReconciliationService: {
     findOrphanedScenesWithActivity: vi.fn(),
     findPhashMatches: vi.fn(),
@@ -140,6 +145,21 @@ describe("Merge Reconciliation Routes", () => {
     });
   });
 
+  const ORPHAN_REF = "scene-123:inst-b";
+  const ORPHAN = { id: "scene-123", instanceId: "inst-b" };
+  const BARE_ID_ERROR = { error: 'Scene reference must be "id:instanceId"' };
+
+  function match(sceneId: string, recommended = false): PhashMatch {
+    return {
+      sceneId,
+      instanceId: "inst-b",
+      instanceName: "Stash B",
+      title: `Scene ${sceneId}`,
+      similarity: "exact",
+      recommended,
+    };
+  }
+
   // ============================================================================
   // GET /api/admin/orphaned-scenes Handler Tests
   // ============================================================================
@@ -149,6 +169,8 @@ describe("Merge Reconciliation Routes", () => {
       const mockOrphans: OrphanedSceneInfo[] = [
         {
           id: "scene-1",
+          instanceId: "inst-a",
+          instanceName: "Stash A",
           title: "Deleted Scene 1",
           phash: "abc123",
           deletedAt: new Date("2024-01-01"),
@@ -158,8 +180,10 @@ describe("Merge Reconciliation Routes", () => {
           hasFavorites: false,
         },
         {
-          id: "scene-2",
-          title: "Deleted Scene 2",
+          id: "scene-1",
+          instanceId: "inst-b",
+          instanceName: "Stash B",
+          title: "Deleted Scene 1",
           phash: "def456",
           deletedAt: new Date("2024-01-02"),
           userActivityCount: 3,
@@ -215,49 +239,42 @@ describe("Merge Reconciliation Routes", () => {
   });
 
   // ============================================================================
-  // GET /api/admin/orphaned-scenes/:id/matches Handler Tests
+  // GET /api/admin/orphaned-scenes/:ref/matches Handler Tests
   // ============================================================================
 
-  describe("GET /orphaned-scenes/:id/matches handler", () => {
+  describe("GET /orphaned-scenes/:ref/matches handler", () => {
     it("should return phash matches for an orphaned scene", async () => {
-      const mockMatches = [
-        {
-          sceneId: "target-1",
-          title: "Similar Scene 1",
-          similarity: "exact" as const,
-          recommended: true,
-        },
-        {
-          sceneId: "target-2",
-          title: "Similar Scene 2",
-          similarity: "exact" as const,
-          recommended: false,
-        },
-      ];
+      const mockMatches = [match("target-1", true), match("target-2")];
 
       mockService.findPhashMatches.mockResolvedValue(mockMatches);
 
-      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
+      const handler = await routeHandler(
+        "get",
+        "/orphaned-scenes/:ref/matches"
+      );
       const req = reqFor(handler, {
-        params: { id: "scene-123" },
+        params: { ref: ORPHAN_REF },
         user: ADMIN,
       });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
       expect(res.json).toHaveBeenCalledWith({ matches: mockMatches });
-      expect(mockService.findPhashMatches).toHaveBeenCalledWith("scene-123");
+      expect(mockService.findPhashMatches).toHaveBeenCalledWith(ORPHAN);
     });
 
-    it("should return empty matches when no phash matches found", async () => {
-      mockService.findPhashMatches.mockResolvedValue([]);
-
-      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
-      const req = reqFor(handler, { params: { id: "scene-123" } });
+    it("a bare id answers 400", async () => {
+      const handler = await routeHandler(
+        "get",
+        "/orphaned-scenes/:ref/matches"
+      );
+      const req = reqFor(handler, { params: { ref: "scene-123" } });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
-      expect(res.json).toHaveBeenCalledWith({ matches: [] });
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(BARE_ID_ERROR);
+      expect(mockService.findPhashMatches).not.toHaveBeenCalled();
     });
 
     it("should return 500 on service error", async () => {
@@ -265,8 +282,11 @@ describe("Merge Reconciliation Routes", () => {
         new Error("Lookup failed")
       );
 
-      const handler = await routeHandler("get", "/orphaned-scenes/:id/matches");
-      const req = reqFor(handler, { params: { id: "scene-123" } });
+      const handler = await routeHandler(
+        "get",
+        "/orphaned-scenes/:ref/matches"
+      );
+      const req = reqFor(handler, { params: { ref: ORPHAN_REF } });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
@@ -279,17 +299,17 @@ describe("Merge Reconciliation Routes", () => {
   });
 
   // ============================================================================
-  // POST /api/admin/orphaned-scenes/:id/reconcile Handler Tests
+  // POST /api/admin/orphaned-scenes/:ref/reconcile Handler Tests
   // ============================================================================
 
-  describe("POST /orphaned-scenes/:id/reconcile handler", () => {
+  describe("POST /orphaned-scenes/:ref/reconcile handler", () => {
     it("should return 400 when targetSceneId is missing", async () => {
       const handler = await routeHandler(
         "post",
-        "/orphaned-scenes/:id/reconcile"
+        "/orphaned-scenes/:ref/reconcile"
       );
       const req = reqFor(handler, {
-        params: { id: "scene-123" },
+        params: { ref: ORPHAN_REF },
         body: {},
         user: ADMIN,
       });
@@ -302,7 +322,25 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
-    it("should reconcile scene and return result", async () => {
+    it("a bare id answers 400", async () => {
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:ref/reconcile"
+      );
+      const req = reqFor(handler, {
+        params: { ref: "scene-123" },
+        body: { targetSceneId: "target-456" },
+        user: ADMIN,
+      });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(BARE_ID_ERROR);
+      expect(mockService.reconcileScene).not.toHaveBeenCalled();
+    });
+
+    it("should reconcile into the target on the orphan's instance and return result", async () => {
       const mockResult = {
         sourceSceneId: "scene-123",
         targetSceneId: "target-456",
@@ -314,10 +352,10 @@ describe("Merge Reconciliation Routes", () => {
 
       const handler = await routeHandler(
         "post",
-        "/orphaned-scenes/:id/reconcile"
+        "/orphaned-scenes/:ref/reconcile"
       );
       const req = reqFor(handler, {
-        params: { id: "scene-123" },
+        params: { ref: ORPHAN_REF },
         body: { targetSceneId: "target-456" },
         user: ADMIN,
       });
@@ -325,8 +363,8 @@ describe("Merge Reconciliation Routes", () => {
       await handler(req, res, vi.fn());
 
       expect(mockService.reconcileScene).toHaveBeenCalledWith(
-        "scene-123",
-        "target-456",
+        ORPHAN,
+        { id: "target-456", instanceId: "inst-b" },
         null,
         1
       );
@@ -339,6 +377,29 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
+    it("a target that is not a live scene on the orphan's instance answers 400", async () => {
+      mockService.reconcileScene.mockRejectedValue(
+        new MergeTargetError("Scene 999 is not a live scene on Stash B")
+      );
+
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:ref/reconcile"
+      );
+      const req = reqFor(handler, {
+        params: { ref: ORPHAN_REF },
+        body: { targetSceneId: "999" },
+        user: ADMIN,
+      });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Scene 999 is not a live scene on Stash B",
+      });
+    });
+
     it("should return 500 on service error", async () => {
       mockService.reconcileScene.mockRejectedValue(
         new Error("Transfer failed")
@@ -346,22 +407,16 @@ describe("Merge Reconciliation Routes", () => {
 
       const handler = await routeHandler(
         "post",
-        "/orphaned-scenes/:id/reconcile"
+        "/orphaned-scenes/:ref/reconcile"
       );
       const req = reqFor(handler, {
-        params: { id: "scene-123" },
+        params: { ref: ORPHAN_REF },
         body: { targetSceneId: "target-456" },
         user: ADMIN,
       });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
-      expect(mockService.reconcileScene).toHaveBeenCalledWith(
-        "scene-123",
-        "target-456",
-        null,
-        1
-      );
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
         error: "Failed to reconcile scene",
@@ -371,10 +426,10 @@ describe("Merge Reconciliation Routes", () => {
   });
 
   // ============================================================================
-  // POST /api/admin/orphaned-scenes/:id/discard Handler Tests
+  // POST /api/admin/orphaned-scenes/:ref/discard Handler Tests
   // ============================================================================
 
-  describe("POST /orphaned-scenes/:id/discard handler", () => {
+  describe("POST /orphaned-scenes/:ref/discard handler", () => {
     it("should discard orphaned data and return counts", async () => {
       const mockResult = {
         watchHistoryDeleted: 5,
@@ -385,21 +440,38 @@ describe("Merge Reconciliation Routes", () => {
 
       const handler = await routeHandler(
         "post",
-        "/orphaned-scenes/:id/discard"
+        "/orphaned-scenes/:ref/discard"
       );
       const req = reqFor(handler, {
-        params: { id: "scene-123" },
+        params: { ref: ORPHAN_REF },
         user: ADMIN,
       });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
-      expect(mockService.discardOrphanedData).toHaveBeenCalledWith("scene-123");
+      expect(mockService.discardOrphanedData).toHaveBeenCalledWith(ORPHAN);
       expect(res.json).toHaveBeenCalledWith({
         ok: true,
         watchHistoryDeleted: 5,
         ratingsDeleted: 2,
       });
+    });
+
+    it("a bare id answers 400", async () => {
+      const handler = await routeHandler(
+        "post",
+        "/orphaned-scenes/:ref/discard"
+      );
+      const req = reqFor(handler, {
+        params: { ref: "scene-123" },
+        user: ADMIN,
+      });
+      const res = resFor(handler);
+      await handler(req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(BARE_ID_ERROR);
+      expect(mockService.discardOrphanedData).not.toHaveBeenCalled();
     });
 
     it("should return 500 on service error", async () => {
@@ -409,9 +481,9 @@ describe("Merge Reconciliation Routes", () => {
 
       const handler = await routeHandler(
         "post",
-        "/orphaned-scenes/:id/discard"
+        "/orphaned-scenes/:ref/discard"
       );
-      const req = reqFor(handler, { params: { id: "scene-123" } });
+      const req = reqFor(handler, { params: { ref: ORPHAN_REF } });
       const res = resFor(handler);
       await handler(req, res, vi.fn());
 
@@ -428,36 +500,23 @@ describe("Merge Reconciliation Routes", () => {
   // ============================================================================
 
   describe("POST /reconcile-all handler", () => {
-    it("should reconcile all orphans with exact matches", async () => {
+    it("reconciles only the orphans with exactly one match, on their own instance", async () => {
       const mockOrphans: OrphanedSceneInfo[] = [
-        partialRow({ id: "orphan-1", phash: "abc123", title: "Scene 1" }),
-        partialRow({ id: "orphan-2", phash: "def456", title: "Scene 2" }),
-        partialRow({ id: "orphan-3", phash: null, title: "Scene 3" }), // No phash - will be skipped
+        partialRow({ id: "orphan-1", instanceId: "inst-b", phash: "abc123" }),
+        partialRow({ id: "orphan-2", instanceId: "inst-b", phash: "def456" }),
+        partialRow({ id: "orphan-3", instanceId: "inst-b", phash: null }), // No phash - will be skipped
       ];
 
       mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
 
-      // First orphan has exact match, second has no exact match
-      mockService.findPhashMatches.mockImplementation((id: string) => {
-        if (id === "orphan-1") {
-          return Promise.resolve([
-            {
-              sceneId: "target-1",
-              title: "Match 1",
-              similarity: "exact" as const,
-              recommended: true,
-            },
-          ]);
-        }
-        return Promise.resolve([
-          {
-            sceneId: "target-2",
-            title: "Match 2",
-            similarity: "similar" as const,
-            recommended: true,
-          },
-        ]);
-      });
+      // The first orphan has one match, the second two
+      mockService.findPhashMatches.mockImplementation((scene) =>
+        Promise.resolve(
+          scene.id === "orphan-1"
+            ? [match("target-1", true)]
+            : [match("target-2", true), match("target-3")]
+        )
+      );
 
       mockService.reconcileScene.mockResolvedValue({
         sourceSceneId: "orphan-1",
@@ -473,14 +532,16 @@ describe("Merge Reconciliation Routes", () => {
       expect(res.json).toHaveBeenCalledWith({
         ok: true,
         reconciled: 1,
-        skipped: 2, // orphan-2 (no exact) + orphan-3 (no phash)
+        skipped: 2, // orphan-2 (two matches) + orphan-3 (no phash)
       });
-
-      // Verify reconcileScene was called only for exact match
+      expect(mockService.findPhashMatches).toHaveBeenCalledWith({
+        id: "orphan-1",
+        instanceId: "inst-b",
+      });
       expect(mockService.reconcileScene).toHaveBeenCalledTimes(1);
       expect(mockService.reconcileScene).toHaveBeenCalledWith(
-        "orphan-1",
-        "target-1",
+        { id: "orphan-1", instanceId: "inst-b" },
+        { id: "target-1", instanceId: "inst-b" },
         "abc123",
         1
       );
@@ -500,20 +561,13 @@ describe("Merge Reconciliation Routes", () => {
       });
     });
 
-    it("should skip all when no exact matches found", async () => {
+    it("skips an orphan without any match", async () => {
       const mockOrphans: OrphanedSceneInfo[] = [
-        partialRow({ id: "orphan-1", phash: "abc123", title: "Scene 1" }),
+        partialRow({ id: "orphan-1", instanceId: "inst-b", phash: "abc123" }),
       ];
 
       mockService.findOrphanedScenesWithActivity.mockResolvedValue(mockOrphans);
-      mockService.findPhashMatches.mockResolvedValue([
-        {
-          sceneId: "target-1",
-          title: "Similar",
-          similarity: "similar" as const,
-          recommended: true,
-        },
-      ]);
+      mockService.findPhashMatches.mockResolvedValue([]);
 
       const handler = await routeHandler("post", "/reconcile-all");
       const res = resFor(handler);

@@ -1554,6 +1554,10 @@ class StashSyncService extends EventEmitter {
    *
    * Fetches all entity IDs from Stash using pagination and soft-deletes any
    * entities in Peek that are not present in Stash (due to deletion or merge).
+   * For scenes it then moves user data from merged scenes to their survivors
+   * (MergeReconciliationService.reconcileDeletedScenes), after first
+   * catching up on scenes an earlier cleanup soft-deleted but did not
+   * reconcile.
    */
   private async cleanupDeletedEntities(
     entityType: EntityType,
@@ -1568,6 +1572,13 @@ class StashSyncService extends EventEmitter {
     const CLEANUP_PAGE_SIZE = 5000;
 
     try {
+      // Merges a cleanup soft-deleted but stopped before reconciling
+      if (entityType === "scene") {
+        await mergeReconciliationService.reconcileRecentDeletions(
+          stashInstanceId
+        );
+      }
+
       // Fetch all IDs from Stash using pagination
       const stashIds: string[] = [];
       let page = 1;
@@ -1783,28 +1794,9 @@ class StashSyncService extends EventEmitter {
               return 0;
             }
 
-            // Check for merges and reconcile user data before soft-deleting
-            for (const scene of scenesToDelete) {
-              if (scene.phash) {
-                // Try to find a merge target
-                const matches =
-                  await mergeReconciliationService.findPhashMatches(scene.id);
-                if (matches.length > 0) {
-                  const target = matches[0] as (typeof matches)[number]; // Use the recommended match
-                  logger.info(
-                    `Detected merge: scene ${scene.id} -> ${target.sceneId}`
-                  );
-                  await mergeReconciliationService.reconcileScene(
-                    scene.id,
-                    target.sceneId,
-                    scene.phash,
-                    null // automatic
-                  );
-                }
-              }
-            }
-
-            // Soft-delete in batches
+            // Soft-delete in batches, then look for merges: scenes that
+            // left Stash together are deleted by then, so none becomes
+            // another's merge target
             const deleteIds = scenesToDelete.map((s) => s.id);
             const instanceId = stashInstanceId;
             for (let i = 0; i < deleteIds.length; i += sceneBatchSize) {
@@ -1815,6 +1807,11 @@ class StashSyncService extends EventEmitter {
               });
             }
             deletedCount = deleteIds.length;
+
+            await mergeReconciliationService.reconcileDeletedScenes(
+              stashInstanceId,
+              scenesToDelete
+            );
           }
           // Note: the _stash_scene_ids temp table is created and dropped inside the
           // transaction above, so there is nothing to clean up here.
