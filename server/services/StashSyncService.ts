@@ -2583,15 +2583,15 @@ class StashSyncService extends EventEmitter {
    * - images written, even unchanged (their junction rows were rewritten
    *   from Stash), re-apply gallery inheritance, as do changed galleries;
    * - nothing changed and no user holds `pending` rows: no other step runs;
-   * - scenes changed, or a performer's, studio's or group's tag set:
-   *   scene tag inheritance;
+   * - scene tag inheritance for the scenes the changes reach
+   *   (`sceneTagInheritanceScope`), when there are any;
    * - any change: the image counts, user stats and tag counts, then the
    *   exclusion recompute of the users who can see a changed instance,
    *   plus those with pending holds.
-   * Inheritance and the counts are whole library still (C4 and C5 scope
-   * them to the change set); user stats and tag counts stay whole library
-   * (1.3 s and 0.04 s on the prod copy, and the stats depend on watch
-   * history as well as the library).
+   * Gallery inheritance and the image counts are whole library still (C5
+   * scopes them to the change set); user stats and tag counts stay whole
+   * library (1.3 s and 0.04 s on the prod copy, and the stats depend on
+   * watch history as well as the library).
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
@@ -2634,11 +2634,9 @@ class StashSyncService extends EventEmitter {
           await exclusionComputationService.recomputeUsersForInstances([]);
         }
       } else {
-        const tagSetChanged = (["performer", "studio", "group"] as const).some(
-          (type) => !changes.tagSetChanged(type).isEmpty()
-        );
-        if (!changes.changed("scene").isEmpty() || tagSetChanged) {
-          await this.computeSceneTagInheritance();
+        const scope = await this.sceneTagInheritanceScope(changes);
+        if (scope === "all" || scope.length > 0) {
+          await this.computeSceneTagInheritance(scope);
         }
         await this.rebuildCounts();
         const instances = changes.instances();
@@ -2655,11 +2653,58 @@ class StashSyncService extends EventEmitter {
     // D8: PRAGMA optimize goes here, at the end of every run's steps
   }
 
-  /** Scene tag inheritance, whole library (after scenes, performers, studios and groups). */
-  private async computeSceneTagInheritance(): Promise<void> {
-    logger.info("Computing inherited tags for scenes...");
-    await sceneTagInheritanceService.computeInheritedTags();
+  /**
+   * Scene tag inheritance for `scope`, every live scene by default (after
+   * scenes, performers, studios and groups).
+   */
+  private async computeSceneTagInheritance(
+    scope: EntityRef[] | "all" = "all"
+  ): Promise<void> {
+    logger.info(
+      scope === "all"
+        ? "Computing inherited tags for scenes..."
+        : `Computing inherited tags for ${scope.length} scenes...`
+    );
+    await sceneTagInheritanceService.computeInheritedTags(scope);
     logger.info("Scene tag inheritance complete");
+  }
+
+  /**
+   * The scenes whose inherited tags a run's changes reach: the changed
+   * scenes, and the scenes of every performer, studio and group whose tag
+   * set changed or that was soft-deleted (one statement per source type).
+   * "all" when one of those kinds is past the change set's limit; empty
+   * when the changes reach no scene.
+   */
+  private async sceneTagInheritanceScope(
+    changes: SyncChangeSet
+  ): Promise<EntityRef[] | "all"> {
+    const scenes = changes.changed("scene");
+    const sources = (["performer", "studio", "group"] as const).map((type) => ({
+      type,
+      scopes: [changes.tagSetChanged(type), changes.deleted(type)],
+    }));
+    if (
+      scenes.whole ||
+      sources.some(({ scopes }) => scopes.some((scope) => scope.whole))
+    ) {
+      return "all";
+    }
+
+    // Each scene once, however many of its sources changed
+    const byKey = new Map<string, EntityRef>();
+    const add = (refs: readonly EntityRef[]) => {
+      for (const ref of refs) byKey.set(`${ref.id}\0${ref.instanceId}`, ref);
+    };
+    add(scenes.refs);
+    for (const { type, scopes } of sources) {
+      const sourceRefs = scopes.flatMap((scope) => scope.refs);
+      if (sourceRefs.length === 0) continue;
+      add(
+        await sceneTagInheritanceService.scenesInheritingFrom(type, sourceRefs)
+      );
+    }
+    return Array.from(byKey.values());
   }
 
   /** Gallery inheritance, whole library (after images and galleries). */

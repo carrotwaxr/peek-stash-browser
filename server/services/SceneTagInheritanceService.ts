@@ -1,6 +1,51 @@
 import prisma from "../prisma/singleton.js";
 import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
+import type { EntityRef } from "./SyncChangeSet.js";
+
+/** Scenes per batch: one read of their sources and one UPDATE (a dbWrite unit). */
+const BATCH_SIZE = 500;
+
+/** A scene as the batch reads it. */
+interface SceneRow {
+  id: string;
+  stashInstanceId: string;
+  studioId: string | null;
+}
+
+/** An entity whose tags its scenes inherit. */
+export type InheritanceSource = "performer" | "studio" | "group";
+
+/**
+ * The scenes of a batch of sources, one statement per source type, driving
+ * from the bound (id, instance) pairs: `CROSS JOIN` keeps `json_each` as the
+ * outer loop, so each pair searches the junction's reverse index (the
+ * studio's by `studioId`; the `+` keeps the planner off the instance index,
+ * which matches every scene of the instance).
+ */
+const SCENES_OF: Record<InheritanceSource, string> = {
+  performer: `SELECT DISTINCT sp.sceneId AS id, sp.sceneInstanceId AS instanceId
+FROM json_each(?) j
+CROSS JOIN ScenePerformer sp ON sp.performerId = json_extract(j.value, '$[0]') AND sp.performerInstanceId = json_extract(j.value, '$[1]')`,
+  studio: `SELECT s.id AS id, s.stashInstanceId AS instanceId
+FROM json_each(?) j
+CROSS JOIN StashScene s ON s.studioId = json_extract(j.value, '$[0]') AND +s.stashInstanceId = json_extract(j.value, '$[1]')
+WHERE s.deletedAt IS NULL`,
+  group: `SELECT DISTINCT sg.sceneId AS id, sg.sceneInstanceId AS instanceId
+FROM json_each(?) j
+CROSS JOIN SceneGroup sg ON sg.groupId = json_extract(j.value, '$[0]') AND sg.groupInstanceId = json_extract(j.value, '$[1]')`,
+};
+
+/** Refs as one JSON parameter of [id, instanceId] pairs. */
+const pairsJson = (refs: readonly EntityRef[]): string =>
+  JSON.stringify(refs.map((ref) => [ref.id, ref.instanceId]));
+
+/** Refs without duplicates, keyed as the in-memory maps are. */
+function distinctRefs(refs: readonly EntityRef[]): EntityRef[] {
+  const byKey = new Map<string, EntityRef>();
+  for (const ref of refs) byKey.set(`${ref.id}\0${ref.instanceId}`, ref);
+  return Array.from(byKey.values());
+}
 
 /**
  * SceneTagInheritanceService
@@ -18,33 +63,49 @@ import { logger } from "../utils/logger.js";
  * - Tags are deduplicated across all sources
  * - Stored as JSON array for efficient querying
  * - Multi-instance aware: uses composite keys (id:instanceId) to prevent cross-instance contamination
+ * - Scoped: a sync recomputes only the scenes its change set reaches (see
+ *   `scenesInheritingFrom`); a full sync, or a scope past the change set's
+ *   limit, recomputes every live scene
  */
 class SceneTagInheritanceService {
-  async computeInheritedTags(): Promise<void> {
+  /**
+   * Recompute `inheritedTagIds` for `scope`: every live scene ("all", the
+   * default), or the live scenes among the given refs (soft-deleted and
+   * unknown refs are skipped), 500 at a time.
+   */
+  async computeInheritedTags(
+    scope: readonly EntityRef[] | "all" = "all"
+  ): Promise<void> {
     const startTime = Date.now();
 
     try {
-      const scenes = await prisma.stashScene.findMany({
-        where: { deletedAt: null },
-        select: { id: true, stashInstanceId: true, studioId: true },
-      });
+      let sceneCount = 0;
+      if (scope === "all") {
+        const scenes = await prisma.stashScene.findMany({
+          where: { deletedAt: null },
+          select: { id: true, stashInstanceId: true, studioId: true },
+        });
+        for (let i = 0; i < scenes.length; i += BATCH_SIZE) {
+          const batch = scenes.slice(i, i + BATCH_SIZE);
+          await this.processBatch(batch);
+          sceneCount += batch.length;
 
-      const BATCH_SIZE = 500;
-      let processedCount = 0;
-
-      for (let i = 0; i < scenes.length; i += BATCH_SIZE) {
-        const batch = scenes.slice(i, i + BATCH_SIZE);
-        await this.processBatch(batch);
-        processedCount += batch.length;
-
-        if (processedCount % 1000 === 0) {
-          logger.info(`Processed ${processedCount}/${scenes.length} scenes`);
+          if (sceneCount % 1000 === 0) {
+            logger.info(`Processed ${sceneCount}/${scenes.length} scenes`);
+          }
+        }
+      } else {
+        const refs = distinctRefs(scope);
+        for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+          const batch = await this.liveScenes(refs.slice(i, i + BATCH_SIZE));
+          if (batch.length > 0) await this.processBatch(batch);
+          sceneCount += batch.length;
         }
       }
 
       const duration = Date.now() - startTime;
       logger.info(
-        `Scene tag inheritance computed in ${duration}ms for ${scenes.length} scenes`
+        `Scene tag inheritance computed in ${duration}ms for ${sceneCount} scenes${scope === "all" ? "" : " (scoped)"}`
       );
     } catch (error) {
       logger.error("Failed to compute scene tag inheritance", {
@@ -54,9 +115,33 @@ class SceneTagInheritanceService {
     }
   }
 
-  private async processBatch(
-    scenes: { id: string; stashInstanceId: string; studioId: string | null }[]
-  ): Promise<void> {
+  /**
+   * The scenes that inherit from these performers, studios or groups. Some
+   * may be soft-deleted; `computeInheritedTags` skips those.
+   */
+  async scenesInheritingFrom(
+    source: InheritanceSource,
+    refs: readonly EntityRef[]
+  ): Promise<EntityRef[]> {
+    if (refs.length === 0) return [];
+    return prisma.$queryRawUnsafe<EntityRef[]>(
+      SCENES_OF[source],
+      pairsJson(refs)
+    );
+  }
+
+  /** The live scenes among `refs`, each looked up by its primary key. */
+  private async liveScenes(refs: readonly EntityRef[]): Promise<SceneRow[]> {
+    return prisma.$queryRawUnsafe<SceneRow[]>(
+      `SELECT s.id AS id, s.stashInstanceId AS stashInstanceId, s.studioId AS studioId
+FROM json_each(?) j
+CROSS JOIN StashScene s ON s.id = json_extract(j.value, '$[0]') AND s.stashInstanceId = json_extract(j.value, '$[1]')
+WHERE s.deletedAt IS NULL`,
+      pairsJson(refs)
+    );
+  }
+
+  private async processBatch(scenes: SceneRow[]): Promise<void> {
     const sceneIds = scenes.map((s) => s.id);
     const sceneInstanceIds = [...new Set(scenes.map((s) => s.stashInstanceId))];
 

@@ -7,7 +7,7 @@ import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceSe
 function inheritedTagIdsOf(
   scene: { inheritedTagIds: string | null } | null
 ): string[] {
-  return z.array(z.string()).parse(JSON.parse(scene?.inheritedTagIds || "[]"));
+  return z.array(z.string()).parse(JSON.parse(scene?.inheritedTagIds ?? "[]"));
 }
 
 describe("SceneTagInheritanceService", () => {
@@ -468,6 +468,161 @@ describe("SceneTagInheritanceService", () => {
         where: { id: sceneId, stashInstanceId: INSTANCE_ID },
       });
       expect(inheritedTagIdsOf(scene)).toEqual([`${PREFIX}tag-1`]);
+    });
+  });
+
+  describe("scoped to a sync's changes", () => {
+    const INSTANCE_B = "test-instance-sti-b";
+    const STALE = JSON.stringify(["stale"]);
+
+    /** On each instance: a tagged performer, studio and group, each on its own scene. */
+    async function seedSources(): Promise<void> {
+      for (const instanceId of [INSTANCE_ID, INSTANCE_B]) {
+        const on = { stashInstanceId: instanceId };
+        await prisma.stashTag.create({
+          data: { id: `${PREFIX}tag-1`, ...on, name: "Tag" },
+        });
+        await prisma.stashPerformer.create({
+          data: { id: `${PREFIX}performer-1`, ...on, name: "Performer" },
+        });
+        await prisma.stashStudio.create({
+          data: { id: `${PREFIX}studio-1`, ...on, name: "Studio" },
+        });
+        await prisma.stashGroup.create({
+          data: { id: `${PREFIX}group-1`, ...on, name: "Group" },
+        });
+        await prisma.stashScene.createMany({
+          data: [
+            { id: `${PREFIX}scene-p`, ...on, inheritedTagIds: STALE },
+            { id: `${PREFIX}scene-p2`, ...on, inheritedTagIds: STALE },
+            {
+              id: `${PREFIX}scene-gone`,
+              ...on,
+              inheritedTagIds: STALE,
+              deletedAt: new Date(),
+            },
+            {
+              id: `${PREFIX}scene-s`,
+              ...on,
+              studioId: `${PREFIX}studio-1`,
+              inheritedTagIds: STALE,
+            },
+            { id: `${PREFIX}scene-g`, ...on, inheritedTagIds: STALE },
+          ],
+        });
+        const tag = { tagId: `${PREFIX}tag-1`, tagInstanceId: instanceId };
+        await prisma.performerTag.create({
+          data: {
+            performerId: `${PREFIX}performer-1`,
+            performerInstanceId: instanceId,
+            ...tag,
+          },
+        });
+        await prisma.studioTag.create({
+          data: {
+            studioId: `${PREFIX}studio-1`,
+            studioInstanceId: instanceId,
+            ...tag,
+          },
+        });
+        await prisma.groupTag.create({
+          data: {
+            groupId: `${PREFIX}group-1`,
+            groupInstanceId: instanceId,
+            ...tag,
+          },
+        });
+        await prisma.scenePerformer.createMany({
+          data: ["scene-p", "scene-p2", "scene-gone"].map((scene) => ({
+            sceneId: `${PREFIX}${scene}`,
+            sceneInstanceId: instanceId,
+            performerId: `${PREFIX}performer-1`,
+            performerInstanceId: instanceId,
+          })),
+        });
+        await prisma.sceneGroup.create({
+          data: {
+            sceneId: `${PREFIX}scene-g`,
+            sceneInstanceId: instanceId,
+            groupId: `${PREFIX}group-1`,
+            groupInstanceId: instanceId,
+          },
+        });
+      }
+    }
+
+    async function storedTags(
+      scene: string,
+      instanceId: string
+    ): Promise<string[]> {
+      return inheritedTagIdsOf(
+        await prisma.stashScene.findFirst({
+          where: { id: `${PREFIX}${scene}`, stashInstanceId: instanceId },
+        })
+      );
+    }
+
+    it("recomputes only the live scenes it lists", async () => {
+      await seedSources();
+      const ref = (scene: string) => ({
+        id: `${PREFIX}${scene}`,
+        instanceId: INSTANCE_ID,
+      });
+
+      await sceneTagInheritanceService.computeInheritedTags([
+        ref("scene-p"),
+        ref("scene-p"),
+        ref("scene-gone"),
+        ref("scene-unknown"),
+      ]);
+
+      expect(await storedTags("scene-p", INSTANCE_ID)).toEqual([
+        `${PREFIX}tag-1`,
+      ]);
+      expect(await storedTags("scene-p2", INSTANCE_ID)).toEqual(["stale"]);
+      expect(await storedTags("scene-gone", INSTANCE_ID)).toEqual(["stale"]);
+      expect(await storedTags("scene-p", INSTANCE_B)).toEqual(["stale"]);
+    });
+
+    it("finds the scenes of performers, studios and groups on their own instance", async () => {
+      await seedSources();
+      const sceneKeys = (rows: Array<{ id: string; instanceId: string }>) =>
+        rows.map((r) => `${r.id}@${r.instanceId}`).sort();
+      const onA = (id: string) => [
+        { id: `${PREFIX}${id}`, instanceId: INSTANCE_ID },
+      ];
+
+      expect(
+        sceneKeys(
+          await sceneTagInheritanceService.scenesInheritingFrom(
+            "performer",
+            onA("performer-1")
+          )
+        )
+      ).toEqual(
+        ["scene-gone", "scene-p", "scene-p2"]
+          .map((scene) => `${PREFIX}${scene}@${INSTANCE_ID}`)
+          .sort()
+      );
+      expect(
+        sceneKeys(
+          await sceneTagInheritanceService.scenesInheritingFrom(
+            "studio",
+            onA("studio-1")
+          )
+        )
+      ).toEqual([`${PREFIX}scene-s@${INSTANCE_ID}`]);
+      expect(
+        sceneKeys(
+          await sceneTagInheritanceService.scenesInheritingFrom(
+            "group",
+            onA("group-1")
+          )
+        )
+      ).toEqual([`${PREFIX}scene-g@${INSTANCE_ID}`]);
+      expect(
+        await sceneTagInheritanceService.scenesInheritingFrom("studio", [])
+      ).toEqual([]);
     });
   });
 });
