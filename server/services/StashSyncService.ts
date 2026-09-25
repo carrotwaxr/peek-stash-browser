@@ -2875,10 +2875,6 @@ class StashSyncService extends EventEmitter {
     run: SyncRunContext
   ): Promise<number> {
     const stash = this.getStashClient(stashInstanceId);
-    // No change count for clips yet, so the startup smart sync skips them
-    // once they have synced; the scheduled incremental sync still runs them
-    if (entityType === "clip") return 0;
-
     try {
       const { count } = await ENTITY_SYNC[entityType].fetchPage(stash, {
         page: 1,
