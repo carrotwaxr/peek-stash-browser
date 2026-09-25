@@ -610,20 +610,14 @@ export const createStashInstance = async (
     // Reload the StashInstanceManager to pick up the new instance
     await stashInstanceManager.reload();
 
-    // Trigger sync for the new instance in background
-    if (enabled) {
-      logger.info("Triggering sync for new Stash instance...");
-      stashSyncService.fullSync(instance.id).catch((err: unknown) => {
-        logger.error("Failed to sync new Stash instance", {
-          instanceId: instance.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
+    // Sync the new instance in the background, once a running sync ends:
+    // the instance is saved, so refusing would only lose its sync
+    const sync = enabled ? stashSyncService.queueFullSync(instance.id) : "none";
 
     res.status(201).json({
       success: true,
       instance,
+      sync,
     });
   } catch (error) {
     logger.error("Failed to create Stash instance", { error });
@@ -732,22 +726,17 @@ export const updateStashInstance = async (
     // Reload the StashInstanceManager to pick up changes
     await stashInstanceManager.reload();
 
-    // If connection details changed, re-sync this instance to refresh cached data
-    if (connectionChanged && instance.enabled) {
-      logger.info(
-        "Connection details changed, triggering re-sync for instance..."
-      );
-      stashSyncService.fullSync(instance.id).catch((err: unknown) => {
-        logger.error("Failed to re-sync Stash instance after update", {
-          instanceId: instance.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
+    // If connection details changed, re-sync this instance to refresh cached
+    // data, once a running sync ends
+    const sync =
+      connectionChanged && instance.enabled
+        ? stashSyncService.queueFullSync(instance.id)
+        : "none";
 
     res.json({
       success: true,
       instance,
+      sync,
     });
   } catch (error) {
     logger.error("Failed to update Stash instance", { error });

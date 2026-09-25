@@ -159,6 +159,11 @@ export interface CreateStashInstanceRequest {
 export interface CreateStashInstanceResponse {
   success: true;
   instance: StashInstanceData;
+  /**
+   * The instance's first sync: "started", "queued" to start once the running
+   * sync ends, or "none" for a disabled instance
+   */
+  sync: "started" | "queued" | "none";
 }
 
 /**
@@ -182,6 +187,11 @@ export interface UpdateStashInstanceRequest {
 export interface UpdateStashInstanceResponse {
   success: true;
   instance: StashInstanceData;
+  /**
+   * The re-sync a new URL or API key needs: "started", "queued" to start once
+   * the running sync ends, or "none" (nothing to refetch, or disabled)
+   */
+  sync: "started" | "queued" | "none";
 }
 
 /**

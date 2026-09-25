@@ -11,6 +11,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, refreshCache } from "../../controllers/stats.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
+import { logger } from "../../utils/logger.js";
 import { reqFor, resFor } from "../helpers/controllerTestUtils.js";
 import { partialRow } from "../helpers/prismaMock.js";
 
@@ -42,6 +43,7 @@ vi.mock("fs", () => ({
 
 const mockEntityService = vi.mocked(stashEntityService);
 const mockSyncService = vi.mocked(stashSyncService);
+const mockLogger = vi.mocked(logger);
 const mockFsStat = vi.mocked(fs.stat);
 
 describe("Stats Controller", () => {
@@ -236,6 +238,43 @@ describe("Stats Controller", () => {
       expect(res._getBody()).toMatchObject({
         success: true,
         message: "Cache refresh initiated",
+      });
+    });
+
+    it("refreshCache answers 409 and starts nothing while a sync runs", () => {
+      mockSyncService.isSyncing.mockReturnValue(true);
+
+      const req = reqFor(refreshCache);
+      const res = resFor(refreshCache);
+
+      refreshCache(req, res);
+
+      expect(res._getStatus()).toBe(409);
+      expect(res._getBody()).toEqual({ error: "A sync is already running" });
+      expect(mockSyncService.fullSync).not.toHaveBeenCalled();
+    });
+
+    it("an admin's abort of the refresh logs Sync aborted at info, not a failure", async () => {
+      mockSyncService.fullSync.mockRejectedValue(new Error("Sync aborted"));
+
+      refreshCache(reqFor(refreshCache), resFor(refreshCache));
+
+      await vi.waitFor(() => {
+        expect(mockLogger.info).toHaveBeenCalledWith("Sync aborted", {});
+      });
+      expect(mockLogger.error).not.toHaveBeenCalled();
+    });
+
+    it("a refresh that fails logs the failure at error level", async () => {
+      mockSyncService.fullSync.mockRejectedValue(new Error("Stash is down"));
+
+      refreshCache(reqFor(refreshCache), resFor(refreshCache));
+
+      await vi.waitFor(() => {
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          "Background full sync failed",
+          { error: "Stash is down" }
+        );
       });
     });
 

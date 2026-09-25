@@ -11,6 +11,7 @@ import {
   CONNECTION_TEST_FAILED,
   createFirstAdmin,
   createFirstStashInstance,
+  createStashInstance,
   deleteStashInstance,
   getAllStashInstances,
   getSetupStatus,
@@ -78,6 +79,7 @@ vi.mock("../../services/StashSyncService.js", () => ({
   SyncBusyError,
   stashSyncService: {
     fullSync: vi.fn().mockResolvedValue(undefined),
+    queueFullSync: vi.fn(),
     deleteInstance: vi.fn(),
   },
 }));
@@ -494,6 +496,62 @@ describe("Setup Controller", () => {
     });
   });
 
+  describe("createStashInstance", () => {
+    const body = {
+      name: "Archive",
+      url: "http://archive:9999/graphql",
+      apiKey: "archive-key",
+    };
+
+    beforeEach(() => {
+      mockPrisma.stashInstance.create.mockResolvedValue(
+        partialRow({
+          id: "inst-new",
+          name: "Archive",
+          url: "http://archive:9999/graphql",
+          enabled: true,
+          priority: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      );
+    });
+
+    it("createStashInstance during a sync answers 201 with sync: queued", async () => {
+      mockSync.queueFullSync.mockReturnValue("queued");
+
+      const res = resFor(createStashInstance);
+      await createStashInstance(reqFor(createStashInstance, { body }), res);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res._getOkBody()).toMatchObject({ success: true, sync: "queued" });
+      expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith(
+        "inst-new"
+      );
+      expect(mockSync.fullSync).not.toHaveBeenCalled();
+    });
+
+    it("answers sync: started when no sync runs", async () => {
+      mockSync.queueFullSync.mockReturnValue("started");
+
+      const res = resFor(createStashInstance);
+      await createStashInstance(reqFor(createStashInstance, { body }), res);
+
+      expect(res._getOkBody().sync).toBe("started");
+    });
+
+    it("a disabled instance syncs nothing: sync: none", async () => {
+      const res = resFor(createStashInstance);
+      await createStashInstance(
+        reqFor(createStashInstance, { body: { ...body, enabled: false } }),
+        res
+      );
+
+      expect(res._getOkBody().sync).toBe("none");
+      expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getAllStashInstances", () => {
     it("returns instances ordered by priority", async () => {
       const instances: StashInstance[] = [
@@ -652,6 +710,64 @@ describe("Setup Controller", () => {
       );
 
       expect(res._getOkBody().success).toBe(true);
+    });
+
+    it("re-pointing an instance during a sync answers sync: queued", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://moved:9999/graphql",
+          enabled: true,
+        })
+      );
+      mockSync.queueFullSync.mockReturnValue("queued");
+
+      const res = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { url: "http://moved:9999/graphql" },
+          params: { id: "inst-a" },
+        }),
+        res
+      );
+
+      expect(res._getOkBody()).toMatchObject({ success: true, sync: "queued" });
+      expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith("inst-a");
+      expect(mockSync.fullSync).not.toHaveBeenCalled();
+    });
+
+    it("a rename syncs nothing: sync: none", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", name: "Renamed", enabled: true })
+      );
+
+      const res = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { name: "Renamed" },
+          params: { id: "inst-a" },
+        }),
+        res
+      );
+
+      expect(res._getOkBody().sync).toBe("none");
+      expect(mockSync.queueFullSync).not.toHaveBeenCalled();
     });
 
     it("returns 404 when instance not found", async () => {

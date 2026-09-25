@@ -11,6 +11,7 @@
  */
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { logSyncFailure } from "../utils/syncLog.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { type SyncProgress, stashSyncService } from "./StashSyncService.js";
 
@@ -153,9 +154,7 @@ class SyncScheduler {
     try {
       await stashSyncService.incrementalSync();
     } catch (error) {
-      logger.error("Manual incremental sync failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logSyncFailure("Manual incremental sync failed", error);
       throw error;
     }
   }
@@ -173,9 +172,7 @@ class SyncScheduler {
     try {
       await stashSyncService.fullSync();
     } catch (error) {
-      logger.error("Manual full sync failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logSyncFailure("Manual full sync failed", error);
       throw error;
     }
   }
@@ -218,9 +215,7 @@ class SyncScheduler {
           try {
             await stashSyncService.incrementalSync();
           } catch (error) {
-            logger.error("Scheduled sync failed", {
-              error: error instanceof Error ? error.message : String(error),
-            });
+            logSyncFailure("Scheduled sync failed", error);
           }
         })(),
       intervalMs
@@ -270,9 +265,7 @@ class SyncScheduler {
       try {
         await stashSyncService.fullSync();
       } catch (error) {
-        logger.error("Startup full sync failed", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        logSyncFailure("Startup full sync failed", error);
         // Don't throw - let the app continue, sync can be retried manually
       }
       return;
@@ -290,9 +283,7 @@ class SyncScheduler {
     try {
       await stashSyncService.smartIncrementalSync();
     } catch (error) {
-      logger.error("Startup smart incremental sync failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logSyncFailure("Startup smart incremental sync failed", error);
       // Don't throw - let the app continue
     }
   }

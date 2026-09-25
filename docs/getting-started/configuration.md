@@ -31,7 +31,7 @@ Peek can connect to **multiple Stash servers** simultaneously. This is useful wh
 3. Click **Test Connection** to validate
 4. Save the instance
 
-Peek automatically triggers a full sync for new instances in the background.
+Peek automatically triggers a full sync for new instances in the background. If a sync is already running, the new instance syncs right after it.
 
 ### Managing Instances
 

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import type { DeleteStashInstanceResponse } from "@peek/shared-types";
+import type {
+  CreateStashInstanceResponse,
+  DeleteStashInstanceResponse,
+  UpdateStashInstanceResponse,
+} from "@peek/shared-types";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../api";
 import { useAuth } from "../../hooks/useAuth";
-import { showError, showSuccess } from "../../utils/toast";
+import { showError, showInfo, showSuccess } from "../../utils/toast";
 import { Button, Paper } from "../ui/index";
 
 interface StashInstance {
@@ -182,6 +186,7 @@ const StashInstanceSection = () => {
       setSaving(true);
       setFormError(null);
 
+      let result: CreateStashInstanceResponse | UpdateStashInstanceResponse;
       if (editingInstance) {
         // Update existing instance
         const updateData: Record<string, unknown> = {
@@ -197,18 +202,31 @@ const StashInstanceSection = () => {
           updateData.apiKey = formData.apiKey;
         }
 
-        await apiPut(`/setup/stash-instance/${editingInstance.id}`, updateData);
+        result = await apiPut<UpdateStashInstanceResponse>(
+          `/setup/stash-instance/${editingInstance.id}`,
+          updateData
+        );
       } else {
         // Create new instance
-        await apiPost("/setup/stash-instance", {
-          name: formData.name,
-          description: formData.description || null,
-          url: formData.url,
-          uiUrl: formData.uiUrl || null,
-          apiKey: formData.apiKey,
-          enabled: formData.enabled,
-          priority: formData.priority,
-        });
+        result = await apiPost<CreateStashInstanceResponse>(
+          "/setup/stash-instance",
+          {
+            name: formData.name,
+            description: formData.description || null,
+            url: formData.url,
+            uiUrl: formData.uiUrl || null,
+            apiKey: formData.apiKey,
+            enabled: formData.enabled,
+            priority: formData.priority,
+          }
+        );
+      }
+
+      // The instance is saved; its sync waits for the running one
+      if (result.sync === "queued") {
+        showInfo(
+          `Saved. A sync is running; "${formData.name}" syncs right after it.`
+        );
       }
 
       await loadInstances();

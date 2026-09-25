@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../src/api/client";
 import StashInstanceSection from "../../../src/components/settings/StashInstanceSection";
 import { useAuth } from "../../../src/hooks/useAuth";
-import { showError, showSuccess } from "../../../src/utils/toast";
+import { showError, showInfo, showSuccess } from "../../../src/utils/toast";
 
 vi.mock("../../../src/utils/toast", () => ({
   showError: vi.fn(),
+  showInfo: vi.fn(),
   showSuccess: vi.fn(),
 }));
 
@@ -167,6 +168,63 @@ describe("StashInstanceSection", () => {
           priority: 1,
         });
       });
+    });
+
+    it("adding an instance while a sync runs says it will sync afterwards", async () => {
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+      mockApiPost.mockResolvedValue({
+        success: true,
+        instance: { ...mockInstance, id: "test-instance-2", name: "Archive" },
+        sync: "queued",
+      });
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getByText("Add Instance")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Add Instance"));
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Archive" },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://archive:9999/graphql" } }
+      );
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+
+      await waitFor(() => {
+        expect(showInfo).toHaveBeenCalledWith(
+          'Saved. A sync is running; "Archive" syncs right after it.'
+        );
+      });
+    });
+
+    it("adding an instance with no sync running says nothing more", async () => {
+      mockApiGet.mockResolvedValue({ instances: [mockInstance] });
+      mockApiPost.mockResolvedValue({
+        success: true,
+        instance: { ...mockInstance, id: "test-instance-2", name: "Archive" },
+        sync: "started",
+      });
+
+      render(<StashInstanceSection />);
+      await waitFor(() => {
+        expect(screen.getByText("Add Instance")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Add Instance"));
+      fireEvent.change(screen.getByPlaceholderText("My Stash Server"), {
+        target: { value: "Archive" },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("http://localhost:9999/graphql"),
+        { target: { value: "http://archive:9999/graphql" } }
+      );
+      fireEvent.click(screen.getByText("Add Instance", { selector: "button" }));
+
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledTimes(2);
+      });
+      expect(showInfo).not.toHaveBeenCalled();
     });
 
     it("shows delete button only when multiple instances exist", async () => {

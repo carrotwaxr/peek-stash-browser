@@ -87,7 +87,7 @@ export const showWarning = (message: string, options: ToastOptions = {}) => {
   );
 };
 
-const showInfo = (message: string, options: ToastOptions = {}) => {
+export const showInfo = (message: string, options: ToastOptions = {}) => {
   return toast.custom(
     (t) => (
       <InfoMessage

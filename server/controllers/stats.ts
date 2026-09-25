@@ -2,12 +2,14 @@ import { promises as fs } from "fs";
 import os from "os";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { stashSyncService } from "../services/StashSyncService.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedRequest, TypedResponse } from "../types/api/express.js";
 import type {
   GetStatsResponse,
   RefreshCacheResponse,
 } from "../types/api/stats.js";
 import { logger } from "../utils/logger.js";
+import { logSyncFailure } from "../utils/syncLog.js";
 
 /**
  * Get comprehensive server statistics
@@ -218,19 +220,24 @@ function formatUptime(seconds: number): string {
 
 /**
  * Manually refresh the Stash cache
- * Admin-only endpoint to trigger cache refresh on demand
+ * Admin-only endpoint to trigger cache refresh on demand. While a sync (or an
+ * instance deletion) runs it answers 409 and starts nothing, as
+ * /api/sync/trigger does: the admin clicked, so they hear that it did not start.
  */
 export const refreshCache = (
   _req: TypedRequest,
-  res: TypedResponse<RefreshCacheResponse>
+  res: TypedResponse<RefreshCacheResponse | ApiErrorResponse>
 ) => {
   try {
+    if (stashSyncService.isSyncing()) {
+      res.status(409).json({ error: "A sync is already running" });
+      return;
+    }
+
     logger.info("Manual cache refresh triggered by admin");
     // Trigger a full sync (non-blocking - runs in background)
     stashSyncService.fullSync().catch((err: unknown) => {
-      logger.error("Background full sync failed", {
-        error: (err as Error).message,
-      });
+      logSyncFailure("Background full sync failed", err);
     });
 
     res.json({
