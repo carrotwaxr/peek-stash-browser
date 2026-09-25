@@ -14,7 +14,10 @@ import type { FindSceneMarkersQuery } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  SyncBusyError,
+  stashSyncService,
+} from "../../services/StashSyncService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { stringContaining } from "../helpers/matchers.js";
@@ -554,6 +557,51 @@ describe("StashSyncService.cleanupDeletedEntities", () => {
         expect(outcome.skipped !== undefined).toBe(refused);
       }
     );
+
+    it("with ignoreRatioGuard, soft-deletes what the ratio guard refuses", async () => {
+      stashHas("scene", ids(1, 40));
+      cacheHas(
+        120,
+        ids(41, 120).map((id) => ({ id, phash: null }))
+      );
+
+      const outcome = await stashSyncService["cleanupDeletedEntities"](
+        "scene",
+        INSTANCE,
+        { ignoreRatioGuard: true }
+      );
+
+      expect(outcome).toEqual({
+        deleted: 80,
+        deletedIds: ids(41, 120),
+        stashIds: ids(1, 40),
+      });
+      expect(mockReconcile.reconcileDeletedScenes).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      { what: "a partial list", keepSet: ids(1, 100), count: 120 },
+      { what: "an empty list", keepSet: [], count: 0 },
+    ])(
+      "with ignoreRatioGuard, still skips $what",
+      async ({ keepSet, count }) => {
+        stashHas("performer", keepSet, count);
+        cacheHas(120, []);
+
+        const outcome = await stashSyncService["cleanupDeletedEntities"](
+          "performer",
+          INSTANCE,
+          { ignoreRatioGuard: true }
+        );
+
+        expect(outcome).toEqual({
+          deleted: 0,
+          deletedIds: [],
+          skipped: stringContaining("Cleanup skipped:"),
+        });
+        expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe("errors", () => {
@@ -618,5 +666,112 @@ describe("StashSyncService.cleanupDeletedEntities", () => {
         error: "disk I/O error",
       });
     });
+  });
+});
+
+describe("StashSyncService.runCleanup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(stashInstanceManager.get).mockReturnValue(
+      partialRow<StashClient>(client)
+    );
+    client.withSignal.mockReturnValue(partialRow<StashClient>(client));
+    mockReconcile.reconcileDeletedScenes.mockResolvedValue({
+      merged: 0,
+      ambiguous: 0,
+    });
+    mockReconcile.reconcileRecentDeletions.mockResolvedValue({
+      merged: 0,
+      ambiguous: 0,
+    });
+    mockPrisma.syncState.updateMany.mockResolvedValue({ count: 1 });
+    cacheHas(0, []);
+  });
+
+  it("applies a refused deletion and clears the type's lastError", async () => {
+    stashHas("scene", ids(1, 40));
+    cacheHas(
+      120,
+      ids(41, 120).map((id) => ({ id, phash: null }))
+    );
+
+    const outcome = await stashSyncService.runCleanup("scene", INSTANCE, {
+      ignoreRatioGuard: true,
+    });
+
+    expect(outcome.deleted).toBe(80);
+    expect(mockPrisma.syncState.updateMany.mock.calls).toEqual([
+      [
+        {
+          where: { stashInstanceId: INSTANCE, entityType: "scene" },
+          data: { lastError: null },
+        },
+      ],
+    ]);
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("records a skip in the type's lastError", async () => {
+    stashHas("tag", ids(1, 100), 120);
+    cacheHas(120, []);
+
+    await stashSyncService.runCleanup("tag", INSTANCE, {
+      ignoreRatioGuard: true,
+    });
+
+    expect(mockPrisma.syncState.updateMany.mock.calls).toEqual([
+      [
+        {
+          where: { stashInstanceId: INSTANCE, entityType: "tag" },
+          data: {
+            lastError: stringContaining(
+              "Cleanup skipped: Stash returned 100 of 120 tags"
+            ),
+          },
+        },
+      ],
+    ]);
+  });
+
+  it("holds the lock while it runs: a sync or a second cleanup is refused", async () => {
+    let answer: () => void = () => {};
+    client.findTagIDs.mockReturnValue(
+      new Promise((resolve) => {
+        answer = () => resolve({ findTags: { count: 1, tags: [{ id: "1" }] } });
+      })
+    );
+
+    const running = stashSyncService.runCleanup("tag", INSTANCE, {
+      ignoreRatioGuard: true,
+    });
+
+    expect(stashSyncService.isSyncing()).toBe(true);
+    expect(() =>
+      stashSyncService.runCleanup("scene", INSTANCE, { ignoreRatioGuard: true })
+    ).toThrow(SyncBusyError);
+    await expect(stashSyncService.fullSync(INSTANCE)).rejects.toThrow(
+      SyncBusyError
+    );
+    // Stash is asked once the lock is taken
+    await vi.waitFor(() => {
+      expect(client.findTagIDs).toHaveBeenCalled();
+    });
+    answer();
+    await running;
+    expect(stashSyncService.isSyncing()).toBe(false);
+  });
+
+  it("an abort rejects with `Sync aborted`, records nothing and frees the lock", async () => {
+    client.findImageIDs.mockImplementation(() => {
+      stashSyncService.abort();
+      return Promise.reject(new Error("Sync aborted"));
+    });
+
+    await expect(
+      stashSyncService.runCleanup("image", INSTANCE, { ignoreRatioGuard: true })
+    ).rejects.toThrow("Sync aborted");
+
+    expect(mockPrisma.syncState.updateMany).not.toHaveBeenCalled();
+    expect(stashSyncService.isSyncing()).toBe(false);
   });
 });

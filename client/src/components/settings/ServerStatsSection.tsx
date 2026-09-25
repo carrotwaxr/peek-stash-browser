@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Clock, Cpu, Database, Film, HardDrive, RefreshCw } from "lucide-react";
 import { apiGet, apiPost } from "../../api";
+import { ApiError } from "../../api/client";
 import { useAuth } from "../../hooks/useAuth";
-import { Button, Paper } from "../ui/index";
+import { useVisibleInterval } from "../../hooks/useVisibleInterval";
+import { showError, showSuccess } from "../../utils/toast";
+import { Button, ConfirmDialog, Paper } from "../ui/index";
 
 interface CacheCounts {
   scenes: number;
@@ -42,38 +45,66 @@ type ReprobeResult =
   | { success: true; checked: number; updated: number }
   | { success: false; message: string };
 
-const ServerStatsSection = () => {
+interface Props {
+  /**
+   * Called when a sync starts: this section's Full Sync, or one its poll
+   * sees begin (a scheduled sync, say), so the sync status can follow it.
+   */
+  onSyncStarted?: () => void;
+}
+
+const ServerStatsSection = ({ onSyncStarted }: Props) => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const [stats, setStats] = useState<ServerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingCache, setRefreshingCache] = useState(false);
+  const [confirmingFullSync, setConfirmingFullSync] = useState(false);
+  // Whether the last poll saw a sync running (null before the first one)
+  const wasSyncing = useRef<boolean | null>(null);
+  const syncStarted = useRef(onSyncStarted);
+  useEffect(() => {
+    syncStarted.current = onSyncStarted;
+  }, [onSyncStarted]);
   const [reprobingClips, setReprobingClips] = useState(false);
   const [reprobeResult, setReprobeResult] = useState<ReprobeResult | null>(
     null
   );
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const data = await apiGet<ServerStats>("/stats");
       setStats(data);
+      const syncing = data.cache?.isRefreshing ?? false;
+      if (syncing && wasSyncing.current === false) syncStarted.current?.();
+      wasSyncing.current = syncing;
     } catch (err) {
       console.error("Failed to load server stats:", err);
       // Silently fail - stats are not critical
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
+  /** Full Sync, once the admin confirmed it */
   const refreshCache = async () => {
+    setConfirmingFullSync(false);
     try {
       setRefreshingCache(true);
       await apiPost("/stats/refresh-cache");
+      // Started here: the next poll's running sync is no news
+      wasSyncing.current = true;
+      syncStarted.current?.();
+      showSuccess("Full sync started");
       // Wait a moment then reload stats to show refreshing status
       setTimeout(() => void loadStats(), 500);
     } catch (err) {
-      console.error("Failed to refresh cache:", err);
-      // Silently fail - will show error in console
+      if (err instanceof ApiError && err.status === 409) {
+        showError("A sync is already running");
+      } else {
+        console.error("Failed to start a full sync:", err);
+        showError("Failed to start a full sync");
+      }
     } finally {
       setRefreshingCache(false);
     }
@@ -107,10 +138,9 @@ const ServerStatsSection = () => {
 
   useEffect(() => {
     void loadStats();
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(() => void loadStats(), 10000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [loadStats]);
+  // Auto-refresh every 10 seconds while the page is visible
+  useVisibleInterval(() => void loadStats(), 10_000);
 
   if (loading && !stats) {
     return null; // Don't show anything while initial load
@@ -185,7 +215,7 @@ const ServerStatsSection = () => {
               Library Statistics
             </h3>
             <Button
-              onClick={() => void refreshCache()}
+              onClick={() => setConfirmingFullSync(true)}
               disabled={refreshingCache || stats.cache?.isRefreshing}
               variant="secondary"
               size="sm"
@@ -346,6 +376,16 @@ const ServerStatsSection = () => {
         )}
 
         <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
+
+        <ConfirmDialog
+          isOpen={confirmingFullSync}
+          title="Start a full sync?"
+          message="Peek fetches every item from every Stash instance again, then recomputes each user's content restrictions. On a large library this takes a while. The scheduled syncs already pick up changes, so a full sync is only needed when something looks out of date."
+          confirmText="Start Full Sync"
+          confirmStyle="primary"
+          onConfirm={() => void refreshCache()}
+          onClose={() => setConfirmingFullSync(false)}
+        />
 
         {/* Database */}
         <div className="mb-6">
