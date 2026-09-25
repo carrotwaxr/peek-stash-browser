@@ -15,6 +15,7 @@ import {
   ENTITY_SYNC,
   type SyncEntityOf,
 } from "../../services/StashSyncService.js";
+import { SyncChangeSet } from "../../services/SyncChangeSet.js";
 import { must } from "../../tests/helpers/must.js";
 import { untrusted } from "../../tests/helpers/untrusted.js";
 
@@ -95,6 +96,7 @@ const scene: SyncScene = {
 async function syncScene(): Promise<void> {
   await ENTITY_SYNC.scene.processBatch([scene], TEST_INSTANCE, {
     signal: new AbortController().signal,
+    changes: new SyncChangeSet(),
   });
 }
 

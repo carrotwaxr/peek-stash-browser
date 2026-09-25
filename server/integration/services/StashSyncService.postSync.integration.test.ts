@@ -1,0 +1,857 @@
+/**
+ * Integration tests for the post-sync steps (item 42): they run once per
+ * sync after every instance, only for what changed, and the exclusion
+ * recompute covers the users who can see a changed instance.
+ *
+ * Two made-up instances, pc-a and pc-b, hold the same library (a tag, a
+ * performer, a gallery with both, an image in the gallery whose performer
+ * and tag rows are gallery-inherited, a scene, a clip), each with a stub
+ * Stash client that answers from a small in-memory library, so the real
+ * sync runs against the real test database. The post-step services are
+ * spied on; gallery inheritance runs for real so its rows can be checked.
+ */
+import {
+  type MockInstance,
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import type { StashClient } from "../../graphql/StashClient.js";
+import type {
+  FindFilterType,
+  FindGalleriesQuery,
+  FindImagesQuery,
+  FindPerformersQuery,
+  FindSceneMarkersQuery,
+  FindScenesCompactQuery,
+  FindTagsQuery,
+} from "../../graphql/generated/graphql.js";
+import prisma from "../../prisma/singleton.js";
+import { clipPreviewProber } from "../../services/ClipPreviewProber.js";
+import { entityImageCountService } from "../../services/EntityImageCountService.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
+import { must } from "../../tests/helpers/must.js";
+import { partialRow } from "../../tests/helpers/prismaMock.js";
+import { logger } from "../../utils/logger.js";
+import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { createApiUser } from "../helpers/accessFixture.js";
+import { UNREACHABLE_STASH_URL } from "../helpers/stashTarget.js";
+import { adminClient } from "../helpers/testClient.js";
+
+// Skip if no database connection (matches other integration tests).
+const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+// Made-up instances: no real Stash, so background sync never touches them.
+const PC_A = "postsync-it-a";
+const PC_B = "postsync-it-b";
+const INSTANCES = [PC_A, PC_B];
+const ID = "1";
+const CREATED_AT = "2026-01-01T00:00:00-08:00";
+const UPDATED_AT = "2026-01-02T03:04:05-08:00";
+const LATER_AT = "2026-01-03T00:00:00-08:00";
+
+/** The test's users: no selection, pc-b only, both. */
+const USERS = {
+  all: "postsync_it_all",
+  b: "postsync_it_b",
+  ab: "postsync_it_ab",
+  api: "postsync_it_api",
+} as const;
+const API_PASSWORD = "PostSync-IT-password-1";
+
+/** Every cached table of an instance, a clip before its scene and tag. */
+const TABLES = [
+  "StashClip",
+  "StashImage",
+  "StashGallery",
+  "StashScene",
+  "StashGroup",
+  "StashPerformer",
+  "StashStudio",
+  "StashTag",
+] as const;
+
+const SYNC_TYPES = [
+  "tag",
+  "studio",
+  "performer",
+  "group",
+  "gallery",
+  "scene",
+  "clip",
+  "image",
+] as const;
+
+type SyncTag = FindTagsQuery["findTags"]["tags"][number];
+type SyncPerformer =
+  FindPerformersQuery["findPerformers"]["performers"][number];
+type SyncGallery = FindGalleriesQuery["findGalleries"]["galleries"][number];
+type SyncScene = FindScenesCompactQuery["findScenes"]["scenes"][number];
+type SyncClip =
+  FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
+type SyncImage = FindImagesQuery["findImages"]["images"][number];
+
+/** What one stub Stash holds of each type (studios and groups: none). */
+interface Library {
+  tag: SyncTag[];
+  performer: SyncPerformer[];
+  gallery: SyncGallery[];
+  scene: SyncScene[];
+  clip: SyncClip[];
+  image: SyncImage[];
+}
+
+/**
+ * What a stub Stash answers: `all` to a page without an updated_at filter
+ * (a full sync) and to the id lists cleanup fetches; `updated` to a page or
+ * count with one (an incremental sync), nothing by default.
+ */
+interface StashAnswer {
+  all: Library;
+  updated?: Partial<Library>;
+}
+
+const dates = { created_at: CREATED_AT, updated_at: UPDATED_AT };
+
+/** The library both instances hold, as Stash returns it. */
+function library(): Library {
+  return {
+    tag: [
+      partialRow<SyncTag>({
+        id: ID,
+        name: "PostSync IT tag",
+        stash_ids: [],
+        aliases: [],
+        parents: [],
+        ...dates,
+      }),
+    ],
+    performer: [
+      partialRow<SyncPerformer>({
+        id: ID,
+        name: "PostSync IT performer",
+        stash_ids: [],
+        alias_list: [],
+        tags: [],
+        ...dates,
+      }),
+    ],
+    gallery: [
+      partialRow<SyncGallery>({
+        id: ID,
+        title: "PostSync IT gallery",
+        urls: [],
+        files: [],
+        performers: [partialRow({ id: ID })],
+        tags: [partialRow({ id: ID })],
+        scenes: [],
+        studio: null,
+        folder: null,
+        cover: null,
+        image_count: 1,
+        ...dates,
+      }),
+    ],
+    scene: [
+      partialRow<SyncScene>({
+        id: ID,
+        title: "PostSync IT scene",
+        urls: [],
+        files: [],
+        performers: [partialRow({ id: ID })],
+        tags: [partialRow({ id: ID })],
+        groups: [],
+        galleries: [partialRow({ id: ID })],
+        captions: [],
+        studio: null,
+        ...dates,
+      }),
+    ],
+    clip: [
+      partialRow<SyncClip>({
+        id: ID,
+        title: "PostSync IT clip",
+        seconds: 10,
+        end_seconds: null,
+        scene: partialRow({ id: ID }),
+        primary_tag: partialRow({ id: ID }),
+        tags: [],
+        preview: "http://stash.invalid/scene/1/scene_marker/1/preview",
+        screenshot: "http://stash.invalid/scene/1/scene_marker/1/screenshot",
+        stream: "http://stash.invalid/scene/1/scene_marker/1/stream",
+        ...dates,
+      }),
+    ],
+    image: [
+      partialRow<SyncImage>({
+        id: ID,
+        title: "PostSync IT image",
+        urls: [],
+        files: [],
+        paths: {},
+        galleries: [partialRow({ id: ID })],
+        studio: null,
+        tags: [],
+        performers: [],
+        ...dates,
+      }),
+    ],
+  };
+}
+
+/** The library's scene, updated in Stash after the last sync. */
+function updatedScene(): SyncScene {
+  return { ...must(library().scene[0]), updated_at: LATER_AT };
+}
+
+/** One page of `rows` as `filter` asks for it; per_page 0 is a count. */
+function page<T>(
+  rows: T[],
+  filter: FindFilterType | null | undefined
+): { count: number; items: T[] } {
+  const perPage = filter?.per_page ?? 25;
+  const pageNo = filter?.page ?? 1;
+  return {
+    count: rows.length,
+    items: rows.slice((pageNo - 1) * perPage, pageNo * perPage),
+  };
+}
+
+/** Whether a type filter narrows to entities updated since a time. */
+function since(typeFilter: unknown): boolean {
+  return (
+    typeof typeFilter === "object" &&
+    typeFilter !== null &&
+    "updated_at" in typeFilter
+  );
+}
+
+/** The rows a page selects: what changed with an updated_at filter, else all. */
+function rowsFor<K extends keyof Library>(
+  answer: StashAnswer,
+  type: K,
+  typeFilter: unknown
+): Library[K] {
+  return since(typeFilter)
+    ? (answer.updated?.[type] ?? ([] as unknown as Library[K]))
+    : answer.all[type];
+}
+
+/** A Stash client answering `answer` for every sync and cleanup request. */
+function stubClient(answer: StashAnswer): StashClient {
+  const ids = (rows: Array<{ id: string }>) => rows.map(({ id }) => ({ id }));
+  const client: StashClient = partialRow<StashClient>({
+    findTags: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "tag", vars?.tag_filter),
+        vars?.filter
+      );
+      return Promise.resolve({ findTags: { count, tags: items } });
+    },
+    findStudios: (vars) => {
+      const { count, items } = page([], vars?.filter);
+      return Promise.resolve({ findStudios: { count, studios: items } });
+    },
+    findPerformers: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "performer", vars?.performer_filter),
+        vars?.filter
+      );
+      return Promise.resolve({
+        findPerformers: { count, performers: items },
+      });
+    },
+    findGroups: (vars) => {
+      const { count, items } = page([], vars?.filter);
+      return Promise.resolve({ findGroups: { count, groups: items } });
+    },
+    findGalleries: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "gallery", vars?.gallery_filter),
+        vars?.filter
+      );
+      return Promise.resolve({ findGalleries: { count, galleries: items } });
+    },
+    findScenesCompact: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "scene", vars?.scene_filter),
+        vars?.filter
+      );
+      return Promise.resolve({
+        findScenes: { count, duration: 0, filesize: 0, scenes: items },
+      });
+    },
+    // Clips page and list their ids for cleanup through the same operation
+    findSceneMarkers: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "clip", vars?.scene_marker_filter),
+        vars?.filter
+      );
+      return Promise.resolve({
+        findSceneMarkers: { count, scene_markers: items },
+      });
+    },
+    findImages: (vars) => {
+      const { count, items } = page(
+        rowsFor(answer, "image", vars?.image_filter),
+        vars?.filter
+      );
+      return Promise.resolve({ findImages: { count, images: items } });
+    },
+    // Cleanup's id lists: everything Stash holds
+    findTagIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.tag), vars?.filter);
+      return Promise.resolve({ findTags: { count, tags: items } });
+    },
+    findStudioIDs: () =>
+      Promise.resolve({ findStudios: { count: 0, studios: [] } }),
+    findPerformerIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.performer), vars?.filter);
+      return Promise.resolve({
+        findPerformers: { count, performers: items },
+      });
+    },
+    findGroupIDs: () =>
+      Promise.resolve({ findGroups: { count: 0, groups: [] } }),
+    findGalleryIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.gallery), vars?.filter);
+      return Promise.resolve({ findGalleries: { count, galleries: items } });
+    },
+    findSceneIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.scene), vars?.filter);
+      return Promise.resolve({ findScenes: { count, scenes: items } });
+    },
+    findImageIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.image), vars?.filter);
+      return Promise.resolve({ findImages: { count, images: items } });
+    },
+    // The sync scopes its client to its abort signal
+    withSignal: () => client,
+  });
+  return client;
+}
+
+/** Route `stashInstanceManager.get` to a stub per made-up instance. */
+function stubInstances(answers: Record<string, StashAnswer>): void {
+  const realGet = stashInstanceManager.get.bind(stashInstanceManager);
+  const clients = new Map(
+    Object.entries(answers).map(([id, answer]) => [id, stubClient(answer)])
+  );
+  vi.spyOn(stashInstanceManager, "get").mockImplementation(
+    (id) => clients.get(id) ?? realGet(id)
+  );
+}
+
+/** Seed one instance's library as a completed sync would have stored it. */
+async function seedLibrary(instanceId: string): Promise<void> {
+  const base = { stashInstanceId: instanceId, stashUpdatedAt: UPDATED_AT };
+  await prisma.stashTag.create({
+    data: { id: ID, ...base, name: "PostSync IT tag" },
+  });
+  await prisma.stashPerformer.create({
+    data: { id: ID, ...base, name: "PostSync IT performer" },
+  });
+  await prisma.stashGallery.create({
+    data: { id: ID, ...base, title: "PostSync IT gallery", imageCount: 1 },
+  });
+  await prisma.stashImage.create({
+    data: { id: ID, ...base, title: "PostSync IT image" },
+  });
+  await prisma.stashScene.create({
+    data: { id: ID, ...base, title: "PostSync IT scene" },
+  });
+  await prisma.stashClip.create({
+    data: {
+      id: ID,
+      stashInstanceId: instanceId,
+      stashUpdatedAt: new Date(UPDATED_AT),
+      sceneId: ID,
+      sceneInstanceId: instanceId,
+      seconds: 10,
+      primaryTagId: ID,
+      primaryTagInstanceId: instanceId,
+    },
+  });
+  // Sync stores stashUpdatedAt as the text Stash sent (Prisma's typed
+  // create above stored it as a number); clips are Prisma-written for real
+  for (const table of TABLES) {
+    if (table === "StashClip") continue;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
+      UPDATED_AT,
+      instanceId
+    );
+  }
+
+  const junctions: Array<[string, string, string, string, string]> = [
+    [
+      "GalleryPerformer",
+      "galleryId",
+      "galleryInstanceId",
+      "performerId",
+      "performerInstanceId",
+    ],
+    ["GalleryTag", "galleryId", "galleryInstanceId", "tagId", "tagInstanceId"],
+    [
+      "ImageGallery",
+      "imageId",
+      "imageInstanceId",
+      "galleryId",
+      "galleryInstanceId",
+    ],
+    // Gallery-inherited: the image has no performers or tags of its own
+    [
+      "ImagePerformer",
+      "imageId",
+      "imageInstanceId",
+      "performerId",
+      "performerInstanceId",
+    ],
+    ["ImageTag", "imageId", "imageInstanceId", "tagId", "tagInstanceId"],
+    [
+      "ScenePerformer",
+      "sceneId",
+      "sceneInstanceId",
+      "performerId",
+      "performerInstanceId",
+    ],
+    ["SceneTag", "sceneId", "sceneInstanceId", "tagId", "tagInstanceId"],
+    [
+      "SceneGallery",
+      "sceneId",
+      "sceneInstanceId",
+      "galleryId",
+      "galleryInstanceId",
+    ],
+  ];
+  for (const [
+    table,
+    leftId,
+    leftInstance,
+    rightId,
+    rightInstance,
+  ] of junctions) {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${table}" ("${leftId}", "${leftInstance}", "${rightId}", "${rightInstance}")
+       VALUES (?, ?, ?, ?)`,
+      ID,
+      instanceId,
+      ID,
+      instanceId
+    );
+  }
+
+  // Every type synced whole at UPDATED_AT, so the smart path probes counts
+  await prisma.syncState.createMany({
+    data: SYNC_TYPES.map((entityType) => ({
+      stashInstanceId: instanceId,
+      entityType,
+      lastFullSyncTimestamp: UPDATED_AT,
+      lastFullSyncActual: new Date(),
+    })),
+  });
+}
+
+/** A second scene, cached but no longer in Stash (the stub never lists it). */
+async function seedGoneScene(instanceId: string): Promise<void> {
+  await prisma.stashScene.create({
+    data: {
+      id: "2",
+      stashInstanceId: instanceId,
+      stashUpdatedAt: UPDATED_AT,
+      title: "PostSync IT gone scene",
+    },
+  });
+}
+
+async function clearSeed(): Promise<void> {
+  const users = await prisma.user.findMany({
+    where: { username: { in: Object.values(USERS) } },
+    select: { id: true },
+  });
+  const userIds = users.map((u) => u.id);
+  // Stats and rankings have no foreign key to User
+  await prisma.userEntityStats.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await prisma.userPerformerStats.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await prisma.userStudioStats.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await prisma.userTagStats.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.userEntityRanking.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+
+  await prisma.userExcludedEntity.deleteMany({
+    where: { instanceId: { in: INSTANCES } },
+  });
+  for (const table of TABLES) {
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "${table}" WHERE "stashInstanceId" IN (?, ?)`,
+      ...INSTANCES
+    );
+  }
+  await prisma.syncState.deleteMany({
+    where: { stashInstanceId: { in: INSTANCES } },
+  });
+  await prisma.stashInstance.deleteMany({ where: { id: { in: INSTANCES } } });
+}
+
+/** The image's performer and tag rows on `instanceId` (gallery-inherited). */
+async function inheritedRows(
+  instanceId: string
+): Promise<{ performers: number; tags: number }> {
+  const [p] = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+    `SELECT COUNT(*) AS n FROM "ImagePerformer" WHERE "imageId" = ? AND "imageInstanceId" = ?`,
+    ID,
+    instanceId
+  );
+  const [t] = await prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+    `SELECT COUNT(*) AS n FROM "ImageTag" WHERE "imageId" = ? AND "imageInstanceId" = ?`,
+    ID,
+    instanceId
+  );
+  return { performers: Number(p?.n ?? 0), tags: Number(t?.n ?? 0) };
+}
+
+async function pendingRows(userIds: number[]): Promise<number> {
+  return prisma.userExcludedEntity.count({
+    where: { userId: { in: userIds }, reason: "pending" },
+  });
+}
+
+/** The scene's stashUpdatedAt as sync stored it (Stash's own text). */
+async function sceneUpdatedAt(instanceId: string): Promise<string | null> {
+  const [row] = await prisma.$queryRawUnsafe<
+    Array<{ updatedAt: string | null }>
+  >(
+    `SELECT CAST("stashUpdatedAt" AS TEXT) AS updatedAt FROM "StashScene"
+     WHERE "id" = ? AND "stashInstanceId" = ?`,
+    ID,
+    instanceId
+  );
+  return row?.updatedAt ?? null;
+}
+
+type Step = MockInstance<() => Promise<void>>;
+
+/** The message texts logged at info level. */
+function infoMessages(spy: MockInstance<typeof logger.info>): string[] {
+  return spy.mock.calls.map((call) => call[0]);
+}
+
+describeWithDb("StashSyncService post-sync steps (integration)", () => {
+  /** The test's users by role, created per test. */
+  let users: { all: number; b: number; ab: number };
+  let steps: {
+    sceneTags: Step;
+    gallery: Step;
+    imageCounts: Step;
+    stats: Step;
+    tagCounts: Step;
+  };
+  let recompute: MockInstance<
+    typeof exclusionComputationService.recomputeForUser
+  >;
+  let info: MockInstance<typeof logger.info>;
+
+  /** Which of the test's users were recomputed, by role. */
+  const recomputedRoles = (): string[] =>
+    Object.entries(users)
+      .filter(([, id]) => recompute.mock.calls.some((call) => call[0] === id))
+      .map(([role]) => role)
+      .sort();
+
+  const stepCalls = (): Record<string, number> =>
+    Object.fromEntries(
+      Object.entries(steps).map(([name, spy]) => [name, spy.mock.calls.length])
+    );
+
+  beforeAll(async () => {
+    // The instances the server knows (the test Stash), as in production:
+    // clip sync reads the default one's key
+    await stashInstanceManager.reload();
+    await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+  });
+
+  beforeEach(async () => {
+    await clearSeed();
+    for (const [priority, id] of INSTANCES.entries()) {
+      await prisma.stashInstance.create({
+        data: {
+          id,
+          name: id,
+          url: UNREACHABLE_STASH_URL,
+          apiKey: "postsync-it-key",
+          enabled: true,
+          priority: 960 + priority,
+        },
+      });
+      await seedLibrary(id);
+    }
+    const create = async (username: string, selection: string[]) => {
+      const user = await prisma.user.create({
+        data: { username, password: "not-a-real-hash" },
+      });
+      if (selection.length > 0) {
+        await prisma.userStashInstance.createMany({
+          data: selection.map((instanceId) => ({
+            userId: user.id,
+            instanceId,
+          })),
+        });
+      }
+      return user.id;
+    };
+    users = {
+      all: await create(USERS.all, []),
+      b: await create(USERS.b, [PC_B]),
+      ab: await create(USERS.ab, [PC_A, PC_B]),
+    };
+
+    // The clip's preview is on no real Stash
+    vi.spyOn(clipPreviewProber, "probeBatch").mockResolvedValue(new Map());
+    steps = {
+      sceneTags: vi
+        .spyOn(sceneTagInheritanceService, "computeInheritedTags")
+        .mockResolvedValue(undefined),
+      // Real: its rows are what the image tests check
+      gallery: vi.spyOn(
+        imageGalleryInheritanceService,
+        "applyGalleryInheritance"
+      ),
+      imageCounts: vi
+        .spyOn(entityImageCountService, "rebuildAllImageCounts")
+        .mockResolvedValue(undefined),
+      stats: vi
+        .spyOn(userStatsService, "rebuildAllStats")
+        .mockResolvedValue(undefined),
+      tagCounts: vi
+        .spyOn(stashSyncService, "computeTagSceneCountsViaPerformers")
+        .mockResolvedValue(undefined),
+    };
+    recompute = vi
+      .spyOn(exclusionComputationService, "recomputeForUser")
+      .mockResolvedValue(undefined);
+    info = vi.spyOn(logger, "info");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await clearSeed();
+    await stashInstanceManager.reload();
+  });
+
+  it("an incremental sync that finds nothing runs no post-sync step", async () => {
+    stubInstances({ [PC_A]: { all: library() } });
+
+    await stashSyncService.smartIncrementalSync(PC_A);
+
+    expect(stepCalls()).toEqual({
+      sceneTags: 0,
+      gallery: 0,
+      imageCounts: 0,
+      stats: 0,
+      tagCounts: 0,
+    });
+    expect(recomputedRoles()).toEqual([]);
+    expect(infoMessages(info)).toContain(
+      "nothing changed, post-sync steps skipped"
+    );
+    // The inherited rows stay, and nothing is held
+    expect(await inheritedRows(PC_A)).toEqual({ performers: 1, tags: 1 });
+    expect(await pendingRows(Object.values(users))).toBe(0);
+  }, 60_000);
+
+  it("with two instances the post-sync steps run once, after both", async () => {
+    stubInstances({
+      [PC_A]: { all: library(), updated: { scene: [updatedScene()] } },
+      [PC_B]: { all: library(), updated: { scene: [updatedScene()] } },
+    });
+    vi.spyOn(stashInstanceManager, "getAllEnabled").mockReturnValue(
+      INSTANCES.map((id) => ({ id, name: id }))
+    );
+    // What both instances' scenes carry when the steps run
+    const seenAtSteps: Array<string | null> = [];
+    steps.imageCounts.mockImplementation(async () => {
+      seenAtSteps.push(await sceneUpdatedAt(PC_A), await sceneUpdatedAt(PC_B));
+    });
+
+    await stashSyncService.smartIncrementalSync();
+
+    expect(stepCalls()).toEqual({
+      sceneTags: 1,
+      gallery: 0,
+      imageCounts: 1,
+      stats: 1,
+      tagCounts: 1,
+    });
+    expect(seenAtSteps).toEqual([LATER_AT, LATER_AT]);
+    // Each affected user once, not once per instance
+    const perUser = Object.values(users).map(
+      (id) => recompute.mock.calls.filter((call) => call[0] === id).length
+    );
+    expect(perUser).toEqual([1, 1, 1]);
+  }, 60_000);
+
+  it("a change on pc-a recomputes the users who can see pc-a and not a user whose instance selection is only pc-b", async () => {
+    stubInstances({
+      [PC_A]: { all: library(), updated: { scene: [updatedScene()] } },
+    });
+
+    await stashSyncService.smartIncrementalSync(PC_A);
+
+    expect(recomputedRoles()).toEqual(["ab", "all"]);
+  }, 60_000);
+
+  it("an incremental sync that rewrites an unchanged image re-applies gallery inheritance and recomputes nobody", async () => {
+    // Stash lists the image as updated but returns it as stored
+    stubInstances({
+      [PC_A]: { all: library(), updated: { image: library().image } },
+    });
+
+    await stashSyncService.smartIncrementalSync(PC_A);
+
+    expect(stepCalls()).toEqual({
+      sceneTags: 0,
+      gallery: 1,
+      imageCounts: 0,
+      stats: 0,
+      tagCounts: 0,
+    });
+    expect(recomputedRoles()).toEqual([]);
+    // The rewrite dropped the inherited rows; the inheritance put them back
+    expect(await inheritedRows(PC_A)).toEqual({ performers: 1, tags: 1 });
+    expect(await pendingRows(Object.values(users))).toBe(0);
+  }, 60_000);
+
+  it("a full sync runs every post-sync step and recomputes every user, even when Stash returns rows identical to the stored ones", async () => {
+    stubInstances({ [PC_A]: { all: library() } });
+
+    await stashSyncService.fullSync(PC_A);
+
+    expect(stepCalls()).toEqual({
+      sceneTags: 1,
+      gallery: 1,
+      imageCounts: 1,
+      stats: 1,
+      tagCounts: 1,
+    });
+    const everyUser = (await prisma.user.findMany({ select: { id: true } }))
+      .map((u) => u.id)
+      .sort((a, b) => a - b);
+    const recomputed = recompute.mock.calls
+      .map((call) => call[0])
+      .sort((a, b) => a - b);
+    expect(recomputed).toEqual(everyUser);
+    expect(await inheritedRows(PC_A)).toEqual({ performers: 1, tags: 1 });
+    expect(await pendingRows(Object.values(users))).toBe(0);
+  }, 60_000);
+
+  it("users with pending holds are recomputed even when nothing changed", async () => {
+    stubInstances({ [PC_A]: { all: library() } });
+    // A hold a batch wrote (C18) for a user who cannot see pc-a
+    await prisma.userExcludedEntity.create({
+      data: {
+        userId: users.b,
+        entityType: "scene",
+        entityId: ID,
+        instanceId: PC_B,
+        reason: "pending",
+      },
+    });
+
+    await stashSyncService.smartIncrementalSync(PC_A);
+
+    expect(recomputedRoles()).toEqual(["b"]);
+    expect(stepCalls()).toEqual({
+      sceneTags: 0,
+      gallery: 0,
+      imageCounts: 0,
+      stats: 0,
+      tagCounts: 0,
+    });
+    expect(infoMessages(info)).not.toContain(
+      "nothing changed, post-sync steps skipped"
+    );
+  }, 60_000);
+
+  it("the admin's Apply deletions runs the post-sync steps for what it soft-deleted", async () => {
+    await seedGoneScene(PC_A);
+    await seedGoneScene(PC_B);
+    stubInstances({ [PC_A]: { all: library() } });
+
+    const outcome = await stashSyncService.runCleanup("scene", PC_A, {
+      ignoreRatioGuard: true,
+    });
+
+    expect(outcome.deleted).toBe(1);
+    expect(stepCalls()).toEqual({
+      sceneTags: 0,
+      gallery: 0,
+      imageCounts: 1,
+      stats: 1,
+      tagCounts: 1,
+    });
+    expect(recomputedRoles()).toEqual(["ab", "all"]);
+    const gone = await prisma.stashScene.findMany({
+      where: { id: "2", stashInstanceId: { in: INSTANCES } },
+      select: { stashInstanceId: true, deletedAt: true },
+    });
+    expect(
+      Object.fromEntries(
+        gone.map((s) => [s.stashInstanceId, s.deletedAt !== null])
+      )
+    ).toEqual({ [PC_A]: true, [PC_B]: false });
+  }, 60_000);
+
+  it("adding an instance to a user's selection stores that instance's exclusion rows before any sync", async () => {
+    const { id: userId, client } = await createApiUser(USERS.api, API_PASSWORD);
+    // Always-hide the tag on pc-a; the selection is pc-b only, so far
+    await prisma.userContentRestriction.create({
+      data: {
+        userId,
+        entityType: "tags",
+        mode: "EXCLUDE",
+        entityIds: JSON.stringify([`${ID}:${PC_A}`]),
+      },
+    });
+    await prisma.userStashInstance.create({
+      data: { userId, instanceId: PC_B },
+    });
+    const rowsOnA = () =>
+      prisma.userExcludedEntity.findMany({
+        where: { userId, instanceId: PC_A },
+        select: { entityType: true, entityId: true },
+        orderBy: { entityType: "asc" },
+      });
+    expect(await rowsOnA()).toEqual([]);
+
+    const response = await client.put("/api/user/stash-instances", {
+      instanceIds: [PC_A, PC_B],
+    });
+
+    expect(response.status).toBe(200);
+    const rows = await rowsOnA();
+    expect(rows).toContainEqual({ entityType: "tag", entityId: ID });
+    expect(rows).toContainEqual({ entityType: "scene", entityId: ID });
+    expect(rows).toContainEqual({ entityType: "image", entityId: ID });
+  }, 60_000);
+});

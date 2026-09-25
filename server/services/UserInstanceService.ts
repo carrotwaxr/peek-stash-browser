@@ -12,13 +12,66 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * Get the list of Stash instance IDs that a user should see content from.
+ * A user's instance scope: the enabled instances, narrowed to the user's
+ * selection when there is one (an empty selection means all enabled). The
+ * exclusion compute runs over it, and a sync recomputes the users whose
+ * scope holds a changed instance. Throws on a database error.
  *
- * Logic:
- * 1. Get all enabled Stash instances
- * 2. Check if user has any instance selections
- * 3. If user has selections, filter to only those instances (intersected with enabled)
- * 4. If user has no selections, return all enabled instances
+ * @param userId - The user ID
+ * @returns Array of instance IDs in the user's scope
+ */
+export async function getUserInstanceScope(userId: number): Promise<string[]> {
+  // Get all enabled instances
+  const enabledInstances = await prisma.stashInstance.findMany({
+    where: { enabled: true },
+    select: { id: true },
+  });
+  const enabledIds = new Set(enabledInstances.map((i) => i.id));
+
+  // Get user's instance selections
+  const userSelections = await prisma.userStashInstance.findMany({
+    where: { userId },
+    select: { instanceId: true },
+  });
+
+  if (userSelections.length === 0) {
+    // No selections = see all enabled instances
+    return Array.from(enabledIds);
+  }
+
+  // Filter user selections to only enabled instances
+  return userSelections
+    .map((s) => s.instanceId)
+    .filter((id) => enabledIds.has(id));
+}
+
+/**
+ * The users whose scope includes `instanceId` whatever its enabled state:
+ * those with no selection (every enabled instance) and those whose
+ * selection names it. These are the users a change to the instance's
+ * enabled state, or its deletion, affects; read them before a deletion
+ * removes the selection rows.
+ *
+ * @param instanceId - The instance ID
+ * @returns The user IDs, in id order
+ */
+export async function getUsersSelecting(instanceId: string): Promise<number[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        { stashInstances: { none: {} } },
+        { stashInstances: { some: { instanceId } } },
+      ],
+    },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  return users.map((u) => u.id);
+}
+
+/**
+ * Get the list of Stash instance IDs that a user should see content from:
+ * the user's scope (getUserInstanceScope), or none when it cannot be read.
  *
  * @param userId - The user ID
  * @returns Array of instance IDs the user should see content from
@@ -27,30 +80,7 @@ export async function getUserAllowedInstanceIds(
   userId: number
 ): Promise<string[]> {
   try {
-    // Get all enabled instances
-    const enabledInstances = await prisma.stashInstance.findMany({
-      where: { enabled: true },
-      select: { id: true },
-    });
-    const enabledIds = new Set(enabledInstances.map((i) => i.id));
-
-    // Get user's instance selections
-    const userSelections = await prisma.userStashInstance.findMany({
-      where: { userId },
-      select: { instanceId: true },
-    });
-
-    if (userSelections.length === 0) {
-      // No selections = see all enabled instances
-      return Array.from(enabledIds);
-    }
-
-    // Filter user selections to only enabled instances
-    const allowedIds = userSelections
-      .map((s) => s.instanceId)
-      .filter((id) => enabledIds.has(id));
-
-    return allowedIds;
+    return await getUserInstanceScope(userId);
   } catch (error) {
     logger.error("Failed to get user allowed instance IDs", {
       userId,

@@ -30,15 +30,11 @@ Peek provides three sync strategies, each optimized for different use cases:
 An upgrade does not start a full sync. A migration that needs Peek to refetch some entity types clears their timestamps in `SyncState`, and the next sync (at startup or scheduled) fetches those types whole, the others incrementally. See [Sync State Tracking](#sync-state-tracking).
 
 **Process:**
-1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety)
-2. Apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images)
-3. Compute scene tag inheritance
-4. Rebuild inherited image counts
-5. Rebuild user stats
-6. Recompute user exclusions
+1. Sync all entity types in [dependency order](#entity-sync-order), each followed by its [cleanup](#cleanup-safety), on every instance
+2. Then, once for the whole sync: compute scene tag inheritance, apply gallery inheritance (performers, tags, studio, date, etc. propagate from galleries to images), rebuild inherited image counts, rebuild user stats, recompute the exclusions of every user
 
 **Characteristics:**
-- **Always runs gallery inheritance** regardless of what changed
+- **Always runs every post-sync step**, whole library, whatever changed: it is the catch-all for links Stash edits without moving `updated_at` (tag and performer merges, images added to a gallery)
 - Slowest option but guarantees complete data consistency
 - Safe recovery mechanism for any sync issues
 
@@ -52,15 +48,10 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
 **Process:**
 1. Sync all entity types, but only fetch entities with `updated_at > since`
 2. Clean up deleted entities (detect deletions/merges in Stash)
-3. **Conditionally** apply gallery inheritance (if images OR galleries synced)
-4. **Conditionally** compute scene tag inheritance (if scenes synced)
-5. Rebuild inherited image counts
-6. Rebuild user stats
-7. Recompute user exclusions
+3. After every instance, the [post-sync steps](#post-sync-processing) once, only for what changed; nothing changed means none of them runs
 
 **Characteristics:**
 - Faster than full sync for small changesets
-- Gallery inheritance runs if **either** images or galleries were updated
 - Useful for syncing recent changes without full resync
 
 ### Smart Incremental Sync
@@ -79,16 +70,12 @@ An upgrade does not start a full sync. A migration that needs Peek to refetch so
    - If changes: sync that entity type
    - If no changes: skip entirely
 2. Clean up deleted entities
-3. **Conditionally** apply gallery inheritance (if images OR galleries synced)
-4. **Conditionally** compute scene tag inheritance (if scenes synced)
-5. Rebuild inherited image counts
-6. Rebuild user stats
-7. Recompute user exclusions
+3. After every instance, the [post-sync steps](#post-sync-processing) once, only for what changed; a sync in which Stash reports no change runs none of them
 
 **Characteristics:**
 - Fastest for typical usage (many entity types unchanged)
 - Per-entity-type tracking prevents unnecessary work
-- Gallery inheritance runs if **either** images or galleries were updated
+- A no-op sync costs the change probes and the cleanup id lists, nothing else
 
 ---
 
@@ -131,6 +118,15 @@ How the delete set is computed: one SQL statement compares the cached rows with 
 
 ## Post-Sync Processing
 
+The steps below run once per sync, after every instance has synced, not once per instance. Each sync collects a change set (`SyncChangeSet`): every batch reports which of its rows changed, and every cleanup which rows it soft-deleted. An entity counts as changed when it is new, its `stashUpdatedAt` differs, it was soft-deleted and is back, or (for every type but images) its junction rows or studio differ from what was stored. An image's junction rows and studio are never compared, because gallery inheritance writes into them.
+
+- **Full sync**: every step, whole library, and every user's exclusions are recomputed.
+- **Incremental and smart sync**: nothing changed and no user holds `pending` exclusion rows means no step runs at all (the log says `nothing changed, post-sync steps skipped`). Otherwise the change set decides which steps run, as each step's trigger conditions say, and the exclusion recompute covers the users whose instance scope holds a changed instance (plus users with pending holds), not everyone.
+- **Apply deletions** (the sync status's action after a refused cleanup) runs the steps for what it soft-deleted.
+- A sync that is aborted or fails before its steps hands its change set to the next sync, so the steps still cover what it wrote.
+
+A change to a user's instance scope recomputes exclusions in the same request: a user changing their instance selection (their own recompute), and an admin enabling, disabling or deleting an instance (every user with no selection or a selection naming it).
+
 ### Gallery Inheritance
 
 Images can inherit metadata from their parent galleries:
@@ -150,8 +146,7 @@ Images can inherit metadata from their parent galleries:
 
 **Trigger conditions:**
 - Full sync: Always runs
-- Incremental sync: Runs if images OR galleries were synced
-- Smart incremental: Runs if images OR galleries were synced
+- Incremental and smart sync: Runs if any image was written (even one Stash returned unchanged: its junction rows were rewritten from Stash, and inheritance puts the gallery's back) or any gallery changed
 
 ### Scene Tag Inheritance
 
@@ -163,8 +158,7 @@ Scenes inherit tags from their performers and studios:
 
 **Trigger conditions:**
 - Full sync: Always runs
-- Incremental sync: Runs if scenes were synced
-- Smart incremental: Runs if scenes were synced
+- Incremental and smart sync: Runs if a scene changed, or a performer's, studio's or group's tag set changed
 
 ### Image Count Rebuild
 
@@ -175,7 +169,7 @@ Maintains denormalized image counts on entities:
 - Studios: Count of images from that studio
 - Galleries: Count of images in that gallery
 
-**Always runs** after any sync to ensure consistency.
+Runs after every full sync and after any sync that changed or soft-deleted something, followed by the user stats rebuild and the tag counts via performers.
 
 ---
 

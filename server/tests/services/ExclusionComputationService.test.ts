@@ -14,14 +14,25 @@
  * rows the write phase stores are read from the _peek_result fills.
  */
 import type { UserContentRestriction } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  type MockInstance,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   disconnectComputeClient,
   withComputeConnection,
 } from "../../prisma/computeClient.js";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
-import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import {
+  getUserAllowedInstanceIds,
+  getUserInstanceScope,
+} from "../../services/UserInstanceService.js";
 import { dbWrite } from "../../utils/dbWrite.js";
 import type * as dbWriteModule from "../../utils/dbWrite.js";
 import { must } from "../helpers/must.js";
@@ -30,6 +41,7 @@ import { partialRow, prismaImpl } from "../helpers/prismaMock.js";
 // Mock UserInstanceService before importing service
 vi.mock("../../services/UserInstanceService.js", () => ({
   getUserAllowedInstanceIds: vi.fn().mockResolvedValue(["A"]),
+  getUserInstanceScope: vi.fn().mockResolvedValue(["A"]),
   buildInstanceFilterClause: vi
     .fn()
     .mockImplementation((ids: string[], col: string = "s.stashInstanceId") => {
@@ -2039,6 +2051,100 @@ describe("recomputeAllUsers", () => {
     expect(result.success).toBe(0);
     expect(result.failed).toBe(0);
     expect(result.errors).toEqual([]);
+  });
+});
+
+describe("recomputeUsersForInstances", () => {
+  const mockScope = vi.mocked(getUserInstanceScope);
+  let recomputeForUser: MockInstance<
+    typeof exclusionComputationService.recomputeForUser
+  >;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.user.findMany.mockResolvedValue([
+      partialRow({ id: 1 }),
+      partialRow({ id: 2 }),
+      partialRow({ id: 3 }),
+    ]);
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([]);
+    mockScope.mockImplementation((userId) =>
+      Promise.resolve(
+        { 1: ["A"], 2: ["B"], 3: ["A", "B"] }[userId] ?? ([] as string[])
+      )
+    );
+    recomputeForUser = vi
+      .spyOn(exclusionComputationService, "recomputeForUser")
+      .mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    recomputeForUser.mockRestore();
+  });
+
+  const recomputed = () => recomputeForUser.mock.calls.map((call) => call[0]);
+
+  it("recomputes the users whose scope holds a changed instance and skips the others", async () => {
+    const result = await exclusionComputationService.recomputeUsersForInstances(
+      ["A"]
+    );
+
+    expect(recomputed()).toEqual([1, 3]);
+    expect(result).toEqual({ success: 2, failed: 0, errors: [] });
+  });
+
+  it("a user with a pending hold is recomputed even when no instance changed", async () => {
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+      partialRow({ userId: 2 }),
+    ]);
+
+    await exclusionComputationService.recomputeUsersForInstances([]);
+
+    expect(recomputed()).toEqual([2]);
+    // No instance changed: nobody's scope was read
+    expect(mockScope).not.toHaveBeenCalled();
+  });
+
+  it("a user with a pending hold on an unchanged instance is recomputed once", async () => {
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+      partialRow({ userId: 2 }),
+      partialRow({ userId: 3 }),
+    ]);
+
+    await exclusionComputationService.recomputeUsersForInstances(["A"]);
+
+    expect(recomputed()).toEqual([1, 2, 3]);
+  });
+
+  it("usersWithPendingHolds asks for each user once", async () => {
+    mockPrisma.userExcludedEntity.findMany.mockResolvedValue([
+      partialRow({ userId: 5 }),
+    ]);
+
+    expect(await exclusionComputationService.usersWithPendingHolds()).toEqual([
+      5,
+    ]);
+    expect(mockPrisma.userExcludedEntity.findMany).toHaveBeenCalledWith({
+      where: { reason: "pending" },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+  });
+
+  it("a failing user is counted and the next one still runs", async () => {
+    recomputeForUser.mockImplementation((userId) =>
+      userId === 1
+        ? Promise.reject(new Error("compute failed"))
+        : Promise.resolve()
+    );
+
+    const result = await exclusionComputationService.recomputeUsers([1, 2]);
+
+    expect(result).toEqual({
+      success: 1,
+      failed: 1,
+      errors: [{ userId: 1, error: "compute failed" }],
+    });
   });
 });
 

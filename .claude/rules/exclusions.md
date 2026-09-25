@@ -34,7 +34,8 @@ paths:
 
 - Saving restrictions (`updateUserRestrictions` in `controllers/user.ts`) runs a full recompute for that user.
 - Hiding requires visibility: `checkHideTarget` in `controllers/user.ts` answers 404 for anything the user can't see; a repeat hide succeeds without writing. It then calls `addHiddenEntity`, which adds that entity and its cascades but skips the empty-entity phase and the stats update, and never overwrites an existing row. Unhiding queues a full recompute in the background without awaiting it.
-- `fullSync`, `incrementalSync` and `smartIncrementalSync` end with `recomputeAllUsers`.
+- A sync recomputes once per run, after every instance: a full sync `recomputeAllUsers`; an incremental or smart sync `recomputeUsersForInstances(changedInstances)`, the users whose scope (`getUserInstanceScope`: enabled instances, narrowed by the selection; an empty selection means all) holds a changed instance, plus every user with a `pending` row (`usersWithPendingHolds`). A sync that found nothing recomputes nobody. `recomputeAllUsers` stays for `routes/exclusions.ts` and the data migrations.
+- A scope change recomputes in the same request: `PUT /user/stash-instances` and the first-login wizard recompute that user; `updateStashInstance` with a changed `enabled`, and `deleteInstance` (before its purge), recompute `getUsersSelecting(instanceId)`, the users with no selection or one naming the instance, through `recomputeUsers`.
 
 ## Reading exclusions
 

@@ -11,6 +11,7 @@
 import {
   afterAll,
   afterEach,
+  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -290,6 +291,12 @@ const ROWS = ids(1, 120);
 describeWithDb.each(TYPES)(
   "StashSyncService.cleanupDeletedEntities, $type (integration)",
   ({ type, table }) => {
+    beforeAll(async () => {
+      // The instances the server knows (the test Stash), as in production:
+      // the post-sync steps an admin's cleanup runs read the default one
+      await stashInstanceManager.reload();
+    });
+
     beforeEach(async () => {
       await clearSeeds();
       await seed(type, table, INSTANCE_A, ROWS);

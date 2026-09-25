@@ -147,7 +147,7 @@ Scenes inherit tags from their associated performers, studio, and groups. This e
 - **No duplication**: Tags already directly on the scene are not added to inherited tags
 - **Deduplicated**: Same tag from multiple sources (e.g., two performers) appears once
 - **Stored separately**: Inherited tags stored in `inheritedTagIds` field, not mixed with direct tags
-- **When computed**: After every sync (full, incremental, or smart)
+- **When computed**: After every full sync, and after an incremental or smart sync in which a scene changed or a performer's, studio's or group's tag set changed
 
 **Query behavior:**
 
@@ -179,7 +179,7 @@ Images inherit metadata from their parent gallery when the image's own field is 
 - **Never overwrites**: Only copies when image field is NULL/empty
 - **All-or-nothing for relationships**: Performers and tags only inherit if image has NONE
 - **Multi-gallery handling**: If image is in multiple galleries, uses first gallery (by ID)
-- **When computed**: After every sync that touches images or galleries
+- **When computed**: After every full sync, and after any sync that wrote images (even unchanged ones, whose junction rows sync rewrites) or changed galleries
 
 !!! note
     Image `title` is NOT inherited — each image keeps its own name.

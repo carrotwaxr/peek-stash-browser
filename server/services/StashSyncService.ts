@@ -14,6 +14,7 @@
  * - Progress events for UI feedback
  * - Soft delete for removed entities
  */
+import type { PrismaClient } from "@prisma/client";
 import { EventEmitter } from "events";
 import {
   type StashClient,
@@ -54,6 +55,18 @@ import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
+import {
+  type BatchChanges,
+  type EntityRef,
+  type IncomingEntity,
+  type JunctionName,
+  type StoredEntity,
+  SyncChangeSet,
+  detectChanges,
+  linksByNearId,
+  noChanges,
+} from "./SyncChangeSet.js";
+import { getUsersSelecting } from "./UserInstanceService.js";
 import { userStatsService } from "./UserStatsService.js";
 
 // Type aliases for query-specific entity types returned by the GraphQL SDK.
@@ -477,6 +490,160 @@ function escapeSqlNullable(value: string | null | undefined): string {
   return `'${escapeSql(value)}'`;
 }
 
+// ==================== Change detection helpers ====================
+
+/**
+ * What a batch's rows looked like before it wrote them, by id, for the
+ * change diff (SyncChangeSet): one statement over the batch's ids. Sync
+ * stores `stashUpdatedAt` as the text Stash sent, in a column declared
+ * DateTime, which Prisma's raw reads would parse into a Date; the CAST
+ * returns the text, so it compares equal to what Stash sends again. Not for
+ * clips, whose `stashUpdatedAt` Prisma writes (processClipsBatch reads them
+ * through Prisma).
+ */
+async function readStored(
+  table: Exclude<(typeof INSTANCE_CACHE_TABLES)[number], "StashClip">,
+  stashInstanceId: string,
+  ids: readonly string[],
+  withStudio: boolean
+): Promise<Map<string, StoredEntity>> {
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      stashUpdatedAt: string | null;
+      deleted: bigint | number;
+      studioId?: string | null;
+    }>
+  >(
+    `SELECT "id", CAST("stashUpdatedAt" AS TEXT) AS stashUpdatedAt,
+            "deletedAt" IS NOT NULL AS deleted${withStudio ? `, "studioId"` : ""}
+     FROM "${table}"
+     WHERE "stashInstanceId" = ? AND "id" IN (SELECT value FROM json_each(?))`,
+    stashInstanceId,
+    JSON.stringify(ids)
+  );
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        updatedAt: row.stashUpdatedAt,
+        deleted: Number(row.deleted) === 1,
+        ...(withStudio ? { studioId: row.studioId ?? null } : {}),
+      },
+    ])
+  );
+}
+
+/** Each junction's near (the synced entity) and far columns. */
+const JUNCTION_COLUMNS: Record<
+  JunctionName,
+  { near: string; nearInstance: string; far: string; farInstance: string }
+> = {
+  ScenePerformer: {
+    near: "sceneId",
+    nearInstance: "sceneInstanceId",
+    far: "performerId",
+    farInstance: "performerInstanceId",
+  },
+  SceneTag: {
+    near: "sceneId",
+    nearInstance: "sceneInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  SceneGroup: {
+    near: "sceneId",
+    nearInstance: "sceneInstanceId",
+    far: "groupId",
+    farInstance: "groupInstanceId",
+  },
+  SceneGallery: {
+    near: "sceneId",
+    nearInstance: "sceneInstanceId",
+    far: "galleryId",
+    farInstance: "galleryInstanceId",
+  },
+  PerformerTag: {
+    near: "performerId",
+    nearInstance: "performerInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  StudioTag: {
+    near: "studioId",
+    nearInstance: "studioInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  GroupTag: {
+    near: "groupId",
+    nearInstance: "groupInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  GalleryPerformer: {
+    near: "galleryId",
+    nearInstance: "galleryInstanceId",
+    far: "performerId",
+    farInstance: "performerInstanceId",
+  },
+  GalleryTag: {
+    near: "galleryId",
+    nearInstance: "galleryInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  ImagePerformer: {
+    near: "imageId",
+    nearInstance: "imageInstanceId",
+    far: "performerId",
+    farInstance: "performerInstanceId",
+  },
+  ImageTag: {
+    near: "imageId",
+    nearInstance: "imageInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+  ImageGallery: {
+    near: "imageId",
+    nearInstance: "imageInstanceId",
+    far: "galleryId",
+    farInstance: "galleryInstanceId",
+  },
+  ClipTag: {
+    near: "clipId",
+    nearInstance: "clipInstanceId",
+    far: "tagId",
+    farInstance: "tagInstanceId",
+  },
+};
+
+/**
+ * Deletes the junction rows of `nearIds` on `instanceId` and returns them by
+ * near id: the old far sides the change diff compares with the new ones.
+ * SQLite's `DELETE ... RETURNING` (Prisma's engine runs 3.46.0), on the main
+ * client or the batch's transaction.
+ */
+async function deleteJunctionRows(
+  db: Pick<PrismaClient, "$queryRawUnsafe">,
+  junction: JunctionName,
+  nearIds: readonly string[],
+  instanceId: string
+): Promise<Map<string, EntityRef[]>> {
+  const { near, nearInstance, far, farInstance } = JUNCTION_COLUMNS[junction];
+  const rows = await db.$queryRawUnsafe<
+    Array<{ nearId: string; farId: string; farInstanceId: string }>
+  >(
+    `DELETE FROM "${junction}"
+     WHERE "${near}" IN (SELECT value FROM json_each(?)) AND "${nearInstance}" = ?
+     RETURNING "${near}" AS nearId, "${far}" AS farId, "${farInstance}" AS farInstanceId`,
+    JSON.stringify(nearIds),
+    instanceId
+  );
+  return linksByNearId(rows);
+}
+
 // ==================== Entity sync specs ====================
 
 /** One page request of a type's sync. */
@@ -496,12 +663,8 @@ export interface SyncPageQuery {
 export interface SyncRunContext {
   /** Fires on abort(): the run stops between pages, a request in flight ends */
   signal: AbortSignal;
-}
-
-/** What one batch wrote. */
-export interface BatchChanges {
-  /** Rows written (a row with an unsafe id is skipped) */
-  written: number;
+  /** What the run has changed so far, across its instances (SyncChangeSet) */
+  changes: SyncChangeSet;
 }
 
 /**
@@ -712,7 +875,7 @@ async function processScenesBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (scenes.length === 0) return { written: 0 };
+  if (scenes.length === 0) return noChanges();
 
   // Validate all scene IDs for SQL safety (defense-in-depth)
   const invalidIds = scenes.filter((s) => !validateEntityId(s.id));
@@ -720,31 +883,34 @@ async function processScenesBatch(
     logger.warn(`Skipping ${invalidIds.length} scenes with invalid IDs`);
   }
   const validScenes = scenes.filter((s) => validateEntityId(s.id));
-  if (validScenes.length === 0) return { written: 0 };
+  if (validScenes.length === 0) return noChanges();
 
   const sceneIds = validScenes.map((s) => s.id);
   const instanceId = stashInstanceId;
 
-  // Bulk delete all junction records for this batch
-  // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
-  // and includes extended timeout for large libraries
-  const sceneIdList = sceneIds.map((id) => `'${escapeSql(id)}'`).join(",");
-  const escapedInstanceId = escapeSql(instanceId);
+  // What the batch's scenes looked like before the write, for the change diff
+  const stored = await readStored("StashScene", instanceId, sceneIds, true);
+
+  // Bulk delete all junction records for this batch, keeping the rows for
+  // the change diff. Uses sequential raw SQL in a transaction to avoid
+  // SQLite lock contention and includes extended timeout for large libraries
+  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
   await dbWriteTransaction(
     "sync.scenes.junctions",
     async (tx) => {
-      await tx.$executeRawUnsafe(
-        `DELETE FROM ScenePerformer WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-      );
-      await tx.$executeRawUnsafe(
-        `DELETE FROM SceneTag WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-      );
-      await tx.$executeRawUnsafe(
-        `DELETE FROM SceneGroup WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-      );
-      await tx.$executeRawUnsafe(
-        `DELETE FROM SceneGallery WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-      );
+      for (const junction of [
+        "ScenePerformer",
+        "SceneTag",
+        "SceneGroup",
+        "SceneGallery",
+      ] as const) {
+        oldLinks[junction] = await deleteJunctionRows(
+          tx,
+          junction,
+          sceneIds,
+          instanceId
+        );
+      }
     },
     { timeout: 60000 } // 60 second timeout for large batches
   );
@@ -860,15 +1026,24 @@ async function processScenesBatch(
     phashes = excluded.phashes
 `);
 
-  // Collect all junction records (validate related entity IDs too)
+  // Collect all junction records (validate related entity IDs too), and
+  // each scene's new far sides for the change diff
   const performerRecords: string[] = [];
   const tagRecords: string[] = [];
   const groupRecords: string[] = [];
   const galleryRecords: string[] = [];
+  const incoming: IncomingEntity[] = [];
 
   for (const scene of validScenes) {
+    const links = {
+      ScenePerformer: [] as string[],
+      SceneTag: [] as string[],
+      SceneGroup: [] as string[],
+      SceneGallery: [] as string[],
+    };
     for (const p of scene.performers || []) {
       if (validateEntityId(p.id)) {
+        links.ScenePerformer.push(p.id);
         performerRecords.push(
           `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
         );
@@ -876,6 +1051,7 @@ async function processScenesBatch(
     }
     for (const t of scene.tags || []) {
       if (validateEntityId(t.id)) {
+        links.SceneTag.push(t.id);
         tagRecords.push(
           `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
         );
@@ -883,6 +1059,7 @@ async function processScenesBatch(
     }
     for (const g of scene.groups || []) {
       if (validateEntityId(g.group.id)) {
+        links.SceneGroup.push(g.group.id);
         const index = g.scene_index ?? "NULL";
         groupRecords.push(
           `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.group.id)}', '${escapeSql(instanceId)}', ${index})`
@@ -891,11 +1068,18 @@ async function processScenesBatch(
     }
     for (const g of scene.galleries || []) {
       if (validateEntityId(g.id)) {
+        links.SceneGallery.push(g.id);
         galleryRecords.push(
           `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
         );
       }
     }
+    incoming.push({
+      id: scene.id,
+      updatedAt: scene.updated_at,
+      studioId: scene.studio?.id ?? null,
+      links,
+    });
   }
 
   // Batch insert junction records
@@ -932,7 +1116,13 @@ async function processScenesBatch(
 
   await Promise.all(inserts);
 
-  return { written: validScenes.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming,
+    oldLinks,
+    compareStudio: true,
+  });
 }
 
 // ==================== Performer Sync ====================
@@ -942,11 +1132,19 @@ async function processPerformersBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (performers.length === 0) return { written: 0 };
+  if (performers.length === 0) return noChanges();
 
   // Validate IDs
   const validPerformers = performers.filter((p) => validateEntityId(p.id));
-  if (validPerformers.length === 0) return { written: 0 };
+  if (validPerformers.length === 0) return noChanges();
+
+  // What the batch's performers looked like before the write
+  const stored = await readStored(
+    "StashPerformer",
+    stashInstanceId,
+    validPerformers.map((p) => p.id),
+    false
+  );
 
   const values = validPerformers
     .map((performer) => {
@@ -1045,12 +1243,16 @@ async function processPerformersBatch(
   // Sync performer tags to PerformerTag junction table (batched for performance)
   const instanceId = stashInstanceId;
 
-  // Collect all tag relationships for batch insert
+  // Collect all tag relationships for batch insert, and each performer's
+  // new tag set for the change diff
   const tagInserts: { performerId: string; tagId: string }[] = [];
+  const incoming: IncomingEntity[] = [];
   for (const performer of validPerformers) {
+    const tagIds: string[] = [];
     if (performer.tags && performer.tags.length > 0) {
       for (const tag of performer.tags) {
         if (tag?.id && validateEntityId(tag.id)) {
+          tagIds.push(tag.id);
           tagInserts.push({
             performerId: performer.id,
             tagId: tag.id,
@@ -1058,15 +1260,23 @@ async function processPerformersBatch(
         }
       }
     }
+    incoming.push({
+      id: performer.id,
+      updatedAt: performer.updated_at,
+      links: { PerformerTag: tagIds },
+    });
   }
 
-  // Bulk delete existing tags for all performers in this batch
-  const performerIds = validPerformers
-    .map((p) => `'${escapeSql(p.id)}'`)
-    .join(",");
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM PerformerTag WHERE performerId IN (${performerIds}) AND performerInstanceId = '${escapeSql(instanceId)}'`
-  );
+  // Bulk delete existing tags for all performers in this batch, keeping
+  // the rows for the change diff
+  const oldLinks = {
+    PerformerTag: await deleteJunctionRows(
+      prisma,
+      "PerformerTag",
+      validPerformers.map((p) => p.id),
+      instanceId
+    ),
+  };
 
   // Bulk insert all new tags
   if (tagInserts.length > 0) {
@@ -1082,7 +1292,13 @@ async function processPerformersBatch(
     );
   }
 
-  return { written: validPerformers.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming,
+    oldLinks,
+    tagJunction: "PerformerTag",
+  });
 }
 
 // ==================== Studio Sync ====================
@@ -1092,11 +1308,19 @@ async function processStudiosBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (studios.length === 0) return { written: 0 };
+  if (studios.length === 0) return noChanges();
 
   // Validate IDs
   const validStudios = studios.filter((s) => validateEntityId(s.id));
-  if (validStudios.length === 0) return { written: 0 };
+  if (validStudios.length === 0) return noChanges();
+
+  // What the batch's studios looked like before the write
+  const stored = await readStored(
+    "StashStudio",
+    stashInstanceId,
+    validStudios.map((s) => s.id),
+    false
+  );
 
   const values = validStudios
     .map((studio) => {
@@ -1164,19 +1388,33 @@ async function processStudiosBatch(
 
   // Sync studio tags to StudioTag junction table
   const instanceId = stashInstanceId;
+  const oldLinks = { StudioTag: new Map<string, EntityRef[]>() };
+  const incoming: IncomingEntity[] = [];
   for (const studio of validStudios) {
+    const entity: IncomingEntity = {
+      id: studio.id,
+      updatedAt: studio.updated_at,
+    };
+    incoming.push(entity);
     if (studio.tags && studio.tags.length > 0) {
       const studioId = studio.id;
 
-      // Delete existing tags for this studio
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM StudioTag WHERE studioId = '${escapeSql(studioId)}' AND studioInstanceId = '${escapeSql(instanceId)}'`
-      );
+      // Delete existing tags for this studio, keeping the rows for the
+      // change diff
+      for (const [nearId, refs] of await deleteJunctionRows(
+        prisma,
+        "StudioTag",
+        [studioId],
+        instanceId
+      )) {
+        oldLinks.StudioTag.set(nearId, refs);
+      }
 
       // Insert new tags (filter to valid tag IDs)
       const validTags = studio.tags.filter(
         (t: TagRef) => t?.id && validateEntityId(t.id)
       );
+      entity.links = { StudioTag: validTags.map((t: TagRef) => t.id) };
       if (validTags.length > 0) {
         const tagValues = validTags
           .map(
@@ -1192,7 +1430,13 @@ async function processStudiosBatch(
     }
   }
 
-  return { written: validStudios.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming,
+    oldLinks,
+    tagJunction: "StudioTag",
+  });
 }
 
 // ==================== Tag Sync ====================
@@ -1202,11 +1446,20 @@ async function processTagsBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (tags.length === 0) return { written: 0 };
+  if (tags.length === 0) return noChanges();
 
   // Validate IDs
   const validTags = tags.filter((t) => validateEntityId(t.id));
-  if (validTags.length === 0) return { written: 0 };
+  if (validTags.length === 0) return noChanges();
+
+  // What the batch's tags looked like before the write (tags have no
+  // junction of their own: a parent change moves the tag's updated_at)
+  const stored = await readStored(
+    "StashTag",
+    stashInstanceId,
+    validTags.map((t) => t.id),
+    false
+  );
 
   const values = validTags
     .map((tag) => {
@@ -1280,7 +1533,14 @@ async function processTagsBatch(
     deletedAt = NULL
 `);
 
-  return { written: validTags.length };
+  return detectChanges({
+    instanceId: stashInstanceId,
+    stored,
+    incoming: validTags.map((tag) => ({
+      id: tag.id,
+      updatedAt: tag.updated_at,
+    })),
+  });
 }
 
 // ==================== Group Sync ====================
@@ -1290,11 +1550,19 @@ async function processGroupsBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (groups.length === 0) return { written: 0 };
+  if (groups.length === 0) return noChanges();
 
   // Validate IDs
   const validGroups = groups.filter((g) => validateEntityId(g.id));
-  if (validGroups.length === 0) return { written: 0 };
+  if (validGroups.length === 0) return noChanges();
+
+  // What the batch's groups looked like before the write
+  const stored = await readStored(
+    "StashGroup",
+    stashInstanceId,
+    validGroups.map((g) => g.id),
+    false
+  );
 
   const values = validGroups
     .map((group) => {
@@ -1351,19 +1619,33 @@ async function processGroupsBatch(
 
   // Sync group tags to GroupTag junction table
   const instanceId = stashInstanceId;
+  const oldLinks = { GroupTag: new Map<string, EntityRef[]>() };
+  const incoming: IncomingEntity[] = [];
   for (const group of validGroups) {
+    const entity: IncomingEntity = {
+      id: group.id,
+      updatedAt: group.updated_at,
+    };
+    incoming.push(entity);
     if (group.tags && group.tags.length > 0) {
       const groupId = group.id;
 
-      // Delete existing tags for this group
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM GroupTag WHERE groupId = '${escapeSql(groupId)}' AND groupInstanceId = '${escapeSql(instanceId)}'`
-      );
+      // Delete existing tags for this group, keeping the rows for the
+      // change diff
+      for (const [nearId, refs] of await deleteJunctionRows(
+        prisma,
+        "GroupTag",
+        [groupId],
+        instanceId
+      )) {
+        oldLinks.GroupTag.set(nearId, refs);
+      }
 
       // Insert new tags (filter to valid tag IDs)
       const validTags = group.tags.filter(
         (t: TagRef) => t?.id && validateEntityId(t.id)
       );
+      entity.links = { GroupTag: validTags.map((t: TagRef) => t.id) };
       if (validTags.length > 0) {
         const tagValues = validTags
           .map(
@@ -1379,7 +1661,13 @@ async function processGroupsBatch(
     }
   }
 
-  return { written: validGroups.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming,
+    oldLinks,
+    tagJunction: "GroupTag",
+  });
 }
 
 // ==================== Gallery Sync ====================
@@ -1389,11 +1677,19 @@ async function processGalleriesBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (galleries.length === 0) return { written: 0 };
+  if (galleries.length === 0) return noChanges();
 
   // Validate IDs
   const validGalleries = galleries.filter((g) => validateEntityId(g.id));
-  if (validGalleries.length === 0) return { written: 0 };
+  if (validGalleries.length === 0) return noChanges();
+
+  // What the batch's galleries looked like before the write
+  const stored = await readStored(
+    "StashGallery",
+    stashInstanceId,
+    validGalleries.map((g) => g.id),
+    true
+  );
 
   const values = validGalleries
     .map((gallery) => {
@@ -1458,13 +1754,22 @@ async function processGalleriesBatch(
     deletedAt = NULL
 `);
 
-  // Sync gallery performers (junction table)
+  // Sync gallery performers (junction table), keeping each gallery's new
+  // far sides for the change diff
   const instanceId = stashInstanceId;
+  const galleryIds = validGalleries.map((g) => g.id);
+  const linksOf = new Map(
+    validGalleries.map((g) => [
+      g.id,
+      { GalleryPerformer: [] as string[], GalleryTag: [] as string[] },
+    ])
+  );
   const performerInserts: { galleryId: string; performerId: string }[] = [];
   for (const gallery of validGalleries) {
     if (gallery.performers && gallery.performers.length > 0) {
       for (const performer of gallery.performers) {
         if (validateEntityId(performer.id)) {
+          linksOf.get(gallery.id)?.GalleryPerformer.push(performer.id);
           performerInserts.push({
             galleryId: gallery.id,
             performerId: performer.id,
@@ -1474,13 +1779,15 @@ async function processGalleriesBatch(
     }
   }
 
-  // Delete existing gallery-performer relationships for these galleries
-  const galleryIds = validGalleries
-    .map((g) => `'${escapeSql(g.id)}'`)
-    .join(",");
-  await prisma.$executeRawUnsafe(`
-    DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${escapeSql(instanceId)}'
-  `);
+  // Delete existing gallery-performer relationships for these galleries,
+  // keeping the rows for the change diff
+  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
+  oldLinks.GalleryPerformer = await deleteJunctionRows(
+    prisma,
+    "GalleryPerformer",
+    galleryIds,
+    instanceId
+  );
 
   // Insert new gallery-performer relationships
   if (performerInserts.length > 0) {
@@ -1503,6 +1810,7 @@ async function processGalleriesBatch(
     if (gallery.tags && gallery.tags.length > 0) {
       for (const tag of gallery.tags) {
         if (tag?.id && validateEntityId(tag.id)) {
+          linksOf.get(gallery.id)?.GalleryTag.push(tag.id);
           tagInserts.push({
             galleryId: gallery.id,
             tagId: tag.id,
@@ -1512,10 +1820,14 @@ async function processGalleriesBatch(
     }
   }
 
-  // Delete existing gallery-tag relationships for these galleries
-  await prisma.$executeRawUnsafe(`
-    DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${escapeSql(instanceId)}'
-  `);
+  // Delete existing gallery-tag relationships for these galleries, keeping
+  // the rows for the change diff
+  oldLinks.GalleryTag = await deleteJunctionRows(
+    prisma,
+    "GalleryTag",
+    galleryIds,
+    instanceId
+  );
 
   // Insert new gallery-tag relationships
   if (tagInserts.length > 0) {
@@ -1532,7 +1844,18 @@ async function processGalleriesBatch(
     `);
   }
 
-  return { written: validGalleries.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming: validGalleries.map((gallery) => ({
+      id: gallery.id,
+      updatedAt: gallery.updated_at,
+      studioId: gallery.studio?.id ?? null,
+      links: linksOf.get(gallery.id),
+    })),
+    oldLinks,
+    compareStudio: true,
+  });
 }
 
 // ==================== Image Sync ====================
@@ -1542,32 +1865,37 @@ async function processImagesBatch(
   stashInstanceId: string
 ): Promise<BatchChanges> {
   // Skip empty batches
-  if (images.length === 0) return { written: 0 };
+  if (images.length === 0) return noChanges();
 
   // Validate IDs
   const validImages = images.filter((i) => validateEntityId(i.id));
-  if (validImages.length === 0) return { written: 0 };
+  if (validImages.length === 0) return noChanges();
 
   const imageIds = validImages.map((i) => i.id);
   const instanceId = stashInstanceId;
 
-  // Bulk delete junction records
+  // What the batch's images looked like before the write
+  const stored = await readStored("StashImage", instanceId, imageIds, true);
+
+  // Bulk delete junction records, keeping the rows for the change diff.
   // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
   // and includes extended timeout for large libraries
-  const imageIdList = imageIds.map((id) => `'${escapeSql(id)}'`).join(",");
-  const escapedInstanceId = escapeSql(instanceId);
+  const oldLinks: Partial<Record<JunctionName, Map<string, EntityRef[]>>> = {};
   await dbWriteTransaction(
     "sync.images.junctions",
     async (tx) => {
-      await tx.$executeRawUnsafe(
-        `DELETE FROM ImagePerformer WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-      );
-      await tx.$executeRawUnsafe(
-        `DELETE FROM ImageTag WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-      );
-      await tx.$executeRawUnsafe(
-        `DELETE FROM ImageGallery WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-      );
+      for (const junction of [
+        "ImagePerformer",
+        "ImageTag",
+        "ImageGallery",
+      ] as const) {
+        oldLinks[junction] = await deleteJunctionRows(
+          tx,
+          junction,
+          imageIds,
+          instanceId
+        );
+      }
     },
     { timeout: 60000 } // 60 second timeout for large batches
   );
@@ -1637,14 +1965,22 @@ async function processImagesBatch(
       deletedAt = NULL
   `);
 
-  // Collect junction records (validate related entity IDs too)
+  // Collect junction records (validate related entity IDs too), and each
+  // image's new far sides for the change diff
   const performerRecords: string[] = [];
   const tagRecords: string[] = [];
   const galleryRecords: string[] = [];
+  const incoming: IncomingEntity[] = [];
 
   for (const image of validImages) {
+    const links = {
+      ImagePerformer: [] as string[],
+      ImageTag: [] as string[],
+      ImageGallery: [] as string[],
+    };
     for (const p of image.performers || []) {
       if (validateEntityId(p.id)) {
+        links.ImagePerformer.push(p.id);
         performerRecords.push(
           `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
         );
@@ -1652,6 +1988,7 @@ async function processImagesBatch(
     }
     for (const t of image.tags || []) {
       if (validateEntityId(t.id)) {
+        links.ImageTag.push(t.id);
         tagRecords.push(
           `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
         );
@@ -1659,11 +1996,18 @@ async function processImagesBatch(
     }
     for (const g of image.galleries || []) {
       if (validateEntityId(g.id)) {
+        links.ImageGallery.push(g.id);
         galleryRecords.push(
           `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
         );
       }
     }
+    incoming.push({
+      id: image.id,
+      updatedAt: image.updated_at,
+      studioId: image.studio?.id ?? null,
+      links,
+    });
   }
 
   // Batch insert junction records
@@ -1693,7 +2037,16 @@ async function processImagesBatch(
 
   await Promise.all(inserts);
 
-  return { written: validImages.length };
+  // An image's junction rows and studio are not compared: gallery
+  // inheritance writes into them (lead decision, 2026-09-24)
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming,
+    oldLinks,
+    compareLinks: false,
+    compareStudio: false,
+  });
 }
 
 // ==================== Clip Sync ====================
@@ -1706,7 +2059,7 @@ async function processClipsBatch(
   markers: SyncClip[],
   stashInstanceId: string
 ): Promise<BatchChanges> {
-  if (markers.length === 0) return { written: 0 };
+  if (markers.length === 0) return noChanges();
 
   // Build preview URLs for probing
   // Note: m.preview is already a full URL from Stash, just append API key
@@ -1716,8 +2069,31 @@ async function processClipsBatch(
   // Probe previews in batch
   const probeResults = await clipPreviewProber.probeBatch(previewUrls);
 
-  // Upsert clips
   const instanceId = stashInstanceId;
+  const markerIds = markers.map((m) => m.id);
+
+  // What the batch's clips looked like before the write, for the change
+  // diff: stashUpdatedAt is a DateTime here, compared as epoch milliseconds
+  const storedRows = await prisma.stashClip.findMany({
+    where: { stashInstanceId: instanceId, id: { in: markerIds } },
+    select: { id: true, stashUpdatedAt: true, deletedAt: true },
+  });
+  const stored = new Map<string, StoredEntity>(
+    storedRows.map((row) => [
+      row.id,
+      {
+        updatedAt: row.stashUpdatedAt?.getTime() ?? null,
+        deleted: row.deletedAt !== null,
+      },
+    ])
+  );
+
+  // Delete the batch's clip tags, keeping the rows for the change diff
+  const oldLinks = {
+    ClipTag: await deleteJunctionRows(prisma, "ClipTag", markerIds, instanceId),
+  };
+
+  // Upsert clips
   for (let i = 0; i < markers.length; i++) {
     const marker = markers[i] as (typeof markers)[number];
     const previewUrl = previewUrls[i] as string;
@@ -1752,14 +2128,7 @@ async function processClipsBatch(
       update: clipData,
     });
 
-    // Sync clip tags (junction table)
-    await prisma.clipTag.deleteMany({
-      where: {
-        clipId: marker.id,
-        clipInstanceId: instanceId,
-      },
-    });
-
+    // Sync clip tags (junction table); the old rows went above
     const tagIds = marker.tags.map((t) => t.id);
     if (tagIds.length > 0) {
       const tagValues = tagIds
@@ -1774,7 +2143,18 @@ async function processClipsBatch(
     }
   }
 
-  return { written: markers.length };
+  return detectChanges({
+    instanceId,
+    stored,
+    incoming: markers.map((marker) => ({
+      id: marker.id,
+      updatedAt: marker.updated_at
+        ? new Date(marker.updated_at).getTime()
+        : null,
+      links: { ClipTag: marker.tags.map((t) => t.id) },
+    })),
+    oldLinks,
+  });
 }
 
 class StashSyncService extends EventEmitter {
@@ -1793,6 +2173,13 @@ class StashSyncService extends EventEmitter {
   /** whenIdle() callers, resolved when a release leaves the lock free. */
   private readonly idleWaiters: Array<() => void> = [];
   private abortController: AbortController | null = null;
+  /**
+   * The change set of a run that ended before its post-sync steps (an
+   * abort, or a failure): the next run takes it over, so the steps still
+   * cover what that run wrote. Lost with the process; the daily full pass
+   * is the catch-all.
+   */
+  private carriedChanges: SyncChangeSet | null = null;
 
   /**
    * Get the Stash client for the specified instance ID, or default if not specified.
@@ -1980,28 +2367,54 @@ class StashSyncService extends EventEmitter {
     }
   }
 
+  /**
+   * The change set a run starts with: the one an earlier run left behind
+   * (its post-sync steps never ran), else a fresh one.
+   */
+  private takeChanges(): SyncChangeSet {
+    const changes = this.carriedChanges ?? new SyncChangeSet();
+    this.carriedChanges = null;
+    return changes;
+  }
+
   /** The running job's context. The caller holds the lock. */
   private runContext(): SyncRunContext {
     if (this.abortController === null) {
       throw new Error("A sync runs only while it holds the lock");
     }
-    return { signal: this.abortController.signal };
+    return { signal: this.abortController.signal, changes: this.takeChanges() };
   }
 
   /**
    * One sync run in `mode`: the instance given, or every enabled instance in
-   * turn. An instance that fails is logged and the next one syncs; an abort
-   * ends the whole run. The caller holds the lock.
+   * turn, then the post-sync steps once for what the whole run changed. An
+   * instance that fails is logged and the next one syncs; an abort ends the
+   * whole run, and its changes carry into the next run. The caller holds the
+   * lock.
    */
   private async runSync(
     mode: SyncMode,
     stashInstanceId?: string
   ): Promise<SyncResult[]> {
     const run = this.runContext();
-    if (stashInstanceId) {
-      return this.syncInstance(stashInstanceId, mode, run);
+    try {
+      const results = stashInstanceId
+        ? await this.syncInstance(stashInstanceId, mode, run)
+        : await this.syncEveryInstance(mode, run);
+      await this.runPostSyncSteps(run.changes, { full: mode === "full" });
+      return results;
+    } catch (error) {
+      // What this run wrote still needs its post-sync steps
+      this.carriedChanges = run.changes;
+      throw error;
     }
+  }
 
+  /** runSync over every enabled instance. */
+  private async syncEveryInstance(
+    mode: SyncMode,
+    run: SyncRunContext
+  ): Promise<SyncResult[]> {
     const enabledInstances = stashInstanceManager.getAllEnabled();
     if (enabledInstances.length === 0) {
       logger.warn("No enabled Stash instances to sync");
@@ -2038,10 +2451,11 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Syncs one instance in `mode`: every type in SYNC_ORDER, then the
-   * cleanups (on the full path each type's runs right after it), then the
-   * post-sync steps. Each type's state is saved at once, so a restart does
-   * not sync completed types again; a type that fails is recorded and the
-   * next one runs. The caller holds the lock.
+   * cleanups (on the full path each type's runs right after it). Each
+   * type's state is saved at once, so a restart does not sync completed
+   * types again; a type that fails is recorded and the next one runs. What
+   * changed goes into the run's change set; the post-sync steps run once
+   * per run, after every instance (runSync). The caller holds the lock.
    */
   private async syncInstance(
     stashInstanceId: string,
@@ -2064,10 +2478,8 @@ class StashSyncService extends EventEmitter {
 
       // Cleanup deleted entities (detect deletions/merges in Stash)
       if (mode !== "full") {
-        await this.cleanupEveryType(stashInstanceId, results);
+        await this.cleanupEveryType(stashInstanceId, results, run);
       }
-
-      await this.runInstancePostSteps(mode, results);
 
       const duration = Date.now() - startTime;
       logger.info(`${title} completed`, {
@@ -2164,47 +2576,101 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * The steps after one instance's types: the full path runs every one; the
-   * others apply gallery inheritance only when images or galleries synced,
-   * and scene tag inheritance only when scenes did.
+   * The steps after every instance of a run, once. A full pass runs every
+   * step whole library and recomputes every user: it is the catch-all for
+   * links Stash edits without moving updated_at. Otherwise the change set
+   * decides:
+   * - images written, even unchanged (their junction rows were rewritten
+   *   from Stash), re-apply gallery inheritance, as do changed galleries;
+   * - nothing changed and no user holds `pending` rows: no other step runs;
+   * - scenes changed, or a performer's, studio's or group's tag set:
+   *   scene tag inheritance;
+   * - any change: the image counts, user stats and tag counts, then the
+   *   exclusion recompute of the users who can see a changed instance,
+   *   plus those with pending holds.
+   * Inheritance and the counts are whole library still (C4 and C5 scope
+   * them to the change set); user stats and tag counts stay whole library
+   * (1.3 s and 0.04 s on the prod copy, and the stats depend on watch
+   * history as well as the library).
    */
-  private async runInstancePostSteps(
-    mode: SyncMode,
-    results: SyncResult[]
+  private async runPostSyncSteps(
+    changes: SyncChangeSet,
+    { full }: { full: boolean }
   ): Promise<void> {
-    const synced = (entityType: EntityType) =>
-      (results.find((r) => r.entityType === entityType)?.synced ?? 0) > 0;
-
-    if (mode === "full") {
-      // Compute inherited tags for scenes (must happen after scenes, performers, studios, groups are synced)
-      logger.info("Computing inherited tags for scenes...");
-      await sceneTagInheritanceService.computeInheritedTags();
-      logger.info("Scene tag inheritance complete");
-
-      // Apply gallery inheritance to images (must happen after images and galleries are synced)
-      logger.info("Applying gallery inheritance to images...");
-      await imageGalleryInheritanceService.applyGalleryInheritance();
-      logger.info("Gallery inheritance complete");
+    if (full) {
+      logger.info("Full sync: running every post-sync step");
+      await this.computeSceneTagInheritance();
+      await this.applyGalleryInheritance();
+      await this.rebuildCounts();
+      logger.info("Sync complete, recomputing user exclusions...");
+      await exclusionComputationService.recomputeAllUsers();
+      logger.info("User exclusions recomputed");
     } else {
-      const { name } = SYNC_MODE_NAMES[mode];
-
-      // Apply gallery inheritance if images or galleries were synced
-      // (galleries may have new performers/tags that need to propagate to images)
-      if (synced("image") || synced("gallery")) {
-        logger.info(`Applying gallery inheritance after ${name}...`);
-        await imageGalleryInheritanceService.applyGalleryInheritance();
-        logger.info("Gallery inheritance complete");
+      const wroteImages = !changes.written("image").isEmpty();
+      if (
+        wroteImages ||
+        !changes.changed("gallery").isEmpty() ||
+        !changes.changed("image").isEmpty()
+      ) {
+        await this.applyGalleryInheritance();
       }
 
-      // Compute inherited tags for scenes if scenes were updated
-      if (synced("scene")) {
-        logger.info(`Computing inherited tags for scenes after ${name}...`);
-        await sceneTagInheritanceService.computeInheritedTags();
-        logger.info("Scene tag inheritance complete");
+      if (changes.isEmpty()) {
+        const pending =
+          await exclusionComputationService.usersWithPendingHolds();
+        if (pending.length === 0) {
+          logger.info(
+            wroteImages
+              ? "nothing changed; only gallery inheritance re-applied to the rewritten images"
+              : "nothing changed, post-sync steps skipped"
+          );
+        } else {
+          logger.info(
+            "nothing changed; recomputing the users with pending holds",
+            {
+              users: pending.length,
+            }
+          );
+          await exclusionComputationService.recomputeUsersForInstances([]);
+        }
+      } else {
+        const tagSetChanged = (["performer", "studio", "group"] as const).some(
+          (type) => !changes.tagSetChanged(type).isEmpty()
+        );
+        if (!changes.changed("scene").isEmpty() || tagSetChanged) {
+          await this.computeSceneTagInheritance();
+        }
+        await this.rebuildCounts();
+        const instances = changes.instances();
+        logger.info(
+          "Sync complete, recomputing the exclusions of the users on the changed instances...",
+          {
+            instances,
+          }
+        );
+        await exclusionComputationService.recomputeUsersForInstances(instances);
+        logger.info("User exclusions recomputed");
       }
     }
+    // D8: PRAGMA optimize goes here, at the end of every run's steps
+  }
 
-    // Rebuild inherited image counts (must happen after gallery inheritance)
+  /** Scene tag inheritance, whole library (after scenes, performers, studios and groups). */
+  private async computeSceneTagInheritance(): Promise<void> {
+    logger.info("Computing inherited tags for scenes...");
+    await sceneTagInheritanceService.computeInheritedTags();
+    logger.info("Scene tag inheritance complete");
+  }
+
+  /** Gallery inheritance, whole library (after images and galleries). */
+  private async applyGalleryInheritance(): Promise<void> {
+    logger.info("Applying gallery inheritance to images...");
+    await imageGalleryInheritanceService.applyGalleryInheritance();
+    logger.info("Gallery inheritance complete");
+  }
+
+  /** The image counts (after gallery inheritance), user stats and tag counts. */
+  private async rebuildCounts(): Promise<void> {
     logger.info("Rebuilding inherited image counts...");
     await entityImageCountService.rebuildAllImageCounts();
     logger.info("Inherited image counts rebuild complete");
@@ -2213,13 +2679,7 @@ class StashSyncService extends EventEmitter {
     await userStatsService.rebuildAllStats();
     logger.info("User stats rebuild complete");
 
-    // Compute tag scene counts via performers
     await this.computeTagSceneCountsViaPerformers();
-
-    // Recompute exclusions for all users after sync
-    logger.info("Sync complete, recomputing user exclusions...");
-    await exclusionComputationService.recomputeAllUsers();
-    logger.info("User exclusions recomputed");
   }
 
   /**
@@ -2350,7 +2810,10 @@ class StashSyncService extends EventEmitter {
           // Track max updated_at for sync state
           maxUpdatedAt = newestUpdatedAt(maxUpdatedAt, items);
 
-          await spec.processBatch(items, stashInstanceId, run);
+          run.changes.addBatch(
+            entityType,
+            await spec.processBatch(items, stashInstanceId, run)
+          );
 
           fetched += items.length;
           synced += items.length;
@@ -2452,6 +2915,7 @@ class StashSyncService extends EventEmitter {
         entityType,
         stashInstanceId
       );
+      run.changes.addDeleted(entityType, stashInstanceId, outcome.deletedIds);
       result.deleted = outcome.deleted;
       result.error = joinProblems(result.error, cleanupProblem(outcome));
     }
@@ -2462,12 +2926,14 @@ class StashSyncService extends EventEmitter {
 
   /**
    * The incremental paths' cleanup, every type after all of them synced.
-   * Each type's soft-deleted count goes into its result, and a cleanup that
-   * skips, refuses or fails is added to the type's `lastError`.
+   * Each type's soft-deleted count goes into its result and its rows into
+   * the run's change set, and a cleanup that skips, refuses or fails is
+   * added to the type's `lastError`.
    */
   private async cleanupEveryType(
     stashInstanceId: string,
-    results: SyncResult[]
+    results: SyncResult[],
+    run: SyncRunContext
   ): Promise<void> {
     logger.info("Checking for deleted entities...");
     let totalDeleted = 0;
@@ -2477,6 +2943,7 @@ class StashSyncService extends EventEmitter {
         entityType,
         stashInstanceId
       );
+      run.changes.addDeleted(entityType, stashInstanceId, outcome.deletedIds);
       totalDeleted += outcome.deleted;
       const result = results.find((r) => r.entityType === entityType);
       if (result) result.deleted = outcome.deleted;
@@ -2542,8 +3009,11 @@ class StashSyncService extends EventEmitter {
    *    target; each scene cleanup first catches up on scenes an earlier one
    *    soft-deleted but did not reconcile.
    *
-   * An abort rethrows; any other failure returns `{ deleted: 0, error }`,
-   * and a failure before step 5 soft-deletes nothing.
+   * An abort rethrows; any other failure returns the `error`. A failure
+   * before step 5 soft-deletes nothing (`deleted` 0, no `deletedIds`); one
+   * at or after it returns the rows soft-deleted so far in `deleted` and
+   * the whole delete set in `deletedIds`, so the run's change set covers
+   * every row that may have gone.
    */
   private async cleanupDeletedEntities(
     entityType: EntityType,
@@ -2553,6 +3023,8 @@ class StashSyncService extends EventEmitter {
     const { table, plural } = ENTITY_TABLES[entityType];
     logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
+    // Set once the soft-delete starts: what a failure after that leaves
+    const progress = { attempted: [] as string[], changed: 0 };
     const skip = (reason: string): CleanupOutcome => {
       logger.warn(
         `Cleanup safety: ${reason}. Skipping ${plural} cleanup to prevent false deletions.`
@@ -2654,11 +3126,13 @@ class StashSyncService extends EventEmitter {
 
       // 5. Soft-delete
       const deletedIds = missing.map((row) => row.id);
+      progress.attempted = deletedIds;
       const deleted = await this.softDeleteMissing(
         entityType,
         stashInstanceId,
         deletedIds,
-        new Date()
+        new Date(),
+        progress
       );
 
       // 6. Merges, once every scene that left Stash is soft-deleted
@@ -2681,13 +3155,18 @@ class StashSyncService extends EventEmitter {
       // Kept in the type's lastError: never the query a Stash error embeds
       const message = describeStashError(error);
       logger.error(`Failed to cleanup deleted ${plural}`, { error: message });
-      return { deleted: 0, deletedIds: [], error: message };
+      return {
+        deleted: progress.changed,
+        deletedIds: progress.attempted,
+        error: message,
+      };
     }
   }
 
   /**
    * Soft-deletes `ids` of one type and instance, CLEANUP_SOFT_DELETE_BATCH
-   * rows per writer-queue unit, and returns how many rows changed.
+   * rows per writer-queue unit, and returns how many rows changed (also
+   * kept up to date in `progress.changed`, for a failure midway).
    * `deletedAt` is bound as epoch milliseconds, which is how Prisma stores a
    * DateTime in SQLite, so Prisma reads it back as `now`. A failure midway
    * leaves the batches already written soft-deleted, and the next cleanup
@@ -2697,13 +3176,13 @@ class StashSyncService extends EventEmitter {
     entityType: EntityType,
     stashInstanceId: string,
     ids: string[],
-    now: Date
+    now: Date,
+    progress: { changed: number } = { changed: 0 }
   ): Promise<number> {
     const { table, plural } = ENTITY_TABLES[entityType];
-    let changed = 0;
     for (let i = 0; i < ids.length; i += CLEANUP_SOFT_DELETE_BATCH) {
       const batch = JSON.stringify(ids.slice(i, i + CLEANUP_SOFT_DELETE_BATCH));
-      changed += await dbWrite(`sync.cleanup.${plural}`, () =>
+      progress.changed += await dbWrite(`sync.cleanup.${plural}`, () =>
         prisma.$executeRawUnsafe(
           `UPDATE "${table}" SET "deletedAt" = ?
            WHERE "stashInstanceId" = ? AND "deletedAt" IS NULL
@@ -2714,7 +3193,7 @@ class StashSyncService extends EventEmitter {
         )
       );
     }
-    return changed;
+    return progress.changed;
   }
 
   // ==================== Helper Methods ====================
@@ -2744,8 +3223,9 @@ class StashSyncService extends EventEmitter {
    * Takes the lock as a sync at once, and throws SyncBusyError when a sync
    * or an instance deletion holds it. The returned promise is the cleanup:
    * its outcome replaces the type's `lastError` (null when it ran clean, the
-   * skip or failure otherwise), then the lock is released. Abort stops it
-   * like a sync, rejecting with "Sync aborted" and recording nothing.
+   * skip or failure otherwise), the post-sync steps run for what it
+   * soft-deleted, then the lock is released. Abort stops it like a sync,
+   * rejecting with "Sync aborted" and recording nothing.
    */
   runCleanup(
     entityType: EntityType,
@@ -2764,23 +3244,31 @@ class StashSyncService extends EventEmitter {
     stashInstanceId: string,
     options: CleanupOptions
   ): Promise<CleanupOutcome> {
-    const outcome = await this.cleanupDeletedEntities(
-      entityType,
-      stashInstanceId,
-      options
-    );
-    await this.recordEntityError(
-      stashInstanceId,
-      entityType,
-      cleanupProblem(outcome) ?? null
-    );
-    logger.info("Cleanup run by an admin finished", {
-      stashInstanceId,
-      entityType,
-      deleted: outcome.deleted,
-      problem: cleanupProblem(outcome) ?? null,
-    });
-    return outcome;
+    const changes = this.takeChanges();
+    try {
+      const outcome = await this.cleanupDeletedEntities(
+        entityType,
+        stashInstanceId,
+        options
+      );
+      changes.addDeleted(entityType, stashInstanceId, outcome.deletedIds);
+      await this.recordEntityError(
+        stashInstanceId,
+        entityType,
+        cleanupProblem(outcome) ?? null
+      );
+      logger.info("Cleanup run by an admin finished", {
+        stashInstanceId,
+        entityType,
+        deleted: outcome.deleted,
+        problem: cleanupProblem(outcome) ?? null,
+      });
+      await this.runPostSyncSteps(changes, { full: false });
+      return outcome;
+    } catch (error) {
+      this.carriedChanges = changes;
+      throw error;
+    }
   }
 
   /**
@@ -3068,15 +3556,20 @@ class StashSyncService extends EventEmitter {
    * rankings). Rows for every instance (`instanceId = ''`) stay. The
    * instance manager then reloads, so no later sync can reach it.
    *
-   * It answers once that is done. The cached library goes afterwards,
-   * still under the lock, in `purged` (which never rejects): its rows carry
-   * an instance id that no longer exists, so a failure or an abort midway
-   * leaves them to the startup sweep (`purgeUnknownInstanceCaches`).
+   * It answers once that is done. Afterwards, still under the lock, in
+   * `purged` (which never rejects): the users whose scope held the instance
+   * (no selection, or a selection naming it, read before the batch removes
+   * the selections) are recomputed, since their library changed, and then
+   * the cached library goes. Its rows carry an instance id that no longer
+   * exists, so a failure or an abort midway leaves them to the startup
+   * sweep (`purgeUnknownInstanceCaches`).
    */
   async deleteInstance(instanceId: string): Promise<{ purged: Promise<void> }> {
     this.acquire("instance-delete");
 
+    let affectedUsers: number[];
     try {
+      affectedUsers = await getUsersSelecting(instanceId);
       const own = { instanceId };
       await dbWriteBatch("instance.delete", [
         prisma.stashInstance.delete({ where: { id: instanceId } }),
@@ -3119,7 +3612,11 @@ class StashSyncService extends EventEmitter {
     logger.info("Deleted Stash instance; removing its cached library", {
       instanceId,
     });
-    const purged = this.purgeInstanceCache(instanceId)
+    const purged = exclusionComputationService
+      .recomputeUsers(affectedUsers, "recomputeUsersAfterInstanceDelete", {
+        instanceId,
+      })
+      .then(() => this.purgeInstanceCache(instanceId))
       .then(() => undefined)
       .catch((error: unknown) => {
         logger.error(

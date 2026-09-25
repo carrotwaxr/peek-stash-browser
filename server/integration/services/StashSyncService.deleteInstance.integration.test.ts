@@ -10,8 +10,17 @@
  * The instances point at UNREACHABLE_STASH_URL and are disabled, so no sync
  * touches them; the server process never loads them either.
  */
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import {
   SyncBusyError,
@@ -27,6 +36,9 @@ const B = "delete-it-b";
 const GHOST = "delete-it-ghost";
 const INSTANCES = [A, B, GHOST];
 const USERNAME = "delete_it_user";
+/** A second user whose selection is B only: A's deletion is not their business */
+const USERNAME_B_ONLY = "delete_it_user_b_only";
+const USERNAMES = [USERNAME, USERNAME_B_ONLY];
 const ID = "1";
 
 const ENTITY_TABLES = [
@@ -180,7 +192,7 @@ function all(
 
 async function clearSeed(): Promise<void> {
   const users = await prisma.user.findMany({
-    where: { username: USERNAME },
+    where: { username: { in: USERNAMES } },
     select: { id: true },
   });
   const userIds = users.map((u) => u.id);
@@ -195,7 +207,7 @@ async function clearSeed(): Promise<void> {
   await prisma.userEntityRanking.deleteMany({
     where: { userId: { in: userIds } },
   });
-  await prisma.user.deleteMany({ where: { username: USERNAME } });
+  await prisma.user.deleteMany({ where: { username: { in: USERNAMES } } });
 
   // Junction rows cascade from their entities; clips from their scene
   for (const table of ENTITY_TABLES) {
@@ -354,9 +366,36 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
     });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   afterAll(async () => {
     await clearSeed();
     await stashInstanceManager.reload();
+  });
+
+  it("deleting an instance recomputes the users whose selection contained it", async () => {
+    const bOnly = await prisma.user.create({
+      data: { username: USERNAME_B_ONLY, password: "not-a-real-hash" },
+    });
+    const bOnlyUserId = bOnly.id;
+    await prisma.userStashInstance.create({
+      data: { userId: bOnlyUserId, instanceId: B },
+    });
+    const recompute = vi
+      .spyOn(exclusionComputationService, "recomputeForUser")
+      .mockResolvedValue(undefined);
+
+    const { purged } = await stashSyncService.deleteInstance(A);
+    await purged;
+
+    const recomputed = recompute.mock.calls.map((call) => call[0]);
+    // The test user selected A and B; the other user only B
+    expect(recomputed).toContain(userId);
+    expect(recomputed).not.toContain(bOnlyUserId);
+    // Once each
+    expect(recomputed.filter((id) => id === userId)).toHaveLength(1);
   });
 
   it("deleting instance A keeps every junction row of instance B", async () => {
