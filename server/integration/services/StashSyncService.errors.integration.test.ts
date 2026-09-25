@@ -247,7 +247,7 @@ async function clearInstance(): Promise<void> {
 describeWithDb("StashSyncService, one type failing (integration)", () => {
   beforeAll(async () => {
     // The instances the server knows (the test Stash), as in production:
-    // clip sync and the post-sync stats read the default one
+    // the post-sync stats read the default one
     await stashInstanceManager.reload();
   });
 
@@ -257,6 +257,14 @@ describeWithDb("StashSyncService, one type failing (integration)", () => {
     const client = stubClient();
     vi.spyOn(stashInstanceManager, "get").mockImplementation((id) =>
       id === INSTANCE ? client : realGet(id)
+    );
+    // Clip sync probes previews with its instance's own key
+    const realCredentials =
+      stashInstanceManager.getCredentials.bind(stashInstanceManager);
+    vi.spyOn(stashInstanceManager, "getCredentials").mockImplementation((id) =>
+      id === INSTANCE
+        ? { baseUrl: "http://stash.invalid", apiKey: "sync-errors-it-key" }
+        : realCredentials(id)
     );
     // The clip's preview is on no real Stash
     vi.spyOn(clipPreviewProber, "probeBatch").mockResolvedValue(new Map());
