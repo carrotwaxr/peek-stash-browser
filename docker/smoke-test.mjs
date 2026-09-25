@@ -9,6 +9,12 @@
  * EXPECT_BUILD_DATE, when set, must equal the image's BUILD_DATE build arg.
  * EXPECT_VERSION, when set, replaces server/package.json's version (only for
  * checking an older published image by hand).
+ *
+ * UPGRADE_FROM, when set to a published image (image-smoke.yml's
+ * upgrade-check uses carrotwaxr/peek-stash-browser:latest), adds the upgrade
+ * and downgrade checks: that image creates a database, the image under test
+ * upgrades it after backing it up, and the backup restored brings the older
+ * image back.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -32,13 +38,29 @@ const migrations = readdirSync(new URL("server/prisma/migrations/", repo), {
   .map((entry) => entry.name)
   .sort();
 
+const upgradeFrom = process.env.UPGRADE_FROM || "";
+
 const name = `peek-smoke-${process.pid}`;
 const volume = `${name}-data`;
+const upgradeName = `${name}-upgrade`;
+const upgradeVolume = `${upgradeName}-data`;
 const base = `http://127.0.0.1:${port}`;
+const DATABASE = "/app/data/peek-stash-browser.db";
+const APPLIED_MIGRATIONS =
+  "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY 1";
 const docker = (...args) =>
   execFileSync("docker", args, { encoding: "utf8" }).trim();
-const sql = (query) =>
-  docker("exec", name, "sqlite3", "/app/data/peek-stash-browser.db", query);
+// A backup is read with -readonly, so root's read leaves no file beside it
+const sqlIn = (container, query, file = DATABASE) =>
+  file === DATABASE
+    ? docker("exec", container, "sqlite3", file, query)
+    : docker("exec", container, "sqlite3", "-readonly", file, query);
+const sql = (query) => sqlIn(name, query);
+const logsOf = (container, ...args) =>
+  execFileSync("docker", ["logs", ...args, container], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
 let failures = 0;
 async function check(what, fn) {
@@ -58,13 +80,13 @@ function expectEqual(actual, expected, label) {
   }
 }
 
-async function waitHealthy() {
+async function waitHealthy(container = name) {
   for (let i = 0; i < 90; i++) {
     const [health, running] = docker(
       "inspect",
       "-f",
       "{{.State.Health.Status}} {{.State.Running}}",
-      name
+      container
     ).split(" ");
     if (health === "healthy") return;
     if (health === "unhealthy" || running !== "true") {
@@ -79,6 +101,123 @@ async function get(path) {
   const response = await fetch(`${base}${path}`);
   expectEqual(response.status, 200, `GET ${path} status`);
   return response;
+}
+
+/** Starts `img` as the upgrade check's container on its volume. */
+function startForUpgrade(img) {
+  docker(
+    "run",
+    "-d",
+    "--name",
+    upgradeName,
+    "-p",
+    `127.0.0.1:${port}:80`,
+    "-v",
+    `${upgradeVolume}:/app/data`,
+    img
+  );
+}
+
+function stopForUpgrade() {
+  docker("stop", "-t", "2", upgradeName);
+  docker("rm", upgradeName);
+}
+
+/**
+ * The upgrade and downgrade checks (UPGRADE_FROM). The older image creates a
+ * database; the image under test backs it up before applying the migrations
+ * the older one lacks (and takes no backup when there are none); then the
+ * backup, copied over the database, starts the older image again.
+ */
+async function checkUpgrade() {
+  // Each step needs the one before it
+  const failuresBefore = failures;
+  const failed = () => failures > failuresBefore;
+  // The first container gives up the port
+  docker("stop", "-t", "3", name);
+  docker("volume", "create", upgradeVolume);
+
+  let before = [];
+  await check(`${upgradeFrom} starts on a new volume`, async () => {
+    startForUpgrade(upgradeFrom);
+    await waitHealthy(upgradeName);
+    before = sqlIn(upgradeName, APPLIED_MIGRATIONS).split("\n");
+    stopForUpgrade();
+  });
+  if (failed()) return;
+
+  const added = migrations.filter((m) => !before.includes(m));
+  const pattern = new RegExp(
+    `^peek-stash-browser\\.db\\.backup-\\d{8}-\\d{6}-pre-${version.replace(/\./g, "\\.")}$`
+  );
+  let backup = null;
+  await check(
+    added.length > 0
+      ? `the upgrade backs up the database before applying ${added.length} migration(s) ${upgradeFrom} lacks`
+      : `the upgrade from ${upgradeFrom} applies no migration and takes no backup`,
+    async () => {
+      startForUpgrade(image);
+      await waitHealthy(upgradeName);
+      const backups = docker("exec", upgradeName, "ls", "/app/data")
+        .split("\n")
+        .filter((file) => pattern.test(file));
+      if (added.length === 0) {
+        expectEqual(backups.length, 0, "pre-migration backups");
+        return;
+      }
+      expectEqual(backups.length, 1, "pre-migration backups");
+      backup = `/app/data/${backups[0]}`;
+      const log = logsOf(upgradeName);
+      if (
+        !log.includes(`Backed up the database to ${backup} before migrating`)
+      ) {
+        throw new Error(`no 'Backed up the database to ${backup}' in the log`);
+      }
+      expectEqual(
+        sqlIn(upgradeName, APPLIED_MIGRATIONS, backup),
+        before.join("\n"),
+        "the backup's applied migrations"
+      );
+      expectEqual(
+        sqlIn(upgradeName, APPLIED_MIGRATIONS),
+        migrations.join("\n"),
+        "the upgraded database's applied migrations"
+      );
+    }
+  );
+  if (failed()) return;
+
+  await check(
+    backup
+      ? "the pre-migration backup restores on the previous image"
+      : `${upgradeFrom} starts again on the database the upgrade left`,
+    async () => {
+      stopForUpgrade();
+      if (backup) {
+        docker(
+          "run",
+          "--rm",
+          "-u",
+          "99:100",
+          "-v",
+          `${upgradeVolume}:/app/data`,
+          "--entrypoint",
+          "sh",
+          image,
+          "-c",
+          `rm -f ${DATABASE}-wal ${DATABASE}-shm && cp ${backup} ${DATABASE}`
+        );
+      }
+      startForUpgrade(upgradeFrom);
+      await waitHealthy(upgradeName);
+      await get("/api/setup/status");
+      expectEqual(
+        sqlIn(upgradeName, APPLIED_MIGRATIONS),
+        backup ? before.join("\n") : migrations.join("\n"),
+        "the database's applied migrations"
+      );
+    }
+  );
 }
 
 const SECURITY_HEADERS = {
@@ -288,6 +427,8 @@ try {
       }
     }
   );
+
+  if (upgradeFrom) await checkUpgrade();
 } finally {
   if (failures) {
     console.log("--- container log (last 80 lines) ---");
@@ -297,6 +438,25 @@ try {
   }
   execFileSync("docker", ["rm", "-f", name], { stdio: "ignore" });
   execFileSync("docker", ["volume", "rm", volume], { stdio: "ignore" });
+  if (upgradeFrom) {
+    const running = execFileSync(
+      "docker",
+      ["ps", "-aq", "--filter", `name=^${upgradeName}$`],
+      { encoding: "utf8" }
+    ).trim();
+    if (running) {
+      if (failures) {
+        console.log("--- upgrade container log (last 80 lines) ---");
+        execFileSync("docker", ["logs", "--tail", "80", upgradeName], {
+          stdio: "inherit",
+        });
+      }
+      execFileSync("docker", ["rm", "-f", upgradeName], { stdio: "ignore" });
+    }
+    execFileSync("docker", ["volume", "rm", "-f", upgradeVolume], {
+      stdio: "ignore",
+    });
+  }
 }
 
 console.log(failures ? `${failures} check(s) failed` : "all checks passed");

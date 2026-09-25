@@ -306,11 +306,6 @@
       "count": 3
     }
   },
-  "services/DatabaseBackupService.ts": {
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    }
-  },
   "services/DownloadService.ts": {
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2

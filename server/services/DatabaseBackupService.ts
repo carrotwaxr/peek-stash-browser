@@ -5,13 +5,39 @@
  * - List existing backups
  * - Create new backups using VACUUM INTO
  * - Delete backup files
+ * - Back up the database before the server applies pending migrations
  */
+import type { PrismaClient } from "@prisma/client";
 import fs from "fs/promises";
 import path from "path";
 import prisma from "../prisma/singleton.js";
+import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
 
 const BACKUP_PATTERN = /^peek-stash-browser\.db\.backup-\d{8}-\d{6}$/;
+
+/** How many pre-migration backups are kept; older ones are deleted. */
+export const PRE_MIGRATION_BACKUPS_KEPT = 3;
+
+const MIB = 1024 * 1024;
+
+/**
+ * Free space an upgrade needs, per byte the database uses: the backup (about
+ * the used size, since `VACUUM INTO` writes only used pages), the migrations'
+ * peak WAL (up to the used size again for a migration that rebuilds tables)
+ * and the main file's growth.
+ */
+const UPGRADE_SPACE_PER_USED_BYTE = 2.2;
+/** Headroom on top, so a small database still leaves room to run. */
+const UPGRADE_SPACE_MARGIN = 64 * MIB;
+
+/** Errors meaning the platform cannot open or fsync a directory. */
+const DIRECTORY_SYNC_UNSUPPORTED = new Set([
+  "EINVAL",
+  "ENOTSUP",
+  "EISDIR",
+  "EPERM",
+]);
 
 export interface BackupInfo {
   filename: string;
@@ -19,9 +45,118 @@ export interface BackupInfo {
   createdAt: Date;
 }
 
+export interface PreMigrationBackup extends BackupInfo {
+  /** The backup's full path. */
+  path: string;
+}
+
+export interface PreMigrationBackupOptions {
+  /** The database to back up; the server's client by default. */
+  client?: PrismaClient;
+  /** Where the backup goes; `getBackupDir()` by default. */
+  dir?: string;
+}
+
+/** Bytes as MB or GB, for messages. */
+function formatSize(bytes: number): string {
+  return bytes >= 1e9
+    ? `${(bytes / 1e9).toFixed(2)} GB`
+    : `${(bytes / 1e6).toFixed(1)} MB`;
+}
+
+/**
+ * Thrown before a migration when the backup directory has too little free
+ * space for the backup and the migration after it. Nothing has been written.
+ */
+export class InsufficientSpaceError extends Error {
+  readonly dir: string;
+  /** Bytes free in `dir`. */
+  readonly free: number;
+  /** Bytes the backup and the migration need free. */
+  readonly needed: number;
+
+  constructor(dir: string, free: number, needed: number) {
+    super(
+      `Not enough disk space to upgrade the database: the upgrade needs ${formatSize(needed)} free in ${dir}, which has ${formatSize(free)} (a backup of the database, then room for the migrations to run). Free at least ${formatSize(needed - free)} there, for example by deleting old *.backup-* files, then start Peek again. Nothing was changed.`
+    );
+    this.name = "InsufficientSpaceError";
+    this.dir = dir;
+    this.free = free;
+    this.needed = needed;
+  }
+}
+
+/** A string safe inside a file name: the version, in practice. */
+function fileNamePart(value: string): string {
+  return value.replace(/[^0-9A-Za-z.+-]/g, "_");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The pre-migration backups of the database named `base`:
+ * `<base>.backup-<YYYYMMDD-HHMMSS>-pre-<version>`, not SQLite's `-wal`,
+ * `-shm` or `-journal` files beside one.
+ */
+function preMigrationPattern(base: string): RegExp {
+  return new RegExp(
+    `^${escapeRegExp(base)}\\.backup-\\d{8}-\\d{6}-pre-[0-9A-Za-z.+_-]+(?<!-wal|-shm|-journal)$`
+  );
+}
+
+/**
+ * The file name of the database `client` is connected to, such as
+ * `peek-stash-browser.db`, read from SQLite itself so that it holds wherever
+ * `DATABASE_URL` points.
+ */
+export async function getDatabaseBaseName(
+  client: PrismaClient = prisma
+): Promise<string> {
+  const rows = await client.$queryRaw<
+    { file: string }[]
+  >`SELECT file FROM pragma_database_list WHERE name = 'main'`;
+  const file = rows[0]?.file ?? "";
+  return file === "" ? "peek-stash-browser.db" : path.basename(file);
+}
+
+/** Bytes in the pages the database uses (its freelist left out). */
+async function usedBytes(client: PrismaClient): Promise<number> {
+  const rows = await client.$queryRaw<{ used: bigint | number }[]>`
+    SELECT (page_count - freelist_count) * page_size AS used
+    FROM pragma_page_count(), pragma_freelist_count(), pragma_page_size()
+  `;
+  return Number(rows[0]?.used ?? 0);
+}
+
+/** Flushes a file, then its directory entry, to disk. */
+async function syncToDisk(file: string): Promise<void> {
+  const handle = await fs.open(file, "r+");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    const dir = await fs.open(path.dirname(file), "r");
+    try {
+      await dir.sync();
+    } finally {
+      await dir.close();
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === undefined || !DIRECTORY_SYNC_UNSUPPORTED.has(code)) {
+      throw error;
+    }
+  }
+}
+
 class DatabaseBackupService {
-  private getDataDir(): string {
-    return process.env.CONFIG_DIR || "/app/data";
+  /** Where backups are written and listed: the config directory. */
+  getBackupDir(): string {
+    return getConfigDir();
   }
 
   /**
@@ -29,7 +164,7 @@ class DatabaseBackupService {
    * Returns sorted by date descending (newest first).
    */
   async listBackups(): Promise<BackupInfo[]> {
-    const dataDir = this.getDataDir();
+    const dataDir = this.getBackupDir();
 
     let files: string[];
     try {
@@ -73,7 +208,7 @@ class DatabaseBackupService {
    * Returns info about the created backup.
    */
   async createBackup(): Promise<BackupInfo> {
-    const dataDir = this.getDataDir();
+    const dataDir = this.getBackupDir();
     const timestamp = this.formatTimestamp(new Date());
     const filename = `peek-stash-browser.db.backup-${timestamp}`;
     const backupPath = path.join(dataDir, filename);
@@ -81,7 +216,7 @@ class DatabaseBackupService {
     logger.info(`Creating database backup: ${filename}`);
 
     // Use VACUUM INTO for atomic, consistent backup
-    await prisma.$executeRawUnsafe(`VACUUM INTO '${backupPath}'`);
+    await prisma.$executeRaw`VACUUM INTO ${backupPath}`;
 
     const stat = await fs.stat(backupPath);
 
@@ -97,6 +232,86 @@ class DatabaseBackupService {
   }
 
   /**
+   * Copies the database with `VACUUM INTO` before the server migrates it to
+   * `targetVersion`, as `<base>.backup-<YYYYMMDD-HHMMSS>-pre-<targetVersion>`
+   * in the backup directory, synced to disk; then deletes all but the newest
+   * `PRE_MIGRATION_BACKUPS_KEPT` pre-migration backups. Manual and legacy
+   * backups are never deleted.
+   *
+   * Throws `InsufficientSpaceError`, before writing anything, when the
+   * directory has less free space than the backup and the migration need.
+   * A failed copy leaves no partial file behind.
+   */
+  async createPreMigrationBackup(
+    targetVersion: string,
+    opts: PreMigrationBackupOptions = {}
+  ): Promise<PreMigrationBackup> {
+    const client = opts.client ?? prisma;
+    const dir = opts.dir ?? this.getBackupDir();
+    const base = await getDatabaseBaseName(client);
+
+    const used = await usedBytes(client);
+    const { bavail, bsize } = await fs.statfs(dir);
+    const free = bavail * bsize;
+    const needed = Math.ceil(
+      used * UPGRADE_SPACE_PER_USED_BYTE + UPGRADE_SPACE_MARGIN
+    );
+    if (free < needed) throw new InsufficientSpaceError(dir, free, needed);
+
+    const filename = `${base}.backup-${this.formatTimestamp(new Date())}-pre-${fileNamePart(targetVersion)}`;
+    const backupPath = path.join(dir, filename);
+    const started = performance.now();
+    // VACUUM INTO writes into an empty file. Creating it here claims the
+    // name, so the cleanup below never deletes a file this call did not make
+    await (await fs.open(backupPath, "wx")).close();
+    try {
+      await client.$executeRaw`VACUUM INTO ${backupPath}`;
+      // A power cut after the migration must not find a torn backup
+      await syncToDisk(backupPath);
+    } catch (error) {
+      await fs.unlink(backupPath).catch(() => undefined);
+      throw error;
+    }
+    const seconds = (performance.now() - started) / 1000;
+
+    const stat = await fs.stat(backupPath);
+    logger.info(
+      `Backed up the database to ${backupPath} before migrating (${formatSize(stat.size)}, ${seconds.toFixed(1)} s)`
+    );
+    await this.prunePreMigrationBackups(dir, base);
+    return {
+      filename,
+      path: backupPath,
+      size: stat.size,
+      createdAt: stat.mtime,
+    };
+  }
+
+  /**
+   * Deletes all but the newest `PRE_MIGRATION_BACKUPS_KEPT` pre-migration
+   * backups of `base` in `dir`. Their names sort by their timestamps.
+   */
+  private async prunePreMigrationBackups(
+    dir: string,
+    base: string
+  ): Promise<void> {
+    const pattern = preMigrationPattern(base);
+    const backups = (await fs.readdir(dir))
+      .filter((name) => pattern.test(name))
+      .sort();
+    for (const name of backups.slice(0, -PRE_MIGRATION_BACKUPS_KEPT)) {
+      try {
+        await fs.unlink(path.join(dir, name));
+        logger.info(`Deleted the old pre-migration backup ${name}`);
+      } catch (error) {
+        logger.warn(`Could not delete the old pre-migration backup ${name}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /**
    * Delete a backup file.
    * Validates filename to prevent path traversal attacks.
    */
@@ -106,7 +321,7 @@ class DatabaseBackupService {
       throw new Error("Invalid backup filename");
     }
 
-    const dataDir = this.getDataDir();
+    const dataDir = this.getBackupDir();
     const filePath = path.join(dataDir, filename);
 
     logger.info(`Deleting backup: ${filename}`);

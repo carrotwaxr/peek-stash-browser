@@ -6,6 +6,10 @@
  * no process; otherwise it runs `prisma migrate deploy` once. The image's
  * start script only starts Node.
  *
+ * Before the first write to a database that has data, the server copies it
+ * into the config directory (`createPreMigrationBackup`): the way back to the
+ * version that ran before.
+ *
  * Databases from before Peek kept migration history (`prisma db push`, up to
  * v2.0.0) upgrade only from v2.0.0, whose tables are `0_baseline`'s; older
  * ones stop at startup with an error naming the release to run first.
@@ -16,8 +20,10 @@ import { existsSync, readdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import prisma from "../prisma/singleton.js";
+import { databaseBackupService } from "../services/DatabaseBackupService.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
+import { getServerVersion } from "../utils/serverVersion.js";
 
 /** A row of `_prisma_migrations`, as Prisma reads it. */
 export interface MigrationRow {
@@ -279,6 +285,21 @@ export interface MigrationResult {
   applied: string[];
 }
 
+/**
+ * After a failed deploy, gives back the disk its WAL took, which a migration
+ * that ran out of space leaves behind. Best effort: the deploy's error is
+ * the one that matters.
+ */
+async function truncateWal(client: PrismaClient): Promise<void> {
+  try {
+    await client.$queryRaw`PRAGMA wal_checkpoint(TRUNCATE)`;
+  } catch (error) {
+    logger.warn(
+      `Could not truncate the WAL after the failed migration: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 function migrationCount(count: number): string {
   return `${count} migration${count === 1 ? "" : "s"}`;
 }
@@ -304,6 +325,19 @@ export async function migrateDatabase(
     logger.warn(
       `A newer Peek migrated this database (migrations this version does not have: ${plan.unknownApplied.join(", ")}). Starting anyway; to go back, restore its pre-migration backup from ${opts.configDir ?? getConfigDir()}`
     );
+  }
+
+  // A new database has nothing to lose. Any other gets a copy before the
+  // first write, which for a v2.0.0 database is the baseline marking; a
+  // refusal for lack of space stops here with nothing changed
+  if (
+    plan.shape !== "empty" &&
+    (plan.pending.length > 0 || plan.shape === "dbPush")
+  ) {
+    await databaseBackupService.createPreMigrationBackup(getServerVersion(), {
+      client,
+      dir: opts.configDir,
+    });
   }
 
   let pending = plan.pending;
@@ -334,7 +368,12 @@ export async function migrateDatabase(
   // client reconnects at its next query
   await client.$disconnect();
   const started = performance.now();
-  await runPrismaCli(["migrate", "deploy"], cli);
+  try {
+    await runPrismaCli(["migrate", "deploy"], cli);
+  } catch (error) {
+    await truncateWal(client);
+    throw error;
+  }
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   logger.info(`Applied ${migrationCount(pending.length)} in ${seconds} s`);
   return { plan, applied: pending };
