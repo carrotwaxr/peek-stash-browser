@@ -49,6 +49,7 @@ const INSTANCE_A = {
   priority: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
+  lastFullPassAt: null,
 };
 
 const INSTANCE_B = {
@@ -62,6 +63,7 @@ const INSTANCE_B = {
   priority: 1,
   createdAt: new Date(),
   updatedAt: new Date(),
+  lastFullPassAt: null,
 };
 
 describe("StashInstanceManager", () => {

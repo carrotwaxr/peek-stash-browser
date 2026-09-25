@@ -205,10 +205,18 @@ describe("sync state instance required migration", () => {
     sandbox = db;
     const { client } = db;
 
+    // Raw SQL: the client follows the current schema, whose StashInstance
+    // has columns later migrations add (lastFullPassAt, 20260925000850)
     for (const id of ["inst-a", "inst-b"]) {
-      await client.stashInstance.create({
-        data: { id, name: id, url: `http://${id}:9999/graphql`, apiKey: "k" },
-      });
+      await client.$executeRawUnsafe(
+        `INSERT INTO "StashInstance" ("id", "name", "url", "apiKey", "createdAt", "updatedAt")
+         VALUES (?, ?, ?, 'k', ?, ?)`,
+        id,
+        id,
+        `http://${id}:9999/graphql`,
+        Date.now(),
+        Date.now()
+      );
     }
     // Kept: rows of the two instances, every column set on one of them.
     // Gone: January's rows with no instance and a deleted instance's row,
