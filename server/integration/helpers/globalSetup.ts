@@ -13,6 +13,7 @@ import {
 } from "../stash-replay/library.js";
 import { type ReplayServer, startStashReplay } from "../stash-replay/server.js";
 import { TEST_CONFIG } from "./config.js";
+import { findForeignKeyViolations } from "./foreignKeyCheck.js";
 import { setServerInstance, stopServer } from "./serverManager.js";
 import {
   type StashEndpoint,
@@ -306,6 +307,20 @@ export async function setup() {
 
     fs.rmSync(configDir, { recursive: true, force: true });
 
+    // Rows whose parent is gone, left by any sync, cleanup, instance
+    // deletion or migration the run went through. A replay run starts from
+    // an empty database, so any is this run's; a live run's test.db may carry
+    // older ones, so it only logs them.
+    const violations = await findForeignKeyViolations(prisma);
+    const violationList = violations
+      .map((row) => `${row.table} -> ${row.parent}: ${row.n}`)
+      .join(", ");
+    if (violations.length > 0 && !replay) {
+      console.warn(
+        `[Integration Tests] Foreign key violations in the test database: ${violationList}`
+      );
+    }
+
     // Disconnect Prisma — suppress stderr noise from SQLite cleanup
     // Prisma emits benign connection-close warnings that pollute test output
     console.log("[Integration Tests] Disconnecting Prisma...");
@@ -335,11 +350,20 @@ export async function setup() {
     // replayAudit.ts names the file; this catches what no file owned (the
     // startup sync, say). vitest reports a teardown error as a startup error
     // but sets exit code 1 only when process.exitCode is still unset.
+    const failures: string[] = [];
     if (audit && (audit.mutations.length > 0 || audit.unsupported.length > 0)) {
-      process.exitCode = 1;
-      throw new Error(
+      failures.push(
         `The Stash replay refused requests during the run. Mutations: ${JSON.stringify(audit.mutations)}. Requests it cannot answer: ${JSON.stringify(audit.unsupported)}`
       );
+    }
+    if (replay && violations.length > 0) {
+      failures.push(
+        `Foreign key violations after the run (table -> missing parent: rows): ${violationList}. A code path or migration the run went through left rows without their parent.`
+      );
+    }
+    if (failures.length > 0) {
+      process.exitCode = 1;
+      throw new Error(failures.join(" "));
     }
 
     console.log("[Integration Tests] Global teardown complete");
