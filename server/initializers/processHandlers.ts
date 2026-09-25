@@ -3,6 +3,10 @@ import { disconnectComputeClient } from "../prisma/computeClient.js";
 import prisma from "../prisma/singleton.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { syncScheduler } from "../services/SyncScheduler.js";
+import {
+  checkpointWal,
+  refreshPlannerStatistics,
+} from "../utils/databaseMaintenance.js";
 import { logger } from "../utils/logger.js";
 import { whenMigrationsSettled } from "./database.js";
 
@@ -13,9 +17,9 @@ import { whenMigrationsSettled } from "./database.js";
  * `docker stop` sends SIGTERM and kills the container 10 s later. The
  * server is PID 1 in the image, and nginx goes with it when it exits.
  * The shutdown stops the syncs, closes the HTTP server, waits for the
- * migrations and the sync, checkpoints the WAL into the database file and
- * disconnects, so the next start (or a copy of the data volume) finds
- * everything in `peek-stash-browser.db`.
+ * migrations and the sync, refreshes the planner statistics, checkpoints the
+ * WAL into the database file and disconnects, so the next start (or a copy
+ * of the data volume) finds everything in `peek-stash-browser.db`.
  *
  * An uncaught exception leaves the process in an unknown state (Node documents
  * that resuming is unsafe), so it is logged and the process exits with code 1;
@@ -28,7 +32,8 @@ import { whenMigrationsSettled } from "./database.js";
 export const FATAL_EXIT_TIMEOUT_MS = 5000;
 /**
  * Upper bound on the graceful shutdown before exiting 1 anyway: under
- * Docker's default 10 s stop timeout, with room for the checkpoint.
+ * Docker's default 10 s stop timeout, with room for the statistics and the
+ * checkpoint.
  */
 export const SHUTDOWN_DEADLINE_MS = 8000;
 /**
@@ -86,33 +91,6 @@ async function closeHttpServer(server: Server): Promise<void> {
 }
 
 /**
- * Moves the WAL's pages into the database file and empties it. Best effort:
- * a recompute's read transaction on the compute connection can keep it from
- * finishing, which SQLite reports as busy.
- */
-async function checkpointWal(): Promise<void> {
-  try {
-    const [result] = await prisma.$queryRaw<
-      Array<{
-        busy: number | bigint;
-        log: number | bigint;
-        checkpointed: number | bigint;
-      }>
-    >`PRAGMA wal_checkpoint(TRUNCATE)`;
-    if (result && Number(result.busy) !== 0) {
-      logger.warn("WAL checkpoint could not finish: the database was busy", {
-        walPages: Number(result.log),
-        checkpointedPages: Number(result.checkpointed),
-      });
-    }
-  } catch (error) {
-    logger.warn("WAL checkpoint failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-/**
  * The shutdown on SIGTERM or SIGINT. A second signal while it runs exits 1
  * at once, and so does SHUTDOWN_DEADLINE_MS passing.
  */
@@ -152,10 +130,12 @@ export async function gracefulShutdown(
   await whenMigrationsSettled();
   await stashSyncService.whenIdle();
 
-  // 4. Everything in the database file, the WAL emptied
-  await checkpointWal();
+  // 4. Planner statistics for the next start (they are written to the WAL,
+  // so before the checkpoint)
+  await refreshPlannerStatistics("shutdown.optimize");
 
-  // 5. (D8: PRAGMA optimize)
+  // 5. Everything in the database file, the WAL emptied
+  await checkpointWal();
 
   // 6. Both Prisma clients
   await closeResources();

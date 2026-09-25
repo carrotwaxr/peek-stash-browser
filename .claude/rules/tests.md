@@ -41,6 +41,7 @@ paths:
 - Global teardown also runs `PRAGMA foreign_key_check` (`helpers/foreignKeyCheck.ts`): a replay run fails on any row whose parent is missing, naming the table and parent; a live run only logs them. A test that seeds orphan rows on purpose deletes them before it ends.
 - Entity IDs come from `fixtures/testEntities.ts`, which re-exports `TEST_ENTITIES` from `stash-replay/fixture/manifest.ts` (picked by `fixtures:generate`): the manifest's ids in replay mode, each minus `FIXTURE_ID_OFFSET` (the test Stash's own ids) in live mode. `TEST_ADMIN` is `integration_admin`; after it changes, a live run needs `FRESH_DB=true`.
 - Each test file logs in `adminClient` (from `helpers/testClient.ts`) in its own `beforeAll`. Global setup runs in a separate process, so its login doesn't carry over; a test that skips the login gets 401s. `selectTestInstanceOnly()` limits a test to the test instance.
+- A plan test (`EXPLAIN QUERY PLAN`) reads its plans through `helpers/largeLibraryPlanner.ts`, a copy of the test database without `sqlite_stat1` and `sqlite_stat4`: the startup sync's `PRAGMA optimize` records the replay's few-row tables, and SQLite then rightly scans them, where the test pins the plan for a large library. Check the plans with statistics on a prod-snapshot copy.
 - To test a service against real SQLite without depending on Stash data, seed rows under a made-up `stashInstanceId` and spy on the Stash client; `services/StashSyncService.cleanup.integration.test.ts` shows how.
 
 ## E2E (`e2e/`)

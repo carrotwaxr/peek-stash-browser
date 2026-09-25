@@ -9,9 +9,13 @@
  * B-tree. The index on the other side, which the tag, performer, gallery and
  * group filters drive from, stays.
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { must } from "../../tests/helpers/must.js";
+import {
+  type LargeLibraryPlanner,
+  largeLibraryPlanner,
+} from "../helpers/largeLibraryPlanner.js";
 
 /** Each junction with the prefix of its two sides' columns */
 const JUNCTIONS = [
@@ -51,16 +55,22 @@ async function indexesOf(table: string): Promise<IndexRow[]> {
   );
 }
 
+let planner: LargeLibraryPlanner;
+
+/** A large library's plan (`largeLibraryPlanner`), one line per step */
 async function planOf(sql: string): Promise<string> {
-  const rows = await prisma.$queryRawUnsafe<{ detail: string }[]>(
-    `EXPLAIN QUERY PLAN ${sql}`,
-    "1",
-    "default"
-  );
-  return rows.map((row) => row.detail).join("\n");
+  return (await planner.planOf(sql, "1", "default")).join("\n");
 }
 
 describe("junction table indexes", () => {
+  beforeAll(async () => {
+    planner = await largeLibraryPlanner();
+  });
+
+  afterAll(async () => {
+    await planner.close();
+  });
+
   it("no junction table carries an index whose columns are a prefix of its primary key", async () => {
     const findings: string[] = [];
     for (const { table } of JUNCTIONS) {

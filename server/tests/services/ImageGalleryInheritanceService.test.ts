@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../services/../prisma/singleton.js";
-import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
+import {
+  imageGalleryInheritanceService,
+  inheritScalarSql,
+} from "../../services/ImageGalleryInheritanceService.js";
 import { must } from "../helpers/must.js";
 
 describe("ImageGalleryInheritanceService", () => {
@@ -595,5 +598,22 @@ describe("ImageGalleryInheritanceService", () => {
         `${PREFIX}image-2@${INSTANCE_ID}`,
       ]);
     });
+  });
+
+  describe("inheritScalarSql", () => {
+    // With planner statistics (PRAGMA optimize after each sync), SQLite
+    // drove the whole-library UPDATE from the gallery list, probing
+    // StashImage by id for each of its 260k rows: 0.2 s became 1.1 s on the
+    // prod copy. The `+` keeps the image's key off that list, so each image
+    // is read from its own indexes and tested against the list. A real
+    // plan needs prod-sized tables; the replay's stay on the good plan.
+    it.each(["studioId", "date", "photographer", "details"] as const)(
+      "the whole-library %s update tests the gallery list per image instead of driving from it",
+      (column) => {
+        expect(inheritScalarSql(column, false)).toContain(
+          "(+id, +stashInstanceId) IN ("
+        );
+      }
+    );
   });
 });

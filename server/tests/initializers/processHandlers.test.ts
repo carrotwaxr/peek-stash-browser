@@ -77,6 +77,7 @@ async function load() {
   const { logger } = vi.mocked(await import("../../utils/logger.js"), true);
 
   prisma.$disconnect.mockResolvedValue(undefined);
+  prisma.$queryRawUnsafe.mockResolvedValue([]);
   prisma.$queryRaw.mockResolvedValue([{ busy: 0, log: 0, checkpointed: 0 }]);
   disconnectComputeClient.mockResolvedValue(undefined);
   sync.whenIdle.mockResolvedValue(undefined);
@@ -203,7 +204,7 @@ describe("processHandlers", () => {
   });
 
   describe("gracefulShutdown", () => {
-    it("SIGTERM closes the server, stops the scheduler, aborts the sync, waits for it, checkpoints the WAL, disconnects both clients and exits 0", async () => {
+    it("SIGTERM closes the server, stops the scheduler, aborts the sync, waits for it, refreshes the planner statistics, checkpoints the WAL, disconnects both clients and exits 0", async () => {
       const m = await load();
       const server = await listening();
       const close = vi.spyOn(server, "close");
@@ -218,9 +219,13 @@ describe("processHandlers", () => {
       expect("sql" in checkpoint ? checkpoint.sql : checkpoint.join("?")).toBe(
         "PRAGMA wal_checkpoint(TRUNCATE)"
       );
+      expect(m.prisma.$queryRawUnsafe).toHaveBeenCalledExactlyOnceWith(
+        "PRAGMA optimize=0x10002"
+      );
       // Stop what starts syncs, abort the running one, stop taking requests
       // (then abort whatever a request still running started), wait for the
-      // migrations and the sync, checkpoint, disconnect both clients, exit
+      // migrations and the sync, refresh the statistics, checkpoint,
+      // disconnect both clients, exit
       const disconnects = [
         callOrder(m.prisma.$disconnect.mock),
         callOrder(m.disconnectComputeClient.mock),
@@ -232,6 +237,7 @@ describe("processHandlers", () => {
         callOrder(m.sync.abort.mock, 1),
         callOrder(m.whenMigrationsSettled.mock),
         callOrder(m.sync.whenIdle.mock),
+        callOrder(m.prisma.$queryRawUnsafe.mock),
         callOrder(m.prisma.$queryRaw.mock),
         Math.min(...disconnects),
         Math.max(...disconnects),
@@ -285,6 +291,7 @@ describe("processHandlers", () => {
       expect(exit).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
       expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+      expect(m.prisma.$queryRawUnsafe).not.toHaveBeenCalled();
       expect(m.prisma.$queryRaw).not.toHaveBeenCalled();
     });
 
@@ -314,6 +321,7 @@ describe("processHandlers", () => {
 
       expect(m.isShuttingDown()).toBe(true);
       expect(m.sync.whenIdle).not.toHaveBeenCalled();
+      expect(m.prisma.$queryRawUnsafe).not.toHaveBeenCalled();
       expect(m.prisma.$queryRaw).not.toHaveBeenCalled();
       expect(m.prisma.$disconnect).not.toHaveBeenCalled();
       expect(exit).not.toHaveBeenCalled();
@@ -325,6 +333,21 @@ describe("processHandlers", () => {
         callOrder(m.whenMigrationsSettled.mock)
       );
       expect(m.prisma.$disconnect).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledExactlyOnceWith(0);
+    });
+
+    it("a failing PRAGMA optimize is logged and the checkpoint still runs", async () => {
+      const m = await load();
+      m.prisma.$queryRawUnsafe.mockRejectedValue(new Error("disk I/O error"));
+      const exit = vi.fn();
+
+      await m.gracefulShutdown("SIGTERM", exit);
+
+      expect(m.logger.warn).toHaveBeenCalledWith(
+        stringContaining("PRAGMA optimize failed"),
+        objectContaining({ error: "disk I/O error" })
+      );
+      expect(m.prisma.$queryRaw).toHaveBeenCalledOnce();
       expect(exit).toHaveBeenCalledExactlyOnceWith(0);
     });
 

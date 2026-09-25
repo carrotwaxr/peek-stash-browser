@@ -92,8 +92,12 @@ type ScalarColumn = (typeof SCALAR_FIELDS)[number]["column"];
  * One scalar field for every live image that has none and is in a live
  * gallery that has one, from its first such gallery; for every image or
  * only the scoped ones. The whole-library form finds those images with one
- * list of the galleries' images; the scoped form probes the scoped images
- * by rowid and checks each one's galleries through the junction's index.
+ * list of the galleries' images, which each image is tested against: the
+ * `+` keeps the image's key off that list, or with planner statistics
+ * SQLite drives from it and probes StashImage by id for every row of it
+ * (0.2 s became 1.1 s for the four UPDATEs on the prod copy). The scoped
+ * form probes the scoped images by rowid and checks each one's galleries
+ * through the junction's index.
  * An inherited studio takes the image's own instance, as the gallery's
  * studio is on the gallery's (and so the image's) Stash.
  */
@@ -113,7 +117,7 @@ export function inheritScalarSql(
           WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
             AND g.${column} IS NOT NULL AND g.deletedAt IS NULL
         )`
-    : `(id, stashInstanceId) IN (
+    : `(+id, +stashInstanceId) IN (
           SELECT ig.imageId, ig.imageInstanceId
           ${galleryWithValue}
           WHERE g.${column} IS NOT NULL AND g.deletedAt IS NULL
