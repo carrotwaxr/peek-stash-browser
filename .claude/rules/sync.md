@@ -16,6 +16,8 @@ paths:
 
 - `fullSync`: every entity, then every post-sync step.
 - `incrementalSync` and `smartIncrementalSync` (the startup path, from `SyncScheduler`): entities changed since the last sync, then the post-sync steps below.
+- All three take the lock and call `runSync(mode, instanceId?)`, which runs `syncInstance(instanceId, mode, run)` for the instance given or each enabled one. `syncInstance` syncs each type in `SYNC_ORDER` (`syncEntityType` picks full, incremental or skipped for the mode), then the cleanups and `runInstancePostSteps`.
+- Every type goes through one page loop, `paginate(type, instanceId, { since, ids }, run)`, reading the type's spec in `ENTITY_SYNC`: `fetchPage` (its Stash query, 500 a page, narrowed by `since` or by ids; images by `image_ids`) and `processBatch` (its batch writer). A change to how a type is fetched or written goes in its spec, not in a loop of its own. The run's `SyncRunContext` carries the abort signal, checked between pages and passed to every request. An empty id list fetches nothing: Stash reads it as no list.
 
 ## Ordering
 
@@ -59,9 +61,10 @@ Merges (`MergeReconciliationService`): the scene branch soft-deletes first and t
 
 ## Raw SQL
 
-Several junction writes build SQL with `this.escape()` and string interpolation. Keep the escaping when touching them, and use `?` parameters in new code.
+Several junction writes build SQL with `escapeSql()` and string interpolation. Keep the escaping when touching them, and use `?` parameters in new code.
 
 ## Tests
 
+- `server/tests/services/StashSyncService.paginate.test.ts` pins the page loop (stubbed specs) and each spec's request variables (a stubbed client). Integration tests write rows through a spec's `processBatch` (`ENTITY_SYNC.scene.processBatch(rows, instanceId, { signal })`) instead of a whole sync.
 - `server/tests/services/StashSyncService.cleanup.test.ts` mocks Prisma with `tests/helpers/prismaMock.ts`, routes `$queryRawUnsafe` by statement shape and spies on `dbWrite`.
 - Real-SQLite coverage is in `server/integration/services/StashSyncService.cleanup.integration.test.ts`, every type: it seeds rows under two made-up instances with the same ids, which real sync never touches, and spies on `stashInstanceManager.get` to page what Stash returns.

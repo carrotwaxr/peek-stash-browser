@@ -10,7 +10,10 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runPrismaCli } from "../../initializers/migrations.js";
 import prisma from "../../prisma/singleton.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  ENTITY_SYNC,
+  type SyncEntityOf,
+} from "../../services/StashSyncService.js";
 import { arrayContaining } from "../../tests/helpers/matchers.js";
 import {
   type MigrationSandbox,
@@ -74,9 +77,7 @@ const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
 const TEST_INSTANCE = "drop-scene-fts-it-instance";
 
 /** A scene as Stash's compact scene query returns it */
-type SyncScene = Parameters<
-  (typeof stashSyncService)["processScenesBatch"]
->[0][number];
+type SyncScene = SyncEntityOf<"scene">;
 
 function stashScene(id: string, title: string): SyncScene {
   return {
@@ -136,11 +137,10 @@ describeWithDb("scene sync without scene_fts (integration)", () => {
     });
 
     // The next sync upserts it and stores a scene it has not seen
-    await stashSyncService["processScenesBatch"](
+    await ENTITY_SYNC.scene.processBatch(
       [stashScene("1", "Synced after"), stashScene("2", "New scene")],
       TEST_INSTANCE,
-      0,
-      2
+      { signal: new AbortController().signal }
     );
 
     const rows = await prisma.stashScene.findMany({

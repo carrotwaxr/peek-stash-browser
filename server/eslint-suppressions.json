@@ -364,10 +364,10 @@
   },
   "services/StashSyncService.ts": {
     "@typescript-eslint/no-unnecessary-condition": {
-      "count": 66
+      "count": 59
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 6
+      "count": 4
     }
   },
   "services/StudioQueryBuilder.ts": {

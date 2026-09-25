@@ -1,11 +1,14 @@
 /**
  * Stash Sync Service
  *
- * Handles syncing entities from Stash to the local SQLite cache.
- * Supports both full sync (all entities) and incremental sync (only changed).
+ * Handles syncing entities from Stash to the local SQLite cache: a full sync
+ * (every entity), an incremental sync (what changed since each type's last
+ * sync) and a smart incremental sync (a type only when Stash counts changes
+ * to it), one instance or every enabled one (`runSync`, `syncInstance`).
  *
  * Key features:
- * - Paginated fetches (5000 per batch) to avoid memory issues
+ * - One page loop for every entity type (`paginate`, 500 a page), reading
+ *   the type's spec in `ENTITY_SYNC`: its Stash query and its batch writer
  * - Incremental sync via updated_at timestamps
  * - Junction table management for many-to-many relationships
  * - Progress events for UI feedback
@@ -26,17 +29,11 @@ import type {
   FindGroupsQuery,
   FindImagesQuery,
   FindPerformersQuery,
+  FindSceneMarkersQuery,
   FindScenesCompactQuery,
   FindStudiosQuery,
   FindTagsQuery,
-  GalleryFilterType,
-  GroupFilterType,
-  ImageFilterType,
-  PerformerFilterType,
-  SceneFilterType,
-  SceneMarkerFilterType,
-  StudioFilterType,
-  TagFilterType,
+  TimestampCriterionInput,
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
 import type {
@@ -70,6 +67,8 @@ type SyncTag = FindTagsQuery["findTags"]["tags"][number];
 type SyncGroup = FindGroupsQuery["findGroups"]["groups"][number];
 type SyncGallery = FindGalleriesQuery["findGalleries"]["galleries"][number];
 type SyncImage = FindImagesQuery["findImages"]["images"][number];
+type SyncClip =
+  FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
 
 /** Minimal tag reference shape used in junction table syncing */
 interface TagRef {
@@ -122,6 +121,29 @@ interface RunEntityTypeOptions {
   since?: string;
   /** Run the type's cleanup right after it (the full sync path). */
   withCleanup: boolean;
+}
+
+/**
+ * How a sync picks what to fetch: every entity ("full", each type cleaned up
+ * right after it), what changed since each type's last sync
+ * ("incremental"), or that only for the types Stash counts changes to
+ * ("smart", the startup path).
+ */
+type SyncMode = "full" | "incremental" | "smart";
+
+/** Each mode's name in the logs. */
+const SYNC_MODE_NAMES: Record<SyncMode, { name: string; title: string }> = {
+  full: { name: "full sync", title: "Full sync" },
+  incremental: { name: "incremental sync", title: "Incremental sync" },
+  smart: { name: "smart incremental sync", title: "Smart incremental sync" },
+};
+
+/** What one type's page loop fetches besides every entity. */
+interface PaginateOptions {
+  /** Only entities updated after this Stash timestamp */
+  since?: string;
+  /** Only these ids, fetched a page of ids at a time */
+  ids?: string[];
 }
 
 // Constants for sync configuration
@@ -359,23 +381,41 @@ function getMostRecentTimestamp(
 }
 
 /**
- * Get the max updated_at timestamp from a list of entities.
- * Returns the raw string from Stash (with timezone) to preserve accuracy.
+ * The newest of `current` and the `updated_at` values of `entities`, by
+ * time: the watermark the next incremental sync starts from. Kept as Stash
+ * wrote it, with its timezone.
  */
-function getMaxUpdatedAt(
-  entities: Array<{ updated_at?: string | null }>
+function newestUpdatedAt(
+  current: string | undefined,
+  entities: ReadonlyArray<{ updated_at?: string | null }>
 ): string | undefined {
-  let max: string | undefined;
-
-  for (const entity of entities) {
-    if (entity.updated_at) {
-      if (!max || entity.updated_at > max) {
-        max = entity.updated_at;
-      }
+  let newest = current;
+  for (const { updated_at: updatedAt } of entities) {
+    if (!updatedAt) continue;
+    if (newest === undefined || compareTimestamps(updatedAt, newest) > 0) {
+      newest = updatedAt;
     }
   }
+  return newest;
+}
 
-  return max;
+/** `items` in runs of `size` (none for an empty list). */
+function chunksOf<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/** A sync's abort, once `signal` has fired. */
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw new Error("Sync aborted");
+}
+
+/** "scenes" to "Scenes", for the logs. */
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -426,6 +466,1317 @@ function extractPhashes(
   };
 }
 
+/** Escape a string for SQL, handling quotes */
+function escapeSql(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/** Escape a nullable string for SQL: 'value' or NULL */
+function escapeSqlNullable(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "NULL";
+  return `'${escapeSql(value)}'`;
+}
+
+// ==================== Entity sync specs ====================
+
+/** One page request of a type's sync. */
+export interface SyncPageQuery {
+  page: number;
+  /** 0 asks only for Stash's count (the smart sync's change probe) */
+  perPage: number;
+  /** Only entities updated after this Stash timestamp */
+  since?: string;
+  /** Only these ids (a page of them at most) */
+  ids?: string[];
+  /** The run's abort signal: it ends the request in flight */
+  signal: AbortSignal;
+}
+
+/** What one sync run hands to every page and batch of it. */
+export interface SyncRunContext {
+  /** Fires on abort(): the run stops between pages, a request in flight ends */
+  signal: AbortSignal;
+}
+
+/** What one batch wrote. */
+export interface BatchChanges {
+  /** Rows written (a row with an unsafe id is skipped) */
+  written: number;
+}
+
+/**
+ * How one entity type syncs: the Stash query that lists it a page at a time
+ * (narrowed by `since` or `ids`), and the writer of one page. `paginate` runs
+ * the page loop for every type.
+ */
+export interface EntitySyncSpec<
+  T extends { id: string; updated_at?: string | null },
+> {
+  type: EntityType;
+  fetchPage(
+    client: StashClient,
+    q: SyncPageQuery
+  ): Promise<{ items: T[]; count: number }>;
+  processBatch(
+    items: T[],
+    instanceId: string,
+    run: SyncRunContext
+  ): Promise<BatchChanges>;
+}
+
+/** Each type's entity as its sync query returns it. */
+interface SyncEntities {
+  scene: SyncScene;
+  performer: SyncPerformer;
+  studio: SyncStudio;
+  tag: SyncTag;
+  group: SyncGroup;
+  gallery: SyncGallery;
+  image: SyncImage;
+  clip: SyncClip;
+}
+
+export type SyncEntityOf<K extends EntityType> = SyncEntities[K];
+
+/** A sync page's FindFilterType. */
+function pageFilter(q: SyncPageQuery): FindFilterType {
+  return { page: q.page, per_page: q.perPage };
+}
+
+/**
+ * An incremental page's updated_at criterion, in the form Stash reads
+ * (formatTimestampForStash); none without `since`.
+ */
+function updatedSince(
+  since: string | undefined
+): { updated_at: TimestampCriterionInput } | undefined {
+  return since
+    ? {
+        updated_at: {
+          modifier: CriterionModifier.GreaterThan,
+          value: formatTimestampForStash(since),
+        },
+      }
+    : undefined;
+}
+
+/**
+ * Every synced type's spec. Each request carries the run's abort signal.
+ * Images narrow by Stash's integer id list, the others by `ids`; clips page
+ * in updated_at order.
+ */
+export const ENTITY_SYNC: {
+  readonly [K in EntityType]: EntitySyncSpec<SyncEntityOf<K>>;
+} = {
+  tag: {
+    type: "tag",
+    async fetchPage(client, q) {
+      const { findTags } = await client.findTags(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          tag_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findTags.tags, count: findTags.count };
+    },
+    processBatch: processTagsBatch,
+  },
+  studio: {
+    type: "studio",
+    async fetchPage(client, q) {
+      const { findStudios } = await client.findStudios(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          studio_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findStudios.studios, count: findStudios.count };
+    },
+    processBatch: processStudiosBatch,
+  },
+  performer: {
+    type: "performer",
+    async fetchPage(client, q) {
+      const { findPerformers } = await client.findPerformers(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          performer_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findPerformers.performers, count: findPerformers.count };
+    },
+    processBatch: processPerformersBatch,
+  },
+  group: {
+    type: "group",
+    async fetchPage(client, q) {
+      const { findGroups } = await client.findGroups(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          group_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findGroups.groups, count: findGroups.count };
+    },
+    processBatch: processGroupsBatch,
+  },
+  gallery: {
+    type: "gallery",
+    async fetchPage(client, q) {
+      const { findGalleries } = await client.findGalleries(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          gallery_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findGalleries.galleries, count: findGalleries.count };
+    },
+    processBatch: processGalleriesBatch,
+  },
+  scene: {
+    type: "scene",
+    async fetchPage(client, q) {
+      const { findScenes } = await client.findScenesCompact(
+        {
+          filter: pageFilter(q),
+          ids: q.ids,
+          scene_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findScenes.scenes, count: findScenes.count };
+    },
+    processBatch: processScenesBatch,
+  },
+  clip: {
+    type: "clip",
+    async fetchPage(client, q) {
+      const { findSceneMarkers } = await client.findSceneMarkers(
+        {
+          filter: {
+            ...pageFilter(q),
+            sort: "updated_at",
+            direction: SortDirectionEnum.Asc,
+          },
+          ids: q.ids,
+          scene_marker_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return {
+        items: findSceneMarkers.scene_markers,
+        count: findSceneMarkers.count,
+      };
+    },
+    processBatch: processClipsBatch,
+  },
+  image: {
+    type: "image",
+    async fetchPage(client, q) {
+      const { findImages } = await client.findImages(
+        {
+          filter: pageFilter(q),
+          image_ids: q.ids?.map((id) => Number(id)),
+          image_filter: updatedSince(q.since),
+        },
+        undefined,
+        q.signal
+      );
+      return { items: findImages.images, count: findImages.count };
+    },
+    processBatch: processImagesBatch,
+  },
+};
+
+// ==================== Scene Sync ====================
+
+async function processScenesBatch(
+  scenes: SyncScene[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (scenes.length === 0) return { written: 0 };
+
+  // Validate all scene IDs for SQL safety (defense-in-depth)
+  const invalidIds = scenes.filter((s) => !validateEntityId(s.id));
+  if (invalidIds.length > 0) {
+    logger.warn(`Skipping ${invalidIds.length} scenes with invalid IDs`);
+  }
+  const validScenes = scenes.filter((s) => validateEntityId(s.id));
+  if (validScenes.length === 0) return { written: 0 };
+
+  const sceneIds = validScenes.map((s) => s.id);
+  const instanceId = stashInstanceId;
+
+  // Bulk delete all junction records for this batch
+  // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
+  // and includes extended timeout for large libraries
+  const sceneIdList = sceneIds.map((id) => `'${escapeSql(id)}'`).join(",");
+  const escapedInstanceId = escapeSql(instanceId);
+  await dbWriteTransaction(
+    "sync.scenes.junctions",
+    async (tx) => {
+      await tx.$executeRawUnsafe(
+        `DELETE FROM ScenePerformer WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM SceneTag WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM SceneGroup WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM SceneGallery WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+      );
+    },
+    { timeout: 60000 } // 60 second timeout for large batches
+  );
+
+  // Build bulk scene upsert using raw SQL
+  const sceneValues = validScenes
+    .map((scene) => {
+      const file = scene.files?.[0];
+      const paths = scene.paths;
+      // Stash may return extra fields (chapters_vtt, stream) not in the GraphQL query selection
+      const pathsExtended = scene.paths as Record<string, unknown>;
+      // Extract phashes from files
+      const { phash, phashes } = extractPhashes(scene.files);
+      // Stash's stream choices, read from its labels. The URLs carry the
+      // Stash API key and are never stored.
+      const streamOptions = summarizeStashStreams(
+        (scene.sceneStreams ?? []).map((s) => s.label ?? "")
+      );
+
+      return `(
+    '${escapeSql(scene.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(scene.title)},
+    ${escapeSqlNullable(scene.code)},
+    ${escapeSqlNullable(scene.date)},
+    ${scene.studio?.id ? `'${escapeSql(scene.studio.id)}'` : "NULL"},
+    ${scene.rating100 ?? "NULL"},
+    ${file?.duration ? Math.round(file.duration) : "NULL"},
+    ${scene.organized ? 1 : 0},
+    ${escapeSqlNullable(scene.details)},
+    ${escapeSqlNullable(scene.director)},
+    ${escapeSqlNullable(JSON.stringify(scene.urls || []))},
+    ${escapeSqlNullable(file?.path)},
+    ${file?.bit_rate ?? "NULL"},
+    ${file?.frame_rate ?? "NULL"},
+    ${file?.width ?? "NULL"},
+    ${file?.height ?? "NULL"},
+    ${escapeSqlNullable(file?.video_codec)},
+    ${escapeSqlNullable(file?.audio_codec)},
+    ${file?.size ?? "NULL"},
+    ${escapeSqlNullable(paths?.screenshot)},
+    ${escapeSqlNullable(paths?.preview)},
+    ${escapeSqlNullable(paths?.sprite)},
+    ${escapeSqlNullable(paths?.vtt)},
+    ${escapeSqlNullable(pathsExtended?.chapters_vtt as string | undefined)},
+    ${escapeSqlNullable(pathsExtended?.stream as string | undefined)},
+    ${escapeSqlNullable(paths?.caption)},
+    ${escapeSqlNullable(JSON.stringify(scene.captions ?? []))},
+    ${streamOptions.direct ? 1 : 0},
+    ${streamOptions.mkv ? 1 : 0},
+    ${escapeSqlNullable(streamOptions.resolutions.join(","))},
+    ${scene.o_counter ?? 0},
+    ${scene.play_count ?? 0},
+    ${scene.play_duration ?? 0},
+    ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
+    ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL,
+    ${escapeSqlNullable(phash)},
+    ${escapeSqlNullable(phashes)}
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashScene (
+    id, stashInstanceId, title, code, date, studioId, rating100, duration,
+    organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
+    fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
+    pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption, captions,
+    streamDirect, streamMkv, streamResolutions, oCounter, playCount, playDuration,
+    stashCreatedAt, stashUpdatedAt,
+    syncedAt, deletedAt, phash, phashes
+  ) VALUES ${sceneValues}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    title = excluded.title,
+    code = excluded.code,
+    date = excluded.date,
+    studioId = excluded.studioId,
+    rating100 = excluded.rating100,
+    duration = excluded.duration,
+    organized = excluded.organized,
+    details = excluded.details,
+    director = excluded.director,
+    urls = excluded.urls,
+    filePath = excluded.filePath,
+    fileBitRate = excluded.fileBitRate,
+    fileFrameRate = excluded.fileFrameRate,
+    fileWidth = excluded.fileWidth,
+    fileHeight = excluded.fileHeight,
+    fileVideoCodec = excluded.fileVideoCodec,
+    fileAudioCodec = excluded.fileAudioCodec,
+    fileSize = excluded.fileSize,
+    pathScreenshot = excluded.pathScreenshot,
+    pathPreview = excluded.pathPreview,
+    pathSprite = excluded.pathSprite,
+    pathVtt = excluded.pathVtt,
+    pathChaptersVtt = excluded.pathChaptersVtt,
+    pathStream = excluded.pathStream,
+    pathCaption = excluded.pathCaption,
+    captions = excluded.captions,
+    streamDirect = excluded.streamDirect,
+    streamMkv = excluded.streamMkv,
+    streamResolutions = excluded.streamResolutions,
+    oCounter = excluded.oCounter,
+    playCount = excluded.playCount,
+    playDuration = excluded.playDuration,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL,
+    phash = excluded.phash,
+    phashes = excluded.phashes
+`);
+
+  // Collect all junction records (validate related entity IDs too)
+  const performerRecords: string[] = [];
+  const tagRecords: string[] = [];
+  const groupRecords: string[] = [];
+  const galleryRecords: string[] = [];
+
+  for (const scene of validScenes) {
+    for (const p of scene.performers || []) {
+      if (validateEntityId(p.id)) {
+        performerRecords.push(
+          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+    for (const t of scene.tags || []) {
+      if (validateEntityId(t.id)) {
+        tagRecords.push(
+          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+    for (const g of scene.groups || []) {
+      if (validateEntityId(g.group.id)) {
+        const index = g.scene_index ?? "NULL";
+        groupRecords.push(
+          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.group.id)}', '${escapeSql(instanceId)}', ${index})`
+        );
+      }
+    }
+    for (const g of scene.galleries || []) {
+      if (validateEntityId(g.id)) {
+        galleryRecords.push(
+          `('${escapeSql(scene.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+  }
+
+  // Batch insert junction records
+  const inserts = [];
+
+  if (performerRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ScenePerformer (sceneId, sceneInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
+      )
+    );
+  }
+  if (tagRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO SceneTag (sceneId, sceneInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
+      )
+    );
+  }
+  if (groupRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO SceneGroup (sceneId, sceneInstanceId, groupId, groupInstanceId, sceneIndex) VALUES ${groupRecords.join(",")}`
+      )
+    );
+  }
+  if (galleryRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO SceneGallery (sceneId, sceneInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
+      )
+    );
+  }
+
+  await Promise.all(inserts);
+
+  return { written: validScenes.length };
+}
+
+// ==================== Performer Sync ====================
+
+async function processPerformersBatch(
+  performers: SyncPerformer[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (performers.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validPerformers = performers.filter((p) => validateEntityId(p.id));
+  if (validPerformers.length === 0) return { written: 0 };
+
+  const values = validPerformers
+    .map((performer) => {
+      // Serialize stash_ids array to JSON for deduplication
+      const stashIdsJson =
+        performer.stash_ids.length > 0
+          ? JSON.stringify(
+              performer.stash_ids.map((s) => ({
+                endpoint: s.endpoint,
+                stash_id: s.stash_id,
+              }))
+            )
+          : null;
+
+      return `(
+    '${escapeSql(performer.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(stashIdsJson)},
+    ${escapeSqlNullable(performer.name)},
+    ${escapeSqlNullable(performer.disambiguation)},
+    ${escapeSqlNullable(performer.gender)},
+    ${escapeSqlNullable(performer.birthdate)},
+    ${performer.favorite ? 1 : 0},
+    ${performer.rating100 ?? "NULL"},
+    ${escapeSqlNullable(performer.details)},
+    ${escapeSqlNullable(JSON.stringify(performer.alias_list || []))},
+    ${escapeSqlNullable(performer.country)},
+    ${escapeSqlNullable(performer.ethnicity)},
+    ${escapeSqlNullable(performer.hair_color)},
+    ${escapeSqlNullable(performer.eye_color)},
+    ${performer.height_cm ?? "NULL"},
+    ${performer.weight ?? "NULL"},
+    ${escapeSqlNullable(performer.measurements)},
+    ${escapeSqlNullable(performer.fake_tits)},
+    ${escapeSqlNullable(performer.tattoos)},
+    ${escapeSqlNullable(performer.piercings)},
+    ${escapeSqlNullable(performer.career_length)},
+    ${escapeSqlNullable(performer.death_date)},
+    ${escapeSqlNullable(performer.url)},
+    ${escapeSqlNullable(performer.image_path)},
+    ${performer.scene_count ?? 0},
+    ${performer.image_count ?? 0},
+    ${performer.gallery_count ?? 0},
+    ${performer.group_count ?? 0},
+    ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
+    ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashPerformer (
+    id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
+    rating100, details, aliasList,
+    country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements, fakeTits,
+    tattoos, piercings, careerLength, deathDate, url, imagePath,
+    sceneCount, imageCount, galleryCount, groupCount,
+    stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+  ) VALUES ${values}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    stashIds = excluded.stashIds,
+    name = excluded.name,
+    disambiguation = excluded.disambiguation,
+    gender = excluded.gender,
+    birthdate = excluded.birthdate,
+    favorite = excluded.favorite,
+    rating100 = excluded.rating100,
+    details = excluded.details,
+    aliasList = excluded.aliasList,
+    country = excluded.country,
+    ethnicity = excluded.ethnicity,
+    hairColor = excluded.hairColor,
+    eyeColor = excluded.eyeColor,
+    heightCm = excluded.heightCm,
+    weightKg = excluded.weightKg,
+    measurements = excluded.measurements,
+    fakeTits = excluded.fakeTits,
+    tattoos = excluded.tattoos,
+    piercings = excluded.piercings,
+    careerLength = excluded.careerLength,
+    deathDate = excluded.deathDate,
+    url = excluded.url,
+    imagePath = excluded.imagePath,
+    sceneCount = excluded.sceneCount,
+    imageCount = excluded.imageCount,
+    galleryCount = excluded.galleryCount,
+    groupCount = excluded.groupCount,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL
+`);
+
+  // Sync performer tags to PerformerTag junction table (batched for performance)
+  const instanceId = stashInstanceId;
+
+  // Collect all tag relationships for batch insert
+  const tagInserts: { performerId: string; tagId: string }[] = [];
+  for (const performer of validPerformers) {
+    if (performer.tags && performer.tags.length > 0) {
+      for (const tag of performer.tags) {
+        if (tag?.id && validateEntityId(tag.id)) {
+          tagInserts.push({
+            performerId: performer.id,
+            tagId: tag.id,
+          });
+        }
+      }
+    }
+  }
+
+  // Bulk delete existing tags for all performers in this batch
+  const performerIds = validPerformers
+    .map((p) => `'${escapeSql(p.id)}'`)
+    .join(",");
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM PerformerTag WHERE performerId IN (${performerIds}) AND performerInstanceId = '${escapeSql(instanceId)}'`
+  );
+
+  // Bulk insert all new tags
+  if (tagInserts.length > 0) {
+    const tagValues = tagInserts
+      .map(
+        (t) =>
+          `('${escapeSql(t.performerId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
+      )
+      .join(", ");
+
+    await prisma.$executeRawUnsafe(
+      `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+    );
+  }
+
+  return { written: validPerformers.length };
+}
+
+// ==================== Studio Sync ====================
+
+async function processStudiosBatch(
+  studios: SyncStudio[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (studios.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validStudios = studios.filter((s) => validateEntityId(s.id));
+  if (validStudios.length === 0) return { written: 0 };
+
+  const values = validStudios
+    .map((studio) => {
+      // Serialize stash_ids array to JSON for deduplication
+      const stashIdsJson =
+        studio.stash_ids.length > 0
+          ? JSON.stringify(
+              studio.stash_ids.map((s) => ({
+                endpoint: s.endpoint,
+                stash_id: s.stash_id,
+              }))
+            )
+          : null;
+
+      return `(
+    '${escapeSql(studio.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(stashIdsJson)},
+    ${escapeSqlNullable(studio.name)},
+    ${studio.parent_studio?.id ? `'${escapeSql(studio.parent_studio.id)}'` : "NULL"},
+    ${studio.favorite ? 1 : 0},
+    ${studio.rating100 ?? "NULL"},
+    ${studio.scene_count ?? 0},
+    ${studio.image_count ?? 0},
+    ${studio.gallery_count ?? 0},
+    ${studio.performer_count ?? 0},
+    ${studio.group_count ?? 0},
+    ${escapeSqlNullable(studio.details)},
+    ${escapeSqlNullable(studio.url)},
+    ${escapeSqlNullable(studio.image_path)},
+    ${studio.created_at ? `'${studio.created_at}'` : "NULL"},
+    ${studio.updated_at ? `'${studio.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashStudio (
+    id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
+    sceneCount, imageCount, galleryCount, performerCount, groupCount,
+    details, url, imagePath, stashCreatedAt,
+    stashUpdatedAt, syncedAt, deletedAt
+  ) VALUES ${values}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    stashIds = excluded.stashIds,
+    name = excluded.name,
+    parentId = excluded.parentId,
+    favorite = excluded.favorite,
+    rating100 = excluded.rating100,
+    sceneCount = excluded.sceneCount,
+    imageCount = excluded.imageCount,
+    galleryCount = excluded.galleryCount,
+    performerCount = excluded.performerCount,
+    groupCount = excluded.groupCount,
+    details = excluded.details,
+    url = excluded.url,
+    imagePath = excluded.imagePath,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL
+`);
+
+  // Sync studio tags to StudioTag junction table
+  const instanceId = stashInstanceId;
+  for (const studio of validStudios) {
+    if (studio.tags && studio.tags.length > 0) {
+      const studioId = studio.id;
+
+      // Delete existing tags for this studio
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM StudioTag WHERE studioId = '${escapeSql(studioId)}' AND studioInstanceId = '${escapeSql(instanceId)}'`
+      );
+
+      // Insert new tags (filter to valid tag IDs)
+      const validTags = studio.tags.filter(
+        (t: TagRef) => t?.id && validateEntityId(t.id)
+      );
+      if (validTags.length > 0) {
+        const tagValues = validTags
+          .map(
+            (t: TagRef) =>
+              `('${escapeSql(studioId)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
+          )
+          .join(", ");
+
+        await prisma.$executeRawUnsafe(
+          `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+        );
+      }
+    }
+  }
+
+  return { written: validStudios.length };
+}
+
+// ==================== Tag Sync ====================
+
+async function processTagsBatch(
+  tags: SyncTag[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (tags.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validTags = tags.filter((t) => validateEntityId(t.id));
+  if (validTags.length === 0) return { written: 0 };
+
+  const values = validTags
+    .map((tag) => {
+      const parentIds = tag.parents?.map((p) => p.id) || [];
+      const aliases = tag.aliases || [];
+      // Serialize stash_ids array to JSON for deduplication
+      const stashIdsJson =
+        tag.stash_ids.length > 0
+          ? JSON.stringify(
+              tag.stash_ids.map((s) => ({
+                endpoint: s.endpoint,
+                stash_id: s.stash_id,
+              }))
+            )
+          : null;
+
+      // "color" is not in the standard Stash GraphQL schema but may be added by plugins
+      const tagRecord = tag as Record<string, unknown>;
+
+      return `(
+    '${escapeSql(tag.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(stashIdsJson)},
+    ${escapeSqlNullable(tag.name)},
+    ${tag.favorite ? 1 : 0},
+    ${tag.scene_count ?? 0},
+    ${tag.image_count ?? 0},
+    ${tag.gallery_count ?? 0},
+    ${tag.performer_count ?? 0},
+    ${tag.studio_count ?? 0},
+    ${tag.group_count ?? 0},
+    ${tag.scene_marker_count ?? 0},
+    ${escapeSqlNullable(tag.description)},
+    ${escapeSqlNullable(JSON.stringify(aliases))},
+    ${escapeSqlNullable(JSON.stringify(parentIds))},
+    ${escapeSqlNullable(tag.image_path)},
+    ${escapeSqlNullable(tagRecord.color as string | undefined)},
+    ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
+    ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashTag (
+    id, stashInstanceId, stashIds, name, favorite,
+    sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
+    description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+  ) VALUES ${values}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    stashIds = excluded.stashIds,
+    name = excluded.name,
+    favorite = excluded.favorite,
+    sceneCount = excluded.sceneCount,
+    imageCount = excluded.imageCount,
+    galleryCount = excluded.galleryCount,
+    performerCount = excluded.performerCount,
+    studioCount = excluded.studioCount,
+    groupCount = excluded.groupCount,
+    sceneMarkerCount = excluded.sceneMarkerCount,
+    description = excluded.description,
+    aliases = excluded.aliases,
+    parentIds = excluded.parentIds,
+    imagePath = excluded.imagePath,
+    color = excluded.color,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL
+`);
+
+  return { written: validTags.length };
+}
+
+// ==================== Group Sync ====================
+
+async function processGroupsBatch(
+  groups: SyncGroup[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (groups.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validGroups = groups.filter((g) => validateEntityId(g.id));
+  if (validGroups.length === 0) return { written: 0 };
+
+  const values = validGroups
+    .map((group) => {
+      const duration = group.duration || null;
+      const urls = group.urls || [];
+      return `(
+    '${escapeSql(group.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(group.name)},
+    ${escapeSqlNullable(group.date)},
+    ${group.studio?.id ? `'${escapeSql(group.studio.id)}'` : "NULL"},
+    ${group.rating100 ?? "NULL"},
+    ${duration ? Math.round(duration) : "NULL"},
+    ${group.scene_count ?? 0},
+    ${group.performer_count ?? 0},
+    ${escapeSqlNullable(group.director)},
+    ${escapeSqlNullable(group.synopsis)},
+    ${escapeSqlNullable(JSON.stringify(urls))},
+    ${escapeSqlNullable(group.front_image_path)},
+    ${escapeSqlNullable(group.back_image_path)},
+    ${group.created_at ? `'${group.created_at}'` : "NULL"},
+    ${group.updated_at ? `'${group.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashGroup (
+    id, stashInstanceId, name, date, studioId, rating100, duration,
+    sceneCount, performerCount,
+    director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
+    stashUpdatedAt, syncedAt, deletedAt
+  ) VALUES ${values}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    name = excluded.name,
+    date = excluded.date,
+    studioId = excluded.studioId,
+    rating100 = excluded.rating100,
+    duration = excluded.duration,
+    sceneCount = excluded.sceneCount,
+    performerCount = excluded.performerCount,
+    director = excluded.director,
+    synopsis = excluded.synopsis,
+    urls = excluded.urls,
+    frontImagePath = excluded.frontImagePath,
+    backImagePath = excluded.backImagePath,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL
+`);
+
+  // Sync group tags to GroupTag junction table
+  const instanceId = stashInstanceId;
+  for (const group of validGroups) {
+    if (group.tags && group.tags.length > 0) {
+      const groupId = group.id;
+
+      // Delete existing tags for this group
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM GroupTag WHERE groupId = '${escapeSql(groupId)}' AND groupInstanceId = '${escapeSql(instanceId)}'`
+      );
+
+      // Insert new tags (filter to valid tag IDs)
+      const validTags = group.tags.filter(
+        (t: TagRef) => t?.id && validateEntityId(t.id)
+      );
+      if (validTags.length > 0) {
+        const tagValues = validTags
+          .map(
+            (t: TagRef) =>
+              `('${escapeSql(groupId)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
+          )
+          .join(", ");
+
+        await prisma.$executeRawUnsafe(
+          `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+        );
+      }
+    }
+  }
+
+  return { written: validGroups.length };
+}
+
+// ==================== Gallery Sync ====================
+
+async function processGalleriesBatch(
+  galleries: SyncGallery[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (galleries.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validGalleries = galleries.filter((g) => validateEntityId(g.id));
+  if (validGalleries.length === 0) return { written: 0 };
+
+  const values = validGalleries
+    .map((gallery) => {
+      const folder = gallery.folder;
+      // Get first file's basename for zip gallery title fallback
+      const fileBasename = gallery.files?.[0]?.basename || null;
+      // Cover image ID for dimension lookup
+      const coverImageId = gallery.cover?.id || null;
+      // A gallery's studio is on the gallery's own Stash, so it takes the
+      // gallery's instance (as does an image's, below)
+      return `(
+    '${escapeSql(gallery.id)}',
+    ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${escapeSqlNullable(gallery.title)},
+    ${escapeSqlNullable(gallery.date)},
+    ${gallery.studio?.id ? `'${escapeSql(gallery.studio.id)}'` : "NULL"},
+    ${gallery.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+    ${gallery.rating100 ?? "NULL"},
+    ${coverImageId ? `'${escapeSql(coverImageId)}'` : "NULL"},
+    ${gallery.image_count ?? 0},
+    ${escapeSqlNullable(gallery.details)},
+    ${escapeSqlNullable(gallery.urls?.[0])},
+    ${escapeSqlNullable(gallery.code)},
+    ${escapeSqlNullable(gallery.photographer)},
+    ${escapeSqlNullable(gallery.urls ? JSON.stringify(gallery.urls) : null)},
+    ${escapeSqlNullable(folder?.path)},
+    ${escapeSqlNullable(fileBasename)},
+    ${escapeSqlNullable(gallery.paths?.cover)},
+    ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
+    ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
+    datetime('now'),
+    NULL
+  )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+  INSERT INTO StashGallery (
+    id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
+    details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
+    syncedAt, deletedAt
+  ) VALUES ${values}
+  ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+    title = excluded.title,
+    date = excluded.date,
+    studioId = excluded.studioId,
+    studioInstanceId = excluded.studioInstanceId,
+    rating100 = excluded.rating100,
+    coverImageId = excluded.coverImageId,
+    imageCount = excluded.imageCount,
+    details = excluded.details,
+    url = excluded.url,
+    code = excluded.code,
+    photographer = excluded.photographer,
+    urls = excluded.urls,
+    folderPath = excluded.folderPath,
+    fileBasename = excluded.fileBasename,
+    coverPath = excluded.coverPath,
+    stashCreatedAt = excluded.stashCreatedAt,
+    stashUpdatedAt = excluded.stashUpdatedAt,
+    syncedAt = excluded.syncedAt,
+    deletedAt = NULL
+`);
+
+  // Sync gallery performers (junction table)
+  const instanceId = stashInstanceId;
+  const performerInserts: { galleryId: string; performerId: string }[] = [];
+  for (const gallery of validGalleries) {
+    if (gallery.performers && gallery.performers.length > 0) {
+      for (const performer of gallery.performers) {
+        if (validateEntityId(performer.id)) {
+          performerInserts.push({
+            galleryId: gallery.id,
+            performerId: performer.id,
+          });
+        }
+      }
+    }
+  }
+
+  // Delete existing gallery-performer relationships for these galleries
+  const galleryIds = validGalleries
+    .map((g) => `'${escapeSql(g.id)}'`)
+    .join(",");
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${escapeSql(instanceId)}'
+  `);
+
+  // Insert new gallery-performer relationships
+  if (performerInserts.length > 0) {
+    const performerValues = performerInserts
+      .map(
+        (p) =>
+          `('${escapeSql(p.galleryId)}', '${escapeSql(instanceId)}', '${escapeSql(p.performerId)}', '${escapeSql(instanceId)}')`
+      )
+      .join(",\n");
+
+    await prisma.$executeRawUnsafe(`
+      INSERT OR IGNORE INTO GalleryPerformer (galleryId, galleryInstanceId, performerId, performerInstanceId)
+      VALUES ${performerValues}
+    `);
+  }
+
+  // Sync gallery tags to GalleryTag junction table
+  const tagInserts: { galleryId: string; tagId: string }[] = [];
+  for (const gallery of validGalleries) {
+    if (gallery.tags && gallery.tags.length > 0) {
+      for (const tag of gallery.tags) {
+        if (tag?.id && validateEntityId(tag.id)) {
+          tagInserts.push({
+            galleryId: gallery.id,
+            tagId: tag.id,
+          });
+        }
+      }
+    }
+  }
+
+  // Delete existing gallery-tag relationships for these galleries
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${escapeSql(instanceId)}'
+  `);
+
+  // Insert new gallery-tag relationships
+  if (tagInserts.length > 0) {
+    const tagValues = tagInserts
+      .map(
+        (t) =>
+          `('${escapeSql(t.galleryId)}', '${escapeSql(instanceId)}', '${escapeSql(t.tagId)}', '${escapeSql(instanceId)}')`
+      )
+      .join(",\n");
+
+    await prisma.$executeRawUnsafe(`
+      INSERT OR IGNORE INTO GalleryTag (galleryId, galleryInstanceId, tagId, tagInstanceId)
+      VALUES ${tagValues}
+    `);
+  }
+
+  return { written: validGalleries.length };
+}
+
+// ==================== Image Sync ====================
+
+async function processImagesBatch(
+  images: SyncImage[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  // Skip empty batches
+  if (images.length === 0) return { written: 0 };
+
+  // Validate IDs
+  const validImages = images.filter((i) => validateEntityId(i.id));
+  if (validImages.length === 0) return { written: 0 };
+
+  const imageIds = validImages.map((i) => i.id);
+  const instanceId = stashInstanceId;
+
+  // Bulk delete junction records
+  // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
+  // and includes extended timeout for large libraries
+  const imageIdList = imageIds.map((id) => `'${escapeSql(id)}'`).join(",");
+  const escapedInstanceId = escapeSql(instanceId);
+  await dbWriteTransaction(
+    "sync.images.junctions",
+    async (tx) => {
+      await tx.$executeRawUnsafe(
+        `DELETE FROM ImagePerformer WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM ImageTag WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM ImageGallery WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+      );
+    },
+    { timeout: 60000 } // 60 second timeout for large batches
+  );
+
+  // Build bulk image upsert
+  const values = validImages
+    .map((image) => {
+      const visualFile = image.files?.[0];
+      const paths = image.paths;
+      return `(
+      '${escapeSql(image.id)}',
+      ${stashInstanceId ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+      ${escapeSqlNullable(image.title)},
+      ${escapeSqlNullable(image.code)},
+      ${escapeSqlNullable(image.details)},
+      ${escapeSqlNullable(image.photographer)},
+      ${escapeSqlNullable(image.urls ? JSON.stringify(image.urls) : null)},
+      ${escapeSqlNullable(image.date)},
+      ${image.studio?.id ? `'${escapeSql(image.studio.id)}'` : "NULL"},
+      ${image.studio?.id ? `'${escapeSql(stashInstanceId)}'` : "NULL"},
+      ${image.rating100 ?? "NULL"},
+      ${image.o_counter ?? 0},
+      ${image.organized ? 1 : 0},
+      ${escapeSqlNullable(visualFile?.path)},
+      ${visualFile?.width ?? "NULL"},
+      ${visualFile?.height ?? "NULL"},
+      ${visualFile?.size ?? "NULL"},
+      ${escapeSqlNullable(paths?.thumbnail)},
+      ${escapeSqlNullable(paths?.preview)},
+      ${escapeSqlNullable(paths?.image)},
+      ${image.created_at ? `'${image.created_at}'` : "NULL"},
+      ${image.updated_at ? `'${image.updated_at}'` : "NULL"},
+      datetime('now'),
+      NULL
+    )`;
+    })
+    .join(",\n");
+
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO StashImage (
+      id, stashInstanceId, title, code, details, photographer, urls, date, studioId, studioInstanceId, rating100, oCounter, organized,
+      filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
+      stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+    ) VALUES ${values}
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
+      title = excluded.title,
+      code = excluded.code,
+      details = excluded.details,
+      photographer = excluded.photographer,
+      urls = excluded.urls,
+      date = excluded.date,
+      studioId = excluded.studioId,
+      studioInstanceId = excluded.studioInstanceId,
+      rating100 = excluded.rating100,
+      oCounter = excluded.oCounter,
+      organized = excluded.organized,
+      filePath = excluded.filePath,
+      width = excluded.width,
+      height = excluded.height,
+      fileSize = excluded.fileSize,
+      pathThumbnail = excluded.pathThumbnail,
+      pathPreview = excluded.pathPreview,
+      pathImage = excluded.pathImage,
+      stashCreatedAt = excluded.stashCreatedAt,
+      stashUpdatedAt = excluded.stashUpdatedAt,
+      syncedAt = excluded.syncedAt,
+      deletedAt = NULL
+  `);
+
+  // Collect junction records (validate related entity IDs too)
+  const performerRecords: string[] = [];
+  const tagRecords: string[] = [];
+  const galleryRecords: string[] = [];
+
+  for (const image of validImages) {
+    for (const p of image.performers || []) {
+      if (validateEntityId(p.id)) {
+        performerRecords.push(
+          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(p.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+    for (const t of image.tags || []) {
+      if (validateEntityId(t.id)) {
+        tagRecords.push(
+          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(t.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+    for (const g of image.galleries || []) {
+      if (validateEntityId(g.id)) {
+        galleryRecords.push(
+          `('${escapeSql(image.id)}', '${escapeSql(instanceId)}', '${escapeSql(g.id)}', '${escapeSql(instanceId)}')`
+        );
+      }
+    }
+  }
+
+  // Batch insert junction records
+  const inserts = [];
+
+  if (performerRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
+      )
+    );
+  }
+  if (tagRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
+      )
+    );
+  }
+  if (galleryRecords.length > 0) {
+    inserts.push(
+      prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ImageGallery (imageId, imageInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
+      )
+    );
+  }
+
+  await Promise.all(inserts);
+
+  return { written: validImages.length };
+}
+
+// ==================== Clip Sync ====================
+
+/**
+ * Writes one page of clips (scene markers) and their tags. Each preview is
+ * probed first, to record whether Stash has generated it.
+ */
+async function processClipsBatch(
+  markers: SyncClip[],
+  stashInstanceId: string
+): Promise<BatchChanges> {
+  if (markers.length === 0) return { written: 0 };
+
+  // Build preview URLs for probing
+  // Note: m.preview is already a full URL from Stash, just append API key
+  const apiKey = stashInstanceManager.getApiKey();
+  const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
+
+  // Probe previews in batch
+  const probeResults = await clipPreviewProber.probeBatch(previewUrls);
+
+  // Upsert clips
+  const instanceId = stashInstanceId;
+  for (let i = 0; i < markers.length; i++) {
+    const marker = markers[i] as (typeof markers)[number];
+    const previewUrl = previewUrls[i] as string;
+
+    const clipData = {
+      sceneId: marker.scene.id,
+      sceneInstanceId: instanceId,
+      title: marker.title || null,
+      seconds: marker.seconds,
+      endSeconds: marker.end_seconds || null,
+      primaryTagId: marker.primary_tag.id,
+      primaryTagInstanceId: instanceId,
+      previewPath: marker.preview,
+      screenshotPath: marker.screenshot,
+      streamPath: marker.stream,
+      isGenerated: probeResults.get(previewUrl) ?? false,
+      generationCheckedAt: new Date(),
+      stashCreatedAt: marker.created_at ? new Date(marker.created_at) : null,
+      stashUpdatedAt: marker.updated_at ? new Date(marker.updated_at) : null,
+      syncedAt: new Date(),
+      deletedAt: null,
+    };
+
+    await prisma.stashClip.upsert({
+      where: {
+        id_stashInstanceId: {
+          id: marker.id,
+          stashInstanceId: instanceId,
+        },
+      },
+      create: { id: marker.id, stashInstanceId: instanceId, ...clipData },
+      update: clipData,
+    });
+
+    // Sync clip tags (junction table)
+    await prisma.clipTag.deleteMany({
+      where: {
+        clipId: marker.id,
+        clipInstanceId: instanceId,
+      },
+    });
+
+    const tagIds = marker.tags.map((t) => t.id);
+    if (tagIds.length > 0) {
+      const tagValues = tagIds
+        .map(
+          (tagId) =>
+            `('${escapeSql(marker.id)}', '${escapeSql(instanceId)}', '${escapeSql(tagId)}', '${escapeSql(instanceId)}')`
+        )
+        .join(", ");
+      await prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO ClipTag (clipId, clipInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+      );
+    }
+  }
+
+  return { written: markers.length };
+}
+
 class StashSyncService extends EventEmitter {
   /**
    * The lock: which job runs, if any. A sync, or an instance deletion (the
@@ -441,9 +1792,7 @@ class StashSyncService extends EventEmitter {
   private readonly queuedFullSyncs = new Set<string>();
   /** whenIdle() callers, resolved when a release leaves the lock free. */
   private readonly idleWaiters: Array<() => void> = [];
-  private readonly PAGE_SIZE = BATCH_SIZE;
   private abortController: AbortController | null = null;
-  private batchItemCount = 0; // Track items within current batch for progress logging
 
   /**
    * Get the Stash client for the specified instance ID, or default if not specified.
@@ -465,22 +1814,6 @@ class StashSyncService extends EventEmitter {
     return this.abortController
       ? client.withSignal(this.abortController.signal)
       : client;
-  }
-
-  /**
-   * Escape a string for SQL, handling quotes
-   */
-  private escape(value: string): string {
-    return value.replace(/'/g, "''");
-  }
-
-  /**
-   * Escape a nullable string for SQL
-   * Returns 'value' or NULL
-   */
-  private escapeNullable(value: string | null | undefined): string {
-    if (value === null || value === undefined) return "NULL";
-    return `'${this.escape(value)}'`;
   }
 
   /**
@@ -597,126 +1930,9 @@ class StashSyncService extends EventEmitter {
     this.acquire("sync");
 
     try {
-      // If no instance specified, sync all enabled instances
-      if (!stashInstanceId) {
-        return await this.fullSyncAllInstances();
-      }
-      return await this.fullSyncInstance(stashInstanceId);
+      return await this.runSync("full", stashInstanceId);
     } finally {
       this.release();
-    }
-  }
-
-  /**
-   * Full sync all enabled instances
-   * Note: the caller holds the lock (activeJob)
-   */
-  private async fullSyncAllInstances(): Promise<SyncResult[]> {
-    const enabledInstances = stashInstanceManager.getAllEnabled();
-
-    if (enabledInstances.length === 0) {
-      logger.warn("No enabled Stash instances to sync");
-      return [];
-    }
-
-    logger.info(
-      `Starting full sync for ${enabledInstances.length} instance(s)...`
-    );
-    const allResults: SyncResult[] = [];
-
-    for (const instance of enabledInstances) {
-      logger.info(`Syncing instance: ${instance.name} (${instance.id})`);
-      try {
-        const results = await this.fullSyncInstance(instance.id);
-        allResults.push(...results);
-      } catch (error) {
-        // An abort ends the whole run, not just this instance
-        if (this.isAbort(error)) throw new Error("Sync aborted");
-        logger.error(`Failed to sync instance ${instance.name}`, {
-          instanceId: instance.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Continue with other instances
-      }
-    }
-
-    return allResults;
-  }
-
-  /**
-   * Full sync a single instance
-   * Note: the caller holds the lock (activeJob)
-   */
-  private async fullSyncInstance(
-    stashInstanceId: string
-  ): Promise<SyncResult[]> {
-    const startTime = Date.now();
-    const results: SyncResult[] = [];
-
-    try {
-      logger.info("Starting full sync...", { stashInstanceId });
-
-      // Each type, then its cleanup; its state is saved at once, so a
-      // restart does not sync completed types again. A type that fails is
-      // recorded and the next one runs.
-      for (const entityType of SYNC_ORDER) {
-        this.checkAbort();
-        results.push(
-          await this.runEntityType(entityType, stashInstanceId, {
-            syncType: "full",
-            withCleanup: true,
-          })
-        );
-      }
-
-      // Compute inherited tags for scenes (must happen after scenes, performers, studios, groups are synced)
-      logger.info("Computing inherited tags for scenes...");
-      await sceneTagInheritanceService.computeInheritedTags();
-      logger.info("Scene tag inheritance complete");
-
-      // Apply gallery inheritance to images (must happen after images and galleries are synced)
-      logger.info("Applying gallery inheritance to images...");
-      await imageGalleryInheritanceService.applyGalleryInheritance();
-      logger.info("Gallery inheritance complete");
-
-      // Rebuild inherited image counts (must happen after gallery inheritance)
-      logger.info("Rebuilding inherited image counts...");
-      await entityImageCountService.rebuildAllImageCounts();
-      logger.info("Inherited image counts rebuild complete");
-
-      logger.info("Rebuilding user stats after sync...");
-      await userStatsService.rebuildAllStats();
-      logger.info("User stats rebuild complete");
-
-      // Compute tag scene counts via performers
-      await this.computeTagSceneCountsViaPerformers();
-
-      // Recompute exclusions for all users after sync
-      logger.info("Sync complete, recomputing user exclusions...");
-      await exclusionComputationService.recomputeAllUsers();
-      logger.info("User exclusions recomputed");
-
-      const duration = Date.now() - startTime;
-      logger.info("Full sync completed", {
-        durationMs: duration,
-        results: results.map((r) => ({
-          type: r.entityType,
-          synced: r.synced,
-          deleted: r.deleted,
-        })),
-      });
-
-      return results;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-
-      if (errorMsg === "Sync aborted") {
-        logger.info("Full sync aborted by user");
-      } else {
-        logger.error("Full sync failed", { error: errorMsg });
-      }
-
-      throw error;
     }
   }
 
@@ -737,43 +1953,80 @@ class StashSyncService extends EventEmitter {
     this.acquire("sync");
 
     try {
-      // If no instance specified, sync all enabled instances
-      if (!stashInstanceId) {
-        return await this.smartIncrementalSyncAllInstances();
-      }
-      return await this.smartIncrementalSyncInstance(stashInstanceId);
+      return await this.runSync("smart", stashInstanceId);
     } finally {
       this.release();
     }
   }
 
   /**
-   * Smart incremental sync all enabled instances
-   * Note: the caller holds the lock (activeJob)
+   * Incremental sync - fetches only changed entities
+   * Uses per-entity-type timestamps so each entity type syncs from its own last sync time
    */
-  private async smartIncrementalSyncAllInstances(): Promise<SyncResult[]> {
-    const enabledInstances = stashInstanceManager.getAllEnabled();
+  async incrementalSync(stashInstanceId?: string): Promise<SyncResult[]> {
+    if (this.activeJob !== null) {
+      logger.warn("Sync already in progress, skipping", {
+        job: this.activeJob,
+      });
+      return [];
+    }
 
+    this.acquire("sync");
+
+    try {
+      return await this.runSync("incremental", stashInstanceId);
+    } finally {
+      this.release();
+    }
+  }
+
+  /** The running job's context. The caller holds the lock. */
+  private runContext(): SyncRunContext {
+    if (this.abortController === null) {
+      throw new Error("A sync runs only while it holds the lock");
+    }
+    return { signal: this.abortController.signal };
+  }
+
+  /**
+   * One sync run in `mode`: the instance given, or every enabled instance in
+   * turn. An instance that fails is logged and the next one syncs; an abort
+   * ends the whole run. The caller holds the lock.
+   */
+  private async runSync(
+    mode: SyncMode,
+    stashInstanceId?: string
+  ): Promise<SyncResult[]> {
+    const run = this.runContext();
+    if (stashInstanceId) {
+      return this.syncInstance(stashInstanceId, mode, run);
+    }
+
+    const enabledInstances = stashInstanceManager.getAllEnabled();
     if (enabledInstances.length === 0) {
       logger.warn("No enabled Stash instances to sync");
       return [];
     }
 
+    const { name } = SYNC_MODE_NAMES[mode];
     logger.info(
-      `Starting smart incremental sync for ${enabledInstances.length} instance(s)...`
+      `Starting ${name} for ${enabledInstances.length} instance(s)...`
     );
     const allResults: SyncResult[] = [];
 
     for (const instance of enabledInstances) {
-      logger.info(`Smart sync instance: ${instance.name} (${instance.id})`);
+      logger.info(`Syncing instance: ${instance.name} (${instance.id})`, {
+        mode,
+      });
       try {
-        const results = await this.smartIncrementalSyncInstance(instance.id);
+        const results = await this.syncInstance(instance.id, mode, run);
         allResults.push(...results);
       } catch (error) {
         // An abort ends the whole run, not just this instance
         if (this.isAbort(error)) throw new Error("Sync aborted");
-        logger.error(`Failed to smart sync instance ${instance.name}`, {
+        logger.error(`Failed to sync instance ${instance.name}`, {
           instanceId: instance.id,
+          mode,
           error: error instanceof Error ? error.message : String(error),
         });
         // Continue with other instances
@@ -784,119 +2037,40 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Smart incremental sync a single instance
-   * Note: the caller holds the lock (activeJob)
+   * Syncs one instance in `mode`: every type in SYNC_ORDER, then the
+   * cleanups (on the full path each type's runs right after it), then the
+   * post-sync steps. Each type's state is saved at once, so a restart does
+   * not sync completed types again; a type that fails is recorded and the
+   * next one runs. The caller holds the lock.
    */
-  private async smartIncrementalSyncInstance(
-    stashInstanceId: string
+  private async syncInstance(
+    stashInstanceId: string,
+    mode: SyncMode,
+    run: SyncRunContext
   ): Promise<SyncResult[]> {
+    const { name, title } = SYNC_MODE_NAMES[mode];
     const startTime = Date.now();
     const results: SyncResult[] = [];
 
     try {
-      logger.info("Starting smart incremental sync...", { stashInstanceId });
+      logger.info(`Starting ${name}...`, { stashInstanceId });
 
       for (const entityType of SYNC_ORDER) {
         this.checkAbort();
-
-        // Get sync state for this specific entity type
-        const syncState = await this.getEntitySyncState(
-          stashInstanceId,
-          entityType
+        results.push(
+          await this.syncEntityType(entityType, stashInstanceId, mode, run)
         );
-        const lastSync = this.getMostRecentSyncTime(syncState);
-
-        if (!lastSync) {
-          // Never synced - do full sync for this entity type only
-          logger.info(`${entityType}: No previous sync, syncing all`);
-          results.push(
-            await this.runEntityType(entityType, stashInstanceId, {
-              syncType: "full",
-              withCleanup: false,
-            })
-          );
-          continue;
-        }
-
-        // Check how many entities changed since last sync
-        const changeCount = await this.getChangeCount(
-          entityType,
-          lastSync,
-          stashInstanceId
-        );
-
-        if (changeCount === 0) {
-          // lastSync is now a raw RFC3339 string
-          logger.info(`${entityType}: No changes since ${lastSync}, skipping`);
-          results.push({
-            entityType,
-            synced: 0,
-            deleted: 0,
-            durationMs: 0,
-          });
-          // Nothing failed this run: clear an earlier run's error
-          await this.recordEntityError(stashInstanceId, entityType, null);
-        } else {
-          logger.info(
-            `${entityType}: ${changeCount} changes since ${lastSync}, syncing`
-          );
-          results.push(
-            await this.runEntityType(entityType, stashInstanceId, {
-              syncType: "incremental",
-              since: lastSync,
-              withCleanup: false,
-            })
-          );
-        }
       }
 
       // Cleanup deleted entities (detect deletions/merges in Stash)
-      await this.cleanupEveryType(stashInstanceId, results);
-
-      // Apply gallery inheritance if images or galleries were synced
-      // (galleries may have new performers/tags that need to propagate to images)
-      const imageResult = results.find((r) => r.entityType === "image");
-      const galleryResult = results.find((r) => r.entityType === "gallery");
-      if (
-        (imageResult && imageResult.synced > 0) ||
-        (galleryResult && galleryResult.synced > 0)
-      ) {
-        logger.info(
-          "Applying gallery inheritance after smart incremental sync..."
-        );
-        await imageGalleryInheritanceService.applyGalleryInheritance();
-        logger.info("Gallery inheritance complete");
+      if (mode !== "full") {
+        await this.cleanupEveryType(stashInstanceId, results);
       }
 
-      // Compute inherited tags for scenes if scenes were updated
-      const sceneResult = results.find((r) => r.entityType === "scene");
-      if (sceneResult && sceneResult.synced > 0) {
-        logger.info(
-          "Computing inherited tags for scenes after smart incremental sync..."
-        );
-        await sceneTagInheritanceService.computeInheritedTags();
-        logger.info("Scene tag inheritance complete");
-      }
-
-      // Rebuild inherited image counts (must happen after gallery inheritance)
-      logger.info("Rebuilding inherited image counts...");
-      await entityImageCountService.rebuildAllImageCounts();
-      logger.info("Inherited image counts rebuild complete");
-
-      logger.info("Rebuilding user stats after sync...");
-      await userStatsService.rebuildAllStats();
-      logger.info("User stats rebuild complete");
-
-      // Compute tag scene counts via performers
-      await this.computeTagSceneCountsViaPerformers();
-
-      // Recompute exclusions for all users after sync
-      logger.info("Sync complete, recomputing user exclusions...");
-      await exclusionComputationService.recomputeAllUsers();
-      logger.info("User exclusions recomputed");
+      await this.runInstancePostSteps(mode, results);
 
       const duration = Date.now() - startTime;
-      logger.info("Smart incremental sync completed", {
+      logger.info(`${title} completed`, {
         durationMs: duration,
         results: results.map((r) => ({
           type: r.entityType,
@@ -910,13 +2084,142 @@ class StashSyncService extends EventEmitter {
       const errorMsg = error instanceof Error ? error.message : String(error);
 
       if (errorMsg === "Sync aborted") {
-        logger.info("Smart incremental sync aborted by user");
+        logger.info(`${title} aborted by user`);
       } else {
-        logger.error("Smart incremental sync failed", { error: errorMsg });
+        logger.error(`${title} failed`, { error: errorMsg });
       }
 
       throw error;
     }
+  }
+
+  /**
+   * One type of one instance in `mode`. The full path fetches every entity
+   * and cleans the type up. The others fetch what changed since the type's
+   * last sync (everything when it never synced); the smart path first asks
+   * Stash how many changed and skips the type at none, clearing an earlier
+   * run's error.
+   */
+  private async syncEntityType(
+    entityType: EntityType,
+    stashInstanceId: string,
+    mode: SyncMode,
+    run: SyncRunContext
+  ): Promise<SyncResult> {
+    if (mode === "full") {
+      return this.runEntityType(
+        entityType,
+        stashInstanceId,
+        { syncType: "full", withCleanup: true },
+        run
+      );
+    }
+
+    const syncState = await this.getEntitySyncState(
+      stashInstanceId,
+      entityType
+    );
+    const lastSync = this.getMostRecentSyncTime(syncState);
+
+    if (!lastSync) {
+      // Never synced - do full sync for this entity type only
+      logger.info(`${entityType}: No previous sync, syncing all`);
+      return this.runEntityType(
+        entityType,
+        stashInstanceId,
+        { syncType: "full", withCleanup: false },
+        run
+      );
+    }
+
+    if (mode === "smart") {
+      // Check how many entities changed since last sync
+      const changeCount = await this.getChangeCount(
+        entityType,
+        lastSync,
+        stashInstanceId,
+        run
+      );
+      if (changeCount === 0) {
+        // lastSync is a raw RFC3339 string
+        logger.info(`${entityType}: No changes since ${lastSync}, skipping`);
+        // Nothing failed this run: clear an earlier run's error
+        await this.recordEntityError(stashInstanceId, entityType, null);
+        return { entityType, synced: 0, deleted: 0, durationMs: 0 };
+      }
+      logger.info(
+        `${entityType}: ${changeCount} changes since ${lastSync}, syncing`
+      );
+    } else {
+      // Incremental sync using this entity's own timestamp
+      logger.info(`${entityType}: syncing changes since ${lastSync}`);
+    }
+
+    return this.runEntityType(
+      entityType,
+      stashInstanceId,
+      { syncType: "incremental", since: lastSync, withCleanup: false },
+      run
+    );
+  }
+
+  /**
+   * The steps after one instance's types: the full path runs every one; the
+   * others apply gallery inheritance only when images or galleries synced,
+   * and scene tag inheritance only when scenes did.
+   */
+  private async runInstancePostSteps(
+    mode: SyncMode,
+    results: SyncResult[]
+  ): Promise<void> {
+    const synced = (entityType: EntityType) =>
+      (results.find((r) => r.entityType === entityType)?.synced ?? 0) > 0;
+
+    if (mode === "full") {
+      // Compute inherited tags for scenes (must happen after scenes, performers, studios, groups are synced)
+      logger.info("Computing inherited tags for scenes...");
+      await sceneTagInheritanceService.computeInheritedTags();
+      logger.info("Scene tag inheritance complete");
+
+      // Apply gallery inheritance to images (must happen after images and galleries are synced)
+      logger.info("Applying gallery inheritance to images...");
+      await imageGalleryInheritanceService.applyGalleryInheritance();
+      logger.info("Gallery inheritance complete");
+    } else {
+      const { name } = SYNC_MODE_NAMES[mode];
+
+      // Apply gallery inheritance if images or galleries were synced
+      // (galleries may have new performers/tags that need to propagate to images)
+      if (synced("image") || synced("gallery")) {
+        logger.info(`Applying gallery inheritance after ${name}...`);
+        await imageGalleryInheritanceService.applyGalleryInheritance();
+        logger.info("Gallery inheritance complete");
+      }
+
+      // Compute inherited tags for scenes if scenes were updated
+      if (synced("scene")) {
+        logger.info(`Computing inherited tags for scenes after ${name}...`);
+        await sceneTagInheritanceService.computeInheritedTags();
+        logger.info("Scene tag inheritance complete");
+      }
+    }
+
+    // Rebuild inherited image counts (must happen after gallery inheritance)
+    logger.info("Rebuilding inherited image counts...");
+    await entityImageCountService.rebuildAllImageCounts();
+    logger.info("Inherited image counts rebuild complete");
+
+    logger.info("Rebuilding user stats after sync...");
+    await userStatsService.rebuildAllStats();
+    logger.info("User stats rebuild complete");
+
+    // Compute tag scene counts via performers
+    await this.computeTagSceneCountsViaPerformers();
+
+    // Recompute exclusions for all users after sync
+    logger.info("Sync complete, recomputing user exclusions...");
+    await exclusionComputationService.recomputeAllUsers();
+    logger.info("User exclusions recomputed");
   }
 
   /**
@@ -957,79 +2260,30 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Get count of entities updated since a given timestamp
-   * Used to determine if we need to sync at all
+   * How many entities of a type Stash has updated since `since`: the type's
+   * spec asked for a page of 0, which returns only the count. The smart sync
+   * skips a type that has none. A failed probe counts as a change; an abort
+   * ends the sync.
    */
   private async getChangeCount(
     entityType: EntityType,
     since: string,
-    stashInstanceId?: string
+    stashInstanceId: string,
+    run: SyncRunContext
   ): Promise<number> {
     const stash = this.getStashClient(stashInstanceId);
-    const updatedAtFilter = {
-      updated_at: {
-        modifier: CriterionModifier.GreaterThan,
-        value: formatTimestampForStash(since),
-      },
-    };
+    // No change count for clips yet, so the startup smart sync skips them
+    // once they have synced; the scheduled incremental sync still runs them
+    if (entityType === "clip") return 0;
 
     try {
-      switch (entityType) {
-        case "scene": {
-          const result = await stash.findScenesCompact({
-            filter: { page: 1, per_page: 0 },
-            scene_filter: updatedAtFilter,
-          });
-          return result.findScenes.count;
-        }
-        case "performer": {
-          const result = await stash.findPerformers({
-            filter: { page: 1, per_page: 0 },
-            performer_filter: updatedAtFilter,
-          });
-          return result.findPerformers.count;
-        }
-        case "studio": {
-          const result = await stash.findStudios({
-            filter: { page: 1, per_page: 0 },
-            studio_filter: updatedAtFilter,
-          });
-          return result.findStudios.count;
-        }
-        case "tag": {
-          const result = await stash.findTags({
-            filter: { page: 1, per_page: 0 },
-            tag_filter: updatedAtFilter,
-          });
-          return result.findTags.count;
-        }
-        case "group": {
-          const result = await stash.findGroups({
-            filter: { page: 1, per_page: 0 },
-            group_filter: updatedAtFilter,
-          });
-          return result.findGroups.count;
-        }
-        case "gallery": {
-          const result = await stash.findGalleries({
-            filter: { page: 1, per_page: 0 },
-            gallery_filter: updatedAtFilter,
-          });
-          return result.findGalleries.count;
-        }
-        case "image": {
-          const result = await stash.findImages({
-            filter: { page: 1, per_page: 0 },
-            image_filter: updatedAtFilter,
-          });
-          return result.findImages.count;
-        }
-        // No change count for clips yet, so the startup smart sync skips them
-        // once they have synced; the scheduled incremental sync still runs them
-        case "clip":
-        default:
-          return 0;
-      }
+      const { count } = await ENTITY_SYNC[entityType].fetchPage(stash, {
+        page: 1,
+        perPage: 0,
+        since,
+        signal: run.signal,
+      });
+      return count;
     } catch (error) {
       // An abort ends the sync; anything else is not this probe's to decide
       if (this.isAbort(error)) throw new Error("Sync aborted");
@@ -1042,34 +2296,112 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Sync a specific entity type
+   * Syncs one type of one instance page by page: every entity, those Stash
+   * updated after `since`, or only `ids` (a page of ids per request; none
+   * for an empty list, which Stash would read as no list). Each page is
+   * written by the type's spec before the next is asked for, and the loop
+   * ends at Stash's count or on an empty page. The run's abort is checked
+   * before every page and ends a request in flight. The result carries the
+   * newest updated_at seen, the type's next watermark.
    */
-  private async syncEntityType(
+  private async paginate(
     entityType: EntityType,
     stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
+    { since, ids }: PaginateOptions,
+    run: SyncRunContext
   ): Promise<SyncResult> {
-    switch (entityType) {
-      case "studio":
-        return this.syncStudios(stashInstanceId, isFullSync, lastSyncTime);
-      case "tag":
-        return this.syncTags(stashInstanceId, isFullSync, lastSyncTime);
-      case "performer":
-        return this.syncPerformers(stashInstanceId, isFullSync, lastSyncTime);
-      case "group":
-        return this.syncGroups(stashInstanceId, isFullSync, lastSyncTime);
-      case "gallery":
-        return this.syncGalleries(stashInstanceId, isFullSync, lastSyncTime);
-      case "scene":
-        return this.syncScenes(stashInstanceId, isFullSync, lastSyncTime);
-      case "clip":
-        return this.syncClips(stashInstanceId, isFullSync, lastSyncTime);
-      case "image":
-        return this.syncImages(stashInstanceId, isFullSync, lastSyncTime);
-      default:
-        throw new Error(`Unknown entity type: ${entityType as string}`);
+    // Widened to every type's entity: the pages it fetches are the ones its
+    // own processBatch writes
+    const spec: EntitySyncSpec<SyncEntityOf<EntityType>> =
+      ENTITY_SYNC[entityType];
+    const { plural } = ENTITY_TABLES[entityType];
+    logger.info(`Syncing ${plural}...`);
+    const startTime = Date.now();
+    const stash = this.getStashClient(stashInstanceId);
+    let synced = 0;
+    let total = 0;
+    let maxUpdatedAt: string | undefined;
+
+    this.emitProgress({ entityType, phase: "fetching", current: 0, total: 0 });
+
+    try {
+      const idChunks =
+        ids === undefined ? [undefined] : chunksOf(ids, BATCH_SIZE);
+      for (const idChunk of idChunks) {
+        let fetched = 0;
+        for (let page = 1; ; page++) {
+          throwIfAborted(run.signal);
+
+          const fetchStart = Date.now();
+          const { items, count } = await spec.fetchPage(stash, {
+            page,
+            perPage: BATCH_SIZE,
+            since,
+            ids: idChunk,
+            signal: run.signal,
+          });
+          logger.debug(
+            `Fetched ${plural} page ${page} in ${Date.now() - fetchStart}ms`
+          );
+          total = ids === undefined ? count : ids.length;
+
+          if (items.length === 0) break;
+
+          // Track max updated_at for sync state
+          maxUpdatedAt = newestUpdatedAt(maxUpdatedAt, items);
+
+          await spec.processBatch(items, stashInstanceId, run);
+
+          fetched += items.length;
+          synced += items.length;
+          this.emitProgress({
+            entityType,
+            phase: "processing",
+            current: synced,
+            total,
+          });
+          logger.debug(
+            `${capitalize(plural)}: ${synced}/${total} (${Math.round((synced / total) * 100)}%)`
+          );
+
+          if (fetched >= count) break;
+        }
+      }
+
+      this.emitProgress({
+        entityType,
+        phase: "complete",
+        current: synced,
+        total: synced,
+      });
+
+      const durationMs = Date.now() - startTime;
+      logger.info(
+        `${capitalize(plural)} synced: ${synced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
+      );
+
+      return {
+        entityType,
+        synced,
+        deleted: 0,
+        durationMs,
+        maxUpdatedAt,
+      };
+    } catch (error) {
+      this.emitProgress({
+        entityType,
+        phase: "error",
+        current: synced,
+        total,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
+  }
+
+  /** Tells progress listeners (SyncScheduler.onProgress) how a type goes. */
+  private emitProgress(progress: SyncProgress): void {
+    this.emit("progress", progress);
   }
 
   /**
@@ -1086,16 +2418,17 @@ class StashSyncService extends EventEmitter {
   private async runEntityType(
     entityType: EntityType,
     stashInstanceId: string,
-    { syncType, since, withCleanup }: RunEntityTypeOptions
+    { syncType, since, withCleanup }: RunEntityTypeOptions,
+    run: SyncRunContext
   ): Promise<SyncResult> {
     const startTime = Date.now();
     let result: SyncResult;
     try {
-      result = await this.syncEntityType(
+      result = await this.paginate(
         entityType,
         stashInstanceId,
-        syncType === "full",
-        since
+        { since: syncType === "full" ? undefined : since },
+        run
       );
     } catch (error) {
       if (this.isAbort(error)) throw new Error("Sync aborted");
@@ -1159,522 +2492,6 @@ class StashSyncService extends EventEmitter {
         `Cleanup complete: ${totalDeleted} entities marked as deleted`
       );
     }
-  }
-
-  /**
-   * Incremental sync - fetches only changed entities
-   * Uses per-entity-type timestamps so each entity type syncs from its own last sync time
-   */
-  async incrementalSync(stashInstanceId?: string): Promise<SyncResult[]> {
-    if (this.activeJob !== null) {
-      logger.warn("Sync already in progress, skipping", {
-        job: this.activeJob,
-      });
-      return [];
-    }
-
-    this.acquire("sync");
-
-    try {
-      // If no instance specified, sync all enabled instances
-      if (!stashInstanceId) {
-        return await this.incrementalSyncAllInstances();
-      }
-      return await this.incrementalSyncInstance(stashInstanceId);
-    } finally {
-      this.release();
-    }
-  }
-
-  /**
-   * Incremental sync all enabled instances
-   * Note: the caller holds the lock (activeJob)
-   */
-  private async incrementalSyncAllInstances(): Promise<SyncResult[]> {
-    const enabledInstances = stashInstanceManager.getAllEnabled();
-
-    if (enabledInstances.length === 0) {
-      logger.warn("No enabled Stash instances to sync");
-      return [];
-    }
-
-    logger.info(
-      `Starting incremental sync for ${enabledInstances.length} instance(s)...`
-    );
-    const allResults: SyncResult[] = [];
-
-    for (const instance of enabledInstances) {
-      logger.info(
-        `Incremental sync instance: ${instance.name} (${instance.id})`
-      );
-      try {
-        const results = await this.incrementalSyncInstance(instance.id);
-        allResults.push(...results);
-      } catch (error) {
-        // An abort ends the whole run, not just this instance
-        if (this.isAbort(error)) throw new Error("Sync aborted");
-        logger.error(`Failed to incremental sync instance ${instance.name}`, {
-          instanceId: instance.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Continue with other instances
-      }
-    }
-
-    return allResults;
-  }
-
-  /**
-   * Incremental sync a single instance
-   * Note: the caller holds the lock (activeJob)
-   */
-  private async incrementalSyncInstance(
-    stashInstanceId: string
-  ): Promise<SyncResult[]> {
-    const startTime = Date.now();
-    const results: SyncResult[] = [];
-
-    try {
-      logger.info("Starting incremental sync with per-entity timestamps...", {
-        stashInstanceId,
-      });
-
-      for (const entityType of SYNC_ORDER) {
-        this.checkAbort();
-
-        // Get THIS entity type's last sync timestamp
-        const syncState = await this.getEntitySyncState(
-          stashInstanceId,
-          entityType
-        );
-        const lastSync = this.getMostRecentSyncTime(syncState);
-
-        if (!lastSync) {
-          // Never synced - do full sync for this entity type only
-          logger.info(`${entityType}: No previous sync, syncing all`);
-        } else {
-          // Incremental sync using this entity's own timestamp
-          // lastSync is now a raw RFC3339 string from Stash
-          logger.info(`${entityType}: syncing changes since ${lastSync}`);
-        }
-        results.push(
-          await this.runEntityType(
-            entityType,
-            stashInstanceId,
-            lastSync
-              ? { syncType: "incremental", since: lastSync, withCleanup: false }
-              : { syncType: "full", withCleanup: false }
-          )
-        );
-      }
-
-      // Cleanup deleted entities (detect deletions/merges in Stash)
-      await this.cleanupEveryType(stashInstanceId, results);
-
-      // Apply gallery inheritance if images or galleries were synced
-      // (galleries may have new performers/tags that need to propagate to images)
-      const imageResult = results.find((r) => r.entityType === "image");
-      const galleryResult = results.find((r) => r.entityType === "gallery");
-      if (
-        (imageResult && imageResult.synced > 0) ||
-        (galleryResult && galleryResult.synced > 0)
-      ) {
-        logger.info("Applying gallery inheritance after incremental sync...");
-        await imageGalleryInheritanceService.applyGalleryInheritance();
-        logger.info("Gallery inheritance complete");
-      }
-
-      // Compute inherited tags for scenes if scenes were updated
-      const sceneResult = results.find((r) => r.entityType === "scene");
-      if (sceneResult && sceneResult.synced > 0) {
-        logger.info(
-          "Computing inherited tags for scenes after incremental sync..."
-        );
-        await sceneTagInheritanceService.computeInheritedTags();
-        logger.info("Scene tag inheritance complete");
-      }
-
-      // Rebuild inherited image counts (must happen after gallery inheritance)
-      logger.info("Rebuilding inherited image counts...");
-      await entityImageCountService.rebuildAllImageCounts();
-      logger.info("Inherited image counts rebuild complete");
-
-      logger.info("Rebuilding user stats after sync...");
-      await userStatsService.rebuildAllStats();
-      logger.info("User stats rebuild complete");
-
-      // Compute tag scene counts via performers
-      await this.computeTagSceneCountsViaPerformers();
-
-      // Recompute exclusions for all users after sync
-      logger.info("Sync complete, recomputing user exclusions...");
-      await exclusionComputationService.recomputeAllUsers();
-      logger.info("User exclusions recomputed");
-
-      const duration = Date.now() - startTime;
-      logger.info("Incremental sync completed", {
-        durationMs: duration,
-        results: results.map((r) => ({
-          type: r.entityType,
-          synced: r.synced,
-          deleted: r.deleted,
-        })),
-      });
-
-      return results;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-
-      if (errorMsg === "Sync aborted") {
-        logger.info("Incremental sync aborted by user");
-      } else {
-        logger.error("Incremental sync failed", { error: errorMsg });
-      }
-
-      throw error;
-    }
-  }
-
-  // ==================== Scene Sync ====================
-
-  private async syncScenes(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing scenes...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "scene",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        // Build filter for incremental sync
-        // Use formatTimestampForStash to handle Stash's timezone quirks
-        const sceneFilter: SceneFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        logger.debug(`Fetching scenes page ${page}...`);
-        const fetchStart = Date.now();
-        const result = await stash.findScenesCompact({
-          filter: { page, per_page: this.PAGE_SIZE },
-          scene_filter: sceneFilter,
-        });
-        logger.debug(`Fetched page ${page} in ${Date.now() - fetchStart}ms`);
-
-        const scenes = result.findScenes.scenes;
-        totalCount = result.findScenes.count;
-
-        if (scenes.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          scenes as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        // Process batch with progress logging every 500 items
-        await this.processScenesBatch(
-          scenes,
-          stashInstanceId,
-          totalSynced,
-          totalCount
-        );
-
-        totalSynced += scenes.length;
-        this.emit("progress", {
-          entityType: "scene",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        // Log batch completion at debug level
-        logger.debug(
-          `Scenes: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "scene",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Scenes synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "scene",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "scene",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processScenesBatch(
-    scenes: SyncScene[],
-    stashInstanceId: string,
-    _batchStart: number,
-    _totalCount: number
-  ): Promise<void> {
-    // Skip empty batches
-    if (scenes.length === 0) return;
-
-    // Validate all scene IDs for SQL safety (defense-in-depth)
-    const invalidIds = scenes.filter((s) => !validateEntityId(s.id));
-    if (invalidIds.length > 0) {
-      logger.warn(`Skipping ${invalidIds.length} scenes with invalid IDs`);
-    }
-    const validScenes = scenes.filter((s) => validateEntityId(s.id));
-    if (validScenes.length === 0) return;
-
-    const sceneIds = validScenes.map((s) => s.id);
-    const instanceId = stashInstanceId;
-
-    // Bulk delete all junction records for this batch
-    // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
-    // and includes extended timeout for large libraries
-    const sceneIdList = sceneIds.map((id) => `'${this.escape(id)}'`).join(",");
-    const escapedInstanceId = this.escape(instanceId);
-    await dbWriteTransaction(
-      "sync.scenes.junctions",
-      async (tx) => {
-        await tx.$executeRawUnsafe(
-          `DELETE FROM ScenePerformer WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-        );
-        await tx.$executeRawUnsafe(
-          `DELETE FROM SceneTag WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-        );
-        await tx.$executeRawUnsafe(
-          `DELETE FROM SceneGroup WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-        );
-        await tx.$executeRawUnsafe(
-          `DELETE FROM SceneGallery WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
-        );
-      },
-      { timeout: 60000 } // 60 second timeout for large batches
-    );
-
-    // Build bulk scene upsert using raw SQL
-    const sceneValues = validScenes
-      .map((scene) => {
-        const file = scene.files?.[0];
-        const paths = scene.paths;
-        // Stash may return extra fields (chapters_vtt, stream) not in the GraphQL query selection
-        const pathsExtended = scene.paths as Record<string, unknown>;
-        // Extract phashes from files
-        const { phash, phashes } = extractPhashes(scene.files);
-        // Stash's stream choices, read from its labels. The URLs carry the
-        // Stash API key and are never stored.
-        const streamOptions = summarizeStashStreams(
-          (scene.sceneStreams ?? []).map((s) => s.label ?? "")
-        );
-
-        return `(
-      '${this.escape(scene.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(scene.title)},
-      ${this.escapeNullable(scene.code)},
-      ${this.escapeNullable(scene.date)},
-      ${scene.studio?.id ? `'${this.escape(scene.studio.id)}'` : "NULL"},
-      ${scene.rating100 ?? "NULL"},
-      ${file?.duration ? Math.round(file.duration) : "NULL"},
-      ${scene.organized ? 1 : 0},
-      ${this.escapeNullable(scene.details)},
-      ${this.escapeNullable(scene.director)},
-      ${this.escapeNullable(JSON.stringify(scene.urls || []))},
-      ${this.escapeNullable(file?.path)},
-      ${file?.bit_rate ?? "NULL"},
-      ${file?.frame_rate ?? "NULL"},
-      ${file?.width ?? "NULL"},
-      ${file?.height ?? "NULL"},
-      ${this.escapeNullable(file?.video_codec)},
-      ${this.escapeNullable(file?.audio_codec)},
-      ${file?.size ?? "NULL"},
-      ${this.escapeNullable(paths?.screenshot)},
-      ${this.escapeNullable(paths?.preview)},
-      ${this.escapeNullable(paths?.sprite)},
-      ${this.escapeNullable(paths?.vtt)},
-      ${this.escapeNullable(pathsExtended?.chapters_vtt as string | undefined)},
-      ${this.escapeNullable(pathsExtended?.stream as string | undefined)},
-      ${this.escapeNullable(paths?.caption)},
-      ${this.escapeNullable(JSON.stringify(scene.captions ?? []))},
-      ${streamOptions.direct ? 1 : 0},
-      ${streamOptions.mkv ? 1 : 0},
-      ${this.escapeNullable(streamOptions.resolutions.join(","))},
-      ${scene.o_counter ?? 0},
-      ${scene.play_count ?? 0},
-      ${scene.play_duration ?? 0},
-      ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
-      ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL,
-      ${this.escapeNullable(phash)},
-      ${this.escapeNullable(phashes)}
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashScene (
-      id, stashInstanceId, title, code, date, studioId, rating100, duration,
-      organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
-      fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
-      pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption, captions,
-      streamDirect, streamMkv, streamResolutions, oCounter, playCount, playDuration,
-      stashCreatedAt, stashUpdatedAt,
-      syncedAt, deletedAt, phash, phashes
-    ) VALUES ${sceneValues}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      title = excluded.title,
-      code = excluded.code,
-      date = excluded.date,
-      studioId = excluded.studioId,
-      rating100 = excluded.rating100,
-      duration = excluded.duration,
-      organized = excluded.organized,
-      details = excluded.details,
-      director = excluded.director,
-      urls = excluded.urls,
-      filePath = excluded.filePath,
-      fileBitRate = excluded.fileBitRate,
-      fileFrameRate = excluded.fileFrameRate,
-      fileWidth = excluded.fileWidth,
-      fileHeight = excluded.fileHeight,
-      fileVideoCodec = excluded.fileVideoCodec,
-      fileAudioCodec = excluded.fileAudioCodec,
-      fileSize = excluded.fileSize,
-      pathScreenshot = excluded.pathScreenshot,
-      pathPreview = excluded.pathPreview,
-      pathSprite = excluded.pathSprite,
-      pathVtt = excluded.pathVtt,
-      pathChaptersVtt = excluded.pathChaptersVtt,
-      pathStream = excluded.pathStream,
-      pathCaption = excluded.pathCaption,
-      captions = excluded.captions,
-      streamDirect = excluded.streamDirect,
-      streamMkv = excluded.streamMkv,
-      streamResolutions = excluded.streamResolutions,
-      oCounter = excluded.oCounter,
-      playCount = excluded.playCount,
-      playDuration = excluded.playDuration,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL,
-      phash = excluded.phash,
-      phashes = excluded.phashes
-  `);
-
-    // Collect all junction records (validate related entity IDs too)
-    const performerRecords: string[] = [];
-    const tagRecords: string[] = [];
-    const groupRecords: string[] = [];
-    const galleryRecords: string[] = [];
-
-    for (const scene of validScenes) {
-      for (const p of scene.performers || []) {
-        if (validateEntityId(p.id)) {
-          performerRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(p.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-      for (const t of scene.tags || []) {
-        if (validateEntityId(t.id)) {
-          tagRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-      for (const g of scene.groups || []) {
-        if (validateEntityId(g.group.id)) {
-          const index = g.scene_index ?? "NULL";
-          groupRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(g.group.id)}', '${this.escape(instanceId)}', ${index})`
-          );
-        }
-      }
-      for (const g of scene.galleries || []) {
-        if (validateEntityId(g.id)) {
-          galleryRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(g.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-    }
-
-    // Batch insert junction records
-    const inserts = [];
-
-    if (performerRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO ScenePerformer (sceneId, sceneInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
-        )
-      );
-    }
-    if (tagRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneTag (sceneId, sceneInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
-        )
-      );
-    }
-    if (groupRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneGroup (sceneId, sceneInstanceId, groupId, groupInstanceId, sceneIndex) VALUES ${groupRecords.join(",")}`
-        )
-      );
-    }
-    if (galleryRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneGallery (sceneId, sceneInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
-        )
-      );
-    }
-
-    await Promise.all(inserts);
   }
 
   /**
@@ -1900,1539 +2717,6 @@ class StashSyncService extends EventEmitter {
     return changed;
   }
 
-  // ==================== Performer Sync ====================
-
-  private async syncPerformers(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing performers...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "performer",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const performerFilter: PerformerFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findPerformers({
-          filter: { page, per_page: this.PAGE_SIZE },
-          performer_filter: performerFilter,
-        });
-
-        const performers = result.findPerformers.performers;
-        totalCount = result.findPerformers.count;
-
-        if (performers.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          performers as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processPerformersBatch(performers, stashInstanceId);
-
-        totalSynced += performers.length;
-        this.emit("progress", {
-          entityType: "performer",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Performers: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "performer",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Performers synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "performer",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "performer",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processPerformersBatch(
-    performers: SyncPerformer[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (performers.length === 0) return;
-
-    // Validate IDs
-    const validPerformers = performers.filter((p) => validateEntityId(p.id));
-    if (validPerformers.length === 0) return;
-
-    const values = validPerformers
-      .map((performer) => {
-        // Serialize stash_ids array to JSON for deduplication
-        const stashIdsJson =
-          performer.stash_ids.length > 0
-            ? JSON.stringify(
-                performer.stash_ids.map((s) => ({
-                  endpoint: s.endpoint,
-                  stash_id: s.stash_id,
-                }))
-              )
-            : null;
-
-        return `(
-      '${this.escape(performer.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(stashIdsJson)},
-      ${this.escapeNullable(performer.name)},
-      ${this.escapeNullable(performer.disambiguation)},
-      ${this.escapeNullable(performer.gender)},
-      ${this.escapeNullable(performer.birthdate)},
-      ${performer.favorite ? 1 : 0},
-      ${performer.rating100 ?? "NULL"},
-      ${this.escapeNullable(performer.details)},
-      ${this.escapeNullable(JSON.stringify(performer.alias_list || []))},
-      ${this.escapeNullable(performer.country)},
-      ${this.escapeNullable(performer.ethnicity)},
-      ${this.escapeNullable(performer.hair_color)},
-      ${this.escapeNullable(performer.eye_color)},
-      ${performer.height_cm ?? "NULL"},
-      ${performer.weight ?? "NULL"},
-      ${this.escapeNullable(performer.measurements)},
-      ${this.escapeNullable(performer.fake_tits)},
-      ${this.escapeNullable(performer.tattoos)},
-      ${this.escapeNullable(performer.piercings)},
-      ${this.escapeNullable(performer.career_length)},
-      ${this.escapeNullable(performer.death_date)},
-      ${this.escapeNullable(performer.url)},
-      ${this.escapeNullable(performer.image_path)},
-      ${performer.scene_count ?? 0},
-      ${performer.image_count ?? 0},
-      ${performer.gallery_count ?? 0},
-      ${performer.group_count ?? 0},
-      ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
-      ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashPerformer (
-      id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
-      rating100, details, aliasList,
-      country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements, fakeTits,
-      tattoos, piercings, careerLength, deathDate, url, imagePath,
-      sceneCount, imageCount, galleryCount, groupCount,
-      stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
-    ) VALUES ${values}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      stashIds = excluded.stashIds,
-      name = excluded.name,
-      disambiguation = excluded.disambiguation,
-      gender = excluded.gender,
-      birthdate = excluded.birthdate,
-      favorite = excluded.favorite,
-      rating100 = excluded.rating100,
-      details = excluded.details,
-      aliasList = excluded.aliasList,
-      country = excluded.country,
-      ethnicity = excluded.ethnicity,
-      hairColor = excluded.hairColor,
-      eyeColor = excluded.eyeColor,
-      heightCm = excluded.heightCm,
-      weightKg = excluded.weightKg,
-      measurements = excluded.measurements,
-      fakeTits = excluded.fakeTits,
-      tattoos = excluded.tattoos,
-      piercings = excluded.piercings,
-      careerLength = excluded.careerLength,
-      deathDate = excluded.deathDate,
-      url = excluded.url,
-      imagePath = excluded.imagePath,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      groupCount = excluded.groupCount,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL
-  `);
-
-    // Sync performer tags to PerformerTag junction table (batched for performance)
-    const instanceId = stashInstanceId;
-
-    // Collect all tag relationships for batch insert
-    const tagInserts: { performerId: string; tagId: string }[] = [];
-    for (const performer of validPerformers) {
-      if (performer.tags && performer.tags.length > 0) {
-        for (const tag of performer.tags) {
-          if (tag?.id && validateEntityId(tag.id)) {
-            tagInserts.push({
-              performerId: performer.id,
-              tagId: tag.id,
-            });
-          }
-        }
-      }
-    }
-
-    // Bulk delete existing tags for all performers in this batch
-    const performerIds = validPerformers
-      .map((p) => `'${this.escape(p.id)}'`)
-      .join(",");
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM PerformerTag WHERE performerId IN (${performerIds}) AND performerInstanceId = '${this.escape(instanceId)}'`
-    );
-
-    // Bulk insert all new tags
-    if (tagInserts.length > 0) {
-      const tagValues = tagInserts
-        .map(
-          (t) =>
-            `('${this.escape(t.performerId)}', '${this.escape(instanceId)}', '${this.escape(t.tagId)}', '${this.escape(instanceId)}')`
-        )
-        .join(", ");
-
-      await prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-      );
-    }
-  }
-
-  // ==================== Studio Sync ====================
-
-  private async syncStudios(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing studios...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "studio",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const studioFilter: StudioFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findStudios({
-          filter: { page, per_page: this.PAGE_SIZE },
-          studio_filter: studioFilter,
-        });
-
-        const studios = result.findStudios.studios;
-        totalCount = result.findStudios.count;
-
-        if (studios.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          studios as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processStudiosBatch(studios, stashInstanceId);
-
-        totalSynced += studios.length;
-        this.emit("progress", {
-          entityType: "studio",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Studios: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "studio",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Studios synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "studio",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "studio",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processStudiosBatch(
-    studios: SyncStudio[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (studios.length === 0) return;
-
-    // Validate IDs
-    const validStudios = studios.filter((s) => validateEntityId(s.id));
-    if (validStudios.length === 0) return;
-
-    const values = validStudios
-      .map((studio) => {
-        // Serialize stash_ids array to JSON for deduplication
-        const stashIdsJson =
-          studio.stash_ids.length > 0
-            ? JSON.stringify(
-                studio.stash_ids.map((s) => ({
-                  endpoint: s.endpoint,
-                  stash_id: s.stash_id,
-                }))
-              )
-            : null;
-
-        return `(
-      '${this.escape(studio.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(stashIdsJson)},
-      ${this.escapeNullable(studio.name)},
-      ${studio.parent_studio?.id ? `'${this.escape(studio.parent_studio.id)}'` : "NULL"},
-      ${studio.favorite ? 1 : 0},
-      ${studio.rating100 ?? "NULL"},
-      ${studio.scene_count ?? 0},
-      ${studio.image_count ?? 0},
-      ${studio.gallery_count ?? 0},
-      ${studio.performer_count ?? 0},
-      ${studio.group_count ?? 0},
-      ${this.escapeNullable(studio.details)},
-      ${this.escapeNullable(studio.url)},
-      ${this.escapeNullable(studio.image_path)},
-      ${studio.created_at ? `'${studio.created_at}'` : "NULL"},
-      ${studio.updated_at ? `'${studio.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashStudio (
-      id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
-      sceneCount, imageCount, galleryCount, performerCount, groupCount,
-      details, url, imagePath, stashCreatedAt,
-      stashUpdatedAt, syncedAt, deletedAt
-    ) VALUES ${values}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      stashIds = excluded.stashIds,
-      name = excluded.name,
-      parentId = excluded.parentId,
-      favorite = excluded.favorite,
-      rating100 = excluded.rating100,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      performerCount = excluded.performerCount,
-      groupCount = excluded.groupCount,
-      details = excluded.details,
-      url = excluded.url,
-      imagePath = excluded.imagePath,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL
-  `);
-
-    // Sync studio tags to StudioTag junction table
-    const instanceId = stashInstanceId;
-    for (const studio of validStudios) {
-      if (studio.tags && studio.tags.length > 0) {
-        const studioId = studio.id;
-
-        // Delete existing tags for this studio
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM StudioTag WHERE studioId = '${this.escape(studioId)}' AND studioInstanceId = '${this.escape(instanceId)}'`
-        );
-
-        // Insert new tags (filter to valid tag IDs)
-        const validTags = studio.tags.filter(
-          (t: TagRef) => t?.id && validateEntityId(t.id)
-        );
-        if (validTags.length > 0) {
-          const tagValues = validTags
-            .map(
-              (t: TagRef) =>
-                `('${this.escape(studioId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`
-            )
-            .join(", ");
-
-          await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-          );
-        }
-      }
-    }
-  }
-
-  // ==================== Tag Sync ====================
-
-  private async syncTags(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing tags...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "tag",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const tagFilter: TagFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findTags({
-          filter: { page, per_page: this.PAGE_SIZE },
-          tag_filter: tagFilter,
-        });
-
-        const tags = result.findTags.tags;
-        totalCount = result.findTags.count;
-
-        if (tags.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          tags as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processTagsBatch(tags, stashInstanceId);
-
-        totalSynced += tags.length;
-        this.emit("progress", {
-          entityType: "tag",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Tags: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "tag",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Tags synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "tag",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "tag",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processTagsBatch(
-    tags: SyncTag[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (tags.length === 0) return;
-
-    // Validate IDs
-    const validTags = tags.filter((t) => validateEntityId(t.id));
-    if (validTags.length === 0) return;
-
-    const values = validTags
-      .map((tag) => {
-        const parentIds = tag.parents?.map((p) => p.id) || [];
-        const aliases = tag.aliases || [];
-        // Serialize stash_ids array to JSON for deduplication
-        const stashIdsJson =
-          tag.stash_ids.length > 0
-            ? JSON.stringify(
-                tag.stash_ids.map((s) => ({
-                  endpoint: s.endpoint,
-                  stash_id: s.stash_id,
-                }))
-              )
-            : null;
-
-        // "color" is not in the standard Stash GraphQL schema but may be added by plugins
-        const tagRecord = tag as Record<string, unknown>;
-
-        return `(
-      '${this.escape(tag.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(stashIdsJson)},
-      ${this.escapeNullable(tag.name)},
-      ${tag.favorite ? 1 : 0},
-      ${tag.scene_count ?? 0},
-      ${tag.image_count ?? 0},
-      ${tag.gallery_count ?? 0},
-      ${tag.performer_count ?? 0},
-      ${tag.studio_count ?? 0},
-      ${tag.group_count ?? 0},
-      ${tag.scene_marker_count ?? 0},
-      ${this.escapeNullable(tag.description)},
-      ${this.escapeNullable(JSON.stringify(aliases))},
-      ${this.escapeNullable(JSON.stringify(parentIds))},
-      ${this.escapeNullable(tag.image_path)},
-      ${this.escapeNullable(tagRecord.color as string | undefined)},
-      ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
-      ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashTag (
-      id, stashInstanceId, stashIds, name, favorite,
-      sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
-      description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
-    ) VALUES ${values}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      stashIds = excluded.stashIds,
-      name = excluded.name,
-      favorite = excluded.favorite,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      performerCount = excluded.performerCount,
-      studioCount = excluded.studioCount,
-      groupCount = excluded.groupCount,
-      sceneMarkerCount = excluded.sceneMarkerCount,
-      description = excluded.description,
-      aliases = excluded.aliases,
-      parentIds = excluded.parentIds,
-      imagePath = excluded.imagePath,
-      color = excluded.color,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL
-  `);
-  }
-
-  // ==================== Group Sync ====================
-
-  private async syncGroups(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing groups...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "group",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const groupFilter: GroupFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findGroups({
-          filter: { page, per_page: this.PAGE_SIZE },
-          group_filter: groupFilter,
-        });
-
-        const groups = result.findGroups.groups;
-        totalCount = result.findGroups.count;
-
-        if (groups.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          groups as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processGroupsBatch(groups, stashInstanceId);
-
-        totalSynced += groups.length;
-        this.emit("progress", {
-          entityType: "group",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Groups: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "group",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Groups synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "group",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "group",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processGroupsBatch(
-    groups: SyncGroup[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (groups.length === 0) return;
-
-    // Validate IDs
-    const validGroups = groups.filter((g) => validateEntityId(g.id));
-    if (validGroups.length === 0) return;
-
-    const values = validGroups
-      .map((group) => {
-        const duration = group.duration || null;
-        const urls = group.urls || [];
-        return `(
-      '${this.escape(group.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(group.name)},
-      ${this.escapeNullable(group.date)},
-      ${group.studio?.id ? `'${this.escape(group.studio.id)}'` : "NULL"},
-      ${group.rating100 ?? "NULL"},
-      ${duration ? Math.round(duration) : "NULL"},
-      ${group.scene_count ?? 0},
-      ${group.performer_count ?? 0},
-      ${this.escapeNullable(group.director)},
-      ${this.escapeNullable(group.synopsis)},
-      ${this.escapeNullable(JSON.stringify(urls))},
-      ${this.escapeNullable(group.front_image_path)},
-      ${this.escapeNullable(group.back_image_path)},
-      ${group.created_at ? `'${group.created_at}'` : "NULL"},
-      ${group.updated_at ? `'${group.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashGroup (
-      id, stashInstanceId, name, date, studioId, rating100, duration,
-      sceneCount, performerCount,
-      director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
-      stashUpdatedAt, syncedAt, deletedAt
-    ) VALUES ${values}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      name = excluded.name,
-      date = excluded.date,
-      studioId = excluded.studioId,
-      rating100 = excluded.rating100,
-      duration = excluded.duration,
-      sceneCount = excluded.sceneCount,
-      performerCount = excluded.performerCount,
-      director = excluded.director,
-      synopsis = excluded.synopsis,
-      urls = excluded.urls,
-      frontImagePath = excluded.frontImagePath,
-      backImagePath = excluded.backImagePath,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL
-  `);
-
-    // Sync group tags to GroupTag junction table
-    const instanceId = stashInstanceId;
-    for (const group of validGroups) {
-      if (group.tags && group.tags.length > 0) {
-        const groupId = group.id;
-
-        // Delete existing tags for this group
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM GroupTag WHERE groupId = '${this.escape(groupId)}' AND groupInstanceId = '${this.escape(instanceId)}'`
-        );
-
-        // Insert new tags (filter to valid tag IDs)
-        const validTags = group.tags.filter(
-          (t: TagRef) => t?.id && validateEntityId(t.id)
-        );
-        if (validTags.length > 0) {
-          const tagValues = validTags
-            .map(
-              (t: TagRef) =>
-                `('${this.escape(groupId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`
-            )
-            .join(", ");
-
-          await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-          );
-        }
-      }
-    }
-  }
-
-  // ==================== Gallery Sync ====================
-
-  private async syncGalleries(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing galleries...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "gallery",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const galleryFilter: GalleryFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findGalleries({
-          filter: { page, per_page: this.PAGE_SIZE },
-          gallery_filter: galleryFilter,
-        });
-
-        const galleries = result.findGalleries.galleries;
-        totalCount = result.findGalleries.count;
-
-        if (galleries.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          galleries as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processGalleriesBatch(galleries, stashInstanceId);
-
-        totalSynced += galleries.length;
-        this.emit("progress", {
-          entityType: "gallery",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Galleries: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "gallery",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Galleries synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "gallery",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "gallery",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processGalleriesBatch(
-    galleries: SyncGallery[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (galleries.length === 0) return;
-
-    // Validate IDs
-    const validGalleries = galleries.filter((g) => validateEntityId(g.id));
-    if (validGalleries.length === 0) return;
-
-    const values = validGalleries
-      .map((gallery) => {
-        const folder = gallery.folder;
-        // Get first file's basename for zip gallery title fallback
-        const fileBasename = gallery.files?.[0]?.basename || null;
-        // Cover image ID for dimension lookup
-        const coverImageId = gallery.cover?.id || null;
-        // A gallery's studio is on the gallery's own Stash, so it takes the
-        // gallery's instance (as does an image's, below)
-        return `(
-      '${this.escape(gallery.id)}',
-      ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${this.escapeNullable(gallery.title)},
-      ${this.escapeNullable(gallery.date)},
-      ${gallery.studio?.id ? `'${this.escape(gallery.studio.id)}'` : "NULL"},
-      ${gallery.studio?.id ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-      ${gallery.rating100 ?? "NULL"},
-      ${coverImageId ? `'${this.escape(coverImageId)}'` : "NULL"},
-      ${gallery.image_count ?? 0},
-      ${this.escapeNullable(gallery.details)},
-      ${this.escapeNullable(gallery.urls?.[0])},
-      ${this.escapeNullable(gallery.code)},
-      ${this.escapeNullable(gallery.photographer)},
-      ${this.escapeNullable(gallery.urls ? JSON.stringify(gallery.urls) : null)},
-      ${this.escapeNullable(folder?.path)},
-      ${this.escapeNullable(fileBasename)},
-      ${this.escapeNullable(gallery.paths?.cover)},
-      ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
-      ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
-      datetime('now'),
-      NULL
-    )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-    INSERT INTO StashGallery (
-      id, stashInstanceId, title, date, studioId, studioInstanceId, rating100, coverImageId, imageCount,
-      details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
-      syncedAt, deletedAt
-    ) VALUES ${values}
-    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-      title = excluded.title,
-      date = excluded.date,
-      studioId = excluded.studioId,
-      studioInstanceId = excluded.studioInstanceId,
-      rating100 = excluded.rating100,
-      coverImageId = excluded.coverImageId,
-      imageCount = excluded.imageCount,
-      details = excluded.details,
-      url = excluded.url,
-      code = excluded.code,
-      photographer = excluded.photographer,
-      urls = excluded.urls,
-      folderPath = excluded.folderPath,
-      fileBasename = excluded.fileBasename,
-      coverPath = excluded.coverPath,
-      stashCreatedAt = excluded.stashCreatedAt,
-      stashUpdatedAt = excluded.stashUpdatedAt,
-      syncedAt = excluded.syncedAt,
-      deletedAt = NULL
-  `);
-
-    // Sync gallery performers (junction table)
-    const instanceId = stashInstanceId;
-    const performerInserts: { galleryId: string; performerId: string }[] = [];
-    for (const gallery of validGalleries) {
-      if (gallery.performers && gallery.performers.length > 0) {
-        for (const performer of gallery.performers) {
-          if (validateEntityId(performer.id)) {
-            performerInserts.push({
-              galleryId: gallery.id,
-              performerId: performer.id,
-            });
-          }
-        }
-      }
-    }
-
-    // Delete existing gallery-performer relationships for these galleries
-    const galleryIds = validGalleries
-      .map((g) => `'${this.escape(g.id)}'`)
-      .join(",");
-    await prisma.$executeRawUnsafe(`
-      DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${this.escape(instanceId)}'
-    `);
-
-    // Insert new gallery-performer relationships
-    if (performerInserts.length > 0) {
-      const performerValues = performerInserts
-        .map(
-          (p) =>
-            `('${this.escape(p.galleryId)}', '${this.escape(instanceId)}', '${this.escape(p.performerId)}', '${this.escape(instanceId)}')`
-        )
-        .join(",\n");
-
-      await prisma.$executeRawUnsafe(`
-        INSERT OR IGNORE INTO GalleryPerformer (galleryId, galleryInstanceId, performerId, performerInstanceId)
-        VALUES ${performerValues}
-      `);
-    }
-
-    // Sync gallery tags to GalleryTag junction table
-    const tagInserts: { galleryId: string; tagId: string }[] = [];
-    for (const gallery of validGalleries) {
-      if (gallery.tags && gallery.tags.length > 0) {
-        for (const tag of gallery.tags) {
-          if (tag?.id && validateEntityId(tag.id)) {
-            tagInserts.push({
-              galleryId: gallery.id,
-              tagId: tag.id,
-            });
-          }
-        }
-      }
-    }
-
-    // Delete existing gallery-tag relationships for these galleries
-    await prisma.$executeRawUnsafe(`
-      DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${this.escape(instanceId)}'
-    `);
-
-    // Insert new gallery-tag relationships
-    if (tagInserts.length > 0) {
-      const tagValues = tagInserts
-        .map(
-          (t) =>
-            `('${this.escape(t.galleryId)}', '${this.escape(instanceId)}', '${this.escape(t.tagId)}', '${this.escape(instanceId)}')`
-        )
-        .join(",\n");
-
-      await prisma.$executeRawUnsafe(`
-        INSERT OR IGNORE INTO GalleryTag (galleryId, galleryInstanceId, tagId, tagInstanceId)
-        VALUES ${tagValues}
-      `);
-    }
-  }
-
-  // ==================== Image Sync ====================
-
-  private async syncImages(
-    stashInstanceId: string,
-    isFullSync: boolean,
-    lastSyncTime?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing images...");
-    const startTime = Date.now();
-    const stash = this.getStashClient(stashInstanceId);
-    let page = 1;
-    let totalSynced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "image",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      while (true) {
-        this.checkAbort();
-
-        const imageFilter: ImageFilterType | undefined = lastSyncTime
-          ? {
-              updated_at: {
-                modifier: CriterionModifier.GreaterThan,
-                value: formatTimestampForStash(lastSyncTime),
-              },
-            }
-          : undefined;
-
-        const result = await stash.findImages({
-          filter: { page, per_page: this.PAGE_SIZE },
-          image_filter: imageFilter,
-        });
-
-        const images = result.findImages.images;
-        totalCount = result.findImages.count;
-
-        if (images.length === 0) break;
-
-        // Track max updated_at for sync state
-        const batchMax = getMaxUpdatedAt(
-          images as Array<{ updated_at?: string | null }>
-        );
-        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
-          maxUpdatedAt = batchMax;
-        }
-
-        await this.processImagesBatch(images, stashInstanceId);
-
-        totalSynced += images.length;
-        this.emit("progress", {
-          entityType: "image",
-          phase: "processing",
-          current: totalSynced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Images: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`
-        );
-
-        if (totalSynced >= totalCount) break;
-        page++;
-      }
-
-      this.emit("progress", {
-        entityType: "image",
-        phase: "complete",
-        current: totalSynced,
-        total: totalSynced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Images synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "image",
-        synced: totalSynced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "image",
-        phase: "error",
-        current: totalSynced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  /**
-   * Sync clips (scene markers) from Stash
-   */
-  async syncClips(
-    stashInstanceId: string,
-    isFullSync = false,
-    since?: string
-  ): Promise<SyncResult> {
-    logger.info("Syncing clips...");
-    const startTime = Date.now();
-    const client = this.getStashClient(stashInstanceId);
-    let synced = 0;
-    let totalCount = 0;
-    let maxUpdatedAt: string | undefined;
-
-    this.emit("progress", {
-      entityType: "clip",
-      phase: "fetching",
-      current: 0,
-      total: 0,
-    } as SyncProgress);
-
-    try {
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        this.checkAbort();
-
-        const filter: FindFilterType = {
-          page,
-          per_page: this.PAGE_SIZE,
-          sort: "updated_at",
-          direction: SortDirectionEnum.Asc,
-        };
-
-        const markerFilter: SceneMarkerFilterType = {};
-        if (since && !isFullSync) {
-          markerFilter.updated_at = {
-            modifier: CriterionModifier.GreaterThan,
-            value: formatTimestampForStash(since),
-          };
-        }
-
-        const result = await client.findSceneMarkers({
-          filter,
-          scene_marker_filter:
-            Object.keys(markerFilter).length > 0 ? markerFilter : undefined,
-        });
-
-        const markers = result.findSceneMarkers.scene_markers;
-        totalCount = result.findSceneMarkers.count;
-
-        if (markers.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        // Track max updated_at for next incremental sync
-        const batchMax = getMaxUpdatedAt(markers);
-        if (batchMax) {
-          maxUpdatedAt =
-            getMostRecentTimestamp(maxUpdatedAt || null, batchMax) ||
-            maxUpdatedAt;
-        }
-
-        // Build preview URLs for probing
-        // Note: m.preview is already a full URL from Stash, just append API key
-        const apiKey = stashInstanceManager.getApiKey();
-        const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
-
-        // Probe previews in batch
-        const probeResults = await clipPreviewProber.probeBatch(previewUrls);
-
-        // Upsert clips
-        const instanceId = stashInstanceId;
-        for (let i = 0; i < markers.length; i++) {
-          const marker = markers[i] as (typeof markers)[number];
-          const previewUrl = previewUrls[i] as string;
-
-          const clipData = {
-            sceneId: marker.scene.id,
-            sceneInstanceId: instanceId,
-            title: marker.title || null,
-            seconds: marker.seconds,
-            endSeconds: marker.end_seconds || null,
-            primaryTagId: marker.primary_tag.id,
-            primaryTagInstanceId: instanceId,
-            previewPath: marker.preview,
-            screenshotPath: marker.screenshot,
-            streamPath: marker.stream,
-            isGenerated: probeResults.get(previewUrl) ?? false,
-            generationCheckedAt: new Date(),
-            stashCreatedAt: marker.created_at
-              ? new Date(marker.created_at)
-              : null,
-            stashUpdatedAt: marker.updated_at
-              ? new Date(marker.updated_at)
-              : null,
-            syncedAt: new Date(),
-            deletedAt: null,
-          };
-
-          await prisma.stashClip.upsert({
-            where: {
-              id_stashInstanceId: {
-                id: marker.id,
-                stashInstanceId: instanceId,
-              },
-            },
-            create: { id: marker.id, stashInstanceId: instanceId, ...clipData },
-            update: clipData,
-          });
-
-          // Sync clip tags (junction table)
-          await prisma.clipTag.deleteMany({
-            where: {
-              clipId: marker.id,
-              clipInstanceId: instanceId,
-            },
-          });
-
-          const tagIds = marker.tags.map((t) => t.id);
-          if (tagIds.length > 0) {
-            const tagValues = tagIds
-              .map(
-                (tagId) =>
-                  `('${this.escape(marker.id)}', '${this.escape(instanceId)}', '${this.escape(tagId)}', '${this.escape(instanceId)}')`
-              )
-              .join(", ");
-            await prisma.$executeRawUnsafe(
-              `INSERT OR IGNORE INTO ClipTag (clipId, clipInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-            );
-          }
-        }
-
-        synced += markers.length;
-        this.emit("progress", {
-          entityType: "clip",
-          phase: "processing",
-          current: synced,
-          total: totalCount,
-        } as SyncProgress);
-
-        logger.debug(
-          `Clips: ${synced}/${totalCount} (${Math.round((synced / totalCount) * 100)}%)`
-        );
-
-        if (synced >= totalCount) break;
-        page++;
-        hasMore = markers.length === this.PAGE_SIZE;
-      }
-
-      this.emit("progress", {
-        entityType: "clip",
-        phase: "complete",
-        current: synced,
-        total: synced,
-      } as SyncProgress);
-
-      const durationMs = Date.now() - startTime;
-      logger.info(
-        `Clips synced: ${synced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`
-      );
-
-      return {
-        entityType: "clip",
-        synced,
-        deleted: 0,
-        durationMs,
-        maxUpdatedAt,
-      };
-    } catch (error) {
-      this.emit("progress", {
-        entityType: "clip",
-        phase: "error",
-        current: synced,
-        total: totalCount,
-        message: error instanceof Error ? error.message : String(error),
-      } as SyncProgress);
-      throw error;
-    }
-  }
-
-  private async processImagesBatch(
-    images: SyncImage[],
-    stashInstanceId: string
-  ): Promise<void> {
-    // Skip empty batches
-    if (images.length === 0) return;
-
-    // Validate IDs
-    const validImages = images.filter((i) => validateEntityId(i.id));
-    if (validImages.length === 0) return;
-
-    const imageIds = validImages.map((i) => i.id);
-    const instanceId = stashInstanceId;
-
-    // Bulk delete junction records
-    // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
-    // and includes extended timeout for large libraries
-    const imageIdList = imageIds.map((id) => `'${this.escape(id)}'`).join(",");
-    const escapedInstanceId = this.escape(instanceId);
-    await dbWriteTransaction(
-      "sync.images.junctions",
-      async (tx) => {
-        await tx.$executeRawUnsafe(
-          `DELETE FROM ImagePerformer WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-        );
-        await tx.$executeRawUnsafe(
-          `DELETE FROM ImageTag WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-        );
-        await tx.$executeRawUnsafe(
-          `DELETE FROM ImageGallery WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
-        );
-      },
-      { timeout: 60000 } // 60 second timeout for large batches
-    );
-
-    // Build bulk image upsert
-    const values = validImages
-      .map((image) => {
-        const visualFile = image.files?.[0];
-        const paths = image.paths;
-        return `(
-        '${this.escape(image.id)}',
-        ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-        ${this.escapeNullable(image.title)},
-        ${this.escapeNullable(image.code)},
-        ${this.escapeNullable(image.details)},
-        ${this.escapeNullable(image.photographer)},
-        ${this.escapeNullable(image.urls ? JSON.stringify(image.urls) : null)},
-        ${this.escapeNullable(image.date)},
-        ${image.studio?.id ? `'${this.escape(image.studio.id)}'` : "NULL"},
-        ${image.studio?.id ? `'${this.escape(stashInstanceId)}'` : "NULL"},
-        ${image.rating100 ?? "NULL"},
-        ${image.o_counter ?? 0},
-        ${image.organized ? 1 : 0},
-        ${this.escapeNullable(visualFile?.path)},
-        ${visualFile?.width ?? "NULL"},
-        ${visualFile?.height ?? "NULL"},
-        ${visualFile?.size ?? "NULL"},
-        ${this.escapeNullable(paths?.thumbnail)},
-        ${this.escapeNullable(paths?.preview)},
-        ${this.escapeNullable(paths?.image)},
-        ${image.created_at ? `'${image.created_at}'` : "NULL"},
-        ${image.updated_at ? `'${image.updated_at}'` : "NULL"},
-        datetime('now'),
-        NULL
-      )`;
-      })
-      .join(",\n");
-
-    await prisma.$executeRawUnsafe(`
-      INSERT INTO StashImage (
-        id, stashInstanceId, title, code, details, photographer, urls, date, studioId, studioInstanceId, rating100, oCounter, organized,
-        filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
-        stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
-      ) VALUES ${values}
-      ON CONFLICT(id, stashInstanceId) DO UPDATE SET
-        title = excluded.title,
-        code = excluded.code,
-        details = excluded.details,
-        photographer = excluded.photographer,
-        urls = excluded.urls,
-        date = excluded.date,
-        studioId = excluded.studioId,
-        studioInstanceId = excluded.studioInstanceId,
-        rating100 = excluded.rating100,
-        oCounter = excluded.oCounter,
-        organized = excluded.organized,
-        filePath = excluded.filePath,
-        width = excluded.width,
-        height = excluded.height,
-        fileSize = excluded.fileSize,
-        pathThumbnail = excluded.pathThumbnail,
-        pathPreview = excluded.pathPreview,
-        pathImage = excluded.pathImage,
-        stashCreatedAt = excluded.stashCreatedAt,
-        stashUpdatedAt = excluded.stashUpdatedAt,
-        syncedAt = excluded.syncedAt,
-        deletedAt = NULL
-    `);
-
-    // Collect junction records (validate related entity IDs too)
-    const performerRecords: string[] = [];
-    const tagRecords: string[] = [];
-    const galleryRecords: string[] = [];
-
-    for (const image of validImages) {
-      for (const p of image.performers || []) {
-        if (validateEntityId(p.id)) {
-          performerRecords.push(
-            `('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(p.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-      for (const t of image.tags || []) {
-        if (validateEntityId(t.id)) {
-          tagRecords.push(
-            `('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-      for (const g of image.galleries || []) {
-        if (validateEntityId(g.id)) {
-          galleryRecords.push(
-            `('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(g.id)}', '${this.escape(instanceId)}')`
-          );
-        }
-      }
-    }
-
-    // Batch insert junction records
-    const inserts = [];
-
-    if (performerRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
-        )
-      );
-    }
-    if (tagRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
-        )
-      );
-    }
-    if (galleryRecords.length > 0) {
-      inserts.push(
-        prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO ImageGallery (imageId, imageInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
-        )
-      );
-    }
-
-    await Promise.all(inserts);
-  }
-
   // ==================== Helper Methods ====================
 
   private checkAbort(): void {
@@ -3600,77 +2884,6 @@ class StashSyncService extends EventEmitter {
           totalEntities: result.synced,
         },
       });
-    }
-  }
-
-  private async updateAllSyncStates(
-    stashInstanceId: string,
-    syncType: "full" | "incremental",
-    results: SyncResult[],
-    _totalDurationMs: number
-  ): Promise<void> {
-    const instanceId = stashInstanceId;
-
-    for (const result of results) {
-      // Actual time (real UTC) for display purposes
-      const actualTime = new Date();
-
-      // Find existing sync state
-      const existing = await prisma.syncState.findFirst({
-        where: {
-          stashInstanceId: instanceId,
-          entityType: result.entityType,
-        },
-      });
-
-      // Build update data - only include sync timestamp if we have one
-      const updateData: Record<string, unknown> = {
-        lastSyncCount: result.synced,
-        lastSyncDurationMs: result.durationMs,
-        lastError: result.error ?? null,
-      };
-
-      // Only update timestamp fields if we have a valid timestamp from synced entities
-      if (result.maxUpdatedAt) {
-        if (syncType === "full") {
-          updateData.lastFullSyncTimestamp = result.maxUpdatedAt;
-          updateData.lastFullSyncActual = actualTime;
-        } else {
-          updateData.lastIncrementalSyncTimestamp = result.maxUpdatedAt;
-          updateData.lastIncrementalSyncActual = actualTime;
-        }
-        // Only update totalEntities when we actually sync something
-        updateData.totalEntities = result.synced;
-      }
-
-      if (existing) {
-        await prisma.syncState.update({
-          where: { id: existing.id },
-          data: updateData,
-        });
-      } else {
-        await prisma.syncState.create({
-          data: {
-            stashInstanceId: instanceId,
-            entityType: result.entityType,
-            ...(result.maxUpdatedAt
-              ? syncType === "full"
-                ? {
-                    lastFullSyncTimestamp: result.maxUpdatedAt,
-                    lastFullSyncActual: actualTime,
-                  }
-                : {
-                    lastIncrementalSyncTimestamp: result.maxUpdatedAt,
-                    lastIncrementalSyncActual: actualTime,
-                  }
-              : {}),
-            lastSyncCount: result.synced,
-            lastSyncDurationMs: result.durationMs,
-            lastError: result.error ?? null,
-            totalEntities: result.synced,
-          },
-        });
-      }
     }
   }
 
