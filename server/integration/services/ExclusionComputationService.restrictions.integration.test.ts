@@ -13,14 +13,24 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
 import { userHiddenEntityService } from "../../services/UserHiddenEntityService.js";
 import { defaultRestrictEmpty } from "../../services/exclusionPolicy.js";
 import { must } from "../../tests/helpers/must.js";
+import { partialRow } from "../../tests/helpers/prismaMock.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 import { TestClient, adminClient } from "../helpers/testClient.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+/** Galleries and images as Stash's sync queries return them */
+type SyncGallery = Parameters<
+  (typeof stashSyncService)["processGalleriesBatch"]
+>[0][number];
+type SyncImage = Parameters<
+  (typeof stashSyncService)["processImagesBatch"]
+>[0][number];
 
 const A = "restr-it-a";
 const B = "restr-it-b";
@@ -602,6 +612,62 @@ describeWithDb("ExclusionComputationService restrictions (integration)", () => {
     await expectRows(userId, "gallery", [...K(A, "cascade", "g1")]);
     await expectRows(userId, "image", [...K(A, "cascade", "i7")]);
     await expectNoGlobalRows(userId);
+  }, 60000);
+
+  it("restricting instance B's studio hides B's images and galleries, and not A's same-id studio's", async () => {
+    // Synced as sync writes them, not seeded: the batch writers set the
+    // studio's instance. Both instances get the same Stash rows.
+    const gallery = partialRow<SyncGallery>({
+      id: "g9",
+      urls: [],
+      organized: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+      image_count: 1,
+      studio: partialRow({ id: "1", name: "Root" }),
+      performers: [],
+      tags: [],
+    });
+    const image = partialRow<SyncImage>({
+      id: "i9",
+      urls: [],
+      organized: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+      files: [],
+      paths: {},
+      galleries: [{ id: "g9" }],
+      studio: { id: "1", name: "Root" },
+      tags: [],
+      performers: [],
+    });
+    try {
+      for (const instanceId of INSTANCES) {
+        await stashSyncService["processGalleriesBatch"]([gallery], instanceId);
+        await stashSyncService["processImagesBatch"]([image], instanceId);
+      }
+
+      await setRules(userId, [
+        { entityType: "studios", mode: "EXCLUDE", entityIds: [`1:${B}`] },
+      ]);
+      await recompute(userId);
+
+      await expectRows(userId, "studio", [...K(B, "restricted", "1", "3")]);
+      await expectRows(userId, "scene", [...K(B, "cascade", "s1", "s8")]);
+      await expectRows(userId, "gallery", [...K(B, "cascade", "g9")]);
+      await expectRows(userId, "image", [...K(B, "cascade", "i9")]);
+      await expectNoGlobalRows(userId);
+    } finally {
+      await prisma.imageGallery.deleteMany({
+        where: { imageId: "i9", imageInstanceId: { in: INSTANCES } },
+      });
+      await prisma.stashImage.deleteMany({
+        where: { id: "i9", stashInstanceId: { in: INSTANCES } },
+      });
+      await prisma.stashGallery.deleteMany({
+        where: { id: "g9", stashInstanceId: { in: INSTANCES } },
+      });
+    }
   }, 60000);
 
   it("galleries EXCLUDE [g1@A]", async () => {

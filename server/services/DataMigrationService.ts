@@ -18,6 +18,46 @@ interface Migration {
   run: () => Promise<void>;
 }
 
+/**
+ * A migration that recomputes every user's exclusions once, after a change to
+ * what the computation reads. A failure leaves it pending for the next start.
+ */
+function recomputeExclusionsMigration(
+  name: string,
+  description: string,
+  after: string
+): Migration {
+  const label = `[Migration ${name.slice(0, 3)}]`;
+  return {
+    name,
+    description,
+    run: async () => {
+      const startTime = Date.now();
+      logger.info(
+        `${label} Recomputing exclusions for all users after ${after}`
+      );
+
+      try {
+        const result = await exclusionComputationService.recomputeAllUsers();
+        logger.info(`${label} Exclusion recompute completed`, {
+          durationMs: Date.now() - startTime,
+          success: result.success,
+          failed: result.failed,
+        });
+      } catch (error) {
+        logger.error(
+          `${label} Exclusion recompute failed - will retry on next startup`,
+          {
+            durationMs: Date.now() - startTime,
+            error: error instanceof Error ? error.message : "Unknown error",
+          }
+        );
+        throw error;
+      }
+    },
+  };
+}
+
 // Define all migrations here
 const migrations: Migration[] = [
   {
@@ -93,64 +133,23 @@ const migrations: Migration[] = [
       }
     },
   },
-  {
-    name: "003_recompute_exclusions_restriction_semantics",
-    description:
-      "Recompute every user's exclusions after the INCLUDE/restrictEmpty/hierarchy/admin semantics change (item 13)",
-    run: async () => {
-      const startTime = Date.now();
-      logger.info(
-        "[Migration 003] Recomputing exclusions for all users after the restriction semantics change"
-      );
-
-      try {
-        const result = await exclusionComputationService.recomputeAllUsers();
-        logger.info("[Migration 003] Exclusion recompute completed", {
-          durationMs: Date.now() - startTime,
-          success: result.success,
-          failed: result.failed,
-        });
-      } catch (error) {
-        logger.error(
-          "[Migration 003] Exclusion recompute failed - will retry on next startup",
-          {
-            durationMs: Date.now() - startTime,
-            error: error instanceof Error ? error.message : "Unknown error",
-          }
-        );
-        throw error;
-      }
-    },
-  },
-  {
-    name: "004_recompute_exclusions_reason_precedence",
-    description:
-      "Recompute every user's exclusions so a hidden item never masks a content restriction (the Hidden Items list reads the stored reason)",
-    run: async () => {
-      const startTime = Date.now();
-      logger.info(
-        "[Migration 004] Recomputing exclusions for all users after the reason precedence change"
-      );
-
-      try {
-        const result = await exclusionComputationService.recomputeAllUsers();
-        logger.info("[Migration 004] Exclusion recompute completed", {
-          durationMs: Date.now() - startTime,
-          success: result.success,
-          failed: result.failed,
-        });
-      } catch (error) {
-        logger.error(
-          "[Migration 004] Exclusion recompute failed - will retry on next startup",
-          {
-            durationMs: Date.now() - startTime,
-            error: error instanceof Error ? error.message : "Unknown error",
-          }
-        );
-        throw error;
-      }
-    },
-  },
+  recomputeExclusionsMigration(
+    "003_recompute_exclusions_restriction_semantics",
+    "Recompute every user's exclusions after the INCLUDE/restrictEmpty/hierarchy/admin semantics change (item 13)",
+    "the restriction semantics change"
+  ),
+  recomputeExclusionsMigration(
+    "004_recompute_exclusions_reason_precedence",
+    "Recompute every user's exclusions so a hidden item never masks a content restriction (the Hidden Items list reads the stored reason)",
+    "the reason precedence change"
+  ),
+  // The database migration 20260925000400 corrects the stored studio
+  // instances; this applies the corrected cascade without waiting for a sync
+  recomputeExclusionsMigration(
+    "005_recompute_exclusions_studio_instance",
+    "Recompute every user's exclusions once galleries and images record their studio's instance, so a studio restriction covers them on every instance",
+    "galleries and images recorded their studio's instance"
+  ),
 ];
 
 class DataMigrationService {
