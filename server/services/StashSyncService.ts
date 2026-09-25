@@ -3005,7 +3005,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  /** Tells progress listeners (SyncScheduler.onProgress) how a type goes. */
+  /** Emits a `progress` event for how a type goes (nothing listens today). */
   private emitProgress(progress: SyncProgress): void {
     this.emit("progress", progress);
   }

@@ -2,9 +2,13 @@
  * The startup sync reads only the stored sync state. A migration that needs
  * Peek to refetch a type clears that type's `SyncState` timestamps, and the
  * sync fetches it whole; the other types sync incrementally.
+ *
+ * The scheduler starts once an instance exists (the setup wizard starts it),
+ * and a new sync interval only re-arms the timer: it never starts a sync.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { stashSyncService } from "../../services/StashSyncService.js";
 import { syncScheduler } from "../../services/SyncScheduler.js";
 import { logger } from "../../utils/logger.js";
@@ -32,6 +36,7 @@ vi.mock("../../services/StashSyncService.js", () => ({
 // Two enabled instances; the manager loads only enabled ones
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
+    hasInstances: vi.fn(() => true),
     getAllEnabled: () => [
       { id: "default", name: "Main" },
       { id: "second", name: "Second" },
@@ -45,6 +50,7 @@ vi.mock("../../utils/logger.js", () => ({
 
 const mockPrisma = vi.mocked(prisma, true);
 const mockSync = vi.mocked(stashSyncService, true);
+const mockManager = vi.mocked(stashInstanceManager, true);
 const mockLogger = vi.mocked(logger, true);
 
 const TYPES = ["studio", "tag", "performer", "group", "gallery", "scene"];
@@ -233,5 +239,128 @@ describe("an admin's abort is not a failure", () => {
       "Startup smart incremental sync failed",
       { error: "Stash is down" }
     );
+  });
+});
+
+describe("start and the sync interval", () => {
+  const MINUTE = 60_000;
+
+  /** What `SyncSettings` holds after an update saving `minutes`. */
+  function savedSettings(minutes: number) {
+    mockPrisma.syncSettings.upsert.mockResolvedValue(
+      partialRow({
+        id: 1,
+        syncIntervalMinutes: minutes,
+        enableScanSubscription: true,
+      })
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockManager.hasInstances.mockReturnValue(true);
+    mockPrisma.syncSettings.findFirst.mockResolvedValue(
+      partialRow({
+        id: 1,
+        syncIntervalMinutes: 60,
+        enableScanSubscription: true,
+      })
+    );
+    // Every type synced before: the startup sync is the smart one
+    storeSyncStates(syncStates([]));
+  });
+
+  afterEach(() => {
+    syncScheduler.stop();
+    vi.useRealTimers();
+  });
+
+  it("start with no instance does not mark the scheduler started, and a later start runs the startup sync and schedules the interval", async () => {
+    // A server that boots before the setup wizard has saved an instance
+    mockManager.hasInstances.mockReturnValue(false);
+    await syncScheduler.start();
+
+    expect(syncScheduler.isRunning()).toBe(false);
+    expect(mockSync.fullSync).not.toHaveBeenCalled();
+    expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
+
+    // The wizard saved the first instance, which has never synced
+    mockManager.hasInstances.mockReturnValue(true);
+    storeSyncStates([]);
+    await syncScheduler.start();
+
+    expect(syncScheduler.isRunning()).toBe(true);
+    expect(mockSync.fullSync).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
+  });
+
+  it("updateSettings with a new interval starts no sync and fires the next scheduled sync after the new interval", async () => {
+    await syncScheduler.start();
+    expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30 * MINUTE);
+
+    savedSettings(15);
+    await syncScheduler.updateSettings({ syncIntervalMinutes: 15 });
+
+    // Only the startup sync so far
+    expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
+    expect(mockSync.fullSync).not.toHaveBeenCalled();
+    expect(mockSync.incrementalSync).not.toHaveBeenCalled();
+    expect(mockPrisma.syncSettings.upsert).toHaveBeenCalledOnce();
+    expect(syncScheduler.getSettings()).toEqual({
+      syncIntervalMinutes: 15,
+      enableScanSubscription: true,
+    });
+
+    // The timer counts from the change, 15 minutes
+    await vi.advanceTimersByTimeAsync(15 * MINUTE - 1);
+    expect(mockSync.incrementalSync).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(15 * MINUTE);
+    expect(mockSync.incrementalSync).toHaveBeenCalledTimes(2);
+  });
+
+  it("a stop while the settings load (a shutdown during boot) arms no timer and runs no startup sync", async () => {
+    const starting = syncScheduler.start();
+    syncScheduler.stop();
+    await starting;
+
+    expect(syncScheduler.isRunning()).toBe(false);
+    expect(mockSync.smartIncrementalSync).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(mockSync.incrementalSync).not.toHaveBeenCalled();
+  });
+
+  it("a start that cannot read the settings stays stopped, so a later start runs", async () => {
+    mockPrisma.syncSettings.findFirst.mockRejectedValueOnce(
+      new Error("database is locked")
+    );
+
+    await expect(syncScheduler.start()).rejects.toThrow("database is locked");
+    expect(syncScheduler.isRunning()).toBe(false);
+
+    await syncScheduler.start();
+    expect(syncScheduler.isRunning()).toBe(true);
+    expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
+  });
+
+  it("updateSettings with the same interval changes nothing", async () => {
+    await syncScheduler.start();
+    await vi.advanceTimersByTimeAsync(30 * MINUTE);
+
+    savedSettings(60);
+    await syncScheduler.updateSettings({ syncIntervalMinutes: 60 });
+
+    expect(mockSync.smartIncrementalSync).toHaveBeenCalledOnce();
+    expect(mockSync.fullSync).not.toHaveBeenCalled();
+    expect(mockSync.incrementalSync).not.toHaveBeenCalled();
+
+    // The timer keeps counting from start: the next sync is 60 minutes
+    // after it, 30 after the update
+    await vi.advanceTimersByTimeAsync(30 * MINUTE);
+    expect(mockSync.incrementalSync).toHaveBeenCalledOnce();
   });
 });

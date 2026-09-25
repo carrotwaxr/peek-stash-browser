@@ -276,7 +276,8 @@ router.post(
 
 /**
  * PUT /api/sync/settings
- * Update sync settings (admin only)
+ * Update sync settings (admin only). A new interval re-arms the scheduler's
+ * timer; no sync starts, so the answer comes at once.
  *
  * Body: {
  *   syncIntervalMinutes?: number,
@@ -288,7 +289,8 @@ router.put(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      const { syncIntervalMinutes, enableScanSubscription } = req.body as {
+      const { syncIntervalMinutes, enableScanSubscription } = (req.body ??
+        {}) as {
         syncIntervalMinutes?: number;
         enableScanSubscription?: boolean;
       };

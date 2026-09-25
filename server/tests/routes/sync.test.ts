@@ -1,7 +1,7 @@
 /**
  * The sync routes after the plugin webhook's removal (item 22): no
  * `POST /notify`, and `PUT /settings` passes the scheduler only the settings
- * that still exist.
+ * that still exist, and none for a request without a body.
  */
 import type { NextFunction, Request, Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -85,6 +85,24 @@ describe("sync routes", () => {
     expect(mockScheduler.updateSettings.mock.calls).toStrictEqual([
       [{ syncIntervalMinutes: 120 }],
     ]);
+    expect(res.json).toHaveBeenCalledWith({
+      ok: true,
+      settings: { syncIntervalMinutes: 120, enableScanSubscription: true },
+    });
+  });
+
+  it("PUT /settings without a body changes nothing and answers 200", async () => {
+    const handler = findHandler(await syncRouter(), "put", "/settings");
+    const req = reqFor(handler, {
+      body: malformed(undefined),
+      user: testUser({ role: "ADMIN" }),
+    });
+    const res = resFor(handler);
+
+    await handler(req, res, () => {});
+
+    expect(mockScheduler.updateSettings.mock.calls).toStrictEqual([[{}]]);
+    expect(res.status).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
       ok: true,
       settings: { syncIntervalMinutes: 120, enableScanSubscription: true },

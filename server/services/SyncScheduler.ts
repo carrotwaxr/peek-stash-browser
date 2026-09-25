@@ -13,7 +13,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { logSyncFailure } from "../utils/syncLog.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
-import { type SyncProgress, stashSyncService } from "./StashSyncService.js";
+import { stashSyncService } from "./StashSyncService.js";
 
 /** The types the startup check reports as never synced when a row is absent */
 const STARTUP_TYPES = [
@@ -37,8 +37,10 @@ class SyncScheduler {
   private currentSettings: SyncSchedulerSettings | null = null;
 
   /**
-   * Start the sync scheduler
-   * Should be called after StashInstanceManager is initialized
+   * Start the sync scheduler: the polling interval, then the startup sync.
+   * Called after StashInstanceManager is initialized, at boot and by the
+   * setup wizard once it has saved the first instance. With no enabled
+   * instance it does nothing and stays stopped, so a later call starts it.
    */
   async start(): Promise<void> {
     if (this.isStarted) {
@@ -46,7 +48,6 @@ class SyncScheduler {
       return;
     }
 
-    // Check if Stash is configured
     if (!stashInstanceManager.hasInstances()) {
       logger.info(
         "No Stash instances configured - sync scheduler will not start"
@@ -54,21 +55,28 @@ class SyncScheduler {
       logger.info(
         "Sync will start automatically after Stash is configured via setup wizard"
       );
-      this.isStarted = true;
       return;
     }
 
-    // Load settings
-    const settings = await this.loadSettings();
+    // Started from here on: a second call while this one's startup sync runs
+    // returns above instead of starting another sync
+    this.isStarted = true;
+    let settings: SyncSchedulerSettings;
+    try {
+      settings = await this.loadSettings();
+    } catch (error) {
+      // Not started: a later call tries again
+      this.isStarted = false;
+      throw error;
+    }
+    // Stopped (a shutdown) while the settings loaded: arm no timer
+    if (!this.isRunning()) return;
     this.currentSettings = settings;
 
-    // Start polling interval
     this.startPollingInterval(settings.syncIntervalMinutes);
 
-    // Perform initial sync
     await this.performStartupSync();
 
-    this.isStarted = true;
     logger.info("SyncScheduler started", {
       intervalMinutes: settings.syncIntervalMinutes,
       scanSubscription: settings.enableScanSubscription,
@@ -88,14 +96,6 @@ class SyncScheduler {
   }
 
   /**
-   * Restart the scheduler (e.g., after settings change)
-   */
-  async restart(): Promise<void> {
-    this.stop();
-    await this.start();
-  }
-
-  /**
    * Check if scheduler is running
    */
   isRunning(): boolean {
@@ -110,12 +110,15 @@ class SyncScheduler {
   }
 
   /**
-   * Update settings and restart scheduler if needed
+   * Save the settings. A new interval re-arms the running scheduler's timer,
+   * so the next scheduled sync comes one new interval from now; it never
+   * starts a sync. A stopped scheduler reads the saved settings when it
+   * starts.
    */
   async updateSettings(
     settings: Partial<SyncSchedulerSettings>
   ): Promise<void> {
-    await prisma.syncSettings.upsert({
+    const saved = await prisma.syncSettings.upsert({
       where: { id: 1 },
       update: settings,
       create: {
@@ -125,19 +128,18 @@ class SyncScheduler {
       },
     });
 
-    // Restart if interval changed
-    if (
-      settings.syncIntervalMinutes !== undefined &&
-      settings.syncIntervalMinutes !== this.currentSettings?.syncIntervalMinutes
-    ) {
-      logger.info("Sync interval changed, restarting scheduler", {
-        oldInterval: this.currentSettings?.syncIntervalMinutes,
-        newInterval: settings.syncIntervalMinutes,
+    const oldInterval = this.currentSettings?.syncIntervalMinutes;
+    this.currentSettings = {
+      syncIntervalMinutes: saved.syncIntervalMinutes,
+      enableScanSubscription: saved.enableScanSubscription,
+    };
+
+    if (this.isStarted && saved.syncIntervalMinutes !== oldInterval) {
+      logger.info("Sync interval changed, next scheduled sync reset", {
+        oldInterval,
+        newInterval: saved.syncIntervalMinutes,
       });
-      await this.restart();
-    } else {
-      // Just update in-memory settings
-      this.currentSettings = await this.loadSettings();
+      this.startPollingInterval(saved.syncIntervalMinutes);
     }
   }
 
@@ -175,14 +177,6 @@ class SyncScheduler {
       logSyncFailure("Manual full sync failed", error);
       throw error;
     }
-  }
-
-  /**
-   * Subscribe to sync progress events
-   */
-  onProgress(callback: (progress: SyncProgress) => void): () => void {
-    stashSyncService.on("progress", callback);
-    return () => stashSyncService.off("progress", callback);
   }
 
   // ==================== Private Methods ====================
