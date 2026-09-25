@@ -1,7 +1,8 @@
 /**
  * The Stash replay evaluates list queries against a synthetic library
  * (sweep item 83): Stash's pagination, id lists, the updated_at filter that
- * incremental sync sends, and sort. Anything else fails loudly, naming the
+ * incremental sync sends, the galleries INCLUDES filter of its gallery
+ * members refetch, and sort. Anything else fails loudly, naming the
  * argument, so a new filter in Peek cannot pass by being ignored.
  */
 import { describe, expect, it } from "vitest";
@@ -156,6 +157,76 @@ describe("queryList", () => {
     expect(changed.scene_markers).toEqual([]);
     const unchanged = changedSince("2003-02-11T08:00:00.999");
     expect(unchanged.count).toBe(0);
+  });
+
+  it("findImages and findScenes filter by galleries INCLUDES", () => {
+    const library = fixtureLibrary();
+    // Both images and scene 100001 are in gallery 100001; image 100002
+    // moves to gallery 100002
+    must(library.entities.image[1], "image 100002").galleries = [
+      { id: "100002", title: "Gallery 100002" },
+    ];
+    // Sync's gallery members query: the ID-only operations, 5,000 a page
+    const inGalleries = (
+      root: "findImages" | "findScenes",
+      value: unknown,
+      modifier = "INCLUDES"
+    ) => {
+      const [operation, argument, key] =
+        root === "findImages"
+          ? ["FindImageIDs", "image_filter", "images"]
+          : ["FindSceneIDs", "scene_filter", "scenes"];
+      return listIds(
+        queryList(library, operation, root, {
+          filter: { page: 1, per_page: 5000 },
+          [argument]: { galleries: { value, modifier } },
+        }),
+        key
+      );
+    };
+
+    expect(inGalleries("findImages", ["100001"])).toEqual(["100001"]);
+    expect(inGalleries("findImages", ["100002"])).toEqual(["100002"]);
+    // INCLUDES matches an entity in any of them
+    expect(inGalleries("findImages", ["100002", "100001"])).toEqual([
+      "100001",
+      "100002",
+    ]);
+    expect(inGalleries("findImages", ["999999"])).toEqual([]);
+    expect(inGalleries("findScenes", ["100001"])).toEqual(["100001"]);
+    expect(inGalleries("findScenes", ["100002"])).toEqual([]);
+
+    // Every other form of it is still refused
+    const teach =
+      "is not evaluated by the replay; teach server/integration/stash-replay/library.ts.";
+    expect(() => inGalleries("findImages", ["100001"], "INCLUDES_ALL")).toThrow(
+      `stash-replay cannot answer FindImageIDs: findImages(image_filter.galleries.modifier: INCLUDES_ALL) ${teach}`
+    );
+    expect(() => inGalleries("findScenes", [])).toThrow(
+      `stash-replay cannot answer FindSceneIDs: findScenes(scene_filter.galleries.value: []) ${teach}`
+    );
+    expect(() =>
+      queryList(library, "FindImageIDs", "findImages", {
+        image_filter: {
+          galleries: {
+            value: ["100001"],
+            modifier: "INCLUDES",
+            excludes: ["100002"],
+          },
+        },
+      })
+    ).toThrow(
+      `stash-replay cannot answer FindImageIDs: findImages(image_filter.galleries.excludes) ${teach}`
+    );
+    expect(() =>
+      queryList(library, "FindPerformerIDs", "findPerformers", {
+        performer_filter: {
+          galleries: { value: ["100001"], modifier: "INCLUDES" },
+        },
+      })
+    ).toThrow(
+      `stash-replay cannot answer FindPerformerIDs: findPerformers(performer_filter.galleries) ${teach}`
+    );
   });
 
   it("findScenes duration and filesize sum the matched first files", () => {

@@ -34,6 +34,7 @@ import type {
   FindScenesCompactQuery,
   FindStudiosQuery,
   FindTagsQuery,
+  MultiCriterionInput,
   TimestampCriterionInput,
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
@@ -64,6 +65,7 @@ import {
   type IncomingEntity,
   type JunctionName,
   type RefScope,
+  SCOPE_LIMIT,
   type StoredEntity,
   SyncChangeSet,
   detectChanges,
@@ -879,23 +881,70 @@ const LINK_PATHS: readonly LinkPath[] = [
 ];
 
 /**
- * The live entities on `instanceId` that link to the given ones (by type,
- * soft-deleted by a cleanup) along `LINK_PATHS`, by type in SYNC_ORDER. One
- * statement per linked type: each source's ids are bound as one JSON list
- * that drives the junction's reverse index (or the column's index), and
- * each linked id is then looked up by primary key.
+ * How a gallery's scenes and images link to it: Peek writes both junctions
+ * from the member's side (its own galleries), while adding images to a
+ * gallery in Stash, removing them or editing its scenes from the gallery
+ * moves only the gallery's updated_at (`refetchGalleryMembers`).
+ */
+const GALLERY_MEMBER_PATHS: readonly LinkPath[] = [
+  { linked: "scene", source: "gallery", junction: "SceneGallery" },
+  { linked: "image", source: "gallery", junction: "ImageGallery" },
+];
+
+/** The types a gallery's members are, in SYNC_ORDER. */
+const GALLERY_MEMBER_TYPES = ["scene", "image"] as const;
+
+/**
+ * Stash's ids of the scenes or images in any of the galleries `galleries`
+ * names (INCLUDES), one page of the ID-only operation.
+ */
+const GALLERY_MEMBER_ID_FETCHERS: Record<
+  (typeof GALLERY_MEMBER_TYPES)[number],
+  (
+    stash: StashClient,
+    galleries: MultiCriterionInput,
+    filter: FindFilterType,
+    signal: AbortSignal
+  ) => Promise<StashIdPage>
+> = {
+  scene: async (stash, galleries, filter, signal) => {
+    const { findScenes } = await stash.findSceneIDs(
+      { filter, scene_filter: { galleries } },
+      undefined,
+      signal
+    );
+    return { ids: findScenes.scenes.map((s) => s.id), count: findScenes.count };
+  },
+  image: async (stash, galleries, filter, signal) => {
+    const { findImages } = await stash.findImageIDs(
+      { filter, image_filter: { galleries } },
+      undefined,
+      signal
+    );
+    return { ids: findImages.images.map((i) => i.id), count: findImages.count };
+  },
+};
+
+/**
+ * The live entities on `instanceId` that link to the given ones (`sources`,
+ * ids by type) along `paths` (`LINK_PATHS` by default: what linked to the
+ * entities a cleanup soft-deleted), by type in SYNC_ORDER. One statement
+ * per linked type: each source's ids are bound as one JSON list that drives
+ * the junction's reverse index (or the column's index), and each linked id
+ * is then looked up by primary key.
  */
 async function linkedTo(
   instanceId: string,
-  deleted: ReadonlyMap<EntityType, readonly string[]>
+  sources: ReadonlyMap<EntityType, readonly string[]>,
+  paths: readonly LinkPath[] = LINK_PATHS
 ): Promise<Map<EntityType, string[]>> {
   const linked = new Map<EntityType, string[]>();
   for (const type of SYNC_ORDER) {
     const { table } = ENTITY_TABLES[type];
     const arms: string[] = [];
     const params: string[] = [];
-    for (const path of LINK_PATHS) {
-      const ids = deleted.get(path.source) ?? [];
+    for (const path of paths) {
+      const ids = sources.get(path.source) ?? [];
       if (path.linked !== type || ids.length === 0) continue;
       if ("junction" in path) {
         const { near, far, farInstance } = JUNCTION_COLUMNS[path.junction];
@@ -2626,10 +2675,12 @@ class StashSyncService extends EventEmitter {
    * reads: what no page returned is fetched by id (`fetchMissedIds`). On
    * the incremental paths, what linked to the entities the cleanups
    * soft-deleted is then fetched again (`refetchLinkedToDeleted`): a merge
-   * or deletion in Stash rewrites those links without moving updated_at.
-   * Each type's state is saved at once, so a restart does not sync
-   * completed types again; a type that fails is recorded and the next one
-   * runs. What changed goes into the run's change set; the post-sync steps
+   * or deletion in Stash rewrites those links without moving updated_at;
+   * then the scenes and images of the galleries that changed or went
+   * (`refetchGalleryMembers`): a gallery's members edited from the gallery
+   * move only its updated_at. Each type's state is saved at once, so a
+   * restart does not sync completed types again; a type that fails is
+   * recorded and the next one runs. What changed goes into the run's change set; the post-sync steps
    * run once per run, after every instance (runSync). The caller holds the
    * lock.
    */
@@ -2662,8 +2713,9 @@ class StashSyncService extends EventEmitter {
       }
 
       // Cleanup deleted entities (detect deletions/merges in Stash), then
-      // what linked to them. The full path fetched every type after a
-      // cleaned-up one whole, so it needs no refetch
+      // what linked to them, then the members of the galleries that changed
+      // or went. The full path fetched every type after a cleaned-up one
+      // whole, scenes and images after galleries, so it needs no refetch
       if (mode !== "full") {
         const deleted = await this.cleanupEveryType(
           stashInstanceId,
@@ -2676,6 +2728,12 @@ class StashSyncService extends EventEmitter {
           deleted,
           results,
           run
+        );
+        await this.refetchGalleryMembers(
+          stashInstanceId,
+          results,
+          run,
+          seenIds
         );
       }
 
@@ -3489,6 +3547,138 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * The scenes and images of the galleries the run changed or soft-deleted
+   * on `stashInstanceId` are fetched again by id (item 42, SYNC-18). Adding
+   * images to a gallery in Stash, removing them, and editing its scenes from
+   * the gallery move only the gallery's updated_at, and deleting a gallery
+   * moves nothing, while Peek writes `ImageGallery` and `SceneGallery` from
+   * the member's side; and an image keeps what it inherited from a gallery
+   * (inheritance fills only what is empty). So both the members Peek links
+   * to those galleries (the ones that left, and a deleted gallery's) and the
+   * ones Stash lists in the changed galleries (`galleries` INCLUDES: the
+   * ones that joined) are paged in by id (`paginate`, 500 a request), into
+   * the change set as changed (`markChanged`): their links are rewritten
+   * from Stash, and the post-sync steps put back what they inherit and
+   * recount what they link to. A type fetched whole this run (`fetchedWhole`,
+   * a never-synced type's page ids) is skipped: its rows are Stash's
+   * already. Past the change set's limit, which galleries changed on this
+   * instance is no longer known, so both types are fetched whole again. A
+   * type whose refetch fails keeps its old links until a full sync: the
+   * failure is added to its result's error and its `lastError`. An abort
+   * throws.
+   */
+  private async refetchGalleryMembers(
+    stashInstanceId: string,
+    results: SyncResult[],
+    run: SyncRunContext,
+    fetchedWhole: ReadonlyMap<EntityType, unknown> = new Map()
+  ): Promise<void> {
+    const changed = run.changes.changed("gallery");
+    const deleted = run.changes.deleted("gallery");
+    const onInstance = (scope: RefScope) =>
+      scope.refs
+        .filter((ref) => ref.instanceId === stashInstanceId)
+        .map((ref) => ref.id);
+    const whole = changed.whole || deleted.whole;
+    const live = onInstance(changed);
+    const gone = onInstance(deleted);
+    if (!whole && live.length === 0 && gone.length === 0) return;
+
+    const linked = whole
+      ? new Map<EntityType, string[]>()
+      : await linkedTo(
+          stashInstanceId,
+          new Map([["gallery", [...live, ...gone]]]),
+          GALLERY_MEMBER_PATHS
+        );
+    const refetch: SyncRunContext = { ...run, markChanged: true };
+    for (const entityType of GALLERY_MEMBER_TYPES) {
+      if (fetchedWhole.has(entityType)) continue;
+      this.checkAbort();
+      const { plural } = ENTITY_TABLES[entityType];
+      const result = results.find((r) => r.entityType === entityType);
+      try {
+        let ids: string[] | undefined;
+        if (whole) {
+          logger.info(
+            `More than ${SCOPE_LIMIT.toLocaleString("en-US")} galleries changed or went this run: fetching every one of this instance's ${plural} again`,
+            { instanceId: stashInstanceId }
+          );
+        } else {
+          // Deleted galleries are gone from Stash: only the changed ones
+          // can list members
+          const listed =
+            live.length > 0
+              ? await this.galleryMembersInStash(
+                  entityType,
+                  stashInstanceId,
+                  live,
+                  run
+                )
+              : [];
+          ids = [...new Set([...(linked.get(entityType) ?? []), ...listed])];
+          if (ids.length === 0) continue;
+          logger.info(
+            `Fetching ${ids.length} ${plural} in or out of galleries that Stash changed or deleted`,
+            { instanceId: stashInstanceId, ids: ids.slice(0, LOGGED_IDS) }
+          );
+        }
+        const { synced } = await this.paginate(
+          entityType,
+          stashInstanceId,
+          { ids },
+          refetch
+        );
+        if (result) result.synced += synced;
+      } catch (error) {
+        if (this.isAbort(error)) throw new Error("Sync aborted");
+        const message = describeStashError(error);
+        logger.error(
+          `Failed to refetch the ${plural} of galleries Stash changed or deleted`,
+          { stashInstanceId, entityType, error: message }
+        );
+        const problem = `Could not refetch the ${plural} of galleries Stash changed or deleted: ${message}`;
+        const lastError = joinProblems(result?.error, problem) ?? problem;
+        if (result) result.error = lastError;
+        await this.recordEntityError(stashInstanceId, entityType, lastError);
+      }
+    }
+  }
+
+  /**
+   * Stash's ids of the scenes or images in any of `galleryIds` (the
+   * `galleries` criterion, INCLUDES), 500 galleries a request and 5,000 ids
+   * a page. The list stops at Stash's count or at an empty page.
+   */
+  private async galleryMembersInStash(
+    entityType: (typeof GALLERY_MEMBER_TYPES)[number],
+    stashInstanceId: string,
+    galleryIds: readonly string[],
+    run: SyncRunContext
+  ): Promise<string[]> {
+    const stash = this.getStashClient(stashInstanceId);
+    const fetchIds = GALLERY_MEMBER_ID_FETCHERS[entityType];
+    const ids: string[] = [];
+    for (const value of chunksOf(galleryIds, BATCH_SIZE)) {
+      const galleries = { value, modifier: CriterionModifier.Includes };
+      let listed = 0;
+      for (let page = 1; ; page++) {
+        throwIfAborted(run.signal);
+        const result = await fetchIds(
+          stash,
+          galleries,
+          { page, per_page: CLEANUP_PAGE_SIZE },
+          run.signal
+        );
+        for (const id of result.ids) ids.push(id);
+        listed += result.ids.length;
+        if (result.ids.length === 0 || listed >= result.count) break;
+      }
+    }
+    return ids;
+  }
+
+  /**
    * Safety guard against a bad or truncated keep-set hiding much of the
    * library. Returns true, and logs loudly, when more than
    * MAX_CLEANUP_DELETE_RATIO of the live cached rows would go and more than
@@ -3767,7 +3957,8 @@ class StashSyncService extends EventEmitter {
 
   /**
    * runCleanup's work; the caller holds the lock. What linked to the rows it
-   * soft-deleted is fetched again, as after a sync's cleanups.
+   * soft-deleted is fetched again, and the members of the galleries it
+   * soft-deleted or that refetch changed, as after a sync's cleanups.
    */
   private async cleanupAndRecord(
     entityType: EntityType,
@@ -3794,6 +3985,7 @@ class StashSyncService extends EventEmitter {
         [],
         run
       );
+      await this.refetchGalleryMembers(stashInstanceId, [], run);
       logger.info("Cleanup run by an admin finished", {
         stashInstanceId,
         entityType,
