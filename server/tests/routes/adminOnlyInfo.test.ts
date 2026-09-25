@@ -6,6 +6,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type * as authModule from "../../middleware/auth.js";
+import type { SyncStatusResponse } from "../../types/api/sync.js";
 import { startTestApp } from "../helpers/httpTestApp.js";
 
 vi.mock("../../middleware/auth.js", async (importOriginal) => {
@@ -30,11 +31,19 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
+/** What the admin sees: every instance's states, no instance address */
+const SYNC_STATUS: SyncStatusResponse = {
+  inProgress: false,
+  activeJob: null,
+  settings: { syncIntervalMinutes: 60, enableScanSubscription: true },
+  instances: [
+    { instanceId: "inst-a", name: "Main", enabled: true, states: [] },
+  ],
+};
+
 vi.mock("../../services/StashSyncService.js", () => ({
   stashSyncService: {
-    getSyncStatus: vi.fn().mockResolvedValue({
-      settings: { syncIntervalMinutes: 60 },
-    }),
+    getSyncStatus: vi.fn(() => Promise.resolve(SYNC_STATUS)),
   },
 }));
 
@@ -95,8 +104,6 @@ describe("admin-only server information", () => {
 
     const status = await get("/api/sync/status", "ADMIN");
     expect(status.status).toBe(200);
-    expect(await status.json()).toEqual({
-      settings: { syncIntervalMinutes: 60 },
-    });
+    expect(await status.json()).toEqual(SYNC_STATUS);
   });
 });

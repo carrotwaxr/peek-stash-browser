@@ -256,6 +256,14 @@ export type {
   DeleteDatabaseBackupResponse,
 } from "@peek/shared-types/api/databaseBackup.js";
 
+// Sync endpoint types
+export type {
+  SyncJob,
+  SyncEntityState,
+  SyncInstanceStatus,
+  SyncStatusResponse,
+} from "@peek/shared-types/api/sync.js";
+
 // ---------------------------------------------------------------------------
 // Server-local API types (dependencies on Express, Prisma, GraphQL)
 // ---------------------------------------------------------------------------

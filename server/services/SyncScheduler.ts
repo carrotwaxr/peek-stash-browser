@@ -14,6 +14,17 @@ import { logger } from "../utils/logger.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { type SyncProgress, stashSyncService } from "./StashSyncService.js";
 
+/** The types the startup check reports as never synced when a row is absent */
+const STARTUP_TYPES = [
+  "studio",
+  "tag",
+  "performer",
+  "group",
+  "gallery",
+  "scene",
+  "image",
+];
+
 interface SyncSchedulerSettings {
   syncIntervalMinutes: number;
   enableScanSubscription: boolean;
@@ -223,33 +234,36 @@ class SyncScheduler {
     // needs Peek to refetch a type clears that type's timestamps, and the
     // sync below fetches it whole (see .claude/rules/prisma.md).
     // Check sync state for ALL entity types, not just scenes: this prevents
-    // re-syncing already completed entities when scene sync fails/never completes
-    const syncStates = await prisma.syncState.findMany();
-    const syncStateMap = new Map(syncStates.map((s) => [s.entityType, s]));
-
-    // Log what we found
-    const completedTypes = syncStates
-      .filter((s) => s.lastFullSyncTimestamp ?? s.lastIncrementalSyncTimestamp)
-      .map((s) => s.entityType);
-
-    const missingTypes = [
-      "studio",
-      "tag",
-      "performer",
-      "group",
-      "gallery",
-      "scene",
-      "image",
-    ].filter((t) => !syncStateMap.has(t));
+    // re-syncing already completed entities when scene sync fails/never
+    // completes. Each enabled instance's own rows: another instance's (a
+    // disabled one, or a deleted one whose purge has not run) never count.
+    const instanceIds = stashInstanceManager.getAllEnabled().map((i) => i.id);
+    const syncStates = await prisma.syncState.findMany({
+      where: { stashInstanceId: { in: instanceIds } },
+    });
+    const instances = instanceIds.map((instanceId) => {
+      const states = syncStates.filter((s) => s.stashInstanceId === instanceId);
+      const stored = new Set(states.map((s) => s.entityType));
+      return {
+        instanceId,
+        completedTypes: states
+          .filter(
+            (s) => s.lastFullSyncTimestamp ?? s.lastIncrementalSyncTimestamp
+          )
+          .map((s) => s.entityType),
+        missingTypes: STARTUP_TYPES.filter((t) => !stored.has(t)),
+      };
+    });
 
     logger.info("Startup sync state check", {
-      completedTypes,
-      missingTypes,
+      instances,
       totalSyncStates: syncStates.length,
     });
 
-    // If NO entity types have ever been synced, do a full sync
-    if (completedTypes.length === 0) {
+    // If no instance has ever synced any entity type, do a full sync. An
+    // instance that has not, beside one that has, is fetched whole by the
+    // smart sync below (its types have no timestamp).
+    if (instances.every((i) => i.completedTypes.length === 0)) {
       logger.info(
         "No previous sync found for any entity type, performing full sync"
       );
@@ -270,8 +284,7 @@ class SyncScheduler {
     // - Re-sync entities that never completed
     // - Incrementally sync entities that have changes
     logger.info("Performing smart incremental sync on startup", {
-      completedTypes,
-      missingTypes,
+      instances,
     });
 
     try {

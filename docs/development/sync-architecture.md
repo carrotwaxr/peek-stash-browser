@@ -181,12 +181,12 @@ Maintains denormalized image counts on entities:
 
 ## Sync State Tracking
 
-Each entity type maintains its own sync state:
+Each entity type of each instance maintains its own sync state:
 
 ```sql
 CREATE TABLE SyncState (
   id INTEGER PRIMARY KEY,
-  stashInstanceId TEXT,
+  stashInstanceId TEXT NOT NULL,
   entityType TEXT,              -- 'scene', 'performer', 'studio', etc.
   lastFullSyncTimestamp TEXT,   -- RFC3339 timestamp from Stash
   lastIncrementalSyncTimestamp TEXT,
@@ -196,7 +196,9 @@ CREATE TABLE SyncState (
 
 Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastIncrementalSyncTimestamp` for each entity type independently. A type with neither is fetched whole, by every sync mode; that is how a migration asks for a refetch.
 
-`lastError` holds the last sync's problem with the type: Stash's error when fetching it failed (its GraphQL message and HTTP status, a timeout, or "Could not reach Stash", never the query), then any cleanup skip, refusal or failure, joined with "; ". A type that syncs cleanly, or that a smart sync skips because nothing changed, clears it. A failed type keeps its timestamps, so the next sync fetches it again from the same point.
+`lastError` holds the last sync's problem with the type: Stash's error when fetching it failed (the operation, each GraphQL message with the field it broke on, and the HTTP status, as in `FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.3.parent_studio) (HTTP 200)`; a timeout; or "Could not reach Stash"; never the query or its variables), then any cleanup skip, refusal or failure, joined with "; ". A type that syncs cleanly, or that a smart sync skips because nothing changed, clears it. A failed type keeps its timestamps, so the next sync fetches it again from the same point.
+
+`GET /api/sync/status` (admins only) reports every configured instance, enabled or not, in priority order: its id, name, whether it is enabled, and its entity types' states in sync order (the row above without `id` and `stashInstanceId`). It never includes an instance's address or API key. It also says whether a sync runs (`inProgress`), what holds the sync lock (`activeJob`: `sync`, `instance-delete` or null) and the sync settings. Rows of an instance that is no longer configured are left out until the startup sweep removes them. The readiness check (`isReady`), the "last refreshed" time and the startup sync's choice between a full and a smart sync read only the enabled instances' own rows.
 
 ---
 

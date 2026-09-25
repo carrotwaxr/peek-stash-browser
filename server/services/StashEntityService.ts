@@ -41,6 +41,7 @@ import {
   getImageFallbackTitle,
   getSceneFallbackTitle,
 } from "../utils/titleUtils.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /** Junction table entry for scene-performer with included performer */
 interface ScenePerformerWithPerformer {
@@ -1803,38 +1804,45 @@ class StashEntityService {
   }
 
   /**
-   * Check if cache is ready (has data)
+   * The scene `SyncState` row of each enabled instance (the ones the
+   * instance manager has loaded); a disabled or deleted instance's row is
+   * left out.
+   */
+  private async enabledSceneSyncStates() {
+    const instanceIds = stashInstanceManager.getAllEnabled().map((i) => i.id);
+    return prisma.syncState.findMany({
+      where: { entityType: "scene", stashInstanceId: { in: instanceIds } },
+    });
+  }
+
+  /**
+   * The cache is ready once some enabled instance has synced its scenes.
    */
   async isReady(): Promise<boolean> {
-    const syncState = await prisma.syncState.findFirst({
-      where: { entityType: "scene" },
-    });
-
-    return !!(
-      syncState?.lastFullSyncTimestamp ||
-      syncState?.lastIncrementalSyncTimestamp
+    const states = await this.enabledSceneSyncStates();
+    return states.some(
+      (state) =>
+        (state.lastFullSyncTimestamp ?? state.lastIncrementalSyncTimestamp) !==
+        null
     );
   }
 
   /**
-   * Get last refresh time for display (returns most recent actual sync time)
+   * When the cache was last refreshed, for display: the latest scene sync,
+   * full or incremental, of any enabled instance.
    */
   async getLastRefreshed(): Promise<Date | null> {
-    const syncState = await prisma.syncState.findFirst({
-      where: { entityType: "scene" },
-    });
-
-    if (!syncState) return null;
-
-    const { lastFullSyncActual, lastIncrementalSyncActual } = syncState;
-
-    // Return whichever sync happened more recently
-    if (!lastFullSyncActual) return lastIncrementalSyncActual;
-    if (!lastIncrementalSyncActual) return lastFullSyncActual;
-
-    return lastFullSyncActual > lastIncrementalSyncActual
-      ? lastFullSyncActual
-      : lastIncrementalSyncActual;
+    const states = await this.enabledSceneSyncStates();
+    let latest: Date | null = null;
+    for (const state of states) {
+      for (const time of [
+        state.lastFullSyncActual,
+        state.lastIncrementalSyncActual,
+      ]) {
+        if (time && (!latest || time > latest)) latest = time;
+      }
+    }
+    return latest;
   }
 
   /**

@@ -289,12 +289,13 @@ describeWithDb("StashSyncService, one type failing (integration)", () => {
         ])
       )
     ).toEqual({
-      // Stash's own message and status, never the query or its variables
+      // The operation, Stash's own message, the field that broke and the
+      // status, never the query or its variables
       studio: {
         since: null,
         count: 0,
         lastError:
-          "runtime error: invalid memory address or nil pointer dereference (HTTP 200)",
+          "FindStudios: runtime error: invalid memory address or nil pointer dereference (at findStudios.studios.0.image_path) (HTTP 200)",
       },
       tag: { since: UPDATED_AT, count: 1, lastError: null },
       performer: { since: UPDATED_AT, count: 1, lastError: null },

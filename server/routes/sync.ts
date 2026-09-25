@@ -2,7 +2,7 @@
  * Sync Routes
  *
  * Handles sync-related API endpoints:
- * - GET /api/sync/status - Get current sync status and settings (admin only)
+ * - GET /api/sync/status - Sync status, settings and each instance's entity states (admin only)
  * - POST /api/sync/trigger - Trigger manual sync (admin only)
  * - POST /api/sync/abort - Abort the current sync (admin only)
  * - POST /api/sync/reprobe-clips - Re-probe clips without previews (admin only)
@@ -12,6 +12,9 @@ import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { syncScheduler } from "../services/SyncScheduler.js";
+import type { ApiErrorResponse } from "../types/api/common.js";
+import type { TypedResponse } from "../types/api/express.js";
+import type { SyncStatusResponse } from "../types/api/sync.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -21,23 +24,25 @@ router.use(authenticate);
 
 /**
  * GET /api/sync/status
- * Get current sync status and settings for all entity types (admin only:
- * only the Server settings tab shows them)
+ * Whether a sync runs, the sync settings, and every configured instance's
+ * entity sync states (admin only: only the Server settings tab shows them).
+ * Instances appear by id and name, never by address.
  */
 router.get(
   "/status",
   requireAdmin,
-  authenticated(async (req, res) => {
-    try {
-      const status = await stashSyncService.getSyncStatus();
-      res.json(status);
-    } catch (error) {
-      res.status(500).json({
-        error: "Failed to get sync status",
-        message: error instanceof Error ? error.message : String(error),
-      });
+  authenticated(
+    async (_req, res: TypedResponse<SyncStatusResponse | ApiErrorResponse>) => {
+      try {
+        res.json(await stashSyncService.getSyncStatus());
+      } catch (error) {
+        res.status(500).json({
+          error: "Failed to get sync status",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  })
+  )
 );
 
 /**

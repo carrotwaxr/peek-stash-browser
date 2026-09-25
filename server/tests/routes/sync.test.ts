@@ -57,9 +57,10 @@ describe("sync routes", () => {
     vi.clearAllMocks();
     mockScheduler.updateSettings.mockResolvedValue(undefined);
     mockSyncService.getSyncStatus.mockResolvedValue({
-      states: [],
-      settings: { syncIntervalMinutes: 120, enableScanSubscription: true },
       inProgress: false,
+      activeJob: null,
+      settings: { syncIntervalMinutes: 120, enableScanSubscription: true },
+      instances: [],
     });
   });
 

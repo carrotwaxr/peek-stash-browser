@@ -11,7 +11,6 @@
  * - Progress events for UI feedback
  * - Soft delete for removed entities
  */
-import type { SyncSettings, SyncState } from "@prisma/client";
 import { EventEmitter } from "events";
 import {
   type StashClient,
@@ -40,6 +39,11 @@ import type {
   TagFilterType,
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
+import type {
+  SyncEntityState,
+  SyncJob,
+  SyncStatusResponse,
+} from "../types/api/sync.js";
 import { dbWrite, dbWriteBatch, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
@@ -128,13 +132,6 @@ interface RunEntityTypeOptions {
 
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
-
-/**
- * What holds the service's one lock: a sync, or an instance deletion (the
- * instance-row batch, then the purge of its cached library). Neither runs
- * while the other does.
- */
-type SyncJob = "sync" | "instance-delete";
 
 /** The lock is held: a sync or an instance deletion is running. */
 export class SyncBusyError extends Error {
@@ -421,7 +418,11 @@ function extractPhashes(
 }
 
 class StashSyncService extends EventEmitter {
-  /** The lock: which job runs, if any. Read it through isSyncing(). */
+  /**
+   * The lock: which job runs, if any. A sync, or an instance deletion (the
+   * instance-row batch, then the purge of its cached library); neither runs
+   * while the other does. Read it through isSyncing().
+   */
   private activeJob: SyncJob | null = null;
   private readonly PAGE_SIZE = BATCH_SIZE;
   private abortController: AbortController | null = null;
@@ -841,14 +842,9 @@ class StashSyncService extends EventEmitter {
     lastFullSyncTimestamp: string | null;
     lastIncrementalSyncTimestamp: string | null;
   } | null> {
-    const syncState = await prisma.syncState.findFirst({
-      where: {
-        stashInstanceId: stashInstanceId || null,
-        entityType,
-      },
+    return prisma.syncState.findFirst({
+      where: { stashInstanceId, entityType },
     });
-
-    return syncState;
   }
 
   /**
@@ -3537,31 +3533,54 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Get sync status for all entity types
+   * Every configured instance, enabled or not, with its entity types'
+   * `SyncState` rows in sync order; rows of an instance that is not
+   * configured (a deleted one whose purge has not run) are left out. Names
+   * and ids only: never an instance's address or API key.
    */
-  async getSyncStatus(stashInstanceId?: string): Promise<{
-    states: SyncState[];
-    settings:
-      | SyncSettings
-      | {
-          syncIntervalMinutes: number;
-          enableScanSubscription: boolean;
-        };
-    inProgress: boolean;
-  }> {
-    const states = await prisma.syncState.findMany({
-      where: { stashInstanceId: stashInstanceId || null },
+  async getSyncStatus(): Promise<SyncStatusResponse> {
+    const instances = await prisma.stashInstance.findMany({
+      select: { id: true, name: true, enabled: true },
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
     });
-
+    const rows = await prisma.syncState.findMany({
+      where: { stashInstanceId: { in: instances.map((i) => i.id) } },
+    });
     const settings = await prisma.syncSettings.findFirst();
 
+    const order = (entityType: string) => {
+      const index = SYNC_ORDER.findIndex((type) => type === entityType);
+      return index === -1 ? SYNC_ORDER.length : index;
+    };
     return {
-      states,
-      settings: settings ?? {
-        syncIntervalMinutes: 60,
-        enableScanSubscription: true,
-      },
       inProgress: this.activeJob === "sync",
+      activeJob: this.activeJob,
+      settings: {
+        syncIntervalMinutes: settings?.syncIntervalMinutes ?? 60,
+        enableScanSubscription: settings?.enableScanSubscription ?? true,
+      },
+      instances: instances.map((instance) => ({
+        instanceId: instance.id,
+        name: instance.name,
+        enabled: instance.enabled,
+        states: rows
+          .filter((row) => row.stashInstanceId === instance.id)
+          .sort((a, b) => order(a.entityType) - order(b.entityType))
+          .map(
+            (row): SyncEntityState => ({
+              entityType: row.entityType,
+              lastFullSyncTimestamp: row.lastFullSyncTimestamp,
+              lastIncrementalSyncTimestamp: row.lastIncrementalSyncTimestamp,
+              lastFullSyncActual: row.lastFullSyncActual?.toISOString() ?? null,
+              lastIncrementalSyncActual:
+                row.lastIncrementalSyncActual?.toISOString() ?? null,
+              lastSyncCount: row.lastSyncCount,
+              lastSyncDurationMs: row.lastSyncDurationMs,
+              lastError: row.lastError,
+              totalEntities: row.totalEntities,
+            })
+          ),
+      })),
     };
   }
 

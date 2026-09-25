@@ -1279,7 +1279,7 @@ model GroupTag {
 // Sync state tracking per entity type
 model SyncState {
   id              Int     @id @default(autoincrement())
-  stashInstanceId String?
+  stashInstanceId String
   entityType      String // 'scene', 'performer', etc.
 
   // Raw timestamp strings from Stash's maxUpdatedAt - stored exactly as received

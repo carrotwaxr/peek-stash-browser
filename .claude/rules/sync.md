@@ -28,6 +28,7 @@ paths:
 
 - Stash stores sub-second timestamps but returns whole seconds. `formatTimestampForStash` appends `.999`; without it, incremental sync fetches the entities from the last second again, forever.
 - The "since" time is the newer of the last full and the last incremental sync (`getMostRecentSyncTime`).
+- `SyncState` is one row per instance and type (`stashInstanceId` NOT NULL). Every reader names its instances: `getSyncStatus` lists the configured instances (`GET /api/sync/status`, no address), and `isReady`, `getLastRefreshed` and the startup sync's full-or-smart choice read only the enabled instances' rows.
 
 ## Cleanup
 
@@ -52,7 +53,7 @@ Merges (`MergeReconciliationService`): the scene branch soft-deletes first and t
 ## Stash requests
 
 - Every `StashClient` request fails after `STASH_REQUEST_TIMEOUT_MS` (120 s) with `StashRequestTimeoutError`. While a job holds the lock, `getStashClient` returns `client.withSignal(abortController.signal)`, so `abort()` ends a request in flight with `Error("Sync aborted")`. A test's stub client used under the lock needs `withSignal` (returning the stub).
-- Report a Stash failure through `describeStashError`: a graphql-request `ClientError`'s own message embeds the query and its variables.
+- Report a Stash failure through `describeStashError`: a graphql-request `ClientError`'s own message embeds the query and its variables. It gives the operation, each GraphQL message with its `path` (the field that broke) and the HTTP status.
 
 ## Raw SQL
 
