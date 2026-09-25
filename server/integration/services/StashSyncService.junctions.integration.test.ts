@@ -1027,6 +1027,14 @@ function stubStashLibrary(
       );
       return Promise.resolve({ findImages: { count, images: ids } });
     },
+    // The collection hierarchy, read on every sync: none
+    findGroupRelations: () =>
+      Promise.resolve({
+        findGroups: {
+          count: lib.group.length,
+          groups: lib.group.map(({ id }) => ({ id, sub_groups: [] })),
+        },
+      }),
     withSignal: () => client,
   });
   const realGet = stashInstanceManager.get.bind(stashInstanceManager);

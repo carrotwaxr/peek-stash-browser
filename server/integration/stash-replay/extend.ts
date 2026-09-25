@@ -12,6 +12,13 @@
  * - EXTENSION_IMAGES images with P* as their only performer and no gallery
  * - EXTENSION_CLIPS markers on the first recorded scene, with the lowest
  *   tag as their primary tag
+ * - around G (see below), a collection hierarchy the test Stash lacks: a
+ *   group containing G, described "Box set", when G is in none, and a group
+ *   inside G, described "Part 2", when G contains none, numbered after the
+ *   recorded groups. Each link is listed from both ends (a group's
+ *   sub_groups and the other's containing_groups) with the same
+ *   description. Live runs skip the test of it (GroupRelations.integration),
+ *   since the test Stash has no sub-groups.
  * An added entity has every recorded field set and one of each list.
  *
  * The recorded entities stay as they are, but for one rule, "relations the
@@ -47,6 +54,12 @@ export const EXTENDED_SCENE_COUNT = 36;
 export const EXTENSION_IMAGES = 3;
 export const EXTENSION_CLIPS = 2;
 
+/** The descriptions of the links the extension adds around G. */
+const GROUP_LINK_DESCRIPTIONS = {
+  containing: "Box set",
+  sub: "Part 2",
+};
+
 /** The values of the first extension scene: E2E's rated, captioned scene. */
 export const RATED_SCENE_VALUES = {
   rating100: 80,
@@ -66,6 +79,23 @@ function refIds(entity: GraphEntity, field: string): string[] {
 
 function links(...ids: Array<string | undefined>): RelationShape[] {
   return ids.flatMap((id) => (id === undefined ? [] : [{ id }]));
+}
+
+/** A link to a group with a fixed description, as synth.ts serves it. */
+function describedLink(id: string, description: string): RelationShape {
+  return { id, present: ["description"], values: { description } };
+}
+
+/**
+ * The group the tests use (groupWithScenes): the lowest recorded group with
+ * scenes.
+ */
+function groupWithScenes(
+  recorded: Record<EntityType, GraphEntity[]>
+): string | undefined {
+  return recorded.group.find((group) =>
+    recorded.scene.some((scene) => refIds(scene, "groups").includes(group.id))
+  )?.id;
 }
 
 /** The recorded performer with the most scenes, the lowest id on ties. */
@@ -289,6 +319,42 @@ export function extend(shape: RecordedShape): LibraryGraph {
   }
 
   addIntegrationRelations(recorded, entities);
+
+  // The collection hierarchy around G: P contains G, and G contains C
+  const group = entities.group.find(
+    (each) => each.id === groupWithScenes(recorded)
+  );
+  if (group !== undefined) {
+    const groupId = nextId(entities.group);
+    const containing = group.relations.containing_groups ?? [];
+    const sub = group.relations.sub_groups ?? [];
+    if (containing.length === 0) {
+      const id = groupId();
+      const description = GROUP_LINK_DESCRIPTIONS.containing;
+      entities.group.push(
+        added("group", id, {
+          studio: [],
+          tags: [],
+          containing_groups: [],
+          sub_groups: [describedLink(group.id, description)],
+        })
+      );
+      group.relations.containing_groups = [describedLink(id, description)];
+    }
+    if (sub.length === 0) {
+      const id = groupId();
+      const description = GROUP_LINK_DESCRIPTIONS.sub;
+      entities.group.push(
+        added("group", id, {
+          studio: [],
+          tags: [],
+          containing_groups: [describedLink(group.id, description)],
+          sub_groups: [],
+        })
+      );
+      group.relations.sub_groups = [describedLink(id, description)];
+    }
+  }
 
   return { fields, entities };
 }

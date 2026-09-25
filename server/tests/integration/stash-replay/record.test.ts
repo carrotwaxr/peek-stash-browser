@@ -35,7 +35,7 @@ const TEST_ENV = {
   shellEnv: {},
 };
 const SUMMARY =
-  "shape: 16 scenes, 11 performers, 10 studios, 11 tags, 1 group, 2 galleries, 6 images, 0 clips; library after extension: 36 scenes, 11 performers, 10 studios, 11 tags, 1 group, 2 galleries, 9 images, 2 clips; guard: clean (0 source strings exempt as repo text)";
+  "shape: 16 scenes, 11 performers, 10 studios, 11 tags, 1 group, 2 galleries, 6 images, 0 clips; library after extension: 36 scenes, 11 performers, 10 studios, 11 tags, 3 groups, 2 galleries, 9 images, 2 clips; guard: clean (0 source strings exempt as repo text)";
 const FILES = ["library.json", "manifest.ts", "shape.json"];
 
 let dir = "";

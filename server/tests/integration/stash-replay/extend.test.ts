@@ -205,6 +205,9 @@ describe("extend", () => {
     revertedStudio.relations.tags = [];
     entity(reverted, "gallery", "100002").relations.studio = [];
     entity(reverted, "scene", "100010").relations.groups = [];
+    // G's links to the added groups (the collection hierarchy)
+    entity(reverted, "group", "100001").relations.containing_groups = [];
+    entity(reverted, "group", "100001").relations.sub_groups = [];
     for (const type of ENTITY_TYPES) {
       expect(
         reverted.entities[type].filter((each) => each.extension !== true),
@@ -225,6 +228,86 @@ describe("extend", () => {
     expect(studioEntity.gallery_count).toBe(1);
     const tag = must(library.entities.tag.find((each) => each.id === "100001"));
     expect(tag.studio_count).toBe(1);
+    expect(testEntities).toEqual(OWNER_TEST_ENTITIES);
+  });
+
+  it("the extension adds a group containing G and a group inside G, with descriptions", () => {
+    const shape = testStashShape();
+    const graph = extend(shape);
+
+    // G, the group the tests use, is in no hierarchy in the test Stash
+    expect(ids(entity(shape, "group", "100001"), "containing_groups")).toEqual(
+      []
+    );
+    expect(ids(entity(shape, "group", "100001"), "sub_groups")).toEqual([]);
+
+    // P (100002) holds G as its sub-group, and C (100003) sits inside G,
+    // numbered after the recorded group; each link carries its description
+    // on both ends
+    expect(
+      graph.entities.group.map((each) => [each.id, each.extension === true])
+    ).toEqual([
+      ["100001", false],
+      ["100002", true],
+      ["100003", true],
+    ]);
+    const boxSet = {
+      present: ["description"],
+      values: { description: "Box set" },
+    };
+    const part2 = {
+      present: ["description"],
+      values: { description: "Part 2" },
+    };
+    const g = entity(graph, "group", "100001");
+    const p = entity(graph, "group", "100002");
+    const c = entity(graph, "group", "100003");
+    expect(p.relations.sub_groups).toEqual([{ id: "100001", ...boxSet }]);
+    expect(p.relations.containing_groups).toEqual([]);
+    expect(g.relations.containing_groups).toEqual([
+      { id: "100002", ...boxSet },
+    ]);
+    expect(g.relations.sub_groups).toEqual([{ id: "100003", ...part2 }]);
+    expect(c.relations.containing_groups).toEqual([{ id: "100001", ...part2 }]);
+    expect(c.relations.sub_groups).toEqual([]);
+    // Every recorded field set, and no studio or tag
+    for (const added of [p, c]) {
+      expect(added.present).toEqual(
+        arrayContaining([
+          "aliases",
+          "back_image_path",
+          "date",
+          "director",
+          "duration",
+          "name",
+          "rating100",
+          "synopsis",
+        ])
+      );
+      expect(ids(added, "studio")).toEqual([]);
+      expect(ids(added, "tags")).toEqual([]);
+    }
+
+    // The replay serves each link from both ends, and the picks stay
+    const { library, testEntities } = buildFixture(shape);
+    const served = (id: string) =>
+      must(library.entities.group.find((each) => each.id === id));
+    const link = (id: string, description: string) => ({
+      group: { id, name: `Group ${id}` },
+      description,
+    });
+    expect(served("100002").sub_groups).toEqual([link("100001", "Box set")]);
+    expect(served("100001").containing_groups).toEqual([
+      link("100002", "Box set"),
+    ]);
+    expect(served("100001").sub_groups).toEqual([link("100003", "Part 2")]);
+    expect(served("100003").containing_groups).toEqual([
+      link("100001", "Part 2"),
+    ]);
+    expect(served("100001").sub_group_count).toBe(1);
+    expect(served("100002").sub_group_count).toBe(1);
+    expect(served("100003").sub_group_count).toBe(0);
+    expect(served("100002").scene_count).toBe(0);
     expect(testEntities).toEqual(OWNER_TEST_ENTITIES);
   });
 });

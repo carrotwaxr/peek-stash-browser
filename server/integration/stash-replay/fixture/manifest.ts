@@ -9,7 +9,7 @@ export const FIXTURE_LIBRARY = {
   performers: 11,
   studios: 10,
   tags: 11,
-  groups: 1,
+  groups: 3,
   galleries: 2,
   images: 9,
   clips: 2,

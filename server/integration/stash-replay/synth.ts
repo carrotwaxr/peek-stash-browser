@@ -51,6 +51,8 @@ export const FIXTURE_ID_OFFSET = 100000;
 export interface RelationShape {
   id: string;
   present?: string[];
+  /** Link values extend.ts fixes, used as they are (a sub-group's description). */
+  values?: Record<string, unknown>;
 }
 
 /**
@@ -868,6 +870,9 @@ class Synth {
     const rule = own(LINK_RULES, `${type}.${relationName}.${field}`);
     if (rule === undefined) {
       throw noRule(type, `${relationName}.${field}`, selected);
+    }
+    if (link.values !== undefined && field in link.values) {
+      return link.values[field];
     }
     const present =
       (link.present ?? []).includes(field) ||

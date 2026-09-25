@@ -5384,6 +5384,13 @@ export type FindGroupIDsQueryVariables = Exact<{
 
 export type FindGroupIDsQuery = { findGroups: { count: number, groups: Array<{ id: string }> } };
 
+export type FindGroupRelationsQueryVariables = Exact<{
+  filter?: InputMaybe<FindFilterType>;
+}>;
+
+
+export type FindGroupRelationsQuery = { findGroups: { count: number, groups: Array<{ id: string, sub_groups: Array<{ description?: string | null, group: { id: string } }> }> } };
+
 export type FindGroupsQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
   ids?: InputMaybe<Array<Scalars['ID']['input']> | Scalars['ID']['input']>;
@@ -5922,6 +5929,22 @@ export const FindGroupIDsDocument = gql`
     count
     groups {
       id
+    }
+  }
+}
+    `;
+export const FindGroupRelationsDocument = gql`
+    query FindGroupRelations($filter: FindFilterType) {
+  findGroups(filter: $filter) {
+    count
+    groups {
+      id
+      sub_groups {
+        group {
+          id
+        }
+        description
+      }
     }
   }
 }
@@ -7088,6 +7111,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     FindGroupIDs(variables?: FindGroupIDsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindGroupIDsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<FindGroupIDsQuery>({ document: FindGroupIDsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindGroupIDs', 'query', variables);
+    },
+    FindGroupRelations(variables?: FindGroupRelationsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindGroupRelationsQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<FindGroupRelationsQuery>({ document: FindGroupRelationsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindGroupRelations', 'query', variables);
     },
     FindGroups(variables?: FindGroupsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindGroupsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<FindGroupsQuery>({ document: FindGroupsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindGroups', 'query', variables);

@@ -193,6 +193,10 @@ export class StashClient {
     this.sdk.FindGroups(...args);
   findGroup = (...args: Parameters<ReturnType<typeof getSdk>["FindGroup"]>) =>
     this.sdk.FindGroup(...args);
+  /** Every group's sub-groups in Stash's order: the collection hierarchy */
+  findGroupRelations = (
+    ...args: Parameters<ReturnType<typeof getSdk>["FindGroupRelations"]>
+  ) => this.sdk.FindGroupRelations(...args);
   findGalleries = (
     ...args: Parameters<ReturnType<typeof getSdk>["FindGalleries"]>
   ) => this.sdk.FindGalleries(...args);
