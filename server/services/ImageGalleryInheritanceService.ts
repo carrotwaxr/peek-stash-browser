@@ -3,6 +3,48 @@ import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /**
+ * Gallery performers for every live image in a live gallery that has no
+ * performers of its own. "Has none" is a correlated NOT EXISTS, which looks
+ * up each image's rows in the junction's (imageId, imageInstanceId) index;
+ * a row-value NOT IN over the junction scanned it whole as a list, and the
+ * two inserts held the write lock for 50 to 90 s each on a 260k-image
+ * library.
+ */
+export const INHERIT_PERFORMERS_SQL = `
+  INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId)
+  SELECT DISTINCT ig.imageId, ig.imageInstanceId, gp.performerId, gp.performerInstanceId
+  FROM ImageGallery ig
+  JOIN GalleryPerformer gp ON gp.galleryId = ig.galleryId AND gp.galleryInstanceId = ig.galleryInstanceId
+  JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
+  JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+  WHERE i.deletedAt IS NULL
+    AND g.deletedAt IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ImagePerformer x
+      WHERE x.imageId = ig.imageId AND x.imageInstanceId = ig.imageInstanceId
+    )
+`;
+
+/**
+ * Gallery tags for every live image in a live gallery that has no tags of
+ * its own, probed by index as in INHERIT_PERFORMERS_SQL.
+ */
+export const INHERIT_TAGS_SQL = `
+  INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId)
+  SELECT DISTINCT ig.imageId, ig.imageInstanceId, gt.tagId, gt.tagInstanceId
+  FROM ImageGallery ig
+  JOIN GalleryTag gt ON gt.galleryId = ig.galleryId AND gt.galleryInstanceId = ig.galleryInstanceId
+  JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
+  JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+  WHERE i.deletedAt IS NULL
+    AND g.deletedAt IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ImageTag x
+      WHERE x.imageId = ig.imageId AND x.imageInstanceId = ig.imageInstanceId
+    )
+`;
+
+/**
  * ImageGalleryInheritanceService
  *
  * Applies gallery metadata to images that have none.
@@ -174,22 +216,8 @@ class ImageGalleryInheritanceService {
   private async inheritPerformers(): Promise<void> {
     // Insert gallery performers for images that have no performers
     // Junction tables now have composite keys: (imageId, imageInstanceId, performerId, performerInstanceId)
-    await dbWrite(
-      "galleryInheritance.performers",
-      () =>
-        prisma.$executeRaw`
-      INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId)
-      SELECT DISTINCT ig.imageId, ig.imageInstanceId, gp.performerId, gp.performerInstanceId
-      FROM ImageGallery ig
-      JOIN GalleryPerformer gp ON gp.galleryId = ig.galleryId AND gp.galleryInstanceId = ig.galleryInstanceId
-      JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
-      JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-      WHERE i.deletedAt IS NULL
-        AND g.deletedAt IS NULL
-        AND (ig.imageId, ig.imageInstanceId) NOT IN (
-          SELECT DISTINCT imageId, imageInstanceId FROM ImagePerformer
-        )
-    `
+    await dbWrite("galleryInheritance.performers", () =>
+      prisma.$executeRawUnsafe(INHERIT_PERFORMERS_SQL)
     );
   }
 
@@ -200,22 +228,8 @@ class ImageGalleryInheritanceService {
   private async inheritTags(): Promise<void> {
     // Insert gallery tags for images that have no tags
     // Junction tables now have composite keys: (imageId, imageInstanceId, tagId, tagInstanceId)
-    await dbWrite(
-      "galleryInheritance.tags",
-      () =>
-        prisma.$executeRaw`
-      INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId)
-      SELECT DISTINCT ig.imageId, ig.imageInstanceId, gt.tagId, gt.tagInstanceId
-      FROM ImageGallery ig
-      JOIN GalleryTag gt ON gt.galleryId = ig.galleryId AND gt.galleryInstanceId = ig.galleryInstanceId
-      JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
-      JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
-      WHERE i.deletedAt IS NULL
-        AND g.deletedAt IS NULL
-        AND (ig.imageId, ig.imageInstanceId) NOT IN (
-          SELECT DISTINCT imageId, imageInstanceId FROM ImageTag
-        )
-    `
+    await dbWrite("galleryInheritance.tags", () =>
+      prisma.$executeRawUnsafe(INHERIT_TAGS_SQL)
     );
   }
 }
