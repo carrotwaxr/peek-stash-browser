@@ -60,6 +60,7 @@ When multiple instances are configured, each user can choose which instances the
 - Check or uncheck instances to control which content appears in your library
 - At least one instance must remain selected
 - New users see all instances by default
+- If an admin disables every instance a user selected, that user sees all the enabled instances instead, with their restrictions and hidden items applied, until they choose again
 
 !!! tip "First-Login Setup"
     When a new user logs in and multiple instances are available, they're prompted to select which instances they want to see.

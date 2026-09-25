@@ -26,6 +26,7 @@ import {
   SyncBusyError,
   stashSyncService,
 } from "../../services/StashSyncService.js";
+import { must } from "../../tests/helpers/must.js";
 import { UNREACHABLE_STASH_URL } from "../helpers/stashTarget.js";
 
 // Skip if no database connection (matches other integration tests).
@@ -381,8 +382,17 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
       data: { username: USERNAME_B_ONLY, password: "not-a-real-hash" },
     });
     const bOnlyUserId = bOnly.id;
-    await prisma.userStashInstance.create({
-      data: { userId: bOnlyUserId, instanceId: B },
+    // B and an enabled instance: a selection naming no enabled instance
+    // would mean every enabled one, A too once enabled
+    const enabled = await prisma.stashInstance.findFirst({
+      where: { enabled: true, id: { notIn: [A, B] } },
+      select: { id: true },
+    });
+    await prisma.userStashInstance.createMany({
+      data: [B, must(enabled, "an enabled instance").id].map((instanceId) => ({
+        userId: bOnlyUserId,
+        instanceId,
+      })),
     });
     const recompute = vi
       .spyOn(exclusionComputationService, "recomputeForUser")
@@ -392,7 +402,7 @@ describeWithDb("StashSyncService.deleteInstance (integration)", () => {
     await purged;
 
     const recomputed = recompute.mock.calls.map((call) => call[0]);
-    // The test user selected A and B; the other user only B
+    // The test user selected A and B; the other user B and an enabled one
     expect(recomputed).toContain(userId);
     expect(recomputed).not.toContain(bOnlyUserId);
     // Once each

@@ -6,6 +6,10 @@
  * Key behaviors:
  * - Users with no UserStashInstance records see ALL enabled instances (default)
  * - Users with UserStashInstance records see only those selected instances
+ *   that are enabled
+ * - A selection only narrows (invariant 11): when none of its instances is
+ *   enabled (the admin disabled them), the user sees every enabled instance,
+ *   as with no selection, rather than nothing
  * - Disabled instances are never shown regardless of user selection
  * - An instance on its first sync (no firstSyncedAt) is shown to nobody,
  *   admins included, until that sync's exclusion recompute has run; the
@@ -21,9 +25,10 @@ interface ScopedInstance {
 }
 
 /**
- * The enabled instances, narrowed to the user's selection when there is one
- * (an empty selection means all enabled), each with whether its first sync
- * has finished (`firstSyncedAt`). Throws on a database error.
+ * The enabled instances, narrowed to the user's selection when it names an
+ * enabled one (an empty selection, or one whose instances are all disabled,
+ * means all enabled), each with whether its first sync has finished
+ * (`firstSyncedAt`). Throws on a database error.
  */
 async function readScope(userId: number): Promise<ScopedInstance[]> {
   // Get all enabled instances
@@ -41,19 +46,20 @@ async function readScope(userId: number): Promise<ScopedInstance[]> {
     select: { instanceId: true },
   });
 
-  const ids =
-    userSelections.length === 0
-      ? // No selections = see all enabled instances
-        Array.from(enabled.keys())
-      : // Filter user selections to only enabled instances
-        userSelections.map((s) => s.instanceId).filter((id) => enabled.has(id));
+  // The selection narrowed to the enabled instances; when that leaves none
+  // (no selection, or every selected instance disabled), every enabled one
+  const selected = userSelections
+    .map((s) => s.instanceId)
+    .filter((id) => enabled.has(id));
+  const ids = selected.length > 0 ? selected : Array.from(enabled.keys());
   return ids.map((id) => ({ id, ready: enabled.get(id) === true }));
 }
 
 /**
  * A user's instance scope: the enabled instances, narrowed to the user's
- * selection when there is one (an empty selection means all enabled),
- * whether or not their first sync has finished. The exclusion compute runs
+ * selection when it names an enabled one (an empty selection, or one whose
+ * instances are all disabled, means all enabled), whether or not their
+ * first sync has finished. The exclusion compute runs
  * over it, so an instance's exclusion rows exist before it shows, and a
  * sync recomputes the users whose scope holds a changed instance. Throws on
  * a database error.
@@ -66,11 +72,12 @@ export async function getUserInstanceScope(userId: number): Promise<string[]> {
 }
 
 /**
- * The users whose scope includes `instanceId` whatever its enabled state:
- * those with no selection (every enabled instance) and those whose
- * selection names it. These are the users a change to the instance's
- * enabled state, or its deletion, affects; read them before a deletion
- * removes the selection rows.
+ * The users whose scope includes `instanceId` in either of its enabled
+ * states: those whose selection names it, and those whose selection names
+ * no other enabled instance (no selection at all, or only disabled ones),
+ * who see every enabled instance. These are the users a change to the
+ * instance's enabled state, or its deletion, affects; read them before a
+ * deletion removes the selection rows.
  *
  * @param instanceId - The instance ID
  * @returns The user IDs, in id order
@@ -79,8 +86,12 @@ export async function getUsersSelecting(instanceId: string): Promise<number[]> {
   const users = await prisma.user.findMany({
     where: {
       OR: [
-        { stashInstances: { none: {} } },
         { stashInstances: { some: { instanceId } } },
+        {
+          stashInstances: {
+            none: { instance: { enabled: true, id: { not: instanceId } } },
+          },
+        },
       ],
     },
     select: { id: true },

@@ -393,4 +393,95 @@ describeReplay("an instance on its first sync", () => {
       after.restrictedScenes
     );
   }, 120_000);
+
+  it("a restricted user whose only selected instance is disabled sees every enabled instance, filtered by their restrictions, not the 503", async () => {
+    // Always-hide the test library's restrictable tag on the primary
+    // instance, and select only NEW: nothing of the primary is in scope
+    const user = await createApiUser("readiness_it_disabled_only", PASSWORD);
+    createdUsers.push(user.id);
+    await prisma.userContentRestriction.create({
+      data: {
+        userId: user.id,
+        entityType: "tags",
+        mode: "EXCLUDE",
+        entityIds: JSON.stringify([
+          `${TEST_ENTITIES.restrictableTag}:${primaryId}`,
+        ]),
+      },
+    });
+    await prisma.userStashInstance.create({
+      data: { userId: user.id, instanceId: NEW },
+    });
+    await exclusionComputationService.recomputeForUser(user.id);
+    const primaryExclusions = () =>
+      prisma.userExcludedEntity.findMany({
+        where: { userId: user.id, entityType: "scene", instanceId: primaryId },
+        select: { entityId: true },
+      });
+    expect(await primaryExclusions()).toEqual([]);
+
+    const disabled = await adminClient.put(`/api/setup/stash-instance/${NEW}`, {
+      enabled: false,
+    });
+    try {
+      expect(disabled.status).toBe(200);
+      const res = await user.client.post<{
+        findScenes: { count: number; scenes: ListedScene[] };
+        ready?: unknown;
+      }>("/api/library/scenes", { filter: { per_page: 1000 } });
+      expect({ status: res.status, ready: res.data.ready }).toEqual({
+        status: 200,
+        ready: undefined,
+      });
+
+      // The disable recomputed the user over the instances they now see
+      const excluded = new Set(
+        (await primaryExclusions()).map((row) => row.entityId)
+      );
+      const tagged = await prisma.sceneTag.findMany({
+        where: {
+          tagId: TEST_ENTITIES.restrictableTag,
+          tagInstanceId: primaryId,
+          sceneInstanceId: primaryId,
+        },
+        select: { sceneId: true },
+      });
+      expect(tagged.length).toBeGreaterThan(0);
+      for (const { sceneId: id } of tagged) {
+        expect(excluded.has(id), `scene ${id} is tagged`).toBe(true);
+      }
+
+      // Everything the admin sees (every enabled instance) but the user's
+      // excluded scenes
+      const admin = await adminClient.post<{
+        findScenes: { count: number; scenes: ListedScene[] };
+      }>("/api/library/scenes", { filter: { per_page: 1000 } });
+      expect(admin.status).toBe(200);
+      expect(admin.data.findScenes.count).toBeLessThanOrEqual(1000);
+      const rows = await prisma.userExcludedEntity.findMany({
+        where: { userId: user.id, entityType: "scene" },
+        select: { entityId: true, instanceId: true },
+      });
+      const isExcluded = (scene: ListedScene) =>
+        rows.some(
+          (row) =>
+            row.entityId === scene.id &&
+            (row.instanceId === "" || row.instanceId === scene.instanceId)
+        );
+      const key = (scene: ListedScene) => `${scene.id}:${scene.instanceId}`;
+      const listed = res.data.findScenes.scenes.map(key).sort();
+      expect(listed.some((k) => k.endsWith(`:${primaryId}`))).toBe(true);
+      expect(listed.some((k) => k.endsWith(`:${NEW}`))).toBe(false);
+      expect(listed).toEqual(
+        admin.data.findScenes.scenes
+          .filter((scene) => !isExcluded(scene))
+          .map(key)
+          .sort()
+      );
+    } finally {
+      await adminClient.put(`/api/setup/stash-instance/${NEW}`, {
+        enabled: true,
+      });
+    }
+  }, 120_000);
 });
