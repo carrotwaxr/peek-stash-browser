@@ -8,6 +8,7 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "../types/index.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import {
   entityRefKey,
   resolveVisibleApartFromOwnHides,
@@ -84,25 +85,27 @@ class UserHiddenEntityService {
     entityId: string,
     instanceId: string = ""
   ): Promise<void> {
-    await prisma.userHiddenEntity.upsert({
-      where: {
-        userId_entityType_entityId_instanceId: {
+    await dbWrite("hide.add", () =>
+      prisma.userHiddenEntity.upsert({
+        where: {
+          userId_entityType_entityId_instanceId: {
+            userId,
+            entityType,
+            entityId,
+            instanceId,
+          },
+        },
+        create: {
           userId,
           entityType,
           entityId,
           instanceId,
         },
-      },
-      create: {
-        userId,
-        entityType,
-        entityId,
-        instanceId,
-      },
-      update: {
-        hiddenAt: new Date(), // Update timestamp if re-hiding
-      },
-    });
+        update: {
+          hiddenAt: new Date(), // Update timestamp if re-hiding
+        },
+      })
+    );
 
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);
@@ -125,14 +128,16 @@ class UserHiddenEntityService {
     entityId: string,
     instanceId: string = ""
   ): Promise<void> {
-    await prisma.userHiddenEntity.deleteMany({
-      where: {
-        userId,
-        entityType,
-        entityId,
-        instanceId,
-      },
-    });
+    await dbWrite("hide.remove", () =>
+      prisma.userHiddenEntity.deleteMany({
+        where: {
+          userId,
+          entityType,
+          entityId,
+          instanceId,
+        },
+      })
+    );
 
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);
@@ -156,7 +161,9 @@ class UserHiddenEntityService {
       where.entityType = entityType;
     }
 
-    const result = await prisma.userHiddenEntity.deleteMany({ where });
+    const result = await dbWrite("hide.removeAll", () =>
+      prisma.userHiddenEntity.deleteMany({ where })
+    );
 
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);

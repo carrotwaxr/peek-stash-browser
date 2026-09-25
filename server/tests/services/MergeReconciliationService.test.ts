@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "../../prisma/singleton.js";
 import { mergeReconciliationService } from "../../services/MergeReconciliationService.js";
+import { DB_WRITE_TX } from "../../utils/dbWrite.js";
 import { objectContaining } from "../helpers/matchers.js";
 import { must } from "../helpers/must.js";
 import { partialRow } from "../helpers/prismaMock.js";
@@ -320,10 +321,10 @@ describe("MergeReconciliationService", () => {
           }),
         })
       );
-      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-        maxWait: 10_000,
-        timeout: 10_000,
-      });
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        DB_WRITE_TX
+      );
       // The target's find and the merge write, both inside the transaction
       expect(inTransaction).toEqual({ finds: 1, writes: 1 });
     });

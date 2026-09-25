@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -254,12 +255,14 @@ class SceneTagInheritanceService {
         .map(() => "WHEN id = ? AND stashInstanceId = ? THEN ?")
         .join(" ");
       const pairs = updates.map(() => "(?, ?)").join(", ");
-      await prisma.$executeRawUnsafe(
-        `UPDATE StashScene
+      await dbWrite("inheritance.sceneTags", () =>
+        prisma.$executeRawUnsafe(
+          `UPDATE StashScene
          SET inheritedTagIds = CASE ${cases} END
          WHERE (id, stashInstanceId) IN (VALUES ${pairs})`,
-        ...updates.flatMap((u) => [u.id, u.instanceId, u.inheritedTagIds]),
-        ...updates.flatMap((u) => [u.id, u.instanceId])
+          ...updates.flatMap((u) => [u.id, u.instanceId, u.inheritedTagIds]),
+          ...updates.flatMap((u) => [u.id, u.instanceId])
+        )
       );
     }
   }

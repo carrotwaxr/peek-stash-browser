@@ -1,4 +1,5 @@
 import prisma from "../prisma/singleton.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -63,7 +64,10 @@ class EntityImageCountService {
     // 1. Finds all distinct (imageId, performerId) pairs from direct + inherited relations
     // 2. Groups by performerId to get counts
     // 3. Updates all performers in one batch
-    await prisma.$executeRaw`
+    await dbWrite(
+      "imageCounts.performers",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashPerformer
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
@@ -85,7 +89,8 @@ class EntityImageCountService {
           AND combined.performerInstanceId = StashPerformer.stashInstanceId
       ), 0)
       WHERE StashPerformer.deletedAt IS NULL
-    `;
+    `
+    );
 
     const duration = Date.now() - startTime;
     logger.debug(`Performer image counts rebuilt via SQL in ${duration}ms`);
@@ -98,7 +103,10 @@ class EntityImageCountService {
   private async rebuildStudioImageCountsSQL(): Promise<void> {
     const startTime = Date.now();
 
-    await prisma.$executeRaw`
+    await dbWrite(
+      "imageCounts.studios",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashStudio
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
@@ -119,7 +127,8 @@ class EntityImageCountService {
           AND combined.studioInstanceId = StashStudio.stashInstanceId
       ), 0)
       WHERE StashStudio.deletedAt IS NULL
-    `;
+    `
+    );
 
     const duration = Date.now() - startTime;
     logger.debug(`Studio image counts rebuilt via SQL in ${duration}ms`);
@@ -132,7 +141,10 @@ class EntityImageCountService {
   private async rebuildTagImageCountsSQL(): Promise<void> {
     const startTime = Date.now();
 
-    await prisma.$executeRaw`
+    await dbWrite(
+      "imageCounts.tags",
+      () =>
+        prisma.$executeRaw`
       UPDATE StashTag
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
@@ -154,7 +166,8 @@ class EntityImageCountService {
           AND combined.tagInstanceId = StashTag.stashInstanceId
       ), 0)
       WHERE StashTag.deletedAt IS NULL
-    `;
+    `
+    );
 
     const duration = Date.now() - startTime;
     logger.debug(`Tag image counts rebuilt via SQL in ${duration}ms`);

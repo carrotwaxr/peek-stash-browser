@@ -15,6 +15,7 @@ import type {
   UpdateStudioRatingParams,
   UpdateTagRatingParams,
 } from "../types/api/index.js";
+import { dbWrite } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -103,22 +104,24 @@ export async function updateSceneRating(
     }
 
     // Upsert rating record in Peek DB
-    const sceneRating = await prisma.sceneRating.upsert({
-      where: {
-        userId_instanceId_sceneId: { userId, instanceId, sceneId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        sceneId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const sceneRating = await dbWrite("rating.scene", () =>
+      prisma.sceneRating.upsert({
+        where: {
+          userId_instanceId_sceneId: { userId, instanceId, sceneId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          sceneId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Scene rating updated", { userId, sceneId, rating, favorite });
 
@@ -224,22 +227,24 @@ export async function updatePerformerRating(
     }
 
     // Upsert rating record in Peek DB
-    const performerRating = await prisma.performerRating.upsert({
-      where: {
-        userId_instanceId_performerId: { userId, instanceId, performerId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        performerId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const performerRating = await dbWrite("rating.performer", () =>
+      prisma.performerRating.upsert({
+        where: {
+          userId_instanceId_performerId: { userId, instanceId, performerId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          performerId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Performer rating updated", {
       userId,
@@ -351,22 +356,24 @@ export async function updateStudioRating(
     }
 
     // Upsert rating record in Peek DB
-    const studioRating = await prisma.studioRating.upsert({
-      where: {
-        userId_instanceId_studioId: { userId, instanceId, studioId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        studioId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const studioRating = await dbWrite("rating.studio", () =>
+      prisma.studioRating.upsert({
+        where: {
+          userId_instanceId_studioId: { userId, instanceId, studioId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          studioId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Studio rating updated", {
       userId,
@@ -473,22 +480,24 @@ export async function updateTagRating(
     }
 
     // Upsert rating record in Peek DB
-    const tagRating = await prisma.tagRating.upsert({
-      where: {
-        userId_instanceId_tagId: { userId, instanceId, tagId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        tagId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const tagRating = await dbWrite("rating.tag", () =>
+      prisma.tagRating.upsert({
+        where: {
+          userId_instanceId_tagId: { userId, instanceId, tagId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          tagId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Tag rating updated", { userId, tagId, rating, favorite });
 
@@ -593,22 +602,24 @@ export async function updateGalleryRating(
     }
 
     // Upsert rating record in Peek DB
-    const galleryRating = await prisma.galleryRating.upsert({
-      where: {
-        userId_instanceId_galleryId: { userId, instanceId, galleryId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        galleryId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const galleryRating = await dbWrite("rating.gallery", () =>
+      prisma.galleryRating.upsert({
+        where: {
+          userId_instanceId_galleryId: { userId, instanceId, galleryId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          galleryId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Gallery rating updated", {
       userId,
@@ -713,22 +724,24 @@ export async function updateGroupRating(
     }
 
     // Upsert rating record in Peek DB
-    const groupRating = await prisma.groupRating.upsert({
-      where: {
-        userId_instanceId_groupId: { userId, instanceId, groupId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        groupId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const groupRating = await dbWrite("rating.group", () =>
+      prisma.groupRating.upsert({
+        where: {
+          userId_instanceId_groupId: { userId, instanceId, groupId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          groupId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Group rating updated", { userId, groupId, rating, favorite });
 
@@ -828,22 +841,24 @@ export async function updateImageRating(
     }
 
     // Upsert rating record in Peek DB
-    const imageRating = await prisma.imageRating.upsert({
-      where: {
-        userId_instanceId_imageId: { userId, instanceId, imageId },
-      },
-      update: {
-        ...(rating !== undefined && { rating }),
-        ...(favorite !== undefined && { favorite }),
-      },
-      create: {
-        userId,
-        instanceId,
-        imageId,
-        rating: rating ?? null,
-        favorite: favorite ?? false,
-      },
-    });
+    const imageRating = await dbWrite("rating.image", () =>
+      prisma.imageRating.upsert({
+        where: {
+          userId_instanceId_imageId: { userId, instanceId, imageId },
+        },
+        update: {
+          ...(rating !== undefined && { rating }),
+          ...(favorite !== undefined && { favorite }),
+        },
+        create: {
+          userId,
+          instanceId,
+          imageId,
+          rating: rating ?? null,
+          favorite: favorite ?? false,
+        },
+      })
+    );
 
     logger.info("Image rating updated", { userId, imageId, rating, favorite });
 

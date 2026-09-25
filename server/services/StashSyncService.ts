@@ -36,6 +36,7 @@ import type {
   TagFilterType,
 } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
+import { dbWrite, dbWriteTransaction } from "../utils/dbWrite.js";
 import { logger } from "../utils/logger.js";
 import { summarizeStashStreams } from "../utils/sceneStreams.js";
 import { clipPreviewProber } from "./ClipPreviewProber.js";
@@ -1341,7 +1342,8 @@ class StashSyncService extends EventEmitter {
     // and includes extended timeout for large libraries
     const sceneIdList = sceneIds.map((id) => `'${this.escape(id)}'`).join(",");
     const escapedInstanceId = this.escape(instanceId);
-    await prisma.$transaction(
+    await dbWriteTransaction(
+      "sync.scenes.junctions",
       async (tx) => {
         await tx.$executeRawUnsafe(
           `DELETE FROM ScenePerformer WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
@@ -1786,7 +1788,8 @@ class StashSyncService extends EventEmitter {
           // transaction is kept short - it only computes the delete-set; reconciliation and the
           // soft-delete writes happen outside, after the safety threshold check below.
           const sceneBatchSize = 500;
-          const scenesToDelete = await prisma.$transaction(
+          const scenesToDelete = await dbWriteTransaction(
+            "sync.cleanup.scenes",
             async (tx) => {
               await tx.$executeRawUnsafe(
                 `CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`
@@ -3396,7 +3399,8 @@ class StashSyncService extends EventEmitter {
     // and includes extended timeout for large libraries
     const imageIdList = imageIds.map((id) => `'${this.escape(id)}'`).join(",");
     const escapedInstanceId = this.escape(instanceId);
-    await prisma.$transaction(
+    await dbWriteTransaction(
+      "sync.images.junctions",
       async (tx) => {
         await tx.$executeRawUnsafe(
           `DELETE FROM ImagePerformer WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
@@ -3894,7 +3898,10 @@ class StashSyncService extends EventEmitter {
       // 2. Groups by tagId to get counts
       // 3. Updates all tags in one batch
       // Note: Joins include instanceId matching for multi-instance support
-      await prisma.$executeRaw`
+      await dbWrite(
+        "sync.tagSceneCounts",
+        () =>
+          prisma.$executeRaw`
         UPDATE StashTag
         SET sceneCountViaPerformers = COALESCE((
           SELECT COUNT(DISTINCT sp.sceneId)
@@ -3904,7 +3911,8 @@ class StashSyncService extends EventEmitter {
           WHERE pt.tagId = StashTag.id AND pt.tagInstanceId = StashTag.stashInstanceId
         ), 0)
         WHERE StashTag.deletedAt IS NULL
-      `;
+      `
+      );
 
       const duration = Date.now() - startTime;
       logger.info(`Tag scene counts via performers computed in ${duration}ms`);
@@ -3930,7 +3938,8 @@ class StashSyncService extends EventEmitter {
       // Delete in order to respect foreign key constraints
       // Junction tables first, then entities
       // Uses interactive transaction for extended timeout support
-      await prisma.$transaction(
+      await dbWriteTransaction(
+        "sync.clearInstance",
         async (tx) => {
           // Junction tables (depend on entity primary keys)
           await tx.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;

@@ -36,6 +36,7 @@ import type {
   UpdatePlaylistSharesResponse,
 } from "../types/api/index.js";
 import type { NormalizedScene } from "../types/index.js";
+import { dbWrite, dbWriteBatch } from "../utils/dbWrite.js";
 import {
   getEntityInstanceId,
   getEntityInstanceIds,
@@ -719,14 +720,16 @@ export const addSceneToPlaylist = async (
         ? (playlist.items[0] as (typeof playlist.items)[number]).position + 1
         : 0;
 
-    const item = await prisma.playlistItem.create({
-      data: {
-        playlistId,
-        instanceId,
-        sceneId,
-        position: nextPosition,
-      },
-    });
+    const item = await dbWrite("playlist.addItem", () =>
+      prisma.playlistItem.create({
+        data: {
+          playlistId,
+          instanceId,
+          sceneId,
+          position: nextPosition,
+        },
+      })
+    );
 
     res.status(201).json({ item });
   } catch (error) {
@@ -776,15 +779,17 @@ export const removeSceneFromPlaylist = async (
     const instanceId = await getEntityInstanceId("scene", sceneId);
 
     // Delete the item
-    await prisma.playlistItem.delete({
-      where: {
-        playlistId_instanceId_sceneId: {
-          playlistId,
-          instanceId,
-          sceneId,
+    await dbWrite("playlist.removeItem", () =>
+      prisma.playlistItem.delete({
+        where: {
+          playlistId_instanceId_sceneId: {
+            playlistId,
+            instanceId,
+            sceneId,
+          },
         },
-      },
-    });
+      })
+    );
 
     res.json({ success: true, message: "Scene removed from playlist" });
   } catch (error) {
@@ -840,8 +845,9 @@ export const reorderPlaylist = async (
     const sceneIds = items.map((item) => item.sceneId);
     const instanceIdMap = await getEntityInstanceIds("scene", sceneIds);
 
-    // Update positions in a transaction
-    await prisma.$transaction(
+    // Update every position in one batch
+    await dbWriteBatch(
+      "playlist.reorder",
       items.map((item) => {
         const instanceId = instanceIdMap.get(item.sceneId);
         if (!instanceId) {
@@ -990,7 +996,7 @@ export const updatePlaylistShares = async (
     }
 
     // Replace all shares with new set
-    await prisma.$transaction([
+    await dbWriteBatch("playlist.shares", [
       prisma.playlistShare.deleteMany({ where: { playlistId } }),
       ...groupIds.map((groupId) =>
         prisma.playlistShare.create({
