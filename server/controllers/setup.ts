@@ -4,7 +4,10 @@ import { StashClient } from "../graphql/StashClient.js";
 import { generateToken, setTokenCookie } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
-import { stashSyncService } from "../services/StashSyncService.js";
+import {
+  SyncBusyError,
+  stashSyncService,
+} from "../services/StashSyncService.js";
 import type {
   ApiErrorResponse,
   CarouselPreference,
@@ -798,26 +801,31 @@ export const deleteStashInstance = async (
       }
     }
 
-    // Clear all cached data for this instance before deleting
-    logger.info("Clearing cached data for instance before deletion...");
-    await stashSyncService.clearInstanceData(id);
-
-    // Delete the instance (cascades to UserStashInstance)
-    await prisma.stashInstance.delete({
-      where: { id },
-    });
+    // Deletes the instance row and every user's rows for it, reloads the
+    // instance manager, then removes the cached library in the background
+    try {
+      await stashSyncService.deleteInstance(id);
+    } catch (error) {
+      if (error instanceof SyncBusyError) {
+        res.status(409).json({
+          error:
+            error.job === "sync"
+              ? "A sync is running. Wait for it to finish or abort it under Server Configuration → Sync status, then delete again."
+              : "Peek is still removing a deleted instance's cached library. Delete again once it has finished.",
+        });
+        return;
+      }
+      throw error;
+    }
 
     logger.info("Stash instance deleted", {
       instanceId: existing.id,
       instanceName: existing.name,
     });
 
-    // Reload the StashInstanceManager
-    await stashInstanceManager.reload();
-
     res.json({
       success: true,
-      message: `Stash instance "${existing.name}" deleted`,
+      message: `Stash instance "${existing.name}" deleted; its cached library is being removed.`,
     });
   } catch (error) {
     logger.error("Failed to delete Stash instance", { error });

@@ -18,6 +18,8 @@ import {
   updateStashInstance,
 } from "../../controllers/setup.js";
 import prisma from "../../prisma/singleton.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
 import { logger } from "../../utils/logger.js";
 import {
   malformed,
@@ -63,11 +65,20 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
   },
 }));
 
-// Mock StashSyncService
+// Mock StashSyncService; the controller maps SyncBusyError to 409
+const { SyncBusyError } = vi.hoisted(() => ({
+  SyncBusyError: class SyncBusyError extends Error {
+    constructor(readonly job: "sync" | "instance-delete") {
+      super("Sync already in progress");
+      this.name = "SyncBusyError";
+    }
+  },
+}));
 vi.mock("../../services/StashSyncService.js", () => ({
+  SyncBusyError,
   stashSyncService: {
     fullSync: vi.fn().mockResolvedValue(undefined),
-    clearInstanceData: vi.fn().mockResolvedValue(undefined),
+    deleteInstance: vi.fn(),
   },
 }));
 
@@ -79,6 +90,7 @@ vi.mock("bcryptjs", () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma, true);
+const mockSync = vi.mocked(stashSyncService, true);
 
 describe("Setup Controller", () => {
   beforeEach(() => {
@@ -511,6 +523,7 @@ describe("Setup Controller", () => {
         })
       );
       mockPrisma.stashInstance.count.mockResolvedValue(2);
+      mockSync.deleteInstance.mockResolvedValue({ purged: Promise.resolve() });
 
       const res = resFor(deleteStashInstance);
       await deleteStashInstance(
@@ -518,10 +531,54 @@ describe("Setup Controller", () => {
         res
       );
 
-      expect(res._getOkBody().success).toBe(true);
-      expect(mockPrisma.stashInstance.delete).toHaveBeenCalledWith({
-        where: { id: "inst-b" },
+      expect(res._getOkBody()).toEqual({
+        success: true,
+        message:
+          'Stash instance "Secondary" deleted; its cached library is being removed.',
       });
+      expect(mockSync.deleteInstance).toHaveBeenCalledWith("inst-b");
+    });
+
+    it("deleteStashInstance answers 409 and deletes nothing while a sync runs", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({ id: "inst-b", name: "Secondary" })
+      );
+      mockPrisma.stashInstance.count.mockResolvedValue(2);
+      mockSync.deleteInstance.mockRejectedValue(new SyncBusyError("sync"));
+
+      const res = resFor(deleteStashInstance);
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res._getErrorBody().error).toBe(
+        "A sync is running. Wait for it to finish or abort it under Server Configuration → Sync status, then delete again."
+      );
+      expect(mockPrisma.stashInstance.delete).not.toHaveBeenCalled();
+      expect(vi.mocked(stashInstanceManager).reload).not.toHaveBeenCalled();
+    });
+
+    it("answers 409 while another deleted instance's library is being removed", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({ id: "inst-b", name: "Secondary" })
+      );
+      mockPrisma.stashInstance.count.mockResolvedValue(2);
+      mockSync.deleteInstance.mockRejectedValue(
+        new SyncBusyError("instance-delete")
+      );
+
+      const res = resFor(deleteStashInstance);
+      await deleteStashInstance(
+        reqFor(deleteStashInstance, { params: { id: "inst-b" } }),
+        res
+      );
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res._getErrorBody().error).toBe(
+        "Peek is still removing a deleted instance's cached library. Delete again once it has finished."
+      );
     });
 
     it("returns 404 when instance does not exist", async () => {

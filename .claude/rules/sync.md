@@ -38,6 +38,14 @@ paths:
 
 Keep all three when changing cleanup. The other entity types lack the ratio guard so far.
 
+## Deleting an instance
+
+- Lock: the service runs one job at a time, `activeJob` (`"sync"` or `"instance-delete"`). `isSyncing()` is true while either holds it; `getSyncStatus().inProgress` only for a sync. `deleteInstance` throws `SyncBusyError` when the lock is held, and `deleteStashInstance` answers 409.
+- Instance row first: one `dbWriteBatch` deletes the `StashInstance` row (`UserStashInstance` cascades), its `SyncState`, every user's own rows for it (history, the seven rating tables, image views, playlist entries, hides, entity downloads, merge records with it on either side) and the derived stats and rankings; rows with `instanceId = ''` stay. Then `stashInstanceManager.reload()`, and the request is answered.
+- Cascade: the cached library goes afterwards, still under the lock. Junction rows go by their composite `ON DELETE CASCADE` keys; never delete a junction by a bare entity id, which removes the same id's rows on every instance.
+- Chunked purge: `purgeInstanceCache` deletes 1,000 rows per `dbWrite` unit, `UserExcludedEntity` first (by id, since it has no `instanceId` index), then the eight entity tables, clips to tags, then `SyncState`. It checks the abort flag before every chunk and stops there.
+- Startup sweep: `purgeUnknownInstanceCaches`, called by `initializeCache` before the scheduler starts, purges every instance id in the eight tables or `SyncState` without a `StashInstance` row, so a failed or aborted purge finishes at the next start. It does nothing when no instance exists.
+
 ## Raw SQL
 
 Several junction writes build SQL with `this.escape()` and string interpolation. Keep the escaping when touching them, and use `?` parameters in new code.
