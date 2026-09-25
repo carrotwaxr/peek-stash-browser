@@ -101,9 +101,6 @@
     }
   },
   "controllers/proxy.ts": {
-    "@typescript-eslint/no-unnecessary-condition": {
-      "count": 4
-    },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 2
     }

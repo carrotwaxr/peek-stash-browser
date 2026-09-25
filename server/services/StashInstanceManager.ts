@@ -4,6 +4,29 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
 /**
+ * A request named a Stash instance that is not loaded: disabled, deleted or
+ * never configured. Media from it is not found (invariant 11: a disabled
+ * instance never shows).
+ */
+export class UnknownInstanceError extends Error {
+  constructor(readonly instanceId: string) {
+    super(`Stash instance not found: ${instanceId}`);
+    this.name = "UnknownInstanceError";
+  }
+}
+
+/** Where the media proxies reach a Stash instance. */
+export interface StashCredentials {
+  /** The instance's URL without `/graphql` */
+  baseUrl: string;
+  apiKey: string;
+}
+
+function credentialsOf(config: StashInstance): StashCredentials {
+  return { baseUrl: config.url.replace("/graphql", ""), apiKey: config.apiKey };
+}
+
+/**
  * Manages Stash server instance connections.
  *
  * Supports multiple Stash instances for aggregated library view.
@@ -179,6 +202,31 @@ class StashInstanceManager {
       id: c.id,
       name: c.name,
     }));
+  }
+
+  /**
+   * The instance a request is served from: the one it names, or the
+   * highest-priority enabled instance when it names none. Every id is an
+   * ordinary id, "default" included (the owner's instance has that id).
+   * Throws when no instance is named and none is configured.
+   */
+  resolveInstanceId(instanceId?: string): string {
+    return instanceId ?? this.getDefaultConfig().id;
+  }
+
+  /**
+   * The base URL and API key of the instance a request is served from (see
+   * resolveInstanceId). A named instance that is not loaded (disabled or
+   * deleted) throws UnknownInstanceError; no instance named and none
+   * configured throws "No Stash instance configured".
+   */
+  getCredentials(instanceId?: string): StashCredentials {
+    if (instanceId === undefined) {
+      return credentialsOf(this.getDefaultConfig());
+    }
+    const config = this.configs.get(instanceId);
+    if (!config) throw new UnknownInstanceError(instanceId);
+    return credentialsOf(config);
   }
 
   /**

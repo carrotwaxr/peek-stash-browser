@@ -5,7 +5,11 @@ import type {
 import type { Response } from "express";
 import prisma from "../prisma/singleton.js";
 import { canUserAccessEntity } from "../services/EntityAccessService.js";
-import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import {
+  type StashCredentials,
+  UnknownInstanceError,
+  stashInstanceManager,
+} from "../services/StashInstanceManager.js";
 import type { ApiErrorResponse } from "../types/api/common.js";
 import type { TypedAuthRequest, TypedResponse } from "../types/api/express.js";
 import { privateCacheControl } from "../utils/cacheControl.js";
@@ -29,33 +33,36 @@ import {
 import { pipeResponseToClient } from "../utils/streamProxy.js";
 
 /**
- * Get credentials for a specific Stash instance
- * @param instanceId - Optional instance ID. If not provided, uses default instance.
- * @returns Object with baseUrl and apiKey
+ * The address and key of the instance to serve from (the one named, or the
+ * highest-priority enabled instance), or null once the response is sent:
+ * 404 for an instance that is not enabled (disabled or deleted; invariant
+ * 11), 500 when none is named and none is configured.
  */
-function getInstanceCredentials(instanceId?: string): {
-  baseUrl: string;
-  apiKey: string;
-} {
-  // Treat "default" the same as undefined - use the default instance
-  if (instanceId && instanceId !== "default") {
-    const instance = stashInstanceManager.get(instanceId);
-    if (!instance) {
-      throw new Error(`Stash instance not found: ${instanceId}`);
+function credentialsOrRespond(
+  instanceId: string | undefined,
+  res: Response,
+  label: string
+): StashCredentials | null {
+  try {
+    return stashInstanceManager.getCredentials(instanceId);
+  } catch (error) {
+    if (error instanceof UnknownInstanceError) {
+      res.status(404).send("Not found");
+      return null;
     }
-    return {
-      baseUrl: stashInstanceManager.getBaseUrl(instanceId),
-      apiKey: stashInstanceManager.getApiKey(instanceId),
-    };
+    logger.error(`${label} Failed to get Stash instance credentials`, {
+      error,
+      instanceId,
+    });
+    res.status(500).send("Stash configuration missing");
+    return null;
   }
-  // Default instance
-  return {
-    baseUrl: stashInstanceManager.getBaseUrl(),
-    apiKey: stashInstanceManager.getApiKey(),
-  };
 }
 
-/** A present instanceId must be well-formed; absent means the default instance. */
+/**
+ * A present instanceId must be well-formed; absent means the highest-priority
+ * enabled instance.
+ */
 function isValidOptionalInstanceId(
   instanceId: unknown
 ): instanceId is string | undefined {
@@ -304,22 +311,9 @@ export const proxyStashStream = async (
       new URLSearchParams(req.url.split("?")[1] ?? "")
     ).toString();
 
-    // Get Stash instance configuration
-    let stashBaseUrl: string;
-    let apiKey: string;
-
-    try {
-      const creds = getInstanceCredentials(instanceId);
-      stashBaseUrl = creds.baseUrl;
-      apiKey = creds.apiKey;
-    } catch (error) {
-      logger.error("[PROXY] Failed to get Stash instance credentials", {
-        error,
-        instanceId,
-      });
-      res.status(500).send("Stash not configured");
-      return;
-    }
+    const creds = credentialsOrRespond(instanceId, res, "[PROXY]");
+    if (!creds) return;
+    const { baseUrl: stashBaseUrl, apiKey } = creds;
 
     const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${fullStreamPath}${queryString ? "?" + queryString : ""}`;
 
@@ -495,22 +489,9 @@ export const getCaption = async (
       `[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId ?? "(not specified)"}`
     );
 
-    // Get Stash instance configuration
-    let stashUrl: string;
-    let apiKey: string;
-
-    try {
-      const creds = getInstanceCredentials(instanceId);
-      stashUrl = creds.baseUrl;
-      apiKey = creds.apiKey;
-    } catch (error) {
-      logger.error("[CAPTION] Failed to get Stash instance credentials", {
-        error,
-        instanceId,
-      });
-      res.status(500).send("Stash configuration missing");
-      return;
-    }
+    const creds = credentialsOrRespond(instanceId, res, "[CAPTION]");
+    if (!creds) return;
+    const { baseUrl: stashUrl, apiKey } = creds;
 
     // Construct Stash caption URL
     const captionUrl = new URL(`${stashUrl}/scene/${sceneId}/caption`);

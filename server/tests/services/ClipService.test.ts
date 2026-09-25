@@ -33,6 +33,30 @@ describe("ClipService", () => {
     });
   });
 
+  describe("transformUrl", () => {
+    it("appends any instance id, `default` included (the owner's instance id)", () => {
+      const path = `/api/proxy/stash?path=${encodeURIComponent("/x")}`;
+
+      expect(clipService["transformUrl"]("/x", "default")).toContain(
+        "&instanceId=default"
+      );
+      expect(clipService["transformUrl"]("/x", "default")).toBe(
+        `${path}&instanceId=default`
+      );
+      expect(clipService["transformUrl"]("/x", "instance-2")).toBe(
+        `${path}&instanceId=instance-2`
+      );
+    });
+
+    it("leaves the instance out when there is none", () => {
+      const path = `/api/proxy/stash?path=${encodeURIComponent("/x")}`;
+
+      expect(clipService["transformUrl"]("/x")).toBe(path);
+      expect(clipService["transformUrl"]("/x", null)).toBe(path);
+      expect(clipService["transformUrl"](null, "default")).toBeNull();
+    });
+  });
+
   describe("screenshot URL transformation", () => {
     it("should transform screenshotPath to proxy URL", async () => {
       const rawClip = {
@@ -63,7 +87,7 @@ describe("ClipService", () => {
 
       expect(clip).not.toBeNull();
       expect(must(clip).screenshotUrl).toBe(
-        `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/42/screenshot")}`
+        `/api/proxy/stash?path=${encodeURIComponent("/scene/1/marker/42/screenshot")}&instanceId=default`
       );
       // Raw screenshotPath should not be exposed
       expect(clip).not.toHaveProperty("screenshotPath");
@@ -100,7 +124,7 @@ describe("ClipService", () => {
       expect(must(clip).screenshotUrl).toBeNull();
     });
 
-    it("should include instanceId in screenshot proxy URL for non-default instances", async () => {
+    it("should include the scene's instanceId in the screenshot proxy URL", async () => {
       const rawClip = {
         id: "marker-3",
         sceneId: "scene-1",

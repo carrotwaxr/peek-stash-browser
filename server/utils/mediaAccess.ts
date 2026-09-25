@@ -11,14 +11,13 @@ import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type { MediaEntity } from "./stashMediaPath.js";
 
 /**
- * The instance a media request is served from: getInstanceCredentials maps a
- * missing instance and "default" to the default instance, so the access
- * check must look at the same one.
+ * The instance a media request is served from, which the access check must
+ * look at: the one it names ("default" is an ordinary id), or the
+ * highest-priority enabled instance when it names none, as the proxies'
+ * `getCredentials` resolves it.
  */
 export function resolveMediaInstanceId(instanceId: string | undefined): string {
-  return instanceId && instanceId !== "default"
-    ? instanceId
-    : stashInstanceManager.getDefaultConfig().id;
+  return stashInstanceManager.resolveInstanceId(instanceId);
 }
 
 /**
