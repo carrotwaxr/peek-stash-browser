@@ -132,6 +132,12 @@ export interface StashInstanceData {
   priority: number;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * When its first sync finished with its users' exclusions computed; null
+   * while it runs (the instance is hidden from every user until then) or
+   * after its URL changed
+   */
+  firstSyncedAt: Date | null;
 }
 
 /**
@@ -188,8 +194,9 @@ export interface UpdateStashInstanceResponse {
   success: true;
   instance: StashInstanceData;
   /**
-   * The re-sync a new URL or API key needs: "started", "queued" to start once
-   * the running sync ends, or "none" (nothing to refetch, or disabled)
+   * The re-sync a new URL or API key needs, or the first sync of an instance
+   * enabled before one ever finished: "started", "queued" to start once the
+   * running sync ends, or "none" (nothing to fetch, or disabled)
    */
   sync: "started" | "queued" | "none";
 }

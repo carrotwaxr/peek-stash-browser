@@ -131,7 +131,7 @@ describe("UserInstanceService", () => {
 
       expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
         where: { enabled: true },
-        select: { id: true },
+        select: { id: true, firstSyncedAt: true },
       });
     });
 
@@ -162,7 +162,7 @@ describe("UserInstanceService", () => {
       ]);
       expect(mockPrisma.stashInstance.findMany).toHaveBeenCalledWith({
         where: { enabled: true },
-        select: { id: true },
+        select: { id: true, firstSyncedAt: true },
       });
     });
 
@@ -176,6 +176,33 @@ describe("UserInstanceService", () => {
         partialRow({ instanceId: "disabled-c" }),
       ]);
 
+      expect(await getUserInstanceScope(1)).toEqual(["instance-b"]);
+    });
+
+    it("getUserAllowedInstanceIds leaves out instances without firstSyncedAt; getUserInstanceScope keeps them", async () => {
+      // instance-b is on its first sync: its users' exclusions are computed
+      // over it (the scope), and nobody sees it yet (allowed)
+      mockPrisma.stashInstance.findMany.mockResolvedValue([
+        partialRow({
+          id: "instance-a",
+          firstSyncedAt: new Date("2026-09-25T10:00:00Z"),
+        }),
+        partialRow({ id: "instance-b", firstSyncedAt: null }),
+      ]);
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual(["instance-a"]);
+      expect(await getUserInstanceScope(1)).toEqual([
+        "instance-a",
+        "instance-b",
+      ]);
+
+      // A selection of the syncing instance alone: nothing to show yet
+      mockPrisma.userStashInstance.findMany.mockResolvedValue([
+        partialRow({ instanceId: "instance-b" }),
+      ]);
+
+      expect(await getUserAllowedInstanceIds(1)).toEqual([]);
       expect(await getUserInstanceScope(1)).toEqual(["instance-b"]);
     });
 

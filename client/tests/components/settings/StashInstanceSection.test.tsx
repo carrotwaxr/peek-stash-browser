@@ -40,6 +40,7 @@ describe("StashInstanceSection", () => {
     enabled: true,
     priority: 0,
     createdAt: "2024-01-01T00:00:00.000Z",
+    firstSyncedAt: "2024-01-01T00:10:00.000Z",
   };
 
   beforeEach(() => {
@@ -316,6 +317,83 @@ describe("StashInstanceSection", () => {
       await waitFor(() => {
         expect(screen.getByText("Primary")).toBeInTheDocument();
       });
+    });
+
+    it("shows the first-sync badge for an instance without firstSyncedAt", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [
+          mockInstance,
+          {
+            ...mockInstance,
+            id: "test-instance-2",
+            name: "New Stash",
+            priority: 1,
+            firstSyncedAt: null,
+          },
+        ],
+      });
+
+      render(<StashInstanceSection />);
+
+      const badge = await screen.findByText(
+        "First sync running, hidden from users"
+      );
+      // Only on the new instance's card
+      expect(
+        screen.getAllByText("First sync running, hidden from users")
+      ).toHaveLength(1);
+      const card = must(
+        screen.getByText("New Stash").closest("div.p-4"),
+        "the new instance's card"
+      );
+      expect(card).toContainElement(badge);
+    });
+
+    it("the first-sync badge goes once the first sync has finished", async () => {
+      const syncing = {
+        ...mockInstance,
+        id: "test-instance-2",
+        name: "New Stash",
+        priority: 1,
+        firstSyncedAt: null,
+      };
+      mockApiGet.mockResolvedValue({ instances: [mockInstance, syncing] });
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        render(<StashInstanceSection />);
+        await screen.findByText("First sync running, hidden from users");
+
+        mockApiGet.mockResolvedValue({
+          instances: [
+            mockInstance,
+            { ...syncing, firstSyncedAt: "2024-01-02T00:00:00.000Z" },
+          ],
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        await waitFor(() => {
+          expect(
+            screen.queryByText("First sync running, hidden from users")
+          ).not.toBeInTheDocument();
+        });
+        // Quietly: the list stayed on screen
+        expect(screen.getByText("New Stash")).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a disabled instance that never synced shows no first-sync badge", async () => {
+      mockApiGet.mockResolvedValue({
+        instances: [{ ...mockInstance, enabled: false, firstSyncedAt: null }],
+      });
+
+      render(<StashInstanceSection />);
+
+      await screen.findByText("Disabled");
+      expect(
+        screen.queryByText("First sync running, hidden from users")
+      ).not.toBeInTheDocument();
     });
   });
 

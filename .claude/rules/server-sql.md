@@ -30,7 +30,7 @@ The query builders run their list and count queries as raw SQL through `prisma.$
 
 - Exclusions: `LEFT JOIN UserExcludedEntity e ON ... AND (e.instanceId = '' OR e.instanceId = x.stashInstanceId)`, with `e.id IS NULL` in the WHERE. Never `NOT IN (...)` with one parameter per excluded entity: users with many exclusions exceed SQLite's bound-parameter limit (Prisma P2029).
 - `x.deletedAt IS NULL`, because sync soft-deletes.
-- The allowed-instances filter (`buildInstanceFilter`, fed by `UserInstanceService.getUserAllowedInstanceIds`). Its `OR stashInstanceId IS NULL` arm is dead, since the column is NOT NULL; don't copy it into new queries.
+- The allowed-instances filter (`buildInstanceFilter`, fed by `UserInstanceService.getUserAllowedInstanceIds`: enabled, selected and past their first sync). Its `OR stashInstanceId IS NULL` arm is dead, since the column is NOT NULL; don't copy it into new queries.
 - BigInt columns such as `fileSize` go through `Number()` in `transformRow`. Row types live in `server/types/internal/queryRows.ts`.
 - The random sort reduces `% 2147483647` at each step to keep large seeds in integer range.
 

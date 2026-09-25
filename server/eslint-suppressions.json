@@ -115,7 +115,7 @@
       "count": 4
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 8
+      "count": 7
     }
   },
   "controllers/stats.ts": {

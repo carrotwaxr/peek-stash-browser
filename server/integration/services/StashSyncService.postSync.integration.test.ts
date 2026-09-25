@@ -1076,6 +1076,8 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
           apiKey: "postsync-it-key",
           enabled: true,
           priority: 960 + priority,
+          // Their libraries are synced (seedLibrary): no first sync pending
+          firstSyncedAt: new Date(),
         },
       });
       await seedLibrary(id);

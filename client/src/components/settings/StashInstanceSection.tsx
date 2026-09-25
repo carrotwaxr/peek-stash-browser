@@ -18,7 +18,20 @@ interface StashInstance {
   enabled: boolean;
   priority: number;
   createdAt: string;
+  /**
+   * Admins only: when its first sync finished with its users' exclusions
+   * computed; null while that sync runs and the instance is hidden from
+   * every user
+   */
+  firstSyncedAt?: string | null;
 }
+
+/** How often the list refreshes while an instance is on its first sync */
+const FIRST_SYNC_POLL_MS = 5_000;
+
+/** An enabled instance whose first sync has not finished: hidden from users */
+const onFirstSync = (instance: StashInstance) =>
+  instance.enabled && instance.firstSyncedAt === null;
 
 interface InstanceFormData {
   name: string;
@@ -88,6 +101,21 @@ const StashInstanceSection = () => {
   useEffect(() => {
     void loadInstances();
   }, [loadInstances]);
+
+  // While an instance is on its first sync, refresh the list quietly (no
+  // spinner, errors ignored) while the page is visible, so its badge goes
+  // when the instance shows
+  const firstSyncRunning = isAdmin && instances.some(onFirstSync);
+  useEffect(() => {
+    if (!firstSyncRunning || showAddForm) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      apiGet<{ instances?: StashInstance[] }>("/setup/stash-instances")
+        .then((data) => setInstances(data.instances ?? []))
+        .catch(() => {});
+    }, FIRST_SYNC_POLL_MS);
+    return () => clearInterval(timer);
+  }, [firstSyncRunning, showAddForm]);
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "N/A";
@@ -587,6 +615,18 @@ const StashInstanceSection = () => {
                       {index === 0 && instances.length > 1 && (
                         <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">
                           Primary
+                        </span>
+                      )}
+                      {isAdmin && onFirstSync(instance) && (
+                        <span
+                          className="px-2 py-0.5 rounded text-xs"
+                          style={{
+                            backgroundColor: "var(--status-info-bg)",
+                            color: "var(--status-info)",
+                          }}
+                          title="Nobody sees this instance's content until its first sync has finished and every user's restrictions cover it"
+                        >
+                          First sync running, hidden from users
                         </span>
                       )}
                     </div>

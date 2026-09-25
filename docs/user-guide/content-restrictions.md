@@ -14,6 +14,7 @@ Content Restrictions allow admins to control what content each user can access. 
 - Restrictions apply to user accounts only. Admin accounts are never restricted (they still see everything except the items they hide themselves), and the editor is not shown for admin accounts
 - Restrictions cascade throughout the UI: restricted items don't appear anywhere, including galleries, images and clip markers
 - This includes opening an item by a direct link and the related items listed in card tooltips
+- A newly added Stash server appears once its first sync has finished and every user's restrictions cover it, so restricted content never shows while it syncs
 - Users cannot see or modify their own restrictions
 
 ---

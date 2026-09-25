@@ -7,26 +7,33 @@
  * - Users with no UserStashInstance records see ALL enabled instances (default)
  * - Users with UserStashInstance records see only those selected instances
  * - Disabled instances are never shown regardless of user selection
+ * - An instance on its first sync (no firstSyncedAt) is shown to nobody,
+ *   admins included, until that sync's exclusion recompute has run; the
+ *   compute itself already covers it (the scope)
  */
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 
+/** An instance in a user's scope, and whether its first sync is done. */
+interface ScopedInstance {
+  id: string;
+  ready: boolean;
+}
+
 /**
- * A user's instance scope: the enabled instances, narrowed to the user's
- * selection when there is one (an empty selection means all enabled). The
- * exclusion compute runs over it, and a sync recomputes the users whose
- * scope holds a changed instance. Throws on a database error.
- *
- * @param userId - The user ID
- * @returns Array of instance IDs in the user's scope
+ * The enabled instances, narrowed to the user's selection when there is one
+ * (an empty selection means all enabled), each with whether its first sync
+ * has finished (`firstSyncedAt`). Throws on a database error.
  */
-export async function getUserInstanceScope(userId: number): Promise<string[]> {
+async function readScope(userId: number): Promise<ScopedInstance[]> {
   // Get all enabled instances
   const enabledInstances = await prisma.stashInstance.findMany({
     where: { enabled: true },
-    select: { id: true },
+    select: { id: true, firstSyncedAt: true },
   });
-  const enabledIds = new Set(enabledInstances.map((i) => i.id));
+  const enabled = new Map(
+    enabledInstances.map((i) => [i.id, i.firstSyncedAt !== null])
+  );
 
   // Get user's instance selections
   const userSelections = await prisma.userStashInstance.findMany({
@@ -34,15 +41,28 @@ export async function getUserInstanceScope(userId: number): Promise<string[]> {
     select: { instanceId: true },
   });
 
-  if (userSelections.length === 0) {
-    // No selections = see all enabled instances
-    return Array.from(enabledIds);
-  }
+  const ids =
+    userSelections.length === 0
+      ? // No selections = see all enabled instances
+        Array.from(enabled.keys())
+      : // Filter user selections to only enabled instances
+        userSelections.map((s) => s.instanceId).filter((id) => enabled.has(id));
+  return ids.map((id) => ({ id, ready: enabled.get(id) === true }));
+}
 
-  // Filter user selections to only enabled instances
-  return userSelections
-    .map((s) => s.instanceId)
-    .filter((id) => enabledIds.has(id));
+/**
+ * A user's instance scope: the enabled instances, narrowed to the user's
+ * selection when there is one (an empty selection means all enabled),
+ * whether or not their first sync has finished. The exclusion compute runs
+ * over it, so an instance's exclusion rows exist before it shows, and a
+ * sync recomputes the users whose scope holds a changed instance. Throws on
+ * a database error.
+ *
+ * @param userId - The user ID
+ * @returns Array of instance IDs in the user's scope
+ */
+export async function getUserInstanceScope(userId: number): Promise<string[]> {
+  return (await readScope(userId)).map((i) => i.id);
 }
 
 /**
@@ -71,7 +91,10 @@ export async function getUsersSelecting(instanceId: string): Promise<number[]> {
 
 /**
  * Get the list of Stash instance IDs that a user should see content from:
- * the user's scope (getUserInstanceScope), or none when it cannot be read.
+ * the user's scope (getUserInstanceScope) without the instances still on
+ * their first sync, or none when it cannot be read. Everything that lists,
+ * counts or serves content filters by it; EntityAccessService's
+ * LIVE_AND_ALLOWED_WHERE applies the same rules in SQL.
  *
  * @param userId - The user ID
  * @returns Array of instance IDs the user should see content from
@@ -80,7 +103,7 @@ export async function getUserAllowedInstanceIds(
   userId: number
 ): Promise<string[]> {
   try {
-    return await getUserInstanceScope(userId);
+    return (await readScope(userId)).filter((i) => i.ready).map((i) => i.id);
   } catch (error) {
     logger.error("Failed to get user allowed instance IDs", {
       userId,

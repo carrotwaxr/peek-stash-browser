@@ -84,6 +84,7 @@ function instance(
     instanceId,
     name,
     enabled: true,
+    firstSyncedAt: "2026-09-20T08:00:00.000Z",
     states: ENTITY_TYPES.map(([type]) =>
       entityState(type, { lastError: errors[type] ?? null })
     ),

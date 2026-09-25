@@ -121,6 +121,8 @@ export async function seedAccessFixture(): Promise<void> {
         name: inst.id,
         url: "http://127.0.0.1:9/graphql",
         apiKey: "fixture-key",
+        // Synced: its content shows (a first-syncing instance does not)
+        firstSyncedAt: new Date(),
       },
     });
   }

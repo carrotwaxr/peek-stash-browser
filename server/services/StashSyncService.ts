@@ -54,7 +54,10 @@ import {
   type ImageCountScope,
   entityImageCountService,
 } from "./EntityImageCountService.js";
-import { exclusionComputationService } from "./ExclusionComputationService.js";
+import {
+  type RecomputeAllResult,
+  exclusionComputationService,
+} from "./ExclusionComputationService.js";
 import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
@@ -1009,6 +1012,13 @@ export interface SyncRunContext {
    * the post-sync steps are done
    */
   fullPasses?: Set<string>;
+  /**
+   * The instances whose type loop ran to the end in this run, in any mode
+   * (a type that failed counts): one on its first sync becomes visible once
+   * the post-sync steps have computed its users' exclusions
+   * (`markFirstSynced`)
+   */
+  synced?: Set<string>;
 }
 
 /**
@@ -2611,6 +2621,7 @@ class StashSyncService extends EventEmitter {
       signal: this.abortController.signal,
       changes: this.takeChanges(),
       fullPasses: new Set(),
+      synced: new Set(),
     };
   }
 
@@ -2621,7 +2632,9 @@ class StashSyncService extends EventEmitter {
    * whole run, and its changes carry into the next run. A full run then
    * records the last full pass of each instance whose type loop ran to the
    * end (`recordFullPasses`); an abort or a failure before that records
-   * none, so the daily pass is still due. The caller holds the lock.
+   * none, so the daily pass is still due. An instance on its first sync
+   * becomes visible within the steps, once its users' exclusions are
+   * computed. The caller holds the lock.
    */
   private async runSync(
     mode: SyncMode,
@@ -2632,7 +2645,10 @@ class StashSyncService extends EventEmitter {
       const results = stashInstanceId
         ? await this.syncInstance(stashInstanceId, mode, run)
         : await this.syncEveryInstance(mode, run);
-      await this.runPostSyncSteps(run.changes, { full: mode === "full" });
+      await this.runPostSyncSteps(run.changes, {
+        full: mode === "full",
+        synced: run.synced,
+      });
       await this.recordFullPasses(run.fullPasses);
       return results;
     } catch (error) {
@@ -2725,8 +2741,11 @@ class StashSyncService extends EventEmitter {
         );
       }
       // Every type was tried (a failed one keeps its lastError and its
-      // watermark): the full pass counts once the run's steps are done
+      // watermark): the full pass counts once the run's steps are done, and
+      // an instance on its first sync shows once they computed its users'
+      // exclusions
       if (mode === "full") run.fullPasses?.add(stashInstanceId);
+      run.synced?.add(stashInstanceId);
 
       // Cleanup deleted entities (detect deletions/merges in Stash), then
       // what linked to them, then the members of the galleries that changed
@@ -2855,7 +2874,8 @@ class StashSyncService extends EventEmitter {
    * The steps after every instance of a run, once. A full pass runs every
    * step whole library and recomputes every user: it is the catch-all for
    * links Stash edits without moving updated_at. Otherwise the change set
-   * decides:
+   * decides, with each instance of the run still on its first sync
+   * (`synced` without `firstSyncedAt`) counted as a change:
    * - images written, even unchanged (their junction rows were rewritten
    *   from Stash), re-apply gallery inheritance, as do changed galleries,
    *   for those images and the changed galleries' images
@@ -2870,18 +2890,25 @@ class StashSyncService extends EventEmitter {
    * User stats and tag counts stay whole library (1.3 s and 0.04 s on the
    * prod copy, and the stats depend on watch history as well as the
    * library).
+   *
+   * Then the run's instances on their first sync become visible
+   * (`markFirstSynced`), each once no recompute of a user who can see it
+   * failed. One whose content matches what Peek holds (a URL changed to the
+   * same Stash) still recomputes its users, so it does not stay hidden.
    */
   private async runPostSyncSteps(
     changes: SyncChangeSet,
-    { full }: { full: boolean }
+    { full, synced }: { full: boolean; synced?: ReadonlySet<string> }
   ): Promise<void> {
+    const firstSyncs = await this.instancesOnFirstSync(synced);
+    let recomputed: RecomputeAllResult | null = null;
     if (full) {
       logger.info("Full sync: running every post-sync step");
       await this.computeSceneTagInheritance();
       await this.applyGalleryInheritance("all");
       await this.rebuildCounts("all");
       logger.info("Sync complete, recomputing user exclusions...");
-      await exclusionComputationService.recomputeAllUsers();
+      recomputed = await exclusionComputationService.recomputeAllUsers();
       logger.info("User exclusions recomputed");
     } else {
       const wroteImages = !changes.written("image").isEmpty();
@@ -2892,7 +2919,16 @@ class StashSyncService extends EventEmitter {
         }
       }
 
-      if (changes.isEmpty()) {
+      if (changes.isEmpty() && firstSyncs.length > 0) {
+        logger.info(
+          "nothing changed; recomputing the users of the instances on their first sync",
+          { instances: firstSyncs }
+        );
+        recomputed =
+          await exclusionComputationService.recomputeUsersForInstances(
+            firstSyncs
+          );
+      } else if (changes.isEmpty()) {
         const pending =
           await exclusionComputationService.usersWithPendingHolds();
         if (pending.length === 0) {
@@ -2916,18 +2952,81 @@ class StashSyncService extends EventEmitter {
           await this.computeSceneTagInheritance(scope);
         }
         await this.rebuildCounts(await this.imageCountScope(changes));
-        const instances = changes.instances();
+        const instances = [...new Set([...changes.instances(), ...firstSyncs])];
         logger.info(
           "Sync complete, recomputing the exclusions of the users on the changed instances...",
           {
             instances,
           }
         );
-        await exclusionComputationService.recomputeUsersForInstances(instances);
+        recomputed =
+          await exclusionComputationService.recomputeUsersForInstances(
+            instances
+          );
         logger.info("User exclusions recomputed");
       }
     }
+    if (recomputed !== null) {
+      await this.markFirstSynced(firstSyncs, recomputed);
+    }
     // D8: PRAGMA optimize goes here, at the end of every run's steps
+  }
+
+  /**
+   * The instances of `synced` still on their first sync (no
+   * `firstSyncedAt`): hidden from everyone until this run's recompute.
+   */
+  private async instancesOnFirstSync(
+    synced: ReadonlySet<string> | undefined
+  ): Promise<string[]> {
+    if (!synced || synced.size === 0) return [];
+    const rows = await prisma.stashInstance.findMany({
+      where: { id: { in: [...synced] }, firstSyncedAt: null },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * Makes `instanceIds` visible (`firstSyncedAt` = now) once `recomputed`
+   * holds no failure of a user whose scope covers the instance (no
+   * selection, or one naming it): that user would otherwise see it without
+   * their exclusions. Such an instance stays hidden, its users are logged,
+   * and the next sync, which counts it as a change again, retries.
+   */
+  private async markFirstSynced(
+    instanceIds: string[],
+    recomputed: RecomputeAllResult
+  ): Promise<void> {
+    if (instanceIds.length === 0) return;
+    const failed = new Set(recomputed.errors.map((e) => e.userId));
+    const ready: string[] = [];
+    for (const instanceId of instanceIds) {
+      const blocking =
+        failed.size === 0
+          ? []
+          : (await getUsersSelecting(instanceId)).filter((id) =>
+              failed.has(id)
+            );
+      if (blocking.length === 0) {
+        ready.push(instanceId);
+      } else {
+        logger.warn(
+          "The instance stays hidden: the exclusions of users who can see it failed to compute; the next sync retries",
+          { instanceId, userIds: blocking }
+        );
+      }
+    }
+    if (ready.length === 0) return;
+    await dbWrite("sync.firstSynced", () =>
+      prisma.stashInstance.updateMany({
+        where: { id: { in: ready }, firstSyncedAt: null },
+        data: { firstSyncedAt: new Date() },
+      })
+    );
+    logger.info("First sync finished: the instances are visible", {
+      instanceIds: ready,
+    });
   }
 
   /**
@@ -4156,7 +4255,7 @@ class StashSyncService extends EventEmitter {
    */
   async getSyncStatus(): Promise<SyncStatusResponse> {
     const instances = await prisma.stashInstance.findMany({
-      select: { id: true, name: true, enabled: true },
+      select: { id: true, name: true, enabled: true, firstSyncedAt: true },
       orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
     });
     const rows = await prisma.syncState.findMany({
@@ -4179,6 +4278,7 @@ class StashSyncService extends EventEmitter {
         instanceId: instance.id,
         name: instance.name,
         enabled: instance.enabled,
+        firstSyncedAt: instance.firstSyncedAt?.toISOString() ?? null,
         states: rows
           .filter((row) => row.stashInstanceId === instance.id)
           .sort((a, b) => order(a.entityType) - order(b.entityType))

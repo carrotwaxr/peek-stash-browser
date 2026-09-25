@@ -604,6 +604,10 @@ model StashInstance {
   // When the instance's last full pass ran to the end (every type tried, the
   // post-sync steps done); the daily full pass reads it
   lastFullPassAt DateTime?
+  // When the instance's first sync finished with its users' exclusions
+  // computed; until then nobody sees it (UserInstanceService). A new URL
+  // sets it back to null
+  firstSyncedAt DateTime?
 
   // Relations
   userSelections UserStashInstance[]

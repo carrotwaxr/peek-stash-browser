@@ -133,6 +133,7 @@ async function seed(): Promise<void> {
       url: `http://${id}.invalid/graphql`,
       apiKey: "x",
       enabled: true,
+      firstSyncedAt: new Date(),
     })),
   });
 

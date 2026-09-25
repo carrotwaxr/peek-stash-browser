@@ -935,6 +935,97 @@ describe("Setup Controller", () => {
       expect(mockExclusions.recomputeUsers).not.toHaveBeenCalled();
     });
 
+    it("a new URL makes the instance new again: firstSyncedAt is cleared; a new API key or name alone keeps it", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: true,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", enabled: true, firstSyncedAt: null })
+      );
+      mockSync.queueFullSync.mockReturnValue("started");
+      const updateData = () => {
+        const { calls } = mockPrisma.stashInstance.update.mock;
+        return must(calls[calls.length - 1], "the last update")[0].data;
+      };
+
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { url: "http://moved:9999/graphql" },
+          params: { id: "inst-a" },
+        }),
+        resFor(updateStashInstance)
+      );
+      expect(updateData()).toEqual({
+        url: "http://moved:9999/graphql",
+        firstSyncedAt: null,
+      });
+      expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith("inst-a");
+
+      // The same URL, a new key, a new name: still the same Stash
+      for (const body of [
+        { url: "http://stash:9999/graphql", apiKey: "new-key" },
+        { name: "Renamed" },
+      ]) {
+        await updateStashInstance(
+          reqFor(updateStashInstance, { body, params: { id: "inst-a" } }),
+          resFor(updateStashInstance)
+        );
+        expect(updateData()).not.toHaveProperty("firstSyncedAt");
+      }
+    });
+
+    it("enabling an instance whose first sync never finished queues that sync", async () => {
+      mockPrisma.stashInstance.findUnique.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          url: "http://stash:9999/graphql",
+          apiKey: "old-key",
+          enabled: false,
+        })
+      );
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({ id: "inst-a", enabled: true, firstSyncedAt: null })
+      );
+      mockSync.queueFullSync.mockReturnValue("queued");
+
+      const res = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: true },
+          params: { id: "inst-a" },
+        }),
+        res
+      );
+
+      expect(res._getOkBody().sync).toBe("queued");
+      expect(mockSync.queueFullSync).toHaveBeenCalledExactlyOnceWith("inst-a");
+
+      // One that has synced before syncs on the schedule, as today
+      mockSync.queueFullSync.mockClear();
+      mockPrisma.stashInstance.update.mockResolvedValue(
+        partialRow({
+          id: "inst-a",
+          enabled: true,
+          firstSyncedAt: new Date("2026-09-20T08:00:00Z"),
+        })
+      );
+      const again = resFor(updateStashInstance);
+      await updateStashInstance(
+        reqFor(updateStashInstance, {
+          body: { enabled: true },
+          params: { id: "inst-a" },
+        }),
+        again
+      );
+      expect(again._getOkBody().sync).toBe("none");
+      expect(mockSync.queueFullSync).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when instance not found", async () => {
       mockPrisma.stashInstance.findUnique.mockResolvedValue(null);
 

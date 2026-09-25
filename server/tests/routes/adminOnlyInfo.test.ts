@@ -37,7 +37,13 @@ const SYNC_STATUS: SyncStatusResponse = {
   activeJob: null,
   settings: { syncIntervalMinutes: 60, enableScanSubscription: true },
   instances: [
-    { instanceId: "inst-a", name: "Main", enabled: true, states: [] },
+    {
+      instanceId: "inst-a",
+      name: "Main",
+      enabled: true,
+      firstSyncedAt: "2026-09-25T10:00:00.000Z",
+      states: [],
+    },
   ],
 };
 

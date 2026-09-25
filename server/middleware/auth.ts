@@ -3,7 +3,7 @@ import type { JsonValue } from "@prisma/client/runtime/library";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
-import { stashEntityService } from "../services/StashEntityService.js";
+import { getUserAllowedInstanceIds } from "../services/UserInstanceService.js";
 import { getJwtSecret } from "../utils/jwtSecret.js";
 import { shouldLogOnce } from "../utils/logThrottle.js";
 import { logger } from "../utils/logger.js";
@@ -267,13 +267,27 @@ export const requireAdmin = (
   next();
 };
 
+/**
+ * Library routes answer 503 `ready: false` while the user has no instance to
+ * show: a fresh install before its first sync, or a user whose every
+ * instance is still on its first sync (an instance shows once that sync's
+ * exclusions are computed). The client retries and shows the sync banner.
+ * It also keeps the routes behind it from reading an empty instance list,
+ * which the query builders take as no instance filter. Runs after
+ * authenticate.
+ */
 export const requireCacheReady = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const isReady = await stashEntityService.isReady();
-  if (!isReady) {
+  const { user } = req as Partial<AuthenticatedRequest>;
+  if (!user) {
+    res.status(401).json({ error: "Access denied. No token provided." });
+    return;
+  }
+  const allowed = await getUserAllowedInstanceIds(user.id);
+  if (allowed.length === 0) {
     res.status(503).json({
       error: "Server is initializing",
       message: "Cache is still loading. Please wait a moment and try again.",
