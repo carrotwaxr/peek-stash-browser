@@ -718,7 +718,7 @@ class ExclusionComputationService {
           swapQueuedMs: t6 - t5 - swapMs,
         },
       };
-    });
+    }, "exclusions.recompute");
 
     // Phase 5: entity stats, outside the swap
     const t7 = Date.now();
@@ -2208,7 +2208,7 @@ class ExclusionComputationService {
       } finally {
         await this.cleanupTempTables(db);
       }
-    });
+    }, "exclusions.addHidden");
 
     logger.info("ExclusionComputationService.addHiddenEntity complete", {
       userId,

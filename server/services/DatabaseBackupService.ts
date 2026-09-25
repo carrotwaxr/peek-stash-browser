@@ -19,6 +19,7 @@ import path from "path";
 import prisma from "../prisma/singleton.js";
 import { getConfigDir } from "../utils/configDir.js";
 import { logger } from "../utils/logger.js";
+import { createSerialQueue } from "../utils/serialQueue.js";
 
 /** How many pre-migration backups are kept; older ones are deleted. */
 export const PRE_MIGRATION_BACKUPS_KEPT = 3;
@@ -241,8 +242,10 @@ async function syncToDisk(file: string): Promise<void> {
 }
 
 class DatabaseBackupService {
-  /** Settles when the manual backup running now does; the next waits. */
-  private manualBackups: Promise<unknown> = Promise.resolve();
+  /** Manual backups, one at a time: each claims its name after the last. */
+  private readonly manualBackups = createSerialQueue({
+    name: "createBackup",
+  });
 
   /** Where backups are written and listed: the config directory. */
   getBackupDir(): string {
@@ -307,9 +310,9 @@ class DatabaseBackupService {
    * one before it; a failed one leaves no file behind.
    */
   createBackup(): Promise<BackupInfo> {
-    const backup = this.manualBackups.then(() => this.writeManualBackup());
-    this.manualBackups = backup.catch(() => undefined);
-    return backup;
+    return this.manualBackups.run("backup.manual", () =>
+      this.writeManualBackup()
+    );
   }
 
   private async writeManualBackup(): Promise<BackupInfo> {

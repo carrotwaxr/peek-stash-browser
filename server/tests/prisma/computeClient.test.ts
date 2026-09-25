@@ -191,6 +191,26 @@ describe("withComputeConnection", () => {
     expect(PrismaClientMock).toHaveBeenCalledTimes(1);
   });
 
+  it("a nested withComputeConnection fails fast instead of hanging", async () => {
+    // The inner call would wait for the outer one, which waits for it
+    const inner = vi.fn((db: unknown) => Promise.resolve(db));
+
+    await expect(
+      withComputeConnection(
+        () => withComputeConnection(inner, "exclusions.addHidden"),
+        "exclusions.recompute"
+      )
+    ).rejects.toThrow(
+      "withComputeConnection re-entered: exclusions.recompute -> exclusions.addHidden"
+    );
+    expect(inner).not.toHaveBeenCalled();
+
+    // The connection is free again
+    await expect(
+      withComputeConnection((db) => Promise.resolve(db))
+    ).resolves.toBeDefined();
+  }, 2_000);
+
   it("releases the connection when the caller throws", async () => {
     await expect(
       withComputeConnection(() => Promise.reject(new Error("compute failed")))
