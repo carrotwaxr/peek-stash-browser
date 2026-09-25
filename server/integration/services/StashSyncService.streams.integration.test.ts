@@ -2,8 +2,7 @@
  * Integration tests for the scene stream choices sync stores (item 1).
  *
  * Stash's sceneStreams URLs carry the Stash API key. Sync keeps only Stash's
- * decisions (Direct, MKV, the resolution tiers) in three small columns and
- * leaves the old `streams` column NULL, clearing any value left from before.
+ * decisions (Direct, MKV, the resolution tiers) in three small columns.
  *
  * Rows are seeded under an isolated stashInstanceId that real sync never
  * touches, and processScenesBatch is called directly with a Stash-shaped
@@ -128,26 +127,10 @@ describeWithDb("StashSyncService scene stream choices (integration)", () => {
       typeof v === "bigint" ? String(v) : v
     );
     expect(json).not.toContain("IT-SECRET");
-    expect(row.streams).toBeNull();
     // SQLite stores 1 and 0; Prisma's raw queries return BOOLEAN columns as
     // true and false.
     expect(Number(row.streamDirect)).toBe(1);
     expect(Number(row.streamMkv)).toBe(0);
     expect(row.streamResolutions).toBe("ORIGINAL,LOW");
-  });
-
-  it("clears a leftover streams value when the scene syncs again", async () => {
-    await syncScene();
-    await prisma.$executeRawUnsafe(
-      "UPDATE StashScene SET streams = ? WHERE id = ? AND stashInstanceId = ?",
-      '[{"url":"x?apikey=OLD"}]',
-      SCENE_ID,
-      TEST_INSTANCE
-    );
-
-    await syncScene();
-
-    const row = await readRow();
-    expect(row.streams).toBeNull();
   });
 });

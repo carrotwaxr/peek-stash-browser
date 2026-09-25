@@ -1459,7 +1459,6 @@ class StashSyncService extends EventEmitter {
       streamDirect = excluded.streamDirect,
       streamMkv = excluded.streamMkv,
       streamResolutions = excluded.streamResolutions,
-      streams = NULL,
       oCounter = excluded.oCounter,
       playCount = excluded.playCount,
       playDuration = excluded.playDuration,

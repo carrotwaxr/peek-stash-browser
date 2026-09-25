@@ -122,6 +122,12 @@ If the message names `carrotwaxr/peek-stash-browser:3.2.2` instead, your databas
 
 ## Version Notes
 
+### Version 3.4.0
+
+**Migration:** Automatic.
+
+- Two columns kept only so that a downgrade to 3.3.6 could still run are removed: the scene stream list, empty since 3.3.7, and the plaintext recovery key. A recovery key that 3.3.6 created after such a downgrade keeps working. Downgrading from this version needs the pre-migration backup Peek takes before upgrading: see [Downgrading](#downgrading).
+
 ### Version 3.3.7
 
 **Migration:** Automatic. Peek no longer runs as root.

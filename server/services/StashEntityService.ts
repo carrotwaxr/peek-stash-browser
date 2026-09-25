@@ -322,7 +322,7 @@ class StashEntityService {
     pathStream: true,
     pathCaption: true,
     captions: true,
-    // Not selected: the stream choices (read by getPlaybackStreams); streams is always NULL
+    // Not selected: the stream choices (read by getPlaybackStreams)
     oCounter: true,
     playCount: true,
     playDuration: true,
