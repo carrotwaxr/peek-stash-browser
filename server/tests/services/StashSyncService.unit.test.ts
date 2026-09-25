@@ -236,6 +236,7 @@ vi.mock("../../services/ClipPreviewProber.js", () => ({
 vi.mock("../../services/SceneTagInheritanceService.js", () => ({
   sceneTagInheritanceService: {
     computeInheritedTags: vi.fn().mockResolvedValue(undefined),
+    scenesInheritingFrom: vi.fn().mockResolvedValue([]),
   },
 }));
 vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({

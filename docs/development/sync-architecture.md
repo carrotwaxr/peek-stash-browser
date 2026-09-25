@@ -150,15 +150,16 @@ Images can inherit metadata from their parent galleries:
 
 ### Scene Tag Inheritance
 
-Scenes inherit tags from their performers and studios:
+Scenes inherit tags from their performers, studio and groups:
 
 - Performer tags propagate to scenes featuring that performer
 - Studio tags propagate to scenes from that studio
-- Stored in `SceneInheritedTag` for efficient querying
+- Group tags propagate to the scenes in that group
+- A scene's own tags are left out; the rest are stored as a JSON array in `StashScene.inheritedTagIds`, which the tag filters and content restrictions read
 
 **Trigger conditions:**
-- Full sync: Always runs
-- Incremental and smart sync: Runs if a scene changed, or a performer's, studio's or group's tag set changed
+- Full sync: Always runs, for every scene
+- Incremental and smart sync: Runs for the scenes the change set reaches: the changed scenes, plus the scenes of every performer, studio and group whose tag set changed or that was soft-deleted. A tag added to a performer in Stash reaches that performer's scenes on the next sync, though the scenes themselves did not change. Past the change set's limit (20,000 of a kind) it runs for every scene
 
 ### Image Count Rebuild
 
@@ -255,10 +256,10 @@ This test will fail if gallery inheritance doesn't run.
 
 **2. Behavioral parity checks:**
 
-The three sync modes run through one per-instance path (`syncInstance`) and one set of post-sync steps (`runInstancePostSteps`), so a step added there runs in every mode. When changing a step's condition, keep the modes equivalent:
+The three sync modes run through one per-instance path (`syncInstance`) and one set of post-sync steps (`runPostSyncSteps`), so a step added there runs in every mode. When changing a step's condition, keep the modes equivalent:
 
 - Gallery inheritance (conditional on images/galleries synced)
-- Scene tag inheritance (conditional on scenes synced)
+- Scene tag inheritance (scoped to the scenes the change set reaches)
 - Image count rebuild
 - User stats rebuild
 - Exclusion recomputation

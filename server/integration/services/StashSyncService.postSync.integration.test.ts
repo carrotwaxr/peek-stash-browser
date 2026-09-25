@@ -25,10 +25,12 @@ import type { StashClient } from "../../graphql/StashClient.js";
 import type {
   FindFilterType,
   FindGalleriesQuery,
+  FindGroupsQuery,
   FindImagesQuery,
   FindPerformersQuery,
   FindSceneMarkersQuery,
   FindScenesCompactQuery,
+  FindStudiosQuery,
   FindTagsQuery,
 } from "../../graphql/generated/graphql.js";
 import prisma from "../../prisma/singleton.js";
@@ -38,7 +40,11 @@ import { exclusionComputationService } from "../../services/ExclusionComputation
 import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
 import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { stashSyncService } from "../../services/StashSyncService.js";
+import {
+  ENTITY_SYNC,
+  stashSyncService,
+} from "../../services/StashSyncService.js";
+import { SCOPE_LIMIT } from "../../services/SyncChangeSet.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
@@ -93,18 +99,22 @@ const SYNC_TYPES = [
 ] as const;
 
 type SyncTag = FindTagsQuery["findTags"]["tags"][number];
+type SyncStudio = FindStudiosQuery["findStudios"]["studios"][number];
 type SyncPerformer =
   FindPerformersQuery["findPerformers"]["performers"][number];
+type SyncGroup = FindGroupsQuery["findGroups"]["groups"][number];
 type SyncGallery = FindGalleriesQuery["findGalleries"]["galleries"][number];
 type SyncScene = FindScenesCompactQuery["findScenes"]["scenes"][number];
 type SyncClip =
   FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
 type SyncImage = FindImagesQuery["findImages"]["images"][number];
 
-/** What one stub Stash holds of each type (studios and groups: none). */
+/** What one stub Stash holds of each type. */
 interface Library {
   tag: SyncTag[];
+  studio: SyncStudio[];
   performer: SyncPerformer[];
+  group: SyncGroup[];
   gallery: SyncGallery[];
   scene: SyncScene[];
   clip: SyncClip[];
@@ -123,9 +133,11 @@ interface StashAnswer {
 
 const dates = { created_at: CREATED_AT, updated_at: UPDATED_AT };
 
-/** The library both instances hold, as Stash returns it. */
+/** The library both instances hold, as Stash returns it (no studio or group). */
 function library(): Library {
   return {
+    studio: [],
+    group: [],
     tag: [
       partialRow<SyncTag>({
         id: ID,
@@ -259,7 +271,10 @@ function stubClient(answer: StashAnswer): StashClient {
       return Promise.resolve({ findTags: { count, tags: items } });
     },
     findStudios: (vars) => {
-      const { count, items } = page([], vars?.filter);
+      const { count, items } = page(
+        rowsFor(answer, "studio", vars?.studio_filter),
+        vars?.filter
+      );
       return Promise.resolve({ findStudios: { count, studios: items } });
     },
     findPerformers: (vars) => {
@@ -272,7 +287,10 @@ function stubClient(answer: StashAnswer): StashClient {
       });
     },
     findGroups: (vars) => {
-      const { count, items } = page([], vars?.filter);
+      const { count, items } = page(
+        rowsFor(answer, "group", vars?.group_filter),
+        vars?.filter
+      );
       return Promise.resolve({ findGroups: { count, groups: items } });
     },
     findGalleries: (vars) => {
@@ -313,16 +331,20 @@ function stubClient(answer: StashAnswer): StashClient {
       const { count, items } = page(ids(answer.all.tag), vars?.filter);
       return Promise.resolve({ findTags: { count, tags: items } });
     },
-    findStudioIDs: () =>
-      Promise.resolve({ findStudios: { count: 0, studios: [] } }),
+    findStudioIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.studio), vars?.filter);
+      return Promise.resolve({ findStudios: { count, studios: items } });
+    },
     findPerformerIDs: (vars) => {
       const { count, items } = page(ids(answer.all.performer), vars?.filter);
       return Promise.resolve({
         findPerformers: { count, performers: items },
       });
     },
-    findGroupIDs: () =>
-      Promise.resolve({ findGroups: { count: 0, groups: [] } }),
+    findGroupIDs: (vars) => {
+      const { count, items } = page(ids(answer.all.group), vars?.filter);
+      return Promise.resolve({ findGroups: { count, groups: items } });
+    },
     findGalleryIDs: (vars) => {
       const { count, items } = page(ids(answer.all.gallery), vars?.filter);
       return Promise.resolve({ findGalleries: { count, galleries: items } });
@@ -547,6 +569,181 @@ async function sceneUpdatedAt(instanceId: string): Promise<string | null> {
   return row?.updatedAt ?? null;
 }
 
+/** What every seeded scene's inheritedTagIds holds until a step rewrites it. */
+const UNTOUCHED = "untouched";
+
+/**
+ * Scene tag inheritance's sources on one instance, beside the library's
+ * performer 1 (no tags) on scene 1: tag 2 (the one Stash adds) and tag 3;
+ * performer 2 on scene 2, studio 1 on scene 3 and group 1 on scene 4, each
+ * carrying tag 3. Every scene's inheritedTagIds holds UNTOUCHED, so a
+ * rewrite shows.
+ */
+async function seedInheritanceSources(instanceId: string): Promise<void> {
+  const base = { stashInstanceId: instanceId, stashUpdatedAt: UPDATED_AT };
+  await prisma.stashTag.createMany({
+    data: [
+      { id: "2", ...base, name: "PostSync IT added tag" },
+      { id: "3", ...base, name: "PostSync IT kept tag" },
+    ],
+  });
+  await prisma.stashPerformer.create({
+    data: { id: "2", ...base, name: "PostSync IT performer 2" },
+  });
+  await prisma.stashStudio.create({
+    data: { id: ID, ...base, name: "PostSync IT studio" },
+  });
+  await prisma.stashGroup.create({
+    data: { id: ID, ...base, name: "PostSync IT group" },
+  });
+  await prisma.stashScene.createMany({
+    data: [
+      { id: "2", ...base, title: "PostSync IT performer 2's scene" },
+      { id: "3", ...base, title: "PostSync IT studio's scene", studioId: ID },
+      { id: "4", ...base, title: "PostSync IT group's scene" },
+    ],
+  });
+  for (const table of TABLES) {
+    if (table === "StashClip") continue;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}" SET "stashUpdatedAt" = ? WHERE "stashInstanceId" = ?`,
+      UPDATED_AT,
+      instanceId
+    );
+  }
+
+  const links: Array<[string, string, string, string, string, string]> = [
+    ["PerformerTag", "performerId", "performerInstanceId", "2", "tagId", "3"],
+    ["StudioTag", "studioId", "studioInstanceId", ID, "tagId", "3"],
+    ["GroupTag", "groupId", "groupInstanceId", ID, "tagId", "3"],
+    ["ScenePerformer", "sceneId", "sceneInstanceId", "2", "performerId", "2"],
+    ["SceneGroup", "sceneId", "sceneInstanceId", "4", "groupId", ID],
+  ];
+  for (const [table, nearId, nearInstance, near, farId, far] of links) {
+    const farInstance = farId.replace(/Id$/, "InstanceId");
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${table}" ("${nearId}", "${nearInstance}", "${farId}", "${farInstance}")
+       VALUES (?, ?, ?, ?)`,
+      near,
+      instanceId,
+      far,
+      instanceId
+    );
+  }
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "StashScene" SET "inheritedTagIds" = ? WHERE "stashInstanceId" = ?`,
+    JSON.stringify([UNTOUCHED]),
+    instanceId
+  );
+}
+
+/** A scene's inheritedTagIds as stored, sorted. */
+async function inheritedTagsOf(
+  instanceId: string,
+  sceneId: string
+): Promise<string[]> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ tagId: string }>>(
+    `SELECT je.value AS tagId
+     FROM "StashScene" s, json_each(COALESCE(s."inheritedTagIds", '[]')) je
+     WHERE s."id" = ? AND s."stashInstanceId" = ?
+     ORDER BY je.value`,
+    sceneId,
+    instanceId
+  );
+  return rows.map((r) => r.tagId);
+}
+
+/** Every seeded scene's inheritedTagIds on `instanceId`, by scene id. */
+async function inheritedTagsByScene(
+  instanceId: string
+): Promise<Record<string, string[]>> {
+  const byScene: Record<string, string[]> = {};
+  for (const sceneId of ["1", "2", "3", "4"]) {
+    byScene[sceneId] = await inheritedTagsOf(instanceId, sceneId);
+  }
+  return byScene;
+}
+
+/** A performer as Stash returns it, by default after an edit on LATER_AT. */
+function performerRow(
+  id: string,
+  tagIds: string[],
+  updatedAt = LATER_AT
+): SyncPerformer {
+  return {
+    ...must(library().performer[0]),
+    id,
+    name: `PostSync IT performer ${id}`,
+    tags: tagIds.map((tagId) => partialRow({ id: tagId })),
+    updated_at: updatedAt,
+  };
+}
+
+/** Studio 1 as Stash returns it, by default after an edit on LATER_AT. */
+function studioRow(tagIds: string[], updatedAt = LATER_AT): SyncStudio {
+  return partialRow<SyncStudio>({
+    id: ID,
+    name: "PostSync IT studio",
+    stash_ids: [],
+    parent_studio: null,
+    tags: tagIds.map((tagId) => partialRow({ id: tagId })),
+    created_at: CREATED_AT,
+    updated_at: updatedAt,
+  });
+}
+
+/** Group 1 as Stash returns it, by default after an edit on LATER_AT. */
+function groupRow(tagIds: string[], updatedAt = LATER_AT): SyncGroup {
+  return partialRow<SyncGroup>({
+    id: ID,
+    name: "PostSync IT group",
+    urls: [],
+    studio: null,
+    tags: tagIds.map((tagId) => partialRow({ id: tagId })),
+    created_at: CREATED_AT,
+    updated_at: updatedAt,
+  });
+}
+
+/**
+ * The library with the inheritance sources, as seedInheritanceSources
+ * stored it: what the smart sync's cleanup lists, so nothing is soft-deleted.
+ */
+function inheritanceLibrary(): Library {
+  const lib = library();
+  const tag = must(lib.tag[0]);
+  const scene = must(lib.scene[0]);
+  const bareScene = (id: string): SyncScene => ({
+    ...scene,
+    id,
+    title: `PostSync IT scene ${id}`,
+    performers: [],
+    tags: [],
+    galleries: [],
+  });
+  return {
+    ...lib,
+    tag: [
+      ...lib.tag,
+      { ...tag, id: "2", name: "PostSync IT added tag" },
+      { ...tag, id: "3", name: "PostSync IT kept tag" },
+    ],
+    studio: [studioRow(["3"], UPDATED_AT)],
+    performer: [...lib.performer, performerRow("2", ["3"], UPDATED_AT)],
+    group: [groupRow(["3"], UPDATED_AT)],
+    scene: [
+      ...lib.scene,
+      { ...bareScene("2"), performers: [partialRow({ id: "2" })] },
+      { ...bareScene("3"), studio: partialRow({ id: ID }) },
+      {
+        ...bareScene("4"),
+        groups: [partialRow({ group: partialRow({ id: ID }) })],
+      },
+    ],
+  };
+}
+
 type Step = MockInstance<() => Promise<void>>;
 
 /** The message texts logged at info level. */
@@ -558,7 +755,9 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
   /** The test's users by role, created per test. */
   let users: { all: number; b: number; ab: number };
   let steps: {
-    sceneTags: Step;
+    sceneTags: MockInstance<
+      typeof sceneTagInheritanceService.computeInheritedTags
+    >;
     gallery: Step;
     imageCounts: Step;
     stats: Step;
@@ -854,4 +1053,121 @@ describeWithDb("StashSyncService post-sync steps (integration)", () => {
     expect(rows).toContainEqual({ entityType: "scene", entityId: ID });
     expect(rows).toContainEqual({ entityType: "image", entityId: ID });
   }, 60_000);
+
+  describe("scene tag inheritance", () => {
+    beforeEach(async () => {
+      for (const id of INSTANCES) await seedInheritanceSources(id);
+      // Real here: the scenes' stored tags are what these tests check
+      steps.sceneTags.mockRestore();
+      steps.sceneTags = vi.spyOn(
+        sceneTagInheritanceService,
+        "computeInheritedTags"
+      );
+    });
+
+    it("a tag added to a performer reaches the inherited tags of that performer's scenes on an incremental sync that fetched no scene", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: inheritanceLibrary(),
+          updated: { performer: [performerRow(ID, ["2"])] },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsOf(PC_A, ID)).toEqual(["2"]);
+    }, 60_000);
+
+    it("the same for a studio and for a group", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: inheritanceLibrary(),
+          updated: {
+            studio: [studioRow(["3", "2"])],
+            group: [groupRow(["3", "2"])],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsOf(PC_A, "3")).toEqual(["2", "3"]);
+      expect(await inheritedTagsOf(PC_A, "4")).toEqual(["2", "3"]);
+    }, 60_000);
+
+    it("a performer, studio or group whose tag set did not change leaves its scenes untouched", async () => {
+      // Performer 1's new tag makes the step run; the others are edited in
+      // Stash with the tags they had
+      stubInstances({
+        [PC_A]: {
+          all: inheritanceLibrary(),
+          updated: {
+            performer: [performerRow(ID, ["2"]), performerRow("2", ["3"])],
+            studio: [studioRow(["3"])],
+            group: [groupRow(["3"])],
+          },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsByScene(PC_A)).toEqual({
+        "1": ["2"],
+        "2": [UNTOUCHED],
+        "3": [UNTOUCHED],
+        "4": [UNTOUCHED],
+      });
+    }, 60_000);
+
+    it("pc-b's scenes with the same ids are untouched by a change on pc-a", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: inheritanceLibrary(),
+          updated: { performer: [performerRow(ID, ["2"])] },
+        },
+      });
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsOf(PC_A, ID)).toEqual(["2"]);
+      expect(await inheritedTagsByScene(PC_B)).toEqual({
+        "1": [UNTOUCHED],
+        "2": [UNTOUCHED],
+        "3": [UNTOUCHED],
+        "4": [UNTOUCHED],
+      });
+    }, 60_000);
+
+    it("past SCOPE_LIMIT the whole library is recomputed", async () => {
+      stubInstances({
+        [PC_A]: {
+          all: inheritanceLibrary(),
+          updated: { performer: [performerRow(ID, ["2"])] },
+        },
+      });
+      // The batch reports more changed tag sets than the change set keeps
+      const performerSpec = ENTITY_SYNC.performer;
+      const processPerformers = performerSpec.processBatch.bind(performerSpec);
+      vi.spyOn(ENTITY_SYNC.performer, "processBatch").mockImplementation(
+        async (items, instanceId, run) => {
+          const changes = await processPerformers(items, instanceId, run);
+          for (let i = 0; i <= SCOPE_LIMIT; i++) {
+            changes.tagSetChanged.push({ id: `c4-${i}`, instanceId });
+          }
+          return changes;
+        }
+      );
+
+      await stashSyncService.smartIncrementalSync(PC_A);
+
+      expect(await inheritedTagsOf(PC_A, ID)).toEqual(["2"]);
+      // pc-b had no change, and its scenes were recomputed all the same
+      expect(await inheritedTagsByScene(PC_B)).toEqual({
+        "1": [],
+        "2": ["3"],
+        "3": ["3"],
+        "4": ["3"],
+      });
+    }, 60_000);
+  });
 });
