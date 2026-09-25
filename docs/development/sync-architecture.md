@@ -96,6 +96,8 @@ Every sync type processes entities in the same dependency order, and runs its cl
 
 This order ensures foreign key relationships are satisfied: a junction row such as a studio's tag has a foreign key to the tag, which must already be stored.
 
+A page can still point at something Peek has not stored: an entity created in Stash after its own type's pages ran, or of a type whose sync failed. Before writing a page, Peek looks up what the page references, fetches the missing entities by id, and writes them first. Then the page is written in one transaction: its rows and their links are replaced together, so a failure midway (a crash, a stop, a database error) leaves the page as it was, and the next sync writes it again. No request to Stash runs while that transaction holds the database's write lock (about 0.1 s for a page of 500 scenes).
+
 **One failing type does not stop the rest.** When Stash (or the database) fails on one type, Peek records the error in that type's sync state, leaves its timestamps where they were so the next sync retries it, and goes on with the next type. The post-sync steps still run. Aborting a sync is different: it stops the whole run, every instance, and records nothing.
 
 ---
@@ -278,8 +280,8 @@ The sync logic is implemented in:
 - `server/services/StashSyncService.ts` - Main sync orchestration:
   - `runSync(mode, instanceId?)`: one sync run, of one instance or every enabled instance in turn, for `fullSync`, `incrementalSync` and `smartIncrementalSync`
   - `syncInstance(instanceId, mode, run)`: one instance's types in `SYNC_ORDER`, then the cleanups and the post-sync steps
-  - `paginate(type, instanceId, { since, ids }, run)`: the one page loop for every type (500 a page): abort checks between pages, progress events, and the newest `updated_at` seen as the next sync's watermark
-  - `ENTITY_SYNC`: each type's spec, `fetchPage` (the Stash query that lists it, narrowed by `updated_at` or by ids, carrying the run's abort signal) and `processBatch` (the writer of one page)
+  - `paginate(type, instanceId, { since, ids }, run)`: the one page loop for every type (500 a page): abort checks between pages, progress events, the page's missing references fetched first (`ensureReferenced`), and the newest `updated_at` seen as the next sync's watermark
+  - `ENTITY_SYNC`: each type's spec, `fetchPage` (the Stash query that lists it, narrowed by `updated_at` or by ids, carrying the run's abort signal), `references` (what a page points at) and `processBatch` (the writer of one page, in one transaction through `writeBatch`)
 - `server/services/ImageGalleryInheritanceService.ts` - Gallery-to-image inheritance
 - `server/services/SceneTagInheritanceService.ts` - Scene tag inheritance
 - `server/services/EntityImageCountService.ts` - Image count denormalization

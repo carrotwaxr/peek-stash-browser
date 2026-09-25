@@ -2,18 +2,17 @@
  * Integration tests for the clip spec's batch writer
  * (ENTITY_SYNC.clip.processBatch), against the real test SQLite database.
  *
- * A page of scene markers is written with a fixed number of statements, all
- * values bound as JSON, whatever the page's size (item 42). Each marker's
- * preview is probed with its own instance's API key (SYNC-03): with the
- * first instance's key, every marker of another instance was stored as not
- * generated and hidden from the Clips page.
+ * A page of scene markers is written in one transaction of a fixed number of
+ * statements, all values bound as JSON, whatever the page's size (item 42).
+ * Each marker's preview is probed with its own instance's API key (SYNC-03):
+ * with the first instance's key, every marker of another instance was stored
+ * as not generated and hidden from the Clips page.
  *
  * Rows are seeded under two made-up instances, cl-a and cl-b, with the same
  * ids. Both are real `StashInstance` rows with their own API keys, loaded
  * into the instance manager, at an unreachable address; the preview probe is
  * stubbed with a fake Stash that answers only its own instance's key.
  */
-import type { Prisma } from "@prisma/client";
 import {
   afterAll,
   afterEach,
@@ -39,6 +38,7 @@ import {
 import { must } from "../../tests/helpers/must.js";
 import { partialRow } from "../../tests/helpers/prismaMock.js";
 import { UNREACHABLE_STASH_URL } from "../helpers/stashTarget.js";
+import { recordStatements } from "../helpers/statementRecorder.js";
 
 // Skip if no database connection (matches other integration tests).
 const describeWithDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -418,54 +418,28 @@ describeWithDb("StashSyncService clip pages (integration)", () => {
         marker(CL_A, String(from + i), { tags: tags("2", "3") })
       );
 
-    /**
-     * Statements one page sends: raw SQL, and the clip model's calls. vi.spyOn
-     * cannot see these methods through Prisma's client proxy (it finds no
-     * descriptor and installs a stub that swallows them), so each wrapper is
-     * installed by hand around the bound original.
-     */
-    const countStatements = async (markers: SyncClip[]): Promise<number> => {
-      let statements = 0;
-      const exec = prisma.$executeRawUnsafe.bind(prisma);
-      const query = prisma.$queryRawUnsafe.bind(prisma);
-      const findMany = prisma.stashClip.findMany.bind(prisma.stashClip);
-      const upsert = prisma.stashClip.upsert.bind(prisma.stashClip);
-      prisma.$executeRawUnsafe = (sql: string, ...values: unknown[]) => {
-        statements++;
-        return exec(sql, ...values);
-      };
-      prisma.$queryRawUnsafe = <T>(sql: string, ...values: unknown[]) => {
-        statements++;
-        return query<T>(sql, ...values);
-      };
-      prisma.stashClip.findMany = <T extends Prisma.StashClipFindManyArgs>(
-        args?: Prisma.SelectSubset<T, Prisma.StashClipFindManyArgs>
-      ) => {
-        statements++;
-        return findMany(args);
-      };
-      prisma.stashClip.upsert = <T extends Prisma.StashClipUpsertArgs>(
-        args: Prisma.SelectSubset<T, Prisma.StashClipUpsertArgs>
-      ) => {
-        statements++;
-        return upsert(args);
-      };
+    /** The statements one page sends, raw SQL and the clip model's calls */
+    const recordPage = async (markers: SyncClip[]) => {
+      const recorder = recordStatements({ stashClip: ["findMany", "upsert"] });
       try {
         await writePage(CL_A, markers);
-        return statements;
       } finally {
-        prisma.$executeRawUnsafe = exec;
-        prisma.$queryRawUnsafe = query;
-        prisma.stashClip.findMany = findMany;
-        prisma.stashClip.upsert = upsert;
+        recorder.restore();
       }
+      return recorder;
     };
 
-    const small = await countStatements(page(5, 1000));
-    const large = await countStatements(page(500, 2000));
+    const small = await recordPage(page(5, 1000));
+    const large = await recordPage(page(500, 2000));
 
-    expect(large).toBeLessThanOrEqual(4);
-    expect(large).toBe(small);
+    // One transaction per page, every statement on it
+    expect(small.transactions()).toBe(1);
+    expect(large.transactions()).toBe(1);
+    expect(small.statements.filter((s) => !s.inTransaction)).toEqual([]);
+    expect(large.statements.filter((s) => !s.inTransaction)).toEqual([]);
+    expect(large.statements.length).toBeGreaterThan(0);
+    expect(large.statements.length).toBeLessThanOrEqual(4);
+    expect(large.statements.length).toBe(small.statements.length);
     // And all 505 were written, with both tags each
     expect(
       await prisma.stashClip.count({ where: { stashInstanceId: CL_A } })
